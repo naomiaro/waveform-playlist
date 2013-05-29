@@ -21,7 +21,7 @@ var Config = function(params) {
 
             UITheme: "default", // bootstrap || jQueryUI || default
 
-            waveColor: '#c7c7c7',
+            waveColor: 'grey',
             progressColor: 'orange',
             loadingColor: 'purple',
             cursorColor: 'green',
