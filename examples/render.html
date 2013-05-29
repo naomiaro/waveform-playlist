@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8 />
+<title>Drawer Tests</title>
+
+<link href="../bootstrap/css/bootstrap.css" rel="stylesheet">
+
+<style>
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  position: relative;
+}
+
+.playlist {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.playlist-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+}
+
+.playlist-time-scale {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  right: 0;
+  height: 30px;
+}
+
+.playlist-time-scale canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  width: 100%;
+}
+
+.playlist-time-scale div {
+  position: absolute;
+}
+
+.playlist-tracks {
+  position: absolute;
+  top: 80px;
+  left: 0;
+  right: 0;
+  bottom: 70px;
+  overflow: auto;
+}
+
+.channel-wrapper {
+  position: relative;
+}
+
+.channel {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+}
+
+.channel canvas {
+  position: absolute;
+  top: 0;
+  padding:0;
+  margin:0;
+}
+
+.playlist-fade {
+  position: absolute;
+  background-color: rgba(0,0,0,0.1);
+  z-index: 1000;
+}
+
+
+.playlist-bottom-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 70px;
+}
+
+.state-select {
+  cursor: text;
+}
+
+.state-shift {
+  cursor: move;
+}
+
+
+</style>
+
+<script type="text/javascript" src="../src/observer/observer.js"></script>
+<script type="text/javascript" src="../src/local_storage.js"></script>
+<script type="text/javascript" src="../src/config.js"></script>
+<script type="text/javascript" src="../src/curves.js"></script>
+<script type="text/javascript" src="../src/track_render.js"></script>
+<script type="text/javascript" src="../src/fades.js"></script>
+<script type="text/javascript" src="../src/playout.js"></script>
+<script type="text/javascript" src="../src/track.js"></script>
+<script type="text/javascript" src="../src/time_scale.js"></script>
+<script type="text/javascript" src="../src/controls.js"></script>
+<script type="text/javascript" src="../src/playlist.js"></script>
+
+</head>
+<body>
+
+  
+
+  <div id=playlist class="playlist">
+    <div id=top-bar class="playlist-top-bar">
+      <div class="btn-toolbar">
+        <div class="btn-group">
+          <a class="btn_open btn btn-inverse btn-small"><i class="icon-folder-open icon-white"></i></a>
+          <a class="btn_save btn btn-inverse btn-small "><i class="icon-ok icon-white"></i></a>
+        </div>
+        <div class="btn-group">
+          <a class="btn_rewind btn btn-success"><i class="icon-fast-backward icon-white"></i></a>
+          <a class="btn_play btn btn-success"><i class="icon-play icon-white"></i></a>
+          <a class="btn_pause btn btn-warning"><i class="icon-pause icon-white"></i></a>
+          <a class="btn_stop btn btn-danger"><i class="icon-stop icon-white"></i></a>
+        </div>
+        <div class="btn-group">
+          <a class="btn_cursor btn btn-mini" data-state="cursor"><i class="icon-headphones"></i></a>
+          <a class="btn_select btn btn-mini" data-state="select"><i class="icon-italic"></i></a>
+          <a class="btn_shift btn btn-mini" data-state="shift"><i class="icon-resize-horizontal"></i></a>
+          <a class="btn_fadein btn btn-mini" data-state="fadein"><i class="icon-arrow-left"></i></a>
+          <a class="btn_fadeout btn btn-mini" data-state="fadeout"><i class="icon-arrow-right"></i></a>
+        </div>
+        <div id="btns_fade" class="btns_fade btn-group">
+          <div class="btn-group fade-in">
+            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="linear">Linear</a>
+            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="logarithmic">Logarithmic</a>
+            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="sCurve">S-Curve</a>
+            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="exponential">Exponential</a>
+          </div>
+          <div class="btn-group fade-out">
+            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="linear">Linear</a>
+            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="logarithmic">Logarithmic</a>
+            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="sCurve">S-Curve</a>
+            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="exponential">Exponential</a>
+          </div>
+        </div>
+        <div id="btns_audio_tools" class="btn-group">
+          <a class="btn_trim_audio btn btn-inverse btn-small disabled">Trim Audio</a>
+        </div>
+      </div>
+    </div>
+    <div class="playlist-time-scale"></div>
+    <div class="playlist-tracks"></div>
+    <div class="playlist-bottom-bar">
+      <form class="form-inline">
+        <select class="time_format">
+          <option value="seconds">seconds</option>
+          <option value="thousandths">thousandths</option>
+          <option value="hh:mm:ss">hh:mm:ss</option>
+          <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
+          <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
+        </select>
+        <input type="text" class="audio_start input-small">
+        <input type="text" class="audio_end input-small">
+        <input type="text" class="audio_pos input-small">
+        <select class="audio_resolution">
+          <option>4000</option>
+          <option>5000</option>
+          <option>6000</option>
+          <option>7000</option>
+          <option>8000</option>
+          <option>9000</option>
+          <option>10000</option>
+          <option>11000</option>
+          <option>12000</option>
+          <option>15000</option>
+          <option>20000</option>
+        </select>
+      </form>
+    </div>
+  </div>
+
+<script type="text/javascript">
+(function(){
+
+    var tracks = [
+        {
+            src: "Tangerine.mp3"
+        },
+
+        {
+           src: "Beautiful.m4a"
+        }
+    ];
+
+
+/*
+    var tracks = [
+        {url: "../sounds/techno.wav"},
+        {url: "../sounds/blueyellow.wav"},
+        {url: "../sounds/organ-echo-chords.wav"},
+        {url: "../sounds/snare.wav"},
+        {url: "../sounds/clapping-crowd.wav"} 
+    ];
+*/
+
+    var container = document.getElementById("playlist");
+
+    var config = new Config({
+        resolution: 10000,
+        mono: false,
+        waveHeight: 80,
+        container: container,
+        timescale: true,
+        UITheme: "bootstrap"
+    });  
+
+    var playlistEditor = new PlaylistEditor();
+    playlistEditor.setConfig(config);
+    playlistEditor.init(tracks);
+
+})();
+</script>
+</body>
+</html>
