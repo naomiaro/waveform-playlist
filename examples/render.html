@@ -94,7 +94,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 70px;
+  height: 90px;
 }
 
 .state-select {
@@ -127,21 +127,24 @@ body {
     <div id=top-bar class="playlist-top-bar">
       <div class="btn-toolbar">
         <div class="btn-group">
-          <a class="btn_open btn btn-inverse btn-small"><i class="icon-folder-open icon-white"></i></a>
-          <a class="btn_save btn btn-inverse btn-small "><i class="icon-ok icon-white"></i></a>
+          <a title="restore playlist" class="btn_open btn btn-inverse btn-small"><i class="icon-folder-open icon-white"></i></a>
+          <a title="save playlist" class="btn_save btn btn-inverse btn-small "><i class="icon-ok icon-white"></i></a>
         </div>
         <div class="btn-group">
           <a class="btn_rewind btn btn-success"><i class="icon-fast-backward icon-white"></i></a>
           <a class="btn_play btn btn-success"><i class="icon-play icon-white"></i></a>
+          <!-- <a class="btn_pause btn btn-warning"><i class="icon-pause icon-white"></i></a> -->
           <a class="btn_stop btn btn-danger"><i class="icon-stop icon-white"></i></a>
         </div>
         <div class="btn-group">
-          <a class="btn_cursor btn btn-mini" data-state="cursor"><i class="icon-headphones"></i></a>
-          <a class="btn_select btn btn-mini" data-state="select"><i class="icon-italic"></i></a>
-          <a class="btn_shift btn btn-mini" data-state="shift"><i class="icon-resize-horizontal"></i></a>
-          <a class="btn_fadein btn btn-mini" data-state="fadein"><i class="icon-arrow-left"></i></a>
-          <a class="btn_fadeout btn btn-mini" data-state="fadeout"><i class="icon-arrow-right"></i></a>
+          <!-- <a class="btn_cursor btn btn-mini" data-state="cursor"><i class="icon-headphones"></i></a> -->
+          <a title="select audio region mode" class="btn_select btn btn-mini" data-state="select"><i class="icon-italic"></i></a>
+          <a title="shift audio in time mode" class="btn_shift btn btn-mini" data-state="shift"><i class="icon-resize-horizontal"></i></a>
+          <a title="set audio fade in mode" class="btn_fadein btn btn-mini" data-state="fadein"><i class="icon-arrow-left"></i></a>
+          <a title="set audio fade out mode" class="btn_fadeout btn btn-mini" data-state="fadeout"><i class="icon-arrow-right"></i></a>
         </div>
+    
+        <!--
         <div id="btns_fade" class="btns_fade btn-group">
           <div class="btn-group fade-in">
             <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="linear">Linear</a>
@@ -156,8 +159,10 @@ body {
             <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="exponential">Exponential</a>
           </div>
         </div>
+        -->
+
         <div id="btns_audio_tools" class="btn-group">
-          <a class="btn_trim_audio btn btn-inverse btn-small disabled">Trim Audio</a>
+          <a title="keep only the selected audio region" class="btn_trim_audio btn btn-inverse btn-small disabled">Trim Audio</a>
         </div>
       </div>
     </div>
@@ -169,13 +174,16 @@ body {
           <option value="seconds">seconds</option>
           <option value="thousandths">thousandths</option>
           <option value="hh:mm:ss">hh:mm:ss</option>
+          <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
           <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
           <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
         </select>
         <input type="text" class="audio_start input-small">
         <input type="text" class="audio_end input-small">
-        <span class="audio_pos">00:00:00</span>
-        <select class="audio_resolution">
+        <label class="audio_pos">00:00:00.0</label>
+      </form>
+      <form class="form-inline">
+        <select title="audio resolution (time)" class="audio_resolution">
           <option>4000</option>
           <option>5000</option>
           <option>6000</option>
@@ -187,6 +195,12 @@ body {
           <option>12000</option>
           <option>15000</option>
           <option>20000</option>
+        </select>
+        <select title="default fade type" class="default_fade">
+          <option value="logarithmic">logarithmic</option>
+          <option value="linear">linear</option>
+          <option value="exponential">exponential</option>
+          <option value="sCurve">s-curve</option>
         </select>
       </form>
     </div>
