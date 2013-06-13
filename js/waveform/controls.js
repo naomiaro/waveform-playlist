@@ -83,6 +83,10 @@ AudioControls.prototype.events = {
 
     "audio_resolution": {
         change: "changeResolution"
+    },
+
+    "default_fade": {
+        change: "changeDefaultFade"
     }
 };
 
@@ -253,6 +257,10 @@ AudioControls.prototype.init = function(config) {
         this.ctrls["audio_resolution"].value = this.config.getResolution();
     }
 
+    if (this.ctrls["default_fade"]) {
+        this.ctrls["default_fade"].value = this.config.getFadeType();
+    }
+
     this.timeFormat = this.config.getTimeFormat();
 
     //Kept in seconds so time format change can update fields easily.
@@ -262,6 +270,12 @@ AudioControls.prototype.init = function(config) {
         start: 0,
         end: 0
     });
+};
+
+AudioControls.prototype.changeDefaultFade = function(e) {
+    var type = e.target.value;
+
+    this.config.setFadeType(type);
 };
 
 AudioControls.prototype.changeTimeFormat = function(e) {
