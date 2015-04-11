@@ -41,9 +41,15 @@ AudioPlayout.prototype.applyFades = function(fades, relPos, now, delay) {
     this.gainNode && this.gainNode.disconnect();
     this.gainNode = this.ac.createGain();
 
+    //loop through each fade on this track
     for (id in fades) {
 
         fade = fades[id];
+
+        //skip fade if it's behind the cursor.
+        if (relPos >= fade.end) {
+            continue;
+        }
 
         if (relPos <= fade.start) {
             startTime = now + (fade.start - relPos) + delay;
