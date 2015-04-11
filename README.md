@@ -12,4 +12,4 @@ Playlist editor written completely in Javascript.
 
 Code taken from examples/render.html
 
-Music by [Ofir Gal](http://www.ofirgal.com)
+Music by [Blitz//Berlin](http://blitz-berlin.com/)
