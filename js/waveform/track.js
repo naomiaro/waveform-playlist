@@ -137,11 +137,6 @@ TrackEditor.prototype.getBuffer = function() {
     return this.playout.getBuffer();
 };
 
-TrackEditor.prototype.setBuffer = function(buffer) {
-    this.playout.setBuffer(buffer);
-};
-
-
 TrackEditor.prototype.loadTrack = function(track) {
     var el;
 

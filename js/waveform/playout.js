@@ -22,10 +22,6 @@ AudioPlayout.prototype.getBuffer = function() {
     return this.buffer;
 };
 
-AudioPlayout.prototype.setBuffer = function(buffer) {
-    this.buffer = buffer;
-};
-
 /*
     param relPos: cursor position in seconds relative to this track.
         can be negative if the cursor is placed before the start of this track etc.
