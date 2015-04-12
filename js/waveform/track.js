@@ -803,34 +803,47 @@ TrackEditor.prototype.isPlaying = function() {
 
 /*
     startTime, endTime in seconds (float).
+    segment is for a highlighted section in the UI.
 */
 TrackEditor.prototype.schedulePlay = function(now, delay, startTime, endTime) { 
     var start,
         duration,
         relPos,
         when = now + delay,
-        window = (endTime) ? (endTime - startTime) : undefined,
+        segment = (endTime) ? (endTime - startTime) : undefined,
         cueOffset = this.cues.cuein / this.sampleRate;
 
     //track has no content to play.
     if (this.endTime <= startTime) return;
 
-    //track does not start in this selection.
-    if (window && (startTime + window) < this.startTime) return;
+    //track does not play in this selection.
+    if (segment && (startTime + segment) < this.startTime) return;
 
 
     //track should have something to play if it gets here.
 
-    //the track starts in the future of the cursor position
+    //the track starts in the future or on the cursor position
     if (this.startTime >= startTime) {
         start = 0;
         when = when + this.startTime - startTime; //schedule additional delay for this audio node.
-        window = window - (this.startTime - startTime);
-        duration = (endTime) ? Math.min(window, this.duration) : this.duration;
+
+        if (endTime) {
+            segment = segment - (this.startTime - startTime);
+            duration = Math.min(segment, this.duration);
+        }
+        else {
+            duration = this.duration;
+        }
     }
     else {
         start = startTime - this.startTime;
-        duration = (endTime) ? Math.min(window, this.duration - start) : this.duration - start;
+
+        if (endTime) {
+            duration = Math.min(segment, this.duration - start);
+        }
+        else {
+            duration = this.duration - start;
+        }
     }
 
     start = start + cueOffset;
