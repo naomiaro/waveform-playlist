@@ -101,28 +101,6 @@ AudioPlayout.prototype.getDuration = function() {
     return this.buffer.duration;
 };
 
-AudioPlayout.prototype.getPlayOffset = function() {
-    var offset = 0;
-
-    //TODO needs a fix for when the buffer naturally plays out. But also have to mind the entire playlist.
-    if (this.playing) {
-        offset = this.secondsOffset + (this.ac.currentTime - this.playTime);
-    }
-    else {
-        offset = this.secondsOffset;
-    }
-
-    return offset;
-};
-
-AudioPlayout.prototype.setPlayedPercents = function(percent) {
-    this.secondsOffset = this.getDuration() * percent;
-};
-
-AudioPlayout.prototype.getPlayedPercents = function() {
-    return this.getPlayOffset() / this.getDuration();
-};
-
 AudioPlayout.prototype.onSourceEnded = function(e) {
     this.source.disconnect();
     this.source = undefined;
