@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8 />
+<title>Drawer Tests</title>
+</head>
+<body>
+
+<script type="text/javascript">
+(function(){
+
+    // success callback when requesting audio input stream
+    function gotStream(stream) {
+        var audioContext = new webkitAudioContext();
+
+        // Create an AudioNode from the stream.
+        var mediaStreamSource = audioContext.createMediaStreamSource( stream );
+
+        // Connect it to the destination to hear yourself (or any other node for processing!)
+        mediaStreamSource.connect( audioContext.destination );
+    }
+
+    navigator.webkitGetUserMedia( {audio:true}, gotStream );
+  
+})();
+</script>
+</body>
+</html>
