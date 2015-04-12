@@ -289,16 +289,11 @@ TrackEditor.prototype.timeShift = function(e) {
     e.preventDefault();
 
     var el = e.currentTarget, //want the events placed on the channel wrapper.
+        editor = this,
         startX = e.pageX, 
         diffX = 0, 
-        origX = 0,
         updatedX = 0,
-        editor = this,
-        res = editor.resolution,
-        scroll = this.config.getTrackScroll(),
-        scrollX = scroll.left;
-
-    origX = editor.leftOffset / res;
+        origX = editor.leftOffset / editor.resolution;
     
     //dynamically put an event on the element.
     el.onmousemove = function(e) {
@@ -314,11 +309,10 @@ TrackEditor.prototype.timeShift = function(e) {
     el.onmouseup = function(e) {
         e.preventDefault();
 
-        var delta;
+        var delta = editor.pixelsToSeconds(diffX);
 
         el.onmousemove = el.onmouseup = null;
         editor.leftOffset = editor.pixelsToSamples(updatedX);
-        delta = editor.pixelsToSeconds(diffX);
 
         //update track's start and end time relative to the playlist.
         editor.startTime = editor.startTime + delta;
