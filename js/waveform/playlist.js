@@ -167,7 +167,7 @@ PlaylistEditor.prototype.onStateChange = function() {
 
 PlaylistEditor.prototype.onTrackScroll = function(e) {
     var that = this,
-        el = e.srcElement;
+        el = e.srcElement || e.target;
 
     if (that.scrollTimeout) return;
 
