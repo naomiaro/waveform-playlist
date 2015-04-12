@@ -93,20 +93,8 @@ AudioPlayout.prototype.loadData = function (audioData, cb) {
     );
 };
 
-AudioPlayout.prototype.isUnScheduled = function() {
-    return this.source && (this.source.playbackState === this.source.UNSCHEDULED_STATE);
-};
-
-AudioPlayout.prototype.isScheduled = function() {
-    return this.source && (this.source.playbackState === this.source.SCHEDULED_STATE);
-};
-
 AudioPlayout.prototype.isPlaying = function() {
-    return this.source && (this.source.playbackState === this.source.PLAYING_STATE);
-};
-
-AudioPlayout.prototype.isFinished = function() {
-    return this.source && (this.source.playbackState === this.source.FINISHED_STATE);
+    return this.source !== undefined;
 };
 
 AudioPlayout.prototype.getDuration = function() {
@@ -135,10 +123,17 @@ AudioPlayout.prototype.getPlayedPercents = function() {
     return this.getPlayOffset() / this.getDuration();
 };
 
+AudioPlayout.prototype.onSourceEnded = function(e) {
+    this.source.disconnect();
+    this.source = undefined;
+};
+
 AudioPlayout.prototype.setSource = function(source) {
-    this.source && this.source.disconnect();
     this.source = source;
     this.source.buffer = this.buffer;
+
+    //keep track of the buffer state.
+    this.source.onended = this.onSourceEnded.bind(this);
 
     this.source.connect(this.gainNode);
     this.gainNode.connect(this.destination);

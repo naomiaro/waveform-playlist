@@ -809,7 +809,7 @@ TrackEditor.prototype.onResolutionChange = function(res) {
 };
 
 TrackEditor.prototype.isPlaying = function() {
-    return this.playout.isScheduled() || this.playout.isPlaying();
+    return this.playout.isPlaying();
 };
 
 /*
