@@ -76,8 +76,9 @@ PlaylistEditor.prototype.init = function(tracks) {
    
     this.scrollTimeout = false;
 
-    //for setInterval that's toggled during play/stop.
-    this.interval;
+    //for requestAnimationFrame that's toggled during play/stop.
+    this.animationRequest;
+    this.animationCallback = this.updateEditor.bind(this);
 
     this.on("playbackcursor", "onAudioUpdate", audioControls);
 
@@ -277,7 +278,7 @@ PlaylistEditor.prototype.play = function() {
     }
 
     this.lastPlay = currentTime + delay;
-    this.interval = setInterval(that.updateEditor.bind(that), 25);
+    this.animationRequest = window.requestAnimationFrame(this.animationCallback);
 };
 
 PlaylistEditor.prototype.stop = function() {
@@ -286,7 +287,7 @@ PlaylistEditor.prototype.stop = function() {
         len,
         currentTime = this.config.getCurrentTime();
 
-    clearInterval(this.interval);
+    window.cancelAnimationFrame(this.animationRequest);
 
     for (i = 0, len = editors.length; i < len; i++) {
         editors[i].scheduleStop(currentTime);
@@ -329,13 +330,14 @@ PlaylistEditor.prototype.updateEditor = function() {
                 "pixels": cursorPixel
             });
         }
+        this.animationRequest = window.requestAnimationFrame(this.animationCallback);
     }
     else {
-        clearInterval(this.interval);
 
         for (i = 0, len = editors.length; i < len; i++) {
             editors[i].updateEditor(-1, undefined, undefined, true);
         }
+        window.cancelAnimationFrame(this.animationRequest);
     } 
 };
 
