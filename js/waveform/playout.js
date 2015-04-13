@@ -14,7 +14,7 @@ AudioPlayout.prototype.init = function(config) {
     this.fadeMaker = new Fades();
     this.fadeMaker.init(this.ac.sampleRate);
     
-    this.gainNode = undefined;
+    this.fadeGain = undefined;
     this.destination = this.ac.destination;
 };
 
@@ -34,8 +34,7 @@ AudioPlayout.prototype.applyFades = function(fades, relPos, now, delay) {
         startTime,
         duration;
 
-    this.gainNode && this.gainNode.disconnect();
-    this.gainNode = this.ac.createGain();
+    this.fadeGain = this.ac.createGain();
 
     //loop through each fade on this track
     for (id in fades) {
@@ -63,7 +62,7 @@ AudioPlayout.prototype.applyFades = function(fades, relPos, now, delay) {
 
         if (fades.hasOwnProperty(id)) {
             fn = this.fadeMaker["create"+fade.type];
-            fn.call(this.fadeMaker, this.gainNode.gain, fade.shape, options);
+            fn.call(this.fadeMaker, this.fadeGain.gain, fade.shape, options);
         }
     }
 };
@@ -100,17 +99,20 @@ AudioPlayout.prototype.getDuration = function() {
 AudioPlayout.prototype.onSourceEnded = function(e) {
     this.source.disconnect();
     this.source = undefined;
+
+    this.fadeGain.disconnect();
+    this.fadeGain = undefined;
 };
 
-AudioPlayout.prototype.setSource = function(source) {
-    this.source = source;
+AudioPlayout.prototype.setUpSource = function() {
+    this.source = this.ac.createBufferSource();
     this.source.buffer = this.buffer;
 
     //keep track of the buffer state.
     this.source.onended = this.onSourceEnded.bind(this);
 
-    this.source.connect(this.gainNode);
-    this.gainNode.connect(this.destination);
+    this.source.connect(this.fadeGain);
+    this.fadeGain.connect(this.destination);
 };
 
 /*
@@ -125,8 +127,7 @@ AudioPlayout.prototype.play = function(when, start, duration) {
         return;
     }
 
-    this.setSource(this.ac.createBufferSource());
-  
+    this.setUpSource();
     this.source.start(when || 0, start, duration);
 };
 
