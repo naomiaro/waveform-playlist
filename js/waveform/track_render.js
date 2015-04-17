@@ -11,6 +11,7 @@ WaveformDrawer.prototype.init = function(container, config) {
     this.config = config;
     this.container = container;
     this.channels = []; //array of canvases, contexts, 1 for each channel displayed.
+    this.pixelOffset = 0;
 
     var theme = this.config.getUITheme();
 
@@ -105,11 +106,16 @@ WaveformDrawer.prototype.getPeaks = function(buffer, cues) {
     this.peaks = peaks;
 };
 
-WaveformDrawer.prototype.setTimeShift = function(pixels) {
+WaveformDrawer.prototype.setPixelOffset = function(pixels) {
+    this.pixelOffset = pixels;
+    this.drawTimeShift();
+};
+
+WaveformDrawer.prototype.drawTimeShift = function() {
     var i, len;
 
     for (i = 0, len = this.channels.length; i < len; i++) {
-        this.channels[i].div.style.left = pixels+"px";
+        this.channels[i].div.style.left = this.pixelOffset+"px";
     } 
 };
 
@@ -145,9 +151,12 @@ WaveformDrawer.prototype.drawLoading = function() {
     this.container.appendChild(div);
 };
 
-WaveformDrawer.prototype.drawBuffer = function(buffer, pixelOffset, cues) {
+WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
     var canv,
         div,
+        progress,
+        cursor,
+        surface,
         i,
         top = 0,
         left = 0,
@@ -156,6 +165,7 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, pixelOffset, cues) {
         numChan = makeMono? 1 : buffer.numberOfChannels,
         numSamples = cues.cueout - cues.cuein + 1,
         fragment = document.createDocumentFragment(),
+        colors = this.config.getColorScheme(),
         wrapperHeight; 
 
     this.container.innerHTML = "";
@@ -174,67 +184,85 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, pixelOffset, cues) {
         div.style.height = this.height+"px";
         div.style.top = top+"px";
         div.style.left = left+"px";
+        div.style.background = colors.waveColor;
 
         canv = document.createElement("canvas");
         canv.setAttribute('width', this.width);
         canv.setAttribute('height', this.height);
 
+        progress = document.createElement("div");
+        progress.classList.add("channel-progress");
+        progress.style.background = colors.progressColor;
+        progress.style.width = 0;
+        progress.style.height = this.height+"px";
+
+        surface = document.createElement("canvas");
+        surface.setAttribute('width', this.width);
+        surface.setAttribute('height', this.height);
+
         this.channels.push({
-            canvas: canv,
             context: canv.getContext('2d'),
-            div: div
+            div: div,
+            progress: progress,
+            surface: surface.getContext('2d')
         });
 
         div.appendChild(canv);
+        div.appendChild(progress);
+        div.appendChild(surface);
         fragment.appendChild(div);
 
         top = top + this.height;
     }
+
+    cursor = document.createElement("div");
+    cursor.classList.add("cursor");
+    cursor.style.position = "absolute";
+    cursor.style.top = 0;
+    cursor.style.left = 0;
+    cursor.style.bottom = 0;
+    cursor.style.borderRight = "1px solid #000";
+
+    this.cursor = cursor;
+
+    fragment.appendChild(cursor);
   
     wrapperHeight = numChan * this.height;
     this.container.style.height = wrapperHeight+"px";
     this.container.appendChild(fragment);
     
-
     this.getPeaks(buffer, cues);
-    this.updateEditor();
-
-    this.setTimeShift(pixelOffset);
+    this.draw(0);
+    this.drawTimeShift();
 };
 
-WaveformDrawer.prototype.drawFrame = function(chanNum, index, peaks, maxPeak, cursorPos, pixelOffset) {
+WaveformDrawer.prototype.drawFrame = function(chanNum, index, peaks, maxPeak, cursorPos) {
     var x, y, w, h, max, min,
         h2 = this.height / 2,
         cc = this.channels[chanNum].context,
         colors = this.config.getColorScheme();
 
-    max = (peaks.max / maxPeak) * h2;
-    min = (peaks.min / maxPeak) * h2;
+    max = Math.abs((peaks.max / maxPeak) * h2);
+    min = Math.abs((peaks.min / maxPeak) * h2);
 
     w = 1;
     x = index * w;
-    y = Math.round(h2 - max);
-    h = Math.ceil(max - min);
+    
+    cc.fillStyle = 'white';
 
-    //to prevent blank space when there is basically silence in the track.
-    h = h === 0 ? 1 : h; 
-
-    if (cursorPos >= (x + pixelOffset)) {
-        cc.fillStyle = colors.progressColor;
-    } 
-    else {
-        cc.fillStyle = colors.waveColor;
-    }
-
-    cc.fillRect(x, y, w, h);
+    //draw maxs
+    cc.fillRect(x, 0, w, h2-max);
+    //draw mins
+    cc.fillRect(x, h2+min, w, h2-min);
 };
 
 /*
     start, end are optional parameters to only redraw part of the canvas.
 */
-WaveformDrawer.prototype.draw = function(cursorPos, pixelOffset, start, end) {
+WaveformDrawer.prototype.draw = function(cursorPos, start, end) {
     var that = this,
         peaks = this.peaks,
+        pixelOffset = this.pixelOffset,
         i = (start) ? start - pixelOffset : 0,
         len = (end) ? end - pixelOffset + 1 : peaks.length;
 
@@ -250,62 +278,63 @@ WaveformDrawer.prototype.draw = function(cursorPos, pixelOffset, start, end) {
         len = peaks.length;
     }
 
-    this.clear(i, len);
- 
     for (; i < len; i++) {
 
         peaks[i].forEach(function(peak, chanNum) {
-            that.drawFrame(chanNum, i, peak, that.maxPeak, cursorPos, pixelOffset);
+            that.drawFrame(chanNum, i, peak, that.maxPeak, cursorPos);
         });
     } 
 };
 
 /*
-    If start/end are set clear only part of the canvas.
+    Clear the surface canvas where cursors, selections, envelopes etc will be drawn.
 */
-WaveformDrawer.prototype.clear = function(start, end) {
-    var i, len,
-        width = end - start;
+WaveformDrawer.prototype.clear = function() {
+    var i, len;
 
     for (i = 0, len = this.channels.length; i < len; i++) {
-        this.channels[i].context.clearRect(start, 0, width, this.height);
+        this.channels[i].surface.clearRect(0, 0, this.width, this.height);
     }
 };
 
-WaveformDrawer.prototype.updateEditor = function(cursorPos, pixelOffset, start, end, highlighted, selected) {
+/*
+    set width of progress box according to cursor position (in pixels).
+*/
+WaveformDrawer.prototype.updateProgress = function(cursorPos) {
+    this.drawProgress(cursorPos);
+    this.drawCursor(cursorPos);
+};
+
+WaveformDrawer.prototype.drawProgress = function(cursorPos) {
     var i, len,
-        fragment = document.createDocumentFragment();
+        currentWidth = Math.max(cursorPos - this.pixelOffset, 0),
+        width = Math.min(currentWidth, this.width);
 
-    this.container.innerHTML = "";
-
-    this.draw(cursorPos, pixelOffset, start, end);
-
-    if (highlighted === true && selected !== undefined) {
-        var border = (selected.end - selected.start === 0) ? true : false;
-        this.drawHighlight(selected.start, selected.end, border);
+    for (i = 0, len = this.channels.length; i < len; i++) {
+        this.channels[i].progress.style.width = width+"px";
     }
+};
 
-    for (i = 0, len = this.channels.length; i < len; i++) {  
-        fragment.appendChild(this.channels[i].div);
-    }
-
-    this.container.appendChild(fragment);
+WaveformDrawer.prototype.drawCursor = function(cursorPos) {
+    this.cursor.style.width = cursorPos+"px";
 };
 
 /*
     start, end in pixels.
 */
-WaveformDrawer.prototype.drawHighlight = function(start, end, isBorder) {
+WaveformDrawer.prototype.drawHighlight = function(start, end) {
     var i, len,
         colors = this.config.getColorScheme(),
         fillStyle,
         ctx,
-        width = end - start + 1;
+        width = end - start + 1,
+        isBorder;
 
-    fillStyle = (isBorder) ? colors.selectBorderColor : colors.selectBackgroundColor;
+    fillStyle = (width === 1) ? colors.selectBorderColor : colors.selectBackgroundColor;
+    this.clear();
 
     for (i = 0, len = this.channels.length; i < len; i++) {
-        ctx = this.channels[i].context;
+        ctx = this.channels[i].surface;
         ctx.fillStyle = fillStyle;
         ctx.fillRect(start, 0, width, this.height);
     }

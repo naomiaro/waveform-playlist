@@ -9,7 +9,6 @@ PlaylistEditor.prototype.setConfig = function(config) {
 };
 
 PlaylistEditor.prototype.init = function(tracks) {
-
     var that = this,
         i,
         len,
@@ -88,7 +87,6 @@ PlaylistEditor.prototype.init = function(tracks) {
     audioControls.on("playaudio", "play", this);
     audioControls.on("stopaudio", "stop", this);
     audioControls.on("trimaudio", "onTrimAudio", this);
-    audioControls.on("removeaudio", "onRemoveAudio", this);
     audioControls.on("changestate", "onStateChange", this);
     audioControls.on("changeselection", "onSelectionChange", this); 
 };
@@ -125,18 +123,9 @@ PlaylistEditor.prototype.onTrimAudio = function() {
     track.trim(selected.start, selected.end); 
 };
 
-PlaylistEditor.prototype.onRemoveAudio = function() {
-    var track = this.activeTrack,
-        selected = track.getSelectedArea(),
-        start, end;
-
-    if (selected === undefined) {
-        return;
-    }
-
-    track.removeAudio(selected.start, selected.end);
-};
-
+/*
+    Called when a user manually updates the cue points in the UI.
+*/
 PlaylistEditor.prototype.onSelectionChange = function(args) {
     
     if (this.activeTrack === undefined) {
@@ -148,8 +137,8 @@ PlaylistEditor.prototype.onSelectionChange = function(args) {
         end = ~~(args.end * this.sampleRate / res);
 
     this.config.setCursorPos(args.start);
+    //TODO this should really be playlist wide - NOT track specific.
     this.activeTrack.setSelectedArea(start, end);
-    this.activeTrack.updateEditor(-1, undefined, undefined, true);
 };
 
 PlaylistEditor.prototype.onStateChange = function() {
@@ -208,7 +197,6 @@ PlaylistEditor.prototype.onSelectUpdate = function(event) {
 
 PlaylistEditor.prototype.resetCursor = function() {
     this.config.setCursorPos(0);
-    this.notifySelectUpdate(0, 0);
 };
 
 PlaylistEditor.prototype.onCursorSelection = function(args) {
@@ -291,7 +279,6 @@ PlaylistEditor.prototype.stop = function() {
 
     for (i = 0, len = editors.length; i < len; i++) {
         editors[i].scheduleStop(currentTime);
-        editors[i].updateEditor(-1, undefined, undefined, true);
     }
 };
 
@@ -304,16 +291,7 @@ PlaylistEditor.prototype.updateEditor = function() {
         res = this.config.getResolution(),
         cursorPos = this.config.getCursorPos(),
         cursorPixel,
-        playbackSec,
-        selected = this.getSelected(), 
-        start, end,
-        highlighted = false;
-
-    if (selected !== undefined) {
-        start = ~~(selected.startTime * this.sampleRate / res);
-        end = Math.ceil(selected.endTime * this.sampleRate / res);
-        highlighted = true;
-    }
+        playbackSec;
 
     if (this.isPlaying()) {
 
@@ -322,7 +300,7 @@ PlaylistEditor.prototype.updateEditor = function() {
             cursorPixel = Math.ceil(playbackSec * this.sampleRate / res);
             
             for (i = 0, len = editors.length; i < len; i++) {
-                editors[i].updateEditor(cursorPixel, start, end, highlighted);
+                editors[i].showProgress(cursorPixel);
             }
 
             this.fire("playbackcursor", {
@@ -333,9 +311,9 @@ PlaylistEditor.prototype.updateEditor = function() {
         this.animationRequest = window.requestAnimationFrame(this.animationCallback);
     }
     else {
-
+        //reset view to not playing look
         for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].updateEditor(-1, undefined, undefined, true);
+            editors[i].showProgress(0);
         }
         window.cancelAnimationFrame(this.animationRequest);
     } 

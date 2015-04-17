@@ -461,20 +461,6 @@ AudioControls.prototype.changeState = function(e) {
     this.fire('changestate', this);
 };
 
-AudioControls.prototype.zeroCrossing = function(e) {
-    var el = e.target,
-        disabled,
-        classes = this.classes;
-
-    disabled = el.classList.contains(classes["disabled"]);
-
-    if (!disabled) {
-        this.fire('trackedit', {
-            type: "zeroCrossing"
-        });
-    }  
-};
-
 AudioControls.prototype.trimAudio = function(e) {
     var el = e.target,
         disabled,
@@ -485,20 +471,6 @@ AudioControls.prototype.trimAudio = function(e) {
     if (!disabled) {
         this.fire('trackedit', {
             type: "trimAudio"
-        });
-    }  
-};
-
-AudioControls.prototype.removeAudio = function(e) {
-    var el = e.target,
-        disabled,
-        classes = this.classes;
-
-    disabled = el.classList.contains(classes["disabled"]);
-
-    if (!disabled) {
-        this.fire('trackedit', {
-            type: "removeAudio"
         });
     }  
 };

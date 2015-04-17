@@ -57,7 +57,7 @@ body {
 }
 
 .playlist-tracks {
-  position: absolute;
+  position: relative;
   top: 80px;
   left: 0;
   right: 0;
@@ -137,7 +137,7 @@ body {
           <a class="btn_stop btn btn-danger"><i class="icon-stop icon-white"></i></a>
         </div>
         <div class="btn-group">
-          <!-- <a class="btn_cursor btn btn-mini" data-state="cursor"><i class="icon-headphones"></i></a> -->
+          <a class="btn_cursor btn btn-mini" data-state="cursor"><i class="icon-headphones"></i></a>
           <a title="select audio region mode" class="btn_select btn btn-mini" data-state="select"><i class="icon-italic"></i></a>
           <a title="shift audio in time mode" class="btn_shift btn btn-mini" data-state="shift"><i class="icon-resize-horizontal"></i></a>
           <a title="set audio fade in mode" class="btn_fadein btn btn-mini" data-state="fadein"><i class="icon-arrow-left"></i></a>
@@ -184,6 +184,8 @@ body {
       </form>
       <form class="form-inline">
         <select title="audio resolution (time)" class="audio_resolution">
+          <option>500</option>
+          <option>1000</option>
           <option>4000</option>
           <option>5000</option>
           <option>6000</option>
