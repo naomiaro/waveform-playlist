@@ -1,7 +1,9 @@
-Web Audio API waveform playlist editor
+Web Audio Multiple Track Waveform Editor
 =================
 
-Playlist editor written completely in javascript using the [Web Audio API](http://webaudio.github.io/web-audio-api/).
+Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a multiple track playlist editor written completely in javascript using the [Web Audio API](http://webaudio.github.io/web-audio-api/).
+
+###[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/examples/render.html)
 
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
 Information on the different fade types in the project can be found [here](https://github.com/naomiaro/Web-Audio-Fades)
@@ -11,8 +13,6 @@ Save your progress by outputing editor state json.
 
 ![Imgur](http://i.imgur.com/99u8ipS.png)
 (code for picture shown can be found in examples/render.html)
-
-###[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/examples/render.html)
 
 ####[Example dBFS meter](http://naomiaro.github.io/waveform-playlist/examples/dbmeter.html)
 Graphic [dBFS](http://en.wikipedia.org/wiki/DBFS) audio meter.
