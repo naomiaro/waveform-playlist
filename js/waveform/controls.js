@@ -16,77 +16,76 @@ AudioControls.prototype.classes = {
 };
 
 AudioControls.prototype.events = {
-   "btn_rewind": {
+   "btn-rewind": {
         click: "rewindAudio"
     },
 
-   "btn_play": {
+   "btn-play": {
         click: "playAudio"
     },
  
-    "btn_stop": {
+    "btn-stop": {
         click: "stopAudio"
     },
 
-    "btn_cursor": {
+    "btn-cursor": {
         click: "changeState"
     },
 
-    "btn_select": {
+    "btn-select": {
         click: "changeState"
     },
 
-    "btn_shift": {
+    "btn-shift": {
         click: "changeState"
     },
 
-    "btn_fadein": {
+    "btn-fadein": {
         click: "changeState"
     },
 
-    "btn_fadeout": {
+    "btn-fadeout": {
         click: "changeState"
     },
 
-
-    "btns_fade": {
-        click: "createFade"
-    },
-
-    "btn_save": {
+    "btn-save": {
         click: "save"
     },
 
-    "btn_open": {
+    "btn-open": {
         click: "open"
     },
     
-    "btn_trim_audio": {
+    "btn-trim-audio": {
         click: "trimAudio"
     },
 
-    "time_format": {
+    "time-format": {
         change: "changeTimeFormat"
     },
 
-    "audio_start": {
+    "audio-pos": {
+
+    },
+
+    "audio-start": {
         blur: "validateCueIn"
     },
 
-    "audio_end": {
+    "audio-end": {
         blur: "validateCueOut"
     },
 
-    "audio_pos": {
-
-    },
-
-    "audio_resolution": {
-        change: "changeResolution"
-    },
-
-    "default_fade": {
+    "default-fade": {
         change: "changeDefaultFade"
+    },
+
+    "btn-zoom-in": {
+        click: "zoomIn"
+    },
+
+    "btn-zoom-out": {
+        click: "zoomOut"
     }
 };
 
@@ -229,7 +228,7 @@ AudioControls.prototype.init = function(config) {
     container = this.config.getContainer();
     state = this.config.getState();
 
-    tmpBtn = document.getElementsByClassName("btn_"+state)[0];
+    tmpBtn = document.getElementsByClassName("btn-"+state)[0];
 
     if (tmpBtn) {
         this.activateButton(tmpBtn);
@@ -249,16 +248,16 @@ AudioControls.prototype.init = function(config) {
         }
     } 
 
-    if (this.ctrls["time_format"]) {
-        this.ctrls["time_format"].value = this.config.getTimeFormat();
+    if (this.ctrls["time-format"]) {
+        this.ctrls["time-format"].value = this.config.getTimeFormat();
     }
 
-    if (this.ctrls["audio_resolution"]) {
-        this.ctrls["audio_resolution"].value = this.config.getResolution();
+    if (this.ctrls["audio-resolution"]) {
+        this.ctrls["audio-resolution"].value = this.config.getResolution();
     }
 
-    if (this.ctrls["default_fade"]) {
-        this.ctrls["default_fade"].value = this.config.getFadeType();
+    if (this.ctrls["default-fade"]) {
+        this.ctrls["default-fade"].value = this.config.getFadeType();
     }
 
     this.timeFormat = this.config.getTimeFormat();
@@ -291,19 +290,39 @@ AudioControls.prototype.changeTimeFormat = function(e) {
         start = this.currentSelectionValues.start;
         end = this.currentSelectionValues.end;
 
-        if (this.ctrls["audio_start"]) {
-            this.ctrls["audio_start"].value = func(start);
+        if (this.ctrls["audio-start"]) {
+            this.ctrls["audio-start"].value = func(start);
         }
 
-        if (this.ctrls["audio_end"]) {
-            this.ctrls["audio_end"].value = func(end);
+        if (this.ctrls["audio-end"]) {
+            this.ctrls["audio-end"].value = func(end);
         }
     }
 };
 
-AudioControls.prototype.changeResolution = function(e) {
-    var res = parseInt(e.target.value, 10);
+AudioControls.prototype.zoomIn = function() {
+    var newRes = this.config.getResolution() * (3/4),
+        min = this.config.getMinResolution();
 
+    newRes = (newRes < min) ? min : newRes;
+
+    if (newRes > min) {
+        this.zoom(newRes);
+    }
+};
+
+AudioControls.prototype.zoomOut = function() {
+    var newRes = this.config.getResolution() * (4/3),
+        max = this.config.getMaxResolution();
+
+    newRes = (newRes > max) ? max : newRes;
+
+    if (newRes < max) {
+        this.zoom(newRes);
+    }
+};
+
+AudioControls.prototype.zoom = function(res) {
     this.config.setResolution(res);
     this.fire("changeresolution", res);
 };
@@ -528,12 +547,12 @@ AudioControls.prototype.onCursorSelection = function(args) {
         end:end
     };
 
-    if (this.ctrls["audio_start"]) {
-        this.ctrls["audio_start"].value = startFormat;
+    if (this.ctrls["audio-start"]) {
+        this.ctrls["audio-start"].value = startFormat;
     }
 
-    if (this.ctrls["audio_end"]) {
-        this.ctrls["audio_end"].value = endFormat;
+    if (this.ctrls["audio-end"]) {
+        this.ctrls["audio-end"].value = endFormat;
     }
 };
 
@@ -541,8 +560,8 @@ AudioControls.prototype.onCursorSelection = function(args) {
     args {seconds, pixels}
 */
 AudioControls.prototype.onAudioUpdate = function(args) {
-    if (this.ctrls["audio_pos"]) {
-        this.ctrls["audio_pos"].innerHTML = this.cueFormatters(this.timeFormat)(args.seconds);
+    if (this.ctrls["audio-pos"]) {
+        this.ctrls["audio-pos"].innerHTML = this.cueFormatters(this.timeFormat)(args.seconds);
     } 
 };
 

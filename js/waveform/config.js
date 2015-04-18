@@ -13,7 +13,9 @@ var Config = function(params) {
             ac: new (window.AudioContext || window.webkitAudioContext),
 
             resolution: 4096, //resolution - samples per pixel to draw.
-            timeFormat: 'hh:mm:ss.uuu',
+            minResolution: 500,
+            maxResolution: 20000,
+            timeFormat: 'hh:mm:ss.uu',
             mono: true, //whether to draw multiple channels or combine them.
             fadeType: 'logarithmic',
 
@@ -99,6 +101,14 @@ var Config = function(params) {
 
         that.getTimeFormat = function getTimeFormat() {
             return params.timeFormat;
+        };
+
+        that.getMinResolution = function getResolution() {
+            return params.minResolution;
+        };
+
+        that.getMaxResolution = function getResolution() {
+            return params.maxResolution;
         };
 
         that.getResolution = function getResolution() {

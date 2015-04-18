@@ -4,7 +4,8 @@
 <meta charset=utf-8 />
 <title>Drawer Tests</title>
 
-<link href="../css/bootstrap.css" rel="stylesheet">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
 <link href="../css/playlist.css" rel="stylesheet">
 
 <script type="text/javascript" src="../js/waveform/observer/observer.js"></script>
@@ -26,42 +27,27 @@
     <div id=top-bar class="playlist-top-bar">
       <div class="btn-toolbar">
         <div class="btn-group">
-          <a title="restore playlist" class="btn_open btn btn-inverse btn-small"><i class="icon-folder-open icon-white"></i></a>
-          <a title="save playlist" class="btn_save btn btn-inverse btn-small "><i class="icon-ok icon-white"></i></a>
+          <a title="restore playlist" class="btn-open btn btn-info"><i class="fa fa-folder-open"></i></a>
+          <a title="save playlist" class="btn-save btn btn-info"><i class="fa fa-floppy-o"></i></a>
         </div>
         <div class="btn-group">
-          <a class="btn_rewind btn btn-success"><i class="icon-fast-backward icon-white"></i></a>
-          <a class="btn_play btn btn-success"><i class="icon-play icon-white"></i></a>
-          <!-- <a class="btn_pause btn btn-warning"><i class="icon-pause icon-white"></i></a> -->
-          <a class="btn_stop btn btn-danger"><i class="icon-stop icon-white"></i></a>
+          <a class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></a>
+          <a class="btn-play btn btn-success"><i class="fa fa-play"></i></a>
+          <a class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></a>
         </div>
         <div class="btn-group">
-          <a class="btn_cursor btn btn-mini" data-state="cursor"><i class="icon-headphones"></i></a>
-          <a title="select audio region mode" class="btn_select btn btn-mini" data-state="select"><i class="icon-italic"></i></a>
-          <a title="shift audio in time mode" class="btn_shift btn btn-mini" data-state="shift"><i class="icon-resize-horizontal"></i></a>
-          <a title="set audio fade in mode" class="btn_fadein btn btn-mini" data-state="fadein"><i class="icon-arrow-left"></i></a>
-          <a title="set audio fade out mode" class="btn_fadeout btn btn-mini" data-state="fadeout"><i class="icon-arrow-right"></i></a>
+          <a title="select cursor mode" class="btn-cursor btn btn-default" data-state="cursor"><i class="fa fa-headphones"></i></a>
+          <a title="select audio region mode" class="btn-select btn btn-default" data-state="select"><i class="fa fa-italic"></i></a>
+          <a title="shift audio in time mode" class="btn-shift btn btn-default" data-state="shift"><i class="fa fa-arrows-h"></i></a>
+          <a title="set audio fade in mode" class="btn-fadein btn btn-default" data-state="fadein"><i class="fa fa-long-arrow-left"></i></a>
+          <a title="set audio fade out mode" class="btn-fadeout btn btn-default" data-state="fadeout"><i class="fa fa-long-arrow-right"></i></a>
         </div>
-    
-        <!--
-        <div id="btns_fade" class="btns_fade btn-group">
-          <div class="btn-group fade-in">
-            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="linear">Linear</a>
-            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="logarithmic">Logarithmic</a>
-            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="sCurve">S-Curve</a>
-            <a class="btn btn-mini disabled" data-type="FadeIn" data-shape="exponential">Exponential</a>
-          </div>
-          <div class="btn-group fade-out">
-            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="linear">Linear</a>
-            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="logarithmic">Logarithmic</a>
-            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="sCurve">S-Curve</a>
-            <a class="btn btn-mini disabled" data-type="FadeOut" data-shape="exponential">Exponential</a>
-          </div>
-        </div>
-        -->
-
         <div id="btns_audio_tools" class="btn-group">
-          <a title="keep only the selected audio region" class="btn_trim_audio btn btn-inverse btn-small disabled">Trim Audio</a>
+          <a title="keep only the selected audio region" class="btn-trim-audio btn btn-primary disabled">Trim Audio</a>
+        </div>
+        <div class="btn-group">
+          <a title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></a>
+          <a title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></a>
         </div>
       </div>
     </div>
@@ -69,7 +55,7 @@
     <div class="playlist-tracks"></div>
     <div class="playlist-bottom-bar">
       <form class="form-inline">
-        <select class="time_format">
+        <select class="time-format form-control">
           <option value="seconds">seconds</option>
           <option value="thousandths">thousandths</option>
           <option value="hh:mm:ss">hh:mm:ss</option>
@@ -77,27 +63,12 @@
           <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
           <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
         </select>
-        <input type="text" class="audio_start input-small">
-        <input type="text" class="audio_end input-small">
-        <label class="audio_pos">00:00:00.0</label>
+        <input type="text" class="audio-start input-small form-control">
+        <input type="text" class="audio-end input-small form-control">
+        <label class="audio-pos">00:00:00.0</label>
       </form>
       <form class="form-inline">
-        <select title="audio resolution (time)" class="audio_resolution">
-          <option>500</option>
-          <option>1000</option>
-          <option>4000</option>
-          <option>5000</option>
-          <option>6000</option>
-          <option>7000</option>
-          <option>8000</option>
-          <option>9000</option>
-          <option>10000</option>
-          <option>11000</option>
-          <option>12000</option>
-          <option>15000</option>
-          <option>20000</option>
-        </select>
-        <select title="default fade type" class="default_fade">
+        <select title="default fade type" class="default-fade form-control">
           <option value="logarithmic">logarithmic</option>
           <option value="linear">linear</option>
           <option value="exponential">exponential</option>
@@ -159,7 +130,8 @@
         waveHeight: 80,
         container: container,
         timescale: true,
-        UITheme: "bootstrap"
+        UITheme: "bootstrap",
+        state: 'select'
     });  
 
     var playlistEditor = new PlaylistEditor();
