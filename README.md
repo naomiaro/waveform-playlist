@@ -6,7 +6,7 @@ Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a mult
 ###[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/examples/render.html)
 
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
-Information on the different fade types in the project can be found [here](https://github.com/naomiaro/Web-Audio-Fades)
+I've written up some demos on github for the different [audio fade types](https://github.com/naomiaro/Web-Audio-Fades) in the project.
 
 Save your progress by outputing editor state json.
 [Localstorage](http://diveintohtml5.info/storage.html) has been used to save/restore editor state.
