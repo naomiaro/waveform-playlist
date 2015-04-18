@@ -5,7 +5,7 @@ var AudioControls = function() {
 };
 
 AudioControls.prototype.groups = {
-    "audio-select": ["btns_audio_tools", "btns_fade"]
+    "audio-select": ["btns_audio_tools"]
 };
 
 AudioControls.prototype.classes = {
@@ -76,8 +76,20 @@ AudioControls.prototype.events = {
         blur: "validateCueOut"
     },
 
-    "default-fade": {
-        change: "changeDefaultFade"
+    "btn-logarithmic": {
+        click: "changeDefaultFade"
+    },
+
+    "btn-linear": {
+        click: "changeDefaultFade"
+    },
+
+    "btn-exponential": {
+        click: "changeDefaultFade"
+    },
+
+    "btn-sCurve": {
+        click: "changeDefaultFade"
     },
 
     "btn-zoom-in": {
@@ -219,6 +231,7 @@ AudioControls.prototype.init = function(config) {
         func,
         state,
         container,
+        fadeType,
         tmpBtn;
 
     makePublisher(this);
@@ -227,12 +240,15 @@ AudioControls.prototype.init = function(config) {
     this.config = config;
     container = this.config.getContainer();
     state = this.config.getState();
+    fadeType = this.config.getFadeType();
 
-    tmpBtn = document.getElementsByClassName("btn-"+state)[0];
+    ["btn-"+state, "btn-"+fadeType].forEach(function(buttonClass) {
+        tmpBtn = document.getElementsByClassName(buttonClass)[0];
 
-    if (tmpBtn) {
-        this.activateButton(tmpBtn);
-    }
+        if (tmpBtn) {
+            this.activateButton(tmpBtn);
+        }
+    }, this);  
 
     for (className in events) {
     
@@ -252,13 +268,6 @@ AudioControls.prototype.init = function(config) {
         this.ctrls["time-format"].value = this.config.getTimeFormat();
     }
 
-    if (this.ctrls["audio-resolution"]) {
-        this.ctrls["audio-resolution"].value = this.config.getResolution();
-    }
-
-    if (this.ctrls["default-fade"]) {
-        this.ctrls["default-fade"].value = this.config.getFadeType();
-    }
 
     this.timeFormat = this.config.getTimeFormat();
 
@@ -272,7 +281,12 @@ AudioControls.prototype.init = function(config) {
 };
 
 AudioControls.prototype.changeDefaultFade = function(e) {
-    var type = e.target.value;
+    var el = e.currentTarget,
+        prevEl = el.parentElement.getElementsByClassName('active')[0],
+        type = el.dataset.fade;
+
+    this.deactivateButton(prevEl);
+    this.activateButton(el);
 
     this.config.setFadeType(type);
 };

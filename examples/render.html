@@ -23,8 +23,8 @@
 </head>
 <body>
 
-  <div id=playlist class="playlist">
-    <div id=top-bar class="playlist-top-bar">
+  <div id="playlist" class="playlist">
+    <div id="top-bar" class="playlist-top-bar">
       <div class="btn-toolbar">
         <div class="btn-group">
           <a title="restore playlist" class="btn-open btn btn-info"><i class="fa fa-folder-open"></i></a>
@@ -41,6 +41,12 @@
           <a title="shift audio in time mode" class="btn-shift btn btn-default" data-state="shift"><i class="fa fa-arrows-h"></i></a>
           <a title="set audio fade in mode" class="btn-fadein btn btn-default" data-state="fadein"><i class="fa fa-long-arrow-left"></i></a>
           <a title="set audio fade out mode" class="btn-fadeout btn btn-default" data-state="fadeout"><i class="fa fa-long-arrow-right"></i></a>
+        </div>
+        <div class="btn-group">
+          <span class="btn btn-default btn-logarithmic" data-fade="logarithmic">logarithmic</span>
+          <span class="btn btn-default btn-linear" data-fade="linear">linear</span>
+          <span class="btn btn-default btn-exponential" data-fade="exponential">exponential</span>
+          <span class="btn btn-default btn-sCurve" data-fade="sCurve">s-curve</span>
         </div>
         <div id="btns_audio_tools" class="btn-group">
           <a title="keep only the selected audio region" class="btn-trim-audio btn btn-primary disabled">Trim Audio</a>
@@ -66,14 +72,6 @@
         <input type="text" class="audio-start input-small form-control">
         <input type="text" class="audio-end input-small form-control">
         <label class="audio-pos">00:00:00.0</label>
-      </form>
-      <form class="form-inline">
-        <select title="default fade type" class="default-fade form-control">
-          <option value="logarithmic">logarithmic</option>
-          <option value="linear">linear</option>
-          <option value="exponential">exponential</option>
-          <option value="sCurve">s-curve</option>
-        </select>
       </form>
     </div>
   </div>
