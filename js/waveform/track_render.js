@@ -25,8 +25,8 @@ WaveformDrawer.prototype.init = function(container, config) {
 
 WaveformDrawer.prototype.loaderStates = {
     "bootstrap": {
-        "downloading": "progress progress-warning",
-        "decoding": "progress progress-success progress-striped active",
+        "downloading": "progress-bar",
+        "decoding": "progress-bar progress-bar-striped",
         "loader": "bar"
     },
     
@@ -124,7 +124,7 @@ WaveformDrawer.prototype.updateLoader = function(percent) {
 };
 
 WaveformDrawer.prototype.setLoaderState = function(state) {
-    this.progressDiv.className = this.loaderStates[state];
+    this.loader.className = this.loaderStates[state];
 };
 
 WaveformDrawer.prototype.drawLoading = function() {
@@ -141,8 +141,6 @@ WaveformDrawer.prototype.drawLoading = function() {
     loader.className = this.loaderStates["loader"];
 
     div.appendChild(loader);
-
-    this.progressDiv = div;
     this.loader = loader;
 
     this.setLoaderState("downloading");
