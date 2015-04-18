@@ -11,7 +11,7 @@ Information on the different fade types in the project can be found [here](https
 Save your progress by outputing editor state json.
 [Localstorage](http://diveintohtml5.info/storage.html) has been used to save/restore editor state.
 
-![Imgur](http://i.imgur.com/99u8ipS.png)
+![Screenshot](img/multitrack.png?raw=true "multi track full editor view")
 (code for picture shown can be found in examples/render.html)
 
 ####[Example dBFS meter](http://naomiaro.github.io/waveform-playlist/examples/dbmeter.html)
