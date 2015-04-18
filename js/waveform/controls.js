@@ -20,6 +20,10 @@ AudioControls.prototype.events = {
         click: "rewindAudio"
     },
 
+    "btn-fast-forward": {
+        click: "fastForwardAudio"
+    },
+
    "btn-play": {
         click: "playAudio"
     },
@@ -446,6 +450,11 @@ AudioControls.prototype.open = function() {
 AudioControls.prototype.rewindAudio = function() {
 
     this.fire('rewindaudio', this);
+};
+
+AudioControls.prototype.fastForwardAudio = function() {
+
+    this.fire('fastforwardaudio', this);
 };
 
 AudioControls.prototype.playAudio = function() {

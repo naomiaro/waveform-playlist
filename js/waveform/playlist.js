@@ -84,6 +84,7 @@ PlaylistEditor.prototype.init = function(tracks) {
     audioControls.on("playlistsave", "save", this);
     audioControls.on("playlistrestore", "restore", this);
     audioControls.on("rewindaudio", "rewind", this);
+    audioControls.on("fastforwardaudio", "fastForward", this);
     audioControls.on("playaudio", "play", this);
     audioControls.on("stopaudio", "stop", this);
     audioControls.on("trimaudio", "onTrimAudio", this);
@@ -164,6 +165,7 @@ PlaylistEditor.prototype.onTrackScroll = function() {
     that.scrollTimeout = setTimeout(function() {
         
         that.config.setTrackScroll(that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
+        console.log(that.trackContainer.scrollLeft);
         that.fire('trackscroll');
         that.scrollTimeout = false;
     }, 25);   
@@ -215,6 +217,22 @@ PlaylistEditor.prototype.rewind = function() {
 
     this.trackContainer.scrollLeft = 0;
     this.config.setTrackScroll(0);
+    this.fire('trackscroll');
+};
+
+PlaylistEditor.prototype.fastForward = function() {
+    var totalWidth = this.trackContainer.scrollWidth,
+        clientWidth = this.trackContainer.offsetWidth,
+        maxOffset = Math.max(totalWidth - clientWidth, 0);
+
+    if (this.activeTrack !== undefined) {
+        this.activeTrack.resetCursor();
+    }
+
+    this.stop();
+
+    this.trackContainer.scrollLeft = maxOffset;
+    this.config.setTrackScroll(maxOffset);
     this.fire('trackscroll');
 };
 
