@@ -175,7 +175,7 @@ var Config = function(params) {
         that.setTrackScroll = function setTrackScroll(left, top) {
             var scroll = params.trackscroll;
 
-            scroll.left = left;
-            scroll.top = top;
+            scroll.left = left || scroll.left;
+            scroll.top = top || scroll.top;
         };
 };

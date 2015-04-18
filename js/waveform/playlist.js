@@ -67,9 +67,9 @@ PlaylistEditor.prototype.init = function(tracks) {
         }).bind(trackEditor));
     }
 
-    div.innerHTML = '';
-    div.appendChild(fragment);
-    div.onscroll = this.onTrackScroll.bind(that);
+    this.trackContainer.innerHTML = '';
+    this.trackContainer.appendChild(fragment);
+    this.trackContainer.onscroll = this.onTrackScroll.bind(this);
 
     this.sampleRate = this.config.getSampleRate();
    
@@ -155,17 +155,16 @@ PlaylistEditor.prototype.onStateChange = function() {
     }
 };
 
-PlaylistEditor.prototype.onTrackScroll = function(e) {
-    var that = this,
-        el = e.srcElement || e.target;
+PlaylistEditor.prototype.onTrackScroll = function() {
+    var that = this;
 
     if (that.scrollTimeout) return;
 
     //limit the scroll firing to every 25ms.
     that.scrollTimeout = setTimeout(function() {
         
-        that.config.setTrackScroll(el.scrollLeft, el.scrollTop);
-        that.fire('trackscroll', e);
+        that.config.setTrackScroll(that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
+        that.fire('trackscroll');
         that.scrollTimeout = false;
     }, 25);   
 };
@@ -213,6 +212,10 @@ PlaylistEditor.prototype.rewind = function() {
     } 
 
     this.stop();
+
+    this.trackContainer.scrollLeft = 0;
+    this.config.setTrackScroll(0);
+    this.fire('trackscroll');
 };
 
 /*
