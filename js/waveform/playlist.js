@@ -348,10 +348,8 @@ PlaylistEditor.prototype.updateEditor = function() {
 
         //if there's a change for the UI show progress.
         if (elapsed) {
-            console.log(cursorPos, elapsed);
             playbackSec = cursorPos + elapsed;
             cursorPixel = Math.ceil(playbackSec * this.sampleRate / res);
-            console.log(cursorPixel);
             
             for (i = 0, len = editors.length; i < len; i++) {
                 editors[i].showProgress(cursorPixel);
