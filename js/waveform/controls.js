@@ -27,6 +27,10 @@ AudioControls.prototype.events = {
    "btn-play": {
         click: "playAudio"
     },
+
+    "btn-pause": {
+        click: "pauseAudio"
+    },
  
     "btn-stop": {
         click: "stopAudio"
@@ -460,6 +464,11 @@ AudioControls.prototype.fastForwardAudio = function() {
 AudioControls.prototype.playAudio = function() {
 
     this.fire('playaudio', this);
+};
+
+AudioControls.prototype.pauseAudio = function() {
+
+    this.fire('pauseaudio', this);
 };
 
 AudioControls.prototype.stopAudio = function() {

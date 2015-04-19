@@ -836,7 +836,6 @@ TrackEditor.prototype.schedulePlay = function(now, delay, startTime, endTime) {
 TrackEditor.prototype.scheduleStop = function(when) {
    
     this.playout.stop(when);
-    this.showProgress(0);
 };
 
 TrackEditor.prototype.resetCursor = function() {

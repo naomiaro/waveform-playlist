@@ -86,6 +86,7 @@ PlaylistEditor.prototype.init = function(tracks) {
     audioControls.on("rewindaudio", "rewind", this);
     audioControls.on("fastforwardaudio", "fastForward", this);
     audioControls.on("playaudio", "play", this);
+    audioControls.on("pauseaudio", "pause", this);
     audioControls.on("stopaudio", "stop", this);
     audioControls.on("trimaudio", "onTrimAudio", this);
     audioControls.on("changestate", "onStateChange", this);
@@ -252,8 +253,7 @@ PlaylistEditor.prototype.getSelected = function() {
 };
 
 PlaylistEditor.prototype.isPlaying = function() {
-     var that = this,
-        editors = this.trackEditors,
+     var editors = this.trackEditors,
         i,
         len,
         isPlaying = false;
@@ -281,6 +281,10 @@ PlaylistEditor.prototype.play = function() {
         endTime = selected.endTime;
     }
 
+    if (this.pausedAt) {
+        startTime = this.pausedAt;
+    }
+
     for (i = 0, len = editors.length; i < len; i++) {
         editors[i].schedulePlay(currentTime, delay, startTime, endTime);
     }
@@ -289,16 +293,39 @@ PlaylistEditor.prototype.play = function() {
     this.animationRequest = window.requestAnimationFrame(this.animationCallback);
 };
 
+PlaylistEditor.prototype.pause = function() {
+    var editors = this.trackEditors,
+        i,
+        len,
+        currentTime = this.config.getCurrentTime(),
+        startTime = this.config.getCursorPos();
+
+    if (this.pausedAt) {
+        startTime = this.pausedAt;
+    }
+
+    this.pausedAt = currentTime - this.lastPlay + startTime;
+
+    window.cancelAnimationFrame(this.animationRequest);
+
+    for (i = 0, len = editors.length; i < len; i++) {
+        editors[i].scheduleStop(currentTime);
+    }
+};
+
 PlaylistEditor.prototype.stop = function() {
      var editors = this.trackEditors,
         i,
         len,
         currentTime = this.config.getCurrentTime();
 
+    this.pausedAt = undefined;
+
     window.cancelAnimationFrame(this.animationRequest);
 
     for (i = 0, len = editors.length; i < len; i++) {
         editors[i].scheduleStop(currentTime);
+        editors[i].showProgress(0);
     }
 };
 
@@ -313,8 +340,14 @@ PlaylistEditor.prototype.updateEditor = function() {
         cursorPixel,
         playbackSec;
 
+    //update drawer to start drawing from where last paused.
+    if (this.pausedAt) {
+        cursorPos = this.pausedAt;
+    }
+
     if (this.isPlaying()) {
 
+        //if there's a change for the UI show progress.
         if (elapsed) {
             playbackSec = cursorPos + elapsed;
             cursorPixel = Math.ceil(playbackSec * this.sampleRate / res);

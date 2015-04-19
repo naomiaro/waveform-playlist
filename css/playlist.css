@@ -24,9 +24,14 @@ body {
   height: 50px;
 }
 
+.playlist-toolbar {
+  margin-left: 5px;
+  margin-top: 5px;
+}
+
 .playlist-time-scale {
   position: absolute;
-  top: 50px;
+  top: 60px;
   left: 0;
   right: 0;
   height: 30px;
@@ -48,7 +53,7 @@ body {
 
 .playlist-tracks {
   position: relative;
-  top: 80px;
+  top: 90px;
   left: 0;
   right: 0;
   bottom: 95px;
