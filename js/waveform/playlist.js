@@ -271,7 +271,6 @@ PlaylistEditor.prototype.play = function() {
         i,
         len,
         currentTime = this.config.getCurrentTime(),
-        delay = 0.2,
         startTime = this.config.getCursorPos(),
         endTime,
         selected = this.getSelected();
@@ -286,10 +285,10 @@ PlaylistEditor.prototype.play = function() {
     }
 
     for (i = 0, len = editors.length; i < len; i++) {
-        editors[i].schedulePlay(currentTime, delay, startTime, endTime);
+        editors[i].schedulePlay(currentTime, startTime, endTime);
     }
 
-    this.lastPlay = currentTime + delay;
+    this.lastPlay = currentTime;
     this.animationRequest = window.requestAnimationFrame(this.animationCallback);
 };
 
@@ -349,8 +348,10 @@ PlaylistEditor.prototype.updateEditor = function() {
 
         //if there's a change for the UI show progress.
         if (elapsed) {
+            console.log(cursorPos, elapsed);
             playbackSec = cursorPos + elapsed;
             cursorPixel = Math.ceil(playbackSec * this.sampleRate / res);
+            console.log(cursorPixel);
             
             for (i = 0, len = editors.length; i < len; i++) {
                 editors[i].showProgress(cursorPixel);

@@ -26,7 +26,7 @@ AudioPlayout.prototype.getBuffer = function() {
     param relPos: cursor position in seconds relative to this track.
         can be negative if the cursor is placed before the start of this track etc.
 */
-AudioPlayout.prototype.applyFades = function(fades, relPos, now, delay) {
+AudioPlayout.prototype.applyFades = function(fades, relPos, now) {
     var id,
         fade,
         fn,
@@ -47,11 +47,11 @@ AudioPlayout.prototype.applyFades = function(fades, relPos, now, delay) {
         }
 
         if (relPos <= fade.start) {
-            startTime = now + (fade.start - relPos) + delay;
+            startTime = now + (fade.start - relPos);
             duration = fade.end - fade.start;
         }
         else if (relPos > fade.start && relPos < fade.end) {
-            startTime = now - (relPos - fade.start) + delay;
+            startTime = now - (relPos - fade.start);
             duration = fade.end - fade.start;
         }
 

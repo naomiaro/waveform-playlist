@@ -785,11 +785,11 @@ TrackEditor.prototype.isPlaying = function() {
     startTime, endTime in seconds (float).
     segment is for a highlighted section in the UI.
 */
-TrackEditor.prototype.schedulePlay = function(now, delay, startTime, endTime) { 
+TrackEditor.prototype.schedulePlay = function(now, startTime, endTime) { 
     var start,
         duration,
         relPos,
-        when = now + delay,
+        when = now,
         segment = (endTime) ? (endTime - startTime) : undefined,
         cueOffset = this.cues.cuein / this.sampleRate;
 
@@ -829,7 +829,7 @@ TrackEditor.prototype.schedulePlay = function(now, delay, startTime, endTime) {
     start = start + cueOffset;
 
     relPos = startTime - this.startTime;
-    this.playout.applyFades(this.fades, relPos, now, delay);
+    this.playout.applyFades(this.fades, relPos, now);
     this.playout.play(when, start, duration);
 };
 
