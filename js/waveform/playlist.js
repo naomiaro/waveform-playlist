@@ -165,7 +165,6 @@ PlaylistEditor.prototype.onTrackScroll = function() {
     that.scrollTimeout = setTimeout(function() {
         
         that.config.setTrackScroll(that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
-        console.log(that.trackContainer.scrollLeft);
         that.fire('trackscroll');
         that.scrollTimeout = false;
     }, 25);   

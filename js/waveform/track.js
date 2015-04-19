@@ -673,6 +673,7 @@ TrackEditor.prototype.trim = function(start, end) {
     
     this.setCuePoints(start, end+1);
     this.resetCursor();
+    this.fades = {};
     this.drawTrack(this.getBuffer());
 };
 
