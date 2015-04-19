@@ -19,4 +19,4 @@ Graphic [dBFS](http://en.wikipedia.org/wiki/DBFS) audio meter.
 
 #### Music by [Blitz//Berlin](http://blitz-berlin.com/)
 
-![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
+![License](https://img.shields.io/github/license/mashape/apistatus.svg)(http://doge.mit-license.org)
