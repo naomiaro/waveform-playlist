@@ -399,7 +399,7 @@ AudioControls.prototype.activateButtonGroup = function(id) {
         return;
     }
 
-    btns = el.getElementsByTagName("a");
+    btns = el.children;
 
     for (i = 0, len = btns.length; i < len; i++) {
         btns[i].classList.remove(classes["disabled"]);
@@ -416,7 +416,7 @@ AudioControls.prototype.deactivateButtonGroup = function(id) {
         return;
     }
 
-    btns = el.getElementsByTagName("a");
+    btns = el.children;
 
     for (i = 0, len = btns.length; i < len; i++) {
         btns[i].classList.add(classes["disabled"]);
