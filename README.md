@@ -21,4 +21,4 @@ Graphic [dBFS](http://en.wikipedia.org/wiki/DBFS) audio meter.
 
 Originally created for the [Airtime](https://www.sourcefabric.org/en/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/)
 
-![License](https://img.shields.io/github/license/mashape/apistatus.svg)(http://doge.mit-license.org)
+![[License](https://img.shields.io/github/license/mashape/apistatus.svg)](http://doge.mit-license.org)
