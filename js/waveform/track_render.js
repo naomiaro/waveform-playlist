@@ -230,18 +230,18 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
     this.container.appendChild(fragment);
     
     this.getPeaks(buffer, cues);
-    this.draw(0);
+    this.draw();
     this.drawTimeShift();
 };
 
-WaveformDrawer.prototype.drawFrame = function(chanNum, index, peaks, maxPeak, cursorPos) {
+WaveformDrawer.prototype.drawFrame = function(chanNum, index, peak) {
     var x, y, w, h, max, min,
         h2 = this.height / 2,
         cc = this.channels[chanNum].context,
         colors = this.config.getColorScheme();
 
-    max = Math.abs((peaks.max / maxPeak) * h2);
-    min = Math.abs((peaks.min / maxPeak) * h2);
+    max = Math.abs((peak.max / this.maxPeak) * h2);
+    min = Math.abs((peak.min / this.maxPeak) * h2);
 
     w = 1;
     x = index * w;
@@ -257,7 +257,7 @@ WaveformDrawer.prototype.drawFrame = function(chanNum, index, peaks, maxPeak, cu
 /*
     start, end are optional parameters to only redraw part of the canvas.
 */
-WaveformDrawer.prototype.draw = function(cursorPos, start, end) {
+WaveformDrawer.prototype.draw = function(start, end) {
     var that = this,
         peaks = this.peaks,
         pixelOffset = this.pixelOffset,
@@ -279,7 +279,7 @@ WaveformDrawer.prototype.draw = function(cursorPos, start, end) {
     for (; i < len; i++) {
 
         peaks[i].forEach(function(peak, chanNum) {
-            that.drawFrame(chanNum, i, peak, that.maxPeak, cursorPos);
+            that.drawFrame(chanNum, i, peak);
         });
     } 
 };
