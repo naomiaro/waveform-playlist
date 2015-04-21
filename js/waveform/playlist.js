@@ -127,6 +127,7 @@ PlaylistEditor.prototype.onTrimAudio = function() {
 
 /*
     Called when a user manually updates the cue points in the UI.
+    args start/end are in seconds
 */
 PlaylistEditor.prototype.onSelectionChange = function(args) {
     
@@ -134,13 +135,14 @@ PlaylistEditor.prototype.onSelectionChange = function(args) {
         return;
     }
 
+    //TODO this should really be playlist wide - NOT track specific.
     var res = this.config.getResolution(),
-        start = ~~(args.start * this.sampleRate / res),
-        end = ~~(args.end * this.sampleRate / res);
+        track = this.activeTrack,
+        start = ~~(track.secondsToPixels(args.start) - track.samplesToPixels(track.leftOffset)),
+        end = ~~(track.secondsToPixels(args.end) - track.samplesToPixels(track.leftOffset));
 
     this.config.setCursorPos(args.start);
-    //TODO this should really be playlist wide - NOT track specific.
-    this.activeTrack.setSelectedArea(start, end);
+    track.setSelectedArea(start, end);
 };
 
 PlaylistEditor.prototype.onStateChange = function() {
