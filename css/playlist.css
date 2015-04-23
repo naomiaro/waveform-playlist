@@ -3,8 +3,19 @@ html, body {
   margin: 0;
 }
 
-body {
+.playlist-wrapper {
   position: relative;
+  height: 100%;
+  width: 90%;
+  margin: 0 auto;
+}
+
+.playlist-container {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  bottom: 0;
+  right: 0;
 }
 
 .playlist {

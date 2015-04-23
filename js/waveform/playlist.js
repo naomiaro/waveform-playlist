@@ -369,6 +369,8 @@ PlaylistEditor.prototype.updateEditor = function() {
         for (i = 0, len = editors.length; i < len; i++) {
             editors[i].showProgress(0);
         }
+
+        this.pausedAt = undefined;
         window.cancelAnimationFrame(this.animationRequest);
     } 
 };
