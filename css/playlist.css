@@ -10,39 +10,13 @@ html, body {
   margin: 0 auto;
 }
 
-.playlist-container {
-  position: absolute;
-  top: 40px;
-  left: 0;
-  bottom: 0;
-  right: 0;
-}
-
 .playlist {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   overflow: hidden;
-}
-
-.playlist-top-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50px;
-}
-
-.playlist-toolbar {
-  margin-left: 5px;
-  margin-top: 5px;
+  margin: 2em 0;
 }
 
 .playlist-time-scale {
-  position: absolute;
-  top: 60px;
+  position: relative;
   left: 0;
   right: 0;
   height: 30px;
@@ -54,8 +28,6 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 30px;
-  width: 100%;
 }
 
 .playlist-time-scale div {
@@ -64,10 +36,6 @@ html, body {
 
 .playlist-tracks {
   position: relative;
-  top: 90px;
-  left: 0;
-  right: 0;
-  bottom: 95px;
   overflow: auto;
 }
 
@@ -94,13 +62,8 @@ html, body {
   z-index: 1000;
 }
 
-
-.playlist-bottom-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 40px;
+.playlist-top-bar {
+  margin: 1em 0;
 }
 
 .state-select .channel {

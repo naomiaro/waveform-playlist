@@ -12,7 +12,7 @@ var Config = function(params) {
 
             ac: new (window.AudioContext || window.webkitAudioContext),
 
-            resolution: 4096, //resolution - samples per pixel to draw.
+            resolution: 4096, //resolution - frames per pixel to draw.
             minResolution: 500,
             maxResolution: 20000,
             timeFormat: 'hh:mm:ss.uu',
