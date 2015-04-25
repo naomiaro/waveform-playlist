@@ -6,56 +6,12 @@ var TrackEditor = function() {
 
 unitConversions.call(TrackEditor.prototype);
 
-TrackEditor.prototype.classes = {
-    "cursor": [
-        "state-select"
-    ],
-
-    "select": [
-        "state-select"
-    ],
-
-    "fadein": [
-        "state-select"
-    ],
-
-    "fadeout": [
-        "state-select"
-    ],
-
-    "shift": [
-        "state-shift"
-    ],
-
-    "active": [
-        "active"
-    ],
-
-    "disabled": [
-        "disabled"
-    ]
-};
-
-TrackEditor.prototype.events = {
-    "cursor": {
-        "mousedown": "selectCursorPos"
-    },
-
-    "select": {
-        "mousedown": "selectStart"
-    },
-
-    "fadein": {
-        "mousedown": "selectFadeIn"
-    },
-
-    "fadeout": {
-        "mousedown": "selectFadeOut"
-    },
-
-    "shift": {
-        "mousedown": "timeShift"
-    }
+TrackEditor.prototype.states = {
+    cursor: cursorState,
+    select: selectState,
+    fadein: fadeinState,
+    fadeout: fadeoutState,
+    shift: shiftState
 };
 
 TrackEditor.prototype.setConfig = function(config) {
@@ -396,203 +352,6 @@ TrackEditor.prototype.findLayerOffset = function(e) {
     return layerOffset;
 };
 
-/* start of state methods */
-
-/*
-    mousedown event in 'shift' mode
-*/
-TrackEditor.prototype.timeShift = function(e) {
-    e.preventDefault();
-
-    var el = this.container, //want the events placed on the channel wrapper.
-        editor = this,
-        startX = e.pageX, 
-        diffX = 0, 
-        updatedX = 0,
-        origX = editor.leftOffset / editor.resolution,
-        complete;
-
-    //dynamically put an event on the element.
-    el.onmousemove = function(e) {
-        e.preventDefault();
-
-        var endX = e.pageX;
-        
-        diffX = endX - startX;
-        updatedX = origX + diffX;
-        editor.setLeftOffset(editor.pixelsToSamples(updatedX));
-    };
-
-    complete = function(e) {
-        e.preventDefault();
-
-        var delta = editor.pixelsToSeconds(diffX);
-
-        el.onmousemove = el.onmouseup = el.onmouseleave = null;
-        editor.setLeftOffset(editor.pixelsToSamples(updatedX));
-
-        //update track's start and end time relative to the playlist.
-        editor.startTime = editor.startTime + delta;
-        editor.endTime = editor.endTime + delta;
-    };
-
-    el.onmouseup = el.onmouseleave = complete;
-};
-
-/*
-    This is used when in 'select' state as a mousedown event
-*/
-TrackEditor.prototype.selectStart = function(e) {
-    e.preventDefault();
-
-    var el = this.container, //want the events placed on the channel wrapper.
-        editor = this,
-        startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-        prevX = e.layerX || e.offsetX,
-        offset = this.leftOffset,
-        startTime,
-        layerOffset,
-        complete;
-
-    layerOffset = this.findLayerOffset(e);
-    if (layerOffset < 0) {
-        return;
-    }
-    startX = startX + layerOffset;
-    prevX = prevX + layerOffset;
-
-    editor.setSelectedArea(startX, startX);
-    startTime = editor.samplesToSeconds(offset + editor.selectedArea.start);
-
-    editor.notifySelectUpdate(startTime, startTime);
-
-    //dynamically put an event on the element.
-    el.onmousemove = function(e) {
-        e.preventDefault();
-
-        var currentX = layerOffset + (e.layerX || e.offsetX),
-            delta = currentX - prevX,
-            minX = Math.min(prevX, currentX, startX),
-            maxX = Math.max(prevX, currentX, startX),
-            selectStart,
-            selectEnd,
-            startTime, endTime;
-        
-        if (currentX > startX) {
-            selectStart = startX;
-            selectEnd = currentX;
-        }
-        else {
-            selectStart = currentX;
-            selectEnd = startX;
-        }
-
-        startTime = editor.samplesToSeconds(offset + editor.selectedArea.start);
-        endTime = editor.samplesToSeconds(offset + editor.selectedArea.end);
-
-        editor.setSelectedArea(selectStart, selectEnd);
-        editor.notifySelectUpdate(startTime, endTime);
-        prevX = currentX;
-    };
-
-    complete = function(e) {
-        e.preventDefault();
-
-        var endX = layerOffset + (e.layerX || e.offsetX),
-            minX, maxX,
-            startTime, endTime;
-
-        minX = Math.min(startX, endX);
-        maxX = Math.max(startX, endX);
-
-        editor.setSelectedArea(minX, maxX, e.shiftKey);
-
-        minX = editor.samplesToPixels(offset + editor.selectedArea.start);
-        maxX = editor.samplesToPixels(offset + editor.selectedArea.end);
-
-        el.onmousemove = el.onmouseup = el.onmouseleave = null;
-        
-        //if more than one pixel is selected, listen to possible fade events.
-        if (Math.abs(minX - maxX)) {
-            editor.activateAudioSelection();
-        }
-        else {
-            editor.deactivateAudioSelection();
-        }
-
-        startTime = editor.samplesToSeconds(offset + editor.selectedArea.start);
-        endTime = editor.samplesToSeconds(offset + editor.selectedArea.end);
-
-        editor.config.setCursorPos(startTime);
-        editor.notifySelectUpdate(startTime, endTime);    
-    };
-
-    el.onmouseup = el.onmouseleave = complete;
-};
-
-/*
-    This is used when in 'cursor' state as a mousedown event
-*/
-TrackEditor.prototype.selectCursorPos = function(e) {
-    var editor = this,
-        startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-        offset = this.leftOffset,
-        startTime, 
-        endTime,
-        layerOffset;
-
-    layerOffset = this.findLayerOffset(e);
-    if (layerOffset < 0) {
-        return;
-    }
-    startX = startX + layerOffset;
-
-    editor.setSelectedArea(startX, startX);
-    startTime = editor.samplesToSeconds(offset + editor.selectedArea.start);
-    endTime = editor.samplesToSeconds(offset + editor.selectedArea.end);
-
-    editor.config.setCursorPos(startTime);
-    editor.notifySelectUpdate(startTime, endTime);
-
-    editor.deactivateAudioSelection();
-};
-
-TrackEditor.prototype.selectFadeIn = function(e) {
-    var startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-        layerOffset,
-        FADETYPE = "FadeIn",
-        shape = this.config.getFadeType();
-
-    layerOffset = this.findLayerOffset(e);
-    if (layerOffset < 0) {
-        return;
-    }
-    startX = startX + layerOffset;
-
-    this.setSelectedArea(undefined, startX);
-    this.removeFadeType(FADETYPE);
-    this.createFade(FADETYPE, shape);
-};
-
-TrackEditor.prototype.selectFadeOut = function(e) {
-    var startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-        layerOffset,
-        FADETYPE = "FadeOut",
-        shape = this.config.getFadeType();
-
-    layerOffset = this.findLayerOffset(e);
-    if (layerOffset < 0) {
-        return;
-    }
-    startX = startX + layerOffset;
-
-    this.setSelectedArea(startX, undefined);
-    this.removeFadeType(FADETYPE);
-    this.createFade(FADETYPE, shape);
-};
-
-/* end of state methods */
-
 TrackEditor.prototype.saveFade = function(id, type, shape, start, end) {
     
     this.fades[id] = {
@@ -691,56 +450,13 @@ TrackEditor.prototype.onTrimAudio = function() {
 };
 
 TrackEditor.prototype.setState = function(state) {
-    var that = this,
-        stateEvents = this.events[state],
-        stateClasses = this.classes[state],
-        disabledClasses = this.classes['disabled'],
-        enabledStates = this.enabledStates,
-        container = this.container,
-        prevState = this.currentState,
-        prevStateClasses,
-        prevStateEvents = this.prevStateEvents,
-        func, event, cl,
-        i, len;
+    //leave the past state if it was enabled
+    this.currentState && this.currentState.leave.call(this);
 
-    if (prevState) {
-        prevStateClasses = this.classes[prevState];
-       
-        if (enabledStates[prevState] === true) {
-            for (event in prevStateEvents) {
-                container.removeEventListener(event, prevStateEvents[event]);
-            }
-            this.prevStateEvents = {};
-
-            for (i = 0, len = prevStateClasses.length; i < len; i++) {
-                container.classList.remove(prevStateClasses[i]);
-            }
-        }
-        else {
-            for (i = 0, len = disabledClasses.length; i < len; i++) {
-                container.classList.remove(disabledClasses[i]);
-            }
-        }  
+    if (this.enabledStates[state]) {
+        this.currentState = this.states[state];
+        this.currentState.enter.call(this);
     }
-
-    if (enabledStates[state] === true) {
-        for (event in stateEvents) {
-            func = that[stateEvents[event]].bind(that);
-            //need to keep track of the added events for later removal since a new function is returned after using "bind"
-            this.prevStateEvents[event] = func;
-            container.addEventListener(event, func);
-        }
-        for (i = 0, len = stateClasses.length; i < len; i++) {
-            container.classList.add(stateClasses[i]);
-        }
-    }
-    else {
-        for (i = 0, len = disabledClasses.length; i < len; i++) {
-            container.classList.add(disabledClasses[i]);
-        }
-    }
-
-    this.currentState = state;
 };
 
 TrackEditor.prototype.onResolutionChange = function(res) {
@@ -859,4 +575,3 @@ TrackEditor.prototype.getTrackDetails = function() {
 
     return d;
 };
-

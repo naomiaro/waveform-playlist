@@ -38,6 +38,9 @@ html, body {
   margin: 1em 0;
 }
 
+.state-cursor .channel,
+.state-fadein .channel,
+.state-fadeout .channel,
 .state-select .channel {
   cursor: text;
 }

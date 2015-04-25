@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset=utf-8 />
-    <title>Waveform Playlist Full Example</title>
+    <title>Waveform Playlist | Individual State Config For Tracks</title>
 
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
@@ -30,8 +30,8 @@
   <body>
     <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
 
-    <h1>Full Waveform Editor Example</h1>
-    <p>Every control and state available</p>
+    <h1>Individual Track State Example</h1>
+    <p>First track in the playlist can not be shifted in time</p>
 
     <article class="playlist-wrapper">
       <section class="playlist-container">
@@ -97,42 +97,21 @@
 
         var tracks = [
             {
-              "start":0,
-              "end":235.83344671201814,
-              "fades":[
-                {
-                  "type":"FadeOut",
-                  "shape":"sCurve",
-                  "start":234.69387755102042,
-                  "end":235.83344671201814
-                }
-              ],
-              "src":"../media/Drink.mp3",
-              "cuein":0,
-              "cueout":235.83344671201814
+              start:0,
+              end:235.83344671201814,
+              src:"../media/Drink.mp3",
+              cuein:0,
+              cueout:235.83344671201814,
+              states: {
+                shift: false
+              }
             },
             {
-              "start":234.92063492063494,
-              "end":485.7483673469387,
-              "fades":[
-                {
-                  "type":"FadeIn",
-                  "shape":"logarithmic",
-                  "start":0,
-                  "end":1.3605442176870748
-                }
-              ],
-              "src":"../media/Legend.mp3",
-              "cuein":0,
-              "cueout":250.82773242630387
-            },
-            {
-              "start":471.6553287981859,
-              "end":747.43,
-              "fades":[],
-              "src":"../media/Outside.mp3",
-              "cuein":0,
-              "cueout":275.77467120181404
+              start:234.92063492063494,
+              end:485.7483673469387,
+              src:"../media/Legend.mp3",
+              cuein:0,
+              cueout:250.82773242630387
             }
         ];
 
@@ -145,7 +124,7 @@
             container: container,
             timescale: true,
             UITheme: "bootstrap",
-            state: 'select'
+            state: 'shift'
         });  
 
         var playlistEditor = new PlaylistEditor();
