@@ -63,7 +63,6 @@ TrackEditor.prototype.init = function(src, start, end, fades, cues, stateConfig)
 
     this.setLeftOffset(this.secondsToSamples(this.startTime));
 
-    this.prevStateEvents = {};
     this.setState(this.config.getState());
 
     this.fades = {};
