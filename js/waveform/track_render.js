@@ -163,7 +163,6 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
         numChan = makeMono? 1 : buffer.numberOfChannels,
         numSamples = cues.cueout - cues.cuein + 1,
         fragment = document.createDocumentFragment(),
-        colors = this.config.getColorScheme(),
         wrapperHeight; 
 
     this.container.innerHTML = "";
@@ -175,6 +174,7 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
 
     for (i = 0; i < numChan; i++) {
 
+        //main container for this channel
         div = document.createElement("div");
         div.classList.add("channel");
         div.classList.add("channel-"+i);
@@ -182,21 +182,36 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
         div.style.height = this.height+"px";
         div.style.top = top+"px";
         div.style.left = left+"px";
-        div.style.background = colors.waveColor;
+        div.style.position = "absolute";
+        div.style.margin = 0;
+        div.style.padding = 0;
+        div.style.zIndex = 1;
 
+        //shows playback progress
+        progress = document.createElement("div");
+        progress.classList.add("channel-progress");
+        progress.style.position = "absolute";
+        progress.style.width = 0;
+        progress.style.height = this.height+"px";
+        progress.style.zIndex = 2;
+
+        //canvas with the waveform drawn
         canv = document.createElement("canvas");
         canv.setAttribute('width', this.width);
         canv.setAttribute('height', this.height);
+        canv.style.position = "absolute";
+        canv.style.margin = 0;
+        canv.style.padding = 0;
+        canv.style.zIndex = 3;
 
-        progress = document.createElement("div");
-        progress.classList.add("channel-progress");
-        progress.style.background = colors.progressColor;
-        progress.style.width = 0;
-        progress.style.height = this.height+"px";
-
+        //draws cursor selection
         surface = document.createElement("canvas");
         surface.setAttribute('width', this.width);
         surface.setAttribute('height', this.height);
+        surface.style.position = "absolute";
+        surface.style.margin = 0;
+        surface.style.padding = 0;
+        surface.style.zIndex = 4;
 
         this.channels.push({
             context: canv.getContext('2d'),
@@ -219,7 +234,7 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
     cursor.style.top = 0;
     cursor.style.left = 0;
     cursor.style.bottom = 0;
-    cursor.style.borderRight = "1px solid #000";
+    cursor.style.zIndex = 100;
 
     this.cursor = cursor;
 
@@ -246,7 +261,7 @@ WaveformDrawer.prototype.drawFrame = function(chanNum, index, peak) {
     w = 1;
     x = index * w;
     
-    cc.fillStyle = 'white';
+    cc.fillStyle = colors.waveOutlineColor;
 
     //draw maxs
     cc.fillRect(x, 0, w, h2-max);
@@ -432,6 +447,7 @@ WaveformDrawer.prototype.drawFade = function(id, type, shape, start, end) {
     div = document.createElement("div");
     div.classList.add("playlist-fade");
     div.classList.add("playlist-fade-"+id);
+    div.style.position = "absolute";
     div.style.width = width+"px";
     div.style.height = this.height+"px";
     div.style.top = 0;

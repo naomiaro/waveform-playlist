@@ -23,16 +23,10 @@ var Config = function(params) {
 
             UITheme: "default", // bootstrap || jQueryUI || default
 
-            waveColor: 'grey',
-            progressColor: 'orange',
-            loadingColor: 'purple',
-            cursorColor: 'green',
-            markerColor: 'green',
+            waveOutlineColor: 'white',
             selectBorderColor: 'red',
             selectBackgroundColor: 'rgba(0,0,0,0.1)',
-
             timeColor: 'grey',
-            fontColor: 'black',
             fadeColor: 'black',
 
             waveHeight: 128, //height of each canvas element a waveform is on.
@@ -121,13 +115,8 @@ var Config = function(params) {
 
         that.getColorScheme = function getColorScheme() {
             return {
-                waveColor: params.waveColor,
-                progressColor: params.progressColor,
-                loadingColor: params.loadingColor,
-                cursorColor: params.cursorColor,
-                markerColor: params.markerColor,
+                waveOutlineColor: params.waveOutlineColor,
                 timeColor: params.timeColor,
-                fontColor: params.fontColor,
                 fadeColor: params.fadeColor,
                 selectBorderColor: params.selectBorderColor,
                 selectBackgroundColor: params.selectBackgroundColor, 

@@ -24,7 +24,12 @@ PlaylistEditor.prototype.init = function(tracks) {
 
     this.storage = new Storage();
 
+    container.style.overflow = "hidden";
+
     this.trackContainer = div;
+    this.trackContainer.style.position = "relative";
+    this.trackContainer.style.overflow = "auto";
+
     this.trackEditors = [];
 
     audioControls = new AudioControls();

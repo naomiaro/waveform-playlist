@@ -14,6 +14,9 @@ TimeScale.prototype.init = function(config) {
     makePublisher(this);
 
     div = document.getElementsByClassName("playlist-time-scale")[0];
+    div.style.position = "relative";
+    div.style.left = 0;
+    div.style.right = 0;
 
     if (div === undefined) {
         return;
@@ -31,6 +34,11 @@ TimeScale.prototype.init = function(config) {
 
     canv.setAttribute('width', this.width);
     canv.setAttribute('height', this.height);
+    canv.style.position = "absolute";
+    canv.style.left = 0;
+    canv.style.right = 0;
+    canv.style.top = 0;
+    canv.style.bottom = 0;
 
     //array of divs displaying time every 30 seconds. (TODO should make this depend on resolution)
     this.times = [];
@@ -126,6 +134,7 @@ TimeScale.prototype.drawScale = function(offset) {
                 time = document.createTextNode(sTime);
                 div = document.createElement("div");
         
+                div.style.position = "absolute";
                 div.style.left = pix+"px";
                 div.appendChild(time);
                 fragment.appendChild(div);

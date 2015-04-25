@@ -4,6 +4,8 @@ var TrackEditor = function() {
 
 };
 
+unitConversions.call(TrackEditor.prototype);
+
 TrackEditor.prototype.classes = {
     "cursor": [
         "state-select"
@@ -86,6 +88,8 @@ TrackEditor.prototype.init = function(src, start, end, fades, cues, stateConfig)
     makePublisher(this);
 
     this.container = document.createElement("div");
+    this.container.classList.add("channel-wrapper");
+    this.container.style.position = "relative";
 
     this.drawer = new WaveformDrawer();
     this.drawer.init(this.container, this.config);
@@ -120,7 +124,6 @@ TrackEditor.prototype.init = function(src, start, end, fades, cues, stateConfig)
     
     this.active = false;
     this.selectedArea = undefined; //selected area of track stored as inclusive buffer indices to the audio buffer.
-    this.container.classList.add("channel-wrapper");
     this.drawer.drawLoading();
 
     return this.container;
@@ -240,30 +243,6 @@ TrackEditor.prototype.onTrackLoad = function(buffer, err) {
         this.config.setCursorPos(startTime);
         this.notifySelectUpdate(startTime, endTime);
     }
-};
-
-TrackEditor.prototype.samplesToSeconds = function(samples) {
-    return samples / this.sampleRate;
-};
-
-TrackEditor.prototype.secondsToSamples = function(seconds) {
-    return Math.ceil(seconds * this.sampleRate);
-};
-
-TrackEditor.prototype.samplesToPixels = function(samples) {
-    return ~~(samples / this.resolution);
-};
-
-TrackEditor.prototype.pixelsToSamples = function(pixels) {
-    return ~~(pixels * this.resolution);
-};
-
-TrackEditor.prototype.pixelsToSeconds = function(pixels) {
-    return pixels * this.resolution / this.sampleRate;
-};
-
-TrackEditor.prototype.secondsToPixels = function(seconds) {
-    return ~~(seconds * this.sampleRate / this.resolution);
 };
 
 TrackEditor.prototype.activate = function() {

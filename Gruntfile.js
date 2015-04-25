@@ -13,17 +13,8 @@ module.exports = function(grunt) {
       },
       dist: {
         src: [
-          'js/waveform/observer/observer.js',
-          'js/waveform/local_storage.js',
-          'js/waveform/config.js',
-          'js/waveform/curves.js',
-          'js/waveform/track_render.js',
-          'js/waveform/fades.js',
-          'js/waveform/playout.js',
-          'js/waveform/track.js',
-          'js/waveform/time_scale.js',
-          'js/waveform/controls.js',
-          'js/waveform/playlist.js'
+          'js/waveform/mixins/*.js',
+          'js/waveform/*.js'
         ],
         dest: 'dist/<%= pkg.name %>.js'
       }
