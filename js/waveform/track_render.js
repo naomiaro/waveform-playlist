@@ -452,6 +452,7 @@ WaveformDrawer.prototype.drawFade = function(id, type, shape, start, end) {
     div.style.height = this.height+"px";
     div.style.top = 0;
     div.style.left = left+"px";
+    div.style.zIndex = 1000;
 
     canv = document.createElement("canvas");
     canv.setAttribute('width', width);
