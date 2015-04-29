@@ -119,15 +119,7 @@ PlaylistEditor.prototype.resize = function() {
 };
 
 PlaylistEditor.prototype.onTrimAudio = function() {
-    var track = this.activeTrack,
-        selected = track.getSelectedArea(),
-        start, end;
-
-    if (selected === undefined) {
-        return;
-    }
-
-    track.trim(selected.start, selected.end); 
+    this.activeTrack && this.activeTrack.trim(); 
 };
 
 /*
@@ -135,19 +127,9 @@ PlaylistEditor.prototype.onTrimAudio = function() {
     args start/end are in seconds
 */
 PlaylistEditor.prototype.onSelectionChange = function(args) {
-    
-    if (this.activeTrack === undefined) {
-        return;
-    }
-
-    //TODO this should really be playlist wide - NOT track specific.
-    var res = this.config.getResolution(),
-        track = this.activeTrack,
-        start = ~~(track.secondsToPixels(args.start) - track.samplesToPixels(track.leftOffset)),
-        end = ~~(track.secondsToPixels(args.end) - track.samplesToPixels(track.leftOffset));
 
     this.config.setCursorPos(args.start);
-    track.setSelectedArea(start, end);
+    this.activeTrack && this.activeTrack.setSelectedArea(args.start, args.end);
 };
 
 PlaylistEditor.prototype.onStateChange = function() {
@@ -207,10 +189,6 @@ PlaylistEditor.prototype.resetCursor = function() {
     this.config.setCursorPos(0);
 };
 
-PlaylistEditor.prototype.onCursorSelection = function(args) {
-    this.activateTrack(args.editor);
-};
-
 PlaylistEditor.prototype.rewind = function() {
     
     if (this.activeTrack !== undefined) {
@@ -247,15 +225,8 @@ PlaylistEditor.prototype.fastForward = function() {
     returns selected time in global (playlist relative) seconds.
 */
 PlaylistEditor.prototype.getSelected = function() {
-    var selected,
-        start,
-        end;
-
     if (this.activeTrack) {
-        selected = this.activeTrack.selectedArea;
-        if (selected !== undefined && (selected.end > selected.start)) {
-            return this.activeTrack.getSelectedPlayTime();
-        }
+        return this.activeTrack.selectedArea;
     }
 };
 
@@ -282,7 +253,7 @@ PlaylistEditor.prototype.play = function() {
         endTime,
         selected = this.getSelected();
 
-    if (selected !== undefined) {
+    if (selected !== undefined && selected.endTime > startTime) {
         startTime = selected.startTime;
         endTime = selected.endTime;
     }

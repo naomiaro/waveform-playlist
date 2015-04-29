@@ -107,8 +107,11 @@ WaveformDrawer.prototype.getPeaks = function(buffer, cues) {
 };
 
 WaveformDrawer.prototype.setPixelOffset = function(pixels) {
+    var containerWidth = pixels + this.width;
+
     this.pixelOffset = pixels;
     this.drawTimeShift();
+    this.container.style.width = containerWidth+"px";
 };
 
 WaveformDrawer.prototype.drawTimeShift = function() {
@@ -149,6 +152,36 @@ WaveformDrawer.prototype.drawLoading = function() {
     this.container.appendChild(div);
 };
 
+/*
+    Returns a layerOffset in pixels relative to the entire playlist.
+*/
+WaveformDrawer.prototype.findLayerOffset = function(target) {
+    var layerOffset = 0,
+        parent;
+
+    if (target.tagName === "CANVAS") {
+        //If canvas selected must add left offset to layerX
+        //this will be an offset relative to the entire playlist.
+        parent = target.parentNode;
+        layerOffset = parent.offsetLeft;
+
+        //need to add the offset of the channel wrapper as well.
+        if (parent.classList.contains('playlist-fade')) {
+            parent = parent.parentNode;
+            layerOffset += parent.offsetLeft;
+        }
+
+    }
+    else {
+        //selection div may even throw us off.
+        if (target.classList.contains('selection')) {
+            layerOffset += target.offsetLeft;
+        }
+    }
+
+    return layerOffset;
+};
+
 WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
     var canv,
         div,
@@ -166,7 +199,8 @@ WaveformDrawer.prototype.drawBuffer = function(buffer, cues) {
         wrapperHeight; 
 
     this.container.innerHTML = "";
-    this.channels = [];  
+    this.channels = []; 
+    this.selection = undefined; 
 
     //width and height is per waveform canvas.
     this.width = Math.ceil(numSamples / res);
@@ -255,8 +289,8 @@ WaveformDrawer.prototype.drawFrame = function(chanNum, index, peak) {
         cc = this.channels[chanNum].context,
         colors = this.config.getColorScheme();
 
-    max = Math.abs((peak.max / this.maxPeak) * h2);
-    min = Math.abs((peak.min / this.maxPeak) * h2);
+    max = Math.abs(peak.max * h2);
+    min = Math.abs(peak.min * h2);
 
     w = 1;
     x = index * w;
@@ -336,20 +370,25 @@ WaveformDrawer.prototype.drawCursor = function(cursorPos) {
     start, end in pixels.
 */
 WaveformDrawer.prototype.drawHighlight = function(start, end) {
-    var i, len,
-        colors = this.config.getColorScheme(),
-        fillStyle,
-        ctx,
-        width = end - start + 1,
-        isBorder;
+    var width = end - start + 1,
+        selectionClass,
+        selection = this.selection || document.createElement("div");
 
-    fillStyle = (width === 1) ? colors.selectBorderColor : colors.selectBackgroundColor;
-    this.clear();
+    selectionClass = (width === 1) ? 'selection-cursor' : 'selection-segment';
 
-    for (i = 0, len = this.channels.length; i < len; i++) {
-        ctx = this.channels[i].surface;
-        ctx.fillStyle = fillStyle;
-        ctx.fillRect(start, 0, width, this.height);
+    selection.className = "";
+    selection.classList.add(selectionClass);
+    selection.classList.add("selection");
+    selection.style.position = "absolute";
+    selection.style.width = width+"px";
+    selection.style.bottom = 0;
+    selection.style.top = 0;
+    selection.style.left = start+"px";
+    selection.style.zIndex = 2000;
+
+    if (this.selection === undefined) {
+        this.container.appendChild(selection);
+        this.selection = selection;
     }
 };
 

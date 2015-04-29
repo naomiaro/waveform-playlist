@@ -3,13 +3,6 @@ html, body {
   margin: 0;
 }
 
-.playlist-wrapper {
-  position: relative;
-  height: 100%;
-  width: 90%;
-  margin: 0 auto;
-}
-
 .playlist {
   margin: 2em 0;
 }
@@ -38,13 +31,21 @@ html, body {
   margin: 1em 0;
 }
 
-.state-cursor .channel,
+.state-cursor,
 .state-fadein .channel,
 .state-fadeout .channel,
-.state-select .channel {
+.state-select {
   cursor: text;
 }
 
 .state-shift .channel {
   cursor: move;
+}
+
+.selection-cursor {
+  background: red;
+}
+
+.selection-segment {
+  background: rgba(0,0,0,0.1);
 }

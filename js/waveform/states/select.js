@@ -28,84 +28,48 @@ var selectState = {
 
       var el = this.container, //want the events placed on the channel wrapper.
           editor = this,
-          startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-          prevX = e.layerX || e.offsetX,
-          offset = this.leftOffset,
+          startX = e.layerX || e.offsetX,
           startTime,
           layerOffset,
           complete;
 
-      layerOffset = this.findLayerOffset(e);
-      if (layerOffset < 0) {
-          return;
-      }
-      startX = startX + layerOffset;
-      prevX = prevX + layerOffset;
-
-      editor.setSelectedArea(startX, startX);
-      startTime = editor.samplesToSeconds(offset + editor.selectedArea.start);
-
+      layerOffset = editor.drawer.findLayerOffset(e.target);
+      startX += layerOffset;
+      startTime = editor.pixelsToSeconds(startX);
       editor.notifySelectUpdate(startTime, startTime);
 
       //dynamically put an event on the element.
       el.onmousemove = function(e) {
           e.preventDefault();
 
-          var currentX = layerOffset + (e.layerX || e.offsetX),
-              delta = currentX - prevX,
-              minX = Math.min(prevX, currentX, startX),
-              maxX = Math.max(prevX, currentX, startX),
-              selectStart,
-              selectEnd,
-              startTime, endTime;
-          
-          if (currentX > startX) {
-              selectStart = startX;
-              selectEnd = currentX;
-          }
-          else {
-              selectStart = currentX;
-              selectEnd = startX;
-          }
+          var layerOffset = editor.drawer.findLayerOffset(e.target),
+              currentX = layerOffset + (e.layerX || e.offsetX),
+              minX = Math.min(currentX, startX),
+              maxX = Math.max(currentX, startX),
+              startTime,
+              endTime;
 
-          startTime = editor.samplesToSeconds(offset + editor.selectedArea.start);
-          endTime = editor.samplesToSeconds(offset + editor.selectedArea.end);
-
-          editor.setSelectedArea(selectStart, selectEnd);
+          startTime = editor.pixelsToSeconds(minX);
+          endTime = editor.pixelsToSeconds(maxX);
           editor.notifySelectUpdate(startTime, endTime);
-          prevX = currentX;
       };
 
       complete = function(e) {
           e.preventDefault();
 
-          var endX = layerOffset + (e.layerX || e.offsetX),
+          var layerOffset = editor.drawer.findLayerOffset(e.target),
+              endX = layerOffset + (e.layerX || e.offsetX),
               minX, maxX,
               startTime, endTime;
 
           minX = Math.min(startX, endX);
           maxX = Math.max(startX, endX);
 
-          editor.setSelectedArea(minX, maxX, e.shiftKey);
-
-          minX = editor.samplesToPixels(offset + editor.selectedArea.start);
-          maxX = editor.samplesToPixels(offset + editor.selectedArea.end);
+          startTime = editor.pixelsToSeconds(minX);
+          endTime = editor.pixelsToSeconds(maxX);
+          editor.notifySelectUpdate(startTime, endTime, e.shiftKey);
 
           el.onmousemove = el.onmouseup = el.onmouseleave = null;
-          
-          //if more than one pixel is selected, listen to possible fade events.
-          if (Math.abs(minX - maxX)) {
-              editor.activateAudioSelection();
-          }
-          else {
-              editor.deactivateAudioSelection();
-          }
-
-          startTime = editor.samplesToSeconds(offset + editor.selectedArea.start);
-          endTime = editor.samplesToSeconds(offset + editor.selectedArea.end);
-
-          editor.config.setCursorPos(startTime);
-          editor.notifySelectUpdate(startTime, endTime);    
       };
 
       el.onmouseup = el.onmouseleave = complete;

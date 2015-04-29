@@ -24,8 +24,6 @@ var Config = function(params) {
             UITheme: "default", // bootstrap || jQueryUI || default
 
             waveOutlineColor: 'white',
-            selectBorderColor: 'red',
-            selectBackgroundColor: 'rgba(0,0,0,0.1)',
             timeColor: 'grey',
             fadeColor: 'black',
 

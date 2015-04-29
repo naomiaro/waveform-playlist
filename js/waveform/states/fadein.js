@@ -20,19 +20,20 @@ var fadeinState = {
   },
 
   event: function(e) {
-    var startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
+    var startX = e.layerX || e.offsetX, //relative to e.target
         layerOffset,
         FADETYPE = "FadeIn",
-        shape = this.config.getFadeType();
+        shape = this.config.getFadeType(),
+        trackStartPix = this.drawer.pixelOffset,
+        trackEndPix = trackStartPix + this.drawer.width;
 
-    layerOffset = this.findLayerOffset(e);
-    if (layerOffset < 0) {
-        return;
-    }
-    startX = startX + layerOffset;
+    layerOffset = this.drawer.findLayerOffset(e.target);
+    startX += layerOffset;
 
-    this.setSelectedArea(undefined, startX);
     this.removeFadeType(FADETYPE);
-    this.createFade(FADETYPE, shape);
+
+    if (trackStartPix <= startX && trackEndPix >= startX) {
+      this.createFade(FADETYPE, shape, 0, (startX - trackStartPix));
+    }
   }
 };
