@@ -1,0 +1,61 @@
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+.playlist {
+  margin: 2em 0;
+  background: #E0EFF1;
+}
+
+.playlist-top-bar {
+  margin: 1em 0;
+}
+
+.playlist-time-scale {
+  height: 30px;
+  background: #E0EFF1;
+}
+
+.playlist-tracks {
+  background: #E0EFF1;
+}
+
+.playlist-bottom-bar {
+  margin-top: 2em;
+}
+
+.channel {
+  background: #7DB4B5;
+}
+
+.channel-progress {
+  background: #680148;
+}
+
+.cursor {
+  border-right: 1px solid #000;
+}
+
+.playlist-fade {
+  background-color: rgba(0,0,0,0.1);
+}
+
+.selection-cursor {
+  background: #000;
+}
+
+.selection-segment {
+  background: rgba(1,1,1,0.1);
+}
+
+.state-cursor,
+.state-fadein .channel,
+.state-fadeout .channel,
+.state-select {
+  cursor: text;
+}
+
+.state-shift .channel {
+  cursor: move;
+}
