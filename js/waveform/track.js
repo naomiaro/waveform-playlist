@@ -22,6 +22,8 @@ TrackEditor.prototype.setConfig = function(config) {
 TrackEditor.prototype.setLeftOffset = function(offset) {
     this.leftOffset = offset;
     this.drawer.setPixelOffset(offset / this.resolution);
+
+    this.fire('changeshift');
 };
 
 TrackEditor.prototype.init = function(src, start, end, fades, cues, stateConfig) {
@@ -402,6 +404,8 @@ TrackEditor.prototype.onResolutionChange = function(res) {
         
         this.drawer.drawHighlight(this.secondsToPixels(selected.startTime), this.secondsToPixels(selected.endTime));
     }
+
+    this.fire('changeshift');
 };
 
 TrackEditor.prototype.isPlaying = function() {

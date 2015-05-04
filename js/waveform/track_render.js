@@ -12,6 +12,7 @@ WaveformDrawer.prototype.init = function(container, config) {
     this.container = container;
     this.channels = []; //array of canvases, contexts, 1 for each channel displayed.
     this.pixelOffset = 0;
+    this.containerWidth = 0;
 
     var theme = this.config.getUITheme();
 
@@ -111,7 +112,9 @@ WaveformDrawer.prototype.setPixelOffset = function(pixels) {
 
     this.pixelOffset = pixels;
     this.drawTimeShift();
-    this.container.style.width = containerWidth+"px";
+
+    //minimum width in pixels required by this waveform
+    this.containerWidth = pixels + this.width;
 };
 
 WaveformDrawer.prototype.drawTimeShift = function() {

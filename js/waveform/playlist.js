@@ -60,6 +60,7 @@ PlaylistEditor.prototype.init = function(tracks) {
         trackEditor.on("deactivateSelection", "onAudioDeselection", audioControls);
         trackEditor.on("changecursor", "onCursorSelection", audioControls);
         trackEditor.on("changecursor", "onSelectUpdate", this);
+        trackEditor.on("changeshift", "onChangeShift", this);
 
         trackEditor.on("unregister", (function() {
             var editor = this;
@@ -183,6 +184,22 @@ PlaylistEditor.prototype.activateTrack = function(trackEditor) {
 PlaylistEditor.prototype.onSelectUpdate = function(event) {
     
     this.activateTrack(event.editor);
+};
+
+PlaylistEditor.prototype.onChangeShift = function(event) {
+    var editors = this.trackEditors,
+        i,
+        len,
+        maxTrackLength = 0;
+
+    for (i = 0, len = editors.length; i < len; i++) {
+        maxTrackLength = Math.max(maxTrackLength, editors[i].drawer.containerWidth);
+    }
+
+    //set the width so that the entire area will be selectable when needed.
+    for (i = 0, len = editors.length; i < len; i++) {
+        editors[i].drawer.container.style.width = maxTrackLength+'px';
+    }
 };
 
 PlaylistEditor.prototype.resetCursor = function() {
