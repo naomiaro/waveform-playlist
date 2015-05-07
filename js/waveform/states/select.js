@@ -1,8 +1,12 @@
+'use strict';
+
+WaveformPlaylist.states = WaveformPlaylist.states || {};
+
 /*
   called with an instance of Track as 'this'
 */
 
-var selectState = {
+WaveformPlaylist.states.select = {
 
   classes: "state-select",
 

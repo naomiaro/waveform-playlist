@@ -1,18 +1,19 @@
-var Storage = function() {};
+'use strict';
 
-Storage.prototype.save = function save(name, playlist) {
-    var json = JSON.stringify(playlist);
-    console.log(json);
+WaveformPlaylist.Storage = {
 
-    localStorage.setItem(name, json);
-};
+	save: function save(name, playlist) {
+		var json = JSON.stringify(playlist);
 
-Storage.prototype.restore = function restore(name) {
-    var JSONstring = localStorage.getItem(name),
-        data;
-    console.log(JSONstring);
+		localStorage.setItem(name, json);
+	},
 
-    data = JSON.parse(JSONstring);
+	restore: function restore(name) {
+		var JSONstring = localStorage.getItem(name),
+				data;
 
-    return data;
+		data = JSON.parse(JSONstring);
+
+		return data;
+	}
 };

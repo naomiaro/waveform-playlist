@@ -1,7 +1,11 @@
+'use strict';
+
+WaveformPlaylist.states = WaveformPlaylist.states || {};
+
 /*
   called with an instance of Track as 'this'
 */
-var fadeinState = {
+WaveformPlaylist.states.fadein = {
 
   classes: "state-fadein",
 

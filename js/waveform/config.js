@@ -1,9 +1,11 @@
+'use strict';
+
 /*
-    Stores configuration settings for the playlist builder.
+    Stores configuration settings for the waveform playlist.
     A container object (ex a div) must be passed in, the playlist will be built on this element.
 */
 
-var Config = function(params) {
+WaveformPlaylist.Config = function(params) {
 
         var that = this,
             defaultParams;

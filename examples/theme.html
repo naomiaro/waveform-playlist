@@ -8,8 +8,11 @@
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
     <link href="../css/theme.css" rel="stylesheet" />
 
+    <script type="text/javascript" src="../js/waveform_playlist.js"></script>
+    <script type="text/javascript" src="../js/waveform/mixins/mixin.js"></script>
     <script type="text/javascript" src="../js/waveform/mixins/observer.js"></script>
     <script type="text/javascript" src="../js/waveform/mixins/conversions.js"></script>
+    <script type="text/javascript" src="../js/waveform/mixins/curves.js"></script>
     <script type="text/javascript" src="../js/waveform/states/cursor.js"></script>
     <script type="text/javascript" src="../js/waveform/states/fadein.js"></script>
     <script type="text/javascript" src="../js/waveform/states/fadeout.js"></script>
@@ -17,14 +20,12 @@
     <script type="text/javascript" src="../js/waveform/states/shift.js"></script>
     <script type="text/javascript" src="../js/waveform/local_storage.js"></script>
     <script type="text/javascript" src="../js/waveform/config.js"></script>
-    <script type="text/javascript" src="../js/waveform/curves.js"></script>
     <script type="text/javascript" src="../js/waveform/track_render.js"></script>
     <script type="text/javascript" src="../js/waveform/fades.js"></script>
     <script type="text/javascript" src="../js/waveform/playout.js"></script>
     <script type="text/javascript" src="../js/waveform/track.js"></script>
     <script type="text/javascript" src="../js/waveform/time_scale.js"></script>
     <script type="text/javascript" src="../js/waveform/controls.js"></script>
-    <script type="text/javascript" src="../js/waveform/playlist.js"></script>
 
   </head>
   <body>
@@ -134,7 +135,7 @@
 
         var container = document.getElementById("playlist");
 
-        var config = new Config({
+        var config = new WaveformPlaylist.Config({
             resolution: 10000,
             mono: true,
             waveHeight: 80,
@@ -147,8 +148,11 @@
             fadeColor: 'black'
         });  
 
-        var playlistEditor = new PlaylistEditor();
-        playlistEditor.setConfig(config);
+        var playlistEditor = Object.create(WaveformPlaylist, {
+          config: {
+            value: config
+          }
+        });
         playlistEditor.init(tracks);
 
     })();

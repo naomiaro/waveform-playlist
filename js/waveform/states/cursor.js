@@ -1,8 +1,12 @@
+'use strict';
+
+WaveformPlaylist.states = WaveformPlaylist.states || {};
+
 /*
   called with an instance of Track as 'this'
 */
 
-var cursorState = {
+WaveformPlaylist.states.cursor = {
 
     classes: "state-cursor",
 

@@ -1,7 +1,11 @@
+'use strict';
+
+WaveformPlaylist.states = WaveformPlaylist.states || {};
+
 /*
   called with an instance of Track as 'this'
 */
-var shiftState = {
+WaveformPlaylist.states.shift = {
 
   classes: "state-shift",
 

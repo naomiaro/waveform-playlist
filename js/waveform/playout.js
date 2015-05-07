@@ -1,138 +1,129 @@
 'use strict';
 
-var AudioPlayout = function() {
+WaveformPlaylist.AudioPlayout = {
 
-};
+    init: function() {
+        this.ac = this.config.getAudioContext();
 
-AudioPlayout.prototype.init = function(config) {
+        this.fadeMaker = Object.create(WaveformPlaylist.fades, {
+            sampleRate: {
+                value: this.ac.sampleRate
+            }
+        });
 
-    makePublisher(this);
+        this.fadeGain = undefined;
+        this.destination = this.ac.destination;
+    },
 
-    this.config = config;
-    this.ac = this.config.getAudioContext();
+    getBuffer: function() {
+        return this.buffer;
+    },
 
-    this.fadeMaker = new Fades();
-    this.fadeMaker.init(this.ac.sampleRate);
-    
-    this.fadeGain = undefined;
-    this.destination = this.ac.destination;
-};
+    /*
+        param relPos: cursor position in seconds relative to this track.
+            can be negative if the cursor is placed before the start of this track etc.
+    */
+    applyFades: function(fades, relPos, now) {
+        var id,
+            fade,
+            fn,
+            options,
+            startTime,
+            duration;
 
-AudioPlayout.prototype.getBuffer = function() {
-    return this.buffer;
-};
+        this.fadeGain = this.ac.createGain();
 
-/*
-    param relPos: cursor position in seconds relative to this track.
-        can be negative if the cursor is placed before the start of this track etc.
-*/
-AudioPlayout.prototype.applyFades = function(fades, relPos, now) {
-    var id,
-        fade,
-        fn,
-        options,
-        startTime,
-        duration;
+        //loop through each fade on this track
+        for (id in fades) {
 
-    this.fadeGain = this.ac.createGain();
+            fade = fades[id];
 
-    //loop through each fade on this track
-    for (id in fades) {
+            //skip fade if it's behind the cursor.
+            if (relPos >= fade.end) {
+                continue;
+            }
 
-        fade = fades[id];
+            if (relPos <= fade.start) {
+                startTime = now + (fade.start - relPos);
+                duration = fade.end - fade.start;
+            }
+            else if (relPos > fade.start && relPos < fade.end) {
+                startTime = now - (relPos - fade.start);
+                duration = fade.end - fade.start;
+            }
 
-        //skip fade if it's behind the cursor.
-        if (relPos >= fade.end) {
-            continue;
+            options = {
+                start: startTime,
+                duration: duration
+            };
+
+            if (fades.hasOwnProperty(id)) {
+                fn = this.fadeMaker["create"+fade.type];
+                fn.call(this.fadeMaker, this.fadeGain.gain, fade.shape, options);
+            }
         }
+    },
 
-        if (relPos <= fade.start) {
-            startTime = now + (fade.start - relPos);
-            duration = fade.end - fade.start;
-        }
-        else if (relPos > fade.start && relPos < fade.end) {
-            startTime = now - (relPos - fade.start);
-            duration = fade.end - fade.start;
-        }
+    /**
+     * Loads audiobuffer.
+     *
+     * @param {AudioBuffer} audioData Audio data.
+     */
+    loadData: function (audioData, cb) {
+        var that = this;
 
-        options = {
-            start: startTime,
-            duration: duration
-        };
+        this.ac.decodeAudioData(
+            audioData,
+            function (buffer) {
+                that.buffer = buffer;
+                cb(buffer);
+            },
+            function(err) { 
+                console.log("err(decodeAudioData): "+err);
+                cb(null, err);
+            }
+        );
+    },
 
-        if (fades.hasOwnProperty(id)) {
-            fn = this.fadeMaker["create"+fade.type];
-            fn.call(this.fadeMaker, this.fadeGain.gain, fade.shape, options);
-        }
+    isPlaying: function() {
+        return this.source !== undefined;
+    },
+
+    getDuration: function() {
+        return this.buffer.duration;
+    },
+
+    onSourceEnded: function(e) {
+        this.source.disconnect();
+        this.source = undefined;
+
+        this.fadeGain.disconnect();
+        this.fadeGain = undefined;
+    },
+
+    setUpSource: function() {
+        this.source = this.ac.createBufferSource();
+        this.source.buffer = this.buffer;
+
+        //keep track of the buffer state.
+        this.source.onended = this.onSourceEnded.bind(this);
+
+        this.source.connect(this.fadeGain);
+        this.fadeGain.connect(this.destination);
+    },
+
+    /*
+        source.start is picky when passing the end time. 
+        If rounding error causes a number to make the source think 
+        it is playing slightly more samples than it has it won't play at all.
+        Unfortunately it doesn't seem to work if you just give it a start time.
+    */
+    play: function(when, start, duration) {
+        this.setUpSource();
+        this.source.start(when || 0, start, duration);
+    },
+
+    stop: function(when) {
+        this.source && this.source.stop(when || 0);
     }
 };
-
-/**
- * Loads audiobuffer.
- *
- * @param {AudioBuffer} audioData Audio data.
- */
-AudioPlayout.prototype.loadData = function (audioData, cb) {
-    var that = this;
-
-    this.ac.decodeAudioData(
-        audioData,
-        function (buffer) {
-            that.buffer = buffer;
-            cb(buffer);
-        },
-        function(err) { 
-            console.log("err(decodeAudioData): "+err);
-            cb(null, err);
-        }
-    );
-};
-
-AudioPlayout.prototype.isPlaying = function() {
-    return this.source !== undefined;
-};
-
-AudioPlayout.prototype.getDuration = function() {
-    return this.buffer.duration;
-};
-
-AudioPlayout.prototype.onSourceEnded = function(e) {
-    this.source.disconnect();
-    this.source = undefined;
-
-    this.fadeGain.disconnect();
-    this.fadeGain = undefined;
-};
-
-AudioPlayout.prototype.setUpSource = function() {
-    this.source = this.ac.createBufferSource();
-    this.source.buffer = this.buffer;
-
-    //keep track of the buffer state.
-    this.source.onended = this.onSourceEnded.bind(this);
-
-    this.source.connect(this.fadeGain);
-    this.fadeGain.connect(this.destination);
-};
-
-/*
-    source.start is picky when passing the end time. 
-    If rounding error causes a number to make the source think 
-    it is playing slightly more samples than it has it won't play at all.
-    Unfortunately it doesn't seem to work if you just give it a start time.
-*/
-AudioPlayout.prototype.play = function(when, start, duration) {
-    if (!this.buffer) {
-        console.error("no buffer to play");
-        return;
-    }
-
-    this.setUpSource();
-    this.source.start(when || 0, start, duration);
-};
-
-AudioPlayout.prototype.stop = function(when) {
- 
-    this.source && this.source.stop(when || 0);
-};
-

@@ -4,7 +4,7 @@ Code taken from http://www.jspatterns.com/book/7/observer-game.html
 Pub/Sub
 */
 
-var publisher = {
+WaveformPlaylist.publisher = {
     subscribers: {
         any: []
     },
@@ -23,8 +23,8 @@ var publisher = {
     fire: function (type, publication) {
         this.visitSubscribers('publish', type, publication);
     },
-    reset: function (type) {
-        this.subscribers[type] = undefined;
+    reset: function () {
+        this.subscribers = {any: []};
     },
     visitSubscribers: function (action, type, arg, context) {
         var pubtype = type || 'any',
@@ -46,8 +46,10 @@ var publisher = {
 };
 
 
-function makePublisher(o) {
-    var i;
+WaveformPlaylist.makePublisher = function(o) {
+    var i,
+        publisher = WaveformPlaylist.publisher;
+
     for (i in publisher) {
         if (publisher.hasOwnProperty(i) && typeof publisher[i] === "function") {
             o[i] = publisher[i];
