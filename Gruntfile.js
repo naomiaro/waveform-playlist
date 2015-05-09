@@ -13,7 +13,9 @@ module.exports = function(grunt) {
       },
       dist: {
         src: [
+          'js/waveform_playlist.js',
           'js/waveform/mixins/*.js',
+          'js/waveform/states/*.js',
           'js/waveform/*.js'
         ],
         dest: 'dist/<%= pkg.name %>.js'
