@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8 />
+<title>DB meter</title>
+<style>
+
+#meter-wrapper {
+  width: 100%;
+  border:1px solid red;
+}
+#meter {
+  width: 0%;
+  height: 15px;
+  margin: 2px 0;
+  background: green;
+  border: red;
+  -webkit-transition: width .05s;
+}
+</style>
+</head>
+<body>
+  
+  <div id='meter-wrapper'>
+    <div id='meter'></div>
+  </div>
+  
+  <div id='db'></div>
+  <div id='max'></div>
+
+<script type="text/javascript" src="../js/dbfs.js"></script>
+</body>
+</html>

@@ -16,11 +16,8 @@ Save your progress by outputing editor state json.
 ![Screenshot](img/multitrack.png?raw=true "multi track full editor view")
 (code for picture shown can be found in examples/render.html)
 
-####[Example dBFS meter](http://naomiaro.github.io/waveform-playlist/examples/dbmeter.html)
-Graphic [dBFS](http://en.wikipedia.org/wiki/DBFS) audio meter.
-
 #### Music by [Blitz//Berlin](http://blitz-berlin.com/)
 
-Originally created for the [Airtime](https://www.sourcefabric.org/en/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/)
+#### Originally created for the [Airtime](https://www.sourcefabric.org/en/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/)
 
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](http://doge.mit-license.org)
