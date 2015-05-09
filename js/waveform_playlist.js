@@ -183,36 +183,57 @@ var WaveformPlaylist = {
     },
 
     onSelectUpdate: function(event) {
+        var editors = this.trackEditors,
+            i,
+            len;
+
         this.activateTrack(event.editor);
+
+        //seeking while playing occuring
+        if (this.isPlaying()) {
+            this.stop();
+            //need to allow time for all the onended callbacks to execute
+            //TODO should maybe think of a better solution for this later...
+            setTimeout(this.play.bind(this), 60);
+        }
+
+        //new cursor selected while paused.
+        else if (this.pausedAt !== undefined) {
+            this.pausedAt = undefined;
+
+            for (i = 0, len = editors.length; i < len; i++) {
+                editors[i].showProgress(0);
+            }
+        }
     },
 
     onChangeShift: function(event) {
         var editors = this.trackEditors,
             i,
             len,
-            maxTrackLength = 0;
+            maxTrackLengthPixels = 0,
+            maxTrackLengthSeconds = 0;
 
         for (i = 0, len = editors.length; i < len; i++) {
-            maxTrackLength = Math.max(maxTrackLength, editors[i].drawer.containerWidth);
+            maxTrackLengthPixels = Math.max(maxTrackLengthPixels, editors[i].drawer.containerWidth);
+            maxTrackLengthSeconds = Math.max(maxTrackLengthSeconds, editors[i].endTime);
         }
 
         //set the width so that the entire area will be selectable when needed.
         for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].drawer.container.style.width = maxTrackLength+'px';
+            editors[i].drawer.container.style.width = maxTrackLengthPixels+'px';
         }
-    },
 
-    resetCursor: function() {
-        this.config.setCursorPos(0);
+        this.duration = maxTrackLengthSeconds;
     },
 
     rewind: function() {
         
         if (this.activeTrack !== undefined) {
-            this.activeTrack.resetCursor();
+            this.activeTrack.notifySelectUpdate(0, 0);
         }
         else {
-            this.resetCursor();
+            this.config.setCursorPos(0);
         } 
 
         this.stop();
@@ -228,7 +249,10 @@ var WaveformPlaylist = {
             maxOffset = Math.max(totalWidth - clientWidth, 0);
 
         if (this.activeTrack !== undefined) {
-            this.activeTrack.resetCursor();
+            this.activeTrack.notifySelectUpdate(this.duration, this.duration);
+        }
+        else {
+            this.config.setCursorPos(this.duration);
         }
 
         this.stop();
@@ -307,7 +331,7 @@ var WaveformPlaylist = {
     },
 
     stop: function() {
-         var editors = this.trackEditors,
+        var editors = this.trackEditors,
             i,
             len,
             currentTime = this.config.getCurrentTime();
@@ -328,9 +352,7 @@ var WaveformPlaylist = {
             len,
             currentTime = this.config.getCurrentTime(),
             elapsed = currentTime - this.lastPlay,
-            res = this.config.getResolution(),
             cursorPos = this.config.getCursorPos(),
-            cursorPixel,
             playbackSec;
 
         //update drawer to start drawing from where last paused.
@@ -342,15 +364,13 @@ var WaveformPlaylist = {
             //if there's a change for the UI show progress.
             if (elapsed) {
                 playbackSec = cursorPos + elapsed;
-                cursorPixel = Math.ceil(playbackSec * this.sampleRate / res);
-                
+
                 for (i = 0, len = editors.length; i < len; i++) {
-                    editors[i].showProgress(cursorPixel);
+                    editors[i].showProgress(playbackSec);
                 }
 
                 this.fire("playbackcursor", {
-                    "seconds": playbackSec,
-                    "pixels": cursorPixel
+                    "seconds": playbackSec
                 });
             }
             this.animationRequest = window.requestAnimationFrame(this.animationCallback);

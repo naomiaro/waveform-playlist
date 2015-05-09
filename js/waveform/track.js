@@ -201,8 +201,6 @@ WaveformPlaylist.TrackEditor = {
             this.drawer.selection && this.drawer.container.removeChild(this.drawer.selection);
             this.drawer.selection = undefined;
         }
-
-        this.drawer.clear();
     },
 
     /*
@@ -342,7 +340,7 @@ WaveformPlaylist.TrackEditor = {
         sampleEnd = this.secondsToSamples(selected.endTime) - this.leftOffset + 1;
         
         this.setCuePoints(sampleStart, sampleEnd);
-        this.resetCursor();
+        this.notifySelectUpdate(0, 0);
         this.fades = {};
         this.drawTrack(this.getBuffer());
     },
@@ -365,7 +363,7 @@ WaveformPlaylist.TrackEditor = {
             endTime = this.pixelsToSeconds(end),
             id = this.getFadeId();
 
-        this.resetCursor();
+        this.notifySelectUpdate(0, 0);
         this.saveFade(id, type, shape, startTime, endTime);
         this.drawer.drawFade(id, type, shape, start, end);
     },
@@ -467,12 +465,11 @@ WaveformPlaylist.TrackEditor = {
         this.playout.stop(when);
     },
 
-    resetCursor: function() {
-        this.notifySelectUpdate(0, 0);
-    },
-
+    /*
+        cursorPos in seconds
+    */
     showProgress: function(cursorPos) {
-        this.drawer.updateProgress(cursorPos);
+        this.drawer.updateProgress(this.secondsToPixels(cursorPos));
     },
 
     showSelection: function() {

@@ -237,7 +237,7 @@ WaveformPlaylist.WaveformDrawer = {
             canv.style.padding = 0;
             canv.style.zIndex = 3;
 
-            //draws cursor selection
+            //will be used later for evelopes now.
             surface = document.createElement("canvas");
             surface.setAttribute('width', this.width);
             surface.setAttribute('height', this.height);
@@ -264,6 +264,9 @@ WaveformPlaylist.WaveformDrawer = {
         cursor = document.createElement("div");
         cursor.classList.add("cursor");
         cursor.style.position = "absolute";
+        cursor.style.boxSizing = "content-box";
+        cursor.style.margin = 0;
+        cursor.style.padding = 0;
         cursor.style.top = 0;
         cursor.style.left = 0;
         cursor.style.bottom = 0;

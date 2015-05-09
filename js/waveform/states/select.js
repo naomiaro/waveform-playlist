@@ -8,74 +8,73 @@ WaveformPlaylist.states = WaveformPlaylist.states || {};
 
 WaveformPlaylist.states.select = {
 
-  classes: "state-select",
+    classes: "state-select",
 
-  enter: function() {
-    var stateObject = this.currentState;
+    enter: function() {
+        var stateObject = this.currentState;
 
-    this.container.onmousedown = stateObject.event.bind(this);
-    this.container.classList.add(stateObject.classes);
-  },
+        this.container.onmousedown = stateObject.event.bind(this);
+        this.container.classList.add(stateObject.classes);
+    },
 
-  leave: function() {
-    var stateObject = this.currentState;
+    leave: function() {
+        var stateObject = this.currentState;
 
-    this.container.onmousedown = null;
-    this.container.classList.remove(stateObject.classes);
-  },
+        this.container.onmousedown = null;
+        this.container.classList.remove(stateObject.classes);
+    },
 
-  /*
+    /*
       This is used when in 'select' state as a mousedown event
-  */
-  event: function(e) {
-      e.preventDefault();
+    */
+    event: function(e) {
+        e.preventDefault();
 
-      var el = this.container, //want the events placed on the channel wrapper.
-          editor = this,
-          startX = e.layerX || e.offsetX,
-          startTime,
-          layerOffset,
-          complete;
+        var el = this.container, //want the events placed on the channel wrapper.
+            editor = this,
+            startX = e.layerX || e.offsetX,
+            startTime,
+            layerOffset,
+            complete;
 
-      layerOffset = editor.drawer.findLayerOffset(e.target);
-      startX += layerOffset;
-      startTime = editor.pixelsToSeconds(startX);
-      editor.notifySelectUpdate(startTime, startTime);
+        layerOffset = editor.drawer.findLayerOffset(e.target);
+        startX += layerOffset;
+        startTime = editor.pixelsToSeconds(startX);
 
-      //dynamically put an event on the element.
-      el.onmousemove = function(e) {
-          e.preventDefault();
+        //dynamically put an event on the element.
+        el.onmousemove = function(e) {
+            e.preventDefault();
 
-          var layerOffset = editor.drawer.findLayerOffset(e.target),
-              currentX = layerOffset + (e.layerX || e.offsetX),
-              minX = Math.min(currentX, startX),
-              maxX = Math.max(currentX, startX),
-              startTime,
-              endTime;
+            var layerOffset = editor.drawer.findLayerOffset(e.target),
+                currentX = layerOffset + (e.layerX || e.offsetX),
+                minX = Math.min(currentX, startX),
+                maxX = Math.max(currentX, startX),
+                startTime,
+                endTime;
 
-          startTime = editor.pixelsToSeconds(minX);
-          endTime = editor.pixelsToSeconds(maxX);
-          editor.notifySelectUpdate(startTime, endTime);
-      };
+            startTime = editor.pixelsToSeconds(minX);
+            endTime = editor.pixelsToSeconds(maxX);
+            editor.notifySelectUpdate(startTime, endTime);
+        };
 
-      complete = function(e) {
-          e.preventDefault();
+        complete = function(e) {
+            e.preventDefault();
 
-          var layerOffset = editor.drawer.findLayerOffset(e.target),
-              endX = layerOffset + (e.layerX || e.offsetX),
-              minX, maxX,
-              startTime, endTime;
+            var layerOffset = editor.drawer.findLayerOffset(e.target),
+                endX = layerOffset + (e.layerX || e.offsetX),
+                minX, maxX,
+                startTime, endTime;
 
-          minX = Math.min(startX, endX);
-          maxX = Math.max(startX, endX);
+            minX = Math.min(startX, endX);
+            maxX = Math.max(startX, endX);
 
-          startTime = editor.pixelsToSeconds(minX);
-          endTime = editor.pixelsToSeconds(maxX);
-          editor.notifySelectUpdate(startTime, endTime, e.shiftKey);
+            startTime = editor.pixelsToSeconds(minX);
+            endTime = editor.pixelsToSeconds(maxX);
+            editor.notifySelectUpdate(startTime, endTime, e.shiftKey);
 
-          el.onmousemove = el.onmouseup = el.onmouseleave = null;
-      };
+            el.onmousemove = el.onmouseup = el.onmouseleave = null;
+        };
 
-      el.onmouseup = el.onmouseleave = complete;
-  }
+        el.onmouseup = el.onmouseleave = complete;
+    }
 };
