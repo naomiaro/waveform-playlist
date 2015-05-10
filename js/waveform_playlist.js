@@ -185,13 +185,18 @@ var WaveformPlaylist = {
     onSelectUpdate: function(event) {
         var editors = this.trackEditors,
             i,
-            len;
+            len,
+            currentTime = this.config.getCurrentTime();;
 
         this.activateTrack(event.editor);
 
         //seeking while playing occuring
         if (this.isPlaying()) {
-            this.stop();
+            window.cancelAnimationFrame(this.animationRequest);
+
+            for (i = 0, len = editors.length; i < len; i++) {
+                editors[i].scheduleStop(currentTime);
+            }
             //need to allow time for all the onended callbacks to execute
             //TODO should maybe think of a better solution for this later...
             setTimeout(this.play.bind(this), 60);
