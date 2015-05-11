@@ -102,6 +102,10 @@ WaveformPlaylist.AudioControls = {
 
         "btn-zoom-out": {
             click: "zoomOut"
+        },
+
+        "btn-new-track": {
+            click: "newTrack"
         }
     },
 
@@ -342,6 +346,10 @@ WaveformPlaylist.AudioControls = {
     zoom: function(res) {
         this.config.setResolution(res);
         this.fire("changeresolution", res);
+    },
+
+    newTrack: function() {
+        this.fire("newtrack");
     },
 
     validateCueIn: function(e) {

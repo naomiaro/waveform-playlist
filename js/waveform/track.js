@@ -9,8 +9,11 @@ WaveformPlaylist.TrackEditor = {
             'fadein': true,
             'fadeout': true,
             'select': true,
-            'shift': true
+            'shift': true,
+            'fileDrop': true
         };
+
+        stateConfig = stateConfig || {};
 
         //extend enabled states config.
         Object.keys(statesEnabled).forEach(function (key) {
@@ -50,8 +53,6 @@ WaveformPlaylist.TrackEditor = {
         //value is a float in seconds
         this.endTime = end || 0; //set properly in onTrackLoad.
 
-        this.setState(this.config.getState());
-
         this.fades = {};
         if (fades !== undefined && fades.length > 0) {
         
@@ -68,7 +69,6 @@ WaveformPlaylist.TrackEditor = {
         this.active = false;
         //selected area stored in seconds relative to entire playlist.
         this.selectedArea = undefined;
-        this.drawer.drawLoading();
 
         return this.container;
     },
@@ -91,6 +91,9 @@ WaveformPlaylist.TrackEditor = {
         return this.playout.getBuffer();
     },
 
+    /*
+    *   Completes track load from a passed in url.
+    */
     loadTrack: function(track) {
         var el;
 
@@ -103,7 +106,7 @@ WaveformPlaylist.TrackEditor = {
                 cuein: track.cuein,
                 cueout: track.cueout
             },
-            track.states || {}
+            track.states
         );
 
         if (track.selected !== undefined) {
@@ -113,9 +116,29 @@ WaveformPlaylist.TrackEditor = {
             };
         }
 
+        this.drawer.drawLoading();
         this.loadBuffer(track.src);
 
         return el;
+    },
+
+    fileProgress: function(e) {
+        var percentComplete;
+
+        if (e.lengthComputable) {
+            percentComplete = e.loaded / e.total * 100;
+            this.drawer.updateLoader(percentComplete);
+        }
+    },
+
+    fileLoad: function(e) {
+        var that = this;
+        this.drawer.setLoaderState("decoding");
+
+        this.playout.loadData(
+            e.target.response || e.target.result,
+            that.onTrackLoad.bind(that)
+        );
     },
 
     /**
@@ -125,30 +148,35 @@ WaveformPlaylist.TrackEditor = {
         var that = this,
             xhr = new XMLHttpRequest();
 
+        this.src = src;
+
         xhr.open('GET', src, true);
         xhr.responseType = 'arraybuffer';
 
-        xhr.addEventListener('progress', function(e) {
-            var percentComplete;
-
-            if (e.lengthComputable) {
-                percentComplete = e.loaded / e.total * 100;
-                that.drawer.updateLoader(percentComplete);
-            } 
-
-        }, false);
-
-        xhr.addEventListener('load', function(e) {
-            that.src = src;
-            that.drawer.setLoaderState("decoding");
-
-            that.playout.loadData(
-                e.target.response,
-                that.onTrackLoad.bind(that)
-            );
-        }, false);
-
+        xhr.addEventListener('progress', this.fileProgress.bind(this));
+        xhr.addEventListener('load', this.fileLoad.bind(this));
         xhr.send();
+    },
+
+    /*
+    * Loads an audio file vie a FileReader
+    */
+    loadBlob: function(file) {
+        if (file.type.match(/audio.*/)) {
+            var fr = new FileReader();
+
+            this.src = file.name;
+            this.drawer.drawLoading();
+
+            fr.addEventListener('progress', this.fileProgress.bind(this));
+            fr.addEventListener('load', this.fileLoad.bind(this));
+
+            fr.addEventListener('error', function () {
+                console.log('error loading file');
+            });
+
+            fr.readAsArrayBuffer(file);
+        }
     },
 
     drawTrack: function(buffer) {
@@ -167,7 +195,7 @@ WaveformPlaylist.TrackEditor = {
         if (err !== undefined) {
             this.container.innerHTML = "";
             this.container.classList.add("error");
-            this.fire('unregister');
+            this.fire('error', this);
             return;
         }
 
@@ -185,6 +213,9 @@ WaveformPlaylist.TrackEditor = {
 
             this.notifySelectUpdate(startTime, endTime);
         }
+
+        this.setState(this.config.getState());
+        this.fire('trackloaded', this);
     },
 
     activate: function() {

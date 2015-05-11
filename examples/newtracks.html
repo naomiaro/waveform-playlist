@@ -2,7 +2,9 @@
 <html>
   <head>
     <meta charset=utf-8 />
-    <title>Waveform Playlist Full Example</title>
+    <title>Waveform Playlist | New Track Example</title>
+
+    <meta name="description" content="Waveform Playlist create new tracks. Add your own tracks into the editor with drag and drop via a file (uses a blob)." />
 
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
@@ -32,16 +34,12 @@
   <body>
     <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
 
-    <h1>Full Waveform Editor Example</h1>
-    <p>Every control and state available</p>
+    <h1>Create tracks from file blobs</h1>
+    <p>Press 'New Track' and then drag a file into the new track container!</p>
 
     <div id="playlist" class="playlist">
       <div id="top-bar" class="playlist-top-bar">
         <div class="playlist-toolbar">
-          <div class="btn-group">
-            <span title="restore playlist" class="btn-open btn btn-info"><i class="fa fa-folder-open"></i></span>
-            <span title="save playlist" class="btn-save btn btn-info"><i class="fa fa-floppy-o"></i></span>
-          </div>
           <div class="btn-group">
             <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
             <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
@@ -96,47 +94,6 @@
     <script type="text/javascript">
     (function(){
 
-        var tracks = [
-            {
-              "start":0,
-              "end":235.83344671201814,
-              "fades":[
-                {
-                  "type":"FadeOut",
-                  "shape":"sCurve",
-                  "start":234.69387755102042,
-                  "end":235.83344671201814
-                }
-              ],
-              "src":"../media/Drink.mp3",
-              "cuein":0,
-              "cueout":235.83344671201814
-            },
-            {
-              "start":234.92063492063494,
-              "end":485.7483673469387,
-              "fades":[
-                {
-                  "type":"FadeIn",
-                  "shape":"logarithmic",
-                  "start":0,
-                  "end":1.3605442176870748
-                }
-              ],
-              "src":"../media/Legend.mp3",
-              "cuein":0,
-              "cueout":250.82773242630387
-            },
-            {
-              "start":471.6553287981859,
-              "end":747.43,
-              "fades":[],
-              "src":"../media/Outside.mp3",
-              "cuein":0,
-              "cueout":275.77467120181404
-            }
-        ];
-
         var config = new WaveformPlaylist.Config({
             resolution: 10000,
             mono: false,
@@ -152,7 +109,7 @@
             value: config
           }
         });
-        playlistEditor.init(tracks);
+        playlistEditor.init();
 
     })();
     </script>

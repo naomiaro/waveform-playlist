@@ -31,6 +31,10 @@ html, body {
   margin: 1em 0;
 }
 
+.playlist-bottom-bar {
+  margin: 1em 0;
+}
+
 .state-cursor,
 .state-fadein .channel,
 .state-fadeout .channel,
@@ -48,4 +52,14 @@ html, body {
 
 .selection-segment {
   background: rgba(0,0,0,0.1);
+}
+
+.state-file-drop {
+  border: 2px dashed blue;
+  height: 100px;
+  width: 100%;
+}
+
+.state-file-drop.drag-enter {
+  border: 2px solid orange;
 }

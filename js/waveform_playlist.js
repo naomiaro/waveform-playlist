@@ -13,6 +13,8 @@ var WaveformPlaylist = {
             trackElem,
             audioControls;
 
+        tracks = tracks || [];
+
         WaveformPlaylist.makePublisher(this);
 
         this.storage = Object.create(WaveformPlaylist.Storage);
@@ -56,24 +58,7 @@ var WaveformPlaylist = {
             this.trackEditors.push(trackEditor);
             fragment.appendChild(trackElem);
 
-            audioControls.on("trackedit", "onTrackEdit", trackEditor);
-            audioControls.on("changeresolution", "onResolutionChange", trackEditor);
-
-            trackEditor.on("activateSelection", "onAudioSelection", audioControls);
-            trackEditor.on("deactivateSelection", "onAudioDeselection", audioControls);
-            trackEditor.on("changecursor", "onCursorSelection", audioControls);
-            trackEditor.on("changecursor", "onSelectUpdate", this);
-            trackEditor.on("changeshift", "onChangeShift", this);
-
-            trackEditor.on("unregister", (function() {
-                var editor = this;
-
-                audioControls.remove("trackedit", "onTrackEdit", editor);
-                audioControls.remove("changeresolution", "onResolutionChange", editor);
-
-                that.removeTrack(editor);
-
-            }).bind(trackEditor));
+            trackEditor.on("trackloaded", "onTrackLoad", this);
         }
 
         this.trackContainer.appendChild(fragment);
@@ -89,6 +74,7 @@ var WaveformPlaylist = {
 
         this.on("playbackcursor", "onAudioUpdate", audioControls);
 
+        audioControls.on("newtrack", "createTrack", this);
         audioControls.on("playlistsave", "save", this);
         audioControls.on("playlistrestore", "restore", this);
         audioControls.on("rewindaudio", "rewind", this);
@@ -349,6 +335,34 @@ var WaveformPlaylist = {
             editors[i].scheduleStop(currentTime);
             editors[i].showProgress(0);
         }
+    },
+
+    createTrack: function() {
+        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
+            config: {
+                value: this.config
+            }
+        });
+        var trackElem = trackEditor.init();
+
+        trackEditor.setState('fileDrop');
+    
+        this.trackEditors.push(trackEditor);
+        this.trackContainer.appendChild(trackElem);
+
+        trackEditor.on("trackloaded", "onTrackLoad", this);
+    },
+
+    onTrackLoad: function(trackEditor) {
+
+        this.audioControls.on("trackedit", "onTrackEdit", trackEditor);
+        this.audioControls.on("changeresolution", "onResolutionChange", trackEditor);
+
+        trackEditor.on("activateSelection", "onAudioSelection", this.audioControls);
+        trackEditor.on("deactivateSelection", "onAudioDeselection", this.audioControls);
+        trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
+        trackEditor.on("changecursor", "onSelectUpdate", this);
+        trackEditor.on("changeshift", "onChangeShift", this);
     },
 
     updateEditor: function() {
