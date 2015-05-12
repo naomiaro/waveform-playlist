@@ -163,10 +163,15 @@ WaveformPlaylist.TrackEditor = {
     */
     loadBlob: function(file) {
         if (file.type.match(/audio.*/)) {
+            var dr = new FileReader();
             var fr = new FileReader();
+            var track = this;
 
-            this.src = file.name;
             this.drawer.drawLoading();
+
+            dr.addEventListener('load', function() {
+                track.src = dr.result;
+            });
 
             fr.addEventListener('progress', this.fileProgress.bind(this));
             fr.addEventListener('load', this.fileLoad.bind(this));
@@ -175,6 +180,7 @@ WaveformPlaylist.TrackEditor = {
                 console.log('error loading file');
             });
 
+            dr.readAsDataURL(file);
             fr.readAsArrayBuffer(file);
         }
     },
