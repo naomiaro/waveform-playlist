@@ -5,7 +5,7 @@ Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a mult
 
 For help with setup check the [wiki](https://github.com/naomiaro/waveform-playlist/wiki)
 
-###[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/examples/render.html)
+###[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/examples/web-audio-editor.html)
 
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
 I've written up some demos on github for the different [audio fade types](https://github.com/naomiaro/Web-Audio-Fades) in the project.
