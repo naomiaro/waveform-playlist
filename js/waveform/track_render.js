@@ -2,6 +2,8 @@
 
 WaveformPlaylist.WaveformDrawer = {
 
+    MAX_CANVAS_WIDTH: 20000,
+
     init: function() {
 
         WaveformPlaylist.makePublisher(this);
@@ -186,7 +188,6 @@ WaveformPlaylist.WaveformDrawer = {
             div,
             progress,
             cursor,
-            surface,
             i,
             top = 0,
             left = 0,
@@ -227,6 +228,7 @@ WaveformPlaylist.WaveformDrawer = {
             progress.style.width = 0;
             progress.style.height = this.height+"px";
             progress.style.zIndex = 2;
+            div.appendChild(progress);
 
             //canvas with the waveform drawn
             canv = document.createElement("canvas");
@@ -236,28 +238,15 @@ WaveformPlaylist.WaveformDrawer = {
             canv.style.margin = 0;
             canv.style.padding = 0;
             canv.style.zIndex = 3;
-
-            //will be used later for evelopes now.
-            surface = document.createElement("canvas");
-            surface.setAttribute('width', this.width);
-            surface.setAttribute('height', this.height);
-            surface.style.position = "absolute";
-            surface.style.margin = 0;
-            surface.style.padding = 0;
-            surface.style.zIndex = 4;
+            div.appendChild(canv);
 
             this.channels.push({
                 context: canv.getContext('2d'),
                 div: div,
-                progress: progress,
-                surface: surface.getContext('2d')
+                progress: progress
             });
 
-            div.appendChild(canv);
-            div.appendChild(progress);
-            div.appendChild(surface);
             fragment.appendChild(div);
-
             top = top + this.height;
         }
 
@@ -333,17 +322,6 @@ WaveformPlaylist.WaveformDrawer = {
                 that.drawFrame(chanNum, i, peak);
             });
         } 
-    },
-
-    /*
-        Clear the surface canvas where envelopes etc will be drawn.
-    */
-    clear: function() {
-        var i, len;
-
-        for (i = 0, len = this.channels.length; i < len; i++) {
-            this.channels[i].surface.clearRect(0, 0, this.width, this.height);
-        }
     },
 
     /*
