@@ -154,12 +154,16 @@ WaveformPlaylist.WaveformDrawer = {
     },
 
     /*
-        Returns a layerOffset in pixels relative to the entire playlist.
+        Returns a pixel clicked on this track relative to the entire playlist.
     */
-    findLayerOffset: function(target) {
-        var layerOffset = 0,
-            parent;
+    findClickedPixel: function(e) {
+        var target = e.target,
+            layerOffset = 0,
+            canvasOffset = 0,
+            parent,
+            startX = e.layerX || e.offsetX;
 
+        //need to find the canvas offset
         if (target.tagName === "CANVAS") {
             //If canvas selected must add left offset to layerX
             //this will be an offset relative to the entire playlist.
@@ -171,6 +175,9 @@ WaveformPlaylist.WaveformDrawer = {
                 parent = parent.parentNode;
                 layerOffset += parent.offsetLeft;
             }
+            else {
+                canvasOffset = target.dataset.offset;
+            }
 
         }
         else {
@@ -180,7 +187,7 @@ WaveformPlaylist.WaveformDrawer = {
             }
         }
 
-        return layerOffset;
+        return layerOffset + startX + (canvasOffset * this.MAX_CANVAS_WIDTH);
     },
 
     drawBuffer: function(buffer, cues) {
@@ -196,7 +203,11 @@ WaveformPlaylist.WaveformDrawer = {
             numChan = makeMono? 1 : buffer.numberOfChannels,
             numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
-            wrapperHeight; 
+            wrapperHeight,
+            canvases,
+            width,
+            tmpWidth,
+            canvasOffset; 
 
         this.container.innerHTML = "";
         this.channels = []; 
@@ -230,18 +241,33 @@ WaveformPlaylist.WaveformDrawer = {
             progress.style.zIndex = 2;
             div.appendChild(progress);
 
-            //canvas with the waveform drawn
-            canv = document.createElement("canvas");
-            canv.setAttribute('width', this.width);
-            canv.setAttribute('height', this.height);
-            canv.style.position = "absolute";
-            canv.style.margin = 0;
-            canv.style.padding = 0;
-            canv.style.zIndex = 3;
-            div.appendChild(canv);
+
+            width = 0;
+            canvases = [];
+            canvasOffset = 0;
+
+            //might need to draw the track over multiple canvases as per memory limits.
+            while (width < this.width) {
+                tmpWidth = Math.min(this.MAX_CANVAS_WIDTH, this.width - width);
+                //canvas with the waveform drawn
+                canv = document.createElement("canvas");
+                canv.setAttribute('width', tmpWidth);
+                canv.setAttribute('height', this.height);
+                canv.style.cssFloat = "left";
+                canv.style.position = "relative";
+                canv.style.margin = 0;
+                canv.style.padding = 0;
+                canv.style.zIndex = 3;
+                canv.dataset.offset = canvasOffset;
+                div.appendChild(canv);
+
+                canvases.push(canv);
+                width += tmpWidth;
+                canvasOffset++;
+            }
 
             this.channels.push({
-                context: canv.getContext('2d'),
+                canvas: canvases,
                 div: div,
                 progress: progress
             });
@@ -275,23 +301,22 @@ WaveformPlaylist.WaveformDrawer = {
     },
 
     drawFrame: function(chanNum, index, peak) {
-        var x, y, w, h, max, min,
+        var x, max, min,
             h2 = this.height / 2,
-            cc = this.channels[chanNum].context,
+            canvOffset = Math.floor(index/this.MAX_CANVAS_WIDTH),
+            cc = this.channels[chanNum].canvas[canvOffset].getContext('2d'),
             colors = this.config.getColorScheme();
 
         max = Math.abs(peak.max * h2);
         min = Math.abs(peak.min * h2);
 
-        w = 1;
-        x = index * w;
-        
+        x = index - canvOffset*this.MAX_CANVAS_WIDTH;
         cc.fillStyle = colors.waveOutlineColor;
 
         //draw maxs
-        cc.fillRect(x, 0, w, h2-max);
+        cc.fillRect(x, 0, 1, h2-max);
         //draw mins
-        cc.fillRect(x, h2+min, w, h2-min);
+        cc.fillRect(x, h2+min, 1, h2-min);
     },
 
     /*

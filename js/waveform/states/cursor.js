@@ -30,12 +30,10 @@ WaveformPlaylist.states.cursor = {
     event: function(e) {
         e.preventDefault();
 
-        var startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-            layerOffset,
+        var startX,
             startTime;
 
-        layerOffset = this.drawer.findLayerOffset(e.target);
-        startX += layerOffset;
+        startX = this.drawer.findClickedPixel(e);
         startTime = this.pixelsToSeconds(startX);
         this.notifySelectUpdate(startTime, startTime);
   }

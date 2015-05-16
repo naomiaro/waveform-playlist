@@ -32,21 +32,18 @@ WaveformPlaylist.states.select = {
 
         var el = this.container, //want the events placed on the channel wrapper.
             editor = this,
-            startX = e.layerX || e.offsetX,
+            startX,
             startTime,
-            layerOffset,
             complete;
 
-        layerOffset = editor.drawer.findLayerOffset(e.target);
-        startX += layerOffset;
+        startX = editor.drawer.findClickedPixel(e);
         startTime = editor.pixelsToSeconds(startX);
 
         //dynamically put an event on the element.
         el.onmousemove = function(e) {
             e.preventDefault();
 
-            var layerOffset = editor.drawer.findLayerOffset(e.target),
-                currentX = layerOffset + (e.layerX || e.offsetX),
+            var currentX = editor.drawer.findClickedPixel(e),
                 minX = Math.min(currentX, startX),
                 maxX = Math.max(currentX, startX),
                 startTime,
@@ -60,8 +57,7 @@ WaveformPlaylist.states.select = {
         complete = function(e) {
             e.preventDefault();
 
-            var layerOffset = editor.drawer.findLayerOffset(e.target),
-                endX = layerOffset + (e.layerX || e.offsetX),
+            var endX = editor.drawer.findClickedPixel(e),
                 minX, maxX,
                 startTime, endTime;
 

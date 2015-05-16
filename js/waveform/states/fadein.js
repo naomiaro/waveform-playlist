@@ -24,15 +24,11 @@ WaveformPlaylist.states.fadein = {
   },
 
   event: function(e) {
-    var startX = e.layerX || e.offsetX, //relative to e.target
-        layerOffset,
+    var startX = this.drawer.findClickedPixel(e), //relative to e.target
         FADETYPE = "FadeIn",
         shape = this.config.getFadeType(),
         trackStartPix = this.drawer.pixelOffset,
         trackEndPix = trackStartPix + this.drawer.width;
-
-    layerOffset = this.drawer.findLayerOffset(e.target);
-    startX += layerOffset;
 
     this.removeFadeType(FADETYPE);
 
