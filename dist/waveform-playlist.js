@@ -1,4 +1,4 @@
-/*! waveform-playlist 0.2.1
+/*! waveform-playlist 0.2.2
 Written by: Naomi Aro
 Website: http://naomiaro.github.io/waveform-playlist
 License: MIT */
@@ -16,6 +16,8 @@ var WaveformPlaylist = {
             trackEditor,
             trackElem,
             audioControls;
+
+        tracks = tracks || [];
 
         WaveformPlaylist.makePublisher(this);
 
@@ -60,24 +62,7 @@ var WaveformPlaylist = {
             this.trackEditors.push(trackEditor);
             fragment.appendChild(trackElem);
 
-            audioControls.on("trackedit", "onTrackEdit", trackEditor);
-            audioControls.on("changeresolution", "onResolutionChange", trackEditor);
-
-            trackEditor.on("activateSelection", "onAudioSelection", audioControls);
-            trackEditor.on("deactivateSelection", "onAudioDeselection", audioControls);
-            trackEditor.on("changecursor", "onCursorSelection", audioControls);
-            trackEditor.on("changecursor", "onSelectUpdate", this);
-            trackEditor.on("changeshift", "onChangeShift", this);
-
-            trackEditor.on("unregister", (function() {
-                var editor = this;
-
-                audioControls.remove("trackedit", "onTrackEdit", editor);
-                audioControls.remove("changeresolution", "onResolutionChange", editor);
-
-                that.removeTrack(editor);
-
-            }).bind(trackEditor));
+            trackEditor.on("trackloaded", "onTrackLoad", this);
         }
 
         this.trackContainer.appendChild(fragment);
@@ -93,6 +78,7 @@ var WaveformPlaylist = {
 
         this.on("playbackcursor", "onAudioUpdate", audioControls);
 
+        audioControls.on("newtrack", "createTrack", this);
         audioControls.on("playlistsave", "save", this);
         audioControls.on("playlistrestore", "restore", this);
         audioControls.on("rewindaudio", "rewind", this);
@@ -353,6 +339,34 @@ var WaveformPlaylist = {
             editors[i].scheduleStop(currentTime);
             editors[i].showProgress(0);
         }
+    },
+
+    createTrack: function() {
+        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
+            config: {
+                value: this.config
+            }
+        });
+        var trackElem = trackEditor.init();
+
+        trackEditor.setState('fileDrop');
+    
+        this.trackEditors.push(trackEditor);
+        this.trackContainer.appendChild(trackElem);
+
+        trackEditor.on("trackloaded", "onTrackLoad", this);
+    },
+
+    onTrackLoad: function(trackEditor) {
+
+        this.audioControls.on("trackedit", "onTrackEdit", trackEditor);
+        this.audioControls.on("changeresolution", "onResolutionChange", trackEditor);
+
+        trackEditor.on("activateSelection", "onAudioSelection", this.audioControls);
+        trackEditor.on("deactivateSelection", "onAudioDeselection", this.audioControls);
+        trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
+        trackEditor.on("changecursor", "onSelectUpdate", this);
+        trackEditor.on("changeshift", "onChangeShift", this);
     },
 
     updateEditor: function() {
@@ -645,12 +659,10 @@ WaveformPlaylist.states.cursor = {
     event: function(e) {
         e.preventDefault();
 
-        var startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-            layerOffset,
+        var startX,
             startTime;
 
-        layerOffset = this.drawer.findLayerOffset(e.target);
-        startX += layerOffset;
+        startX = this.drawer.findClickedPixel(e);
         startTime = this.pixelsToSeconds(startX);
         this.notifySelectUpdate(startTime, startTime);
   }
@@ -681,15 +693,11 @@ WaveformPlaylist.states.fadein = {
   },
 
   event: function(e) {
-    var startX = e.layerX || e.offsetX, //relative to e.target
-        layerOffset,
+    var startX = this.drawer.findClickedPixel(e), //relative to e.target
         FADETYPE = "FadeIn",
         shape = this.config.getFadeType(),
         trackStartPix = this.drawer.pixelOffset,
         trackEndPix = trackStartPix + this.drawer.width;
-
-    layerOffset = this.drawer.findLayerOffset(e.target);
-    startX += layerOffset;
 
     this.removeFadeType(FADETYPE);
 
@@ -724,15 +732,11 @@ WaveformPlaylist.states.fadeout = {
   },
 
   event: function(e) {
-    var startX = e.layerX || e.offsetX, //relative to e.target (want the canvas).
-        layerOffset,
+    var startX = this.drawer.findClickedPixel(e), //relative to e.target (want the canvas).
         FADETYPE = "FadeOut",
         shape = this.config.getFadeType(),
         trackStartPix = this.drawer.pixelOffset,
         trackEndPix = trackStartPix + this.drawer.width;
-
-    layerOffset = this.drawer.findLayerOffset(e.target);
-    startX += layerOffset;
 
     this.removeFadeType(FADETYPE);
 
@@ -740,6 +744,72 @@ WaveformPlaylist.states.fadeout = {
       this.createFade(FADETYPE, shape, (startX - trackStartPix), this.drawer.width);
     }
   }
+};
+'use strict';
+
+WaveformPlaylist.states = WaveformPlaylist.states || {};
+
+/*
+  called with an instance of Track as 'this'
+*/
+
+WaveformPlaylist.states.fileDrop = {
+
+    classes: {
+        container: "state-file-drop",
+        drag: "drag-enter"
+    },
+
+    enter: function() {
+        var state = this.currentState;
+
+        this.container.classList.add(state.classes.container);
+
+        this.container.ondragenter = state.dragenter.bind(this);
+        this.container.ondragover = state.dragover.bind(this);
+        this.container.ondragleave = state.dragleave.bind(this);
+        this.container.ondrop = state.drop.bind(this);
+    },
+
+    leave: function() {
+        var state = this.currentState;
+
+        this.container.ondragenter = null;
+        this.container.ondragover = null;
+        this.container.ondragleave = null;
+        this.container.ondrop = null;
+        this.container.classList.remove(state.classes.container);
+    },
+
+    dragenter: function() {
+        var state = this.currentState;
+
+        this.container.classList.add(state.classes.drag);
+    },
+
+    dragover: function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+    },
+
+    dragleave: function() {
+        var state = this.currentState;
+
+        this.container.classList.remove(state.classes.drag);
+    },
+
+    drop: function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        var state = this.currentState;
+
+        this.container.classList.remove(state.classes.drag);
+
+        if (e.dataTransfer.files.length) {
+            this.loadBlob(e.dataTransfer.files[0]);
+        }
+    }
 };
 'use strict';
 
@@ -775,21 +845,18 @@ WaveformPlaylist.states.select = {
 
         var el = this.container, //want the events placed on the channel wrapper.
             editor = this,
-            startX = e.layerX || e.offsetX,
+            startX,
             startTime,
-            layerOffset,
             complete;
 
-        layerOffset = editor.drawer.findLayerOffset(e.target);
-        startX += layerOffset;
+        startX = editor.drawer.findClickedPixel(e);
         startTime = editor.pixelsToSeconds(startX);
 
         //dynamically put an event on the element.
         el.onmousemove = function(e) {
             e.preventDefault();
 
-            var layerOffset = editor.drawer.findLayerOffset(e.target),
-                currentX = layerOffset + (e.layerX || e.offsetX),
+            var currentX = editor.drawer.findClickedPixel(e),
                 minX = Math.min(currentX, startX),
                 maxX = Math.max(currentX, startX),
                 startTime,
@@ -803,8 +870,7 @@ WaveformPlaylist.states.select = {
         complete = function(e) {
             e.preventDefault();
 
-            var layerOffset = editor.drawer.findLayerOffset(e.target),
-                endX = layerOffset + (e.layerX || e.offsetX),
+            var endX = editor.drawer.findClickedPixel(e),
                 minX, maxX,
                 startTime, endTime;
 
@@ -1162,6 +1228,10 @@ WaveformPlaylist.AudioControls = {
 
         "btn-zoom-out": {
             click: "zoomOut"
+        },
+
+        "btn-new-track": {
+            click: "newTrack"
         }
     },
 
@@ -1402,6 +1472,10 @@ WaveformPlaylist.AudioControls = {
     zoom: function(res) {
         this.config.setResolution(res);
         this.fire("changeresolution", res);
+    },
+
+    newTrack: function() {
+        this.fire("newtrack");
     },
 
     validateCueIn: function(e) {
@@ -1894,6 +1968,51 @@ WaveformPlaylist.TimeScale = {
             div,
             resizeTimer;
 
+        this.timeinfo = {
+            20000: {
+                marker: 30000,
+                bigStep: 10000,
+                smallStep: 5000,
+                secondStep: 5
+            },
+            12000: {
+                marker: 15000,
+                bigStep: 5000,
+                smallStep: 1000,
+                secondStep: 1
+            },
+            10000: {
+                marker: 10000,
+                bigStep: 5000,
+                smallStep: 1000,
+                secondStep: 1
+            },
+            5000: {
+                marker: 5000,
+                bigStep: 1000,
+                smallStep: 500,
+                secondStep: 1/2
+            },
+            2500: {
+                marker: 2000,
+                bigStep: 1000,
+                smallStep: 500,
+                secondStep: 1/2
+            },
+            1500: {
+                marker: 2000,
+                bigStep: 1000,
+                smallStep: 200,
+                secondStep: 1/5
+            },
+            700: {
+                marker: 1000,
+                bigStep: 500,
+                smallStep: 100,
+                secondStep: 1/10
+            }
+        };
+
         WaveformPlaylist.makePublisher(this);
 
         div = document.querySelector(".playlist-time-scale");
@@ -1948,11 +2067,27 @@ WaveformPlaylist.TimeScale = {
         this.drawScale();
     },
 
+    getScaleInfo: function(resolution) {
+        var keys, i, end;
+
+        keys = Object.keys(this.timeinfo).map(function(item) {
+            return parseInt(item, 10);
+        });
+
+        for (i = 0, end = keys.length; i < end; i++) {
+           if (resolution <= keys[i]) {
+                return this.timeinfo[keys[i]];
+            } 
+        }
+    },
+
     /*
         Return time in format mm:ss
     */
-    formatTime: function(seconds) {
-        var out, m, s;
+    formatTime: function(milliseconds) {
+        var out, m, s, seconds;
+
+        seconds = milliseconds/1000;
 
         s = seconds % 60;
         m = (seconds - s) / 60;
@@ -1974,7 +2109,6 @@ WaveformPlaylist.TimeScale = {
 
     drawScale: function(offset) {
         var cc = this.context,
-            canv = this.canv,
             colors = this.config.getColorScheme(),
             pix,
             res = this.config.getResolution(),
@@ -1985,24 +2119,21 @@ WaveformPlaylist.TimeScale = {
             end,
             counter = 0,
             pixIndex,
-            container = this.container,
-            width = this.width,
-            height = this.height,
             div,
             time,
             sTime,
             fragment = document.createDocumentFragment(),
             scaleY,
-            scaleHeight;
-
+            scaleHeight,
+            scaleInfo = this.getScaleInfo(res);
 
         this.clear();
 
-        fragment.appendChild(canv);
+        fragment.appendChild(this.canv);
         cc.fillStyle = colors.timeColor;
-        end = width + pixOffset;
+        end = this.width + pixOffset;
 
-        for (i = 0; i < end; i = i + pixPerSec) {
+        for (i = 0; i < end; i = i + pixPerSec*scaleInfo.secondStep) {
 
             pixIndex = ~~(i);
             pix = pixIndex - pixOffset;
@@ -2010,7 +2141,7 @@ WaveformPlaylist.TimeScale = {
             if (pixIndex >= pixOffset) {
 
                 //put a timestamp every 30 seconds.
-                if (counter % 30 === 0) {
+                if (scaleInfo.marker && (counter % scaleInfo.marker === 0)) {
 
                     sTime = this.formatTime(counter);
                     time = document.createTextNode(sTime);
@@ -2022,24 +2153,22 @@ WaveformPlaylist.TimeScale = {
                     fragment.appendChild(div);
 
                     scaleHeight = 10;
-                    scaleY = height - scaleHeight;
                 }
-                else if (counter % 5 === 0) {
+                else if (scaleInfo.bigStep && (counter % scaleInfo.bigStep === 0)) {
                     scaleHeight = 5;
-                    scaleY = height - scaleHeight;
                 }
-                else {
+                else if (scaleInfo.smallStep && (counter % scaleInfo.smallStep === 0)) {
                     scaleHeight = 2;
-                    scaleY = height - scaleHeight;
                 }
 
+                scaleY = this.height - scaleHeight;
                 cc.fillRect(pix, scaleY, 1, scaleHeight);
             }
 
-            counter++;  
+            counter += 1000*scaleInfo.secondStep;  
         }
 
-        container.appendChild(fragment);
+        this.container.appendChild(fragment);
     },
 
     onTrackScroll: function() {
@@ -2071,8 +2200,11 @@ WaveformPlaylist.TrackEditor = {
             'fadein': true,
             'fadeout': true,
             'select': true,
-            'shift': true
+            'shift': true,
+            'fileDrop': true
         };
+
+        stateConfig = stateConfig || {};
 
         //extend enabled states config.
         Object.keys(statesEnabled).forEach(function (key) {
@@ -2112,8 +2244,6 @@ WaveformPlaylist.TrackEditor = {
         //value is a float in seconds
         this.endTime = end || 0; //set properly in onTrackLoad.
 
-        this.setState(this.config.getState());
-
         this.fades = {};
         if (fades !== undefined && fades.length > 0) {
         
@@ -2152,6 +2282,9 @@ WaveformPlaylist.TrackEditor = {
         return this.playout.getBuffer();
     },
 
+    /*
+    *   Completes track load from a passed in url.
+    */
     loadTrack: function(track) {
         var el;
 
@@ -2164,7 +2297,7 @@ WaveformPlaylist.TrackEditor = {
                 cuein: track.cuein,
                 cueout: track.cueout
             },
-            track.states || {}
+            track.states
         );
 
         if (track.selected !== undefined) {
@@ -2180,6 +2313,25 @@ WaveformPlaylist.TrackEditor = {
         return el;
     },
 
+    fileProgress: function(e) {
+        var percentComplete;
+
+        if (e.lengthComputable) {
+            percentComplete = e.loaded / e.total * 100;
+            this.drawer.updateLoader(percentComplete);
+        }
+    },
+
+    fileLoad: function(e) {
+        var that = this;
+        this.drawer.setLoaderState("decoding");
+
+        this.playout.loadData(
+            e.target.response || e.target.result,
+            that.onTrackLoad.bind(that)
+        );
+    },
+
     /**
      * Loads an audio file via XHR.
      */
@@ -2187,30 +2339,41 @@ WaveformPlaylist.TrackEditor = {
         var that = this,
             xhr = new XMLHttpRequest();
 
+        this.src = src;
+
         xhr.open('GET', src, true);
         xhr.responseType = 'arraybuffer';
 
-        xhr.addEventListener('progress', function(e) {
-            var percentComplete;
-
-            if (e.lengthComputable) {
-                percentComplete = e.loaded / e.total * 100;
-                that.drawer.updateLoader(percentComplete);
-            } 
-
-        }, false);
-
-        xhr.addEventListener('load', function(e) {
-            that.src = src;
-            that.drawer.setLoaderState("decoding");
-
-            that.playout.loadData(
-                e.target.response,
-                that.onTrackLoad.bind(that)
-            );
-        }, false);
-
+        xhr.addEventListener('progress', this.fileProgress.bind(this));
+        xhr.addEventListener('load', this.fileLoad.bind(this));
         xhr.send();
+    },
+
+    /*
+    * Loads an audio file vie a FileReader
+    */
+    loadBlob: function(file) {
+        if (file.type.match(/audio.*/)) {
+            var dr = new FileReader();
+            var fr = new FileReader();
+            var track = this;
+
+            this.drawer.drawLoading();
+
+            dr.addEventListener('load', function() {
+                track.src = dr.result;
+            });
+
+            fr.addEventListener('progress', this.fileProgress.bind(this));
+            fr.addEventListener('load', this.fileLoad.bind(this));
+
+            fr.addEventListener('error', function () {
+                console.log('error loading file');
+            });
+
+            dr.readAsDataURL(file);
+            fr.readAsArrayBuffer(file);
+        }
     },
 
     drawTrack: function(buffer) {
@@ -2229,7 +2392,7 @@ WaveformPlaylist.TrackEditor = {
         if (err !== undefined) {
             this.container.innerHTML = "";
             this.container.classList.add("error");
-            this.fire('unregister');
+            this.fire('error', this);
             return;
         }
 
@@ -2247,6 +2410,9 @@ WaveformPlaylist.TrackEditor = {
 
             this.notifySelectUpdate(startTime, endTime);
         }
+
+        this.setState(this.config.getState());
+        this.fire('trackloaded', this);
     },
 
     activate: function() {
@@ -2574,6 +2740,8 @@ WaveformPlaylist.mixin(WaveformPlaylist.TrackEditor, WaveformPlaylist.unitConver
 
 WaveformPlaylist.WaveformDrawer = {
 
+    MAX_CANVAS_WIDTH: 20000,
+
     init: function() {
 
         WaveformPlaylist.makePublisher(this);
@@ -2724,12 +2892,16 @@ WaveformPlaylist.WaveformDrawer = {
     },
 
     /*
-        Returns a layerOffset in pixels relative to the entire playlist.
+        Returns a pixel clicked on this track relative to the entire playlist.
     */
-    findLayerOffset: function(target) {
-        var layerOffset = 0,
-            parent;
+    findClickedPixel: function(e) {
+        var target = e.target,
+            layerOffset = 0,
+            canvasOffset = 0,
+            parent,
+            startX = e.layerX || e.offsetX;
 
+        //need to find the canvas offset
         if (target.tagName === "CANVAS") {
             //If canvas selected must add left offset to layerX
             //this will be an offset relative to the entire playlist.
@@ -2741,6 +2913,9 @@ WaveformPlaylist.WaveformDrawer = {
                 parent = parent.parentNode;
                 layerOffset += parent.offsetLeft;
             }
+            else {
+                canvasOffset = target.dataset.offset;
+            }
 
         }
         else {
@@ -2750,7 +2925,7 @@ WaveformPlaylist.WaveformDrawer = {
             }
         }
 
-        return layerOffset;
+        return layerOffset + startX + (canvasOffset * this.MAX_CANVAS_WIDTH);
     },
 
     drawBuffer: function(buffer, cues) {
@@ -2758,7 +2933,6 @@ WaveformPlaylist.WaveformDrawer = {
             div,
             progress,
             cursor,
-            surface,
             i,
             top = 0,
             left = 0,
@@ -2767,7 +2941,11 @@ WaveformPlaylist.WaveformDrawer = {
             numChan = makeMono? 1 : buffer.numberOfChannels,
             numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
-            wrapperHeight; 
+            wrapperHeight,
+            canvases,
+            width,
+            tmpWidth,
+            canvasOffset; 
 
         this.container.innerHTML = "";
         this.channels = []; 
@@ -2799,37 +2977,40 @@ WaveformPlaylist.WaveformDrawer = {
             progress.style.width = 0;
             progress.style.height = this.height+"px";
             progress.style.zIndex = 2;
+            div.appendChild(progress);
 
-            //canvas with the waveform drawn
-            canv = document.createElement("canvas");
-            canv.setAttribute('width', this.width);
-            canv.setAttribute('height', this.height);
-            canv.style.position = "absolute";
-            canv.style.margin = 0;
-            canv.style.padding = 0;
-            canv.style.zIndex = 3;
 
-            //will be used later for evelopes now.
-            surface = document.createElement("canvas");
-            surface.setAttribute('width', this.width);
-            surface.setAttribute('height', this.height);
-            surface.style.position = "absolute";
-            surface.style.margin = 0;
-            surface.style.padding = 0;
-            surface.style.zIndex = 4;
+            width = 0;
+            canvases = [];
+            canvasOffset = 0;
+
+            //might need to draw the track over multiple canvases as per memory limits.
+            while (width < this.width) {
+                tmpWidth = Math.min(this.MAX_CANVAS_WIDTH, this.width - width);
+                //canvas with the waveform drawn
+                canv = document.createElement("canvas");
+                canv.setAttribute('width', tmpWidth);
+                canv.setAttribute('height', this.height);
+                canv.style.cssFloat = "left";
+                canv.style.position = "relative";
+                canv.style.margin = 0;
+                canv.style.padding = 0;
+                canv.style.zIndex = 3;
+                canv.dataset.offset = canvasOffset;
+                div.appendChild(canv);
+
+                canvases.push(canv);
+                width += tmpWidth;
+                canvasOffset++;
+            }
 
             this.channels.push({
-                context: canv.getContext('2d'),
+                canvas: canvases,
                 div: div,
-                progress: progress,
-                surface: surface.getContext('2d')
+                progress: progress
             });
 
-            div.appendChild(canv);
-            div.appendChild(progress);
-            div.appendChild(surface);
             fragment.appendChild(div);
-
             top = top + this.height;
         }
 
@@ -2858,23 +3039,22 @@ WaveformPlaylist.WaveformDrawer = {
     },
 
     drawFrame: function(chanNum, index, peak) {
-        var x, y, w, h, max, min,
+        var x, max, min,
             h2 = this.height / 2,
-            cc = this.channels[chanNum].context,
+            canvOffset = Math.floor(index/this.MAX_CANVAS_WIDTH),
+            cc = this.channels[chanNum].canvas[canvOffset].getContext('2d'),
             colors = this.config.getColorScheme();
 
         max = Math.abs(peak.max * h2);
         min = Math.abs(peak.min * h2);
 
-        w = 1;
-        x = index * w;
-        
+        x = index - canvOffset*this.MAX_CANVAS_WIDTH;
         cc.fillStyle = colors.waveOutlineColor;
 
         //draw maxs
-        cc.fillRect(x, 0, w, h2-max);
+        cc.fillRect(x, 0, 1, h2-max);
         //draw mins
-        cc.fillRect(x, h2+min, w, h2-min);
+        cc.fillRect(x, h2+min, 1, h2-min);
     },
 
     /*
@@ -2905,17 +3085,6 @@ WaveformPlaylist.WaveformDrawer = {
                 that.drawFrame(chanNum, i, peak);
             });
         } 
-    },
-
-    /*
-        Clear the surface canvas where envelopes etc will be drawn.
-    */
-    clear: function() {
-        var i, len;
-
-        for (i = 0, len = this.channels.length; i < len; i++) {
-            this.channels[i].surface.clearRect(0, 0, this.width, this.height);
-        }
     },
 
     /*
