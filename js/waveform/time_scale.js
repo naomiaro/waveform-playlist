@@ -8,6 +8,51 @@ WaveformPlaylist.TimeScale = {
             div,
             resizeTimer;
 
+        this.timeinfo = {
+            20000: {
+                marker: 30000,
+                bigStep: 10000,
+                smallStep: 5000,
+                secondStep: 5
+            },
+            12000: {
+                marker: 15000,
+                bigStep: 5000,
+                smallStep: 1000,
+                secondStep: 1
+            },
+            10000: {
+                marker: 10000,
+                bigStep: 5000,
+                smallStep: 1000,
+                secondStep: 1
+            },
+            5000: {
+                marker: 5000,
+                bigStep: 1000,
+                smallStep: 500,
+                secondStep: 1/2
+            },
+            2500: {
+                marker: 2000,
+                bigStep: 1000,
+                smallStep: 500,
+                secondStep: 1/2
+            },
+            1500: {
+                marker: 2000,
+                bigStep: 1000,
+                smallStep: 200,
+                secondStep: 1/5
+            },
+            700: {
+                marker: 1000,
+                bigStep: 500,
+                smallStep: 100,
+                secondStep: 1/10
+            }
+        };
+
         WaveformPlaylist.makePublisher(this);
 
         div = document.querySelector(".playlist-time-scale");
@@ -62,11 +107,27 @@ WaveformPlaylist.TimeScale = {
         this.drawScale();
     },
 
+    getScaleInfo: function(resolution) {
+        var keys, i, end;
+
+        keys = Object.keys(this.timeinfo).map(function(item) {
+            return parseInt(item, 10);
+        });
+
+        for (i = 0, end = keys.length; i < end; i++) {
+           if (resolution <= keys[i]) {
+                return this.timeinfo[keys[i]];
+            } 
+        }
+    },
+
     /*
         Return time in format mm:ss
     */
-    formatTime: function(seconds) {
-        var out, m, s;
+    formatTime: function(milliseconds) {
+        var out, m, s, seconds;
+
+        seconds = milliseconds/1000;
 
         s = seconds % 60;
         m = (seconds - s) / 60;
@@ -88,7 +149,6 @@ WaveformPlaylist.TimeScale = {
 
     drawScale: function(offset) {
         var cc = this.context,
-            canv = this.canv,
             colors = this.config.getColorScheme(),
             pix,
             res = this.config.getResolution(),
@@ -99,24 +159,21 @@ WaveformPlaylist.TimeScale = {
             end,
             counter = 0,
             pixIndex,
-            container = this.container,
-            width = this.width,
-            height = this.height,
             div,
             time,
             sTime,
             fragment = document.createDocumentFragment(),
             scaleY,
-            scaleHeight;
-
+            scaleHeight,
+            scaleInfo = this.getScaleInfo(res);
 
         this.clear();
 
-        fragment.appendChild(canv);
+        fragment.appendChild(this.canv);
         cc.fillStyle = colors.timeColor;
-        end = width + pixOffset;
+        end = this.width + pixOffset;
 
-        for (i = 0; i < end; i = i + pixPerSec) {
+        for (i = 0; i < end; i = i + pixPerSec*scaleInfo.secondStep) {
 
             pixIndex = ~~(i);
             pix = pixIndex - pixOffset;
@@ -124,7 +181,7 @@ WaveformPlaylist.TimeScale = {
             if (pixIndex >= pixOffset) {
 
                 //put a timestamp every 30 seconds.
-                if (counter % 30 === 0) {
+                if (scaleInfo.marker && (counter % scaleInfo.marker === 0)) {
 
                     sTime = this.formatTime(counter);
                     time = document.createTextNode(sTime);
@@ -136,24 +193,22 @@ WaveformPlaylist.TimeScale = {
                     fragment.appendChild(div);
 
                     scaleHeight = 10;
-                    scaleY = height - scaleHeight;
                 }
-                else if (counter % 5 === 0) {
+                else if (scaleInfo.bigStep && (counter % scaleInfo.bigStep === 0)) {
                     scaleHeight = 5;
-                    scaleY = height - scaleHeight;
                 }
-                else {
+                else if (scaleInfo.smallStep && (counter % scaleInfo.smallStep === 0)) {
                     scaleHeight = 2;
-                    scaleY = height - scaleHeight;
                 }
 
+                scaleY = this.height - scaleHeight;
                 cc.fillRect(pix, scaleY, 1, scaleHeight);
             }
 
-            counter++;  
+            counter += 1000*scaleInfo.secondStep;  
         }
 
-        container.appendChild(fragment);
+        this.container.appendChild(fragment);
     },
 
     onTrackScroll: function() {
