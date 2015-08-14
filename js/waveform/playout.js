@@ -93,23 +93,29 @@ WaveformPlaylist.AudioPlayout = {
         return this.buffer.duration;
     },
 
-    onSourceEnded: function(e) {
-        this.source.disconnect();
-        this.source = undefined;
-
-        this.fadeGain.disconnect();
-        this.fadeGain = undefined;
-    },
-
     setUpSource: function() {
+        var sourcePromise;
+        var that = this;
+
         this.source = this.ac.createBufferSource();
         this.source.buffer = this.buffer;
 
-        //keep track of the buffer state.
-        this.source.onended = this.onSourceEnded.bind(this);
+        sourcePromise = new Promise(function(resolve, reject) {
+            //keep track of the buffer state.
+            that.source.onended = function(e) {
+                that.source.disconnect();
+                that.source = undefined;
+
+                that.fadeGain.disconnect();
+                that.fadeGain = undefined;
+                resolve();
+            }
+        });
 
         this.source.connect(this.fadeGain);
         this.fadeGain.connect(this.destination);
+
+        return sourcePromise;
     },
 
     /*
@@ -119,8 +125,10 @@ WaveformPlaylist.AudioPlayout = {
         Unfortunately it doesn't seem to work if you just give it a start time.
     */
     play: function(when, start, duration) {
-        this.setUpSource();
+        var sourcePromise = this.setUpSource();
         this.source.start(when || 0, start, duration);
+
+        return sourcePromise;
     },
 
     stop: function(when) {

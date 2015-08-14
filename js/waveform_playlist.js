@@ -183,9 +183,8 @@ var WaveformPlaylist = {
             for (i = 0, len = editors.length; i < len; i++) {
                 editors[i].scheduleStop(currentTime);
             }
-            //need to allow time for all the onended callbacks to execute
-            //TODO should maybe think of a better solution for this later...
-            setTimeout(this.play.bind(this), 60);
+
+            Promise.all(this.playoutPromises).then(this.play.bind(this));
         }
 
         //new cursor selected while paused.
@@ -282,7 +281,8 @@ var WaveformPlaylist = {
             currentTime = this.config.getCurrentTime(),
             startTime = this.config.getCursorPos(),
             endTime,
-            selected = this.getSelected();
+            selected = this.getSelected(),
+            playoutPromises = [];
 
         if (selected !== undefined && selected.endTime > startTime) {
             startTime = selected.startTime;
@@ -294,10 +294,12 @@ var WaveformPlaylist = {
         }
 
         for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].schedulePlay(currentTime, startTime, endTime);
+            playoutPromises.push(editors[i].schedulePlay(currentTime, startTime, endTime));
         }
 
         this.lastPlay = currentTime;
+        //use these to track when the playlist has fully stopped.
+        this.playoutPromises = playoutPromises;
         this.animationRequest = window.requestAnimationFrame(this.animationCallback);
     },
 

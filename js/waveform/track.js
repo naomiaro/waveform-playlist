@@ -449,6 +449,9 @@ WaveformPlaylist.TrackEditor = {
     /*
         startTime, endTime in seconds (float).
         segment is for a highlighted section in the UI.
+
+        returns a Promise that will resolve when the AudioBufferSource
+        is either stopped or plays out naturally.
     */
     schedulePlay: function(now, startTime, endTime) { 
         var start,
@@ -458,12 +461,12 @@ WaveformPlaylist.TrackEditor = {
             segment = (endTime) ? (endTime - startTime) : undefined,
             cueOffset = this.cues.cuein / this.sampleRate;
 
-        //track has no content to play.
-        if (this.endTime <= startTime) return;
-
-        //track does not play in this selection.
-        if (segment && (startTime + segment) < this.startTime) return;
-
+        //1) track has no content to play.
+        //2) track does not play in this selection.
+        if ((this.endTime <= startTime) || (segment && (startTime + segment) < this.startTime)) {
+            //return a resolved promise since this track is technically "stopped".
+            return Promise.resolve();
+        }
 
         //track should have something to play if it gets here.
 
@@ -495,7 +498,8 @@ WaveformPlaylist.TrackEditor = {
 
         relPos = startTime - this.startTime;
         this.playout.applyFades(this.fades, relPos, now);
-        this.playout.play(when, start, duration);
+
+        return this.playout.play(when, start, duration);
     },
 
     scheduleStop: function(when) {
