@@ -11,7 +11,6 @@ WaveformPlaylist.AudioPlayout = {
             }
         });
 
-        this.fadeGain = undefined;
         this.destination = this.ac.destination;
     },
 
@@ -30,8 +29,6 @@ WaveformPlaylist.AudioPlayout = {
             options,
             startTime,
             duration;
-
-        this.fadeGain = this.ac.createGain();
 
         //loop through each fade on this track
         for (id in fades) {
@@ -108,12 +105,20 @@ WaveformPlaylist.AudioPlayout = {
 
                 that.fadeGain.disconnect();
                 that.fadeGain = undefined;
+
+                that.outputGain.disconnect();
+                that.outputGain = undefined;
+
                 resolve();
             }
         });
 
+        this.fadeGain = this.ac.createGain();
+        this.outputGain = this.ac.createGain();
+
         this.source.connect(this.fadeGain);
-        this.fadeGain.connect(this.destination);
+        this.fadeGain.connect(this.outputGain);
+        this.outputGain.connect(this.destination);
 
         return sourcePromise;
     },
@@ -125,10 +130,7 @@ WaveformPlaylist.AudioPlayout = {
         Unfortunately it doesn't seem to work if you just give it a start time.
     */
     play: function(when, start, duration) {
-        var sourcePromise = this.setUpSource();
         this.source.start(when || 0, start, duration);
-
-        return sourcePromise;
     },
 
     stop: function(when) {

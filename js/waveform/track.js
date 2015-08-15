@@ -24,20 +24,6 @@ WaveformPlaylist.TrackEditor = {
        
         WaveformPlaylist.makePublisher(this);
 
-        this.container = document.createElement("div");
-        this.container.classList.add("channel-wrapper");
-        this.container.style.position = "relative";
-
-        this.drawer = Object.create(WaveformPlaylist.WaveformDrawer, {
-            config: {
-                value: this.config
-            },
-            container: {
-                value: this.container
-            }
-        });
-        this.drawer.init();
-
         this.playout = Object.create(WaveformPlaylist.AudioPlayout, {
             config: {
                 value: this.config
@@ -69,6 +55,14 @@ WaveformPlaylist.TrackEditor = {
         this.active = false;
         //selected area stored in seconds relative to entire playlist.
         this.selectedArea = undefined;
+
+        this.drawer = Object.create(WaveformPlaylist.WaveformDrawer, {
+            config: {
+                value: this.config
+            }
+        });
+        
+        this.container = this.drawer.init();
 
         return this.container;
     },
@@ -199,8 +193,7 @@ WaveformPlaylist.TrackEditor = {
             cueout;
 
         if (err !== undefined) {
-            this.container.innerHTML = "";
-            this.container.classList.add("error");
+            this.drawer.drawError();
             this.fire('error', this);
             return;
         }
@@ -226,17 +219,15 @@ WaveformPlaylist.TrackEditor = {
 
     activate: function() {
         this.active = true;
-        this.container.classList.add("active");
+        this.drawer.drawActive();
     },
 
     deactivate: function() {
         this.active = false;
-        this.container.classList.remove("active");
+        this.drawer.drawInactive();
         
         if (this.selectedArea) {
             this.selectedArea = undefined;
-            this.drawer.selection && this.drawer.container.removeChild(this.drawer.selection);
-            this.drawer.selection = undefined;
         }
     },
 
@@ -459,7 +450,8 @@ WaveformPlaylist.TrackEditor = {
             relPos,
             when = now,
             segment = (endTime) ? (endTime - startTime) : undefined,
-            cueOffset = this.cues.cuein / this.sampleRate;
+            cueOffset = this.cues.cuein / this.sampleRate,
+            sourcePromise;
 
         //1) track has no content to play.
         //2) track does not play in this selection.
@@ -495,11 +487,13 @@ WaveformPlaylist.TrackEditor = {
         }
 
         start = start + cueOffset;
-
         relPos = startTime - this.startTime;
-        this.playout.applyFades(this.fades, relPos, now);
 
-        return this.playout.play(when, start, duration);
+        sourcePromise = this.playout.setUpSource();
+        this.playout.applyFades(this.fades, relPos, now);
+        this.playout.play(when, start, duration);
+
+        return sourcePromise;
     },
 
     scheduleStop: function(when) {

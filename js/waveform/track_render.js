@@ -8,6 +8,10 @@ WaveformPlaylist.WaveformDrawer = {
 
         WaveformPlaylist.makePublisher(this);
 
+        this.container = document.createElement("div");
+        this.container.classList.add("channel-wrapper");
+        this.container.style.position = "relative";
+
         this.channels = []; //array of canvases, contexts, 1 for each channel displayed.
         this.pixelOffset = 0;
         this.containerWidth = 0;
@@ -20,6 +24,8 @@ WaveformPlaylist.WaveformDrawer = {
         else {
             this.loaderStates = this.loaderStates["default"];
         }
+
+        return this.container;
     },
 
     loaderStates: {
@@ -103,6 +109,21 @@ WaveformPlaylist.WaveformDrawer = {
 
         this.maxPeak = maxPeak;
         this.peaks = peaks;
+    },
+
+    drawError: function() {
+        this.container.innerHTML = "";
+        this.container.classList.add("error");
+    },
+
+    drawActive: function() {
+        this.container.classList.add("active");
+    },
+
+    drawInactive: function() {
+        this.container.classList.remove("active");
+        this.selection && this.container.removeChild(this.selection);
+        this.selection = undefined;
     },
 
     setPixelOffset: function(pixels) {
