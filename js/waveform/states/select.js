@@ -30,7 +30,7 @@ WaveformPlaylist.states.select = {
     event: function(e) {
         e.preventDefault();
 
-        var el = this.container, //want the events placed on the channel wrapper.
+        var el = this.drawer.waveformContainer, //want the events placed on the waveform wrapper.
             editor = this,
             startX,
             startTime,
