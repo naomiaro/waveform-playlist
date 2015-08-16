@@ -9,6 +9,11 @@ html, body {
 
 .playlist-time-scale {
   height: 30px;
+  margin-left: 150px;
+}
+
+.channel-wrapper {
+  margin-left: 150px;
 }
 
 .channel {

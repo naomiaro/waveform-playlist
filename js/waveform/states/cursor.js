@@ -13,14 +13,14 @@ WaveformPlaylist.states.cursor = {
     enter: function() {
         var stateObject = this.currentState;
 
-        this.container.onmousedown = stateObject.event.bind(this);
+        this.drawer.waveformContainer.onmousedown = stateObject.event.bind(this);
         this.container.classList.add(stateObject.classes);
     },
 
     leave: function() {
         var stateObject = this.currentState;
 
-        this.container.onmousedown = null;
+        this.drawer.waveformContainer.onmousedown = null;
         this.container.classList.remove(stateObject.classes);
     },
 
