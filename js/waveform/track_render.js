@@ -10,7 +10,6 @@ WaveformPlaylist.WaveformDrawer = {
 
         this.container = document.createElement("div");
         this.container.classList.add("channel-wrapper");
-        this.container.style.position = "relative";
 
         this.channels = []; //array of canvases, contexts, 1 for each channel displayed.
         this.pixelOffset = 0;
@@ -247,16 +246,20 @@ WaveformPlaylist.WaveformDrawer = {
         controls.style.height = wrapperHeight+"px";
         controls.style.width = "150px";
         controls.style.position = "absolute";
-        controls.style.left = "-150px";
+        controls.style.left = 0;
         controls.classList.add("controls");
+        controls.style.zIndex = 1000;
 
         volumeInput = document.createElement("input");
         volumeInput.type = "range";
+        volumeInput.setAttribute('min', 0);
+        volumeInput.setAttribute('max', 100);
 
         waveformContainer = document.createElement("div");
         waveformContainer.classList.add("waveform");
         waveformContainer.style.height = wrapperHeight+"px";
         waveformContainer.style.width = this.width+"px";
+        waveformContainer.style.position = "relative";
 
         cursor = document.createElement("div");
         cursor.classList.add("cursor");
@@ -274,9 +277,9 @@ WaveformPlaylist.WaveformDrawer = {
         this.cursor = cursor;
 
         controls.appendChild(volumeInput);
+        waveformContainer.appendChild(cursor);
         fragment.appendChild(controls);
         fragment.appendChild(waveformContainer);
-        fragment.appendChild(cursor);
 
         //create elements for each audio channel
         for (i = 0; i < numChan; i++) {
@@ -438,7 +441,7 @@ WaveformPlaylist.WaveformDrawer = {
         selection.style.zIndex = 2000;
 
         if (this.selection === undefined) {
-            this.container.appendChild(selection);
+            this.waveformContainer.appendChild(selection);
             this.selection = selection;
         }
     },

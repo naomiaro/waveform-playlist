@@ -20,9 +20,9 @@ var WaveformPlaylist = {
         this.storage = Object.create(WaveformPlaylist.Storage);
 
         container.style.overflow = "hidden";
+        container.style.position = "relative";
 
         this.trackContainer = div;
-        this.trackContainer.style.position = "relative";
         this.trackContainer.style.overflow = "auto";
 
         this.trackEditors = [];
@@ -144,7 +144,7 @@ var WaveformPlaylist = {
         that.scrollTimeout = setTimeout(function() {
             
             that.config.setTrackScroll(that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
-            that.fire('trackscroll');
+            that.fire('trackscroll', that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
             that.scrollTimeout = false;
         }, 25);   
     },

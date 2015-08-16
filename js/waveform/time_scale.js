@@ -211,10 +211,7 @@ WaveformPlaylist.TimeScale = {
         this.container.appendChild(fragment);
     },
 
-    onTrackScroll: function() {
-        var scroll = this.config.getTrackScroll(),
-            scrollX = scroll.left;    
-
+    onTrackScroll: function(scrollX, scrollY) {
         if (scrollX !== this.prevScrollPos) {
             this.prevScrollPos = scrollX;
             this.drawScale(scrollX);
