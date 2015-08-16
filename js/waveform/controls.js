@@ -11,102 +11,116 @@ WaveformPlaylist.AudioControls = {
         "active": "active"
     },
 
-    events: {
-       "btn-rewind": {
-            click: "rewindAudio"
+    eventTypes: {
+        "click": {
+            "btn-rewind": "rewindAudio",
+            "btn-fast-forward": "fastForwardAudio",
+            "btn-play": "playAudio",
+            "btn-pause": "pauseAudio",
+            "btn-stop": "stopAudio",
+            "btn-state": "changeState",
+            "btn-save": "save",
+            "btn-open": "open",
+            "btn-trim-audio": "trimAudio",
+            "btn-fade": "changeDefaultFade",
+            "btn-zoom-in": "zoomIn",
+            "btn-zoom-out": "zoomOut",
+            "btn-new-track": "newTrack"
         },
-
-        "btn-fast-forward": {
-            click: "fastForwardAudio"
+        "change": {
+            "time-format": "changeTimeFormat",
+            "volume-slider": "changeVolume"
         },
-
-       "btn-play": {
-            click: "playAudio"
-        },
-
-        "btn-pause": {
-            click: "pauseAudio"
-        },
-     
-        "btn-stop": {
-            click: "stopAudio"
-        },
-
-        "btn-cursor": {
-            click: "changeState"
-        },
-
-        "btn-select": {
-            click: "changeState"
-        },
-
-        "btn-shift": {
-            click: "changeState"
-        },
-
-        "btn-fadein": {
-            click: "changeState"
-        },
-
-        "btn-fadeout": {
-            click: "changeState"
-        },
-
-        "btn-save": {
-            click: "save"
-        },
-
-        "btn-open": {
-            click: "open"
-        },
-        
-        "btn-trim-audio": {
-            click: "trimAudio"
-        },
-
-        "time-format": {
-            change: "changeTimeFormat"
-        },
-
-        "audio-pos": {
-
-        },
-
-        "audio-start": {
-            blur: "validateCueIn"
-        },
-
-        "audio-end": {
-            blur: "validateCueOut"
-        },
-
-        "btn-logarithmic": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-linear": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-exponential": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-sCurve": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-zoom-in": {
-            click: "zoomIn"
-        },
-
-        "btn-zoom-out": {
-            click: "zoomOut"
-        },
-
-        "btn-new-track": {
-            click: "newTrack"
+        "focusout": {
+            "audio-start": "validateCueIn",
+            "audio-end": "validateCueOut",
         }
+    },
+
+    init: function() {
+        var state,
+            container,
+            fadeType,
+            tmpEl,
+            tmpBtn;
+
+        WaveformPlaylist.makePublisher(this);
+
+        container = this.config.getContainer();
+        state = this.config.getState();
+        fadeType = this.config.getFadeType();
+
+        //controls we should keep a reference to.
+        this.ctrls = {};
+        this.ctrls["time-format"] = container.querySelector(".time-format");
+        this.ctrls["audio-start"] = container.querySelector(".audio-start");
+        this.ctrls["audio-end"] = container.querySelector(".audio-end");
+        this.ctrls["audio-pos"] = container.querySelector(".audio-pos");
+
+        //set current state and fade tyoe on playlist
+        [".btn-state[data-state='"+state+"']", ".btn-fade[data-fade='"+fadeType+"']"].forEach(function(buttonClass) {
+            tmpBtn = container.querySelector(buttonClass);
+
+            if (tmpBtn) {
+                this.activateButton(tmpBtn);
+            }
+        }, this);  
+
+        Object.keys(this.eventTypes).forEach(function(event) {
+            var that = this;
+
+            //all events are delegated to the main container.
+            (function(eventName, classNames) {
+                container.addEventListener(eventName, function(e) {
+                    //check if the event target has a special class name.
+                    var data = that.nodeChainContainsClassName(e.currentTarget, e.target, classNames);
+                    var className;
+
+                    if (data && (className = data['className'])) {
+                        console.log(className);
+                        that[that.eventTypes[eventName][className]].call(that, e);
+                    }
+                });
+            })(event, Object.keys(this.eventTypes[event]));
+
+        }, this);
+
+        if (this.ctrls["time-format"]) {
+            this.ctrls["time-format"].value = this.config.getTimeFormat();
+        }
+
+        this.timeFormat = this.config.getTimeFormat();
+
+        //Kept in seconds so time format change can update fields easily.
+        this.currentSelectionValues = undefined;
+
+        this.onCursorSelection({
+            start: 0,
+            end: 0
+        });
+    },
+
+    nodeChainContainsClassName: function(parent, node, classNames) {
+        var i, len, className, currentNode;
+
+        currentNode = node;
+
+        while (currentNode) {
+            for (i = 0, len = classNames.length; i < len; i++) {
+                className = classNames[i];
+                if (currentNode.classList.contains(className)) {
+                    return {
+                        'className': className,
+                        'node': currentNode
+                    };
+                }
+            }
+
+            if (currentNode === parent) {
+                break;
+            }
+            currentNode = currentNode.parentElement; 
+        }   
     },
 
     validateCue: function(value) {
@@ -116,15 +130,10 @@ WaveformPlaylist.AudioControls = {
 
         validators = {
             "seconds": /^\d+$/,
-
             "thousandths": /^\d+\.\d{3}$/,
-
             "hh:mm:ss": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]$/,
-
             "hh:mm:ss.u": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]\.\d{1}$/,
-
             "hh:mm:ss.uu": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]\.\d{2}$/,
-
             "hh:mm:ss.uuu": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]\.\d{3}$/
         };
 
@@ -228,74 +237,6 @@ WaveformPlaylist.AudioControls = {
         };
 
         return formats[format];
-    },
-
-    init: function() {
-        var that = this,
-            className,
-            event,
-            events = this.events,
-            tmpEl,
-            func,
-            state,
-            container,
-            fadeType,
-            tmpBtn;
-
-        WaveformPlaylist.makePublisher(this);
-
-        this.ctrls = {};
-        container = this.config.getContainer();
-        state = this.config.getState();
-        fadeType = this.config.getFadeType();
-
-        ["btn-"+state, "btn-"+fadeType].forEach(function(buttonClass) {
-            tmpBtn = document.getElementsByClassName(buttonClass)[0];
-
-            if (tmpBtn) {
-                this.activateButton(tmpBtn);
-            }
-        }, this);  
-
-        for (className in events) {
-        
-            tmpEl = container.getElementsByClassName(className)[0];
-            this.ctrls[className] = tmpEl;
-
-            for (event in events[className]) {
-
-                if (tmpEl) {
-                    func = that[events[className][event]].bind(that);
-                    tmpEl.addEventListener(event, func);
-                }
-            }
-        } 
-
-        if (this.ctrls["time-format"]) {
-            this.ctrls["time-format"].value = this.config.getTimeFormat();
-        }
-
-
-        this.timeFormat = this.config.getTimeFormat();
-
-        //Kept in seconds so time format change can update fields easily.
-        this.currentSelectionValues = undefined;
-
-        this.onCursorSelection({
-            start: 0,
-            end: 0
-        });
-    },
-
-    changeDefaultFade: function(e) {
-        var el = e.currentTarget,
-            prevEl = el.parentElement.getElementsByClassName('active')[0],
-            type = el.dataset.fade;
-
-        this.deactivateButton(prevEl);
-        this.activateButton(el);
-
-        this.config.setFadeType(type);
     },
 
     changeTimeFormat: function(e) {
@@ -445,31 +386,36 @@ WaveformPlaylist.AudioControls = {
     },
 
     save: function() {
-        this.fire('playlistsave', this);
+        this.fire('playlistsave');
     },
 
     open: function() {
-        this.fire('playlistrestore', this);
+        this.fire('playlistrestore');
     },
 
     rewindAudio: function() {
-        this.fire('rewindaudio', this);
+        this.fire('rewindaudio');
     },
 
     fastForwardAudio: function() {
-        this.fire('fastforwardaudio', this);
+        this.fire('fastforwardaudio');
     },
 
     playAudio: function() {
-        this.fire('playaudio', this);
+        this.fire('playaudio');
     },
 
     pauseAudio: function() {
-        this.fire('pauseaudio', this);
+        this.fire('pauseaudio');
     },
 
     stopAudio: function() {
-        this.fire('stopaudio', this);
+        this.fire('stopaudio');
+    },
+
+    changeVolume: function(e) {
+        var tracks = document.querySelector('.playlist-tracks').childNodes;
+        this.fire('changevolume');
     },
 
     activateButton: function(el) {
@@ -497,15 +443,28 @@ WaveformPlaylist.AudioControls = {
     },
 
     changeState: function(e) {
-        var el = e.currentTarget,
-            prevEl = el.parentElement.getElementsByClassName('active')[0],
+        var nodeData = this.nodeChainContainsClassName(e.currentTarget, e.target, ['btn-state']),
+            el = nodeData['node'],
+            prevEl = el.parentElement.querySelector('.active'),
             state = el.dataset.state;
 
         this.deactivateButton(prevEl);
         this.activateButton(el);
 
         this.config.setState(state);
-        this.fire('changestate', this);
+        this.fire('changestate');
+    },
+
+    changeDefaultFade: function(e) {
+        var nodeData = this.nodeChainContainsClassName(e.currentTarget, e.target, ['btn-fade']),
+            el = nodeData['node'],
+            prevEl = el.parentElement.querySelector('.active'),
+            type = el.dataset.fade;
+
+        this.deactivateButton(prevEl);
+        this.activateButton(el);
+
+        this.config.setFadeType(type);
     },
 
     trimAudio: function(e) {
