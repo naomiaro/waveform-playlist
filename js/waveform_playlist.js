@@ -365,6 +365,11 @@ var WaveformPlaylist = {
         trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
         trackEditor.on("changecursor", "onSelectUpdate", this);
         trackEditor.on("changeshift", "onChangeShift", this);
+
+        //only one track should be preloaded with a selected area.
+        if (trackEditor.selectedArea !== undefined) {
+            this.activateTrack(trackEditor);
+        }
     },
 
     updateEditor: function() {
