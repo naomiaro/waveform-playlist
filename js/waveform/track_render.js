@@ -121,7 +121,7 @@ WaveformPlaylist.WaveformDrawer = {
 
     drawInactive: function() {
         this.container.classList.remove("active");
-        this.selection && this.container.removeChild(this.selection);
+        this.selection && this.waveformContainer.removeChild(this.selection);
         this.selection = undefined;
     },
 
@@ -254,6 +254,7 @@ WaveformPlaylist.WaveformDrawer = {
         volumeInput.type = "range";
         volumeInput.setAttribute('min', 0);
         volumeInput.setAttribute('max', 100);
+        volumeInput.classList.add("volume-slider");
 
         waveformContainer = document.createElement("div");
         waveformContainer.classList.add("waveform");
