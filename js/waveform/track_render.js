@@ -210,6 +210,31 @@ WaveformPlaylist.WaveformDrawer = {
         return layerOffset + startX + (canvasOffset * this.MAX_CANVAS_WIDTH);
     },
 
+    drawTrackControls: function(width, height) {
+        var controls,
+            volumeInput;
+
+        controls = document.createElement("div");
+        controls.style.height = height+"px";
+        controls.style.width = width+"px";
+        controls.style.position = "absolute";
+        controls.style.left = 0;
+        controls.classList.add("controls");
+        controls.style.zIndex = 1000;
+
+        volumeInput = document.createElement("input");
+        volumeInput.type = "range";
+        volumeInput.setAttribute('min', 0);
+        volumeInput.setAttribute('max', 100);
+        volumeInput.setAttribute('value', 100);
+        volumeInput.classList.add("volume-slider");
+
+        controls.appendChild(volumeInput);
+        this.container.style.marginLeft = width+"px";
+
+        return controls;
+    },
+
     drawBuffer: function(buffer, cues) {
         var canv,
             div,
@@ -228,8 +253,6 @@ WaveformPlaylist.WaveformDrawer = {
             width,
             tmpWidth,
             canvasOffset,
-            controls,
-            volumeInput,
             waveformContainer,
             controlSettings; 
 
@@ -244,23 +267,7 @@ WaveformPlaylist.WaveformDrawer = {
         controlSettings = this.config.getControlSettings();
 
         if (controlSettings.show) {
-            controls = document.createElement("div");
-            controls.style.height = wrapperHeight+"px";
-            controls.style.width = controlSettings.width+"px";
-            controls.style.position = "absolute";
-            controls.style.left = 0;
-            controls.classList.add("controls");
-            controls.style.zIndex = 1000;
-
-            volumeInput = document.createElement("input");
-            volumeInput.type = "range";
-            volumeInput.setAttribute('min', 0);
-            volumeInput.setAttribute('max', 100);
-            volumeInput.classList.add("volume-slider");
-
-            controls.appendChild(volumeInput);
-            fragment.appendChild(controls);
-            this.container.style.marginLeft = controlSettings.width+"px";
+            fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight));
         }
         
         waveformContainer = document.createElement("div");
@@ -280,7 +287,6 @@ WaveformPlaylist.WaveformDrawer = {
         cursor.style.bottom = 0;
         cursor.style.zIndex = 100;
 
-        this.controlContainer = controls;
         this.waveformContainer = waveformContainer;
         this.cursor = cursor;
 
