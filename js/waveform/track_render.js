@@ -212,6 +212,9 @@ WaveformPlaylist.WaveformDrawer = {
 
     drawTrackControls: function(width, height) {
         var controls,
+            btnGroup,
+            muteButton,
+            soloButton,
             volumeInput;
 
         controls = document.createElement("div");
@@ -222,6 +225,17 @@ WaveformPlaylist.WaveformDrawer = {
         controls.classList.add("controls");
         controls.style.zIndex = 1000;
 
+        btnGroup = document.createElement("div");
+        btnGroup.className = "btn-group";
+
+        muteButton = document.createElement("span");
+        muteButton.className = "btn btn-default";
+        muteButton.textContent = "Mute";
+
+        soloButton = document.createElement("span");
+        soloButton.className = "btn btn-default";
+        soloButton.textContent = "Solo";
+
         volumeInput = document.createElement("input");
         volumeInput.type = "range";
         volumeInput.setAttribute('min', 0);
@@ -229,6 +243,9 @@ WaveformPlaylist.WaveformDrawer = {
         volumeInput.setAttribute('value', 100);
         volumeInput.classList.add("volume-slider");
 
+        btnGroup.appendChild(muteButton);
+        btnGroup.appendChild(soloButton);
+        controls.appendChild(btnGroup);
         controls.appendChild(volumeInput);
         this.container.style.marginLeft = width+"px";
 
