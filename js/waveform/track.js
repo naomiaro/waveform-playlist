@@ -437,6 +437,10 @@ WaveformPlaylist.TrackEditor = {
         return this.playout.isPlaying();
     },
 
+    setGainLevel: function(gain) {
+        this.playout.setGainLevel(gain);
+    },
+
     /*
         startTime, endTime in seconds (float).
         segment is for a highlighted section in the UI.

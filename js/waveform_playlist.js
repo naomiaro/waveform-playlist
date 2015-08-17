@@ -85,6 +85,7 @@ var WaveformPlaylist = {
         audioControls.on("trimaudio", "onTrimAudio", this);
         audioControls.on("changestate", "onStateChange", this);
         audioControls.on("changeselection", "onSelectionChange", this);
+        audioControls.on("changevolume", "onTrackVolumeChange", this);
 
         this.audioControls = audioControls;
     },
@@ -147,6 +148,23 @@ var WaveformPlaylist = {
             that.fire('trackscroll', that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
             that.scrollTimeout = false;
         }, 25);   
+    },
+
+    onTrackVolumeChange: function(data) {
+        var editors = this.trackEditors,
+            i,
+            len,
+            editor,
+            gain = data.gain,
+            trackElement = data.trackElement;
+
+        for (i = 0, len = editors.length; i < len; i++) {
+            editor = editors[i];
+
+            if (editor.container === trackElement) {
+                editor.setGainLevel(gain);
+            }
+        }
     },
 
     activateTrack: function(trackEditor) {

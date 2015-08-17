@@ -28,7 +28,9 @@ WaveformPlaylist.AudioControls = {
             "btn-new-track": "newTrack"
         },
         "change": {
-            "time-format": "changeTimeFormat",
+            "time-format": "changeTimeFormat"
+        },
+        "input": {
             "volume-slider": "changeVolume"
         },
         "focusout": {
@@ -77,7 +79,6 @@ WaveformPlaylist.AudioControls = {
                     var className;
 
                     if (data && (className = data['className'])) {
-                        console.log(className);
                         that[that.eventTypes[eventName][className]].call(that, e);
                     }
                 });
@@ -414,8 +415,13 @@ WaveformPlaylist.AudioControls = {
     },
 
     changeVolume: function(e) {
-        var tracks = document.querySelector('.playlist-tracks').childNodes;
-        this.fire('changevolume');
+        var container = this.config.getContainer();
+        var track = this.nodeChainContainsClassName(e.currentTarget, e.target, ["channel-wrapper"])["node"];
+
+        this.fire('changevolume', {
+            trackElement: track,
+            gain: e.target.value/100
+        });
     },
 
     activateButton: function(el) {

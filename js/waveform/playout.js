@@ -11,6 +11,7 @@ WaveformPlaylist.AudioPlayout = {
             }
         });
 
+        this.gain = 1;
         this.destination = this.ac.destination;
     },
 
@@ -114,13 +115,21 @@ WaveformPlaylist.AudioPlayout = {
         });
 
         this.fadeGain = this.ac.createGain();
+
         this.outputGain = this.ac.createGain();
+        this.outputGain.gain.value = this.gain;
 
         this.source.connect(this.fadeGain);
         this.fadeGain.connect(this.outputGain);
         this.outputGain.connect(this.destination);
 
         return sourcePromise;
+    },
+
+    setGainLevel: function(gain) {
+        this.gain = gain;
+
+        this.outputGain && (this.outputGain.gain.value = gain);
     },
 
     /*
