@@ -210,12 +210,13 @@ WaveformPlaylist.WaveformDrawer = {
         return layerOffset + startX + (canvasOffset * this.MAX_CANVAS_WIDTH);
     },
 
-    drawTrackControls: function(width, height) {
+    drawTrackControls: function(width, height, filename) {
         var controls,
             btnGroup,
             muteButton,
             soloButton,
-            volumeInput;
+            volumeInput,
+            name;
 
         controls = document.createElement("div");
         controls.style.height = height+"px";
@@ -225,15 +226,18 @@ WaveformPlaylist.WaveformDrawer = {
         controls.classList.add("controls");
         controls.style.zIndex = 1000;
 
+        name = document.createElement("header");
+        name.textContent = filename;
+
         btnGroup = document.createElement("div");
         btnGroup.className = "btn-group";
 
         muteButton = document.createElement("span");
-        muteButton.className = "btn btn-default";
+        muteButton.className = "btn btn-default btn-mute";
         muteButton.textContent = "Mute";
 
         soloButton = document.createElement("span");
-        soloButton.className = "btn btn-default";
+        soloButton.className = "btn btn-default btn-solo";
         soloButton.textContent = "Solo";
 
         volumeInput = document.createElement("input");
@@ -245,6 +249,7 @@ WaveformPlaylist.WaveformDrawer = {
 
         btnGroup.appendChild(muteButton);
         btnGroup.appendChild(soloButton);
+        controls.appendChild(name);
         controls.appendChild(btnGroup);
         controls.appendChild(volumeInput);
         this.container.style.marginLeft = width+"px";
@@ -252,7 +257,7 @@ WaveformPlaylist.WaveformDrawer = {
         return controls;
     },
 
-    drawBuffer: function(buffer, cues) {
+    drawBuffer: function(buffer, cues, filename) {
         var canv,
             div,
             progress,
@@ -284,7 +289,7 @@ WaveformPlaylist.WaveformDrawer = {
         controlSettings = this.config.getControlSettings();
 
         if (controlSettings.show) {
-            fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight));
+            fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight, filename));
         }
         
         waveformContainer = document.createElement("div");
@@ -467,7 +472,7 @@ WaveformPlaylist.WaveformDrawer = {
         selection.style.bottom = 0;
         selection.style.top = 0;
         selection.style.left = start+"px";
-        selection.style.zIndex = 2000;
+        selection.style.zIndex = 999;
 
         if (this.selection === undefined) {
             this.waveformContainer.appendChild(selection);

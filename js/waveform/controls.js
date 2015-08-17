@@ -25,7 +25,9 @@ WaveformPlaylist.AudioControls = {
             "btn-fade": "changeDefaultFade",
             "btn-zoom-in": "zoomIn",
             "btn-zoom-out": "zoomOut",
-            "btn-new-track": "newTrack"
+            "btn-new-track": "newTrack",
+            "btn-mute": "muteTrack",
+            "btn-solo": "soloTrack"
         },
         "change": {
             "time-format": "changeTimeFormat"
@@ -59,7 +61,7 @@ WaveformPlaylist.AudioControls = {
         this.ctrls["audio-end"] = container.querySelector(".audio-end");
         this.ctrls["audio-pos"] = container.querySelector(".audio-pos");
 
-        //set current state and fade tyoe on playlist
+        //set current state and fade type on playlist
         [".btn-state[data-state='"+state+"']", ".btn-fade[data-fade='"+fadeType+"']"].forEach(function(buttonClass) {
             tmpBtn = container.querySelector(buttonClass);
 
@@ -165,23 +167,18 @@ WaveformPlaylist.AudioControls = {
             "seconds": function(value) {
                 return parseInt(value, 10);
             },
-
             "thousandths": function(value) {
                 return parseFloat(value);
             },
-
             "hh:mm:ss": function(value) {
                 return clockConverter(value);
             },
-
             "hh:mm:ss.u": function(value) {
                 return clockConverter(value);
             },
-
             "hh:mm:ss.uu": function(value) {
                 return clockConverter(value);
             },
-
             "hh:mm:ss.uuu": function(value) {
                 return clockConverter(value);
             } 
@@ -215,23 +212,18 @@ WaveformPlaylist.AudioControls = {
             "seconds": function (seconds) {
                 return seconds.toFixed(0);
             },
-
             "thousandths": function (seconds) {
                 return seconds.toFixed(3);
             },
-
             "hh:mm:ss": function (seconds) {
                 return clockFormat(seconds, 0);   
             },
-
             "hh:mm:ss.u": function (seconds) {
                 return clockFormat(seconds, 1);   
             },
-
             "hh:mm:ss.uu": function (seconds) {
                 return clockFormat(seconds, 2);   
             },
-
             "hh:mm:ss.uuu": function (seconds) {
                 return clockFormat(seconds, 3);   
             }
@@ -424,6 +416,24 @@ WaveformPlaylist.AudioControls = {
         });
     },
 
+    muteTrack: function(e) {
+        var el = this.nodeChainContainsClassName(e.currentTarget, e.target, ["btn-mute"])["node"];
+        var track = this.nodeChainContainsClassName(e.currentTarget, el, ["channel-wrapper"])["node"];
+
+        el.classList.toggle(this.classes["active"]);
+
+        this.fire('mutetrack', track);
+    },
+
+    soloTrack: function(e) {
+        var el = this.nodeChainContainsClassName(e.currentTarget, e.target, ["btn-solo"])["node"];
+        var track = this.nodeChainContainsClassName(e.currentTarget, el, ["channel-wrapper"])["node"];
+
+        el.classList.toggle(this.classes["active"]);
+
+        this.fire('solotrack', track);
+    },
+
     activateButton: function(el) {
         if (el) {
             el.classList.add(this.classes["active"]);
@@ -519,7 +529,6 @@ WaveformPlaylist.AudioControls = {
         start, end in seconds
     */
     notifySelectionUpdate: function(start, end) {
-        
         this.fire('changeselection', {
             start: start,
             end: end

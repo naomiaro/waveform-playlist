@@ -69,6 +69,10 @@ html, body {
   text-align: center;
 }
 
+.channel-wrapper .controls header {
+  overflow: hidden;
+}
+
 input[type=range]{
   -webkit-appearance: none;
   -moz-appearance: none;

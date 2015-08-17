@@ -61,7 +61,7 @@ WaveformPlaylist.TrackEditor = {
                 value: this.config
             }
         });
-        
+
         this.container = this.drawer.init();
 
         return this.container;
@@ -142,6 +142,7 @@ WaveformPlaylist.TrackEditor = {
         var that = this,
             xhr = new XMLHttpRequest();
 
+        this.filename = src.replace(/^.*[\\\/]/, '');
         this.src = src;
 
         xhr.open('GET', src, true);
@@ -161,6 +162,7 @@ WaveformPlaylist.TrackEditor = {
             var fr = new FileReader();
             var track = this;
 
+            this.filename = file.name;
             this.drawer.drawLoading();
 
             dr.addEventListener('load', function() {
@@ -180,8 +182,7 @@ WaveformPlaylist.TrackEditor = {
     },
 
     drawTrack: function(buffer) {
-
-        this.drawer.drawBuffer(buffer, this.cues);
+        this.drawer.drawBuffer(buffer, this.cues, this.filename);
         this.drawer.drawFades(this.fades);
     },
 

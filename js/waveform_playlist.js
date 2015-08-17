@@ -86,8 +86,13 @@ var WaveformPlaylist = {
         audioControls.on("changestate", "onStateChange", this);
         audioControls.on("changeselection", "onSelectionChange", this);
         audioControls.on("changevolume", "onTrackVolumeChange", this);
+        audioControls.on("mutetrack", "onMuteTrack", this);
+        audioControls.on("solotrack", "onSoloTrack", this);
 
         this.audioControls = audioControls;
+
+        this.mutedTracks = [];
+        this.soloedTracks = [];
     },
 
     removeTrack: function(trackEditor) {
@@ -163,6 +168,48 @@ var WaveformPlaylist = {
 
             if (editor.container === trackElement) {
                 editor.setGainLevel(gain);
+            }
+        }
+    },
+
+    onMuteTrack: function(trackElement) {
+        var editors = this.trackEditors,
+            i,
+            len,
+            editor,
+            index;
+
+        for (i = 0, len = editors.length; i < len; i++) {
+            editor = editors[i];
+
+            if (editor.container === trackElement) {
+                if (index = this.mutedTracks.indexOf(editor)) {
+
+                }
+                else {
+                    this.mutedTracks.push(editor);
+                }
+            }
+        }
+    },
+
+    onSoloTrack: function(trackElement) {
+        var editors = this.trackEditors,
+            i,
+            len,
+            editor,
+            index;
+
+        for (i = 0, len = editors.length; i < len; i++) {
+            editor = editors[i];
+
+            if (editor.container === trackElement) {
+                if (index = this.soloedTracks.indexOf(editor)) {
+
+                }
+                else {
+                    this.soloedTracks.push(editor);
+                }
             }
         }
     },
