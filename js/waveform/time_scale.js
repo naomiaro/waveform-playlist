@@ -6,7 +6,8 @@ WaveformPlaylist.TimeScale = {
         var that = this,
             canv,
             div,
-            resizeTimer;
+            resizeTimer,
+            controlSettings = this.config.getControlSettings();
 
         this.timeinfo = {
             20000: {
@@ -59,6 +60,10 @@ WaveformPlaylist.TimeScale = {
         div.style.position = "relative";
         div.style.left = 0;
         div.style.right = 0;
+
+        if (controlSettings.show) {
+            div.style.marginLeft = controlSettings.width+"px";
+        }
 
         if (div === undefined) {
             return;

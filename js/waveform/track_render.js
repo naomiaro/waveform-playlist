@@ -230,7 +230,8 @@ WaveformPlaylist.WaveformDrawer = {
             canvasOffset,
             controls,
             volumeInput,
-            waveformContainer; 
+            waveformContainer,
+            controlSettings; 
 
         this.container.innerHTML = "";
         this.channels = []; 
@@ -240,22 +241,28 @@ WaveformPlaylist.WaveformDrawer = {
         this.width = Math.ceil(numSamples / res);
         this.height = this.config.getWaveHeight();
         wrapperHeight = numChan * this.height;
+        controlSettings = this.config.getControlSettings();
 
+        if (controlSettings.show) {
+            controls = document.createElement("div");
+            controls.style.height = wrapperHeight+"px";
+            controls.style.width = controlSettings.width+"px";
+            controls.style.position = "absolute";
+            controls.style.left = 0;
+            controls.classList.add("controls");
+            controls.style.zIndex = 1000;
 
-        controls = document.createElement("div");
-        controls.style.height = wrapperHeight+"px";
-        controls.style.width = "150px";
-        controls.style.position = "absolute";
-        controls.style.left = 0;
-        controls.classList.add("controls");
-        controls.style.zIndex = 1000;
+            volumeInput = document.createElement("input");
+            volumeInput.type = "range";
+            volumeInput.setAttribute('min', 0);
+            volumeInput.setAttribute('max', 100);
+            volumeInput.classList.add("volume-slider");
 
-        volumeInput = document.createElement("input");
-        volumeInput.type = "range";
-        volumeInput.setAttribute('min', 0);
-        volumeInput.setAttribute('max', 100);
-        volumeInput.classList.add("volume-slider");
-
+            controls.appendChild(volumeInput);
+            fragment.appendChild(controls);
+            this.container.style.marginLeft = controlSettings.width+"px";
+        }
+        
         waveformContainer = document.createElement("div");
         waveformContainer.classList.add("waveform");
         waveformContainer.style.height = wrapperHeight+"px";
@@ -277,9 +284,7 @@ WaveformPlaylist.WaveformDrawer = {
         this.waveformContainer = waveformContainer;
         this.cursor = cursor;
 
-        controls.appendChild(volumeInput);
         waveformContainer.appendChild(cursor);
-        fragment.appendChild(controls);
         fragment.appendChild(waveformContainer);
 
         //create elements for each audio channel

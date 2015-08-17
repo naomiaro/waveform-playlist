@@ -22,6 +22,10 @@ WaveformPlaylist.Config = function(params) {
             fadeType: 'logarithmic',
 
             timescale: false, //whether or not to include the time measure.
+            controls: {
+                show: false, //whether or not to include the track controls
+                width: 150, //width of controls in pixels
+            },
 
             UITheme: "default", // bootstrap || jQueryUI || default
 
@@ -121,6 +125,13 @@ WaveformPlaylist.Config = function(params) {
                 selectBorderColor: params.selectBorderColor,
                 selectBackgroundColor: params.selectBackgroundColor, 
             };
+        };
+
+        that.getControlSettings = function getControlSettings() {
+            return {
+                show: params.controls.show,
+                width: params.controls.width
+            }
         };
 
         that.getTrackScroll = function getTrackScroll() {
