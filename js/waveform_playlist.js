@@ -95,6 +95,22 @@ var WaveformPlaylist = {
         this.soloedTracks = [];
     },
 
+    createTrack: function() {
+        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
+            config: {
+                value: this.config
+            }
+        });
+        var trackElem = trackEditor.init();
+
+        trackEditor.setState('fileDrop');
+    
+        this.trackEditors.push(trackEditor);
+        this.trackContainer.appendChild(trackElem);
+
+        trackEditor.on("trackloaded", "onTrackLoad", this);
+    },
+
     removeTrack: function(trackEditor) {
         var i, 
             len, 
@@ -108,6 +124,23 @@ var WaveformPlaylist = {
                 editors.splice(i, 1);
                 return;
             }
+        }
+    },
+
+    onTrackLoad: function(trackEditor) {
+
+        this.audioControls.on("trackedit", "onTrackEdit", trackEditor);
+        this.audioControls.on("changeresolution", "onResolutionChange", trackEditor);
+
+        trackEditor.on("activateSelection", "onAudioSelection", this.audioControls);
+        trackEditor.on("deactivateSelection", "onAudioDeselection", this.audioControls);
+        trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
+        trackEditor.on("changecursor", "onSelectUpdate", this);
+        trackEditor.on("changeshift", "onChangeShift", this);
+
+        //only one track should be preloaded with a selected area.
+        if (trackEditor.selectedArea !== undefined) {
+            this.activateTrack(trackEditor);
         }
     },
 
@@ -341,6 +374,26 @@ var WaveformPlaylist = {
         return isPlaying;
     },
 
+    shouldTrackPlay: function(trackEditor) {
+        var shouldPlay;
+        //if there are solo tracks, only they should play.
+        if (this.soloedTracks.length > 0) {
+            shouldPlay = false;
+            if (this.soloedTracks.indexOf(trackEditor) > -1) {
+                shouldPlay = true;
+            }
+        }
+        //play all tracks except any muted tracks.
+        else {
+            shouldPlay = true;
+            if (this.mutedTracks.indexOf(trackEditor) > -1) {
+                shouldPlay = false;
+            }
+        }
+
+        return shouldPlay;
+    },
+
     play: function() {
         var editors = this.trackEditors,
             i,
@@ -361,7 +414,9 @@ var WaveformPlaylist = {
         }
 
         for (i = 0, len = editors.length; i < len; i++) {
-            playoutPromises.push(editors[i].schedulePlay(currentTime, startTime, endTime));
+            if (this.shouldTrackPlay(editors[i])) {
+                playoutPromises.push(editors[i].schedulePlay(currentTime, startTime, endTime));
+            }
         }
 
         this.lastPlay = currentTime;
@@ -406,39 +461,9 @@ var WaveformPlaylist = {
         }
     },
 
-    createTrack: function() {
-        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
-            config: {
-                value: this.config
-            }
-        });
-        var trackElem = trackEditor.init();
-
-        trackEditor.setState('fileDrop');
-    
-        this.trackEditors.push(trackEditor);
-        this.trackContainer.appendChild(trackElem);
-
-        trackEditor.on("trackloaded", "onTrackLoad", this);
-    },
-
-    onTrackLoad: function(trackEditor) {
-
-        this.audioControls.on("trackedit", "onTrackEdit", trackEditor);
-        this.audioControls.on("changeresolution", "onResolutionChange", trackEditor);
-
-        trackEditor.on("activateSelection", "onAudioSelection", this.audioControls);
-        trackEditor.on("deactivateSelection", "onAudioDeselection", this.audioControls);
-        trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
-        trackEditor.on("changecursor", "onSelectUpdate", this);
-        trackEditor.on("changeshift", "onChangeShift", this);
-
-        //only one track should be preloaded with a selected area.
-        if (trackEditor.selectedArea !== undefined) {
-            this.activateTrack(trackEditor);
-        }
-    },
-
+    /*
+      Animation function for the playlist.
+    */
     updateEditor: function() {
         var editors = this.trackEditors,
             i,
