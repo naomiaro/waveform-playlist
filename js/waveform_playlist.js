@@ -183,8 +183,9 @@ var WaveformPlaylist = {
             editor = editors[i];
 
             if (editor.container === trackElement) {
-                if (index = this.mutedTracks.indexOf(editor)) {
-
+                index = this.mutedTracks.indexOf(editor);
+                if (index > -1) {
+                    this.mutedTracks.splice(index, 1);
                 }
                 else {
                     this.mutedTracks.push(editor);
@@ -204,8 +205,9 @@ var WaveformPlaylist = {
             editor = editors[i];
 
             if (editor.container === trackElement) {
-                if (index = this.soloedTracks.indexOf(editor)) {
-
+                index = this.soloedTracks.indexOf(editor);
+                if (index > -1) {
+                    this.soloedTracks.splice(index, 1);
                 }
                 else {
                     this.soloedTracks.push(editor);
