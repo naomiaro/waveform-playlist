@@ -257,11 +257,10 @@ WaveformPlaylist.WaveformDrawer = {
         return controls;
     },
 
-    drawBuffer: function(buffer, cues, filename) {
+    drawWaveform: function(buffer, cues) {
         var canv,
             div,
             progress,
-            cursor,
             i,
             top = 0,
             left = 0,
@@ -270,33 +269,15 @@ WaveformPlaylist.WaveformDrawer = {
             numChan = makeMono? 1 : buffer.numberOfChannels,
             numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
-            wrapperHeight,
             canvases,
             width,
             tmpWidth,
             canvasOffset,
-            waveformContainer,
-            controlSettings; 
+            cursor;
 
-        this.container.innerHTML = "";
+        this.waveformContainer.innerHTML = ""; 
         this.channels = []; 
-        this.selection = undefined; 
-
-        //width and height is per waveform canvas.
-        this.width = Math.ceil(numSamples / res);
-        this.height = this.config.getWaveHeight();
-        wrapperHeight = numChan * this.height;
-        controlSettings = this.config.getControlSettings();
-
-        if (controlSettings.show) {
-            fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight, filename));
-        }
-        
-        waveformContainer = document.createElement("div");
-        waveformContainer.classList.add("waveform");
-        waveformContainer.style.height = wrapperHeight+"px";
-        waveformContainer.style.width = this.width+"px";
-        waveformContainer.style.position = "relative";
+        this.selection = undefined;
 
         cursor = document.createElement("div");
         cursor.classList.add("cursor");
@@ -309,11 +290,9 @@ WaveformPlaylist.WaveformDrawer = {
         cursor.style.bottom = 0;
         cursor.style.zIndex = 100;
 
-        this.waveformContainer = waveformContainer;
         this.cursor = cursor;
 
-        waveformContainer.appendChild(cursor);
-        fragment.appendChild(waveformContainer);
+        fragment.appendChild(cursor);
 
         //create elements for each audio channel
         for (i = 0; i < numChan; i++) {
@@ -371,13 +350,49 @@ WaveformPlaylist.WaveformDrawer = {
                 progress: progress
             });
 
-            waveformContainer.appendChild(div);
+            fragment.appendChild(div);
             top = top + this.height;
         }
 
         this.getPeaks(buffer, cues);
         this.draw();
         this.drawTimeShift();
+
+        this.waveformContainer.appendChild(fragment);
+    },
+
+    drawContainer: function(buffer, cues, filename) {
+        var makeMono = this.config.isDisplayMono(),
+            res = this.config.getResolution(),
+            numChan = makeMono? 1 : buffer.numberOfChannels,
+            numSamples = cues.cueout - cues.cuein + 1,
+            fragment = document.createDocumentFragment(),
+            wrapperHeight = numChan * this.height,
+            waveformContainer,
+            controlSettings = this.config.getControlSettings();
+
+        //remove the loading stuff
+        this.container.innerHTML = ""; 
+
+        //width and height is per waveform canvas.
+        this.width = Math.ceil(numSamples / res);
+        this.height = this.config.getWaveHeight();
+
+        if (controlSettings.show) {
+            fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight, filename));
+        }
+        
+        waveformContainer = document.createElement("div");
+        waveformContainer.classList.add("waveform");
+        waveformContainer.style.height = wrapperHeight+"px";
+        waveformContainer.style.width = this.width+"px";
+        waveformContainer.style.position = "relative";
+
+        this.waveformContainer = waveformContainer;
+
+        fragment.appendChild(waveformContainer);
+
+        this.drawWaveform(buffer, cues);
 
         this.container.style.height = wrapperHeight+"px";
         this.container.appendChild(fragment);
