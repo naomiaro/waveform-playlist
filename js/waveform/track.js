@@ -182,8 +182,7 @@ WaveformPlaylist.TrackEditor = {
     },
 
     drawTrack: function(buffer) {
-        this.drawer.drawWaveform(buffer, this.cues);
-        this.drawer.drawFades(this.fades);
+        this.drawer.drawWaveform(buffer, this.cues, this.fades);
     },
 
     onTrackLoad: function(buffer, err) {
@@ -204,7 +203,7 @@ WaveformPlaylist.TrackEditor = {
 
         this.setCuePoints(cuein, cueout);
 
-        this.drawer.drawContainer(buffer, this.cues, this.filename);
+        this.drawer.drawContainer(buffer, this.cues, this.fades, this.filename);
         this.setLeftOffset(this.secondsToSamples(this.startTime));
 
         if (this.selectedArea !== undefined) {

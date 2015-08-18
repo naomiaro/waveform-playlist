@@ -257,7 +257,7 @@ WaveformPlaylist.WaveformDrawer = {
         return controls;
     },
 
-    drawWaveform: function(buffer, cues) {
+    drawWaveform: function(buffer, cues, fades) {
         var canv,
             div,
             progress,
@@ -359,11 +359,12 @@ WaveformPlaylist.WaveformDrawer = {
         this.getPeaks(buffer, cues);
         this.draw();
         this.drawTimeShift();
+        this.drawFades(fades);
 
         this.waveformContainer.appendChild(fragment);
     },
 
-    drawContainer: function(buffer, cues, filename) {
+    drawContainer: function(buffer, cues, fades, filename) {
         var makeMono = this.config.isDisplayMono(),
             res = this.config.getResolution(),
             numChan = makeMono? 1 : buffer.numberOfChannels,
@@ -393,7 +394,7 @@ WaveformPlaylist.WaveformDrawer = {
 
         fragment.appendChild(waveformContainer);
 
-        this.drawWaveform(buffer, cues);
+        this.drawWaveform(buffer, cues, fades);
 
         this.container.style.height = wrapperHeight+"px";
         this.container.appendChild(fragment);

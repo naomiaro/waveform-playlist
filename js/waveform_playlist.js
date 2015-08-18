@@ -284,7 +284,7 @@ var WaveformPlaylist = {
                 editors[i].scheduleStop(currentTime);
             }
 
-            Promise.all(this.playoutPromises).then(this.play.bind(this));
+            Promise.all(this.playoutPromises).then(this.play.bind(this, event.startTime));
         }
 
         //new cursor selected while paused.
@@ -394,18 +394,18 @@ var WaveformPlaylist = {
         return shouldPlay;
     },
 
-    play: function() {
+    play: function(startTime) {
         var editors = this.trackEditors,
             i,
             len,
             currentTime = this.config.getCurrentTime(),
-            startTime = this.config.getCursorPos(),
             endTime,
             selected = this.getSelected(),
             playoutPromises = [];
 
+        startTime = startTime || this.config.getCursorPos();
+
         if (selected !== undefined && selected.endTime > startTime) {
-            startTime = selected.startTime;
             endTime = selected.endTime;
         }
 
@@ -422,7 +422,7 @@ var WaveformPlaylist = {
         this.lastPlay = currentTime;
         //use these to track when the playlist has fully stopped.
         this.playoutPromises = playoutPromises;
-        this.animationRequest = window.requestAnimationFrame(this.animationCallback);
+        this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, startTime));
     },
 
     pause: function() {
@@ -464,14 +464,15 @@ var WaveformPlaylist = {
     /*
       Animation function for the playlist.
     */
-    updateEditor: function() {
+    updateEditor: function(cursorPos) {
         var editors = this.trackEditors,
             i,
             len,
             currentTime = this.config.getCurrentTime(),
             elapsed = currentTime - this.lastPlay,
-            cursorPos = this.config.getCursorPos(),
             playbackSec;
+
+        cursorPos = cursorPos || this.config.getCursorPos();
 
         //update drawer to start drawing from where last paused.
         if (this.pausedAt) {
@@ -491,7 +492,7 @@ var WaveformPlaylist = {
                     "seconds": playbackSec
                 });
             }
-            this.animationRequest = window.requestAnimationFrame(this.animationCallback);
+            this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, cursorPos));
         }
         else {
             //reset view to not playing look
