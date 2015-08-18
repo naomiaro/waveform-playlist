@@ -278,6 +278,8 @@ WaveformPlaylist.WaveformDrawer = {
         this.waveformContainer.innerHTML = ""; 
         this.channels = []; 
         this.selection = undefined;
+        //width and height is per waveform canvas.
+        this.width = Math.ceil(numSamples / res);
 
         cursor = document.createElement("div");
         cursor.classList.add("cursor");
@@ -376,7 +378,6 @@ WaveformPlaylist.WaveformDrawer = {
 
         //width and height is per waveform canvas.
         this.width = Math.ceil(numSamples / res);
-        this.height = this.config.getWaveHeight();
 
         if (controlSettings.show) {
             fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight, filename));
