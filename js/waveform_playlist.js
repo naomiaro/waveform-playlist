@@ -272,9 +272,10 @@ var WaveformPlaylist = {
         var editors = this.trackEditors,
             i,
             len,
-            currentTime = this.config.getCurrentTime();;
+            currentTime = this.config.getCurrentTime(),
+            track = event.editor;
 
-        this.activateTrack(event.editor);
+        this.activateTrack(track);
 
         //seeking while playing occuring
         if (this.isPlaying()) {
@@ -284,9 +285,8 @@ var WaveformPlaylist = {
                 editors[i].scheduleStop(currentTime);
             }
 
-            Promise.all(this.playoutPromises).then(this.play.bind(this, event.startTime));
+            Promise.all(this.playoutPromises).then(this.play.bind(this, event.start));
         }
-
         //new cursor selected while paused.
         else if (this.pausedAt !== undefined) {
             this.pausedAt = undefined;
@@ -294,6 +294,9 @@ var WaveformPlaylist = {
             for (i = 0, len = editors.length; i < len; i++) {
                 editors[i].showProgress(0);
             }
+        }
+        else {
+            track.setSelectedArea(event.start, event.end, event.shiftKey);
         }
     },
 
@@ -404,6 +407,7 @@ var WaveformPlaylist = {
             playoutPromises = [];
 
         startTime = startTime || this.config.getCursorPos();
+        console.log(startTime);
 
         if (selected !== undefined && selected.endTime > startTime) {
             endTime = selected.endTime;

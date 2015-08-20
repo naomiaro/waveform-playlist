@@ -235,18 +235,10 @@ WaveformPlaylist.TrackEditor = {
         startTime, endTime in seconds.
     */
     notifySelectUpdate: function(startTime, endTime, shiftKey) {
-        this.setSelectedArea(startTime, endTime, shiftKey);
-
-        if (startTime < endTime) {
-            this.activateAudioSelection();
-        }
-        else {
-            this.deactivateAudioSelection();
-        }
-
         this.fire('changecursor', {
             start: startTime,
             end: endTime,
+            shiftKey: shiftKey,
             editor: this
         });
     },
@@ -255,7 +247,6 @@ WaveformPlaylist.TrackEditor = {
         start, end in seconds
     */
     setSelectedArea: function(start, end, shiftKey) {
-
         //extending selected area since shift is pressed on a single point click.
         if (shiftKey && (start === end) && (this.prevSelectedArea !== undefined)) {
 
@@ -276,6 +267,13 @@ WaveformPlaylist.TrackEditor = {
 
         this.config.setCursorPos(start);
         this.showSelection();
+
+        if (start < end) {
+            this.activateAudioSelection();
+        }
+        else {
+            this.deactivateAudioSelection();
+        }
     },
 
     activateAudioSelection: function() {

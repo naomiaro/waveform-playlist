@@ -392,10 +392,9 @@ WaveformPlaylist.WaveformDrawer = {
 
         this.waveformContainer = waveformContainer;
 
-        fragment.appendChild(waveformContainer);
-
         this.drawWaveform(buffer, cues, fades);
 
+        fragment.appendChild(waveformContainer);
         this.container.style.height = wrapperHeight+"px";
         this.container.appendChild(fragment);
     },
