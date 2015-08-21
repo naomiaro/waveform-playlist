@@ -296,8 +296,9 @@ var WaveformPlaylist = {
 
         //seeking while playing occuring
         if (this.isPlaying()) {
-            this.restartPlayFrom(event.start);
             this.lastSeeked = event.start;
+            this.pausedAt = undefined;
+            this.restartPlayFrom(event.start);
         }
         //new cursor selected while paused.
         else if (this.pausedAt !== undefined) {
@@ -434,7 +435,7 @@ var WaveformPlaylist = {
     *   returns the current point of time in the playlist in seconds.
     */
     getCurrentTime: function() {
-        var cursorPos = this.lastSeeked || this.config.getCursorPos();
+        var cursorPos = this.lastSeeked || this.pausedAt || this.config.getCursorPos();
 
         console.log(cursorPos);
 
@@ -456,14 +457,10 @@ var WaveformPlaylist = {
             selected = this.getSelected(),
             playoutPromises = [];
 
-        startTime = startTime || this.config.getCursorPos();
+        startTime = startTime || this.pausedAt || this.config.getCursorPos();
 
         if (selected !== undefined && selected.endTime > startTime) {
             endTime = selected.endTime;
-        }
-
-        if (this.pausedAt) {
-            startTime = this.pausedAt;
         }
 
         for (i = 0, len = editors.length; i < len; i++) {
@@ -525,11 +522,6 @@ var WaveformPlaylist = {
         cursorPos = cursorPos || this.config.getCursorPos();
         elapsed = currentTime - this.lastDraw;
 
-        //update drawer to start drawing from where last paused.
-        if (this.pausedAt) {
-            cursorPos = this.pausedAt;
-        }
-
         if (this.isPlaying()) {
             //if there's a change for the UI show progress.
             if (elapsed) {
@@ -554,6 +546,7 @@ var WaveformPlaylist = {
             }
 
             this.pausedAt = undefined;
+            this.lastSeeked = undefined;
         }
 
         this.lastDraw = currentTime;
