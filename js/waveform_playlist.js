@@ -59,6 +59,7 @@ var WaveformPlaylist = {
             fragment.appendChild(trackElem);
 
             trackEditor.on("trackloaded", "onTrackLoad", this);
+            trackEditor.on("changeshift", "onChangeShift", this);
         }
 
         this.trackContainer.appendChild(fragment);
@@ -136,7 +137,6 @@ var WaveformPlaylist = {
         trackEditor.on("deactivateSelection", "onAudioDeselection", this.audioControls);
         trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
         trackEditor.on("changecursor", "onSelectUpdate", this);
-        trackEditor.on("changeshift", "onChangeShift", this);
 
         //only one track should be preloaded with a selected area.
         if (trackEditor.selectedArea !== undefined) {
@@ -212,7 +212,7 @@ var WaveformPlaylist = {
         if (this.isPlaying()) {
             startTime = playlistTime;
 
-            //console.log(startTime);
+            //mark as seeked since we've restarted the sources from this point of play.
             this.lastSeeked = playlistTime;
             this.restartPlayFrom(startTime);
         }
@@ -322,6 +322,7 @@ var WaveformPlaylist = {
         for (i = 0, len = editors.length; i < len; i++) {
             maxTrackLengthPixels = Math.max(maxTrackLengthPixels, editors[i].drawer.containerWidth);
             maxTrackLengthSeconds = Math.max(maxTrackLengthSeconds, editors[i].endTime);
+            console.log(editors[i].endTime);
         }
 
         //set the width so that the entire area will be selectable when needed.
@@ -333,19 +334,21 @@ var WaveformPlaylist = {
     },
 
     rewind: function() {
-        
-        if (this.activeTrack !== undefined) {
-            this.activeTrack.notifySelectUpdate(0, 0);
-        }
-        else {
-            this.config.setCursorPos(0);
-        } 
-
         this.stop();
 
-        this.trackContainer.scrollLeft = 0;
-        this.config.setTrackScroll(0);
-        this.fire('trackscroll');
+        Promise.all(this.playoutPromises).then((function() {
+            if (this.activeTrack !== undefined) {
+                this.activeTrack.setSelectedArea(0, 0, false);
+                this.activeTrack.notifySelectUpdate(0, 0);
+            }
+            else {
+                this.config.setCursorPos(0);
+            }
+
+            this.trackContainer.scrollLeft = 0;
+            this.config.setTrackScroll(0);
+            this.fire('trackscroll');
+        }).bind(this));
     },
 
     fastForward: function() {
@@ -353,18 +356,22 @@ var WaveformPlaylist = {
             clientWidth = this.trackContainer.offsetWidth,
             maxOffset = Math.max(totalWidth - clientWidth, 0);
 
-        if (this.activeTrack !== undefined) {
-            this.activeTrack.notifySelectUpdate(this.duration, this.duration);
-        }
-        else {
-            this.config.setCursorPos(this.duration);
-        }
-
         this.stop();
 
-        this.trackContainer.scrollLeft = maxOffset;
-        this.config.setTrackScroll(maxOffset);
-        this.fire('trackscroll');
+        Promise.all(this.playoutPromises).then((function() {
+            console.log(this.duration);
+            if (this.activeTrack !== undefined) {
+                this.activeTrack.setSelectedArea(this.duration, this.duration, false);
+                this.activeTrack.notifySelectUpdate(this.duration, this.duration);
+            }
+            else {
+                this.config.setCursorPos(this.duration);
+            }
+
+            this.trackContainer.scrollLeft = maxOffset;
+            this.config.setTrackScroll(maxOffset);
+            this.fire('trackscroll');
+        }).bind(this));
     },
 
     /*
