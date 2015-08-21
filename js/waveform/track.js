@@ -499,7 +499,7 @@ WaveformPlaylist.TrackEditor = {
     },
 
     scheduleStop: function(when) {
-        this.playout.stop(when);
+        this.playout.stop(when || this.config.getCurrentTime());
     },
 
     /*

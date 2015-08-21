@@ -205,6 +205,19 @@ var WaveformPlaylist = {
         }
     },
 
+    restartSource: function() {
+        var startTime,
+            playlistTime = this.getCurrentTime();
+
+        if (this.isPlaying()) {
+            startTime = playlistTime;
+
+            //console.log(startTime);
+            this.lastSeeked = playlistTime;
+            this.restartPlayFrom(startTime);
+        }
+    },
+
     onMuteTrack: function(trackElement) {
         var editors = this.trackEditors,
             i,
@@ -225,6 +238,8 @@ var WaveformPlaylist = {
                 }
             }
         }
+
+        this.restartSource();
     },
 
     onSoloTrack: function(trackElement) {
@@ -247,6 +262,8 @@ var WaveformPlaylist = {
                 }
             }
         }
+
+        this.restartSource();
     },
 
     activateTrack: function(trackEditor) {
@@ -279,13 +296,8 @@ var WaveformPlaylist = {
 
         //seeking while playing occuring
         if (this.isPlaying()) {
-            window.cancelAnimationFrame(this.animationRequest);
-
-            for (i = 0, len = editors.length; i < len; i++) {
-                editors[i].scheduleStop(currentTime);
-            }
-
-            Promise.all(this.playoutPromises).then(this.play.bind(this, event.start));
+            this.restartPlayFrom(event.start);
+            this.lastSeeked = event.start;
         }
         //new cursor selected while paused.
         else if (this.pausedAt !== undefined) {
@@ -397,6 +409,37 @@ var WaveformPlaylist = {
         return shouldPlay;
     },
 
+    restartPlayFrom: function(cursorPos) {
+        var editors = this.trackEditors,
+            i,
+            len;
+
+        this.stopAnimation();
+
+        for (i = 0, len = editors.length; i < len; i++) {
+            editors[i].scheduleStop();
+        }
+
+        Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
+    },
+
+    /*
+    *   returns the current point of time in the playlist in seconds.
+    */
+    getCurrentTime: function() {
+        var cursorPos = this.lastSeeked || this.config.getCursorPos();
+
+        console.log(cursorPos);
+
+        return cursorPos + this.getElapsedTime();
+    },
+
+    getElapsedTime: function() {
+        var currentTime = this.config.getCurrentTime();
+
+        return currentTime - this.lastPlay;
+    },
+
     play: function(startTime) {
         var editors = this.trackEditors,
             i,
@@ -407,7 +450,6 @@ var WaveformPlaylist = {
             playoutPromises = [];
 
         startTime = startTime || this.config.getCursorPos();
-        console.log(startTime);
 
         if (selected !== undefined && selected.endTime > startTime) {
             endTime = selected.endTime;
@@ -432,35 +474,30 @@ var WaveformPlaylist = {
     pause: function() {
         var editors = this.trackEditors,
             i,
-            len,
-            currentTime = this.config.getCurrentTime(),
-            startTime = this.config.getCursorPos();
+            len;
 
-        if (this.pausedAt) {
-            startTime = this.pausedAt;
-        }
+        this.pausedAt = this.getCurrentTime();
+        this.lastSeeked = undefined;
 
-        this.pausedAt = currentTime - this.lastPlay + startTime;
-
-        window.cancelAnimationFrame(this.animationRequest);
+        this.stopAnimation();
 
         for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].scheduleStop(currentTime);
+            editors[i].scheduleStop();
         }
     },
 
     stop: function() {
         var editors = this.trackEditors,
             i,
-            len,
-            currentTime = this.config.getCurrentTime();
+            len;
 
         this.pausedAt = undefined;
+        this.lastSeeked = undefined;
 
-        window.cancelAnimationFrame(this.animationRequest);
+        this.stopAnimation();
 
         for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].scheduleStop(currentTime);
+            editors[i].scheduleStop();
             editors[i].showProgress(0);
         }
     },
@@ -473,10 +510,13 @@ var WaveformPlaylist = {
             i,
             len,
             currentTime = this.config.getCurrentTime(),
-            elapsed = currentTime - this.lastPlay,
-            playbackSec;
+            playbackSec = cursorPos,
+            elapsed;
+
+        if (!this.lastDraw) this.lastDraw = currentTime;
 
         cursorPos = cursorPos || this.config.getCursorPos();
+        elapsed = currentTime - this.lastDraw;
 
         //update drawer to start drawing from where last paused.
         if (this.pausedAt) {
@@ -496,17 +536,25 @@ var WaveformPlaylist = {
                     "seconds": playbackSec
                 });
             }
-            this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, cursorPos));
+            this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, playbackSec));
         }
         else {
             //reset view to not playing look
+            this.stopAnimation();
+
             for (i = 0, len = editors.length; i < len; i++) {
                 editors[i].showProgress(0);
             }
 
             this.pausedAt = undefined;
-            window.cancelAnimationFrame(this.animationRequest);
-        } 
+        }
+
+        this.lastDraw = currentTime;
+    },
+
+    stopAnimation: function() {
+        window.cancelAnimationFrame(this.animationRequest);
+        this.lastDraw = undefined;
     },
 
     getJson: function() {
