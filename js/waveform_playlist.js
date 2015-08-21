@@ -472,7 +472,7 @@ var WaveformPlaylist = {
         this.lastPlay = currentTime;
         //use these to track when the playlist has fully stopped.
         this.playoutPromises = playoutPromises;
-        this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, startTime));
+        this.startAnimation(startTime);
     },
 
     pause: function() {
@@ -517,8 +517,6 @@ var WaveformPlaylist = {
             playbackSec = cursorPos,
             elapsed;
 
-        if (!this.lastDraw) this.lastDraw = currentTime;
-
         cursorPos = cursorPos || this.config.getCursorPos();
         elapsed = currentTime - this.lastDraw;
 
@@ -550,6 +548,11 @@ var WaveformPlaylist = {
         }
 
         this.lastDraw = currentTime;
+    },
+
+    startAnimation: function(startTime) {
+        this.lastDraw = this.config.getCurrentTime();
+        this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, startTime));
     },
 
     stopAnimation: function() {
