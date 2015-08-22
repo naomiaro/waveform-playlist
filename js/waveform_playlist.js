@@ -158,21 +158,17 @@ var WaveformPlaylist = {
         args start/end are in seconds
     */
     onSelectionChange: function(args) {
-
         this.config.setCursorPos(args.start);
         this.activeTrack && this.activeTrack.setSelectedArea(args.start, args.end);
     },
 
     onStateChange: function() {
-         var editors = this.trackEditors,
-            i,
-            len,
-            state = this.config.getState();
+         var state = this.config.getState();
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].deactivate();
-            editors[i].setState(state);
-        }
+        this.trackEditors.forEach(function(editor) {
+            editor.deactivate();
+            editor.setState(state);
+        }, this);
     },
 
     onTrackScroll: function() {
