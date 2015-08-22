@@ -71,6 +71,9 @@ html, body {
 
 .channel-wrapper .controls header {
   overflow: hidden;
+  color: white;
+  background-color: blueviolet;
+  margin-bottom: 1em;
 }
 
 input[type=range]{
@@ -78,7 +81,7 @@ input[type=range]{
   -moz-appearance: none;
   appearance: none;
 
-  margin: 10px 0;
+  margin: 1em 0;
 }
 
 input[type=range]::-webkit-slider-runnable-track {
