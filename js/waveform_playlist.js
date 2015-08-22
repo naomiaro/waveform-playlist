@@ -314,7 +314,7 @@ var WaveformPlaylist = {
 
         //set the width so that the entire area will be selectable when needed.
         for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].drawer.container.style.width = maxTrackLengthPixels+'px';
+            editors[i].drawer.updateContainerWidth(maxTrackLengthPixels);
         }
 
         this.duration = maxTrackLengthSeconds;

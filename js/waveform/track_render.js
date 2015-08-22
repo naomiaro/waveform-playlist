@@ -174,6 +174,15 @@ WaveformPlaylist.WaveformDrawer = {
     },
 
     /*
+    * width - pixels.
+    */
+    updateContainerWidth: function(width) {
+        this.container.style.width = width+'px';
+        //this function can still be called while track is loading.
+        this.waveformContainer && (this.waveformContainer.style.width = width+'px');
+    },
+
+    /*
         Returns a pixel clicked on this track relative to the entire playlist.
     */
     findClickedPixel: function(e) {

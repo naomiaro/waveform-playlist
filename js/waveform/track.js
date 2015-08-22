@@ -199,6 +199,7 @@ WaveformPlaylist.TrackEditor = {
             return;
         }
 
+        //placed here to make sure container events are added.
         this.fire('trackloaded', this);
 
         cuein = (this.cuein && this.secondsToSamples(this.cuein)) || 0;
