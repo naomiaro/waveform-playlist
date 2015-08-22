@@ -54,11 +54,13 @@ WaveformPlaylist.states.shift = {
           var delta = editor.pixelsToSeconds(diffX);
 
           el.onmousemove = el.onmouseup = el.onmouseleave = null;
-          editor.setLeftOffset(editor.pixelsToSamples(updatedX));
 
           //update track's start and end time relative to the playlist.
+          //TODO this should probably be done in the mousemove event.
           editor.startTime = editor.startTime + delta;
           editor.endTime = editor.endTime + delta;
+
+          editor.setLeftOffset(editor.pixelsToSamples(updatedX));
       };
 
       el.onmouseup = el.onmouseleave = complete;

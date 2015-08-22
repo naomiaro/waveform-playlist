@@ -173,7 +173,7 @@ WaveformPlaylist.TrackEditor = {
             fr.addEventListener('load', this.fileLoad.bind(this));
 
             fr.addEventListener('error', function () {
-                console.log('error loading file');
+                console.error('error loading file ' + this.filename);
             });
 
             dr.readAsDataURL(file);

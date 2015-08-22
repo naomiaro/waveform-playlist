@@ -324,7 +324,6 @@ var WaveformPlaylist = {
         for (i = 0, len = editors.length; i < len; i++) {
             maxTrackLengthPixels = Math.max(maxTrackLengthPixels, editors[i].drawer.containerWidth);
             maxTrackLengthSeconds = Math.max(maxTrackLengthSeconds, editors[i].endTime);
-            console.log(editors[i].endTime);
         }
 
         //set the width so that the entire area will be selectable when needed.
@@ -361,7 +360,6 @@ var WaveformPlaylist = {
         this.stop();
 
         Promise.all(this.playoutPromises).then((function() {
-            console.log(this.duration);
             if (this.activeTrack !== undefined) {
                 this.activeTrack.setSelectedArea(this.duration, this.duration, false);
                 this.activeTrack.notifySelectUpdate(this.duration, this.duration);
@@ -437,8 +435,6 @@ var WaveformPlaylist = {
     */
     getCurrentTime: function() {
         var cursorPos = this.lastSeeked || this.pausedAt || this.config.getCursorPos();
-
-        console.log(cursorPos);
 
         return cursorPos + this.getElapsedTime();
     },
