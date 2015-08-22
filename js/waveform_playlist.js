@@ -532,33 +532,26 @@ var WaveformPlaylist = {
         this.lastDraw = undefined;
     },
 
-    getJson: function() {
-        var info = [],
-            json;
+    getInfo: function() {
+        var info = [];
 
         this.trackEditors.forEach(function(editor) {
             info.push(editor.getTrackDetails());
         }, this);
-
-        json = JSON.stringify(info);
 
         return info;
     },
 
+    getJson: function() {
+        return JSON.stringify(this.getInfo();
+    },
+
     save: function() {
-         var info = [];
-
-        this.trackEditors.forEach(function(editor) {
-            info.push(editor.getTrackDetails());
-        }, this);
-
-        this.storage.save("test", info);
+        this.storage.save("test", this.getInfo());
     },
 
     restore: function() {
-        var state;
-
-        state = this.storage.restore("test");
+        var state = this.storage.restore("test");;
 
         this.destroy();
         this.init(state);
