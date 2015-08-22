@@ -268,14 +268,7 @@ var WaveformPlaylist = {
     },
 
     activateTrack: function(trackEditor) {
-        var editors = this.trackEditors,
-            i,
-            len,
-            editor;
-
-        for (i = 0, len = editors.length; i < len; i++) {
-            editor = editors[i];
-
+        this.trackEditors.forEach(function(editor) {
             if (editor === trackEditor) {
                 editor.activate();
                 this.activeTrack = trackEditor;
@@ -283,7 +276,7 @@ var WaveformPlaylist = {
             else {
                 editor.deactivate();
             }
-        }
+        }, this);
     },
 
     onSelectUpdate: function(event) {
@@ -446,10 +439,7 @@ var WaveformPlaylist = {
     },
 
     play: function(startTime) {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime(),
+        var currentTime = this.config.getCurrentTime(),
             endTime,
             selected = this.getSelected(),
             playoutPromises = [];
@@ -460,11 +450,11 @@ var WaveformPlaylist = {
             endTime = selected.endTime;
         }
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            playoutPromises.push(editors[i].schedulePlay(currentTime, startTime, endTime, {
-                masterGain: this.shouldTrackPlay(editors[i]) ? 1 : 0
+        this.trackEditors.forEach(function(editor) {
+            playoutPromises.push(editor.schedulePlay(currentTime, startTime, endTime, {
+                masterGain: this.shouldTrackPlay(editor) ? 1 : 0
             }));
-        }
+        }, this);
 
         this.lastPlay = currentTime;
         //use these to track when the playlist has fully stopped.
@@ -473,44 +463,33 @@ var WaveformPlaylist = {
     },
 
     pause: function() {
-        var editors = this.trackEditors,
-            i,
-            len;
-
         this.pausedAt = this.getCurrentTime();
         this.lastSeeked = undefined;
 
         this.stopAnimation();
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].scheduleStop();
-        }
+        this.trackEditors.forEach(function(editor) {
+            editor.scheduleStop();
+        }, this);
     },
 
     stop: function() {
-        var editors = this.trackEditors,
-            i,
-            len;
-
         this.pausedAt = undefined;
         this.lastSeeked = undefined;
 
         this.stopAnimation();
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].scheduleStop();
-            editors[i].showProgress(0);
-        }
+        this.trackEditors.forEach(function(editor) {
+            editor.scheduleStop();
+            editor.showProgress(0);
+        }, this);
     },
 
     /*
       Animation function for the playlist.
     */
     updateEditor: function(cursorPos) {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime(),
+        var currentTime = this.config.getCurrentTime(),
             playbackSec = cursorPos,
             elapsed;
 
@@ -522,9 +501,9 @@ var WaveformPlaylist = {
             if (elapsed) {
                 playbackSec = cursorPos + elapsed;
 
-                for (i = 0, len = editors.length; i < len; i++) {
-                    editors[i].showProgress(playbackSec);
-                }
+                this.trackEditors.forEach(function(editor) {
+                    editor.showProgress(playbackSec);
+                }, this);
 
                 this.fire("playbackcursor", {
                     "seconds": playbackSec
@@ -536,9 +515,9 @@ var WaveformPlaylist = {
             //reset view to not playing look
             this.stopAnimation();
 
-            for (i = 0, len = editors.length; i < len; i++) {
-                editors[i].showProgress(0);
-            }
+            this.trackEditors.forEach(function(editor) {
+                editor.showProgress(0);
+            }, this);
 
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
@@ -558,15 +537,12 @@ var WaveformPlaylist = {
     },
 
     getJson: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            info = [],
+        var info = [],
             json;
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            info.push(editors[i].getTrackDetails());
-        }
+        this.trackEditors.forEach(function(editor) {
+            info.push(editor.getTrackDetails());
+        }, this);
 
         json = JSON.stringify(info);
 
@@ -574,14 +550,11 @@ var WaveformPlaylist = {
     },
 
     save: function() {
-         var editors = this.trackEditors,
-            i,
-            len,
-            info = [];
+         var info = [];
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            info.push(editors[i].getTrackDetails());
-        }
+        this.trackEditors.forEach(function(editor) {
+            info.push(editor.getTrackDetails());
+        }, this);
 
         this.storage.save("test", info);
     },
@@ -596,19 +569,14 @@ var WaveformPlaylist = {
     },
 
     destroy: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            info = [];
-
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].reset();
-        }
+        this.trackEditors.forEach(function(editor) {
+            editor.reset();
+        }, this);
 
         this.audioControls.reset();
         this.timeScale && this.timeScale.reset();
         this.reset();
 
-        this.trackContainer.innerHTML='';
+        this.trackContainer.innerHTML = '';
     }
 };
