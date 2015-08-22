@@ -162,13 +162,20 @@ var WaveformPlaylist = {
         this.activeTrack && this.activeTrack.setSelectedArea(args.start, args.end);
     },
 
+    setState: function(state) {
+        this.trackEditors.forEach(function(editor) {
+            editor.setState(state);
+        }, this);
+    },
+
     onStateChange: function() {
-         var state = this.config.getState();
+        var state = this.config.getState();
 
         this.trackEditors.forEach(function(editor) {
             editor.deactivate();
-            editor.setState(state);
         }, this);
+
+        this.setState(state);
     },
 
     onTrackScroll: function() {
@@ -439,6 +446,8 @@ var WaveformPlaylist = {
             endTime = selected.endTime;
         }
 
+        this.setState('cursor');
+
         this.trackEditors.forEach(function(editor) {
             playoutPromises.push(editor.schedulePlay(currentTime, startTime, endTime, {
                 masterGain: this.shouldTrackPlay(editor) ? 1 : 0
@@ -460,6 +469,8 @@ var WaveformPlaylist = {
         this.trackEditors.forEach(function(editor) {
             editor.scheduleStop();
         }, this);
+
+        this.setState(this.config.getState());
     },
 
     stop: function() {
@@ -472,6 +483,8 @@ var WaveformPlaylist = {
             editor.scheduleStop();
             editor.showProgress(0);
         }, this);
+
+        this.setState(this.config.getState());
     },
 
     /*

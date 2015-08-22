@@ -40,14 +40,20 @@ html, body {
 }
 
 .state-cursor,
-.state-fadein .channel,
-.state-fadeout .channel,
 .state-select {
   cursor: text;
 }
 
+.state-fadein .channel {
+  cursor: w-resize;
+}
+
+.state-fadeout .channel {
+  cursor: e-resize;
+}
+
 .state-shift .channel {
-  cursor: move;
+  cursor: ew-resize;
 }
 
 .selection-cursor {
@@ -107,6 +113,7 @@ input[type=range]::-webkit-slider-thumb {
   border-radius: 50%;
   background: goldenrod;
   margin-top: 2px;
+  cursor: ew-resize;
 }
 
 input[type=range]:focus {
