@@ -91,6 +91,9 @@ WaveformPlaylist.AudioPlayout = {
         return this.buffer.duration;
     },
 
+    /*
+    * param audible boolean whether master gain is 0 or 1.
+    */
     setUpSource: function() {
         var sourcePromise;
         var that = this;
@@ -102,34 +105,39 @@ WaveformPlaylist.AudioPlayout = {
             //keep track of the buffer state.
             that.source.onended = function(e) {
                 that.source.disconnect();
-                that.source = undefined;
-
                 that.fadeGain.disconnect();
-                that.fadeGain = undefined;
-
                 that.outputGain.disconnect();
+                that.masterGain.disconnect();
+
+                that.source = undefined;
+                that.fadeGain = undefined;
                 that.outputGain = undefined;
+                that.masterGain = undefined;
 
                 resolve();
             }
         });
 
         this.fadeGain = this.ac.createGain();
-
+        //used for track volume slider
         this.outputGain = this.ac.createGain();
-        this.outputGain.gain.value = this.gain;
+        //used for solo/mute
+        this.masterGain = this.ac.createGain();
 
         this.source.connect(this.fadeGain);
         this.fadeGain.connect(this.outputGain);
-        this.outputGain.connect(this.destination);
+        this.outputGain.connect(this.masterGain);
+        this.masterGain.connect(this.destination);
 
         return sourcePromise;
     },
 
     setGainLevel: function(gain) {
-        this.gain = gain;
-
         this.outputGain && (this.outputGain.gain.value = gain);
+    },
+
+    setMasterGainLevel: function(gain) {
+        this.masterGain && (this.masterGain.gain.value = gain);
     },
 
     /*

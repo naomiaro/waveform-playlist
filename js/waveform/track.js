@@ -53,6 +53,7 @@ WaveformPlaylist.TrackEditor = {
         }
         
         this.active = false;
+        this.gain = 1;
         //selected area stored in seconds relative to entire playlist.
         this.selectedArea = undefined;
 
@@ -436,7 +437,12 @@ WaveformPlaylist.TrackEditor = {
     },
 
     setGainLevel: function(gain) {
+        this.gain = gain;
         this.playout.setGainLevel(gain);
+    },
+
+    setMasterGainLevel: function(gain) {
+        this.playout.setMasterGainLevel(gain);
     },
 
     /*
@@ -446,7 +452,7 @@ WaveformPlaylist.TrackEditor = {
         returns a Promise that will resolve when the AudioBufferSource
         is either stopped or plays out naturally.
     */
-    schedulePlay: function(now, startTime, endTime) { 
+    schedulePlay: function(now, startTime, endTime, options) { 
         var start,
             duration,
             relPos,
@@ -493,6 +499,8 @@ WaveformPlaylist.TrackEditor = {
 
         sourcePromise = this.playout.setUpSource();
         this.playout.applyFades(this.fades, relPos, now);
+        this.playout.setGainLevel(this.gain);
+        this.playout.setMasterGainLevel(options.masterGain);
         this.playout.play(when, start, duration);
 
         return sourcePromise;

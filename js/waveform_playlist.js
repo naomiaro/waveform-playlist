@@ -206,17 +206,13 @@ var WaveformPlaylist = {
         }
     },
 
-    restartSource: function() {
-        var startTime,
-            playlistTime = this.getCurrentTime();
+    adjustTrackPlayout: function() {
+        var masterGain;
 
-        if (this.isPlaying()) {
-            startTime = playlistTime;
-
-            //mark as seeked since we've restarted the sources from this point of play.
-            this.lastSeeked = playlistTime;
-            this.restartPlayFrom(startTime);
-        }
+        this.trackEditors.forEach(function(editor) {
+            masterGain = this.shouldTrackPlay(editor) ? 1 : 0;
+            editor.setMasterGainLevel(masterGain);
+        }, this);
     },
 
     onMuteTrack: function(trackElement) {
@@ -240,7 +236,9 @@ var WaveformPlaylist = {
             }
         }
 
-        this.restartSource();
+        if (this.isPlaying()) {
+            this.adjustTrackPlayout();
+        }
     },
 
     onSoloTrack: function(trackElement) {
@@ -264,7 +262,9 @@ var WaveformPlaylist = {
             }
         }
 
-        this.restartSource();
+        if (this.isPlaying()) {
+            this.adjustTrackPlayout();
+        }
     },
 
     activateTrack: function(trackEditor) {
@@ -461,9 +461,9 @@ var WaveformPlaylist = {
         }
 
         for (i = 0, len = editors.length; i < len; i++) {
-            if (this.shouldTrackPlay(editors[i])) {
-                playoutPromises.push(editors[i].schedulePlay(currentTime, startTime, endTime));
-            }
+            playoutPromises.push(editors[i].schedulePlay(currentTime, startTime, endTime, {
+                masterGain: this.shouldTrackPlay(editors[i]) ? 1 : 0
+            }));
         }
 
         this.lastPlay = currentTime;
