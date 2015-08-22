@@ -94,6 +94,7 @@ var WaveformPlaylist = {
 
         this.mutedTracks = [];
         this.soloedTracks = [];
+        this.playoutPromises = [];
     },
 
     createTrack: function() {
