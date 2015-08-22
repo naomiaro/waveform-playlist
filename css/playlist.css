@@ -11,6 +11,10 @@ html, body {
   height: 30px;
 }
 
+.playlist-tracks {
+  background: #E0EFF1;
+}
+
 .channel {
   background: grey;
 }
