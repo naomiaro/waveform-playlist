@@ -559,12 +559,8 @@ var WaveformPlaylist = {
 
     destroy: function() {
         this.trackEditors.forEach(function(editor) {
-            editor.reset();
+            editor.destroy();
         }, this);
-
-        this.audioControls.reset();
-        this.timeScale && this.timeScale.reset();
-        this.reset();
 
         this.trackContainer.innerHTML = '';
     }

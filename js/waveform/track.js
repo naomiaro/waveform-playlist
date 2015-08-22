@@ -548,6 +548,11 @@ WaveformPlaylist.TrackEditor = {
         };
 
         return d;
+    },
+
+    destroy: function() {
+        //remove events attached to the waveform
+        this.currentState && this.currentState.leave.call(this);
     }
 };
 
