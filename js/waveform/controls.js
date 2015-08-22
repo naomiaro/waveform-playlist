@@ -12,7 +12,7 @@ WaveformPlaylist.AudioControls = {
     },
 
     eventTypes: {
-        "click": {
+        "onclick": {
             "btn-rewind": "rewindAudio",
             "btn-fast-forward": "fastForwardAudio",
             "btn-play": "playAudio",
@@ -29,13 +29,13 @@ WaveformPlaylist.AudioControls = {
             "btn-mute": "muteTrack",
             "btn-solo": "soloTrack"
         },
-        "change": {
+        "onchange": {
             "time-format": "changeTimeFormat"
         },
-        "input": {
+        "oninput": {
             "volume-slider": "changeVolume"
         },
-        "focusout": {
+        "onfocusout": {
             "audio-start": "validateCueIn",
             "audio-end": "validateCueOut",
         }
@@ -75,7 +75,7 @@ WaveformPlaylist.AudioControls = {
 
             //all events are delegated to the main container.
             (function(eventName, classNames) {
-                container.addEventListener(eventName, function(e) {
+                container[eventName] = function(e) {
                     //check if the event target has a special class name.
                     var data = that.nodeChainContainsClassName(e.currentTarget, e.target, classNames);
                     var className;
@@ -83,7 +83,7 @@ WaveformPlaylist.AudioControls = {
                     if (data && (className = data['className'])) {
                         that[that.eventTypes[eventName][className]].call(that, e);
                     }
-                });
+                };
             })(event, Object.keys(this.eventTypes[event]));
 
         }, this);
