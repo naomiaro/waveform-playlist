@@ -543,7 +543,7 @@ var WaveformPlaylist = {
     },
 
     getJson: function() {
-        return JSON.stringify(this.getInfo();
+        return JSON.stringify(this.getInfo());
     },
 
     save: function() {
