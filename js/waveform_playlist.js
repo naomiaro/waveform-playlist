@@ -276,11 +276,7 @@ var WaveformPlaylist = {
     },
 
     onSelectUpdate: function(event) {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime(),
-            track = event.editor;
+        var track = event.editor;
 
         this.activateTrack(track);
 
@@ -290,15 +286,16 @@ var WaveformPlaylist = {
             this.pausedAt = undefined;
             this.restartPlayFrom(event.start);
         }
-        //new cursor selected while paused.
-        else if (this.pausedAt !== undefined) {
-            this.pausedAt = undefined;
-
-            for (i = 0, len = editors.length; i < len; i++) {
-                editors[i].showProgress(0);
-            }
-        }
         else {
+            //new cursor selected while paused.
+            if (this.pausedAt !== undefined) {
+                this.pausedAt = undefined;
+
+                this.trackEditors.forEach(function(editor) {
+                    editor.showProgress(0);
+                }, this);
+            }
+
             track.setSelectedArea(event.start, event.end, event.shiftKey);
         }
     },
@@ -406,15 +403,11 @@ var WaveformPlaylist = {
     },
 
     restartPlayFrom: function(cursorPos) {
-        var editors = this.trackEditors,
-            i,
-            len;
-
         this.stopAnimation();
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].scheduleStop();
-        }
+        this.trackEditors.forEach(function(editor) {
+            editor.scheduleStop();
+        }, this);
 
         Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
     },
