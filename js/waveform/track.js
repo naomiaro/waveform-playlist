@@ -199,6 +199,8 @@ WaveformPlaylist.TrackEditor = {
             return;
         }
 
+        this.fire('trackloaded', this);
+
         cuein = (this.cuein && this.secondsToSamples(this.cuein)) || 0;
         cueout = (this.cueout && this.secondsToSamples(this.cueout)) || buffer.length;
 
@@ -206,16 +208,15 @@ WaveformPlaylist.TrackEditor = {
 
         this.drawer.drawContainer(buffer, this.cues, this.fades, this.filename);
         this.setLeftOffset(this.secondsToSamples(this.startTime));
+        this.setState(this.config.getState());
 
         if (this.selectedArea !== undefined) {
             startTime = this.selectedArea.startTime;
             endTime = this.selectedArea.endTime;
 
+            this.showSelection();
             this.notifySelectUpdate(startTime, endTime);
         }
-
-        this.setState(this.config.getState());
-        this.fire('trackloaded', this);
     },
 
     activate: function() {
