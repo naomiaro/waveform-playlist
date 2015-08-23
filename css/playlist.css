@@ -79,6 +79,10 @@ html, body {
   text-align: center;
 }
 
+.channel-wrapper.silent .channel {
+  opacity: 0.3;
+}
+
 .channel-wrapper .controls header {
   overflow: hidden;
   color: white;

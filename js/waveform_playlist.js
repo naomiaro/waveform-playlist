@@ -239,9 +239,8 @@ var WaveformPlaylist = {
             }
         }
 
-        if (this.isPlaying()) {
-            this.adjustTrackPlayout();
-        }
+        this.adjustTrackPlayout();
+
     },
 
     onSoloTrack: function(trackElement) {
@@ -265,9 +264,7 @@ var WaveformPlaylist = {
             }
         }
 
-        if (this.isPlaying()) {
-            this.adjustTrackPlayout();
-        }
+        this.adjustTrackPlayout();
     },
 
     activateTrack: function(trackEditor) {

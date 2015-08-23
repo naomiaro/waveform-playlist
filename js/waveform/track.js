@@ -445,6 +445,13 @@ WaveformPlaylist.TrackEditor = {
 
     setMasterGainLevel: function(gain) {
         this.playout.setMasterGainLevel(gain);
+
+        if (gain) {
+            this.container.classList.remove('silent');
+        }
+        else {
+            this.container.classList.add('silent');
+        }
     },
 
     /*
