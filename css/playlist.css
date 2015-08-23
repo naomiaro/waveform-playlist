@@ -90,16 +90,44 @@ html, body {
   margin-bottom: 1em;
 }
 
-input[type=range]{
+.controls label {
+  margin: 1em auto;
+  width: 100%;
+
+  display: inline-block;
+  font: normal normal normal 14px/1 FontAwesome;
+  font-size: inherit;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transform: translate(0, 0);
+}
+
+.controls label:before {
+  content: "\f027";
+  color: black;
+  font-size: 18px;
+  padding-right: 5px;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.controls label:after {
+  content: "\f028";
+  color: black;
+  font-size: 18px;
+  padding-left: 5px;
+}
+
+.controls input[type=range]{
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
 
-  margin-top: 1em;
-  width: 100%;
+  display: inline-block;
+  width: 75%;
 }
 
-input[type=range]::-webkit-slider-runnable-track {
+.controls input[type=range]::-webkit-slider-runnable-track {
   height: 8px;
   background: #ddd;
   border: none;
@@ -107,7 +135,7 @@ input[type=range]::-webkit-slider-runnable-track {
   padding: 1px;
 }
 
-input[type=range]::-webkit-slider-thumb {
+.controls input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -121,16 +149,15 @@ input[type=range]::-webkit-slider-thumb {
   cursor: ew-resize;
 }
 
-input[type=range]:focus {
+.controls input[type=range]:focus {
   outline: none;
 }
 
-input[type=range]:focus::-webkit-slider-runnable-track {
+.controls input[type=range]:focus::-webkit-slider-runnable-track {
   background: #ccc;
 }
 
-input[type=range]::-moz-range-track {
-  width: 100%;
+.controls input[type=range]::-moz-range-track {
   height: 8px;
   background: #ddd;
   border: none;
@@ -138,7 +165,7 @@ input[type=range]::-moz-range-track {
   padding: 1px;
 }
 
-input[type=range]::-moz-range-thumb {
+.controls input[type=range]::-moz-range-thumb {
   border: none;
   height: 16px;
   width: 16px;
@@ -148,12 +175,6 @@ input[type=range]::-moz-range-thumb {
   cursor: ew-resize;
 }
 
-/*hide the outline behind the border*/
-input[type=range]:-moz-focusring {
-    outline: 1px solid white;
-    outline-offset: -1px;
-}
-
-input[type=range]:focus::-moz-range-track {
-    background: #ccc;
+.controls input[type=range]:focus::-moz-range-track {
+  background: #ccc;
 }

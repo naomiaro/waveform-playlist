@@ -225,6 +225,7 @@ WaveformPlaylist.WaveformDrawer = {
             muteButton,
             soloButton,
             volumeInput,
+            label,
             name;
 
         controls = document.createElement("div");
@@ -256,11 +257,14 @@ WaveformPlaylist.WaveformDrawer = {
         volumeInput.setAttribute('value', 100);
         volumeInput.classList.add("volume-slider");
 
+        label = document.createElement("label");
+        label.appendChild(volumeInput);
+
         btnGroup.appendChild(muteButton);
         btnGroup.appendChild(soloButton);
         controls.appendChild(name);
         controls.appendChild(btnGroup);
-        controls.appendChild(volumeInput);
+        controls.appendChild(label);
         this.container.style.marginLeft = width+"px";
 
         return controls;
