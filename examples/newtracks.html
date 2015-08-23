@@ -106,7 +106,11 @@
             timescale: true,
             UITheme: "bootstrap",
             state: 'select',
-            waveOutlineColor: '#E0EFF1'
+            waveOutlineColor: '#E0EFF1',
+            controls: {
+                show: true, //whether or not to include the track controls
+                width: 150, //width of controls in pixels
+            },
         });  
 
         var playlistEditor = Object.create(WaveformPlaylist, {

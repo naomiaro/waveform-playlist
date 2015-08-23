@@ -119,6 +119,9 @@ WaveformPlaylist.TimeScale = {
             return parseInt(item, 10);
         });
 
+        //make sure keys are numerically sorted.
+        keys = keys.sort(function(a, b){return a - b});
+
         for (i = 0, end = keys.length; i < end; i++) {
            if (resolution <= keys[i]) {
                 return this.timeinfo[keys[i]];

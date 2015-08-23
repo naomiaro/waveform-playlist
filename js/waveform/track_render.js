@@ -242,11 +242,11 @@ WaveformPlaylist.WaveformDrawer = {
         btnGroup.className = "btn-group";
 
         muteButton = document.createElement("span");
-        muteButton.className = "btn btn-default btn-mute";
+        muteButton.className = "btn btn-default btn-xs btn-mute";
         muteButton.textContent = "Mute";
 
         soloButton = document.createElement("span");
-        soloButton.className = "btn btn-default btn-solo";
+        soloButton.className = "btn btn-default btn-xs btn-solo";
         soloButton.textContent = "Solo";
 
         volumeInput = document.createElement("input");
