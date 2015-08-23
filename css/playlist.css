@@ -92,6 +92,7 @@ input[type=range]{
   appearance: none;
 
   margin: 1em 0;
+  width: 100%;
 }
 
 input[type=range]::-webkit-slider-runnable-track {
@@ -117,9 +118,38 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 input[type=range]:focus {
-    outline: none;
+  outline: none;
 }
 
 input[type=range]:focus::-webkit-slider-runnable-track {
+  background: #ccc;
+}
+
+input[type=range]::-moz-range-track {
+  width: 100%;
+  height: 22px;
+  background: #ddd;
+  border: none;
+  border-radius: 3px;
+  padding: 1px;
+}
+
+input[type=range]::-moz-range-thumb {
+  border: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: goldenrod;
+  margin-top: 2px;
+  cursor: ew-resize;
+}
+
+/*hide the outline behind the border*/
+input[type=range]:-moz-focusring {
+    outline: 1px solid white;
+    outline-offset: -1px;
+}
+
+input[type=range]:focus::-moz-range-track {
     background: #ccc;
 }
