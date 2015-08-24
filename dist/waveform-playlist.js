@@ -1,4 +1,4 @@
-/*! waveform-playlist 0.2.2
+/*! waveform-playlist 0.3.0
 Written by: Naomi Aro
 Website: http://naomiaro.github.io/waveform-playlist
 License: MIT */
@@ -24,9 +24,9 @@ var WaveformPlaylist = {
         this.storage = Object.create(WaveformPlaylist.Storage);
 
         container.style.overflow = "hidden";
+        container.style.position = "relative";
 
         this.trackContainer = div;
-        this.trackContainer.style.position = "relative";
         this.trackContainer.style.overflow = "auto";
 
         this.trackEditors = [];
@@ -63,6 +63,7 @@ var WaveformPlaylist = {
             fragment.appendChild(trackElem);
 
             trackEditor.on("trackloaded", "onTrackLoad", this);
+            trackEditor.on("changeshift", "onChangeShift", this);
         }
 
         this.trackContainer.appendChild(fragment);
@@ -89,8 +90,31 @@ var WaveformPlaylist = {
         audioControls.on("trimaudio", "onTrimAudio", this);
         audioControls.on("changestate", "onStateChange", this);
         audioControls.on("changeselection", "onSelectionChange", this);
+        audioControls.on("changevolume", "onTrackVolumeChange", this);
+        audioControls.on("mutetrack", "onMuteTrack", this);
+        audioControls.on("solotrack", "onSoloTrack", this);
 
         this.audioControls = audioControls;
+
+        this.mutedTracks = [];
+        this.soloedTracks = [];
+        this.playoutPromises = [];
+    },
+
+    createTrack: function() {
+        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
+            config: {
+                value: this.config
+            }
+        });
+        var trackElem = trackEditor.init();
+
+        trackEditor.setState('fileDrop');
+    
+        this.trackEditors.push(trackEditor);
+        this.trackContainer.appendChild(trackElem);
+
+        trackEditor.on("trackloaded", "onTrackLoad", this);
     },
 
     removeTrack: function(trackEditor) {
@@ -109,6 +133,22 @@ var WaveformPlaylist = {
         }
     },
 
+    onTrackLoad: function(trackEditor) {
+
+        this.audioControls.on("trackedit", "onTrackEdit", trackEditor);
+        this.audioControls.on("changeresolution", "onResolutionChange", trackEditor);
+
+        trackEditor.on("activateSelection", "onAudioSelection", this.audioControls);
+        trackEditor.on("deactivateSelection", "onAudioDeselection", this.audioControls);
+        trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
+        trackEditor.on("changecursor", "onSelectUpdate", this);
+
+        //only one track should be preloaded with a selected area.
+        if (trackEditor.selectedArea !== undefined) {
+            this.activateTrack(trackEditor);
+        }
+    },
+
     resize: function() {
         this.timeScale.onResize();
     },
@@ -122,21 +162,24 @@ var WaveformPlaylist = {
         args start/end are in seconds
     */
     onSelectionChange: function(args) {
-
         this.config.setCursorPos(args.start);
         this.activeTrack && this.activeTrack.setSelectedArea(args.start, args.end);
     },
 
-    onStateChange: function() {
-         var editors = this.trackEditors,
-            i,
-            len,
-            state = this.config.getState();
+    setState: function(state) {
+        this.trackEditors.forEach(function(editor) {
+            editor.setState(state);
+        }, this);
+    },
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].deactivate();
-            editors[i].setState(state);
-        }
+    onStateChange: function() {
+        var state = this.config.getState();
+
+        this.trackEditors.forEach(function(editor) {
+            editor.deactivate();
+        }, this);
+
+        this.setState(state);
     },
 
     onTrackScroll: function() {
@@ -148,20 +191,88 @@ var WaveformPlaylist = {
         that.scrollTimeout = setTimeout(function() {
             
             that.config.setTrackScroll(that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
-            that.fire('trackscroll');
+            that.fire('trackscroll', that.trackContainer.scrollLeft, that.trackContainer.scrollTop);
             that.scrollTimeout = false;
         }, 25);   
     },
 
-    activateTrack: function(trackEditor) {
+    onTrackVolumeChange: function(data) {
         var editors = this.trackEditors,
             i,
             len,
-            editor;
+            editor,
+            gain = data.gain,
+            trackElement = data.trackElement;
 
         for (i = 0, len = editors.length; i < len; i++) {
             editor = editors[i];
 
+            if (editor.container === trackElement) {
+                editor.setGainLevel(gain);
+            }
+        }
+    },
+
+    adjustTrackPlayout: function() {
+        var masterGain;
+
+        this.trackEditors.forEach(function(editor) {
+            masterGain = this.shouldTrackPlay(editor) ? 1 : 0;
+            editor.setMasterGainLevel(masterGain);
+        }, this);
+    },
+
+    onMuteTrack: function(trackElement) {
+        var editors = this.trackEditors,
+            i,
+            len,
+            editor,
+            index;
+
+        for (i = 0, len = editors.length; i < len; i++) {
+            editor = editors[i];
+
+            if (editor.container === trackElement) {
+                index = this.mutedTracks.indexOf(editor);
+                if (index > -1) {
+                    this.mutedTracks.splice(index, 1);
+                }
+                else {
+                    this.mutedTracks.push(editor);
+                }
+            }
+        }
+
+        this.adjustTrackPlayout();
+
+    },
+
+    onSoloTrack: function(trackElement) {
+        var editors = this.trackEditors,
+            i,
+            len,
+            editor,
+            index;
+
+        for (i = 0, len = editors.length; i < len; i++) {
+            editor = editors[i];
+
+            if (editor.container === trackElement) {
+                index = this.soloedTracks.indexOf(editor);
+                if (index > -1) {
+                    this.soloedTracks.splice(index, 1);
+                }
+                else {
+                    this.soloedTracks.push(editor);
+                }
+            }
+        }
+
+        this.adjustTrackPlayout();
+    },
+
+    activateTrack: function(trackEditor) {
+        this.trackEditors.forEach(function(editor) {
             if (editor === trackEditor) {
                 editor.activate();
                 this.activeTrack = trackEditor;
@@ -169,36 +280,31 @@ var WaveformPlaylist = {
             else {
                 editor.deactivate();
             }
-        }
+        }, this);
     },
 
     onSelectUpdate: function(event) {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime();;
+        var track = event.editor;
 
-        this.activateTrack(event.editor);
+        this.activateTrack(track);
 
         //seeking while playing occuring
         if (this.isPlaying()) {
-            window.cancelAnimationFrame(this.animationRequest);
-
-            for (i = 0, len = editors.length; i < len; i++) {
-                editors[i].scheduleStop(currentTime);
-            }
-            //need to allow time for all the onended callbacks to execute
-            //TODO should maybe think of a better solution for this later...
-            setTimeout(this.play.bind(this), 60);
-        }
-
-        //new cursor selected while paused.
-        else if (this.pausedAt !== undefined) {
+            this.lastSeeked = event.start;
             this.pausedAt = undefined;
+            this.restartPlayFrom(event.start);
+        }
+        else {
+            //new cursor selected while paused.
+            if (this.pausedAt !== undefined) {
+                this.pausedAt = undefined;
 
-            for (i = 0, len = editors.length; i < len; i++) {
-                editors[i].showProgress(0);
+                this.trackEditors.forEach(function(editor) {
+                    editor.showProgress(0);
+                }, this);
             }
+
+            track.setSelectedArea(event.start, event.end, event.shiftKey);
         }
     },
 
@@ -216,26 +322,28 @@ var WaveformPlaylist = {
 
         //set the width so that the entire area will be selectable when needed.
         for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].drawer.container.style.width = maxTrackLengthPixels+'px';
+            editors[i].drawer.updateContainerWidth(maxTrackLengthPixels);
         }
 
         this.duration = maxTrackLengthSeconds;
     },
 
     rewind: function() {
-        
-        if (this.activeTrack !== undefined) {
-            this.activeTrack.notifySelectUpdate(0, 0);
-        }
-        else {
-            this.config.setCursorPos(0);
-        } 
-
         this.stop();
 
-        this.trackContainer.scrollLeft = 0;
-        this.config.setTrackScroll(0);
-        this.fire('trackscroll');
+        Promise.all(this.playoutPromises).then((function() {
+            if (this.activeTrack !== undefined) {
+                this.activeTrack.setSelectedArea(0, 0, false);
+                this.activeTrack.notifySelectUpdate(0, 0);
+            }
+            else {
+                this.config.setCursorPos(0);
+            }
+
+            this.trackContainer.scrollLeft = 0;
+            this.config.setTrackScroll(0);
+            this.fire('trackscroll');
+        }).bind(this));
     },
 
     fastForward: function() {
@@ -243,18 +351,21 @@ var WaveformPlaylist = {
             clientWidth = this.trackContainer.offsetWidth,
             maxOffset = Math.max(totalWidth - clientWidth, 0);
 
-        if (this.activeTrack !== undefined) {
-            this.activeTrack.notifySelectUpdate(this.duration, this.duration);
-        }
-        else {
-            this.config.setCursorPos(this.duration);
-        }
-
         this.stop();
 
-        this.trackContainer.scrollLeft = maxOffset;
-        this.config.setTrackScroll(maxOffset);
-        this.fire('trackscroll');
+        Promise.all(this.playoutPromises).then((function() {
+            if (this.activeTrack !== undefined) {
+                this.activeTrack.setSelectedArea(this.duration, this.duration, false);
+                this.activeTrack.notifySelectUpdate(this.duration, this.duration);
+            }
+            else {
+                this.config.setCursorPos(this.duration);
+            }
+
+            this.trackContainer.scrollLeft = maxOffset;
+            this.config.setTrackScroll(maxOffset);
+            this.fire('trackscroll');
+        }).bind(this));
     },
 
     /*
@@ -279,189 +390,190 @@ var WaveformPlaylist = {
         return isPlaying;
     },
 
-    play: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime(),
-            startTime = this.config.getCursorPos(),
+    shouldTrackPlay: function(trackEditor) {
+        var shouldPlay;
+        //if there are solo tracks, only they should play.
+        if (this.soloedTracks.length > 0) {
+            shouldPlay = false;
+            if (this.soloedTracks.indexOf(trackEditor) > -1) {
+                shouldPlay = true;
+            }
+        }
+        //play all tracks except any muted tracks.
+        else {
+            shouldPlay = true;
+            if (this.mutedTracks.indexOf(trackEditor) > -1) {
+                shouldPlay = false;
+            }
+        }
+
+        return shouldPlay;
+    },
+
+    restartPlayFrom: function(cursorPos) {
+        this.stopAnimation();
+
+        this.trackEditors.forEach(function(editor) {
+            editor.scheduleStop();
+        }, this);
+
+        Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
+    },
+
+    /*
+    *   returns the current point of time in the playlist in seconds.
+    */
+    getCurrentTime: function() {
+        var cursorPos = this.lastSeeked || this.pausedAt || this.config.getCursorPos();
+
+        return cursorPos + this.getElapsedTime();
+    },
+
+    getElapsedTime: function() {
+        var currentTime = this.config.getCurrentTime();
+
+        return currentTime - this.lastPlay;
+    },
+
+    play: function(startTime) {
+        var currentTime = this.config.getCurrentTime(),
             endTime,
-            selected = this.getSelected();
+            selected = this.getSelected(),
+            playoutPromises = [];
+
+        startTime = startTime || this.pausedAt || this.config.getCursorPos();
 
         if (selected !== undefined && selected.endTime > startTime) {
-            startTime = selected.startTime;
             endTime = selected.endTime;
         }
 
-        if (this.pausedAt) {
-            startTime = this.pausedAt;
-        }
+        this.setState('cursor');
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].schedulePlay(currentTime, startTime, endTime);
-        }
+        this.trackEditors.forEach(function(editor) {
+            playoutPromises.push(editor.schedulePlay(currentTime, startTime, endTime, {
+                masterGain: this.shouldTrackPlay(editor) ? 1 : 0
+            }));
+        }, this);
 
         this.lastPlay = currentTime;
-        this.animationRequest = window.requestAnimationFrame(this.animationCallback);
+        //use these to track when the playlist has fully stopped.
+        this.playoutPromises = playoutPromises;
+        this.startAnimation(startTime);
     },
 
     pause: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime(),
-            startTime = this.config.getCursorPos();
-
-        if (this.pausedAt) {
-            startTime = this.pausedAt;
+        if (!this.isPlaying()) {
+            return;
         }
 
-        this.pausedAt = currentTime - this.lastPlay + startTime;
+        this.pausedAt = this.getCurrentTime();
+        this.lastSeeked = undefined;
 
-        window.cancelAnimationFrame(this.animationRequest);
+        this.stopAnimation();
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].scheduleStop(currentTime);
-        }
+        this.trackEditors.forEach(function(editor) {
+            editor.scheduleStop();
+        }, this);
+
+        this.setState(this.config.getState());
     },
 
     stop: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime();
-
         this.pausedAt = undefined;
+        this.lastSeeked = undefined;
 
-        window.cancelAnimationFrame(this.animationRequest);
+        this.stopAnimation();
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].scheduleStop(currentTime);
-            editors[i].showProgress(0);
-        }
+        this.trackEditors.forEach(function(editor) {
+            editor.scheduleStop();
+            editor.showProgress(0);
+        }, this);
+
+        this.setState(this.config.getState());
     },
 
-    createTrack: function() {
-        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
-            config: {
-                value: this.config
-            }
-        });
-        var trackElem = trackEditor.init();
+    /*
+      Animation function for the playlist.
+    */
+    updateEditor: function(cursorPos) {
+        var currentTime = this.config.getCurrentTime(),
+            playbackSec = cursorPos,
+            elapsed;
 
-        trackEditor.setState('fileDrop');
-    
-        this.trackEditors.push(trackEditor);
-        this.trackContainer.appendChild(trackElem);
-
-        trackEditor.on("trackloaded", "onTrackLoad", this);
-    },
-
-    onTrackLoad: function(trackEditor) {
-
-        this.audioControls.on("trackedit", "onTrackEdit", trackEditor);
-        this.audioControls.on("changeresolution", "onResolutionChange", trackEditor);
-
-        trackEditor.on("activateSelection", "onAudioSelection", this.audioControls);
-        trackEditor.on("deactivateSelection", "onAudioDeselection", this.audioControls);
-        trackEditor.on("changecursor", "onCursorSelection", this.audioControls);
-        trackEditor.on("changecursor", "onSelectUpdate", this);
-        trackEditor.on("changeshift", "onChangeShift", this);
-    },
-
-    updateEditor: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            currentTime = this.config.getCurrentTime(),
-            elapsed = currentTime - this.lastPlay,
-            cursorPos = this.config.getCursorPos(),
-            playbackSec;
-
-        //update drawer to start drawing from where last paused.
-        if (this.pausedAt) {
-            cursorPos = this.pausedAt;
-        }
+        cursorPos = cursorPos || this.config.getCursorPos();
+        elapsed = currentTime - this.lastDraw;
 
         if (this.isPlaying()) {
             //if there's a change for the UI show progress.
             if (elapsed) {
                 playbackSec = cursorPos + elapsed;
 
-                for (i = 0, len = editors.length; i < len; i++) {
-                    editors[i].showProgress(playbackSec);
-                }
+                this.trackEditors.forEach(function(editor) {
+                    editor.showProgress(playbackSec);
+                }, this);
 
                 this.fire("playbackcursor", {
                     "seconds": playbackSec
                 });
             }
-            this.animationRequest = window.requestAnimationFrame(this.animationCallback);
+            this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, playbackSec));
         }
         else {
             //reset view to not playing look
-            for (i = 0, len = editors.length; i < len; i++) {
-                editors[i].showProgress(0);
-            }
+            this.stopAnimation();
+
+            this.trackEditors.forEach(function(editor) {
+                editor.showProgress(0);
+            }, this);
 
             this.pausedAt = undefined;
-            window.cancelAnimationFrame(this.animationRequest);
-        } 
-    },
-
-    getJson: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            info = [],
-            json;
-
-        for (i = 0, len = editors.length; i < len; i++) {
-            info.push(editors[i].getTrackDetails());
+            this.lastSeeked = undefined;
         }
 
-        json = JSON.stringify(info);
+        this.lastDraw = currentTime;
+    },
+
+    startAnimation: function(startTime) {
+        this.lastDraw = this.config.getCurrentTime();
+        this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, startTime));
+    },
+
+    stopAnimation: function() {
+        window.cancelAnimationFrame(this.animationRequest);
+        this.lastDraw = undefined;
+    },
+
+    getInfo: function() {
+        var info = [];
+
+        this.trackEditors.forEach(function(editor) {
+            info.push(editor.getTrackDetails());
+        }, this);
 
         return info;
     },
 
+    getJson: function() {
+        return JSON.stringify(this.getInfo());
+    },
+
     save: function() {
-         var editors = this.trackEditors,
-            i,
-            len,
-            info = [];
-
-        for (i = 0, len = editors.length; i < len; i++) {
-            info.push(editors[i].getTrackDetails());
-        }
-
-        this.storage.save("test", info);
+        this.storage.save("test", this.getInfo());
     },
 
     restore: function() {
-        var state;
-
-        state = this.storage.restore("test");
+        var state = this.storage.restore("test");;
 
         this.destroy();
         this.init(state);
     },
 
     destroy: function() {
-        var editors = this.trackEditors,
-            i,
-            len,
-            info = [];
+        this.trackEditors.forEach(function(editor) {
+            editor.destroy();
+        }, this);
 
-        for (i = 0, len = editors.length; i < len; i++) {
-            editors[i].reset();
-        }
-
-        this.audioControls.reset();
-        this.timeScale && this.timeScale.reset();
-        this.reset();
-
-        this.trackContainer.innerHTML='';
+        this.trackContainer.innerHTML = '';
     }
 };
 
@@ -642,14 +754,14 @@ WaveformPlaylist.states.cursor = {
     enter: function() {
         var stateObject = this.currentState;
 
-        this.container.onmousedown = stateObject.event.bind(this);
+        this.drawer.waveformContainer.onmousedown = stateObject.event.bind(this);
         this.container.classList.add(stateObject.classes);
     },
 
     leave: function() {
         var stateObject = this.currentState;
 
-        this.container.onmousedown = null;
+        this.drawer.waveformContainer.onmousedown = null;
         this.container.classList.remove(stateObject.classes);
     },
 
@@ -681,14 +793,14 @@ WaveformPlaylist.states.fadein = {
   enter: function() {
     var stateObject = this.currentState;
 
-    this.container.onmousedown = stateObject.event.bind(this);
+    this.drawer.waveformContainer.onmousedown = stateObject.event.bind(this);
     this.container.classList.add(stateObject.classes);
   },
 
   leave: function() {
     var stateObject = this.currentState;
 
-    this.container.onmousedown = null;
+    this.drawer.waveformContainer.onmousedown = null;
     this.container.classList.remove(stateObject.classes);
   },
 
@@ -720,14 +832,14 @@ WaveformPlaylist.states.fadeout = {
   enter: function() {
     var stateObject = this.currentState;
 
-    this.container.onmousedown = stateObject.event.bind(this);
+    this.drawer.waveformContainer.onmousedown = stateObject.event.bind(this);
     this.container.classList.add(stateObject.classes);
   },
 
   leave: function() {
     var stateObject = this.currentState;
 
-    this.container.onmousedown = null;
+    this.drawer.waveformContainer.onmousedown = null;
     this.container.classList.remove(stateObject.classes);
   },
 
@@ -826,14 +938,14 @@ WaveformPlaylist.states.select = {
     enter: function() {
         var stateObject = this.currentState;
 
-        this.container.onmousedown = stateObject.event.bind(this);
+        this.drawer.waveformContainer.onmousedown = stateObject.event.bind(this);
         this.container.classList.add(stateObject.classes);
     },
 
     leave: function() {
         var stateObject = this.currentState;
 
-        this.container.onmousedown = null;
+        this.drawer.waveformContainer.onmousedown = null;
         this.container.classList.remove(stateObject.classes);
     },
 
@@ -843,7 +955,7 @@ WaveformPlaylist.states.select = {
     event: function(e) {
         e.preventDefault();
 
-        var el = this.container, //want the events placed on the channel wrapper.
+        var el = this.drawer.waveformContainer, //want the events placed on the waveform wrapper.
             editor = this,
             startX,
             startTime,
@@ -901,14 +1013,14 @@ WaveformPlaylist.states.shift = {
   enter: function() {
     var stateObject = this.currentState;
 
-    this.container.onmousedown = stateObject.event.bind(this);
+    this.drawer.waveformContainer.onmousedown = stateObject.event.bind(this);
     this.container.classList.add(stateObject.classes);
   },
 
   leave: function() {
     var stateObject = this.currentState;
 
-    this.container.onmousedown = null;
+    this.drawer.waveformContainer.onmousedown = null;
     this.container.classList.remove(stateObject.classes);
   },
 
@@ -918,7 +1030,7 @@ WaveformPlaylist.states.shift = {
   event: function(e) {
       e.preventDefault();
 
-      var el = this.container, //want the events placed on the channel wrapper.
+      var el = this.drawer.waveformContainer, //want the events placed on the waveform wrapper.
           editor = this,
           startX = e.pageX, 
           diffX = 0, 
@@ -943,11 +1055,13 @@ WaveformPlaylist.states.shift = {
           var delta = editor.pixelsToSeconds(diffX);
 
           el.onmousemove = el.onmouseup = el.onmouseleave = null;
-          editor.setLeftOffset(editor.pixelsToSamples(updatedX));
 
           //update track's start and end time relative to the playlist.
+          //TODO this should probably be done in the mousemove event.
           editor.startTime = editor.startTime + delta;
           editor.endTime = editor.endTime + delta;
+
+          editor.setLeftOffset(editor.pixelsToSamples(updatedX));
       };
 
       el.onmouseup = el.onmouseleave = complete;
@@ -977,6 +1091,10 @@ WaveformPlaylist.Config = function(params) {
             fadeType: 'logarithmic',
 
             timescale: false, //whether or not to include the time measure.
+            controls: {
+                show: false, //whether or not to include the track controls
+                width: 150, //width of controls in pixels
+            },
 
             UITheme: "default", // bootstrap || jQueryUI || default
 
@@ -1078,6 +1196,13 @@ WaveformPlaylist.Config = function(params) {
             };
         };
 
+        that.getControlSettings = function getControlSettings() {
+            return {
+                show: params.controls.show,
+                width: params.controls.width
+            }
+        };
+
         that.getTrackScroll = function getTrackScroll() {
             var scroll = params.trackscroll;
         
@@ -1137,102 +1262,119 @@ WaveformPlaylist.AudioControls = {
         "active": "active"
     },
 
-    events: {
-       "btn-rewind": {
-            click: "rewindAudio"
+    eventTypes: {
+        "onclick": {
+            "btn-rewind": "rewindAudio",
+            "btn-fast-forward": "fastForwardAudio",
+            "btn-play": "playAudio",
+            "btn-pause": "pauseAudio",
+            "btn-stop": "stopAudio",
+            "btn-state": "changeState",
+            "btn-save": "save",
+            "btn-open": "open",
+            "btn-trim-audio": "trimAudio",
+            "btn-fade": "changeDefaultFade",
+            "btn-zoom-in": "zoomIn",
+            "btn-zoom-out": "zoomOut",
+            "btn-new-track": "newTrack",
+            "btn-mute": "muteTrack",
+            "btn-solo": "soloTrack"
         },
-
-        "btn-fast-forward": {
-            click: "fastForwardAudio"
+        "onchange": {
+            "time-format": "changeTimeFormat"
         },
-
-       "btn-play": {
-            click: "playAudio"
-        },
-
-        "btn-pause": {
-            click: "pauseAudio"
-        },
-     
-        "btn-stop": {
-            click: "stopAudio"
-        },
-
-        "btn-cursor": {
-            click: "changeState"
-        },
-
-        "btn-select": {
-            click: "changeState"
-        },
-
-        "btn-shift": {
-            click: "changeState"
-        },
-
-        "btn-fadein": {
-            click: "changeState"
-        },
-
-        "btn-fadeout": {
-            click: "changeState"
-        },
-
-        "btn-save": {
-            click: "save"
-        },
-
-        "btn-open": {
-            click: "open"
-        },
-        
-        "btn-trim-audio": {
-            click: "trimAudio"
-        },
-
-        "time-format": {
-            change: "changeTimeFormat"
-        },
-
-        "audio-pos": {
-
-        },
-
-        "audio-start": {
-            blur: "validateCueIn"
-        },
-
-        "audio-end": {
-            blur: "validateCueOut"
-        },
-
-        "btn-logarithmic": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-linear": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-exponential": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-sCurve": {
-            click: "changeDefaultFade"
-        },
-
-        "btn-zoom-in": {
-            click: "zoomIn"
-        },
-
-        "btn-zoom-out": {
-            click: "zoomOut"
-        },
-
-        "btn-new-track": {
-            click: "newTrack"
+        "oninput": {
+            "volume-slider": "changeVolume"
         }
+    },
+
+    init: function() {
+        var state,
+            container,
+            fadeType,
+            tmpEl,
+            tmpBtn;
+
+        WaveformPlaylist.makePublisher(this);
+
+        container = this.config.getContainer();
+        state = this.config.getState();
+        fadeType = this.config.getFadeType();
+
+        //controls we should keep a reference to.
+        this.ctrls = {};
+        this.ctrls["time-format"] = container.querySelector(".time-format");
+        this.ctrls["audio-start"] = container.querySelector(".audio-start");
+        this.ctrls["audio-end"] = container.querySelector(".audio-end");
+        this.ctrls["audio-pos"] = container.querySelector(".audio-pos");
+
+        //set current state and fade type on playlist
+        [".btn-state[data-state='"+state+"']", ".btn-fade[data-fade='"+fadeType+"']"].forEach(function(buttonClass) {
+            tmpBtn = container.querySelector(buttonClass);
+
+            if (tmpBtn) {
+                this.activateButton(tmpBtn);
+            }
+        }, this);  
+
+        Object.keys(this.eventTypes).forEach(function(event) {
+            var that = this;
+
+            //all events are delegated to the main container.
+            (function(eventName, classNames) {
+                container[eventName] = function(e) {
+                    //check if the event target has a special class name.
+                    var data = that.nodeChainContainsClassName(e.currentTarget, e.target, classNames);
+                    var className;
+
+                    if (data && (className = data['className'])) {
+                        that[that.eventTypes[eventName][className]].call(that, e);
+                    }
+                };
+            })(event, Object.keys(this.eventTypes[event]));
+
+        }, this);
+
+        if (this.ctrls["time-format"]) {
+            this.ctrls["time-format"].value = this.config.getTimeFormat();
+        }
+
+        //TODO, need better alternative? onfocusout not in firefox and blur doesn't bubble.
+        this.ctrls["audio-start"].onblur = this.validateCueIn.bind(this);
+        this.ctrls["audio-end"].onblur = this.validateCueOut.bind(this);
+
+        this.timeFormat = this.config.getTimeFormat();
+
+        //Kept in seconds so time format change can update fields easily.
+        this.currentSelectionValues = undefined;
+
+        this.onCursorSelection({
+            start: 0,
+            end: 0
+        });
+    },
+
+    nodeChainContainsClassName: function(parent, node, classNames) {
+        var i, len, className, currentNode;
+
+        currentNode = node;
+
+        while (currentNode) {
+            for (i = 0, len = classNames.length; i < len; i++) {
+                className = classNames[i];
+                if (currentNode.classList.contains(className)) {
+                    return {
+                        'className': className,
+                        'node': currentNode
+                    };
+                }
+            }
+
+            if (currentNode === parent) {
+                break;
+            }
+            currentNode = currentNode.parentElement; 
+        }   
     },
 
     validateCue: function(value) {
@@ -1242,15 +1384,10 @@ WaveformPlaylist.AudioControls = {
 
         validators = {
             "seconds": /^\d+$/,
-
             "thousandths": /^\d+\.\d{3}$/,
-
             "hh:mm:ss": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]$/,
-
             "hh:mm:ss.u": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]\.\d{1}$/,
-
             "hh:mm:ss.uu": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]\.\d{2}$/,
-
             "hh:mm:ss.uuu": /^[0-9]{2,}:[0-5][0-9]:[0-5][0-9]\.\d{3}$/
         };
 
@@ -1281,23 +1418,18 @@ WaveformPlaylist.AudioControls = {
             "seconds": function(value) {
                 return parseInt(value, 10);
             },
-
             "thousandths": function(value) {
                 return parseFloat(value);
             },
-
             "hh:mm:ss": function(value) {
                 return clockConverter(value);
             },
-
             "hh:mm:ss.u": function(value) {
                 return clockConverter(value);
             },
-
             "hh:mm:ss.uu": function(value) {
                 return clockConverter(value);
             },
-
             "hh:mm:ss.uuu": function(value) {
                 return clockConverter(value);
             } 
@@ -1331,97 +1463,24 @@ WaveformPlaylist.AudioControls = {
             "seconds": function (seconds) {
                 return seconds.toFixed(0);
             },
-
             "thousandths": function (seconds) {
                 return seconds.toFixed(3);
             },
-
             "hh:mm:ss": function (seconds) {
                 return clockFormat(seconds, 0);   
             },
-
             "hh:mm:ss.u": function (seconds) {
                 return clockFormat(seconds, 1);   
             },
-
             "hh:mm:ss.uu": function (seconds) {
                 return clockFormat(seconds, 2);   
             },
-
             "hh:mm:ss.uuu": function (seconds) {
                 return clockFormat(seconds, 3);   
             }
         };
 
         return formats[format];
-    },
-
-    init: function() {
-        var that = this,
-            className,
-            event,
-            events = this.events,
-            tmpEl,
-            func,
-            state,
-            container,
-            fadeType,
-            tmpBtn;
-
-        WaveformPlaylist.makePublisher(this);
-
-        this.ctrls = {};
-        container = this.config.getContainer();
-        state = this.config.getState();
-        fadeType = this.config.getFadeType();
-
-        ["btn-"+state, "btn-"+fadeType].forEach(function(buttonClass) {
-            tmpBtn = document.getElementsByClassName(buttonClass)[0];
-
-            if (tmpBtn) {
-                this.activateButton(tmpBtn);
-            }
-        }, this);  
-
-        for (className in events) {
-        
-            tmpEl = container.getElementsByClassName(className)[0];
-            this.ctrls[className] = tmpEl;
-
-            for (event in events[className]) {
-
-                if (tmpEl) {
-                    func = that[events[className][event]].bind(that);
-                    tmpEl.addEventListener(event, func);
-                }
-            }
-        } 
-
-        if (this.ctrls["time-format"]) {
-            this.ctrls["time-format"].value = this.config.getTimeFormat();
-        }
-
-
-        this.timeFormat = this.config.getTimeFormat();
-
-        //Kept in seconds so time format change can update fields easily.
-        this.currentSelectionValues = undefined;
-
-        this.onCursorSelection({
-            start: 0,
-            end: 0
-        });
-    },
-
-    changeDefaultFade: function(e) {
-        var el = e.currentTarget,
-            prevEl = el.parentElement.getElementsByClassName('active')[0],
-            type = el.dataset.fade;
-
-        this.deactivateButton(prevEl);
-        this.activateButton(el);
-
-        this.config.setFadeType(type);
     },
 
     changeTimeFormat: function(e) {
@@ -1571,31 +1630,59 @@ WaveformPlaylist.AudioControls = {
     },
 
     save: function() {
-        this.fire('playlistsave', this);
+        this.fire('playlistsave');
     },
 
     open: function() {
-        this.fire('playlistrestore', this);
+        this.fire('playlistrestore');
     },
 
     rewindAudio: function() {
-        this.fire('rewindaudio', this);
+        this.fire('rewindaudio');
     },
 
     fastForwardAudio: function() {
-        this.fire('fastforwardaudio', this);
+        this.fire('fastforwardaudio');
     },
 
     playAudio: function() {
-        this.fire('playaudio', this);
+        this.fire('playaudio');
     },
 
     pauseAudio: function() {
-        this.fire('pauseaudio', this);
+        this.fire('pauseaudio');
     },
 
     stopAudio: function() {
-        this.fire('stopaudio', this);
+        this.fire('stopaudio');
+    },
+
+    changeVolume: function(e) {
+        var container = this.config.getContainer();
+        var track = this.nodeChainContainsClassName(e.currentTarget, e.target, ["channel-wrapper"])["node"];
+
+        this.fire('changevolume', {
+            trackElement: track,
+            gain: e.target.value/100
+        });
+    },
+
+    muteTrack: function(e) {
+        var el = this.nodeChainContainsClassName(e.currentTarget, e.target, ["btn-mute"])["node"];
+        var track = this.nodeChainContainsClassName(e.currentTarget, el, ["channel-wrapper"])["node"];
+
+        el.classList.toggle(this.classes["active"]);
+
+        this.fire('mutetrack', track);
+    },
+
+    soloTrack: function(e) {
+        var el = this.nodeChainContainsClassName(e.currentTarget, e.target, ["btn-solo"])["node"];
+        var track = this.nodeChainContainsClassName(e.currentTarget, el, ["channel-wrapper"])["node"];
+
+        el.classList.toggle(this.classes["active"]);
+
+        this.fire('solotrack', track);
     },
 
     activateButton: function(el) {
@@ -1623,15 +1710,28 @@ WaveformPlaylist.AudioControls = {
     },
 
     changeState: function(e) {
-        var el = e.currentTarget,
-            prevEl = el.parentElement.getElementsByClassName('active')[0],
+        var nodeData = this.nodeChainContainsClassName(e.currentTarget, e.target, ['btn-state']),
+            el = nodeData['node'],
+            prevEl = el.parentElement.querySelector('.active'),
             state = el.dataset.state;
 
         this.deactivateButton(prevEl);
         this.activateButton(el);
 
         this.config.setState(state);
-        this.fire('changestate', this);
+        this.fire('changestate');
+    },
+
+    changeDefaultFade: function(e) {
+        var nodeData = this.nodeChainContainsClassName(e.currentTarget, e.target, ['btn-fade']),
+            el = nodeData['node'],
+            prevEl = el.parentElement.querySelector('.active'),
+            type = el.dataset.fade;
+
+        this.deactivateButton(prevEl);
+        this.activateButton(el);
+
+        this.config.setFadeType(type);
     },
 
     trimAudio: function(e) {
@@ -1680,7 +1780,6 @@ WaveformPlaylist.AudioControls = {
         start, end in seconds
     */
     notifySelectionUpdate: function(start, end) {
-        
         this.fire('changeselection', {
             start: start,
             end: end
@@ -1841,7 +1940,7 @@ WaveformPlaylist.AudioPlayout = {
             }
         });
 
-        this.fadeGain = undefined;
+        this.gain = 1;
         this.destination = this.ac.destination;
     },
 
@@ -1860,8 +1959,6 @@ WaveformPlaylist.AudioPlayout = {
             options,
             startTime,
             duration;
-
-        this.fadeGain = this.ac.createGain();
 
         //loop through each fade on this track
         for (id in fades) {
@@ -1923,23 +2020,53 @@ WaveformPlaylist.AudioPlayout = {
         return this.buffer.duration;
     },
 
-    onSourceEnded: function(e) {
-        this.source.disconnect();
-        this.source = undefined;
-
-        this.fadeGain.disconnect();
-        this.fadeGain = undefined;
-    },
-
+    /*
+    * param audible boolean whether master gain is 0 or 1.
+    */
     setUpSource: function() {
+        var sourcePromise;
+        var that = this;
+
         this.source = this.ac.createBufferSource();
         this.source.buffer = this.buffer;
 
-        //keep track of the buffer state.
-        this.source.onended = this.onSourceEnded.bind(this);
+        sourcePromise = new Promise(function(resolve, reject) {
+            //keep track of the buffer state.
+            that.source.onended = function(e) {
+                that.source.disconnect();
+                that.fadeGain.disconnect();
+                that.outputGain.disconnect();
+                that.masterGain.disconnect();
+
+                that.source = undefined;
+                that.fadeGain = undefined;
+                that.outputGain = undefined;
+                that.masterGain = undefined;
+
+                resolve();
+            }
+        });
+
+        this.fadeGain = this.ac.createGain();
+        //used for track volume slider
+        this.outputGain = this.ac.createGain();
+        //used for solo/mute
+        this.masterGain = this.ac.createGain();
 
         this.source.connect(this.fadeGain);
-        this.fadeGain.connect(this.destination);
+        this.fadeGain.connect(this.outputGain);
+        this.outputGain.connect(this.masterGain);
+        this.masterGain.connect(this.destination);
+
+        return sourcePromise;
+    },
+
+    setGainLevel: function(gain) {
+        this.outputGain && (this.outputGain.gain.value = gain);
+    },
+
+    setMasterGainLevel: function(gain) {
+        this.masterGain && (this.masterGain.gain.value = gain);
     },
 
     /*
@@ -1949,7 +2076,6 @@ WaveformPlaylist.AudioPlayout = {
         Unfortunately it doesn't seem to work if you just give it a start time.
     */
     play: function(when, start, duration) {
-        this.setUpSource();
         this.source.start(when || 0, start, duration);
     },
 
@@ -1966,7 +2092,8 @@ WaveformPlaylist.TimeScale = {
         var that = this,
             canv,
             div,
-            resizeTimer;
+            resizeTimer,
+            controlSettings = this.config.getControlSettings();
 
         this.timeinfo = {
             20000: {
@@ -2019,6 +2146,10 @@ WaveformPlaylist.TimeScale = {
         div.style.position = "relative";
         div.style.left = 0;
         div.style.right = 0;
+
+        if (controlSettings.show) {
+            div.style.marginLeft = controlSettings.width+"px";
+        }
 
         if (div === undefined) {
             return;
@@ -2073,6 +2204,9 @@ WaveformPlaylist.TimeScale = {
         keys = Object.keys(this.timeinfo).map(function(item) {
             return parseInt(item, 10);
         });
+
+        //make sure keys are numerically sorted.
+        keys = keys.sort(function(a, b){return a - b});
 
         for (i = 0, end = keys.length; i < end; i++) {
            if (resolution <= keys[i]) {
@@ -2171,10 +2305,7 @@ WaveformPlaylist.TimeScale = {
         this.container.appendChild(fragment);
     },
 
-    onTrackScroll: function() {
-        var scroll = this.config.getTrackScroll(),
-            scrollX = scroll.left;    
-
+    onTrackScroll: function(scrollX, scrollY) {
         if (scrollX !== this.prevScrollPos) {
             this.prevScrollPos = scrollX;
             this.drawScale(scrollX);
@@ -2215,20 +2346,6 @@ WaveformPlaylist.TrackEditor = {
        
         WaveformPlaylist.makePublisher(this);
 
-        this.container = document.createElement("div");
-        this.container.classList.add("channel-wrapper");
-        this.container.style.position = "relative";
-
-        this.drawer = Object.create(WaveformPlaylist.WaveformDrawer, {
-            config: {
-                value: this.config
-            },
-            container: {
-                value: this.container
-            }
-        });
-        this.drawer.init();
-
         this.playout = Object.create(WaveformPlaylist.AudioPlayout, {
             config: {
                 value: this.config
@@ -2258,8 +2375,17 @@ WaveformPlaylist.TrackEditor = {
         }
         
         this.active = false;
+        this.gain = 1;
         //selected area stored in seconds relative to entire playlist.
         this.selectedArea = undefined;
+
+        this.drawer = Object.create(WaveformPlaylist.WaveformDrawer, {
+            config: {
+                value: this.config
+            }
+        });
+
+        this.container = this.drawer.init();
 
         return this.container;
     },
@@ -2339,6 +2465,7 @@ WaveformPlaylist.TrackEditor = {
         var that = this,
             xhr = new XMLHttpRequest();
 
+        this.filename = src.replace(/^.*[\\\/]/, '');
         this.src = src;
 
         xhr.open('GET', src, true);
@@ -2358,6 +2485,7 @@ WaveformPlaylist.TrackEditor = {
             var fr = new FileReader();
             var track = this;
 
+            this.filename = file.name;
             this.drawer.drawLoading();
 
             dr.addEventListener('load', function() {
@@ -2368,7 +2496,7 @@ WaveformPlaylist.TrackEditor = {
             fr.addEventListener('load', this.fileLoad.bind(this));
 
             fr.addEventListener('error', function () {
-                console.log('error loading file');
+                console.error('error loading file ' + this.filename);
             });
 
             dr.readAsDataURL(file);
@@ -2377,9 +2505,7 @@ WaveformPlaylist.TrackEditor = {
     },
 
     drawTrack: function(buffer) {
-
-        this.drawer.drawBuffer(buffer, this.cues);
-        this.drawer.drawFades(this.fades);
+        this.drawer.drawWaveform(buffer, this.cues, this.fades);
     },
 
     onTrackLoad: function(buffer, err) {
@@ -2390,44 +2516,43 @@ WaveformPlaylist.TrackEditor = {
             cueout;
 
         if (err !== undefined) {
-            this.container.innerHTML = "";
-            this.container.classList.add("error");
+            this.drawer.drawError();
             this.fire('error', this);
             return;
         }
+
+        //placed here to make sure container events are added.
+        this.fire('trackloaded', this);
 
         cuein = (this.cuein && this.secondsToSamples(this.cuein)) || 0;
         cueout = (this.cueout && this.secondsToSamples(this.cueout)) || buffer.length;
 
         this.setCuePoints(cuein, cueout);
 
-        this.drawTrack(buffer);
+        this.drawer.drawContainer(buffer, this.cues, this.fades, this.filename);
         this.setLeftOffset(this.secondsToSamples(this.startTime));
+        this.setState(this.config.getState());
 
         if (this.selectedArea !== undefined) {
             startTime = this.selectedArea.startTime;
             endTime = this.selectedArea.endTime;
 
+            this.showSelection();
             this.notifySelectUpdate(startTime, endTime);
         }
-
-        this.setState(this.config.getState());
-        this.fire('trackloaded', this);
     },
 
     activate: function() {
         this.active = true;
-        this.container.classList.add("active");
+        this.drawer.drawActive();
     },
 
     deactivate: function() {
         this.active = false;
-        this.container.classList.remove("active");
+        this.drawer.drawInactive();
         
         if (this.selectedArea) {
             this.selectedArea = undefined;
-            this.drawer.selection && this.drawer.container.removeChild(this.drawer.selection);
-            this.drawer.selection = undefined;
         }
     },
 
@@ -2435,18 +2560,10 @@ WaveformPlaylist.TrackEditor = {
         startTime, endTime in seconds.
     */
     notifySelectUpdate: function(startTime, endTime, shiftKey) {
-        this.setSelectedArea(startTime, endTime, shiftKey);
-
-        if (startTime < endTime) {
-            this.activateAudioSelection();
-        }
-        else {
-            this.deactivateAudioSelection();
-        }
-
         this.fire('changecursor', {
             start: startTime,
             end: endTime,
+            shiftKey: shiftKey,
             editor: this
         });
     },
@@ -2455,7 +2572,6 @@ WaveformPlaylist.TrackEditor = {
         start, end in seconds
     */
     setSelectedArea: function(start, end, shiftKey) {
-
         //extending selected area since shift is pressed on a single point click.
         if (shiftKey && (start === end) && (this.prevSelectedArea !== undefined)) {
 
@@ -2476,6 +2592,13 @@ WaveformPlaylist.TrackEditor = {
 
         this.config.setCursorPos(start);
         this.showSelection();
+
+        if (start < end) {
+            this.activateAudioSelection();
+        }
+        else {
+            this.deactivateAudioSelection();
+        }
     },
 
     activateAudioSelection: function() {
@@ -2637,24 +2760,44 @@ WaveformPlaylist.TrackEditor = {
         return this.playout.isPlaying();
     },
 
+    setGainLevel: function(gain) {
+        this.gain = gain;
+        this.playout.setGainLevel(gain);
+    },
+
+    setMasterGainLevel: function(gain) {
+        this.playout.setMasterGainLevel(gain);
+
+        if (gain) {
+            this.container.classList.remove('silent');
+        }
+        else {
+            this.container.classList.add('silent');
+        }
+    },
+
     /*
         startTime, endTime in seconds (float).
         segment is for a highlighted section in the UI.
+
+        returns a Promise that will resolve when the AudioBufferSource
+        is either stopped or plays out naturally.
     */
-    schedulePlay: function(now, startTime, endTime) { 
+    schedulePlay: function(now, startTime, endTime, options) { 
         var start,
             duration,
             relPos,
             when = now,
             segment = (endTime) ? (endTime - startTime) : undefined,
-            cueOffset = this.cues.cuein / this.sampleRate;
+            cueOffset = this.cues.cuein / this.sampleRate,
+            sourcePromise;
 
-        //track has no content to play.
-        if (this.endTime <= startTime) return;
-
-        //track does not play in this selection.
-        if (segment && (startTime + segment) < this.startTime) return;
-
+        //1) track has no content to play.
+        //2) track does not play in this selection.
+        if ((this.endTime <= startTime) || (segment && (startTime + segment) < this.startTime)) {
+            //return a resolved promise since this track is technically "stopped".
+            return Promise.resolve();
+        }
 
         //track should have something to play if it gets here.
 
@@ -2683,14 +2826,19 @@ WaveformPlaylist.TrackEditor = {
         }
 
         start = start + cueOffset;
-
         relPos = startTime - this.startTime;
+
+        sourcePromise = this.playout.setUpSource();
         this.playout.applyFades(this.fades, relPos, now);
+        this.playout.setGainLevel(this.gain);
+        this.playout.setMasterGainLevel(options.masterGain);
         this.playout.play(when, start, duration);
+
+        return sourcePromise;
     },
 
     scheduleStop: function(when) {
-        this.playout.stop(when);
+        this.playout.stop(when || this.config.getCurrentTime());
     },
 
     /*
@@ -2731,6 +2879,11 @@ WaveformPlaylist.TrackEditor = {
         };
 
         return d;
+    },
+
+    destroy: function() {
+        //remove events attached to the waveform
+        this.currentState && this.currentState.leave.call(this);
     }
 };
 
@@ -2746,6 +2899,9 @@ WaveformPlaylist.WaveformDrawer = {
 
         WaveformPlaylist.makePublisher(this);
 
+        this.container = document.createElement("div");
+        this.container.classList.add("channel-wrapper");
+
         this.channels = []; //array of canvases, contexts, 1 for each channel displayed.
         this.pixelOffset = 0;
         this.containerWidth = 0;
@@ -2758,6 +2914,8 @@ WaveformPlaylist.WaveformDrawer = {
         else {
             this.loaderStates = this.loaderStates["default"];
         }
+
+        return this.container;
     },
 
     loaderStates: {
@@ -2843,6 +3001,21 @@ WaveformPlaylist.WaveformDrawer = {
         this.peaks = peaks;
     },
 
+    drawError: function() {
+        this.container.innerHTML = "";
+        this.container.classList.add("error");
+    },
+
+    drawActive: function() {
+        this.container.classList.add("active");
+    },
+
+    drawInactive: function() {
+        this.container.classList.remove("active");
+        this.selection && this.waveformContainer.removeChild(this.selection);
+        this.selection = undefined;
+    },
+
     setPixelOffset: function(pixels) {
         var containerWidth = pixels + this.width;
 
@@ -2892,6 +3065,15 @@ WaveformPlaylist.WaveformDrawer = {
     },
 
     /*
+    * width - pixels.
+    */
+    updateContainerWidth: function(width) {
+        this.container.style.width = width+'px';
+        //this function can still be called while track is loading.
+        this.waveformContainer && (this.waveformContainer.style.width = width+'px');
+    },
+
+    /*
         Returns a pixel clicked on this track relative to the entire playlist.
     */
     findClickedPixel: function(e) {
@@ -2928,11 +3110,61 @@ WaveformPlaylist.WaveformDrawer = {
         return layerOffset + startX + (canvasOffset * this.MAX_CANVAS_WIDTH);
     },
 
-    drawBuffer: function(buffer, cues) {
+    drawTrackControls: function(width, height, filename) {
+        var controls,
+            btnGroup,
+            muteButton,
+            soloButton,
+            volumeInput,
+            label,
+            name;
+
+        controls = document.createElement("div");
+        controls.style.height = height+"px";
+        controls.style.width = width+"px";
+        controls.style.position = "absolute";
+        controls.style.left = 0;
+        controls.classList.add("controls");
+        controls.style.zIndex = 1000;
+
+        name = document.createElement("header");
+        name.textContent = filename;
+
+        btnGroup = document.createElement("div");
+        btnGroup.className = "btn-group";
+
+        muteButton = document.createElement("span");
+        muteButton.className = "btn btn-default btn-xs btn-mute";
+        muteButton.textContent = "Mute";
+
+        soloButton = document.createElement("span");
+        soloButton.className = "btn btn-default btn-xs btn-solo";
+        soloButton.textContent = "Solo";
+
+        volumeInput = document.createElement("input");
+        volumeInput.type = "range";
+        volumeInput.setAttribute('min', 0);
+        volumeInput.setAttribute('max', 100);
+        volumeInput.setAttribute('value', 100);
+        volumeInput.classList.add("volume-slider");
+
+        label = document.createElement("label");
+        label.appendChild(volumeInput);
+
+        btnGroup.appendChild(muteButton);
+        btnGroup.appendChild(soloButton);
+        controls.appendChild(name);
+        controls.appendChild(btnGroup);
+        controls.appendChild(label);
+        this.container.style.marginLeft = width+"px";
+
+        return controls;
+    },
+
+    drawWaveform: function(buffer, cues, fades) {
         var canv,
             div,
             progress,
-            cursor,
             i,
             top = 0,
             left = 0,
@@ -2941,20 +3173,34 @@ WaveformPlaylist.WaveformDrawer = {
             numChan = makeMono? 1 : buffer.numberOfChannels,
             numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
-            wrapperHeight,
             canvases,
             width,
             tmpWidth,
-            canvasOffset; 
+            canvasOffset,
+            cursor;
 
-        this.container.innerHTML = "";
+        this.waveformContainer.innerHTML = ""; 
         this.channels = []; 
-        this.selection = undefined; 
-
+        this.selection = undefined;
         //width and height is per waveform canvas.
         this.width = Math.ceil(numSamples / res);
-        this.height = this.config.getWaveHeight();
 
+        cursor = document.createElement("div");
+        cursor.classList.add("cursor");
+        cursor.style.position = "absolute";
+        cursor.style.boxSizing = "content-box";
+        cursor.style.margin = 0;
+        cursor.style.padding = 0;
+        cursor.style.top = 0;
+        cursor.style.left = 0;
+        cursor.style.bottom = 0;
+        cursor.style.zIndex = 100;
+
+        this.cursor = cursor;
+
+        fragment.appendChild(cursor);
+
+        //create elements for each audio channel
         for (i = 0; i < numChan; i++) {
 
             //main container for this channel
@@ -3014,28 +3260,47 @@ WaveformPlaylist.WaveformDrawer = {
             top = top + this.height;
         }
 
-        cursor = document.createElement("div");
-        cursor.classList.add("cursor");
-        cursor.style.position = "absolute";
-        cursor.style.boxSizing = "content-box";
-        cursor.style.margin = 0;
-        cursor.style.padding = 0;
-        cursor.style.top = 0;
-        cursor.style.left = 0;
-        cursor.style.bottom = 0;
-        cursor.style.zIndex = 100;
-
-        this.cursor = cursor;
-
-        fragment.appendChild(cursor);
-      
-        wrapperHeight = numChan * this.height;
-        this.container.style.height = wrapperHeight+"px";
-        this.container.appendChild(fragment);
-        
         this.getPeaks(buffer, cues);
         this.draw();
         this.drawTimeShift();
+        this.drawFades(fades);
+
+        this.waveformContainer.appendChild(fragment);
+    },
+
+    drawContainer: function(buffer, cues, fades, filename) {
+        var makeMono = this.config.isDisplayMono(),
+            res = this.config.getResolution(),
+            numChan = makeMono? 1 : buffer.numberOfChannels,
+            numSamples = cues.cueout - cues.cuein + 1,
+            fragment = document.createDocumentFragment(),
+            wrapperHeight = numChan * this.height,
+            waveformContainer,
+            controlSettings = this.config.getControlSettings();
+
+        //remove the loading stuff
+        this.container.innerHTML = ""; 
+
+        //width and height is per waveform canvas.
+        this.width = Math.ceil(numSamples / res);
+
+        if (controlSettings.show) {
+            fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight, filename));
+        }
+        
+        waveformContainer = document.createElement("div");
+        waveformContainer.classList.add("waveform");
+        waveformContainer.style.height = wrapperHeight+"px";
+        waveformContainer.style.width = this.width+"px";
+        waveformContainer.style.position = "relative";
+
+        this.waveformContainer = waveformContainer;
+
+        this.drawWaveform(buffer, cues, fades);
+
+        fragment.appendChild(waveformContainer);
+        this.container.style.height = wrapperHeight+"px";
+        this.container.appendChild(fragment);
     },
 
     drawFrame: function(chanNum, index, peak) {
@@ -3127,10 +3392,10 @@ WaveformPlaylist.WaveformDrawer = {
         selection.style.bottom = 0;
         selection.style.top = 0;
         selection.style.left = start+"px";
-        selection.style.zIndex = 2000;
+        selection.style.zIndex = 999;
 
         if (this.selection === undefined) {
-            this.container.appendChild(selection);
+            this.waveformContainer.appendChild(selection);
             this.selection = selection;
         }
     },
