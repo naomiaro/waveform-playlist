@@ -1,7 +1,7 @@
 Web Audio Multiple Track Waveform Editor
 =================
 
-[Donate to the Project](http://igg.me/at/waveform-playlist)
+##[Donate to the Project](http://igg.me/at/waveform-playlist)
 
 Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a multiple track playlist editor written completely in javascript using the [Web Audio API](http://webaudio.github.io/web-audio-api/).
 
