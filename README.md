@@ -13,8 +13,8 @@ I've written up some demos on github for the different [audio fade types](https:
 Save your progress by outputing editor state json.
 [Localstorage](http://diveintohtml5.info/storage.html) has been used to save/restore editor state.
 
-![Screenshot](img/multitrack.png?raw=true "multi track full editor view")
-(code for picture shown can be found in examples/render.html)
+![Screenshot](img/stemtracks.png?raw=true "stem tracks mute solo volume control")
+(code for picture shown can be found in examples/stem-tracks.html)
 
 #### Music by [Blitz//Berlin](http://blitz-berlin.com/)
 
