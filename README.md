@@ -20,4 +20,4 @@ Save your progress by outputing editor state json.
 
 #### Originally created for the [Airtime](https://www.sourcefabric.org/en/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/)
 
-[![License] MIT License](http://doge.mit-license.org)
+[MIT License](http://doge.mit-license.org)
