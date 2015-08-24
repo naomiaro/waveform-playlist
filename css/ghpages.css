@@ -29,3 +29,8 @@ body,
 .main {
   margin: 2em;
 }
+
+.campaign {
+  float: right;
+  margin: 2em;
+}
