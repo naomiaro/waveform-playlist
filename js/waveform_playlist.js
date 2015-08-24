@@ -458,6 +458,10 @@ var WaveformPlaylist = {
     },
 
     pause: function() {
+        if (!this.isPlaying()) {
+            return;
+        }
+
         this.pausedAt = this.getCurrentTime();
         this.lastSeeked = undefined;
 
