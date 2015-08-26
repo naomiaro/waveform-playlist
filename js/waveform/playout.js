@@ -91,9 +91,6 @@ WaveformPlaylist.AudioPlayout = {
         return this.buffer.duration;
     },
 
-    /*
-    * param audible boolean whether master gain is 0 or 1.
-    */
     setUpSource: function() {
         var sourcePromise;
         var that = this;

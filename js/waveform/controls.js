@@ -89,8 +89,12 @@ WaveformPlaylist.AudioControls = {
         }
 
         //TODO, need better alternative? onfocusout not in firefox and blur doesn't bubble.
-        this.ctrls["audio-start"].onblur = this.validateCueIn.bind(this);
-        this.ctrls["audio-end"].onblur = this.validateCueOut.bind(this);
+        if (this.ctrls["time-format"]) {
+            this.ctrls["audio-start"].onblur = this.validateCueIn.bind(this);
+        }
+        if (this.ctrls["time-format"]) {
+            this.ctrls["audio-end"].onblur = this.validateCueOut.bind(this);
+        }
 
         this.timeFormat = this.config.getTimeFormat();
 
