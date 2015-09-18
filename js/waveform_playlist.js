@@ -1,5 +1,34 @@
 'use strict';
 
+navigator.getUserMedia = (navigator.getUserMedia ||
+                       navigator.webkitGetUserMedia ||
+                       navigator.mozGetUserMedia ||
+                       navigator.msGetUserMedia);
+
+//keeping this global for now...
+var userMediaStream;
+
+if (navigator.getUserMedia) {
+   console.log('getUserMedia supported.');
+   navigator.getUserMedia (
+      // constraints - only audio needed for this app
+      {
+         audio: true
+      },
+      // Success callback
+      function(stream) {
+        userMediaStream = stream;
+      },
+      // Error callback
+      function(err) {
+         console.log('The following gUM error occured: ' + err);
+      }
+   );
+} else {
+   console.log('getUserMedia not supported on your browser!');
+}
+
+
 var WaveformPlaylist = {
 
     init: function(tracks) {
@@ -75,6 +104,7 @@ var WaveformPlaylist = {
 
         this.on("playbackcursor", "onAudioUpdate", audioControls);
 
+        audioControls.on("recordtrack", "recordTrack", this);
         audioControls.on("newtrack", "createTrack", this);
         audioControls.on("playlistsave", "save", this);
         audioControls.on("playlistrestore", "restore", this);
@@ -95,6 +125,28 @@ var WaveformPlaylist = {
         this.mutedTracks = [];
         this.soloedTracks = [];
         this.playoutPromises = [];
+
+        this.currentlyRecordingTrack = undefined;
+    },
+
+    recordTrack: function() {
+        console.log("recording");
+
+        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
+            config: {
+                value: this.config
+            }
+        });
+        var trackElem = trackEditor.init();
+
+        trackEditor.setState('record');
+
+        //keep track of the recording track.
+        this.currentlyRecordingTrack = trackEditor;
+    
+        this.trackEditors.push(trackEditor);
+        this.trackContainer.appendChild(trackElem);
+        trackEditor.on("trackloaded", "onTrackLoad", this);
     },
 
     createTrack: function() {
@@ -109,7 +161,6 @@ var WaveformPlaylist = {
     
         this.trackEditors.push(trackEditor);
         this.trackContainer.appendChild(trackElem);
-
         trackEditor.on("trackloaded", "onTrackLoad", this);
     },
 

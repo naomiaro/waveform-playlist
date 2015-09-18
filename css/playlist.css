@@ -70,6 +70,12 @@ html, body {
   width: 100%;
 }
 
+.state-record {
+  border: 2px solid red;
+  height: 100px;
+  width: 100%;
+}
+
 .state-file-drop.drag-enter {
   border: 2px solid orange;
 }

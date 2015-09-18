@@ -480,7 +480,7 @@ WaveformPlaylist.WaveformDrawer = {
     },
 
     drawCursor: function(cursorPos) {
-        this.cursor.style.width = cursorPos+"px";
+        this.cursor && (this.cursor.style.width = cursorPos+"px");
     },
 
     /*

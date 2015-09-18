@@ -10,7 +10,8 @@ WaveformPlaylist.TrackEditor = {
             'fadeout': true,
             'select': true,
             'shift': true,
-            'fileDrop': true
+            'fileDrop': true,
+            'record': true
         };
 
         stateConfig = stateConfig || {};

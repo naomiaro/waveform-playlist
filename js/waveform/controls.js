@@ -26,6 +26,7 @@ WaveformPlaylist.AudioControls = {
             "btn-zoom-in": "zoomIn",
             "btn-zoom-out": "zoomOut",
             "btn-new-track": "newTrack",
+            "btn-record": "recordTrack",
             "btn-mute": "muteTrack",
             "btn-solo": "soloTrack"
         },
@@ -288,6 +289,10 @@ WaveformPlaylist.AudioControls = {
 
     newTrack: function() {
         this.fire("newtrack");
+    },
+
+    recordTrack: function() {
+        this.fire("recordtrack");
     },
 
     validateCueIn: function(e) {
