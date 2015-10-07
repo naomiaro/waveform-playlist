@@ -28,6 +28,8 @@ WaveformPlaylist.states.record = {
           console.log("stop recording");
 
           var blob = new Blob(this.chunks, {'type': 'audio/ogg; codecs=opus'});
+
+          //change this call for streaming drawing.
           this.loadBlob(blob);
 
           this.chunks = undefined;

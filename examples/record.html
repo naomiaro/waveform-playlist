@@ -49,6 +49,13 @@
             <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
             <span class="btn-record btn btn-danger"><i class="fa fa-microphone"></i></span>
           </div>
+          <div class="btn-group">
+            <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
+            <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
+          </div>
+          <div class="btn-group">
+            <span title="new track from blob" class="btn-new-track btn btn-primary"><i class="fa fa-plus"></i> New Track</span>
+          </div>
         </div>
       </div>
       <div class="playlist-time-scale"></div>
@@ -74,8 +81,8 @@
     (function(){
 
         var config = new WaveformPlaylist.Config({
-            resolution: 10000,
-            mono: false,
+            resolution: 1000,
+            mono: true,
             waveHeight: 80,
             container: document.getElementById("playlist"),
             timescale: true,
