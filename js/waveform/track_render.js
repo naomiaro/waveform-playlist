@@ -377,10 +377,13 @@ WaveformPlaylist.WaveformDrawer = {
         this.waveformContainer.appendChild(fragment);
     },
 
-    drawContainer: function(buffer, cues, fades, filename) {
+    /*
+        numChan - container height
+        cues - determine container width.
+    */
+    drawContainer: function(filename, numChan, cues) {
         var makeMono = this.config.isDisplayMono(),
             res = this.config.getResolution(),
-            numChan = makeMono? 1 : buffer.numberOfChannels,
             numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
             wrapperHeight = numChan * this.height,
@@ -404,8 +407,6 @@ WaveformPlaylist.WaveformDrawer = {
         waveformContainer.style.position = "relative";
 
         this.waveformContainer = waveformContainer;
-
-        this.drawWaveform(buffer, cues, fades);
 
         fragment.appendChild(waveformContainer);
         this.container.style.height = wrapperHeight+"px";
