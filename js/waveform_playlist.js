@@ -8,26 +8,6 @@ navigator.getUserMedia = (navigator.getUserMedia ||
 //keeping this global for now...
 var userMediaStream;
 
-if (navigator.getUserMedia) {
-   console.log('getUserMedia supported.');
-   navigator.getUserMedia (
-      // constraints - only audio needed for this app
-      {
-         audio: true
-      },
-      // Success callback
-      function(stream) {
-        userMediaStream = stream;
-      },
-      // Error callback
-      function(err) {
-         console.log('The following gUM error occured: ' + err);
-      }
-   );
-} else {
-   console.log('getUserMedia not supported on your browser!');
-}
-
 
 var WaveformPlaylist = {
 
@@ -127,6 +107,26 @@ var WaveformPlaylist = {
         this.playoutPromises = [];
 
         this.currentlyRecordingTrack = undefined;
+
+        //set up for record functionality
+        if (navigator.getUserMedia) {
+           console.log('getUserMedia supported.');
+           navigator.getUserMedia (
+              {
+                 audio: true
+              },
+              function(stream) {
+                userMediaStream = stream;
+                container.querySelector(".btn-record").classList.remove("disabled");
+              },
+              function(err) {
+                 console.log('The following gUM error occured: ' + err);
+              }
+           );
+        }
+        else {
+           console.log('getUserMedia not supported on your browser!');
+        }
     },
 
     recordTrack: function() {
