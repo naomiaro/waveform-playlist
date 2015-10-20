@@ -280,7 +280,6 @@ WaveformPlaylist.WaveformDrawer = {
             makeMono = this.config.isDisplayMono(),
             res = this.config.getResolution(),
             numChan = makeMono? 1 : buffer.numberOfChannels,
-            numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
             canvases,
             width,
@@ -291,8 +290,6 @@ WaveformPlaylist.WaveformDrawer = {
         this.waveformContainer.innerHTML = ""; 
         this.channels = []; 
         this.selection = undefined;
-        //width and height is per waveform canvas.
-        this.width = Math.ceil(numSamples / res);
 
         cursor = document.createElement("div");
         cursor.classList.add("cursor");
@@ -382,8 +379,7 @@ WaveformPlaylist.WaveformDrawer = {
         cues - determine container width.
     */
     drawContainer: function(filename, numChan, cues) {
-        var makeMono = this.config.isDisplayMono(),
-            res = this.config.getResolution(),
+        var res = this.config.getResolution(),
             numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
             wrapperHeight = numChan * this.height,

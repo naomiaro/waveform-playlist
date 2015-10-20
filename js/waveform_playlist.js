@@ -117,7 +117,10 @@ var WaveformPlaylist = {
               },
               function(stream) {
                 userMediaStream = stream;
-                container.querySelector(".btn-record").classList.remove("disabled");
+                var recordButton = container.querySelector(".btn-record");
+                if (recordButton) {
+                  recordButton.classList.remove("disabled"); 
+                }
               },
               function(err) {
                  console.log('The following gUM error occured: ' + err);
