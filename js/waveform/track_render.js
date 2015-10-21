@@ -280,6 +280,7 @@ WaveformPlaylist.WaveformDrawer = {
             makeMono = this.config.isDisplayMono(),
             res = this.config.getResolution(),
             numChan = makeMono? 1 : buffer.numberOfChannels,
+            numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
             canvases,
             width,
@@ -290,6 +291,10 @@ WaveformPlaylist.WaveformDrawer = {
         this.waveformContainer.innerHTML = ""; 
         this.channels = []; 
         this.selection = undefined;
+
+        //width and height is per waveform canvas.
+        //width still needed here for zooming.
+        this.width = Math.ceil(numSamples / res);
 
         cursor = document.createElement("div");
         cursor.classList.add("cursor");
