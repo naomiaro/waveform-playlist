@@ -71,9 +71,7 @@ html, body {
 }
 
 .state-record {
-  border: 2px solid red;
-  height: 100px;
-  width: 100%;
+
 }
 
 .state-file-drop.drag-enter {
@@ -94,6 +92,7 @@ html, body {
   color: white;
   background-color: blueviolet;
   margin-bottom: 1em;
+  height: 20px;
 }
 
 .controls label {

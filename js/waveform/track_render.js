@@ -24,6 +24,8 @@ WaveformPlaylist.WaveformDrawer = {
             this.loaderStates = this.loaderStates["default"];
         }
 
+        this.height = this.config.getWaveHeight();
+
         return this.container;
     },
 
@@ -53,6 +55,10 @@ WaveformPlaylist.WaveformDrawer = {
         var res = this.config.getResolution(),
             peaks = [],
             i, c, p, l,
+            cues = cues || {
+                cuein: 0,
+                cueout: buffer.length
+            },
             chanLength = cues.cueout - cues.cuein,
             pixels = Math.ceil(chanLength / res),
             numChan = buffer.numberOfChannels,
@@ -106,8 +112,10 @@ WaveformPlaylist.WaveformDrawer = {
             }
         }
 
-        this.maxPeak = maxPeak;
-        this.peaks = peaks;
+        return {
+            peaks: peaks,
+            maxPeak: maxPeak
+        };
     },
 
     drawError: function() {
@@ -154,8 +162,6 @@ WaveformPlaylist.WaveformDrawer = {
     drawLoading: function() {
         var div,
             loader;
-
-        this.height = this.config.getWaveHeight();
 
         div = document.createElement("div");
         div.style.height = this.height+"px";
@@ -280,6 +286,7 @@ WaveformPlaylist.WaveformDrawer = {
             makeMono = this.config.isDisplayMono(),
             res = this.config.getResolution(),
             numChan = makeMono? 1 : buffer.numberOfChannels,
+            cues = cues || {cuein: 0, cueout: buffer.length},
             numSamples = cues.cueout - cues.cuein + 1,
             fragment = document.createDocumentFragment(),
             canvases,
@@ -371,31 +378,34 @@ WaveformPlaylist.WaveformDrawer = {
             top = top + this.height;
         }
 
-        this.getPeaks(buffer, cues);
-        this.draw();
+        this.peakInfo = this.getPeaks(buffer, cues);
+        this.draw(this.peakInfo.peaks);
         this.drawTimeShift();
-        this.drawFades(fades);
+
+        if (fades) {
+            this.drawFades(fades);
+        }
 
         this.waveformContainer.appendChild(fragment);
     },
 
     /*
-        numChan - container height
-        cues - determine container width.
+        numChan - #channels of audio for container height
+        waveformWidth - overall width of canvas needed to draw waveform.
     */
-    drawContainer: function(filename, numChan, cues) {
-        var res = this.config.getResolution(),
-            numSamples = cues.cueout - cues.cuein + 1,
-            fragment = document.createDocumentFragment(),
-            wrapperHeight = numChan * this.height,
+    drawContainer: function(filename, numChan, waveformWidth) {
+        var fragment = document.createDocumentFragment(),
+            //default to 1 channel for recordings for now.
+            //TODO look into making this more dynamic.
+            wrapperHeight = (numChan || 1) * this.height,
             waveformContainer,
             controlSettings = this.config.getControlSettings();
 
-        //remove the loading stuff
+        //remove any loading stuff
         this.container.innerHTML = ""; 
 
         //width and height is per waveform canvas.
-        this.width = Math.ceil(numSamples / res);
+        this.width = waveformWidth || this.MAX_CANVAS_WIDTH;
 
         if (controlSettings.show) {
             fragment.appendChild(this.drawTrackControls(controlSettings.width, wrapperHeight, filename));
@@ -433,33 +443,14 @@ WaveformPlaylist.WaveformDrawer = {
         cc.fillRect(x, h2+min, 1, h2-min);
     },
 
-    /*
-        start, end are optional parameters to only redraw part of the canvas.
-    */
-    draw: function(start, end) {
-        var that = this,
-            peaks = this.peaks,
-            pixelOffset = this.pixelOffset,
-            i = (start) ? start - pixelOffset : 0,
-            len = (end) ? end - pixelOffset + 1 : peaks.length;
+    /* draw individual peaks to the canvas */
+    draw: function(peaks) {
+        var i, len;
 
-        if (i < 0 && len < 0) {
-            return;
-        } 
-
-        if (i < 0) {
-            i = 0;
-        }
-
-        if (len > peaks.length) {
-            len = peaks.length;
-        }
-
-        for (; i < len; i++) {
-
+        for (i = 0, len = peaks.length; i < len; i++) {
             peaks[i].forEach(function(peak, chanNum) {
-                that.drawFrame(chanNum, i, peak);
-            });
+                this.drawFrame(chanNum, i, peak);
+            }, this);
         } 
     },
 

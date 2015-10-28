@@ -142,14 +142,13 @@ var WaveformPlaylist = {
         });
         var trackElem = trackEditor.init();
 
-        trackEditor.setState('record');
-
-        //keep track of the recording track.
-        this.currentlyRecordingTrack = trackEditor;
+        trackEditor.drawer.drawContainer("Recording");
     
         this.trackEditors.push(trackEditor);
         this.trackContainer.appendChild(trackElem);
         trackEditor.on("trackloaded", "onTrackLoad", this);
+
+        trackEditor.setState('record');
     },
 
     createTrack: function() {

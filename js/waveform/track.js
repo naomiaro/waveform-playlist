@@ -188,13 +188,15 @@ WaveformPlaylist.TrackEditor = {
     },
 
     onTrackLoad: function(buffer, err) {
-        var res,
-            startTime,
+        var startTime,
             endTime,
             cuein,
             cueout,
             makeMono = this.config.isDisplayMono(),
-            numChan = makeMono? 1 : buffer.numberOfChannels;
+            numChan = makeMono? 1 : buffer.numberOfChannels,
+            res = this.config.getResolution(),
+            numSamples,
+            waveformWidth;
 
         if (err !== undefined) {
             this.drawer.drawError();
@@ -210,7 +212,10 @@ WaveformPlaylist.TrackEditor = {
 
         this.setCuePoints(cuein, cueout);
 
-        this.drawer.drawContainer(this.filename, numChan, this.cues);
+        numSamples = cueout - cuein + 1;
+        waveformWidth = Math.ceil(numSamples / res);
+
+        this.drawer.drawContainer(this.filename, numChan, waveformWidth);
         this.drawer.drawWaveform(buffer, this.cues, this.fades);
 
         this.setLeftOffset(this.secondsToSamples(this.startTime));
