@@ -20,16 +20,12 @@ WaveformPlaylist.states.record = {
 
         this.mediaRecorder.ondataavailable = function(e) {
           this.chunks.push(e.data);
-          console.log("data available");
-
           var blob = new Blob(this.chunks, {'type': 'audio/ogg; codecs=opus'});
           state.draw.call(this, blob);
 
         }.bind(this);
 
         this.mediaRecorder.onstop = function(e) {
-          console.log("stop recording");
-
           var blob = new Blob(this.chunks, {'type': 'audio/ogg; codecs=opus'});
 
           //change this call for streaming drawing.
@@ -60,8 +56,6 @@ WaveformPlaylist.states.record = {
 
         ac.decodeAudioData(e.target.response || e.target.result,
           function(buffer) {
-            // var peakInfo = that.drawer.getPeaks(buffer);
-            // that.drawer.draw(peakInfo.peaks);
             that.drawer.drawWaveform(buffer);
           },
           function(err) { 

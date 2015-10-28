@@ -419,9 +419,13 @@ WaveformPlaylist.TrackEditor = {
         this.deactivateAudioSelection();
     },
 
-    setState: function(state) {
+    leaveCurrentState: function() {
         //leave the past state if it was enabled
         this.currentState && this.currentState.leave.call(this);
+    },
+
+    setState: function(state) {
+        this.leaveCurrentState();
 
         if (this.enabledStates[state]) {
             this.currentState = WaveformPlaylist.states[state];

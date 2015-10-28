@@ -133,22 +133,35 @@ var WaveformPlaylist = {
     },
 
     recordTrack: function() {
-        console.log("recording");
-
-        var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
+        var recordingEditor = Object.create(WaveformPlaylist.TrackEditor, {
             config: {
                 value: this.config
             }
         });
-        var trackElem = trackEditor.init();
+        var trackElem = recordingEditor.init();
+        var currentTime = this.config.getCurrentTime();
+        this.playoutPromises = [];
 
-        trackEditor.drawer.drawContainer("Recording");
+        recordingEditor.drawer.drawContainer("Recording");
     
-        this.trackEditors.push(trackEditor);
+        this.trackEditors.push(recordingEditor);
         this.trackContainer.appendChild(trackElem);
-        trackEditor.on("trackloaded", "onTrackLoad", this);
+        recordingEditor.on("trackloaded", "onTrackLoad", this);
 
-        trackEditor.setState('record');
+        recordingEditor.setState('record');
+
+        this.trackEditors.forEach(function(editor) {
+            if (editor !== recordingEditor) {
+                //don't want any seeking etc during recording.
+                editor.leaveCurrentState();
+
+                this.playoutPromises.push(editor.schedulePlay(currentTime, 0, undefined, {
+                    masterGain: this.shouldTrackPlay(editor) ? 1 : 0
+                }));
+            }
+        }, this);
+
+        this.startAnimation(0);
     },
 
     createTrack: function() {
