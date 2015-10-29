@@ -64,17 +64,18 @@ html, body {
   background: rgba(0,0,0,0.1);
 }
 
-.state-file-drop {
+.track-drop {
   border: 2px dashed blue;
   height: 100px;
-  width: 100%;
+  width: 200px;
+  margin: 1em 0;
 }
 
-.state-record {
-
+.track-drop::before {
+  content: "Drop audio file(s) here!";
 }
 
-.state-file-drop.drag-enter {
+.track-drop.drag-enter {
   border: 2px solid orange;
 }
 

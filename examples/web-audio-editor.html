@@ -15,7 +15,6 @@
     <script type="text/javascript" src="../js/waveform/mixins/observer.js"></script>
     <script type="text/javascript" src="../js/waveform/mixins/conversions.js"></script>
     <script type="text/javascript" src="../js/waveform/mixins/curves.js"></script>
-    <script type="text/javascript" src="../js/waveform/states/file_drop.js"></script>
     <script type="text/javascript" src="../js/waveform/states/cursor.js"></script>
     <script type="text/javascript" src="../js/waveform/states/fadein.js"></script>
     <script type="text/javascript" src="../js/waveform/states/fadeout.js"></script>
@@ -71,9 +70,6 @@
             <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
             <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
           </div>
-          <div class="btn-group">
-            <span title="new track from blob" class="btn-new-track btn btn-primary"><i class="fa fa-plus"></i> New Track</span>
-          </div>
         </div>
       </div>
       <div class="playlist-time-scale"></div>
@@ -92,6 +88,7 @@
           <input type="text" class="audio-end input-small form-control">
           <label class="audio-pos">00:00:00.0</label>
         </form>
+        <div class="track-drop"></div>
       </div>
     </div>
 

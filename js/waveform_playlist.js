@@ -164,19 +164,17 @@ var WaveformPlaylist = {
         this.startAnimation(0);
     },
 
-    createTrack: function() {
+    createTrack: function(file) {
         var trackEditor = Object.create(WaveformPlaylist.TrackEditor, {
             config: {
                 value: this.config
             }
         });
         var trackElem = trackEditor.init();
-
-        trackEditor.setState('fileDrop');
-    
         this.trackEditors.push(trackEditor);
         this.trackContainer.appendChild(trackElem);
         trackEditor.on("trackloaded", "onTrackLoad", this);
+        trackEditor.loadBlob(file);
     },
 
     removeTrack: function(trackEditor) {

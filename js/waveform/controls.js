@@ -25,7 +25,6 @@ WaveformPlaylist.AudioControls = {
             "btn-fade": "changeDefaultFade",
             "btn-zoom-in": "zoomIn",
             "btn-zoom-out": "zoomOut",
-            "btn-new-track": "newTrack",
             "btn-record": "recordTrack",
             "btn-mute": "muteTrack",
             "btn-solo": "soloTrack"
@@ -35,6 +34,42 @@ WaveformPlaylist.AudioControls = {
         },
         "oninput": {
             "volume-slider": "changeVolume"
+        },
+        "ondragenter": {
+            "track-drop": "trackDropEnter"
+        },
+        "ondragover": {
+            "track-drop": "trackDropOver"
+        },
+        "ondragleave": {
+            "track-drop": "trackDropLeave"
+        },
+        "ondrop": {
+            "track-drop": "trackDrop"
+        }
+    },
+
+    trackDropEnter: function(e) {
+        e.target.classList.add("drag-enter");
+    },
+
+    trackDropOver: function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+    },
+
+    trackDropLeave: function(e) {
+        e.target.classList.remove("drag-enter");
+    },
+
+    trackDrop: function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        e.target.classList.remove("drag-enter");
+
+        for (var i = 0; i < e.dataTransfer.files.length; i++) {
+            this.fire("newtrack", e.dataTransfer.files[i])
         }
     },
 
