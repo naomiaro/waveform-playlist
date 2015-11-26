@@ -28,11 +28,13 @@
     "example": "examples"
   },
   "dependencies": {
-    "gulp-babel": "^5.3.0",
+    "deep-freeze-strict": "^1.1.1",
     "gulp": "^3.9.0",
+    "gulp-babel": "^5.3.0",
     "gulp-concat": "^2.6.0",
     "gulp-connect": "^2.2.0",
-    "gulp-sourcemaps": "^1.6.0"
+    "gulp-sourcemaps": "^1.6.0",
+    "lodash": "^3.10.1"
   },
   "scripts": {
     "test": "mocha --compilers js:babel-core/register --reporter spec",
