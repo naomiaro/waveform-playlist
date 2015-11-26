@@ -2,6 +2,11 @@
 
 import {sCurve, logarithmic} from 'curves';
 
+const SCURVE = "sCurve";
+const LINEAR = "linear";
+const EXPONENTIAL = "exponential";
+const LOGARITHMIC = "logarithmic";
+
 function sCurveFadeIn(start, duration) {
     var curve = sCurve(10000, (Math.PI/2));
     this.setValueCurveAtTime(curve, start, duration);
@@ -44,15 +49,39 @@ function logarithmicFadeOut(start, duration) {
 
 
 export function createFadeIn(gain, type, start, duration) {
-    var method = type + "FadeIn",
-        fn = this[method];
-
-    fn.call(gain, start, duration);
+    switch(type) {
+        case SCURVE:
+            sCurveFadeIn.call(gain, start, duration);
+            break;
+        case LINEAR:
+            linearFadeIn.call(gain, start, duration);
+            break;
+        case EXPONENTIAL:
+            exponentialFadeIn.call(gain, start, duration);
+            break;
+        case LOGARITHMIC:
+            logarithmicFadeIn.call(gain, start, duration);
+            break;
+        default:
+            throw new Error("Unsupported Fade type");
+    }
 }
 
 export function createFadeOut(gain, type, start, duration) {
-    var method = type + "FadeOut",
-        fn = this[method];
-
-    fn.call(gain, start, duration);
+    switch(type) {
+        case SCURVE:
+            sCurveFadeOut.call(gain, start, duration);
+            break;
+        case LINEAR:
+            linearFadeOut.call(gain, start, duration);
+            break;
+        case EXPONENTIAL:
+            exponentialFadeOut.call(gain, start, duration);
+            break;
+        case LOGARITHMIC:
+            logarithmicFadeOut.call(gain, start, duration);
+            break;
+        default:
+            throw new Error("Unsupported Fade type");
+    }
 }
