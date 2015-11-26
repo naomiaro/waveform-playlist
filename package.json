@@ -36,7 +36,7 @@
   },
   "scripts": {
     "test": "mocha --compilers js:babel-core/register --reporter spec",
-    "cover": "node_modules/istanbul/lib/cli.js cover node_modules/mocha/bin/_mocha -- -R spec test/* --compilers js:babel-core/register"
+    "test-cov": "istanbul cover _mocha -- -R spec test/* --compilers js:babel-core/register"
   },
   "repository": {
     "type": "git",

@@ -3,6 +3,10 @@ Waveform Playlist
 
 Web Audio Multiple Track Waveform Editor
 
+[![Build Status](https://travis-ci.org/naomiaro/waveform-playlist.svg)](https://travis-ci.org/naomiaro/waveform-playlist)
+
+[![Coverage Status](https://coveralls.io/repos/naomiaro/waveform-playlist/badge.svg?branch=master&service=github)](https://coveralls.io/github/naomiaro/waveform-playlist?branch=babel-ES6)
+
 ## Installation
 
   `npm install waveform-playlist`
