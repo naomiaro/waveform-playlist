@@ -51,23 +51,22 @@ export default class {
 
     setUpSource() {
         var sourcePromise;
-        var that = this;
 
         this.source = this.ac.createBufferSource();
         this.source.buffer = this.buffer;
 
-        sourcePromise = new Promise(function(resolve, reject) {
+        sourcePromise = new Promise((resolve, reject) => {
             //keep track of the buffer state.
-            that.source.onended = function(e) {
-                that.source.disconnect();
-                that.fadeGain.disconnect();
-                that.outputGain.disconnect();
-                that.masterGain.disconnect();
+            this.source.onended = (e) => {
+                this.source.disconnect();
+                this.fadeGain.disconnect();
+                this.outputGain.disconnect();
+                this.masterGain.disconnect();
 
-                that.source = undefined;
-                that.fadeGain = undefined;
-                that.outputGain = undefined;
-                that.masterGain = undefined;
+                this.source = undefined;
+                this.fadeGain = undefined;
+                this.outputGain = undefined;
+                this.masterGain = undefined;
 
                 resolve();
             }
