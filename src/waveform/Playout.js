@@ -2,6 +2,9 @@
 
 import {createFadein, createFadeout} from 'utils/fades';
 
+const FADEIN = "FadeIn";
+const FADEOUT = "FadeOut";
+
 export default class {
 
     constructor(AudioContext) {
@@ -22,10 +25,10 @@ export default class {
     }
 
     applyFade(type, start, duration, shape="logarithmic") {
-        if (type === "FadeIn") {
+        if (type === FADEIN) {
             createFadeIn(this.fadeGain.gain, shape, start, duration);
         }
-        else if (type === "FadeOut") {
+        else if (type === FADEOUT) {
             createFadeOut(this.fadeGain.gain, shape, start, duration);
         }
         else {
@@ -34,11 +37,11 @@ export default class {
     }
 
     applyFadeIn(start, duration, shape="logarithmic") {
-        this.applyFade("FadeIn", start, duration, shape);
+        this.applyFade(FADEIN, start, duration, shape);
     }
 
     applyFadeOut(start, duration, shape="logarithmic") {
-        this.applyFade("FadeOut", start, duration, shape);
+        this.applyFade(FADEOUT, start, duration, shape);
     }
 
     isPlaying() {
