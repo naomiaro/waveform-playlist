@@ -52,6 +52,6 @@ export default class {
                     reject(Error(`Unable to decode Audio Data for ${this.src}`));
                 }
             );
-        };
+        });
     }
 }

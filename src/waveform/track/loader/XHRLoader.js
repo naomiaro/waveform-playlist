@@ -1,6 +1,6 @@
 'use strict';
 
-import Loader from 'Loader';
+import Loader from './Loader';
 
 export default class extends Loader {
 
@@ -31,6 +31,5 @@ export default class extends Loader {
                 reject(Error(`Track ${this.src} failed to load`));
             });
         });
-    },
-    
+    }
 }

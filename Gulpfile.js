@@ -3,6 +3,8 @@ var sourcemaps = require("gulp-sourcemaps");
 var babel = require("gulp-babel");
 var concat = require("gulp-concat");
 var connect = require('gulp-connect');
+var mocha = require('gulp-mocha');
+var util = require('gulp-util');
 
 gulp.task('connect', function() {
   connect.server({
@@ -29,6 +31,16 @@ gulp.task('html', function () {
 gulp.task('watch', function () {
   gulp.watch(['./examples/*.html'], ['html']);
   gulp.watch(['./src/**/*.js'], ['src']);
+});
+
+gulp.task('test', function () {
+  return gulp.src(['test/**/*.js'], { read: false })
+    .pipe(mocha({ reporter: 'spec' }))
+    .on('error', util.log);
+});
+ 
+gulp.task('watch-test', function () {
+  gulp.watch(['views/**', 'public/**', 'app.js', 'framework/**', 'test/**'], ['test']);
 });
 
 gulp.task('default', ['connect', 'watch']);
