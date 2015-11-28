@@ -2,6 +2,7 @@
 
 import _ from 'lodash';
 import uuid from 'uuid';
+import h from 'virtual-dom/h';
 
 import peaks from './utils/peaks';
 import Playout from './Playout';
@@ -236,5 +237,50 @@ export default class {
 
     secondsToPixels(seconds) {
         return ~~(seconds * this.sampleRate / this.resolution);
+    }
+
+    render() {
+        h("div.channel-wrapper.state-select", {attributes: {
+            "style": "width: 1324px; margin-left: 200px; height: 100px;"
+            }}, [
+            h("div.controls", {attributes: {
+                "style": "height: 100px; width: 200px; position: absolute; left: 0px; z-index: 1000;"
+            }}, [
+                h("header", [ "Vocals30.mp3" ]),
+                h("div.btn-group", [
+                    h("span.btn.btn-default.btn-xs.btn-mute", [ "Mute" ]),
+                    h("span.btn.btn-default.btn-xs.btn-solo", [ "Solo" ])
+                ]),
+                h("label", [
+                    h("input.volume-slider", {attributes: {
+                        "type": "range",
+                        "min": "0",
+                        "max": "100",
+                        "value": "100"
+                    }})
+                ])
+            ]),
+
+            h("div.waveform", {attributes: {
+                "style": "height: 100px; width: 1324px; position: relative;"
+            }}, [
+                h("div.cursor", {attributes: {
+                    "style": "position: absolute; box-sizing: content-box; margin: 0px; padding: 0px; top: 0px; left: 0px; bottom: 0px; z-index: 100;"
+                }}),
+                h("div.channel.channel-0", {attributes: {
+                    "style": "width: 1324px; height: 100px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;"
+                }}, [
+                    h("div.channel-progress", {attributes: {
+                        "style": "position: absolute; width: 0px; height: 100px; z-index: 2;"
+                    }}),
+                    h("canvas", {attributes: {
+                        "width": "1324",
+                        "height": "100",
+                        "data-offset": "0",
+                        "style": "float: left; position: relative; margin: 0px; padding: 0px; z-index: 3;"
+                    }})
+                ])
+            ])
+        ]);
     }
 }

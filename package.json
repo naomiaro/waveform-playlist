@@ -46,9 +46,11 @@
     "example": "examples"
   },
   "dependencies": {
+    "es6-promisify": "^3.0.0",
     "event-emitter": "^0.3.4",
     "lodash": "^3.10.1",
-    "uuid": "^2.0.1"
+    "uuid": "^2.0.1",
+    "virtual-dom": "^2.1.1"
   },
   "scripts": {
     "test": "./node_modules/karma/bin/karma start --browsers Firefox --single-run"
