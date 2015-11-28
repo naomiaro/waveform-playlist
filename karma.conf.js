@@ -7,7 +7,6 @@ module.exports = function(config) {
     // base path that will be used to resolve all patterns (eg. files, exclude)
     basePath: '',
 
-
     // frameworks to use
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
     frameworks: ['mocha', 'requirejs', 'chai-as-promised', 'chai'],
@@ -16,8 +15,7 @@ module.exports = function(config) {
     // list of files / patterns to load in the browser
     files: [
       'test-main.js',
-      {pattern: 'src/**/*.js', included: false},
-      {pattern: 'test/**/*.spec.js', included: false}
+      {pattern: 'test/index.spec.js', included: false}
     ],
 
 
@@ -30,29 +28,48 @@ module.exports = function(config) {
     // preprocess matching files before serving them to the browser
     // available preprocessors: https://npmjs.org/browse/keyword/karma-preprocessor
     preprocessors: {
-      'src/**/*.js': ['babel'],
-      'test/**/*.spec.js': ['babel']
+      'src/**/*.js': ['webpack', 'coverage', 'sourcemap'],
+      'test/index.spec.js': ['webpack', 'sourcemap']
     },
 
-    babelPreprocessor: {
-      options: {
-        presets: ['es2015'],
-        sourceMap: 'inline'
+    webpack: {
+      output: {
+        path: __dirname + "/dist",
+        filename: "[name].bundle.js",
+        chunkFilename: "[id].bundle.js"
       },
-      filename: function (file) {
-        return file.originalPath.replace(/\.js$/, '.es5.js');
-      },
-      sourceFileName: function (file) {
-        return file.originalPath;
+      module: {
+        loaders: [
+          { test: /\.css$/, loader: "style!css" },
+          {
+            test: /\.js?$/,
+            exclude: /(node_modules|bower_components)/,
+            loader: 'babel',
+            query: {
+              presets: ['es2015'],
+              cacheDirectory: true
+            }
+          }
+        ]
       }
+    },
+
+    webpackMiddleware: {
+      noInfo: true
     },
 
 
     // test results reporter to use
     // possible values: 'dots', 'progress'
     // available reporters: https://npmjs.org/browse/keyword/karma-reporter
-    reporters: ['nyan'],
+    reporters: ['coverage', 'nyan'],
 
+    coverageReporter: {
+      reporters: [
+        { type: 'text' },
+        { type: 'lcov', subdir: 'report-lcov' }
+      ]
+    },
 
     // web server port
     port: 9876,
@@ -84,5 +101,5 @@ module.exports = function(config) {
     // Concurrency level
     // how many browser should be started simultanous
     concurrency: Infinity
-  })
+  });
 }

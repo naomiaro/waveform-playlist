@@ -3,8 +3,7 @@ var sourcemaps = require("gulp-sourcemaps");
 var babel = require("gulp-babel");
 var concat = require("gulp-concat");
 var connect = require('gulp-connect');
-var mocha = require('gulp-mocha');
-var util = require('gulp-util');
+var Server = require('karma').Server;
 
 gulp.task('connect', function() {
   connect.server({
@@ -33,14 +32,14 @@ gulp.task('watch', function () {
   gulp.watch(['./src/**/*.js'], ['src']);
 });
 
-gulp.task('test', function () {
-  return gulp.src(['test/**/*.js'], { read: false })
-    .pipe(mocha({ reporter: 'spec' }))
-    .on('error', util.log);
-});
- 
-gulp.task('watch-test', function () {
-  gulp.watch(['views/**', 'public/**', 'app.js', 'framework/**', 'test/**'], ['test']);
+/**
+ * Run test once and exit
+ */
+gulp.task('test', function (done) {
+  new Server({
+    configFile: __dirname + '/karma.conf.js',
+    singleRun: true
+  }, done).start();
 });
 
 gulp.task('default', ['connect', 'watch']);

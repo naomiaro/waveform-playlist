@@ -3,7 +3,8 @@
 import _ from 'lodash';
 import uuid from 'uuid';
 
-import Playout from 'Playout';
+import peaks from './utils/peaks';
+import Playout from './Playout';
 
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";

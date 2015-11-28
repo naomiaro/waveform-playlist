@@ -1,6 +1,6 @@
 'use strict';
 
-import {sCurve, logarithmic} from 'curves';
+import {sCurve, logarithmic} from './curves';
 
 const SCURVE = "sCurve";
 const LINEAR = "linear";

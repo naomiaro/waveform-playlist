@@ -1,4 +1,4 @@
-import State from 'State';
+import State from './State';
 
 export default class extends State {
     constructor(track) {

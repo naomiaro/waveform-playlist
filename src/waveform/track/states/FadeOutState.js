@@ -1,4 +1,4 @@
-import State from 'State';
+import State from './State';
 
 export default class extends State {
     constructor(track) {
@@ -16,6 +16,6 @@ export default class extends State {
     }
 
     static getClasses() {
-        return "state-fadein";
+        return "state-fadeout";
     }
 }
