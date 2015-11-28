@@ -1,7 +1,7 @@
 'use strict';
 
 import {expect} from 'chai';
-import peaks from './../../../src/waveform/utils/peaks';
+import peaks from './../../src/utils/peaks';
 
 describe('peak extractor', function() {
     it('min peaks should be zeros for a zero array', function() {
