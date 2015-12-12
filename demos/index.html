@@ -20,32 +20,29 @@
     </div>
    
     <script type="text/javascript">
-    // (function(){
+      (function(){
 
-    //     var tracks = [
-    //         {
-    //           "src":"../media/stems/Bass\ &\ Drums30.mp3",
-    //         }
-    //     ];
+        console.log(WaveformPlaylist);
 
-    //     var container = document.getElementById("playlist");
+        var tracks = [
+          {
+            "src":"/media/stems/Guitar30.mp3",
+          }
+        ];
 
-    //     var config = new WaveformPlaylist.Config({
-    //         resolution: 10000, //audio frames per pixel
-    //         mono: true,
-    //         container: container,
-    //         state: 'cursor',
-    //         waveOutlineColor: '#E0EFF1'
-    //     });  
+        var container = document.getElementById("playlist");
 
-    //    var playlistEditor = Object.create(WaveformPlaylist, {
-    //       config: {
-    //         value: config
-    //       }
-    //     });
-    //     playlistEditor.init(tracks);
+        var playlist = new WaveformPlaylist.default({
+            resolution: 10000, //audio frames per pixel
+            mono: true,
+            container: container,
+            state: 'cursor',
+            waveOutlineColor: '#E0EFF1'
+        });
 
-    // })();
+        playlist.load(tracks);
+
+     })();
     </script>
   </body>
 </html>

@@ -12,7 +12,7 @@ const FADEOUT = "FadeOut";
 
 export default class {
 
-    constructor(src, start, end, fades, cues, samplerate, resolution, enabledStates={}) {
+    constructor(config, audioBuffer, start=undefined, end=undefined, cues={}, fades={}, enabledStates={}) {
         let defaultStatesEnabled = {
             'cursor': true,
             'fadein': true,
@@ -22,20 +22,22 @@ export default class {
             'record': true
         };
 
-        this.sampleRate = samplerate;
-        this.resolution = resolution;
-        this.startTime = start;
-        this.endTime = end;
+        this.config = config;
 
-        this.active = false;
+        this.sampleRate = this.config.getSampleRate();
+        //this.resolution = resolution;
+
+        this.startTime = start || 0;
+        this.endTime = end || (this.startTime + audioBuffer.duration);
+
         this.gain = 1;
-        //selected area stored in seconds relative to entire playlist.
-        this.selectedArea = undefined;
-        this.fades = {};
+
+        this.cues = cues;
+        this.fades = fades;
 
         this.enabledStates = _.assign(defaultStatesEnabled, enabledStates);
 
-        this.playout = new Playout();
+        this.playout = new Playout(this.config.getAudioContext());
     }
 
     saveFade(type, shape, start, end) {
@@ -68,30 +70,30 @@ export default class {
 
         sample at index cueout is not included.
     */
-    setCuePoints(cuein, cueout) {
-        //need the offset for trimming an already trimmed track.
-        var offset = this.cues ? this.cues.cuein : 0,
-            buffer = this.getBuffer(),
-            cutOff = this.cues ? this.cues.cueout : buffer.length;
+    // setCuePoints(cuein, cueout) {
+    //     //need the offset for trimming an already trimmed track.
+    //     var offset = this.cues ? this.cues.cuein : 0,
+    //         buffer = this.getBuffer(),
+    //         cutOff = this.cues ? this.cues.cueout : buffer.length;
 
-        if (cuein < 0) {
-            cuein = 0;
-        }
-        //adjust if the length was inaccurate and cueout is set to a higher sample than we actually have.
-        if ((offset + cueout) > cutOff) {
-            cueout = cutOff - offset;
-        }
+    //     if (cuein < 0) {
+    //         cuein = 0;
+    //     }
+    //     //adjust if the length was inaccurate and cueout is set to a higher sample than we actually have.
+    //     if ((offset + cueout) > cutOff) {
+    //         cueout = cutOff - offset;
+    //     }
 
-        this.cues = {
-            cuein: offset + cuein,
-            cueout: offset + cueout
-        };
+    //     this.cues = {
+    //         cuein: offset + cuein,
+    //         cueout: offset + cueout
+    //     };
 
-        this.duration = (cueout - cuein) / this.sampleRate;
-        this.endTime = this.duration + this.startTime;
-        this.cuein = this.samplesToSeconds(this.cues.cuein);
-        this.cueout = this.samplesToSeconds(this.cues.cueout);
-    }
+    //     this.duration = (cueout - cuein) / this.sampleRate;
+    //     this.endTime = this.duration + this.startTime;
+    //     this.cuein = this.samplesToSeconds(this.cues.cuein);
+    //     this.cueout = this.samplesToSeconds(this.cues.cueout);
+    // }
 
     leaveCurrentState() {
         //leave the past state if it was enabled
@@ -215,32 +217,8 @@ export default class {
         this.playout.stop(when);
     }
 
-    samplesToSeconds(samples) {
-        return samples / this.sampleRate;
-    }
-
-    secondsToSamples(seconds) {
-        return Math.ceil(seconds * this.sampleRate);
-    }
-
-    samplesToPixels(samples) {
-        return ~~(samples / this.resolution);
-    }
-
-    pixelsToSamples(pixels) {
-        return ~~(pixels * this.resolution);
-    }
-
-    pixelsToSeconds(pixels) {
-        return pixels * this.resolution / this.sampleRate;
-    }
-
-    secondsToPixels(seconds) {
-        return ~~(seconds * this.sampleRate / this.resolution);
-    }
-
     render() {
-        h("div.channel-wrapper.state-select", {attributes: {
+        return h("div.channel-wrapper.state-select", {attributes: {
             "style": "width: 1324px; margin-left: 200px; height: 100px;"
             }}, [
             h("div.controls", {attributes: {

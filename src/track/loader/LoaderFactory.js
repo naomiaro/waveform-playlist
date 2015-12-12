@@ -8,7 +8,7 @@ export default class {
         if (src instanceof Blob) {
             return new BlobLoader(src, audioContext);
         }
-        else if (src instanceof String) {
+        else if (typeof(src) === "string") {
         	return new XHRLoader(src, audioContext);
         }
         else {

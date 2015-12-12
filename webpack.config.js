@@ -4,7 +4,17 @@ module.exports = {
         path: __dirname + "/dist",
         filename: "waveform-playlist.js",
         chunkFilename: "[id].bundle.js",
-        publicPath: "/assets/"
+        publicPath: "",
+
+        // export itself to a global var
+        libraryTarget: "var",
+        // name of the global var: "Foo"
+        library: "WaveformPlaylist"
+    },
+    externals: {
+        // require("jquery") is external and available
+        //  on the global var jQuery
+        //"jquery": "jQuery"
     },
     module: {
         loaders: [

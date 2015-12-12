@@ -7,8 +7,8 @@ const FADEOUT = "FadeOut";
 
 export default class {
 
-    constructor(AudioContext) {
-        this.ac = AudioContext;
+    constructor(ac) {
+        this.ac = ac;
         this.gain = 1;
         this.destination = this.ac.destination;
     }
