@@ -7,21 +7,11 @@ const FADEOUT = "FadeOut";
 
 export default class {
 
-    constructor(ac) {
+    constructor(ac, buffer) {
         this.ac = ac;
         this.gain = 1;
-        this.destination = this.ac.destination;
-    }
-
-    getBuffer() {
-        return this.buffer;
-    }
-
-    /**
-    * @param {ArrayBuffer} buffer
-    */
-    setBuffer(buffer) {
         this.buffer = buffer;
+        this.destination = this.ac.destination;
     }
 
     applyFade(type, start, duration, shape="logarithmic") {
@@ -103,7 +93,7 @@ export default class {
         it is playing slightly more samples than it has it won't play at all.
         Unfortunately it doesn't seem to work if you just give it a start time.
     */
-    play(start, duration, when=0) {
+    play(when, start, duration) {
         this.source.start(when, start, duration);
     }
 

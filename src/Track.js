@@ -12,7 +12,7 @@ const FADEOUT = "FadeOut";
 
 export default class {
 
-    constructor(config, audioBuffer, start=undefined, end=undefined, cues={}, fades={}, enabledStates={}) {
+    constructor(config, audioBuffer, start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
         let defaultStatesEnabled = {
             'cursor': true,
             'fadein': true,
@@ -27,17 +27,22 @@ export default class {
         this.sampleRate = this.config.getSampleRate();
         //this.resolution = resolution;
 
+        //stored in seconds.
         this.startTime = start || 0;
         this.endTime = end || (this.startTime + audioBuffer.duration);
 
         this.gain = 1;
 
-        this.cues = cues;
+        //stored in seconds since webaudio api deals in seconds.
+        this.cueIn = cueIn || 0;
+        this.cueOut = cueOut || audioBuffer.duration;
+        this.duration = this.cueOut - this.cueIn;
+
         this.fades = fades;
 
         this.enabledStates = _.assign(defaultStatesEnabled, enabledStates);
 
-        this.playout = new Playout(this.config.getAudioContext());
+        this.playout = new Playout(this.config.getAudioContext(), audioBuffer);
     }
 
     saveFade(type, shape, start, end) {
@@ -65,48 +70,8 @@ export default class {
         });
     }
 
-    /*
-        Cue points are stored internally in the editor as sample indices for highest precision.
-
-        sample at index cueout is not included.
-    */
-    // setCuePoints(cuein, cueout) {
-    //     //need the offset for trimming an already trimmed track.
-    //     var offset = this.cues ? this.cues.cuein : 0,
-    //         buffer = this.getBuffer(),
-    //         cutOff = this.cues ? this.cues.cueout : buffer.length;
-
-    //     if (cuein < 0) {
-    //         cuein = 0;
-    //     }
-    //     //adjust if the length was inaccurate and cueout is set to a higher sample than we actually have.
-    //     if ((offset + cueout) > cutOff) {
-    //         cueout = cutOff - offset;
-    //     }
-
-    //     this.cues = {
-    //         cuein: offset + cuein,
-    //         cueout: offset + cueout
-    //     };
-
-    //     this.duration = (cueout - cuein) / this.sampleRate;
-    //     this.endTime = this.duration + this.startTime;
-    //     this.cuein = this.samplesToSeconds(this.cues.cuein);
-    //     this.cueout = this.samplesToSeconds(this.cues.cueout);
-    // }
-
-    leaveCurrentState() {
-        //leave the past state if it was enabled
-        this.currentState && this.currentState.leave();
-    }
-
     setState(state) {
-        this.leaveCurrentState();
 
-        if (this.enabledStates[state]) {
-            this.currentState = WaveformPlaylist.states[state];
-            this.currentState.enter();
-        }
     }
 
     isPlaying() {
@@ -135,7 +100,6 @@ export default class {
             relPos,
             when = now,
             segment = (endTime) ? (endTime - startTime) : undefined,
-            cueOffset = this.cues.cuein / this.sampleRate,
             sourcePromise;
 
         //1) track has no content to play.
@@ -171,7 +135,7 @@ export default class {
             }
         }
 
-        start = start + cueOffset;
+        start = start + this.cueIn;
         relPos = startTime - this.startTime;
 
         sourcePromise = this.playout.setUpSource();

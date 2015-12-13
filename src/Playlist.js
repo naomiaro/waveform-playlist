@@ -43,6 +43,16 @@ export default class {
         });
     }
 
+    getSelected() {
+        return this.selectedArea;
+    }
+
+    setState(state) {
+        this.tracks.forEach(function(editor) {
+            editor.setState(state);
+        }, this);
+    }
+
     shouldTrackPlay(track) {
         var shouldPlay;
         //if there are solo tracks, only they should play.
@@ -77,16 +87,16 @@ export default class {
 
         this.setState('cursor');
 
-        this.trackEditors.forEach(function(editor) {
+        this.tracks.forEach((editor) => {
             playoutPromises.push(editor.schedulePlay(currentTime, startTime, endTime, {
                 masterGain: this.shouldTrackPlay(editor) ? 1 : 0
             }));
-        }, this);
+        });
 
         this.lastPlay = currentTime;
         //use these to track when the playlist has fully stopped.
         this.playoutPromises = playoutPromises;
-        this.startAnimation(startTime);
+        //this.startAnimation(startTime);
     }
 
     pause() {
@@ -146,13 +156,13 @@ export default class {
             if (elapsed) {
                 playbackSec = cursorPos + elapsed;
 
-                this.trackEditors.forEach(function(editor) {
-                    editor.showProgress(playbackSec);
-                }, this);
+                // this.trackEditors.forEach(function(editor) {
+                //     editor.showProgress(playbackSec);
+                // }, this);
 
-                this.fire("playbackcursor", {
-                    "seconds": playbackSec
-                });
+                // this.fire("playbackcursor", {
+                //     "seconds": playbackSec
+                // });
             }
             this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, playbackSec));
         }
@@ -160,9 +170,9 @@ export default class {
             //reset view to not playing look
             this.stopAnimation();
 
-            this.trackEditors.forEach(function(editor) {
-                editor.showProgress(0);
-            }, this);
+            // this.trackEditors.forEach(function(editor) {
+            //     editor.showProgress(0);
+            // }, this);
 
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
@@ -172,7 +182,7 @@ export default class {
     }
 
     render() {
-        h("div.playlist-tracks", {attributes: {"style": "overflow: auto;"}});
+        return h("div.playlist-tracks", {attributes: {"style": "overflow: auto;"}});
     }
     
 }

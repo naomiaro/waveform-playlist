@@ -26,21 +26,32 @@
 
         var tracks = [
           {
-            "src":"/media/stems/Guitar30.mp3",
+            "src":"/media/stems/Vocals30.mp3"
+          },
+          {
+            "src":"/media/stems/Guitar30.mp3"
+          },
+          {
+            "src":"/media/stems/Pianos\ &\ Synth30.mp3"
+          },
+          {
+            "src":"/media/stems/Bass\ &\ Drums30.mp3"
           }
         ];
 
         var container = document.getElementById("playlist");
 
         var playlist = new WaveformPlaylist.default({
-            resolution: 10000, //audio frames per pixel
-            mono: true,
-            container: container,
-            state: 'cursor',
-            waveOutlineColor: '#E0EFF1'
+          resolution: 10000, //audio frames per pixel
+          mono: true,
+          container: container,
+          state: 'cursor',
+          waveOutlineColor: '#E0EFF1'
         });
 
-        playlist.load(tracks);
+        playlist.load(tracks).then(function() {
+          playlist.play();
+        });
 
      })();
     </script>
