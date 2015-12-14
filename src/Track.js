@@ -12,7 +12,7 @@ const FADEOUT = "FadeOut";
 
 export default class {
 
-    constructor(config, audioBuffer, start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
+    constructor(config, audioBuffer, name="Untitled", start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
         let defaultStatesEnabled = {
             'cursor': true,
             'fadein': true,
@@ -26,6 +26,8 @@ export default class {
 
         this.sampleRate = this.config.getSampleRate();
         //this.resolution = resolution;
+
+        this.name = name;
 
         //stored in seconds.
         this.startTime = start || 0;
@@ -188,7 +190,7 @@ export default class {
             h("div.controls", {attributes: {
                 "style": "height: 100px; width: 200px; position: absolute; left: 0px; z-index: 1000;"
             }}, [
-                h("header", [ "Vocals30.mp3" ]),
+                h("header", [ this.name ]),
                 h("div.btn-group", [
                     h("span.btn.btn-default.btn-xs.btn-mute", [ "Mute" ]),
                     h("span.btn.btn-default.btn-xs.btn-solo", [ "Solo" ])

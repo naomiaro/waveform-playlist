@@ -45,10 +45,6 @@ export default class {
         Start of all getter methods for config.
     */
 
-    getContainer() {
-        return this.config.container;
-    }
-
     isTimeScaleEnabled() {
         return this.config.timescale;
     }

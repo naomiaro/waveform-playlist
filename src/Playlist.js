@@ -1,5 +1,10 @@
 'use strict';
 
+import h from 'virtual-dom/h';
+import diff from 'virtual-dom/diff';
+import patch from 'virtual-dom/patch';
+import createElement from 'virtual-dom/create-element';
+
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
 import Config from './Config'
@@ -8,6 +13,14 @@ export default class {
 
     constructor(options={}) {
         //selected area stored in seconds relative to entire playlist.
+
+        if (options.container === undefined) {
+            throw new Error("DOM element container must be given.");
+        }
+
+        this.container = options.container;
+        delete options.container;
+
         this.selectedArea = undefined;
         this.config = new Config(options);
 
@@ -26,18 +39,24 @@ export default class {
         });
 
         return Promise.all(loadPromises).then((audioBuffers) => {
-            let TrackEditors = audioBuffers.map((audioBuffer) => {
-                let TrackEditor = new Track(this.config, audioBuffer);
+            let TrackEditors = audioBuffers.map((audioBuffer, index) => {
+                let name = trackList[index].name;
+                let TrackEditor = new Track(this.config, audioBuffer, name);
 
                 return TrackEditor;
             });
+
+            this.tracks = TrackEditors;
 
             return TrackEditors;
 
         }).then((TrackEditors) => {
             console.log(TrackEditors);
 
-            this.tracks = TrackEditors;
+            let tree = this.render();
+            let rootNode = createElement(tree);
+            //draw to canvas here?
+            this.container.appendChild(rootNode);
 
             return TrackEditors;
         });
@@ -182,7 +201,18 @@ export default class {
     }
 
     render() {
-        return h("div.playlist-tracks", {attributes: {"style": "overflow: auto;"}});
+
+        let trackElements = this.tracks.map(function (track) {
+            return track.render();
+        });
+
+        return h("div.playlist", {attributes: {
+            "style": "overflow: hidden; position: relative;"
+        }}, [
+            h("div.playlist-tracks", {attributes: {
+                "style": "overflow: auto;"
+            }}, trackElements)
+        ]);
     }
     
 }
