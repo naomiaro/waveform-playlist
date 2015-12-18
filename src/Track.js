@@ -4,15 +4,12 @@ import _ from 'lodash';
 import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
-import peaks from './utils/peaks';
-import Playout from './Playout';
-
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
 
 export default class {
 
-    constructor(config, audioBuffer, name="Untitled", start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
+    constructor(config, playout, name="Untitled", start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
         let defaultStatesEnabled = {
             'cursor': true,
             'fadein': true,
@@ -25,26 +22,28 @@ export default class {
         this.config = config;
 
         this.sampleRate = this.config.getSampleRate();
-        //this.resolution = resolution;
-
         this.name = name;
 
         //stored in seconds.
         this.startTime = start || 0;
-        this.endTime = end || (this.startTime + audioBuffer.duration);
+        this.endTime = end || (this.startTime + playout.getDuration());
 
         this.gain = 1;
 
         //stored in seconds since webaudio api deals in seconds.
         this.cueIn = cueIn || 0;
-        this.cueOut = cueOut || audioBuffer.duration;
+        this.cueOut = cueOut || playout.getDuration();
         this.duration = this.cueOut - this.cueIn;
 
         this.fades = fades;
 
         this.enabledStates = _.assign(defaultStatesEnabled, enabledStates);
 
-        this.playout = new Playout(this.config.getAudioContext(), audioBuffer);
+        this.playout = playout;
+    }
+
+    setPeaks(peaks) {
+        this.peaks = peaks;
     }
 
     saveFade(type, shape, start, end) {
@@ -183,7 +182,19 @@ export default class {
         this.playout.stop(when);
     }
 
+    /*
+    * virtual-dom hook for drawing to the canvas element.
+    */
+    hook(node, propertyName, previousValue) {
+        //node is just being created.
+        if (previousValue === undefined) {
+
+        }
+    }
+
     render() {
+        let trackChannels = [];
+
         return h("div.channel-wrapper.state-select", {attributes: {
             "style": "width: 1324px; margin-left: 200px; height: 100px;"
             }}, [
@@ -211,19 +222,23 @@ export default class {
                 h("div.cursor", {attributes: {
                     "style": "position: absolute; box-sizing: content-box; margin: 0px; padding: 0px; top: 0px; left: 0px; bottom: 0px; z-index: 100;"
                 }}),
-                h("div.channel.channel-0", {attributes: {
-                    "style": "width: 1324px; height: 100px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;"
-                }}, [
-                    h("div.channel-progress", {attributes: {
-                        "style": "position: absolute; width: 0px; height: 100px; z-index: 2;"
-                    }}),
-                    h("canvas", {attributes: {
-                        "width": "1324",
-                        "height": "100",
-                        "data-offset": "0",
-                        "style": "float: left; position: relative; margin: 0px; padding: 0px; z-index: 3;"
-                    }})
-                ])
+                Object.keys(this.peaks).map((channelNum) => {
+                    return h("div.channel.channel-${channelNum}", {attributes: {
+                        "style": "width: 1324px; height: 100px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;"
+                    }}, [
+                        h("div.channel-progress", {attributes: {
+                            "style": "position: absolute; width: 0px; height: 100px; z-index: 2;"
+                        }}),
+                        h("canvas", {attributes: {
+                            "width": "1324",
+                            "height": "100",
+                            "data-offset": "0",
+                            "data-channel": channelNum,
+                            "style": "float: left; position: relative; margin: 0px; padding: 0px; z-index: 3;"
+                        },
+                        "render-hook": this})
+                    ]);
+                })
             ])
         ]);
     }

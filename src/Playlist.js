@@ -5,8 +5,10 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
+import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
+import Playout from './Playout';
 import Config from './Config'
 
 export default class {
@@ -39,19 +41,25 @@ export default class {
         });
 
         return Promise.all(loadPromises).then((audioBuffers) => {
-            let TrackEditors = audioBuffers.map((audioBuffer, index) => {
+            let trackEditors = audioBuffers.map((audioBuffer, index) => {
                 let name = trackList[index].name;
-                let TrackEditor = new Track(this.config, audioBuffer, name);
 
-                return TrackEditor;
+                //extract peaks with AudioContext for now.
+                let peaks = extractPeaks(audioBuffer, this.config.getResolution(), this.config.isMono());
+                //webaudio specific playout for now.
+                let playout = new Playout(this.config.getAudioContext(), audioBuffer);
+                let trackEditor = new Track(this.config, playout, name);
+
+                trackEditor.setPeaks(peaks);
+
+                return trackEditor;
             });
 
-            this.tracks = TrackEditors;
+            this.tracks = trackEditors;
 
-            return TrackEditors;
+            return trackEditors;
 
         }).then((TrackEditors) => {
-            console.log(TrackEditors);
 
             let tree = this.render();
             let rootNode = createElement(tree);

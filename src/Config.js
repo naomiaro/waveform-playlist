@@ -53,7 +53,7 @@ export default class {
         return this.config.fadeType;
     }
 
-    isDisplayMono() {
+    isMono() {
         return this.config.mono;
     }
 
@@ -140,7 +140,7 @@ export default class {
         this.config.fadeType = type;
     }
 
-    setDisplayMono(bool) {
+    setMono(bool) {
         this.config.mono = bool;
     }
 

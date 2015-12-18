@@ -4,7 +4,7 @@
 * @param {Float32Array} channel  Audio track frames to calculate peaks from.
 * @param {Number} resolution  Audio frames per peak
 */
-export default function(channel, resolution) {
+function extractPeaks(channel, resolution) {
 
     var i;
     var chanLength = channel.length;
@@ -37,4 +37,49 @@ export default function(channel, resolution) {
         minPeaks,
         maxPeak
     }
+}
+
+function makeMono(channelPeaks) {
+    let numChan = channelPeaks.length;
+    let weight = 1 / numChan;
+    let channelLength = channelPeaks[0]['minPeaks'].length;
+    let c = 0;
+    let i = 0;
+    let min = 0;
+    let max = 0;
+    let minPeaks = new Float32Array(channelLength);
+    let maxPeaks = new Float32Array(channelLength);
+
+    for (i = 0; i < channelLength; i++) {
+        for (c = 0; c < numChan; c++) {
+            min += weight * channelPeaks[c]['minPeaks'][i];
+            max += weight * channelPeaks[c]['maxPeaks'][i];
+        }
+
+        minPeaks[i] = min;
+        maxPeaks[i] = max;
+    }
+
+    //return in array so channel number counts still work.
+    return [{
+        maxPeaks,
+        minPeaks
+    }];
+}
+
+export default function(buffer, resolution=10000, isMono=false) {
+    let numChan = buffer.numberOfChannels;
+    let peaks = [];
+    let c;
+
+    for (c = 0; c < numChan; c++) {
+        let channel = buffer.getChannelData(c);
+        peaks.push(extractPeaks(channel, resolution));
+    }
+
+    if (isMono) {
+        peaks = makeMono(peaks);
+    }
+
+    return peaks;
 }
