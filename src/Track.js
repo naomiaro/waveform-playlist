@@ -228,12 +228,14 @@ export default class {
     render() {
         let height = this.config.getWaveHeight();
         let width = this.getPeakLength();
+        let controlSettings = this.config.getControlSettings();
 
         return h("div.channel-wrapper.state-select", {attributes: {
-            "style": `width: ${width}px; margin-left: 200px; height: ${height}px;`
+            "style": `margin-left: ${controlSettings.width}px; height: ${height}px;`
             }}, [
+
             h("div.controls", {attributes: {
-                "style": `height: ${height}px; width: 200px; position: absolute; left: 0px; z-index: 1000;`
+                "style": `height: ${height}px; width: ${controlSettings.width}px; position: absolute; left: 0; z-index: 9999;`
             }}, [
                 h("header", [ this.name ]),
                 h("div.btn-group", [
@@ -251,14 +253,14 @@ export default class {
             ]),
 
             h("div.waveform", {attributes: {
-                "style": `height: ${height}px; width: ${width}px; position: relative;`
+                "style": `height: ${height}px; position: relative;`
             }}, [
                 h("div.cursor", {attributes: {
-                    "style": "position: absolute; box-sizing: content-box; margin: 0px; padding: 0px; top: 0px; left: 0px; bottom: 0px; z-index: 100;"
+                    "style": "position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: 0; bottom: 0; z-index: 100;"
                 }}),
                 Object.keys(this.peaks).map((channelNum) => {
                     return h("div.channel.channel-${channelNum}", {attributes: {
-                        "style": `width: ${width}px; height: ${height}px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;`
+                        "style": `height: ${height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
                     }}, [
                         h("div.channel-progress", {attributes: {
                             "style": `position: absolute; width: 0px; height: ${height}px; z-index: 2;`
@@ -268,11 +270,17 @@ export default class {
                             "height": height,
                             "data-offset": "0",
                             "data-channel": channelNum,
-                            "style": "float: left; position: relative; margin: 0px; padding: 0px; z-index: 3;"
+                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                         },
-                        "render-hook": this})
+                        "render-hook": this
+                        })
                     ]);
-                })
+                }),
+                //use this overlay for track event cursor position calculations.
+                h("div.playlist-overlay", {attributes: {
+                    "style": `position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 9999;`
+                },
+                "ev-click": function (ev) { console.log(ev)}})
             ])
         ]);
     }

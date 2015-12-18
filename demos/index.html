@@ -51,7 +51,11 @@
           waveHeight: 100,
           container: container,
           state: 'cursor',
-          waveOutlineColor: '#E0EFF1'
+          waveOutlineColor: '#E0EFF1',
+          controls: {
+            show: true, //whether or not to include the track controls
+            width: 200 //width of controls in pixels
+          }
         });
 
         playlist.load(tracks).then(function() {

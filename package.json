@@ -48,6 +48,7 @@
     "example": "examples"
   },
   "dependencies": {
+    "dom-delegator": "^13.1.0",
     "es6-promisify": "^3.0.0",
     "event-emitter": "^0.3.4",
     "lodash": "^3.10.1",

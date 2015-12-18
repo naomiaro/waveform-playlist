@@ -5,11 +5,15 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
+import Delegator from 'dom-delegator';
+
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
 import Playout from './Playout';
 import Config from './Config'
+
+var del = Delegator();
 
 export default class {
 
@@ -209,7 +213,6 @@ export default class {
     }
 
     render() {
-
         let trackElements = this.tracks.map(function (track) {
             return track.render();
         });
