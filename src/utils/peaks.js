@@ -45,12 +45,15 @@ function makeMono(channelPeaks) {
     let channelLength = channelPeaks[0]['minPeaks'].length;
     let c = 0;
     let i = 0;
-    let min = 0;
-    let max = 0;
+    let min;
+    let max;
     let minPeaks = new Float32Array(channelLength);
     let maxPeaks = new Float32Array(channelLength);
 
     for (i = 0; i < channelLength; i++) {
+        min = 0;
+        max = 0;
+
         for (c = 0; c < numChan; c++) {
             min += weight * channelPeaks[c]['minPeaks'][i];
             max += weight * channelPeaks[c]['maxPeaks'][i];
