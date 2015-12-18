@@ -46,6 +46,10 @@ export default class {
         this.peaks = peaks;
     }
 
+    getPeakLength() {
+        return this.peaks[0]['minPeaks'].length;
+    }
+
     saveFade(type, shape, start, end) {
         let id = uuid.v4();
         
@@ -182,24 +186,54 @@ export default class {
         this.playout.stop(when);
     }
 
+    drawFrame(cc, x, minPeak, maxPeak) {
+        let h2 = this.config.getWaveHeight() / 2;
+        let min;
+        let max;
+
+        max = Math.abs(maxPeak * h2);
+        min = Math.abs(minPeak * h2);
+
+        //draw maxs
+        cc.fillRect(x, 0, 1, h2-max);
+        //draw mins
+        cc.fillRect(x, h2+min, 1, h2-min);
+    }
+
     /*
     * virtual-dom hook for drawing to the canvas element.
     */
-    hook(node, propertyName, previousValue) {
-        //node is just being created.
-        if (previousValue === undefined) {
+    hook(canvas, propertyName, previousValue) {
+        //node is already created.
+        if (previousValue !== undefined) {
+            return;
+        }
 
+        let i = 0;
+        let len = this.getPeakLength();
+        let channelNum = canvas.dataset.channel;
+        let channel = this.peaks[channelNum];
+        let cc = canvas.getContext('2d');
+        let colors = this.config.getColorScheme();
+
+        console.log(channel);
+
+
+        cc.fillStyle = colors.waveOutlineColor;
+
+        for (i, len; i < len; i++) {
+            this.drawFrame(cc, i, channel.minPeaks[i], channel.maxPeaks[i]);
         }
     }
 
     render() {
-        let trackChannels = [];
+        var height = this.config.getWaveHeight();
 
         return h("div.channel-wrapper.state-select", {attributes: {
-            "style": "width: 1324px; margin-left: 200px; height: 100px;"
+            "style": `width: 1324px; margin-left: 200px; height: ${height}px;`
             }}, [
             h("div.controls", {attributes: {
-                "style": "height: 100px; width: 200px; position: absolute; left: 0px; z-index: 1000;"
+                "style": `height: ${height}px; width: 200px; position: absolute; left: 0px; z-index: 1000;`
             }}, [
                 h("header", [ this.name ]),
                 h("div.btn-group", [
@@ -217,21 +251,21 @@ export default class {
             ]),
 
             h("div.waveform", {attributes: {
-                "style": "height: 100px; width: 1324px; position: relative;"
+                "style": `height: ${height}px; width: 1324px; position: relative;`
             }}, [
                 h("div.cursor", {attributes: {
                     "style": "position: absolute; box-sizing: content-box; margin: 0px; padding: 0px; top: 0px; left: 0px; bottom: 0px; z-index: 100;"
                 }}),
                 Object.keys(this.peaks).map((channelNum) => {
                     return h("div.channel.channel-${channelNum}", {attributes: {
-                        "style": "width: 1324px; height: 100px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;"
+                        "style": `width: 1324px; height: ${height}px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;`
                     }}, [
                         h("div.channel-progress", {attributes: {
-                            "style": "position: absolute; width: 0px; height: 100px; z-index: 2;"
+                            "style": `position: absolute; width: 0px; height: ${height}px; z-index: 2;`
                         }}),
                         h("canvas", {attributes: {
                             "width": "1324",
-                            "height": "100",
+                            "height": height,
                             "data-offset": "0",
                             "data-channel": channelNum,
                             "style": "float: left; position: relative; margin: 0px; padding: 0px; z-index: 3;"
