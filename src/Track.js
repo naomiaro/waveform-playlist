@@ -7,6 +7,8 @@ import h from 'virtual-dom/h';
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
 
+const MAX_CANVAS_WIDTH = 20000;
+
 export default class {
 
     constructor(config, playout, name="Untitled", start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
@@ -216,9 +218,6 @@ export default class {
         let cc = canvas.getContext('2d');
         let colors = this.config.getColorScheme();
 
-        console.log(channel);
-
-
         cc.fillStyle = colors.waveOutlineColor;
 
         for (i, len; i < len; i++) {
@@ -227,10 +226,11 @@ export default class {
     }
 
     render() {
-        var height = this.config.getWaveHeight();
+        let height = this.config.getWaveHeight();
+        let width = this.getPeakLength();
 
         return h("div.channel-wrapper.state-select", {attributes: {
-            "style": `width: 1324px; margin-left: 200px; height: ${height}px;`
+            "style": `width: ${width}px; margin-left: 200px; height: ${height}px;`
             }}, [
             h("div.controls", {attributes: {
                 "style": `height: ${height}px; width: 200px; position: absolute; left: 0px; z-index: 1000;`
@@ -251,20 +251,20 @@ export default class {
             ]),
 
             h("div.waveform", {attributes: {
-                "style": `height: ${height}px; width: 1324px; position: relative;`
+                "style": `height: ${height}px; width: ${width}px; position: relative;`
             }}, [
                 h("div.cursor", {attributes: {
                     "style": "position: absolute; box-sizing: content-box; margin: 0px; padding: 0px; top: 0px; left: 0px; bottom: 0px; z-index: 100;"
                 }}),
                 Object.keys(this.peaks).map((channelNum) => {
                     return h("div.channel.channel-${channelNum}", {attributes: {
-                        "style": `width: 1324px; height: ${height}px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;`
+                        "style": `width: ${width}px; height: ${height}px; top: 0px; left: 0px; position: absolute; margin: 0px; padding: 0px; z-index: 1;`
                     }}, [
                         h("div.channel-progress", {attributes: {
                             "style": `position: absolute; width: 0px; height: ${height}px; z-index: 2;`
                         }}),
                         h("canvas", {attributes: {
-                            "width": "1324",
+                            "width": width,
                             "height": height,
                             "data-offset": "0",
                             "data-channel": channelNum,
