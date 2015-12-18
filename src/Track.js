@@ -4,6 +4,8 @@ import _ from 'lodash';
 import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
+import {secondsToPixels} from './utils/conversions'
+
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
 
@@ -41,11 +43,20 @@ export default class {
 
         this.enabledStates = _.assign(defaultStatesEnabled, enabledStates);
 
+        this.playbackSeconds = 0;
         this.playout = playout;
     }
 
     setPeaks(peaks) {
         this.peaks = peaks;
+    }
+
+    setState(state) {
+
+    }
+
+    setPlaybackSeconds(seconds) {
+        this.playbackSeconds = seconds;
     }
 
     getPeakLength() {
@@ -75,10 +86,6 @@ export default class {
                 this.removeFade(id);
             }
         });
-    }
-
-    setState(state) {
-
     }
 
     isPlaying() {
@@ -229,6 +236,7 @@ export default class {
         let height = this.config.getWaveHeight();
         let width = this.getPeakLength();
         let controlSettings = this.config.getControlSettings();
+        let playbackPixels = secondsToPixels(this.playbackSeconds, this.config.getResolution(), this.sampleRate);
 
         return h("div.channel-wrapper.state-select", {attributes: {
             "style": `margin-left: ${controlSettings.width}px; height: ${height}px;`
@@ -256,14 +264,14 @@ export default class {
                 "style": `height: ${height}px; position: relative;`
             }}, [
                 h("div.cursor", {attributes: {
-                    "style": "position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: 0; bottom: 0; z-index: 100;"
+                    "style": `position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
                 }}),
                 Object.keys(this.peaks).map((channelNum) => {
                     return h("div.channel.channel-${channelNum}", {attributes: {
                         "style": `height: ${height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
                     }}, [
                         h("div.channel-progress", {attributes: {
-                            "style": `position: absolute; width: 0px; height: ${height}px; z-index: 2;`
+                            "style": `position: absolute; width: ${playbackPixels}px; height: ${height}px; z-index: 2;`
                         }}),
                         h("canvas", {attributes: {
                             "width": width,

@@ -69,6 +69,8 @@ export default class {
             let rootNode = createElement(tree);
             //draw to canvas here?
             this.container.appendChild(rootNode);
+            this.tree = tree;
+            this.rootNode = rootNode;
 
             return TrackEditors;
         });
@@ -104,6 +106,12 @@ export default class {
         return shouldPlay;
     }
 
+    isPlaying() {
+        return this.tracks.reduce((isPlaying, track) => {
+            return isPlaying || track.isPlaying();
+        }, false);
+    }
+
     play(startTime) {
         var currentTime = this.config.getCurrentTime(),
             endTime,
@@ -127,7 +135,7 @@ export default class {
         this.lastPlay = currentTime;
         //use these to track when the playlist has fully stopped.
         this.playoutPromises = playoutPromises;
-        //this.startAnimation(startTime);
+        this.startAnimation(startTime);
     }
 
     pause() {
@@ -163,7 +171,7 @@ export default class {
 
     startAnimation(startTime) {
         this.lastDraw = this.config.getCurrentTime();
-        this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(startTime));
+        this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, startTime));
     }
 
     stopAnimation() {
@@ -175,9 +183,9 @@ export default class {
       Animation function for the playlist.
     */
     updateEditor(cursorPos) {
-        var currentTime = this.config.getCurrentTime(),
-            playbackSec = cursorPos,
-            elapsed;
+        let currentTime = this.config.getCurrentTime();
+        let playbackSec = cursorPos;
+        let elapsed;
 
         cursorPos = cursorPos || this.config.getCursorPos();
         elapsed = currentTime - this.lastDraw;
@@ -187,27 +195,30 @@ export default class {
             if (elapsed) {
                 playbackSec = cursorPos + elapsed;
 
-                // this.trackEditors.forEach(function(editor) {
-                //     editor.showProgress(playbackSec);
-                // }, this);
+                this.tracks.forEach((editor) => {
+                    editor.setPlaybackSeconds(playbackSec);
+                }, this);
 
-                // this.fire("playbackcursor", {
-                //     "seconds": playbackSec
-                // });
             }
-            this.animationRequest = window.requestAnimationFrame(this.animationCallback.bind(this, playbackSec));
+
+            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSec));
         }
         else {
             //reset view to not playing look
             this.stopAnimation();
 
-            // this.trackEditors.forEach(function(editor) {
-            //     editor.showProgress(0);
-            // }, this);
+            this.tracks.forEach((editor) => {
+                editor.setPlaybackSeconds(0);
+            }, this);
 
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
         }
+
+        let newTree = this.render();
+        let patches = diff(this.tree, newTree);
+        this.rootNode = patch(this.rootNode, patches);
+        this.tree = newTree;
 
         this.lastDraw = currentTime;
     }
@@ -224,6 +235,5 @@ export default class {
                 "style": "overflow: auto;"
             }}, trackElements)
         ]);
-    }
-    
+    }  
 }
