@@ -9,6 +9,7 @@ import createElement from 'virtual-dom/create-element';
 
 import EventEmitter from 'event-emitter';
 
+import {pixelsToSeconds} from './utils/conversions'
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
@@ -40,8 +41,16 @@ export default class {
         let ee = this.config.getEventEmitter();
 
         ee.on('select', (start, end, track) => {
-            this.setTimeSelection(start, end);
+            let resolution = this.config.getResolution();
+            let sampleRate = this.config.getSampleRate();
+
+            let startTime = pixelsToSeconds(start, resolution, sampleRate);
+            let endTime = pixelsToSeconds(end, resolution, sampleRate);
+
+            this.setTimeSelection(startTime, endTime);
             this.setActiveTrack(track);
+
+            this.draw(this.render());
         });
     }
 
@@ -97,6 +106,10 @@ export default class {
         this.activeTrack = track;
     }
 
+    getActiveTrack() {
+        return this.activeTrack;
+    }
+
     /*
         start, end in seconds.
     */
@@ -107,7 +120,7 @@ export default class {
         };
     }
 
-    getSelected() {
+    getTimeSelection() {
         return this.timeSelection;
     }
 
@@ -251,16 +264,21 @@ export default class {
             "resolution": this.config.getResolution(),
             "sampleRate": this.config.getSampleRate(),
             "playbackSeconds": 0,
-            "controls": this.config.getControlSettings()
+            "controls": this.config.getControlSettings(),
+            "isActive": false,
+            "timeSelection": this.getTimeSelection()
         }
 
         return _.defaults(data, defaults);
     }
 
     render(data={}) {
+        var activeTrack = this.getActiveTrack();
+
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "playbackSeconds": data.playbackSeconds
+                "playbackSeconds": data.playbackSeconds,
+                "isActive": (activeTrack === track) ? true : false
             }));
         });
 

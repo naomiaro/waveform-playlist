@@ -56,7 +56,7 @@ html, body {
   cursor: ew-resize;
 }
 
-.selection.cursor {
+.selection.point {
   background: red;
 }
 

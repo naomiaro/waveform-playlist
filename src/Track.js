@@ -41,8 +41,6 @@ export default class {
         this.fades = fades;
 
         this.enabledStates = _.assign(defaultStatesEnabled, enabledStates);
-
-        this.playbackSeconds = 0;
         this.playout = playout;
     }
 
@@ -190,8 +188,8 @@ export default class {
         this.playout.stop(when);
     }
 
-    drawFrame(cc, x, minPeak, maxPeak) {
-        let h2 = this.config.getWaveHeight() / 2;
+    drawFrame(cc, height, x, minPeak, maxPeak) {
+        let h2 = height / 2;
         let min;
         let max;
 
@@ -223,21 +221,17 @@ export default class {
         cc.fillStyle = colors.waveOutlineColor;
 
         for (i, len; i < len; i++) {
-            this.drawFrame(cc, i, channel.minPeaks[i], channel.maxPeaks[i]);
+            this.drawFrame(cc, canvas.height, i, channel.minPeaks[i], channel.maxPeaks[i]);
         }
     }
 
     renderTimeSelection(data) {
-        if (data.timeSelection === undefined) {
-            return;
-        }
-
-        let startX = secondsToPixels(timeSelection.start, data.resolution, data.sampleRate);
-        let endX = secondsToPixels(timeSelection.end, data.resolution, data.sampleRate);
+        let startX = secondsToPixels(data.timeSelection.start, data.resolution, data.sampleRate);
+        let endX = secondsToPixels(data.timeSelection.end, data.resolution, data.sampleRate);
         let width = endX - startX + 1;
-        let className = (width > 1) ? "segment" : "cursor";
+        let className = (width > 1) ? "segment" : "point";
 
-        return h(`div.selection ${className}`, {
+        return h(`div.selection.${className}`, {
             attributes: {
                 "style": `position: absolute; width: ${width}px; bottom: 0; top: 0; left: ${startX}px; z-index: 999;`
             }
@@ -263,6 +257,44 @@ export default class {
     render(data) {
         let width = this.getPeakLength();
         let playbackPixels = secondsToPixels(data.playbackSeconds, data.resolution, data.sampleRate);
+
+        let waveformChildren = [
+            h("div.cursor",
+                {
+                    attributes: {
+                        "style": `position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
+                    }
+                }
+            ),
+            Object.keys(this.peaks).map((channelNum) => {
+                return h(`div.channel.channel-${channelNum}`, {
+                    attributes: {
+                        "style": `height: ${data.height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
+                    }},
+                    [
+                        h("div.channel-progress", {attributes: {
+                            "style": `position: absolute; width: ${playbackPixels}px; height: ${data.height}px; z-index: 2;`
+                        }}),
+                        h("canvas", {
+                            attributes: {
+                                "width": width,
+                                "height": data.height,
+                                "data-offset": "0",
+                                "data-channel": channelNum,
+                                "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
+                            },
+                            "render-hook": this
+                        })
+                    ]
+                );
+            }),
+            this.renderOverlay()
+        ];
+
+        //draw cursor selection on active track.
+        if (data.isActive === true && data.timeSelection !== undefined) {
+            waveformChildren.push(this.renderTimeSelection(data));
+        }
 
         return h("div.channel-wrapper.state-select",
             {
@@ -300,38 +332,7 @@ export default class {
                             "style": `height: ${data.height}px; position: relative;`
                         }
                     }, 
-                    [
-                        h("div.cursor",
-                            {
-                                attributes: {
-                                    "style": `position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
-                                }
-                            }
-                        ),
-                        Object.keys(this.peaks).map((channelNum) => {
-                            return h(`div.channel.channel-${channelNum}`, {
-                                attributes: {
-                                    "style": `height: ${data.height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
-                                }},
-                                [
-                                    h("div.channel-progress", {attributes: {
-                                        "style": `position: absolute; width: ${playbackPixels}px; height: ${data.height}px; z-index: 2;`
-                                    }}),
-                                    h("canvas", {
-                                        attributes: {
-                                            "width": width,
-                                            "height": data.height,
-                                            "data-offset": "0",
-                                            "data-channel": channelNum,
-                                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
-                                        },
-                                        "render-hook": this
-                                    })
-                                ]
-                            );
-                        }),
-                        this.renderOverlay()
-                    ]
+                    waveformChildren
                 )
             ]
         );

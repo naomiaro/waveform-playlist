@@ -1,5 +1,3 @@
-import {pixelsToSeconds} from '../../utils/conversions'
-
 /*
     This is used when in 'cursor' state as a mousedown event
 
@@ -9,10 +7,9 @@ function onclick(e) {
     e.preventDefault();
 
     let startX = e.offsetX;
-    let startTime = pixelsToSeconds(startX, this.config.getResolution(), this.sampleRate);
     let ee = this.config.getEventEmitter();
 
-    ee.emit('select', startTime, startTime, this);
+    ee.emit('select', startX, startX, this);
 }
 
 
