@@ -262,7 +262,7 @@ export default class {
             h("div.cursor",
                 {
                     attributes: {
-                        "style": `position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
+                        "style": `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
                     }
                 }
             ),

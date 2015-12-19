@@ -24,7 +24,7 @@ html, body {
 }
 
 .cursor {
-  border-right: 1px solid #000;
+  background: black;
 }
 
 .playlist-fade {

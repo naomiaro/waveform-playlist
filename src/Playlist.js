@@ -159,7 +159,7 @@ export default class {
     play(startTime) {
         var currentTime = this.config.getCurrentTime(),
             endTime,
-            selected = this.getSelected(),
+            selected = this.getTimeSelection(),
             playoutPromises = [];
 
         startTime = startTime || this.pausedAt || this.config.getCursorPos();
