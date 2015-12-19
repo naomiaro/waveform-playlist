@@ -56,11 +56,11 @@ html, body {
   cursor: ew-resize;
 }
 
-.selection-cursor {
+.selection.cursor {
   background: red;
 }
 
-.selection-segment {
+.selection.segment {
   background: rgba(0,0,0,0.1);
 }
 

@@ -1,19 +1,19 @@
 'use strict';
 
+import _ from 'lodash';
+
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
-import Delegator from 'dom-delegator';
+import EventEmitter from 'event-emitter';
 
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
 import Playout from './Playout';
 import Config from './Config'
-
-var del = Delegator();
 
 export default class {
 
@@ -29,13 +29,24 @@ export default class {
 
         this.selectedArea = undefined;
         this.config = new Config(options);
+        this.config.setEventEmitter(EventEmitter());
 
         this.tracks = [];
         this.soloedTracks = [];
         this.mutedTracks = [];
     }
 
+    setUpEmitter() {
+        let ee = this.config.getEventEmitter();
+
+        ee.on('select', (start, end, track) => {
+            this.setTimeSelection(start, end);
+            this.setActiveTrack(track);
+        });
+    }
+
     load(trackList, options={}) {
+        this.setUpEmitter();
 
         var loadPromises = trackList.map((trackInfo) => {
             let loader = LoaderFactory.createLoader(trackInfo.src, this.config.getAudioContext());
@@ -63,27 +74,47 @@ export default class {
 
             return trackEditors;
 
-        }).then((TrackEditors) => {
+        }).then((trackEditors) => {
 
+            this.setState(this.config.getState());
+
+            //take care of virtual dom rendering.
             let tree = this.render();
             let rootNode = createElement(tree);
-            //draw to canvas here?
+
             this.container.appendChild(rootNode);
             this.tree = tree;
             this.rootNode = rootNode;
 
-            return TrackEditors;
+            return trackEditors;
         });
     }
 
+    /*
+        track instance of Track.
+    */
+    setActiveTrack(track) {
+        this.activeTrack = track;
+    }
+
+    /*
+        start, end in seconds.
+    */
+    setTimeSelection(start, end) {
+        this.timeSelection = {
+            start,
+            end,
+        };
+    }
+
     getSelected() {
-        return this.selectedArea;
+        return this.timeSelection;
     }
 
     setState(state) {
-        this.tracks.forEach(function(editor) {
+        this.tracks.forEach((editor) => {
             editor.setState(state);
-        }, this);
+        });
     }
 
     shouldTrackPlay(track) {
@@ -148,9 +179,9 @@ export default class {
 
         this.stopAnimation();
 
-        this.trackEditors.forEach(function(editor) {
+        this.trackEditors.forEach((editor) => {
             editor.scheduleStop();
-        }, this);
+        });
 
         this.setState(this.config.getState());
     }
@@ -161,10 +192,9 @@ export default class {
 
         this.stopAnimation();
 
-        this.trackEditors.forEach(function(editor) {
+        this.trackEditors.forEach((editor) => {
             editor.scheduleStop();
-            //editor.showProgress(0);
-        }, this);
+        });
 
         this.setState(this.config.getState());
     }
@@ -184,48 +214,54 @@ export default class {
     */
     updateEditor(cursorPos) {
         let currentTime = this.config.getCurrentTime();
-        let playbackSec = cursorPos;
+        let playbackSeconds = 0;
         let elapsed;
 
         cursorPos = cursorPos || this.config.getCursorPos();
         elapsed = currentTime - this.lastDraw;
 
         if (this.isPlaying()) {
-            //if there's a change for the UI show progress.
-            if (elapsed) {
-                playbackSec = cursorPos + elapsed;
+            playbackSeconds = cursorPos + elapsed;
 
-                this.tracks.forEach((editor) => {
-                    editor.setPlaybackSeconds(playbackSec);
-                }, this);
-
-            }
-
-            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSec));
+            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
         }
         else {
-            //reset view to not playing look
             this.stopAnimation();
-
-            this.tracks.forEach((editor) => {
-                editor.setPlaybackSeconds(0);
-            }, this);
-
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
         }
 
-        let newTree = this.render();
-        let patches = diff(this.tree, newTree);
-        this.rootNode = patch(this.rootNode, patches);
-        this.tree = newTree;
+        let newTree = this.render({
+            playbackSeconds,
+        });
 
+        this.draw(newTree);
         this.lastDraw = currentTime;
     }
 
-    render() {
-        let trackElements = this.tracks.map(function (track) {
-            return track.render();
+    draw(newTree) {
+        let patches = diff(this.tree, newTree);
+        this.rootNode = patch(this.rootNode, patches);
+        this.tree = newTree;
+    }
+
+    getTrackRenderData(data={}) {
+        let defaults = {
+            "height": this.config.getWaveHeight(),
+            "resolution": this.config.getResolution(),
+            "sampleRate": this.config.getSampleRate(),
+            "playbackSeconds": 0,
+            "controls": this.config.getControlSettings()
+        }
+
+        return _.defaults(data, defaults);
+    }
+
+    render(data={}) {
+        let trackElements = this.tracks.map((track) => {
+            return track.render(this.getTrackRenderData({
+                "playbackSeconds": data.playbackSeconds
+            }));
         });
 
         return h("div.playlist", {attributes: {

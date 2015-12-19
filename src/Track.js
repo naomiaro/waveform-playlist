@@ -5,6 +5,7 @@ import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
 import {secondsToPixels} from './utils/conversions'
+import stateObjects from './track/states';
 
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
@@ -24,8 +25,6 @@ export default class {
         };
 
         this.config = config;
-
-        this.sampleRate = this.config.getSampleRate();
         this.name = name;
 
         //stored in seconds.
@@ -52,11 +51,7 @@ export default class {
     }
 
     setState(state) {
-
-    }
-
-    setPlaybackSeconds(seconds) {
-        this.playbackSeconds = seconds;
+        this.state = stateObjects[state];
     }
 
     getPeakLength() {
@@ -232,64 +227,113 @@ export default class {
         }
     }
 
-    render() {
-        let height = this.config.getWaveHeight();
+    renderTimeSelection(data) {
+        if (data.timeSelection === undefined) {
+            return;
+        }
+
+        let startX = secondsToPixels(timeSelection.start, data.resolution, data.sampleRate);
+        let endX = secondsToPixels(timeSelection.end, data.resolution, data.sampleRate);
+        let width = endX - startX + 1;
+        let className = (width > 1) ? "segment" : "cursor";
+
+        return h(`div.selection ${className}`, {
+            attributes: {
+                "style": `position: absolute; width: ${width}px; bottom: 0; top: 0; left: ${startX}px; z-index: 999;`
+            }
+        });
+    }
+
+    renderOverlay() {
+        let config = {
+            attributes: {
+                "style": `position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 9999;`
+            }
+        };
+
+        let stateEvents = this.state.events;
+
+        Object.keys(stateEvents).map((event) => {
+            config[event] = stateEvents[event].bind(this);
+        });
+        //use this overlay for track event cursor position calculations.
+        return h("div.playlist-overlay", config);
+    }
+
+    render(data) {
         let width = this.getPeakLength();
-        let controlSettings = this.config.getControlSettings();
-        let playbackPixels = secondsToPixels(this.playbackSeconds, this.config.getResolution(), this.sampleRate);
+        let playbackPixels = secondsToPixels(data.playbackSeconds, data.resolution, data.sampleRate);
 
-        return h("div.channel-wrapper.state-select", {attributes: {
-            "style": `margin-left: ${controlSettings.width}px; height: ${height}px;`
-            }}, [
+        return h("div.channel-wrapper.state-select",
+            {
+                attributes: {
+                    "style": `margin-left: ${data.controls.width}px; height: ${data.height}px;`
+                }
+            },
+            [
+                h("div.controls",
+                    {
+                        attributes: {
+                            "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 9999;`
+                        }
+                    },
+                    [
+                        h("header", [ this.name ]),
+                        h("div.btn-group", [
+                            h("span.btn.btn-default.btn-xs.btn-mute", [ "Mute" ]),
+                            h("span.btn.btn-default.btn-xs.btn-solo", [ "Solo" ])
+                        ]),
+                        h("label", [
+                            h("input.volume-slider", {attributes: {
+                                "type": "range",
+                                "min": "0",
+                                "max": "100",
+                                "value": "100"
+                            }})
+                        ])
+                    ]
+                ),
 
-            h("div.controls", {attributes: {
-                "style": `height: ${height}px; width: ${controlSettings.width}px; position: absolute; left: 0; z-index: 9999;`
-            }}, [
-                h("header", [ this.name ]),
-                h("div.btn-group", [
-                    h("span.btn.btn-default.btn-xs.btn-mute", [ "Mute" ]),
-                    h("span.btn.btn-default.btn-xs.btn-solo", [ "Solo" ])
-                ]),
-                h("label", [
-                    h("input.volume-slider", {attributes: {
-                        "type": "range",
-                        "min": "0",
-                        "max": "100",
-                        "value": "100"
-                    }})
-                ])
-            ]),
-
-            h("div.waveform", {attributes: {
-                "style": `height: ${height}px; position: relative;`
-            }}, [
-                h("div.cursor", {attributes: {
-                    "style": `position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
-                }}),
-                Object.keys(this.peaks).map((channelNum) => {
-                    return h("div.channel.channel-${channelNum}", {attributes: {
-                        "style": `height: ${height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
-                    }}, [
-                        h("div.channel-progress", {attributes: {
-                            "style": `position: absolute; width: ${playbackPixels}px; height: ${height}px; z-index: 2;`
-                        }}),
-                        h("canvas", {attributes: {
-                            "width": width,
-                            "height": height,
-                            "data-offset": "0",
-                            "data-channel": channelNum,
-                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
-                        },
-                        "render-hook": this
-                        })
-                    ]);
-                }),
-                //use this overlay for track event cursor position calculations.
-                h("div.playlist-overlay", {attributes: {
-                    "style": `position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 9999;`
-                },
-                "ev-click": function (ev) { console.log(ev)}})
-            ])
-        ]);
+                h("div.waveform",
+                    {
+                        attributes: {
+                            "style": `height: ${data.height}px; position: relative;`
+                        }
+                    }, 
+                    [
+                        h("div.cursor",
+                            {
+                                attributes: {
+                                    "style": `position: absolute; box-sizing: content-box; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
+                                }
+                            }
+                        ),
+                        Object.keys(this.peaks).map((channelNum) => {
+                            return h(`div.channel.channel-${channelNum}`, {
+                                attributes: {
+                                    "style": `height: ${data.height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
+                                }},
+                                [
+                                    h("div.channel-progress", {attributes: {
+                                        "style": `position: absolute; width: ${playbackPixels}px; height: ${data.height}px; z-index: 2;`
+                                    }}),
+                                    h("canvas", {
+                                        attributes: {
+                                            "width": width,
+                                            "height": data.height,
+                                            "data-offset": "0",
+                                            "data-channel": channelNum,
+                                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
+                                        },
+                                        "render-hook": this
+                                    })
+                                ]
+                            );
+                        }),
+                        this.renderOverlay()
+                    ]
+                )
+            ]
+        );
     }
 }
