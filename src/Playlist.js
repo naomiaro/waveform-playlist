@@ -280,12 +280,48 @@ export default class {
             }));
         });
 
-        return h("div.playlist", {attributes: {
-            "style": "overflow: hidden; position: relative;"
-        }}, [
-            h("div.playlist-tracks", {attributes: {
-                "style": "overflow: auto;"
-            }}, trackElements)
-        ]);
+        return h("div.playlist",
+            {attributes: {
+                "style": "overflow: hidden; position: relative;"
+            }},
+            [
+                h("div.playlist-top-bar", [
+                    h("div.playlist-toolbar", [
+                        h("div.btn-group", [
+                            h("span.btn-pause.btn.btn-warning", [
+                                h("i.fa.fa-pause")
+                            ]),
+                            h("span.btn-play.btn.btn-success", [
+                                h("i.fa.fa-play")
+                            ]),
+                            h("span.btn-stop.btn.btn-danger", [
+                                h("i.fa.fa-stop")
+                            ]),
+                            h("span.btn-rewind.btn.btn-success", [
+                                h("i.fa.fa-fast-backward")
+                            ]),
+                            h("span.btn-fast-forward.btn.btn-success", [
+                                h("i.fa.fa-fast-forward")
+                            ])
+                        ]),
+                        h("div.btn-group", [
+                            h("span.btn-zoom-in.btn.btn-default", {
+                                    "attributes": {"title":"zoom in"}
+                                }, [
+                                h("i.fa.fa-search-plus")
+                            ]),
+                            h("span.btn-zoom-out.btn.btn-default", {
+                                    "attributes": {"title":"zoom out"}
+                                }, [
+                                h("i.fa.fa-search-minus")
+                            ])
+                        ])
+                    ])
+                ]),
+                
+                h("div.playlist-tracks", {attributes: {
+                    "style": "overflow: auto;"
+                }}, trackElements)
+            ]);
     }  
 }
