@@ -250,7 +250,7 @@ export default class {
         let stateEvents = this.state.events;
 
         Object.keys(stateEvents).map((event) => {
-            config[event] = stateEvents[event].bind(this, data.resolution, data.sampleRate);
+            config[`ev-${event}`] = stateEvents[event].bind(this, data.resolution, data.sampleRate);
         });
         //use this overlay for track event cursor position calculations.
         return h("div.playlist-overlay", config);

@@ -5,7 +5,7 @@ import {pixelsToSeconds} from '../../utils/conversions';
 
     called with 'this' as an intance of Track
 */
-function onclick(resolution, sampleRate, e) {
+function click(resolution, sampleRate, e) {
     e.preventDefault();
 
     let ee = this.config.getEventEmitter();
@@ -19,6 +19,6 @@ function onclick(resolution, sampleRate, e) {
 export default {
 	classes: "state-cursor",
 	events: {
-		onclick
+		click
 	}
 }

@@ -7,13 +7,16 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
+import Delegator from 'dom-delegator';
 import EventEmitter from 'event-emitter';
 
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
 import Playout from './Playout';
-import Config from './Config'
+import Config from './Config';
+
+var del = Delegator();
 
 export default class {
 
@@ -35,6 +38,7 @@ export default class {
         this.soloedTracks = [];
         this.mutedTracks = [];
 
+        this.playbackSeconds = 0;
         this.length = 0;
     }
 
@@ -43,9 +47,23 @@ export default class {
 
         ee.on('select', (start, end, track) => {
 
+            //reset if it was paused.
+            this.playbackSeconds = 0;
             this.setTimeSelection(start, end);
             this.setActiveTrack(track);
             this.draw(this.render());
+        });
+
+        ee.on('play', () => {
+            this.play();
+        });
+
+        ee.on('pause', () => {
+            this.pause();
+        });
+
+        ee.on('stop', () => {
+            this.stop();
         });
     }
 
@@ -184,29 +202,26 @@ export default class {
             return;
         }
 
-        this.pausedAt = this.getCurrentTime();
-        this.lastSeeked = undefined;
-
-        this.stopAnimation();
-
-        this.trackEditors.forEach((editor) => {
-            editor.scheduleStop();
-        });
-
-        this.setState(this.config.getState());
+        this.pausedAt = this.config.getCurrentTime();
+        this.playbackReset();
     }
 
     stop() {
         this.pausedAt = undefined;
-        this.lastSeeked = undefined;
+        this.playbackSeconds = 0;
+        this.playbackReset();
+    }
 
+    playbackReset() {
+        this.lastSeeked = undefined;
         this.stopAnimation();
 
-        this.trackEditors.forEach((editor) => {
+        this.tracks.forEach((editor) => {
             editor.scheduleStop();
         });
 
         this.setState(this.config.getState());
+        this.draw(this.render());
     }
 
     startAnimation(startTime) {
@@ -241,11 +256,9 @@ export default class {
             this.lastSeeked = undefined;
         }
 
-        let newTree = this.render({
-            playbackSeconds,
-        });
+        this.playbackSeconds = playbackSeconds;
 
-        this.draw(newTree);
+        this.draw(this.render());
         this.lastDraw = currentTime;
     }
 
@@ -260,22 +273,21 @@ export default class {
             "height": this.config.getWaveHeight(),
             "resolution": this.config.getResolution(),
             "sampleRate": this.config.getSampleRate(),
-            "playbackSeconds": 0,
             "controls": this.config.getControlSettings(),
             "isActive": false,
             "timeSelection": this.getTimeSelection(),
-            "playlistLength": this.length
+            "playlistLength": this.length,
+            "playbackSeconds": this.playbackSeconds
         };
 
         return _.defaults(data, defaults);
     }
 
-    render({playbackSeconds = 0, length = this.length} = {}) {
+    render() {
         var activeTrack = this.getActiveTrack();
 
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "playbackSeconds": playbackSeconds,
                 "isActive": (activeTrack === track) ? true : false
             }));
         });
@@ -288,13 +300,22 @@ export default class {
                 h("div.playlist-top-bar", [
                     h("div.playlist-toolbar", [
                         h("div.btn-group", [
-                            h("span.btn-pause.btn.btn-warning", [
+                            h("span.btn-pause.btn.btn-warning", {"ev-click": (e) => {
+                                let ee = this.config.getEventEmitter();
+                                ee.emit('pause');
+                            }}, [
                                 h("i.fa.fa-pause")
                             ]),
-                            h("span.btn-play.btn.btn-success", [
+                            h("span.btn-play.btn.btn-success", {"ev-click": (e) => {
+                                let ee = this.config.getEventEmitter();
+                                ee.emit('play');
+                            }}, [
                                 h("i.fa.fa-play")
                             ]),
-                            h("span.btn-stop.btn.btn-danger", [
+                            h("span.btn-stop.btn.btn-danger", {"ev-click": (e) => {
+                                let ee = this.config.getEventEmitter();
+                                ee.emit('stop');
+                            }}, [
                                 h("i.fa.fa-stop")
                             ]),
                             h("span.btn-rewind.btn.btn-success", [
