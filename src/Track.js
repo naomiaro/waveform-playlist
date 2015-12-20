@@ -14,7 +14,7 @@ const MAX_CANVAS_WIDTH = 20000;
 
 export default class {
 
-    constructor(config, playout, name="Untitled", start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
+    constructor(ee, playout, name="Untitled", start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
         let defaultStatesEnabled = {
             'cursor': true,
             'fadein': true,
@@ -24,7 +24,7 @@ export default class {
             'record': true
         };
 
-        this.config = config;
+        this.ee = ee;
         this.name = name;
 
         //stored in seconds.
@@ -216,9 +216,8 @@ export default class {
         let channelNum = canvas.dataset.channel;
         let channel = this.peaks[channelNum];
         let cc = canvas.getContext('2d');
-        let colors = this.config.getColorScheme();
-
-        cc.fillStyle = colors.waveOutlineColor;
+  
+        cc.fillStyle = canvas.dataset.waveOutlineColor;
 
         for (i, len; i < len; i++) {
             this.drawFrame(cc, canvas.height, i, channel.minPeaks[i], channel.maxPeaks[i]);
@@ -283,6 +282,7 @@ export default class {
                                 "height": data.height,
                                 "data-offset": "0",
                                 "data-channel": channelNum,
+                                "data-wave-outline-color": data.colors.waveOutlineColor,
                                 "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                             },
                             "render-hook": this

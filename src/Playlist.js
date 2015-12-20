@@ -32,7 +32,7 @@ export default class {
 
         this.selectedArea = undefined;
         this.config = new Config(options);
-        this.config.setEventEmitter(EventEmitter());
+        this.ee = EventEmitter();
 
         this.tracks = [];
         this.soloedTracks = [];
@@ -43,7 +43,7 @@ export default class {
     }
 
     setUpEmitter() {
-        let ee = this.config.getEventEmitter();
+        let ee = this.ee;
 
         ee.on('select', (start, end, track) => {
 
@@ -85,7 +85,7 @@ export default class {
                 let peaks = extractPeaks(audioBuffer, this.config.getResolution(), this.config.isMono());
                 //webaudio specific playout for now.
                 let playout = new Playout(this.config.getAudioContext(), audioBuffer);
-                let trackEditor = new Track(this.config, playout, name);
+                let trackEditor = new Track(this.ee, playout, name);
 
                 trackEditor.setPeaks(peaks);
 
@@ -277,7 +277,8 @@ export default class {
             "isActive": false,
             "timeSelection": this.getTimeSelection(),
             "playlistLength": this.length,
-            "playbackSeconds": this.playbackSeconds
+            "playbackSeconds": this.playbackSeconds,
+            "colors": this.config.getColorScheme()
         };
 
         return _.defaults(data, defaults);

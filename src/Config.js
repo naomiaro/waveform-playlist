@@ -123,11 +123,6 @@ export default class {
         };
     }
 
-    getEventEmitter() {
-        return this.ee;
-    }
-
-
     /*
         Start of all setter methods for config.
     */
@@ -161,9 +156,5 @@ export default class {
 
         scroll.left = (left !== undefined) ? left : scroll.left;
         scroll.top = (top !== undefined) ? top : scroll.top;
-    }
-
-    setEventEmitter(ee) {
-        this.ee = ee;
     }
 }

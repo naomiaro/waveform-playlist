@@ -8,11 +8,10 @@ import {pixelsToSeconds} from '../../utils/conversions';
 function click(resolution, sampleRate, e) {
     e.preventDefault();
 
-    let ee = this.config.getEventEmitter();
     let startX = e.offsetX;
     let startTime = pixelsToSeconds(startX, resolution, sampleRate);
 
-    ee.emit('select', startTime, startTime, this);
+    this.ee.emit('select', startTime, startTime, this);
 }
 
 
