@@ -7,32 +7,14 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
-import Delegator from 'dom-delegator';
-import EventEmitter from 'event-emitter';
-
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
 import Playout from './Playout';
-import Config from './Config';
-
-var del = Delegator();
 
 export default class {
 
-    constructor(options={}) {
-        //selected area stored in seconds relative to entire playlist.
-
-        if (options.container === undefined) {
-            throw new Error("DOM element container must be given.");
-        }
-
-        this.container = options.container;
-        delete options.container;
-
-        this.selectedArea = undefined;
-        this.config = new Config(options);
-        this.ee = EventEmitter();
+    constructor() {
 
         this.tracks = [];
         this.soloedTracks = [];
@@ -42,7 +24,23 @@ export default class {
         this.length = 0;
     }
 
-    setUpEmitter() {
+    setConfig(config) {
+        this.config = config;
+    }
+
+    setContainer(container) {
+        this.container = container;
+    }
+
+    setEventEmitter(ee) {
+        this.ee = ee;
+    }
+
+    getEventEmitter() {
+        return this.ee;
+    }
+
+    setUpEventEmitter() {
         let ee = this.ee;
 
         ee.on('select', (start, end, track) => {
@@ -68,8 +66,6 @@ export default class {
     }
 
     load(trackList, options={}) {
-        this.setUpEmitter();
-
         var loadPromises = trackList.map((trackInfo) => {
             let loader = LoaderFactory.createLoader(trackInfo.src, this.config.getAudioContext());
             let promise = loader.load();
@@ -254,6 +250,8 @@ export default class {
             this.stopAnimation();
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
+
+            //TODO reset state and draw here?
         }
 
         this.playbackSeconds = playbackSeconds;
@@ -297,50 +295,7 @@ export default class {
             {attributes: {
                 "style": "overflow: hidden; position: relative;"
             }},
-            [
-                h("div.playlist-top-bar", [
-                    h("div.playlist-toolbar", [
-                        h("div.btn-group", [
-                            h("span.btn-pause.btn.btn-warning", {"ev-click": (e) => {
-                                let ee = this.config.getEventEmitter();
-                                ee.emit('pause');
-                            }}, [
-                                h("i.fa.fa-pause")
-                            ]),
-                            h("span.btn-play.btn.btn-success", {"ev-click": (e) => {
-                                let ee = this.config.getEventEmitter();
-                                ee.emit('play');
-                            }}, [
-                                h("i.fa.fa-play")
-                            ]),
-                            h("span.btn-stop.btn.btn-danger", {"ev-click": (e) => {
-                                let ee = this.config.getEventEmitter();
-                                ee.emit('stop');
-                            }}, [
-                                h("i.fa.fa-stop")
-                            ]),
-                            h("span.btn-rewind.btn.btn-success", [
-                                h("i.fa.fa-fast-backward")
-                            ]),
-                            h("span.btn-fast-forward.btn.btn-success", [
-                                h("i.fa.fa-fast-forward")
-                            ])
-                        ]),
-                        h("div.btn-group", [
-                            h("span.btn-zoom-in.btn.btn-default", {
-                                    "attributes": {"title":"zoom in"}
-                                }, [
-                                h("i.fa.fa-search-plus")
-                            ]),
-                            h("span.btn-zoom-out.btn.btn-default", {
-                                    "attributes": {"title":"zoom out"}
-                                }, [
-                                h("i.fa.fa-search-minus")
-                            ])
-                        ])
-                    ])
-                ]),
-                
+            [ 
                 h("div.playlist-tracks", {attributes: {
                     "style": "overflow: auto;"
                 }}, trackElements)

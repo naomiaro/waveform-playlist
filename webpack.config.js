@@ -1,5 +1,5 @@
 module.exports = {
-    entry: __dirname + "/src/Playlist.js",
+    entry: __dirname + "/src/app.js",
     output: {
         path: __dirname + "/dist",
         filename: "waveform-playlist.js",

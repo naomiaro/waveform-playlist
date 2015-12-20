@@ -19,12 +19,54 @@
     <h1>Minimal Editor Example</h1>
     <p>One audio file with combined channel waveform visual and basic cursor selection for start</p>
 
+    <div id="top-bar" class="playlist-top-bar">
+      <div class="playlist-toolbar">
+        <div class="btn-group">
+          <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
+          <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+          <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+          <span class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></span>
+          <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
+        </div>
+        <div class="btn-group">
+          <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
+          <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
+        </div>
+      </div>
+    </div>
     <div id="playlist"></div>
    
     <script type="text/javascript">
       (function(){
 
-        var tracks = [
+        var playlist = new WaveformPlaylist.init({
+          resolution: 1000, //audio frames per pixel
+          mono: true,
+          waveHeight: 100,
+          container: document.getElementById("playlist"),
+          state: 'cursor',
+          waveOutlineColor: '#E0EFF1',
+          controls: {
+            show: true, //whether or not to include the track controls
+            width: 200 //width of controls in pixels
+          }
+        });
+
+        var ee = playlist.getEventEmitter();
+
+        document.querySelector(".btn-play").addEventListener("click", function() {
+          ee.emit("play");
+        });
+
+        document.querySelector(".btn-pause").addEventListener("click", function() {
+          ee.emit("pause");
+        });
+
+        document.querySelector(".btn-stop").addEventListener("click", function() {
+          ee.emit("stop");
+        });
+
+        playlist.load([
           {
             "src": "/media/stems/Vocals30.mp3",
             "name": "Vocals"
@@ -41,25 +83,8 @@
             "src": "/media/stems/Bass\ &\ Drums30.mp3",
             "name": "Drums"
           }
-        ];
-
-        var container = document.getElementById("playlist");
-
-        var playlist = new WaveformPlaylist.default({
-          resolution: 1000, //audio frames per pixel
-          mono: true,
-          waveHeight: 100,
-          container: container,
-          state: 'cursor',
-          waveOutlineColor: '#E0EFF1',
-          controls: {
-            show: true, //whether or not to include the track controls
-            width: 200 //width of controls in pixels
-          }
-        });
-
-        playlist.load(tracks).then(function() {
-          //playlist.play();
+        ]).then(function() {
+          //can do stuff with the playlist.
         });
 
      })();
