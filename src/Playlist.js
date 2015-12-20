@@ -9,7 +9,6 @@ import createElement from 'virtual-dom/create-element';
 
 import EventEmitter from 'event-emitter';
 
-import {pixelsToSeconds} from './utils/conversions'
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
@@ -35,21 +34,17 @@ export default class {
         this.tracks = [];
         this.soloedTracks = [];
         this.mutedTracks = [];
+
+        this.length = 0;
     }
 
     setUpEmitter() {
         let ee = this.config.getEventEmitter();
 
         ee.on('select', (start, end, track) => {
-            let resolution = this.config.getResolution();
-            let sampleRate = this.config.getSampleRate();
 
-            let startTime = pixelsToSeconds(start, resolution, sampleRate);
-            let endTime = pixelsToSeconds(end, resolution, sampleRate);
-
-            this.setTimeSelection(startTime, endTime);
+            this.setTimeSelection(start, end);
             this.setActiveTrack(track);
-
             this.draw(this.render());
         });
     }
@@ -75,6 +70,8 @@ export default class {
                 let trackEditor = new Track(this.config, playout, name);
 
                 trackEditor.setPeaks(peaks);
+
+                this.length = Math.max(this.length, trackEditor.endTime);
 
                 return trackEditor;
             });
@@ -266,18 +263,19 @@ export default class {
             "playbackSeconds": 0,
             "controls": this.config.getControlSettings(),
             "isActive": false,
-            "timeSelection": this.getTimeSelection()
-        }
+            "timeSelection": this.getTimeSelection(),
+            "playlistLength": this.length
+        };
 
         return _.defaults(data, defaults);
     }
 
-    render(data={}) {
+    render({playbackSeconds = 0, length = this.length} = {}) {
         var activeTrack = this.getActiveTrack();
 
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "playbackSeconds": data.playbackSeconds,
+                "playbackSeconds": playbackSeconds,
                 "isActive": (activeTrack === track) ? true : false
             }));
         });

@@ -238,17 +238,19 @@ export default class {
         });
     }
 
-    renderOverlay() {
+    renderOverlay(data) {
+        let channelPixels = secondsToPixels(data.playlistLength, data.resolution, data.sampleRate);
+
         let config = {
             attributes: {
-                "style": `position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 9999;`
+                "style": `position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: ${channelPixels}px; z-index: 9999;`
             }
         };
 
         let stateEvents = this.state.events;
 
         Object.keys(stateEvents).map((event) => {
-            config[event] = stateEvents[event].bind(this);
+            config[event] = stateEvents[event].bind(this, data.resolution, data.sampleRate);
         });
         //use this overlay for track event cursor position calculations.
         return h("div.playlist-overlay", config);
@@ -288,7 +290,7 @@ export default class {
                     ]
                 );
             }),
-            this.renderOverlay()
+            this.renderOverlay(data)
         ];
 
         //draw cursor selection on active track.

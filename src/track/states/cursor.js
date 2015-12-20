@@ -1,15 +1,18 @@
+import {pixelsToSeconds} from '../../utils/conversions';
+
 /*
     This is used when in 'cursor' state as a mousedown event
 
     called with 'this' as an intance of Track
 */
-function onclick(e) {
+function onclick(resolution, sampleRate, e) {
     e.preventDefault();
 
-    let startX = e.offsetX;
     let ee = this.config.getEventEmitter();
+    let startX = e.offsetX;
+    let startTime = pixelsToSeconds(startX, resolution, sampleRate);
 
-    ee.emit('select', startX, startX, this);
+    ee.emit('select', startTime, startTime, this);
 }
 
 
