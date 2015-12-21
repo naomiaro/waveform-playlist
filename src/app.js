@@ -21,5 +21,8 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
 	playlist.setUpEventEmitter();
 	playlist.setTimeSelection(0, 0);
 
+	//have to add extra events that aren't followed by default.
+	delegator.listenTo("scroll");
+
 	return playlist;
 }

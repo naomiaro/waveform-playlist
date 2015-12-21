@@ -273,7 +273,7 @@ export default class {
         ];
 
         //draw cursor selection on active track.
-        if (data.isActive === true && data.timeSelection !== undefined) {
+        if (data.isActive === true) {
             waveformChildren.push(this.renderTimeSelection(data));
         }
 

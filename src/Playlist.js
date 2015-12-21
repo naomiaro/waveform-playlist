@@ -7,7 +7,7 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
-import {secondsToPixels} from './utils/conversions'
+import {secondsToPixels, pixelsToSeconds} from './utils/conversions'
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 
@@ -369,7 +369,9 @@ export default class {
                     "style": "overflow: auto;",
                     "data-scroll-left": scrollX
                 },
-                "scrollLeft": scrollX,
+                "ev-scroll": _.throttle((e) => {
+                    this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, resolution, sampleRate);
+                }, 200),
                 "hook": new ScrollHook(this)
             }, trackElements)
         ]);
