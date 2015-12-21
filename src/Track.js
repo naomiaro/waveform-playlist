@@ -6,7 +6,7 @@ import h from 'virtual-dom/h';
 
 import {secondsToPixels} from './utils/conversions'
 import stateObjects from './track/states';
-import CanvasHook from './track/render/CanvasHook';
+import CanvasHook from './render/CanvasHook';
 
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
@@ -264,7 +264,7 @@ export default class {
                                 "data-wave-outline-color": data.colors.waveOutlineColor,
                                 "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                             },
-                            "render-hook": new CanvasHook(this)
+                            "hook": new CanvasHook(this)
                         })
                     ]
                 );

@@ -66,6 +66,14 @@
           ee.emit("stop");
         });
 
+        document.querySelector(".btn-rewind").addEventListener("click", function() {
+          ee.emit("rewind");
+        });
+
+        document.querySelector(".btn-fast-forward").addEventListener("click", function() {
+          ee.emit("fastforward");
+        });
+
         playlist.load([
           {
             "src": "/media/stems/Vocals30.mp3",

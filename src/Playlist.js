@@ -10,6 +10,9 @@ import createElement from 'virtual-dom/create-element';
 import {secondsToPixels} from './utils/conversions'
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
+
+import ScrollHook from './render/ScrollHook';
+
 import Track from './Track';
 import Playout from './Playout';
 
@@ -20,6 +23,7 @@ export default class {
         this.tracks = [];
         this.soloedTracks = [];
         this.mutedTracks = [];
+        this.playoutPromises = [];
 
         this.cursor = 0;
         this.playbackSeconds = 0;
@@ -72,6 +76,14 @@ export default class {
 
         ee.on('stop', () => {
             this.stop();
+        });
+
+        ee.on('rewind', () => {
+            this.rewind();
+        });
+
+        ee.on('fastforward', () => {
+            this.fastForward();
         });
     }
 
@@ -259,27 +271,17 @@ export default class {
         this.stop();
 
         Promise.all(this.playoutPromises).then(() => {
+            this.scrollLeft = 0;
             this.ee.emit('select', 0, 0);
-
-            //this.trackContainer.scrollLeft = 0;
-            //this.config.setTrackScroll(0);
-            //this.fire('trackscroll');
         });
     }
 
     fastForward() {
-        var totalWidth = this.trackContainer.scrollWidth,
-            clientWidth = this.trackContainer.offsetWidth,
-            maxOffset = Math.max(totalWidth - clientWidth, 0);
-
         this.stop();
 
         Promise.all(this.playoutPromises).then(() => {
+            this.scrollLeft = this.length;
             this.ee.emit('select', this.length, this.length);
-
-            //this.trackContainer.scrollLeft = maxOffset;
-            //this.config.setTrackScroll(maxOffset);
-            //this.fire('trackscroll');
         });
     }
 
@@ -359,13 +361,17 @@ export default class {
         let scrollX = secondsToPixels(this.scrollLeft, resolution, sampleRate);
 
         return h("div.playlist", {
-            attributes: {
+            "attributes": {
                 "style": "overflow: hidden; position: relative;"
             }}, [
-            h("div.playlist-tracks", {attributes: {
-                "style": "overflow: auto;",
-                "data-scroll-left": scrollX
-            }}, trackElements)
+            h("div.playlist-tracks", {
+                "attributes": {
+                    "style": "overflow: auto;",
+                    "data-scroll-left": scrollX
+                },
+                "scrollLeft": scrollX,
+                "hook": new ScrollHook(this)
+            }, trackElements)
         ]);
     }  
 }
