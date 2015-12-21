@@ -46,11 +46,18 @@ export default class {
 
         ee.on('select', (start, end, track) => {
 
-            //reset if it was paused.
-            this.playbackSeconds = 0;
-            this.setTimeSelection(start, end);
-            this.setActiveTrack(track);
-            this.draw(this.render());
+            if (this.isPlaying()) {
+                this.lastSeeked = start;
+                this.pausedAt = undefined;
+                this.restartPlayFrom(start);
+            }
+            else {
+                //reset if it was paused.
+                this.playbackSeconds = 0;
+                this.setTimeSelection(start, end);
+                this.setActiveTrack(track);
+                this.draw(this.render());
+            }
         });
 
         ee.on('play', () => {
@@ -185,6 +192,16 @@ export default class {
         return currentTime - this.lastPlay;
     }
 
+    restartPlayFrom(cursorPos) {
+        this.stopAnimation();
+
+        this.tracks.forEach((editor) => {
+            editor.scheduleStop();
+        });
+
+        Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
+    }
+
     play(startTime) {
         var currentTime = this.config.getCurrentTime(),
             endTime,
@@ -249,7 +266,7 @@ export default class {
     }
 
     /*
-      Animation function for the playlist.
+    * Animation function for the playlist.
     */
     updateEditor(cursorPos) {
         let currentTime = this.config.getCurrentTime();
