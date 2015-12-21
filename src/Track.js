@@ -281,19 +281,15 @@ export default class {
             waveformChildren.push(this.renderTimeSelection(data));
         }
 
-        return h("div.channel-wrapper.state-select",
-            {
-                attributes: {
-                    "style": `margin-left: ${data.controls.width}px; height: ${data.height}px;`
-                }
-            },
+        return h("div.channel-wrapper.state-select", {
+            attributes: {
+                "style": `margin-left: ${data.controls.width}px; height: ${data.height}px;`
+            }},
             [
-                h("div.controls",
-                    {
-                        attributes: {
-                            "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 9999;`
-                        }
-                    },
+                h("div.controls", {
+                    attributes: {
+                        "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 9999;`
+                    }},
                     [
                         h("header", [ this.name ]),
                         h("div.btn-group", [
@@ -311,12 +307,10 @@ export default class {
                     ]
                 ),
 
-                h("div.waveform",
-                    {
-                        attributes: {
-                            "style": `height: ${data.height}px; position: relative;`
-                        }
-                    }, 
+                h("div.waveform", {
+                    attributes: {
+                        "style": `height: ${data.height}px; position: relative;`
+                    }}, 
                     waveformChildren
                 )
             ]
