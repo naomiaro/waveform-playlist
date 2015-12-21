@@ -70,4 +70,4 @@ import BlobLoader from './../../../src/track/loader/BlobLoader';
 //             });
 //         });
 //     });
-});
+//});
