@@ -1,6 +1,20 @@
 import BaseHook from './BaseHook';
 import {secondsToPixels} from '../utils/conversions';
 
+function drawFrame(cc, height, x, minPeak, maxPeak) {
+    let h2 = height / 2;
+    let min;
+    let max;
+
+    max = Math.abs(maxPeak * h2);
+    min = Math.abs(minPeak * h2);
+
+    //draw maxs
+    cc.fillRect(x, 0, 1, h2-max);
+    //draw mins
+    cc.fillRect(x, h2+min, 1, h2-min);
+}
+
 /*
 * virtual-dom hook for drawing to the canvas element.
 */
@@ -27,7 +41,7 @@ export default class extends BaseHook {
         cc.fillStyle = this.color;
 
         for (i, len; i < len; i++) {
-            this.track.drawFrame(cc, canvas.height, i, channel.minPeaks[i], channel.maxPeaks[i]);
+            drawFrame(cc, canvas.height, i, channel.minPeaks[i], channel.maxPeaks[i]);
         }
     }
 }

@@ -213,20 +213,6 @@ export default class {
         this.playout.stop(when);
     }
 
-    drawFrame(cc, height, x, minPeak, maxPeak) {
-        let h2 = height / 2;
-        let min;
-        let max;
-
-        max = Math.abs(maxPeak * h2);
-        min = Math.abs(minPeak * h2);
-
-        //draw maxs
-        cc.fillRect(x, 0, 1, h2-max);
-        //draw mins
-        cc.fillRect(x, h2+min, 1, h2-min);
-    }
-
     renderTimeSelection(data) {
         let startX = secondsToPixels(data.timeSelection.start, data.resolution, data.sampleRate);
         let endX = secondsToPixels(data.timeSelection.end, data.resolution, data.sampleRate);
