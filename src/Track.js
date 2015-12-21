@@ -6,6 +6,7 @@ import h from 'virtual-dom/h';
 
 import {secondsToPixels} from './utils/conversions'
 import stateObjects from './track/states';
+import CanvasHook from './track/render/CanvasHook';
 
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
@@ -202,28 +203,6 @@ export default class {
         cc.fillRect(x, h2+min, 1, h2-min);
     }
 
-    /*
-    * virtual-dom hook for drawing to the canvas element.
-    */
-    hook(canvas, propertyName, previousValue) {
-        //node is already created.
-        if (previousValue !== undefined) {
-            return;
-        }
-
-        let i = 0;
-        let len = this.getPeakLength();
-        let channelNum = canvas.dataset.channel;
-        let channel = this.peaks[channelNum];
-        let cc = canvas.getContext('2d');
-  
-        cc.fillStyle = canvas.dataset.waveOutlineColor;
-
-        for (i, len; i < len; i++) {
-            this.drawFrame(cc, canvas.height, i, channel.minPeaks[i], channel.maxPeaks[i]);
-        }
-    }
-
     renderTimeSelection(data) {
         let startX = secondsToPixels(data.timeSelection.start, data.resolution, data.sampleRate);
         let endX = secondsToPixels(data.timeSelection.end, data.resolution, data.sampleRate);
@@ -285,7 +264,7 @@ export default class {
                                 "data-wave-outline-color": data.colors.waveOutlineColor,
                                 "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                             },
-                            "render-hook": this
+                            "render-hook": new CanvasHook(this)
                         })
                     ]
                 );

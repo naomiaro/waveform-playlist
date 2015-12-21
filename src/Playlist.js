@@ -7,6 +7,7 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
+import {secondsToPixels} from './utils/conversions'
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 import Track from './Track';
@@ -23,6 +24,7 @@ export default class {
         this.cursor = 0;
         this.playbackSeconds = 0;
         this.length = 0;
+        this.scrollLeft = 0;
     }
 
     setConfig(config) {
@@ -74,11 +76,9 @@ export default class {
     }
 
     load(trackList, options={}) {
-        var loadPromises = trackList.map((trackInfo) => {
+        let loadPromises = trackList.map((trackInfo) => {
             let loader = LoaderFactory.createLoader(trackInfo.src, this.config.getAudioContext());
-            let promise = loader.load();
-
-            return promise;
+            return loader.load();
         });
 
         return Promise.all(loadPromises).then((audioBuffers) => {
@@ -255,6 +255,34 @@ export default class {
         this.draw(this.render());
     }
 
+    rewind() {
+        this.stop();
+
+        Promise.all(this.playoutPromises).then(() => {
+            this.ee.emit('select', 0, 0);
+
+            //this.trackContainer.scrollLeft = 0;
+            //this.config.setTrackScroll(0);
+            //this.fire('trackscroll');
+        });
+    }
+
+    fastForward() {
+        var totalWidth = this.trackContainer.scrollWidth,
+            clientWidth = this.trackContainer.offsetWidth,
+            maxOffset = Math.max(totalWidth - clientWidth, 0);
+
+        this.stop();
+
+        Promise.all(this.playoutPromises).then(() => {
+            this.ee.emit('select', this.length, this.length);
+
+            //this.trackContainer.scrollLeft = maxOffset;
+            //this.config.setTrackScroll(maxOffset);
+            //this.fire('trackscroll');
+        });
+    }
+
     startAnimation(startTime) {
         this.lastDraw = this.config.getCurrentTime();
         this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, startTime));
@@ -326,14 +354,18 @@ export default class {
             }));
         });
 
-        return h("div.playlist",
-            {attributes: {
+        let resolution = this.config.getResolution();
+        let sampleRate = this.config.getSampleRate();
+        let scrollX = secondsToPixels(this.scrollLeft, resolution, sampleRate);
+
+        return h("div.playlist", {
+            attributes: {
                 "style": "overflow: hidden; position: relative;"
-            }},
-            [ 
-                h("div.playlist-tracks", {attributes: {
-                    "style": "overflow: auto;"
-                }}, trackElements)
-            ]);
+            }}, [
+            h("div.playlist-tracks", {attributes: {
+                "style": "overflow: auto;",
+                "data-scroll-left": scrollX
+            }}, trackElements)
+        ]);
     }  
 }
