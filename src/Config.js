@@ -32,8 +32,7 @@ var defaults = {
         top: 0
     },
 
-    state: 'select',
-    cursorPos: 0 //value is kept in seconds.
+    state: 'select'
 };
 
 export default class {
@@ -55,10 +54,6 @@ export default class {
 
     isMono() {
         return this.config.mono;
-    }
-
-    getCursorPos() {
-        return this.config.cursorPos;
     }
 
     getState() {
@@ -141,10 +136,6 @@ export default class {
 
     setMono(bool) {
         this.config.mono = bool;
-    }
-
-    setCursorPos(pos) {
-        this.config.cursorPos = pos;
     }
 
     setState(state) {

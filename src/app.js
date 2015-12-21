@@ -18,7 +18,8 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
 	playlist.setConfig(config);
 	playlist.setContainer(container);
 	playlist.setEventEmitter(ee);
-	playlist.setUpEventEmitter()
+	playlist.setUpEventEmitter();
+	playlist.setTimeSelection(0, 0);
 
 	return playlist;
 }

@@ -20,6 +20,7 @@ export default class {
         this.soloedTracks = [];
         this.mutedTracks = [];
 
+        this.cursor = 0;
         this.playbackSeconds = 0;
         this.length = 0;
     }
@@ -129,6 +130,8 @@ export default class {
             start,
             end,
         };
+
+        this.cursor = start;
     }
 
     getTimeSelection() {
@@ -167,15 +170,30 @@ export default class {
         }, false);
     }
 
+    /*
+    *   returns the current point of time in the playlist in seconds.
+    */
+    getCurrentTime() {
+        let cursorPos = this.lastSeeked || this.pausedAt || this.cursor;
+
+        return cursorPos + this.getElapsedTime();
+    }
+
+    getElapsedTime() {
+        let currentTime = this.config.getCurrentTime();
+
+        return currentTime - this.lastPlay;
+    }
+
     play(startTime) {
         var currentTime = this.config.getCurrentTime(),
             endTime,
             selected = this.getTimeSelection(),
             playoutPromises = [];
 
-        startTime = startTime || this.pausedAt || this.config.getCursorPos();
+        startTime = startTime || this.pausedAt || this.cursor;
 
-        if (selected !== undefined && selected.endTime > startTime) {
+        if (selected.endTime > startTime) {
             endTime = selected.endTime;
         }
 
@@ -198,7 +216,7 @@ export default class {
             return;
         }
 
-        this.pausedAt = this.config.getCurrentTime();
+        this.pausedAt = this.getCurrentTime();
         this.playbackReset();
     }
 
@@ -238,7 +256,7 @@ export default class {
         let playbackSeconds = 0;
         let elapsed;
 
-        cursorPos = cursorPos || this.config.getCursorPos();
+        cursorPos = cursorPos || this.cursor;
         elapsed = currentTime - this.lastDraw;
 
         if (this.isPlaying()) {
