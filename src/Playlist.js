@@ -7,7 +7,7 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 import createElement from 'virtual-dom/create-element';
 
-import {secondsToPixels, pixelsToSeconds} from './utils/conversions'
+import {pixelsToSeconds} from './utils/conversions'
 import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 
@@ -27,7 +27,7 @@ export default class {
 
         this.cursor = 0;
         this.playbackSeconds = 0;
-        this.length = 0;
+        this.duration = 0;
         this.scrollLeft = 0;
     }
 
@@ -94,25 +94,32 @@ export default class {
         });
 
         return Promise.all(loadPromises).then((audioBuffers) => {
-            let trackEditors = audioBuffers.map((audioBuffer, index) => {
+            let tracks = audioBuffers.map((audioBuffer, index) => {
                 let name = trackList[index].name;
 
                 //extract peaks with AudioContext for now.
                 let peaks = extractPeaks(audioBuffer, this.config.getResolution(), this.config.isMono());
                 //webaudio specific playout for now.
                 let playout = new Playout(this.config.getAudioContext(), audioBuffer);
-                let trackEditor = new Track(this.ee, playout, name);
 
-                trackEditor.setPeaks(peaks);
+                let track = new Track();
+                track.setName(name);
+                track.setEventEmitter(this.ee);
+                track.setEnabledStates();
+                track.setPeaks(peaks);
+                track.setCues(0, audioBuffer.duration);
+                track.setFades();
+                track.setStartTime(0);
+                track.setPlayout(playout);
 
-                this.length = Math.max(this.length, trackEditor.endTime);
+                this.duration = Math.max(this.duration, track.getEndTime());
 
-                return trackEditor;
+                return track;
             });
 
-            this.tracks = trackEditors;
+            this.tracks = tracks;
 
-            return trackEditors;
+            return tracks;
 
         }).then((trackEditors) => {
 
@@ -280,8 +287,8 @@ export default class {
         this.stop();
 
         Promise.all(this.playoutPromises).then(() => {
-            this.scrollLeft = this.length;
-            this.ee.emit('select', this.length, this.length);
+            this.scrollLeft = this.duration;
+            this.ee.emit('select', this.duration, this.duration);
         });
     }
 
@@ -339,7 +346,7 @@ export default class {
             "controls": this.config.getControlSettings(),
             "isActive": false,
             "timeSelection": this.getTimeSelection(),
-            "playlistLength": this.length,
+            "playlistLength": this.duration,
             "playbackSeconds": this.playbackSeconds,
             "colors": this.config.getColorScheme()
         };
@@ -358,7 +365,6 @@ export default class {
 
         let resolution = this.config.getResolution();
         let sampleRate = this.config.getSampleRate();
-        let scrollX = secondsToPixels(this.scrollLeft, resolution, sampleRate);
 
         return h("div.playlist", {
             "attributes": {
@@ -366,13 +372,12 @@ export default class {
             }}, [
             h("div.playlist-tracks", {
                 "attributes": {
-                    "style": "overflow: auto;",
-                    "data-scroll-left": scrollX
+                    "style": "overflow: auto;"
                 },
                 "ev-scroll": _.throttle((e) => {
                     this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, resolution, sampleRate);
                 }, 200),
-                "hook": new ScrollHook(this)
+                "hook": new ScrollHook(this, resolution, sampleRate)
             }, trackElements)
         ]);
     }  

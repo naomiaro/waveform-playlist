@@ -1,12 +1,11 @@
+import BaseHook from './BaseHook';
+import {secondsToPixels} from '../utils/conversions'
+
 /*
 * virtual-dom hook for scrolling the track container.
 */
-export default class {
-    constructor(track) {
-        this.track = track;
-    }
-
+export default class extends BaseHook {
     hook(trackArea, propertyName, previousValue) {
-        trackArea.scrollLeft = trackArea.dataset.scrollLeft;
+        trackArea.scrollLeft = secondsToPixels(this.track.scrollLeft, this.resolution, this.sampleRate);
     }
 }

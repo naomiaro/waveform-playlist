@@ -15,7 +15,36 @@ const MAX_CANVAS_WIDTH = 20000;
 
 export default class {
 
-    constructor(ee, playout, name="Untitled", start=undefined, end=undefined, cueIn=null, cueOut=null, fades={}, enabledStates={}) {
+    constructor(name="Untitled") {
+
+        this.name = name;
+        this.gain = 1;
+    }
+
+    setEventEmitter(ee) {
+        this.ee = ee;
+    }
+
+    setName(name) {
+        this.name = name;
+    }
+
+    setCues(cueIn, cueOut) {
+        this.cueIn = cueIn;
+        this.cueOut = cueOut;
+        this.duration = this.cueOut - this.cueIn;
+    }
+
+    setStartTime(start) {
+        this.startTime = start;
+        this.endTime = start + this.duration;
+    }
+
+    setPlayout(playout) {
+        this.playout = playout;
+    }
+
+    setEnabledStates(enabledStates={}) {
         let defaultStatesEnabled = {
             'cursor': true,
             'fadein': true,
@@ -25,24 +54,11 @@ export default class {
             'record': true
         };
 
-        this.ee = ee;
-        this.name = name;
-
-        //stored in seconds.
-        this.startTime = start || 0;
-        this.endTime = end || (this.startTime + playout.getDuration());
-
-        this.gain = 1;
-
-        //stored in seconds since webaudio api deals in seconds.
-        this.cueIn = cueIn || 0;
-        this.cueOut = cueOut || playout.getDuration();
-        this.duration = this.cueOut - this.cueIn;
-
-        this.fades = fades;
-
         this.enabledStates = _.assign(defaultStatesEnabled, enabledStates);
-        this.playout = playout;
+    }
+
+    setFades(fades={}) {
+        this.fades = fades;
     }
 
     setPeaks(peaks) {
@@ -53,8 +69,16 @@ export default class {
         this.state = stateObjects[state];
     }
 
-    getPeakLength() {
-        return this.peaks[0]['minPeaks'].length;
+    getStartTime() {
+        return this.startTime;
+    }
+
+    getEndTime() {
+        return this.endTime;
+    }
+
+    getDuration() {
+        return this.duration;
     }
 
     saveFade(type, shape, start, end) {
@@ -235,42 +259,36 @@ export default class {
     }
 
     render(data) {
-        let width = this.getPeakLength();
+        let width = secondsToPixels(this.duration, data.resolution, data.sampleRate);
         let playbackPixels = secondsToPixels(data.playbackSeconds, data.resolution, data.sampleRate);
 
         let waveformChildren = [
-            h("div.cursor",
-                {
-                    attributes: {
-                        "style": `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
-                    }
-                }
-            ),
-            Object.keys(this.peaks).map((channelNum) => {
-                return h(`div.channel.channel-${channelNum}`, {
-                    attributes: {
-                        "style": `height: ${data.height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
-                    }},
-                    [
-                        h("div.channel-progress", {attributes: {
-                            "style": `position: absolute; width: ${playbackPixels}px; height: ${data.height}px; z-index: 2;`
-                        }}),
-                        h("canvas", {
-                            attributes: {
-                                "width": width,
-                                "height": data.height,
-                                "data-offset": "0",
-                                "data-channel": channelNum,
-                                "data-wave-outline-color": data.colors.waveOutlineColor,
-                                "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
-                            },
-                            "hook": new CanvasHook(this)
-                        })
-                    ]
-                );
-            }),
-            this.renderOverlay(data)
+            h("div.cursor", {attributes: {
+                "style": `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
+            }})
         ];
+
+        let channels = Object.keys(this.peaks).map((channelNum) => {
+            return h(`div.channel.channel-${channelNum}`, {attributes: {
+                "style": `height: ${data.height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
+            }},
+            [
+                h("div.channel-progress", {attributes: {
+                    "style": `position: absolute; width: ${playbackPixels}px; height: ${data.height}px; z-index: 2;`
+                }}),
+                h("canvas", {
+                    attributes: {
+                        "width": width,
+                        "height": data.height,
+                        "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
+                    },
+                    "hook": new CanvasHook(this, data.resolution, data.sampleRate, channelNum, 0, data.colors.waveOutlineColor)
+                })
+            ]);
+        });
+
+        waveformChildren.push(channels);
+        waveformChildren.push(this.renderOverlay(data));
 
         //draw cursor selection on active track.
         if (data.isActive === true) {
