@@ -26,12 +26,6 @@ var defaults = {
     },
 
     waveHeight: 128, //height of each canvas element a waveform is on.
-
-    trackscroll: {
-        left: 0,
-        top: 0
-    },
-
     state: 'select'
 };
 
@@ -109,15 +103,6 @@ export default class {
         }
     }
 
-    getTrackScroll() {
-        var scroll = this.config.trackscroll;
-    
-        return {
-            left: scroll.left,
-            top: scroll.top
-        };
-    }
-
     /*
         Start of all setter methods for config.
     */
@@ -140,12 +125,5 @@ export default class {
 
     setState(state) {
         this.config.state = state;
-    }
-
-    setTrackScroll(left, top) {
-        var scroll = this.config.trackscroll;
-
-        scroll.left = (left !== undefined) ? left : scroll.left;
-        scroll.top = (top !== undefined) ? top : scroll.top;
     }
 }
