@@ -92,6 +92,12 @@ export default class {
             this.draw(this.render());
         });
 
+        ee.on('shift', (deltaTime, track) => {
+            console.log(deltaTime);
+            track.setStartTime(track.getStartTime() + deltaTime);
+            this.draw(this.render());
+        });
+
         ee.on('play', () => {
             this.play();
         });

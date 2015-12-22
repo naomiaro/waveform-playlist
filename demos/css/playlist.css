@@ -44,15 +44,15 @@ html, body {
   cursor: text;
 }
 
-.state-fadein .channel {
+.state-fadein {
   cursor: w-resize;
 }
 
-.state-fadeout .channel {
+.state-fadeout {
   cursor: e-resize;
 }
 
-.state-shift .channel {
+.state-shift {
   cursor: ew-resize;
 }
 
