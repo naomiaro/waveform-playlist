@@ -1,6 +1,6 @@
 'use strict';
 
-import _ from 'lodash';
+import _assign from 'lodash/object/assign';
 import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
@@ -62,7 +62,7 @@ export default class {
             'record': true
         };
 
-        this.enabledStates = _.assign(defaultStatesEnabled, enabledStates);
+        this.enabledStates = _assign(defaultStatesEnabled, enabledStates);
     }
 
     setFades(fades={}) {
@@ -243,14 +243,20 @@ export default class {
             }
         };
 
-        let state = new stateClasses[this.state](this, data.resolution, data.sampleRate);
-        let stateEvents = state.getEvents();
+        let stateClass = "";
 
-        Object.keys(stateEvents).map((event) => {
-            config[`ev-${event}`] = stateEvents[event].bind(state);
-        });
+        if (this.enabledStates[this.state]) {
+            let state = new stateClasses[this.state](this, data.resolution, data.sampleRate);
+            let stateEvents = state.getEvents();
+
+            Object.keys(stateEvents).map((event) => {
+                config[`ev-${event}`] = stateEvents[event].bind(state);
+            });
+
+            stateClass = state.getClasses();
+        }
         //use this overlay for track event cursor position calculations.
-        return h(`div.playlist-overlay${state.getClasses()}`, config);
+        return h(`div.playlist-overlay${stateClass}`, config);
     }
 
     renderControls(data) {

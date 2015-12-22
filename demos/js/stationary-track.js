@@ -80,7 +80,10 @@
     playlist.load([
       {
         "src": "/media/audio/Vocals30.mp3",
-        "name": "Vocals"
+        "name": "Vocals",
+        "states": {
+          "shift": false
+        }
       },
       {
         "src": "/media/audio/BassDrums30.mp3",

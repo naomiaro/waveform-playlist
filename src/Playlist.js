@@ -145,6 +145,7 @@ export default class {
             let tracks = audioBuffers.map((audioBuffer, index) => {
                 let name = trackList[index].name || "Untitled";
                 let start = trackList[index].start || 0;
+                let states = trackList[index].states || {};
 
                 //extract peaks with AudioContext for now.
                 let peaks = extractPeaks(audioBuffer, this.samplesPerPixel, true);
@@ -154,7 +155,7 @@ export default class {
                 let track = new Track();
                 track.setName(name);
                 track.setEventEmitter(this.ee);
-                track.setEnabledStates();
+                track.setEnabledStates(states);
                 track.setPeaks(peaks);
                 track.setCues(0, audioBuffer.duration);
                 track.setFades();
