@@ -289,7 +289,7 @@ export default class {
             }})
         ];
 
-        let channels = Object.keys(this.peaks).map((channelNum) => {
+        let channels = Object.keys(this.peaks.data).map((channelNum) => {
             return h(`div.channel.channel-${channelNum}`, {attributes: {
                 "style": `height: ${data.height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
             }},
@@ -303,7 +303,7 @@ export default class {
                         "height": data.height,
                         "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                     },
-                    "hook": new CanvasHook(this, data.resolution, data.sampleRate, channelNum, 0, data.colors.waveOutlineColor)
+                    "hook": new CanvasHook(this, channelNum, 0, data.colors.waveOutlineColor)
                 })
             ]);
         });

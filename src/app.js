@@ -28,7 +28,11 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
             fadeColor: 'black'
         },
         waveHeight: 128, //height of each canvas element a waveform is on.
-        state: 'select'
+        state: 'select',
+        peaks: {
+            type: "WebAudio",
+            mono: true
+        }
     };
 
     let config = _.assign(defaults, options);
@@ -38,7 +42,6 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     playlist.setSampleRate(config.sampleRate);
     playlist.setSamplesPerPixel(config.samplesPerPixel);
     playlist.setAudioContext(config.ac);
-    playlist.setIsMono(config.mono);
     playlist.setEventEmitter(ee);
     playlist.setUpEventEmitter();
     playlist.setTimeSelection(0, 0);

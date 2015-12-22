@@ -42,19 +42,19 @@
 
     playlist.load([
       {
-        "src": "/media/stems/Vocals30.mp3",
+        "src": "/media/audio/Vocals30.mp3",
         "name": "Vocals"
       },
       {
-        "src": "/media/stems/Guitar30.mp3",
+        "src": "/media/audio/Guitar30.mp3",
         "name": "Guitar"
       },
       {
-        "src": "/media/stems/Pianos\ &\ Synth30.mp3",
+        "src": "/media/audio/PianoSynth30.mp3",
         "name": "Pianos & Synth"
       },
       {
-        "src": "/media/stems/Bass\ &\ Drums30.mp3",
+        "src": "/media/audio/BassDrums30.mp3",
         "name": "Drums"
       }
     ]).then(function() {

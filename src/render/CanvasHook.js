@@ -1,6 +1,3 @@
-import BaseHook from './BaseHook';
-import {secondsToPixels} from '../utils/conversions';
-
 function drawFrame(cc, height, x, minPeak, maxPeak) {
     let h2 = height / 2;
     let min;
@@ -18,10 +15,9 @@ function drawFrame(cc, height, x, minPeak, maxPeak) {
 /*
 * virtual-dom hook for drawing to the canvas element.
 */
-export default class extends BaseHook {
-    constructor(track, resolution, sampleRate, channelNum, offset, color) {
-        super(track, resolution, sampleRate);
-
+export default class {
+    constructor(track, channelNum, offset, color) {
+        this.track = track;
         this.channelNum = channelNum;
         this.offset = offset;
         this.color = color;
@@ -33,15 +29,15 @@ export default class extends BaseHook {
             return;
         }
 
-        let i = 0;
-        let len = secondsToPixels(this.track.duration, this.resolution, this.sampleRate);
-        let channel = this.track.peaks[this.channelNum];
+        let i;
+        let len = canvas.width;
+        let channel = this.track.peaks.data[this.channelNum];
         let cc = canvas.getContext('2d');
 
         cc.fillStyle = this.color;
 
-        for (i, len; i < len; i++) {
-            drawFrame(cc, canvas.height, i, channel.minPeaks[i], channel.maxPeaks[i]);
+        for (i = 0; i < len; i++) {
+            drawFrame(cc, canvas.height, i, channel[i*2], channel[i*2+1]);
         }
     }
 }

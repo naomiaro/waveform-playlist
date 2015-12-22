@@ -63,14 +63,6 @@ export default class {
         this.ee = ee;
     }
 
-    setIsMono(isMono) {
-        this.mono = isMono;
-    }
-
-    isMono() {
-        return this.mono;
-    }
-
     getEventEmitter() {
         return this.ee;
     }
@@ -142,7 +134,7 @@ export default class {
                 let name = trackList[index].name;
 
                 //extract peaks with AudioContext for now.
-                let peaks = extractPeaks(audioBuffer, this.samplesPerPixel, this.isMono());
+                let peaks = extractPeaks(audioBuffer, this.samplesPerPixel, true);
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);
 

@@ -2,82 +2,80 @@
 
 /**
 * @param {Float32Array} channel  Audio track frames to calculate peaks from.
-* @param {Number} resolution  Audio frames per peak
+* @param {Number} samplesPerPixel Audio frames per peak
 */
-function extractPeaks(channel, resolution) {
+function extractPeaks(channel, samplesPerPixel) {
 
-    var i;
-    var chanLength = channel.length;
-    var numPeaks = Math.ceil(chanLength / resolution);
-    var start;
-    var end;
-    var segment;
-    var max; 
-    var min;
-    var minPeaks = new Float32Array(numPeaks);
-    var maxPeaks = new Float32Array(numPeaks);
-    var maxPeak = -Infinity; //used to scale the waveform on the canvas.
+    let i;
+    let chanLength = channel.length;
+    let numPeaks = Math.ceil(chanLength / samplesPerPixel);
+    let start;
+    let end;
+    let segment;
+    let max; 
+    let min;
+    //create interleaved array of min,max
+    let peaks = new Float32Array(numPeaks*2);
 
     for (i = 0; i < numPeaks; i++) {
 
-        start = i * resolution;
-        end = (i + 1) * resolution > chanLength ? chanLength : (i + 1) * resolution;
+        start = i * samplesPerPixel;
+        end = (i + 1) * samplesPerPixel > chanLength ? chanLength : (i + 1) * samplesPerPixel;
 
         segment = channel.subarray(start, end);
+        min = Math.min.apply(Math, segment);
         max = Math.max.apply(Math, segment);
-        min = Math.max.apply(Math, segment);
 
-        maxPeaks[i] = max;
-        minPeaks[i] = min;
-        maxPeak = Math.max.apply(Math, [maxPeak, Math.abs(max), Math.abs(min)]);
+        peaks[i*2] = min;
+        peaks[i*2+1] = max;
     }
 
     return {
-        maxPeaks,
-        minPeaks,
-        maxPeak
-    }
+        type: "float",
+        length: numPeaks,
+        data: peaks
+    };
 }
 
 function makeMono(channelPeaks) {
     let numChan = channelPeaks.length;
     let weight = 1 / numChan;
-    let channelLength = channelPeaks[0]['minPeaks'].length;
+    let numPeaks = channelPeaks[0]['length'];
     let c = 0;
     let i = 0;
     let min;
     let max;
-    let minPeaks = new Float32Array(channelLength);
-    let maxPeaks = new Float32Array(channelLength);
+    let peaks = new Float32Array(numPeaks*2);
 
-    for (i = 0; i < channelLength; i++) {
+    for (i = 0; i < numPeaks; i++) {
         min = 0;
         max = 0;
 
         for (c = 0; c < numChan; c++) {
-            min += weight * channelPeaks[c]['minPeaks'][i];
-            max += weight * channelPeaks[c]['maxPeaks'][i];
+            min += weight * channelPeaks[c]['data'][i*2];
+            max += weight * channelPeaks[c]['data'][i*2+1];
         }
 
-        minPeaks[i] = min;
-        maxPeaks[i] = max;
+        peaks[i*2] = min;
+        peaks[i*2+1] = max;
     }
 
     //return in array so channel number counts still work.
-    return [{
-        maxPeaks,
-        minPeaks
-    }];
+    return {
+        type: "float",
+        length: numPeaks,
+        data: [peaks]
+    };
 }
 
-export default function(buffer, resolution=10000, isMono=false) {
+export default function(buffer, samplesPerPixel=10000, isMono=false) {
     let numChan = buffer.numberOfChannels;
     let peaks = [];
     let c;
 
     for (c = 0; c < numChan; c++) {
         let channel = buffer.getChannelData(c);
-        peaks.push(extractPeaks(channel, resolution));
+        peaks.push(extractPeaks(channel, samplesPerPixel));
     }
 
     if (isMono) {
