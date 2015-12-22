@@ -93,8 +93,8 @@ export default class {
         });
 
         ee.on('shift', (deltaTime, track) => {
-            console.log(deltaTime);
             track.setStartTime(track.getStartTime() + deltaTime);
+            this.adjustDuration();
             this.draw(this.render());
         });
 
@@ -161,12 +161,11 @@ export default class {
                 track.setStartTime(start);
                 track.setPlayout(playout);
 
-                this.duration = Math.max(this.duration, track.getEndTime());
-
                 return track;
             });
 
             this.tracks = tracks;
+            this.adjustDuration();
 
             return tracks;
 
@@ -256,6 +255,16 @@ export default class {
             masterGain = this.shouldTrackPlay(track) ? 1 : 0;
             track.setMasterGainLevel(masterGain);
         });
+    }
+
+    adjustDuration() {
+        var duration = 0;
+
+        this.tracks.forEach((track) => {
+            duration = Math.max(duration, track.getEndTime());
+        });
+
+        this.duration = duration;
     }
 
     shouldTrackPlay(track) {
