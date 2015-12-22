@@ -405,8 +405,7 @@ export default class {
             this.stopAnimation();
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
-
-            //TODO reset state and draw here?
+            this.setState(this.getState());
         }
 
         this.playbackSeconds = playbackSeconds;
@@ -452,9 +451,6 @@ export default class {
             }));
         });
 
-        let resolution = this.samplesPerPixel;
-        let sampleRate = this.sampleRate;
-
         return h("div.playlist", {
             "attributes": {
                 "style": "overflow: hidden; position: relative;"
@@ -464,9 +460,9 @@ export default class {
                     "style": "overflow: auto;"
                 },
                 "ev-scroll": _.throttle((e) => {
-                    this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, resolution, sampleRate);
+                    this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
                 }, 200),
-                "hook": new ScrollHook(this, resolution, sampleRate)
+                "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)
             }, trackElements)
         ]);
     }  
