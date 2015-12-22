@@ -311,8 +311,8 @@ export default class {
 
         startTime = startTime || this.pausedAt || this.cursor;
 
-        if (selected.endTime > startTime) {
-            endTime = selected.endTime;
+        if (selected.end > startTime) {
+            endTime = selected.end;
         }
 
         this.tracks.forEach((track) => {
