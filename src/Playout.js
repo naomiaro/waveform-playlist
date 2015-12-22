@@ -1,6 +1,6 @@
 'use strict';
 
-import {createFadein, createFadeout} from './utils/fades';
+import {createFadeIn, createFadeOut} from './utils/fades';
 
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";

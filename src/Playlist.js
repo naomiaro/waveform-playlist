@@ -146,6 +146,8 @@ export default class {
                 let name = trackList[index].name || "Untitled";
                 let start = trackList[index].start || 0;
                 let states = trackList[index].states || {};
+                let fadeIn = trackList[index].fadeIn;
+                let fadeOut = trackList[index].fadeOut;
 
                 //extract peaks with AudioContext for now.
                 let peaks = extractPeaks(audioBuffer, this.samplesPerPixel, true);
@@ -158,7 +160,15 @@ export default class {
                 track.setEnabledStates(states);
                 track.setPeaks(peaks);
                 track.setCues(0, audioBuffer.duration);
-                track.setFades();
+
+                if (fadeIn !== undefined) {
+                    track.setFadeIn(fadeIn);
+                }
+
+                if (fadeOut !== undefined) {
+                    track.setFadeOut(fadeOut);
+                }
+
                 track.setStartTime(start);
                 track.setPlayout(playout);
 

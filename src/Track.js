@@ -1,6 +1,8 @@
 'use strict';
 
 import _assign from 'lodash/object/assign';
+import _forOwn from 'lodash/object/forOwn';
+
 import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
@@ -19,6 +21,7 @@ export default class {
 
         this.name = name;
         this.gain = 1;
+        this.fades = {};
     }
 
     setEventEmitter(ee) {
@@ -65,8 +68,43 @@ export default class {
         this.enabledStates = _assign(defaultStatesEnabled, enabledStates);
     }
 
-    setFades(fades={}) {
-        this.fades = fades;
+    setFadeIn(options={}) {
+        let d = {
+            "shape": "logarithmic",
+            "start": 0,
+            "end": this.duration
+        };
+
+        let fade = _assign(d, options);
+        this.saveFade("FadeIn", fade.shape, fade.start, fade.end);
+    }
+
+    setFadeOut(options={}) {
+        let d = {
+            "shape": "logarithmic",
+            "start": 0,
+            "end": this.duration
+        };
+
+        let fade = _assign(d, options);
+        this.saveFade("FadeOut", fade.shape, fade.start, fade.end);
+    }
+
+    saveFade(type, shape, start, end) {
+        let id = uuid.v4();
+        
+        this.fades[id] = {
+            type: type,
+            shape: shape,
+            start: start,
+            end: end
+        };
+
+        return id;
+    }
+
+    removeFade(id) {
+        delete this.fades[id];
     }
 
     setPeaks(peaks) {
@@ -87,31 +125,6 @@ export default class {
 
     getDuration() {
         return this.duration;
-    }
-
-    saveFade(type, shape, start, end) {
-        let id = uuid.v4();
-        
-        this.fades[id] = {
-            type: type,
-            shape: shape,
-            start: start,
-            end: end
-        };
-
-        return id;
-    }
-
-    removeFade(id) {
-        delete this.fades[id];
-    }
-
-    removeFadeType(type) {
-        _.forOwn(this.fades, (fade, id) => {
-            if (fade.type === type) {
-                this.removeFade(id);
-            }
-        });
     }
 
     isPlaying() {
@@ -182,7 +195,7 @@ export default class {
 
         //param relPos: cursor position in seconds relative to this track.
         //can be negative if the cursor is placed before the start of this track etc.
-        _.forOwn(this.fades, (fade) => {
+        _forOwn(this.fades, (fade) => {
             let startTime;
             let duration;
 
