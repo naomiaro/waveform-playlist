@@ -263,12 +263,17 @@ export default class {
                     }}, [ "Solo" ])
                 ]),
                 h("label", [
-                    h("input.volume-slider", {attributes: {
-                        "type": "range",
-                        "min": "0",
-                        "max": "100",
-                        "value": "100"
-                    }})
+                    h("input.volume-slider", {
+                        attributes: {
+                            "type": "range",
+                            "min": 0,
+                            "max": 100,
+                            "value": 100
+                        },
+                        "ev-input": (e) => {
+                            this.ee.emit("volumechange", e.target.value, this);
+                        }
+                    })
                 ])
             ]
         );

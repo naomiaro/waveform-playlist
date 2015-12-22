@@ -97,6 +97,10 @@ export default class {
             this.adjustTrackPlayout();
             this.draw(this.render());
         });
+
+        ee.on('volumechange', (volume, track) => {
+            track.setGainLevel(volume/100);
+        });
     }
 
     load(trackList, options={}) {
