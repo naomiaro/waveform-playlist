@@ -1,21 +1,28 @@
-import State from './State';
+import {pixelsToSeconds} from '../../utils/conversions';
 
-export default class extends State {
-    constructor(track) {
-        super(track);
-
+export default class {
+    constructor(track, samplesPerPixel, sampleRate) {
         this.track = track;
+        this.samplesPerPixel = samplesPerPixel;
+        this.sampleRate = sampleRate;
     }
 
-    enter() {
-        super.enter();  
+    click(e) {
+        e.preventDefault();
+
+        let startX = e.offsetX;
+        let startTime = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
+
+        this.track.ee.emit('select', startTime, startTime, this.track);
     }
 
-    leave() {
-        super.leave();
+    getClasses() {
+        return ".state-cursor";
     }
 
-    static getClasses() {
-        return "state-cursor";
+    getEvents() {
+        return {
+            "click": this.click
+        }
     }
 }

@@ -1,5 +1,7 @@
-import cursorState from './states/cursor';
+import CursorState from './states/CursorState';
+import SelectState from './states/SelectState';
 
 export default {
-    'cursor': cursorState
+    'cursor': CursorState,
+    'select': SelectState
 };

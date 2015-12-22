@@ -40,6 +40,43 @@
       ee.emit("fastforward");
     });
 
+
+    function toggleActive(node) {
+      var active = node.parentNode.querySelectorAll('.active');
+      var i = 0, len = active.length;
+
+      for (; i < len; i++) {
+        active[i].classList.remove('active');
+      }
+
+      node.classList.toggle('active');
+    }
+
+    document.querySelector(".btn-cursor").addEventListener("click", function(e) {
+      ee.emit("statechange", "cursor");
+      toggleActive(this);
+    });
+
+    document.querySelector(".btn-select").addEventListener("click", function(e) {
+      ee.emit("statechange", "select");
+      toggleActive(this);
+    });
+
+    document.querySelector(".btn-shift").addEventListener("click", function(e) {
+      ee.emit("statechange", "shift");
+      toggleActive(this);
+    });
+
+    document.querySelector(".btn-fadein").addEventListener("click", function(e) {
+      ee.emit("statechange", "fadein");
+      toggleActive(this);
+    });
+
+    document.querySelector(".btn-fadeout").addEventListener("click", function(e) {
+      ee.emit("statechange", "fadeout");
+      toggleActive(this);
+    });
+
     playlist.load([
       {
         "src": "/media/audio/Vocals30.mp3",

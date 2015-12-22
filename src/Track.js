@@ -5,7 +5,7 @@ import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
 import {secondsToPixels} from './utils/conversions'
-import stateObjects from './track/states';
+import stateClasses from './track/states';
 import CanvasHook from './render/CanvasHook';
 
 const FADEIN = "FadeIn";
@@ -74,7 +74,7 @@ export default class {
     }
 
     setState(state) {
-        this.state = stateObjects[state];
+        this.state = state;
     }
 
     getStartTime() {
@@ -243,13 +243,14 @@ export default class {
             }
         };
 
-        let stateEvents = this.state.events;
+        let state = new stateClasses[this.state](this, data.resolution, data.sampleRate);
+        let stateEvents = state.getEvents();
 
         Object.keys(stateEvents).map((event) => {
-            config[`ev-${event}`] = stateEvents[event].bind(this, data.resolution, data.sampleRate);
+            config[`ev-${event}`] = stateEvents[event].bind(state);
         });
         //use this overlay for track event cursor position calculations.
-        return h("div.playlist-overlay", config);
+        return h(`div.playlist-overlay${state.getClasses()}`, config);
     }
 
     renderControls(data) {
@@ -347,7 +348,7 @@ export default class {
 
         channelChildren.push(waveform);
 
-        return h(`div.channel-wrapper.state-select${audibleClass}`, {
+        return h(`div.channel-wrapper${audibleClass}`, {
             attributes: {
                 "style": `margin-left: ${channelMargin}px; height: ${data.height}px;`
             }},
