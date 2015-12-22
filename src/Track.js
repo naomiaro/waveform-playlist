@@ -116,7 +116,7 @@ export default class {
     }
 
     setMasterGainLevel(level) {
-        this.playout.setMasterGainLevel(gain);
+        this.playout.setMasterGainLevel(level);
     }
 
     /*
@@ -244,6 +244,36 @@ export default class {
         return h("div.playlist-overlay", config);
     }
 
+    renderControls(data) {
+        let muteClass = data.muted ? ".active" : "";
+        let soloClass = data.soloed ? ".active" : "";
+
+        return h("div.controls", {
+            attributes: {
+                "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 9999;`
+            }},
+            [
+                h("header", [ this.name ]),
+                h("div.btn-group", [
+                    h(`span.btn.btn-default.btn-xs.btn-mute${muteClass}`, {"ev-click": () => {
+                        this.ee.emit("mute", this);
+                    }}, [ "Mute" ]),
+                    h(`span.btn.btn-default.btn-xs.btn-solo${soloClass}`, {"ev-click": () => {
+                        this.ee.emit("solo", this);
+                    }}, [ "Solo" ])
+                ]),
+                h("label", [
+                    h("input.volume-slider", {attributes: {
+                        "type": "range",
+                        "min": "0",
+                        "max": "100",
+                        "value": "100"
+                    }})
+                ])
+            ]
+        );
+    }
+
     render(data) {
         let width = secondsToPixels(this.duration, data.resolution, data.sampleRate);
         let playbackPixels = secondsToPixels(data.playbackSeconds, data.resolution, data.sampleRate);
@@ -273,6 +303,8 @@ export default class {
             ]);
         });
 
+        let audibleClass = data.masterGain ? "" : ".silent";
+
         waveformChildren.push(channels);
         waveformChildren.push(this.renderOverlay(data));
 
@@ -281,31 +313,12 @@ export default class {
             waveformChildren.push(this.renderTimeSelection(data));
         }
 
-        return h("div.channel-wrapper.state-select", {
+        return h(`div.channel-wrapper.state-select${audibleClass}`, {
             attributes: {
                 "style": `margin-left: ${data.controls.width}px; height: ${data.height}px;`
             }},
             [
-                h("div.controls", {
-                    attributes: {
-                        "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 9999;`
-                    }},
-                    [
-                        h("header", [ this.name ]),
-                        h("div.btn-group", [
-                            h("span.btn.btn-default.btn-xs.btn-mute", [ "Mute" ]),
-                            h("span.btn.btn-default.btn-xs.btn-solo", [ "Solo" ])
-                        ]),
-                        h("label", [
-                            h("input.volume-slider", {attributes: {
-                                "type": "range",
-                                "min": "0",
-                                "max": "100",
-                                "value": "100"
-                            }})
-                        ])
-                    ]
-                ),
+                this.renderControls(data),
 
                 h("div.waveform", {
                     attributes: {

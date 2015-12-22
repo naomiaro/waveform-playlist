@@ -85,6 +85,18 @@ export default class {
         ee.on('fastforward', () => {
             this.fastForward();
         });
+
+        ee.on('solo', (track) => {
+            this.soloTrack(track);
+            this.adjustTrackPlayout();
+            this.draw(this.render());
+        });
+
+        ee.on('mute', (track) => {
+            this.muteTrack(track);
+            this.adjustTrackPlayout();
+            this.draw(this.render());
+        });
     }
 
     load(trackList, options={}) {
@@ -167,6 +179,39 @@ export default class {
     setState(state) {
         this.tracks.forEach((editor) => {
             editor.setState(state);
+        });
+    }
+
+    muteTrack(track) {
+        let mutedList = this.mutedTracks;
+        let index = mutedList.indexOf(track);
+
+        if (index > -1) {
+            mutedList.splice(index, 1);
+        }
+        else {
+            mutedList.push(track);
+        }
+    }
+
+    soloTrack(track) {
+        let soloedList = this.soloedTracks;
+        let index = soloedList.indexOf(track);
+
+        if (index > -1) {
+            soloedList.splice(index, 1);
+        }
+        else {
+            soloedList.push(track);
+        }
+    }
+
+    adjustTrackPlayout() {
+        var masterGain;
+
+        this.tracks.forEach((track) => {
+            masterGain = this.shouldTrackPlay(track) ? 1 : 0;
+            track.setMasterGainLevel(masterGain);
         });
     }
 
@@ -362,7 +407,10 @@ export default class {
 
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "isActive": (activeTrack === track) ? true : false
+                "isActive": (activeTrack === track) ? true : false,
+                "masterGain": this.shouldTrackPlay(track) ? 1 : 0,
+                "soloed": this.soloedTracks.indexOf(track) > -1,
+                "muted": this.mutedTracks.indexOf(track) > -1
             }));
         });
 
