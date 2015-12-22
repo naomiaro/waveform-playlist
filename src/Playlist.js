@@ -315,11 +315,10 @@ export default class {
             endTime = selected.endTime;
         }
 
-        this.setState('cursor');
-
-        this.tracks.forEach((editor) => {
-            playoutPromises.push(editor.schedulePlay(currentTime, startTime, endTime, {
-                masterGain: this.shouldTrackPlay(editor) ? 1 : 0
+        this.tracks.forEach((track) => {
+            track.setState('cursor');
+            playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
+                masterGain: this.shouldTrackPlay(track) ? 1 : 0
             }));
         });
 
@@ -348,11 +347,11 @@ export default class {
         this.lastSeeked = undefined;
         this.stopAnimation();
 
-        this.tracks.forEach((editor) => {
-            editor.scheduleStop();
+        this.tracks.forEach((track) => {
+            track.scheduleStop();
+            track.setState(this.getState());
         });
 
-        this.setState(this.getState());
         this.draw(this.render());
     }
 
