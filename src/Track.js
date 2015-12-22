@@ -318,20 +318,29 @@ export default class {
             waveformChildren.push(this.renderTimeSelection(data));
         }
 
+
+        let waveform = h("div.waveform", {
+            attributes: {
+                "style": `height: ${data.height}px; position: relative;`
+            }}, 
+            waveformChildren
+        );
+
+        let channelChildren = [];
+        let channelMargin = 0;
+
+        if (data.controls.show) {
+            channelChildren.push(this.renderControls(data));
+            channelMargin = data.controls.width;
+        }
+
+        channelChildren.push(waveform);
+
         return h(`div.channel-wrapper.state-select${audibleClass}`, {
             attributes: {
-                "style": `margin-left: ${data.controls.width}px; height: ${data.height}px;`
+                "style": `margin-left: ${channelMargin}px; height: ${data.height}px;`
             }},
-            [
-                this.renderControls(data),
-
-                h("div.waveform", {
-                    attributes: {
-                        "style": `height: ${data.height}px; position: relative;`
-                    }}, 
-                    waveformChildren
-                )
-            ]
+            channelChildren
         );
     }
 }

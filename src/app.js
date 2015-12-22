@@ -28,7 +28,7 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
             fadeColor: 'black'
         },
         waveHeight: 128, //height of each canvas element a waveform is on.
-        state: 'select',
+        state: 'cursor',
         peaks: {
             type: "WebAudio",
             mono: true

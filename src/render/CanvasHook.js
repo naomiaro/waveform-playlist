@@ -1,5 +1,4 @@
-function drawFrame(cc, height, x, minPeak, maxPeak) {
-    let h2 = height / 2;
+function drawFrame(cc, h2, x, minPeak, maxPeak) {
     let min;
     let max;
 
@@ -33,11 +32,12 @@ export default class {
         let len = canvas.width;
         let channel = this.track.peaks.data[this.channelNum];
         let cc = canvas.getContext('2d');
+        let h2 = canvas.height/2;
 
         cc.fillStyle = this.color;
 
         for (i = 0; i < len; i++) {
-            drawFrame(cc, canvas.height, i, channel[i*2], channel[i*2+1]);
+            drawFrame(cc, h2, i, channel[i*2], channel[i*2+1]);
         }
     }
 }
