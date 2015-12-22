@@ -1,12 +1,17 @@
 (function(){
 
     var playlist = new WaveformPlaylist.init({
-      resolution: 1000, //audio frames per pixel
+      samplesPerPixel: 1000,
       mono: true,
       waveHeight: 100,
       container: document.getElementById("playlist"),
       state: 'cursor',
       waveOutlineColor: '#E0EFF1',
+      colors: {
+          waveOutlineColor: '#E0EFF1',
+          timeColor: 'grey',
+          fadeColor: 'black'
+      },
       controls: {
         show: true, //whether or not to include the track controls
         width: 200 //width of controls in pixels

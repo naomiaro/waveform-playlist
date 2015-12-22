@@ -31,16 +31,44 @@ export default class {
         this.scrollLeft = 0;
     }
 
-    setConfig(config) {
-        this.config = config;
+    setSampleRate(sampleRate) {
+        this.sampleRate = sampleRate;
+    }
+
+    setSamplesPerPixel(samplesPerPixel) {
+        this.samplesPerPixel = samplesPerPixel;
+    }
+
+    setAudioContext(ac) {
+        this.ac = ac;
     }
 
     setContainer(container) {
         this.container = container;
     }
 
+    setControlOptions(controlOptions) {
+        this.controls = controlOptions;
+    }
+
+    setWaveHeight(height) {
+        this.waveHeight = height;
+    }
+
+    setColors(colors) {
+        this.colors = colors;
+    }
+
     setEventEmitter(ee) {
         this.ee = ee;
+    }
+
+    setIsMono(isMono) {
+        this.mono = isMono;
+    }
+
+    isMono() {
+        return this.mono;
     }
 
     getEventEmitter() {
@@ -105,7 +133,7 @@ export default class {
 
     load(trackList, options={}) {
         let loadPromises = trackList.map((trackInfo) => {
-            let loader = LoaderFactory.createLoader(trackInfo.src, this.config.getAudioContext());
+            let loader = LoaderFactory.createLoader(trackInfo.src, this.ac);
             return loader.load();
         });
 
@@ -114,9 +142,9 @@ export default class {
                 let name = trackList[index].name;
 
                 //extract peaks with AudioContext for now.
-                let peaks = extractPeaks(audioBuffer, this.config.getResolution(), this.config.isMono());
+                let peaks = extractPeaks(audioBuffer, this.samplesPerPixel, this.isMono());
                 //webaudio specific playout for now.
-                let playout = new Playout(this.config.getAudioContext(), audioBuffer);
+                let playout = new Playout(this.ac, audioBuffer);
 
                 let track = new Track();
                 track.setName(name);
@@ -139,7 +167,7 @@ export default class {
 
         }).then((trackEditors) => {
 
-            this.setState(this.config.getState());
+            this.setState(this.getState());
 
             //take care of virtual dom rendering.
             let tree = this.render();
@@ -181,9 +209,15 @@ export default class {
     }
 
     setState(state) {
+        this.state = state;
+
         this.tracks.forEach((editor) => {
             editor.setState(state);
         });
+    }
+
+    getState() {
+        return this.state;
     }
 
     muteTrack(track) {
@@ -255,7 +289,7 @@ export default class {
     }
 
     getElapsedTime() {
-        let currentTime = this.config.getCurrentTime();
+        let currentTime = this.ac.currentTime;
 
         return currentTime - this.lastPlay;
     }
@@ -271,7 +305,7 @@ export default class {
     }
 
     play(startTime) {
-        var currentTime = this.config.getCurrentTime(),
+        var currentTime = this.ac.currentTime,
             endTime,
             selected = this.getTimeSelection(),
             playoutPromises = [];
@@ -319,7 +353,7 @@ export default class {
             editor.scheduleStop();
         });
 
-        this.setState(this.config.getState());
+        this.setState(this.getState());
         this.draw(this.render());
     }
 
@@ -342,7 +376,7 @@ export default class {
     }
 
     startAnimation(startTime) {
-        this.lastDraw = this.config.getCurrentTime();
+        this.lastDraw = this.ac.currentTime;
         this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, startTime));
     }
 
@@ -355,7 +389,7 @@ export default class {
     * Animation function for the playlist.
     */
     updateEditor(cursorPos) {
-        let currentTime = this.config.getCurrentTime();
+        let currentTime = this.ac.currentTime;
         let playbackSeconds = 0;
         let elapsed;
 
@@ -392,15 +426,15 @@ export default class {
 
     getTrackRenderData(data={}) {
         let defaults = {
-            "height": this.config.getWaveHeight(),
-            "resolution": this.config.getResolution(),
-            "sampleRate": this.config.getSampleRate(),
-            "controls": this.config.getControlSettings(),
+            "height": this.waveHeight,
+            "resolution": this.samplesPerPixel,
+            "sampleRate": this.sampleRate,
+            "controls": this.controls,
             "isActive": false,
             "timeSelection": this.getTimeSelection(),
             "playlistLength": this.duration,
             "playbackSeconds": this.playbackSeconds,
-            "colors": this.config.getColorScheme()
+            "colors": this.colors
         };
 
         return _.defaults(data, defaults);
@@ -418,8 +452,8 @@ export default class {
             }));
         });
 
-        let resolution = this.config.getResolution();
-        let sampleRate = this.config.getSampleRate();
+        let resolution = this.samplesPerPixel;
+        let sampleRate = this.sampleRate;
 
         return h("div.playlist", {
             "attributes": {
