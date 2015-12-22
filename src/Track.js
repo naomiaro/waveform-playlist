@@ -30,12 +30,20 @@ export default class {
     }
 
     setCues(cueIn, cueOut) {
+        if (cueOut < cueIn) {
+            throw new Error("cue out cannot be less than cue in");
+        }
+
         this.cueIn = cueIn;
         this.cueOut = cueOut;
         this.duration = this.cueOut - this.cueIn;
     }
 
     setStartTime(start) {
+        if (this.duration === undefined) {
+            throw new Error("Must set track cues before start time.");
+        }
+
         this.startTime = start;
         this.endTime = start + this.duration;
     }
@@ -281,21 +289,24 @@ export default class {
 
     render(data) {
         let width = secondsToPixels(this.duration, data.resolution, data.sampleRate);
-        let playbackPixels = secondsToPixels(data.playbackSeconds, data.resolution, data.sampleRate);
+        let playbackX = secondsToPixels(data.playbackSeconds, data.resolution, data.sampleRate);
+        let startTimeX = secondsToPixels(this.startTime, data.resolution, data.sampleRate);
+        let endTimeX = secondsToPixels(this.endTime, data.resolution, data.sampleRate);
+        let progressX = playbackX > 0 ? Math.min(playbackX - startTimeX, endTimeX) : 0;
 
         let waveformChildren = [
             h("div.cursor", {attributes: {
-                "style": `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackPixels}px; bottom: 0; z-index: 100;`
+                "style": `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackX}px; bottom: 0; z-index: 100;`
             }})
         ];
 
         let channels = Object.keys(this.peaks.data).map((channelNum) => {
             return h(`div.channel.channel-${channelNum}`, {attributes: {
-                "style": `height: ${data.height}px; top: 0; left: 0; position: absolute; margin: 0; padding: 0; z-index: 1;`
+                "style": `height: ${data.height}px; top: 0; left: ${startTimeX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`
             }},
             [
                 h("div.channel-progress", {attributes: {
-                    "style": `position: absolute; width: ${playbackPixels}px; height: ${data.height}px; z-index: 2;`
+                    "style": `position: absolute; width: ${progressX}px; height: ${data.height}px; z-index: 2;`
                 }}),
                 h("canvas", {
                     attributes: {

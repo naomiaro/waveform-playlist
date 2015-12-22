@@ -1,9 +1,6 @@
 function drawFrame(cc, h2, x, minPeak, maxPeak) {
-    let min;
-    let max;
-
-    max = Math.abs(maxPeak * h2);
-    min = Math.abs(minPeak * h2);
+    let min = Math.abs(minPeak * h2);
+    let max = Math.abs(maxPeak * h2);
 
     //draw maxs
     cc.fillRect(x, 0, 1, h2-max);

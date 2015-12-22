@@ -131,7 +131,8 @@ export default class {
 
         return Promise.all(loadPromises).then((audioBuffers) => {
             let tracks = audioBuffers.map((audioBuffer, index) => {
-                let name = trackList[index].name;
+                let name = trackList[index].name || "Untitled";
+                let start = trackList[index].start || 0;
 
                 //extract peaks with AudioContext for now.
                 let peaks = extractPeaks(audioBuffer, this.samplesPerPixel, true);
@@ -145,7 +146,7 @@ export default class {
                 track.setPeaks(peaks);
                 track.setCues(0, audioBuffer.duration);
                 track.setFades();
-                track.setStartTime(0);
+                track.setStartTime(start);
                 track.setPlayout(playout);
 
                 this.duration = Math.max(this.duration, track.getEndTime());
