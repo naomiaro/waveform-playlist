@@ -1,4 +1,5 @@
 import {pixelsToSeconds} from '../../utils/conversions';
+import _throttle from 'lodash/function/throttle';
 
 export default class {
     constructor(track, samplesPerPixel, sampleRate) {
@@ -10,49 +11,46 @@ export default class {
     mousedown(e) {
         e.preventDefault();
 
-        console.log(e);
-
-        let startX = e.offsetX;
+        var el = e.target;
+        var startX = e.offsetX;
         let startTime = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
 
         this.track.ee.emit('select', startTime, startTime, this.track);
 
-        // //dynamically put an event on the element.
-        // el.onmousemove = function(e) {
-        //     e.preventDefault();
+        let emitSelection = (x) => {
+            let minX = Math.min(x, startX);
+            let maxX = Math.max(x, startX);
+            let startTime = pixelsToSeconds(minX, this.samplesPerPixel, this.sampleRate);
+            let endTime = pixelsToSeconds(maxX, this.samplesPerPixel, this.sampleRate);
 
-        //     var currentX = editor.drawer.findClickedPixel(e),
-        //         minX = Math.min(currentX, startX),
-        //         maxX = Math.max(currentX, startX),
-        //         startTime,
-        //         endTime;
+            this.track.ee.emit('select', startTime, endTime, this.track);
+        }
 
-        //     startTime = editor.pixelsToSeconds(minX);
-        //     endTime = editor.pixelsToSeconds(maxX);
-        //     editor.notifySelectUpdate(startTime, endTime);
-        // };
+        let complete = (e) => {
+            e.preventDefault();
 
-        // complete = function(e) {
-        //     e.preventDefault();
+            emitSelection(e.offsetX);
 
-        //     var endX = editor.drawer.findClickedPixel(e),
-        //         minX, maxX,
-        //         startTime, endTime;
+            el.onmousemove = el.onmouseup = el.onmouseleave = null;
+        };
 
-        //     minX = Math.min(startX, endX);
-        //     maxX = Math.max(startX, endX);
+        //dynamically put an event on the element.
+        el.onmousemove = _throttle((e) => {
+            e.preventDefault();
 
-        //     startTime = editor.pixelsToSeconds(minX);
-        //     endTime = editor.pixelsToSeconds(maxX);
-        //     editor.notifySelectUpdate(startTime, endTime, e.shiftKey);
+            emitSelection(e.offsetX);
+        }, 150);
 
-        //     el.onmousemove = el.onmouseup = el.onmouseleave = null;
-        // };
-
-        // el.onmouseup = el.onmouseleave = complete;
+        el.onmouseup = el.onmouseleave = complete;
     }
 
     getClasses() {
         return ".state-select";
+    }
+
+    getEvents() {
+        return {
+            "mousedown": this.mousedown
+        }
     }
 }

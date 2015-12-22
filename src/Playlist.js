@@ -1,6 +1,7 @@
 'use strict';
 
-import _ from 'lodash';
+import _defaults from 'lodash/object/defaults';
+import _throttle from 'lodash/function/throttle';
 
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';
@@ -84,6 +85,11 @@ export default class {
                 this.setActiveTrack(track);
                 this.draw(this.render());
             }
+        });
+
+        ee.on('statechange', (state) => {
+            this.setState(state);
+            this.draw(this.render());
         });
 
         ee.on('play', () => {
@@ -429,7 +435,7 @@ export default class {
             "colors": this.colors
         };
 
-        return _.defaults(data, defaults);
+        return _defaults(data, defaults);
     }
 
     render() {
@@ -452,7 +458,7 @@ export default class {
                 "attributes": {
                     "style": "overflow: auto;"
                 },
-                "ev-scroll": _.throttle((e) => {
+                "ev-scroll": _throttle((e) => {
                     this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
                 }, 200),
                 "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)
