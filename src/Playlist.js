@@ -361,7 +361,7 @@ export default class {
         this.playoutPromises = playoutPromises;
         this.startAnimation(startTime);
 
-        return this.playoutPromises;
+        return Promise.all(this.playoutPromises);
     }
 
     pause() {
@@ -390,18 +390,18 @@ export default class {
 
         this.draw(this.render());
 
-        return this.playoutPromises;
+        return Promise.all(this.playoutPromises);
     }
 
     rewind() {
-        return Promise.all(this.stop()).then(() => {
+        return this.stop().then(() => {
             this.scrollLeft = 0;
             this.ee.emit('select', 0, 0);
         });
     }
 
     fastForward() {
-        return Promise.all(this.stop()).then(() => {
+        return this.stop().then(() => {
             this.scrollLeft = this.duration;
             this.ee.emit('select', this.duration, this.duration);
         });
