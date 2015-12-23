@@ -155,6 +155,10 @@ export default class {
                 name: file.name
             }]);
         });
+
+        ee.on('trim', () => {
+
+        });
     }
 
     load(trackList, options={}) {
@@ -277,13 +281,9 @@ export default class {
     }
 
     adjustDuration() {
-        var duration = 0;
-
-        this.tracks.forEach((track) => {
-            duration = Math.max(duration, track.getEndTime());
-        });
-
-        this.duration = duration;
+        this.duration = this.tracks.reduce((duration, track) => {
+            return Math.max(duration, track.getEndTime());
+        }, 0);
     }
 
     shouldTrackPlay(track) {
@@ -334,7 +334,7 @@ export default class {
             editor.scheduleStop();
         });
 
-        Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
+        return Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
     }
 
     play(startTime) {
@@ -360,6 +360,8 @@ export default class {
         //use these to track when the playlist has fully stopped.
         this.playoutPromises = playoutPromises;
         this.startAnimation(startTime);
+
+        return this.playoutPromises;
     }
 
     pause() {
@@ -368,13 +370,13 @@ export default class {
         }
 
         this.pausedAt = this.getCurrentTime();
-        this.playbackReset();
+        return this.playbackReset();
     }
 
     stop() {
         this.pausedAt = undefined;
         this.playbackSeconds = 0;
-        this.playbackReset();
+        return this.playbackReset();
     }
 
     playbackReset() {
@@ -387,21 +389,19 @@ export default class {
         });
 
         this.draw(this.render());
+
+        return this.playoutPromises;
     }
 
     rewind() {
-        this.stop();
-
-        Promise.all(this.playoutPromises).then(() => {
+        return Promise.all(this.stop()).then(() => {
             this.scrollLeft = 0;
             this.ee.emit('select', 0, 0);
         });
     }
 
     fastForward() {
-        this.stop();
-
-        Promise.all(this.playoutPromises).then(() => {
+        return Promise.all(this.stop()).then(() => {
             this.scrollLeft = this.duration;
             this.ee.emit('select', this.duration, this.duration);
         });
@@ -430,7 +430,7 @@ export default class {
 
         if (this.isPlaying()) {
             playbackSeconds = cursorPos + elapsed;
-
+            this.ee.emit('timeupdate', playbackSeconds);
             this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
         }
         else {
@@ -441,7 +441,6 @@ export default class {
         }
 
         this.playbackSeconds = playbackSeconds;
-        this.ee.emit('timeupdate', playbackSeconds);
 
         this.draw(this.render());
         this.lastDraw = currentTime;
