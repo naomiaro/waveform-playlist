@@ -1,22 +1,23 @@
 var ee = playlist.getEventEmitter();
+var $container = $("body");
 
-document.querySelector(".btn-play").addEventListener("click", function() {
+$container.on("click", ".btn-play", function() {
   ee.emit("play");
 });
 
-document.querySelector(".btn-pause").addEventListener("click", function() {
+$container.on("click", ".btn-pause", function() {
   ee.emit("pause");
 });
 
-document.querySelector(".btn-stop").addEventListener("click", function() {
+$container.on("click", ".btn-stop", function() {
   ee.emit("stop");
 });
 
-document.querySelector(".btn-rewind").addEventListener("click", function() {
+$container.on("click", ".btn-rewind", function() {
   ee.emit("rewind");
 });
 
-document.querySelector(".btn-fast-forward").addEventListener("click", function() {
+$container.on("click", ".btn-fast-forward", function() {
   ee.emit("fastforward");
 });
 
@@ -31,27 +32,27 @@ function toggleActive(node) {
   node.classList.toggle('active');
 }
 
-document.querySelector(".btn-cursor").addEventListener("click", function(e) {
+$container.on("click", ".btn-cursor", function(e) {
   ee.emit("statechange", "cursor");
   toggleActive(this);
 });
 
-document.querySelector(".btn-select").addEventListener("click", function(e) {
+$container.on("click", ".btn-select", function(e) {
   ee.emit("statechange", "select");
   toggleActive(this);
 });
 
-document.querySelector(".btn-shift").addEventListener("click", function(e) {
+$container.on("click", ".btn-shift", function(e) {
   ee.emit("statechange", "shift");
   toggleActive(this);
 });
 
-document.querySelector(".btn-fadein").addEventListener("click", function(e) {
+$container.on("click", ".btn-fadein", function(e) {
   ee.emit("statechange", "fadein");
   toggleActive(this);
 });
 
-document.querySelector(".btn-fadeout").addEventListener("click", function(e) {
+$container.on("click", ".btn-fadeout", function(e) {
   ee.emit("statechange", "fadeout");
   toggleActive(this);
 });

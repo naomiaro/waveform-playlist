@@ -226,8 +226,8 @@ export default class {
     setState(state) {
         this.state = state;
 
-        this.tracks.forEach((editor) => {
-            editor.setState(state);
+        this.tracks.forEach((track) => {
+            track.setState(state);
         });
     }
 

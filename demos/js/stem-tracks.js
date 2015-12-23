@@ -4,9 +4,7 @@ var playlist = new WaveformPlaylist.init({
   container: document.getElementById("playlist"),
   state: 'cursor',
   colors: {
-    waveOutlineColor: '#E0EFF1',
-    timeColor: 'grey',
-    fadeColor: 'black'
+    waveOutlineColor: '#E0EFF1'
   },
   controls: {
     show: true, //whether or not to include the track controls
