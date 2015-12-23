@@ -14,7 +14,7 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     let defaults = {
         ac: new (window.AudioContext || window.webkitAudioContext),
         sampleRate: 44100,
-        samplesPerPixel: 4096, //resolution - frames per pixel to draw.
+        samplesPerPixel: 4096, //samples per pixel to draw.
         timeFormat: 'hh:mm:ss.uu',
         mono: true, //whether to draw multiple channels or combine them.
         fadeType: 'logarithmic',
@@ -33,7 +33,8 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
         peaks: {
             type: "WebAudio",
             mono: true
-        }
+        },
+        zoomLevels: [512, 1024, 2048, 4096] //zoom levels in samples per pixel
     };
 
     let config = _assign(defaults, options);
