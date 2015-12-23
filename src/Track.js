@@ -61,8 +61,7 @@ export default class {
             'fadein': true,
             'fadeout': true,
             'select': true,
-            'shift': true,
-            'record': true
+            'shift': true
         };
 
         this.enabledStates = _assign(defaultStatesEnabled, enabledStates);

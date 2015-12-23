@@ -149,6 +149,10 @@ export default class {
                 "start": start
             });
         });
+
+        ee.on('fadetype', (type) => {
+            this.fadeType = type;
+        });
     }
 
     load(trackList, options={}) {
