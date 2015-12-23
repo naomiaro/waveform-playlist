@@ -30,6 +30,8 @@ export default class {
         this.playbackSeconds = 0;
         this.duration = 0;
         this.scrollLeft = 0;
+
+        this.fadeType = "logarithmic";
     }
 
     setSampleRate(sampleRate) {
@@ -132,6 +134,20 @@ export default class {
 
         ee.on('volumechange', (volume, track) => {
             track.setGainLevel(volume/100);
+        });
+
+        ee.on('fadein', (end, track) => {
+            track.setFadeIn({
+                "shape": this.fadeType,
+                "end": end
+            });
+        });
+
+        ee.on('fadeout', (start, track) => {
+            track.setFadeOut({
+                "shape": this.fadeType,
+                "start": start
+            });
         });
     }
 

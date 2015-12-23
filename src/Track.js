@@ -75,8 +75,13 @@ export default class {
             "end": this.duration
         };
 
+        if (this.fadeIn) {
+            this.removeFade(this.fadeIn);
+            this.fadeIn = undefined;
+        }
+
         let fade = _assign(d, options);
-        this.saveFade("FadeIn", fade.shape, fade.start, fade.end);
+        this.fadeIn = this.saveFade("FadeIn", fade.shape, fade.start, fade.end);
     }
 
     setFadeOut(options={}) {
@@ -86,8 +91,13 @@ export default class {
             "end": this.duration
         };
 
+        if (this.fadeOut) {
+            this.removeFade(this.fadeOut);
+            this.fadeOut = undefined;
+        }
+
         let fade = _assign(d, options);
-        this.saveFade("FadeOut", fade.shape, fade.start, fade.end);
+        this.fadeOut = this.saveFade("FadeOut", fade.shape, fade.start, fade.end);
     }
 
     saveFade(type, shape, start, end) {
