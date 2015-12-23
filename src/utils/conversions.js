@@ -21,5 +21,5 @@ export function pixelsToSeconds(pixels, resolution, sampleRate) {
 }
 
 export function secondsToPixels(seconds, resolution, sampleRate) {
-    return ~~(seconds * sampleRate / resolution);
+    return Math.ceil(seconds * sampleRate / resolution);
 }

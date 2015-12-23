@@ -14,7 +14,7 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     let defaults = {
         ac: new (window.AudioContext || window.webkitAudioContext),
         sampleRate: 44100,
-        samplesPerPixel: 4096, //samples per pixel to draw.
+        samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
         timeFormat: 'hh:mm:ss.uu',
         mono: true, //whether to draw multiple channels or combine them.
         fadeType: 'logarithmic',
@@ -30,14 +30,15 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
         },
         waveHeight: 128, //height of each canvas element a waveform is on.
         state: 'cursor',
-        peaks: {
-            type: "WebAudio",
-            mono: true
-        },
         zoomLevels: [512, 1024, 2048, 4096] //zoom levels in samples per pixel
     };
 
     let config = _assign(defaults, options);
+    let zoomIndex = config.zoomLevels.indexOf(config.samplesPerPixel);
+
+    if (zoomIndex === -1) {
+        throw new Error("initial samplesPerPixel must be included in array zoomLevels");
+    }
 
     let playlist = new Playlist();
     playlist.setSampleRate(config.sampleRate);
@@ -50,6 +51,8 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     playlist.setControlOptions(config.controls);
     playlist.setWaveHeight(config.waveHeight);
     playlist.setColors(config.colors);
+    playlist.setZoomLevels(config.zoomLevels);
+    playlist.setZoomIndex(zoomIndex);
 
     //take care of initial virtual dom rendering.
     let tree = playlist.render();

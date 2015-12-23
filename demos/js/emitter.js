@@ -79,6 +79,15 @@ $container.on("click", ".btn-exponential", function() {
   toggleActive(this);
 });
 
+//zoom buttons
+$container.on("click", ".btn-zoom-in", function() {
+  ee.emit("zoomin");
+});
+
+$container.on("click", ".btn-zoom-out", function() {
+  ee.emit("zoomout");
+});
+
 //track drop
 $container.on("dragenter", ".track-drop", function(e) {
   e.preventDefault();

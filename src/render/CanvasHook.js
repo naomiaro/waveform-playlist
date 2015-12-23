@@ -12,29 +12,27 @@ function drawFrame(cc, h2, x, minPeak, maxPeak) {
 * virtual-dom hook for drawing to the canvas element.
 */
 export default class {
-    constructor(track, channelNum, offset, color) {
-        this.track = track;
-        this.channelNum = channelNum;
+    constructor(peaks, offset, color) {
+        this.peaks = peaks
         this.offset = offset;
         this.color = color;
     }
 
-    hook(canvas, propertyName, previousValue) {
-        //node is already created.
-        if (previousValue !== undefined) {
+    hook(canvas, prop, prev) {
+        //canvas is up to date
+        if (prev !== undefined && (prev.peaks.length === this.peaks.length)) {
             return;
         }
 
         let i;
         let len = canvas.width;
-        let channel = this.track.peaks.data[this.channelNum];
         let cc = canvas.getContext('2d');
         let h2 = canvas.height/2;
 
         cc.fillStyle = this.color;
 
         for (i = 0; i < len; i++) {
-            drawFrame(cc, h2, i, channel[i*2], channel[i*2+1]);
+            drawFrame(cc, h2, i, this.peaks[i*2], this.peaks[i*2+1]);
         }
     }
 }

@@ -8,7 +8,6 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 
 import {pixelsToSeconds} from './utils/conversions'
-import extractPeaks from './utils/peaks';
 import LoaderFactory from './track/loader/LoaderFactory';
 
 import ScrollHook from './render/ScrollHook';
@@ -159,6 +158,26 @@ export default class {
         ee.on('trim', () => {
 
         });
+
+        ee.on('zoomin', () => {
+            let zoomIndex = Math.max(0, this.zoomIndex-1);
+            let zoom = this.zoomLevels[zoomIndex];
+
+            if (zoom !== this.samplesPerPixel) {
+                this.setZoom(zoom);
+                this.draw(this.render());
+            }
+        });
+
+        ee.on('zoomout', () => {
+            let zoomIndex = Math.min(this.zoomLevels.length-1, this.zoomIndex+1);
+            let zoom = this.zoomLevels[zoomIndex];
+
+            if (zoom !== this.samplesPerPixel) {
+                this.setZoom(zoom);
+                this.draw(this.render());
+            }
+        });
     }
 
     load(trackList, options={}) {
@@ -175,16 +194,14 @@ export default class {
                 let fadeIn = trackList[index].fadeIn;
                 let fadeOut = trackList[index].fadeOut;
 
-                //extract peaks with AudioContext for now.
-                let peaks = extractPeaks(audioBuffer, this.samplesPerPixel, true);
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);
 
                 let track = new Track();
+                track.setBuffer(audioBuffer);
                 track.setName(name);
                 track.setEventEmitter(this.ee);
                 track.setEnabledStates(states);
-                track.setPeaks(peaks);
                 track.setCues(0, audioBuffer.duration);
 
                 if (fadeIn !== undefined) {
@@ -198,6 +215,9 @@ export default class {
                 track.setState(this.getState());
                 track.setStartTime(start);
                 track.setPlayout(playout);
+
+                //extract peaks with AudioContext for now.
+                track.calculatePeaks(this.samplesPerPixel);
 
                 return track;
             });
@@ -245,6 +265,22 @@ export default class {
 
     getState() {
         return this.state;
+    }
+
+    setZoomIndex(index) {
+        this.zoomIndex = index;
+    }
+
+    setZoomLevels(levels) {
+        this.zoomLevels = levels;
+    }
+
+    setZoom(zoom) {
+        this.samplesPerPixel = zoom;
+        this.zoomIndex = this.zoomLevels.indexOf(zoom);
+        this.tracks.forEach((track) => {
+            track.calculatePeaks(zoom);
+        }); 
     }
 
     muteTrack(track) {
@@ -322,9 +358,7 @@ export default class {
     }
 
     getElapsedTime() {
-        let currentTime = this.ac.currentTime;
-
-        return currentTime - this.lastPlay;
+        return this.ac.currentTime - this.lastPlay;
     }
 
     restartPlayFrom(cursorPos) {

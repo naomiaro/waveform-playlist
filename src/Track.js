@@ -7,6 +7,7 @@ import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
 import {secondsToPixels} from './utils/conversions'
+import extractPeaks from './utils/peaks';
 import stateClasses from './track/states';
 import CanvasHook from './render/CanvasHook';
 
@@ -22,6 +23,10 @@ export default class {
         this.name = name;
         this.gain = 1;
         this.fades = {};
+        this.peakData = {
+            type: "WebAudio",
+            mono: true
+        };
     }
 
     setEventEmitter(ee) {
@@ -116,8 +121,16 @@ export default class {
         delete this.fades[id];
     }
 
-    setPeaks(peaks) {
-        this.peaks = peaks;
+    setBuffer(buffer) {
+        this.buffer = buffer;
+    }
+
+    setPeakData(data) {
+        this.peakData = data;
+    }
+
+    calculatePeaks(samplesPerPixel) {
+        this.peaks = extractPeaks(this.buffer, samplesPerPixel, this.peakData.mono);
     }
 
     setState(state) {
@@ -352,7 +365,7 @@ export default class {
                         "height": data.height,
                         "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                     },
-                    "hook": new CanvasHook(this, channelNum, 0, data.colors.waveOutlineColor)
+                    "hook": new CanvasHook(this.peaks.data[channelNum], 0, data.colors.waveOutlineColor)
                 })
             ]);
         });
