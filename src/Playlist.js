@@ -441,6 +441,7 @@ export default class {
         }
 
         this.playbackSeconds = playbackSeconds;
+        this.ee.emit('timeupdate', playbackSeconds);
 
         this.draw(this.render());
         this.lastDraw = currentTime;

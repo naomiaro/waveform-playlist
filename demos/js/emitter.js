@@ -104,3 +104,79 @@ $container.on("drop", ".track-drop", function(e) {
     ee.emit("newtrack", dropEvent.dataTransfer.files[i]);
   }
 });
+
+$container.on("change", ".time-format", function(e) {
+  updateSelect(startTime, endTime);
+  updateTime(audioPos);
+  format = $timeFormat.val();
+});
+
+function cueFormatters(format) {
+
+  function clockFormat(seconds, decimals) {
+      var hours,
+          minutes,
+          secs,
+          result;
+
+      hours = parseInt(seconds / 3600, 10) % 24;
+      minutes = parseInt(seconds / 60, 10) % 60;
+      secs = seconds % 60;
+      secs = secs.toFixed(decimals);
+
+      result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
+
+      return result;
+  }
+
+  var formats = {
+      "seconds": function (seconds) {
+          return seconds.toFixed(0);
+      },
+      "thousandths": function (seconds) {
+          return seconds.toFixed(3);
+      },
+      "hh:mm:ss": function (seconds) {
+          return clockFormat(seconds, 0);   
+      },
+      "hh:mm:ss.u": function (seconds) {
+          return clockFormat(seconds, 1);   
+      },
+      "hh:mm:ss.uu": function (seconds) {
+          return clockFormat(seconds, 2);   
+      },
+      "hh:mm:ss.uuu": function (seconds) {
+          return clockFormat(seconds, 3);   
+      }
+  };
+
+  return formats[format];
+}
+
+var $timeFormat = $container.find('.time-format');
+var $audioStart = $container.find('.audio-start');
+var $audioEnd = $container.find('.audio-end');
+var $time = $container.find('.audio-pos');
+
+var format = "seconds";
+var startTime = 0;
+var endTime = 0;
+var audioPos = 0;
+
+function updateSelect(startTime, endTime) {
+  $audioStart.val(cueFormatters(format)(startTime));
+  $audioEnd.val(cueFormatters(format)(endTime));
+
+  startTime = startTime;
+  endTime = endTime;
+}
+
+ee.on("select", updateSelect);
+
+function updateTime(time) {
+  $time.html(cueFormatters(format)(time));
+
+  audioPos = time;
+}
+
+ee.on("timeupdate", updateTime);
