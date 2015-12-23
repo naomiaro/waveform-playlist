@@ -1,4 +1,5 @@
-import _ from 'lodash';
+import _assign from 'lodash/object/assign';
+import createElement from 'virtual-dom/create-element';
 
 import Delegator from 'dom-delegator';
 import EventEmitter from 'event-emitter';
@@ -35,10 +36,9 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
         }
     };
 
-    let config = _.assign(defaults, options);
+    let config = _assign(defaults, options);
 
     let playlist = new Playlist();
-    playlist.setContainer(config.container);
     playlist.setSampleRate(config.sampleRate);
     playlist.setSamplesPerPixel(config.samplesPerPixel);
     playlist.setAudioContext(config.ac);
@@ -49,6 +49,14 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     playlist.setControlOptions(config.controls);
     playlist.setWaveHeight(config.waveHeight);
     playlist.setColors(config.colors);
+
+    //take care of initial virtual dom rendering.
+    let tree = playlist.render();
+    let rootNode = createElement(tree);
+
+    config.container.appendChild(rootNode);
+    playlist.tree = tree;
+    playlist.rootNode = rootNode;
 
     //have to add extra events that aren't followed by default.
     delegator.listenTo("scroll");

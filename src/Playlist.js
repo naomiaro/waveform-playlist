@@ -6,7 +6,6 @@ import _throttle from 'lodash/function/throttle';
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
-import createElement from 'virtual-dom/create-element';
 
 import {pixelsToSeconds} from './utils/conversions'
 import extractPeaks from './utils/peaks';
@@ -44,10 +43,6 @@ export default class {
 
     setAudioContext(ac) {
         this.ac = ac;
-    }
-
-    setContainer(container) {
-        this.container = container;
     }
 
     setControlOptions(controlOptions) {
@@ -153,6 +148,13 @@ export default class {
         ee.on('fadetype', (type) => {
             this.fadeType = type;
         });
+
+        ee.on('newtrack', (file) => {
+            this.load([{
+                src: file,
+                name: file.name
+            }]);
+        });
     }
 
     load(trackList, options={}) {
@@ -189,30 +191,16 @@ export default class {
                     track.setFadeOut(fadeOut);
                 }
 
+                track.setState(this.getState());
                 track.setStartTime(start);
                 track.setPlayout(playout);
 
                 return track;
             });
 
-            this.tracks = tracks;
+            this.tracks = this.tracks.concat(tracks);
             this.adjustDuration();
-
-            return tracks;
-
-        }).then((trackEditors) => {
-
-            this.setState(this.getState());
-
-            //take care of virtual dom rendering.
-            let tree = this.render();
-            let rootNode = createElement(tree);
-
-            this.container.appendChild(rootNode);
-            this.tree = tree;
-            this.rootNode = rootNode;
-
-            return trackEditors;
+            this.draw(this.render());
         });
     }
 

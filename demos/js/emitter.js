@@ -78,3 +78,29 @@ $container.on("click", ".btn-exponential", function() {
   ee.emit("fadetype", "exponential");
   toggleActive(this);
 });
+
+//track drop
+$container.on("dragenter", ".track-drop", function(e) {
+  e.preventDefault();
+  e.target.classList.add("drag-enter");
+});
+
+$container.on("dragover", ".track-drop", function(e) {
+  e.preventDefault();
+});
+
+$container.on("dragleave", ".track-drop", function(e) {
+  e.preventDefault();
+  e.target.classList.remove("drag-enter");
+});
+
+$container.on("drop", ".track-drop", function(e) {
+  e.preventDefault();
+  e.target.classList.remove("drag-enter");
+
+  var dropEvent = e.originalEvent;
+
+  for (var i = 0; i < dropEvent.dataTransfer.files.length; i++) {
+    ee.emit("newtrack", dropEvent.dataTransfer.files[i]);
+  }
+});
