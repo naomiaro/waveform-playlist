@@ -14,7 +14,7 @@ import CanvasHook from './render/CanvasHook';
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
 
-const MAX_CANVAS_WIDTH = 20000;
+const MAX_CANVAS_WIDTH = 1000;
 
 export default class {
 
@@ -352,22 +352,36 @@ export default class {
         ];
 
         let channels = Object.keys(this.peaks.data).map((channelNum) => {
-            return h(`div.channel.channel-${channelNum}`, {attributes: {
-                "style": `height: ${data.height}px; top: 0; left: ${startX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`
-            }},
-            [
+
+            let channelChildren = [
                 h("div.channel-progress", {attributes: {
                     "style": `position: absolute; width: ${progressWidth}px; height: ${data.height}px; z-index: 2;`
-                }}),
-                h("canvas", {
+                }})
+            ];
+            let offset = 0;
+            let totalWidth = width;
+
+            while (totalWidth > 0) {
+                let currentWidth = Math.min(totalWidth, MAX_CANVAS_WIDTH);
+
+                channelChildren.push(h("canvas", {
                     attributes: {
-                        "width": width,
+                        "width": currentWidth,
                         "height": data.height,
                         "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                     },
-                    "hook": new CanvasHook(this.peaks.data[channelNum], 0, data.colors.waveOutlineColor)
-                })
-            ]);
+                    "hook": new CanvasHook(this.peaks.data[channelNum], offset, data.colors.waveOutlineColor)
+                }));
+
+                totalWidth -= currentWidth;
+                offset++;
+            }
+
+            return h(`div.channel.channel-${channelNum}`, {attributes: {
+                    "style": `height: ${data.height}px; width: ${width}px; top: 0; left: ${startX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`
+                }},
+                channelChildren
+            );
         });
 
         let audibleClass = data.masterGain ? "" : ".silent";

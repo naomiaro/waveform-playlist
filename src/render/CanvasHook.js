@@ -14,7 +14,7 @@ function drawFrame(cc, h2, x, minPeak, maxPeak) {
 export default class {
     constructor(peaks, offset, color) {
         this.peaks = peaks
-        this.offset = offset;
+        this.offset = offset;  //http://stackoverflow.com/questions/6081483/maximum-size-of-a-canvas-element
         this.color = color;
     }
 
@@ -32,7 +32,7 @@ export default class {
         cc.fillStyle = this.color;
 
         for (i = 0; i < len; i++) {
-            drawFrame(cc, h2, i, this.peaks[i*2], this.peaks[i*2+1]);
+            drawFrame(cc, h2, i, this.peaks[this.offset + i*2], this.peaks[this.offset + i*2+1]);
         }
     }
 }
