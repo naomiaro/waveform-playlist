@@ -32,7 +32,7 @@ export default class {
         cc.fillStyle = this.color;
 
         for (i = 0; i < len; i++) {
-            drawFrame(cc, h2, i, this.peaks[this.offset + i*2], this.peaks[this.offset + i*2+1]);
+            drawFrame(cc, h2, i, this.peaks[(i+this.offset)*2], this.peaks[(i+this.offset)*2+1]);
         }
     }
 }

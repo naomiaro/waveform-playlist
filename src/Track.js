@@ -360,6 +360,7 @@ export default class {
             ];
             let offset = 0;
             let totalWidth = width;
+            let peaks = this.peaks.data[channelNum];
 
             while (totalWidth > 0) {
                 let currentWidth = Math.min(totalWidth, MAX_CANVAS_WIDTH);
@@ -368,13 +369,14 @@ export default class {
                     attributes: {
                         "width": currentWidth,
                         "height": data.height,
+                        "data-offset": offset,
                         "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                     },
-                    "hook": new CanvasHook(this.peaks.data[channelNum], offset, data.colors.waveOutlineColor)
+                    "hook": new CanvasHook(peaks, offset, data.colors.waveOutlineColor)
                 }));
 
                 totalWidth -= currentWidth;
-                offset++;
+                offset += MAX_CANVAS_WIDTH;
             }
 
             return h(`div.channel.channel-${channelNum}`, {attributes: {
