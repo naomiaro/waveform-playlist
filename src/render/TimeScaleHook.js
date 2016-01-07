@@ -2,11 +2,20 @@
 * virtual-dom hook for rendering the time scale canvas.
 */
 export default class {
-	constructor(tickInfo) {
+	constructor(tickInfo, offset, samplesPerPixel) {
         this.tickInfo = tickInfo;
+        this.offset = offset;
+        this.samplesPerPixel = samplesPerPixel;
     }
 
-    hook(canvas, propertyName, previousValue) {
+    hook(canvas, prop, prev) {
+    	//canvas is up to date
+        if (prev !== undefined 
+        	&& (prev.offset === this.offset)
+        	&& (prev.samplesPerPixel === this.samplesPerPixel)) {
+            return;
+        }
+
     	let width = canvas.width;
     	let height = canvas.height;
     	let cc = canvas.getContext('2d');

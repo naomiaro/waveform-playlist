@@ -486,9 +486,8 @@ export default class {
     }
 
     draw(newTree) {
-        let patches = diff(this.tree, newTree);
-        
         window.requestAnimationFrame(() => {
+            let patches = diff(this.tree, newTree);
             this.rootNode = patch(this.rootNode, patches);
             this.tree = newTree;
         });
