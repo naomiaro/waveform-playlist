@@ -264,7 +264,7 @@ export default class {
 
         return h(`div.selection.${className}`, {
             attributes: {
-                "style": `position: absolute; width: ${width}px; bottom: 0; top: 0; left: ${startX}px; z-index: 999;`
+                "style": `position: absolute; width: ${width}px; bottom: 0; top: 0; left: ${startX}px; z-index: 4;`
             }
         });
     }
