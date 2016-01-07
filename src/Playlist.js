@@ -384,7 +384,7 @@ export default class {
 
         startTime = startTime || this.pausedAt || this.cursor;
 
-        if (selected.end > startTime) {
+        if (selected.end !== selected.start && selected.end > startTime) {
             endTime = selected.end;
         }
 
