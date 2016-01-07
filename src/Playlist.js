@@ -7,11 +7,12 @@ import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 
-import {pixelsToSeconds} from './utils/conversions'
+import {pixelsToSeconds} from './utils/conversions';
 import LoaderFactory from './track/loader/LoaderFactory';
 
 import ScrollHook from './render/ScrollHook';
 
+import TimeScale from './TimeScale';
 import Track from './Track';
 import Playout from './Playout';
 
@@ -506,8 +507,9 @@ export default class {
     }
 
     render() {
-        var activeTrack = this.getActiveTrack();
+        let timeScale = new TimeScale(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate);
 
+        let activeTrack = this.getActiveTrack();
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
                 "isActive": (activeTrack === track) ? true : false,
@@ -521,6 +523,9 @@ export default class {
             "attributes": {
                 "style": "overflow: hidden; position: relative;"
             }}, [
+
+            timeScale.render(),
+
             h("div.playlist-tracks", {
                 "attributes": {
                     "style": "overflow: auto;"

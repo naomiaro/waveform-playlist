@@ -6,7 +6,7 @@ import _forOwn from 'lodash/object/forOwn';
 import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
-import {secondsToPixels} from './utils/conversions'
+import {secondsToPixels} from './utils/conversions';
 import extractPeaks from './utils/peaks';
 import stateClasses from './track/states';
 import CanvasHook from './render/CanvasHook';
