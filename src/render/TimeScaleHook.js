@@ -7,8 +7,11 @@ export default class {
     }
 
     hook(canvas, propertyName, previousValue) {
+    	let width = canvas.width;
     	let height = canvas.height;
     	let cc = canvas.getContext('2d');
+
+    	cc.clearRect(0, 0, width, height);
     	
         Object.keys(this.tickInfo).forEach((x) => {
         	let scaleHeight = this.tickInfo[x];

@@ -179,6 +179,10 @@ export default class {
                 this.draw(this.render());
             }
         });
+
+        ee.on('scroll', () => {
+            this.draw(this.render());
+        });
     }
 
     load(trackList, options={}) {
@@ -532,6 +536,7 @@ export default class {
                 },
                 "ev-scroll": _throttle((e) => {
                     this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
+                    this.ee.emit("scroll", this.scrollLeft);
                 }, 200),
                 "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)
             }, trackElements)
