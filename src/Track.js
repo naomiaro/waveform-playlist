@@ -274,7 +274,7 @@ export default class {
 
         let config = {
             attributes: {
-                "style": `position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: ${channelPixels}px; z-index: 9999;`
+                "style": `position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: ${channelPixels}px; z-index: 9;`
             }
         };
 
@@ -300,7 +300,7 @@ export default class {
 
         return h("div.controls", {
             attributes: {
-                "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 9999;`
+                "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`
             }},
             [
                 h("header", [ this.name ]),
@@ -347,7 +347,7 @@ export default class {
 
         let waveformChildren = [
             h("div.cursor", {attributes: {
-                "style": `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackX}px; bottom: 0; z-index: 100;`
+                "style": `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackX}px; bottom: 0; z-index: 5;`
             }})
         ];
 
