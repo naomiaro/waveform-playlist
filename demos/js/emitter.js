@@ -1,5 +1,18 @@
+/*
+ * This script is provided to give an example how the playlist can be controlled using the event emitter.
+*/
+
 var ee = playlist.getEventEmitter();
 var $container = $("body");
+var $timeFormat = $container.find('.time-format');
+var $audioStart = $container.find('.audio-start');
+var $audioEnd = $container.find('.audio-end');
+var $time = $container.find('.audio-pos');
+
+var format = "seconds";
+var startTime = 0;
+var endTime = 0;
+var audioPos = 0;
 
 $container.on("click", ".btn-play", function() {
   ee.emit("play");
@@ -115,9 +128,10 @@ $container.on("drop", ".track-drop", function(e) {
 });
 
 $container.on("change", ".time-format", function(e) {
+  format = $timeFormat.val();
+
   updateSelect(startTime, endTime);
   updateTime(audioPos);
-  format = $timeFormat.val();
 });
 
 function cueFormatters(format) {
@@ -162,22 +176,12 @@ function cueFormatters(format) {
   return formats[format];
 }
 
-var $timeFormat = $container.find('.time-format');
-var $audioStart = $container.find('.audio-start');
-var $audioEnd = $container.find('.audio-end');
-var $time = $container.find('.audio-pos');
+function updateSelect(start, end) {
+  $audioStart.val(cueFormatters(format)(start));
+  $audioEnd.val(cueFormatters(format)(end));
 
-var format = "seconds";
-var startTime = 0;
-var endTime = 0;
-var audioPos = 0;
-
-function updateSelect(startTime, endTime) {
-  $audioStart.val(cueFormatters(format)(startTime));
-  $audioEnd.val(cueFormatters(format)(endTime));
-
-  startTime = startTime;
-  endTime = endTime;
+  startTime = start;
+  endTime = end;
 }
 
 ee.on("select", updateSelect);
