@@ -441,7 +441,13 @@ export default class {
 
     fastForward() {
         return this.stop().then(() => {
-            this.scrollLeft = this.duration;
+            if (this.viewDuration < this.duration) {
+                this.scrollLeft = this.duration - this.viewDuration;
+            }
+            else {
+                this.scrollLeft = 0;
+            }
+
             this.ee.emit('select', this.duration, this.duration);
         });
     }
@@ -490,6 +496,9 @@ export default class {
             let patches = diff(this.tree, newTree);
             this.rootNode = patch(this.rootNode, patches);
             this.tree = newTree;
+
+            //use for fast forwarding.
+            this.viewDuration = pixelsToSeconds(this.rootNode.clientWidth - this.controls.width, this.samplesPerPixel, this.sampleRate);
         });
     }
 
