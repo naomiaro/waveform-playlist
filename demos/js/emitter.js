@@ -68,6 +68,13 @@ function cueFormatters(format) {
 }
 
 function updateSelect(start, end) {
+  if (start < end) {
+    $('.btn-trim-audio').removeClass('disabled');
+  }
+  else {
+    $('.btn-trim-audio').addClass('disabled');
+  }
+
   $audioStart.val(cueFormatters(format)(start));
   $audioEnd.val(cueFormatters(format)(end));
 
