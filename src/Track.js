@@ -9,10 +9,11 @@ import h from 'virtual-dom/h';
 import {secondsToPixels} from './utils/conversions';
 import extractPeaks from './utils/peaks';
 import stateClasses from './track/states';
-import CanvasHook from './render/CanvasHook';
 
-const FADEIN = "FadeIn";
-const FADEOUT = "FadeOut";
+import CanvasHook from './render/CanvasHook';
+import FadeCanvasHook from './render/FadeCanvasHook';
+
+import {FADEIN, FADEOUT} from './utils/fades';
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -85,7 +86,7 @@ export default class {
         }
 
         let fade = _assign(d, options);
-        this.fadeIn = this.saveFade("FadeIn", fade.shape, fade.start, fade.end);
+        this.fadeIn = this.saveFade(FADEIN, fade.shape, fade.start, fade.end);
     }
 
     setFadeOut(options={}) {
@@ -101,7 +102,7 @@ export default class {
         }
 
         let fade = _assign(d, options);
-        this.fadeOut = this.saveFade("FadeOut", fade.shape, fade.start, fade.end);
+        this.fadeOut = this.saveFade(FADEOUT, fade.shape, fade.start, fade.end);
     }
 
     saveFade(type, shape, start, end) {
@@ -377,6 +378,25 @@ export default class {
 
                 totalWidth -= currentWidth;
                 offset += MAX_CANVAS_WIDTH;
+            }
+
+            //if there are fades, display them.
+            if (this.fadeIn) {
+                let fadeIn = this.fades[this.fadeIn];
+                let width = secondsToPixels(fadeIn.end - fadeIn.start, data.resolution, data.sampleRate);
+
+                channelChildren.push(h("div.wp-fade.wp-fadein", {
+                    attributes: {
+                        "style": `position: absolute; height: ${data.height}px; width: ${width}px; top: 0; left: 0; z-index: 4;`
+                    }}, [
+                    h("canvas", {
+                        attributes: {
+                            "width": width,
+                            "height": data.height
+                        },
+                        "hook": new FadeCanvasHook(fadeIn)
+                    })
+                ]));
             }
 
             return h(`div.channel.channel-${channelNum}`, {attributes: {

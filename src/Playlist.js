@@ -136,6 +136,8 @@ export default class {
                 "shape": this.fadeType,
                 "end": end
             });
+
+            this.draw(this.render());
         });
 
         ee.on('fadeout', (start, track) => {
@@ -143,6 +145,8 @@ export default class {
                 "shape": this.fadeType,
                 "start": start
             });
+
+            this.draw(this.render());
         });
 
         ee.on('fadetype', (type) => {

@@ -2,18 +2,21 @@
 
 import {sCurve, logarithmic} from './curves';
 
-const SCURVE = "sCurve";
-const LINEAR = "linear";
-const EXPONENTIAL = "exponential";
-const LOGARITHMIC = "logarithmic";
+export const SCURVE = "sCurve";
+export const LINEAR = "linear";
+export const EXPONENTIAL = "exponential";
+export const LOGARITHMIC = "logarithmic";
+
+export const FADEIN = "FadeIn";
+export const FADEOUT = "FadeOut";
 
 function sCurveFadeIn(start, duration) {
-    var curve = sCurve(10000, (Math.PI/2));
+    var curve = sCurve(10000, 1);
     this.setValueCurveAtTime(curve, start, duration);
 }
 
 function sCurveFadeOut(start, duration) {
-    var curve = sCurve(10000, -(Math.PI/2));
+    var curve = sCurve(10000, -1);
     this.setValueCurveAtTime(curve, start, duration);
 }
 
@@ -48,8 +51,8 @@ function logarithmicFadeOut(start, duration) {
 }
 
 
-export function createFadeIn(gain, type, start, duration) {
-    switch(type) {
+export function createFadeIn(gain, shape, start, duration) {
+    switch(shape) {
         case SCURVE:
             sCurveFadeIn.call(gain, start, duration);
             break;
@@ -67,8 +70,8 @@ export function createFadeIn(gain, type, start, duration) {
     }
 }
 
-export function createFadeOut(gain, type, start, duration) {
-    switch(type) {
+export function createFadeOut(gain, shape, start, duration) {
+    switch(shape) {
         case SCURVE:
             sCurveFadeOut.call(gain, start, duration);
             break;
