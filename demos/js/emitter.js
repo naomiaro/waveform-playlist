@@ -1,7 +1,7 @@
 /*
  * This script is provided to give an example how the playlist can be controlled using the event emitter.
+ * This enables projects to create/control the useability of the project.
 */
-
 var ee = playlist.getEventEmitter();
 var $container = $("body");
 var $timeFormat = $container.find('.time-format');
@@ -13,6 +13,95 @@ var format = "seconds";
 var startTime = 0;
 var endTime = 0;
 var audioPos = 0;
+
+function toggleActive(node) {
+  var active = node.parentNode.querySelectorAll('.active');
+  var i = 0, len = active.length;
+
+  for (; i < len; i++) {
+    active[i].classList.remove('active');
+  }
+
+  node.classList.toggle('active');
+}
+
+function cueFormatters(format) {
+
+  function clockFormat(seconds, decimals) {
+      var hours,
+          minutes,
+          secs,
+          result;
+
+      hours = parseInt(seconds / 3600, 10) % 24;
+      minutes = parseInt(seconds / 60, 10) % 60;
+      secs = seconds % 60;
+      secs = secs.toFixed(decimals);
+
+      result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
+
+      return result;
+  }
+
+  var formats = {
+      "seconds": function (seconds) {
+          return seconds.toFixed(0);
+      },
+      "thousandths": function (seconds) {
+          return seconds.toFixed(3);
+      },
+      "hh:mm:ss": function (seconds) {
+          return clockFormat(seconds, 0);   
+      },
+      "hh:mm:ss.u": function (seconds) {
+          return clockFormat(seconds, 1);   
+      },
+      "hh:mm:ss.uu": function (seconds) {
+          return clockFormat(seconds, 2);   
+      },
+      "hh:mm:ss.uuu": function (seconds) {
+          return clockFormat(seconds, 3);   
+      }
+  };
+
+  return formats[format];
+}
+
+function updateSelect(start, end) {
+  $audioStart.val(cueFormatters(format)(start));
+  $audioEnd.val(cueFormatters(format)(end));
+
+  startTime = start;
+  endTime = end;
+}
+
+function updateTime(time) {
+  $time.html(cueFormatters(format)(time));
+
+  audioPos = time;
+}
+
+updateSelect(startTime, endTime);
+updateTime(audioPos);
+
+
+
+/*
+* Code below sets up events to send messages to the playlist.
+*/
+$container.on("click", ".btn-playlist-state-group", function() {
+  //reset these for now.
+  $('.btn-fade-state-group').addClass('hidden');
+  $('.btn-select-state-group').addClass('hidden');
+
+  if ($('.btn-select').hasClass('active')) {
+    $('.btn-select-state-group').removeClass('hidden');
+  }
+
+  if ($('.btn-fadein').hasClass('active') || $('.btn-fadeout').hasClass('active')) {
+    $('.btn-fade-state-group').removeClass('hidden');
+  }
+});
 
 $container.on("click", ".btn-play", function() {
   ee.emit("play");
@@ -33,17 +122,6 @@ $container.on("click", ".btn-rewind", function() {
 $container.on("click", ".btn-fast-forward", function() {
   ee.emit("fastforward");
 });
-
-function toggleActive(node) {
-  var active = node.parentNode.querySelectorAll('.active');
-  var i = 0, len = active.length;
-
-  for (; i < len; i++) {
-    active[i].classList.remove('active');
-  }
-
-  node.classList.toggle('active');
-}
 
 //track interaction states
 $container.on("click", ".btn-cursor", function() {
@@ -134,62 +212,10 @@ $container.on("change", ".time-format", function(e) {
   updateTime(audioPos);
 });
 
-function cueFormatters(format) {
 
-  function clockFormat(seconds, decimals) {
-      var hours,
-          minutes,
-          secs,
-          result;
 
-      hours = parseInt(seconds / 3600, 10) % 24;
-      minutes = parseInt(seconds / 60, 10) % 60;
-      secs = seconds % 60;
-      secs = secs.toFixed(decimals);
-
-      result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
-
-      return result;
-  }
-
-  var formats = {
-      "seconds": function (seconds) {
-          return seconds.toFixed(0);
-      },
-      "thousandths": function (seconds) {
-          return seconds.toFixed(3);
-      },
-      "hh:mm:ss": function (seconds) {
-          return clockFormat(seconds, 0);   
-      },
-      "hh:mm:ss.u": function (seconds) {
-          return clockFormat(seconds, 1);   
-      },
-      "hh:mm:ss.uu": function (seconds) {
-          return clockFormat(seconds, 2);   
-      },
-      "hh:mm:ss.uuu": function (seconds) {
-          return clockFormat(seconds, 3);   
-      }
-  };
-
-  return formats[format];
-}
-
-function updateSelect(start, end) {
-  $audioStart.val(cueFormatters(format)(start));
-  $audioEnd.val(cueFormatters(format)(end));
-
-  startTime = start;
-  endTime = end;
-}
-
+/*
+* Code below receives updates from the playlist.
+*/
 ee.on("select", updateSelect);
-
-function updateTime(time) {
-  $time.html(cueFormatters(format)(time));
-
-  audioPos = time;
-}
-
 ee.on("timeupdate", updateTime);
