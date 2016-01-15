@@ -203,6 +203,7 @@ export default class {
                 let fadeOut = trackList[index].fadeOut;
                 let cueIn = trackList[index].cuein || 0;
                 let cueOut = trackList[index].cueout || audioBuffer.duration;
+                let selection = trackList[index].selected;
 
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);
@@ -220,6 +221,11 @@ export default class {
 
                 if (fadeOut !== undefined) {
                     track.setFadeOut(fadeOut.duration, fadeIn.shape);
+                }
+
+                if (selection !== undefined) {
+                    this.setActiveTrack(track);
+                    this.setTimeSelection(selection.start, selection.end);
                 }
 
                 track.setState(this.getState());
@@ -524,7 +530,8 @@ export default class {
     }
 
     render() {
-        let timeScale = new TimeScale(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate);
+        let controlWidth = this.controls.show ? this.controls.width : 0;
+        let timeScale = new TimeScale(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate, controlWidth);
 
         let activeTrack = this.getActiveTrack();
         let trackElements = this.tracks.map((track) => {

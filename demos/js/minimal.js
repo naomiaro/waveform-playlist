@@ -1,10 +1,5 @@
 var playlist = new WaveformPlaylist.init({
-  samplesPerPixel: 2000,
-  waveHeight: 100,
-  container: document.getElementById("playlist"),
-  colors: {
-      waveOutlineColor: '#E0EFF1'
-  }
+  container: document.getElementById("playlist")
 });
 
 playlist.load([
