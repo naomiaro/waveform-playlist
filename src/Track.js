@@ -399,6 +399,24 @@ export default class {
                 ]));
             }
 
+            if (this.fadeOut) {
+                let fadeOut = this.fades[this.fadeOut];
+                let width = secondsToPixels(fadeOut.end - fadeOut.start, data.resolution, data.sampleRate);
+
+                channelChildren.push(h("div.wp-fade.wp-fadeout", {
+                    attributes: {
+                        "style": `position: absolute; height: ${data.height}px; width: ${width}px; top: 0; right: 0; z-index: 4;`
+                    }}, [
+                    h("canvas", {
+                        attributes: {
+                            "width": width,
+                            "height": data.height
+                        },
+                        "hook": new FadeCanvasHook(fadeOut)
+                    })
+                ]));
+            }
+
             return h(`div.channel.channel-${channelNum}`, {attributes: {
                     "style": `height: ${data.height}px; width: ${width}px; top: 0; left: ${startX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`
                 }},
