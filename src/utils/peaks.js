@@ -68,14 +68,15 @@ function makeMono(channelPeaks) {
     };
 }
 
-export default function(buffer, samplesPerPixel=10000, isMono=false) {
+export default function(buffer, cueIn, cueOut, samplesPerPixel=10000, isMono=false) {
     let numChan = buffer.numberOfChannels;
     let peaks = [];
     let c;
 
     for (c = 0; c < numChan; c++) {
         let channel = buffer.getChannelData(c);
-        peaks.push(extractPeaks(channel, samplesPerPixel));
+        let slice = channel.subarray(cueIn, cueOut);
+        peaks.push(extractPeaks(slice, samplesPerPixel));
     }
 
     if (isMono) {

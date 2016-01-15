@@ -6,7 +6,7 @@ import _forOwn from 'lodash/object/forOwn';
 import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
-import {secondsToPixels} from './utils/conversions';
+import {secondsToPixels, secondsToSamples} from './utils/conversions';
 import extractPeaks from './utils/peaks';
 import stateClasses from './track/states';
 
@@ -130,8 +130,11 @@ export default class {
         this.peakData = data;
     }
 
-    calculatePeaks(samplesPerPixel) {
-        this.peaks = extractPeaks(this.buffer, samplesPerPixel, this.peakData.mono);
+    calculatePeaks(samplesPerPixel, sampleRate) {
+        let cueIn = secondsToSamples(this.cueIn, sampleRate);
+        let cueOut = secondsToSamples(this.cueOut, sampleRate);
+
+        this.peaks = extractPeaks(this.buffer, cueIn, cueOut, samplesPerPixel, this.peakData.mono);
     }
 
     setState(state) {
@@ -394,7 +397,7 @@ export default class {
                             "width": width,
                             "height": data.height
                         },
-                        "hook": new FadeCanvasHook(fadeIn)
+                        "hook": new FadeCanvasHook(fadeIn, data.resolution)
                     })
                 ]));
             }
@@ -412,7 +415,7 @@ export default class {
                             "width": width,
                             "height": data.height
                         },
-                        "hook": new FadeCanvasHook(fadeOut)
+                        "hook": new FadeCanvasHook(fadeOut, data.resolution)
                     })
                 ]));
             }

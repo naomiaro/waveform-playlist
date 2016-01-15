@@ -202,6 +202,8 @@ export default class {
                 let states = trackList[index].states || {};
                 let fadeIn = trackList[index].fadeIn;
                 let fadeOut = trackList[index].fadeOut;
+                let cueIn = trackList[index].cuein || 0;
+                let cueOut = trackList[index].cueout || audioBuffer.duration;
 
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);
@@ -211,7 +213,7 @@ export default class {
                 track.setName(name);
                 track.setEventEmitter(this.ee);
                 track.setEnabledStates(states);
-                track.setCues(0, audioBuffer.duration);
+                track.setCues(cueIn, cueOut);
 
                 if (fadeIn !== undefined) {
                     track.setFadeIn(fadeIn);
@@ -226,7 +228,7 @@ export default class {
                 track.setPlayout(playout);
 
                 //extract peaks with AudioContext for now.
-                track.calculatePeaks(this.samplesPerPixel);
+                track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
 
                 return track;
             });
@@ -288,7 +290,7 @@ export default class {
         this.samplesPerPixel = zoom;
         this.zoomIndex = this.zoomLevels.indexOf(zoom);
         this.tracks.forEach((track) => {
-            track.calculatePeaks(zoom);
+            track.calculatePeaks(zoom, this.sampleRate);
         }); 
     }
 

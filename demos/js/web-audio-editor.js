@@ -20,9 +20,6 @@ playlist.load([
   {
     "src": "/media/audio/Vocals30.mp3",
     "name": "Vocals",
-    "states": {
-      "shift": false
-    },
     "fadeIn": {
       "end": 0.5
     },
@@ -54,8 +51,9 @@ playlist.load([
     },
     "fadeOut": {
       "shape": "linear",
-      "start": 29.5
-    }
+      "start": 14.5
+    },
+    "cuein": 15
   }
 ]).then(function() {
   //can do stuff with the playlist.

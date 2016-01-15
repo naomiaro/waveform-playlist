@@ -52,13 +52,16 @@ function drawFadeCurve(ctx, shape, type, width, height) {
 * virtual-dom hook for drawing the fade curve to the canvas element.
 */
 export default class {
-    constructor(fade) {
+    constructor(fade, samplesPerPixel) {
         this.fade = fade;
+        this.samplesPerPixel = samplesPerPixel;
     }
 
     hook(canvas, prop, prev) {
         //node is up to date.
-        if (prev !== undefined && _isEqual(prev.fade, this.fade)) {
+        if (prev !== undefined &&
+            _isEqual(prev.fade, this.fade) &&
+            prev.samplesPerPixel === this.samplesPerPixel) {
             return;
         }
 
