@@ -12,7 +12,7 @@ export default class {
         let time = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
 
         if (time > this.track.getStartTime() && time < this.track.getEndTime()) {
-            this.track.ee.emit('fadeout', time - this.track.getStartTime(), this.track);
+            this.track.ee.emit('fadeout', this.track.getEndTime() - time, this.track);
         }
     }
 

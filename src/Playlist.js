@@ -131,21 +131,13 @@ export default class {
             track.setGainLevel(volume/100);
         });
 
-        ee.on('fadein', (end, track) => {
-            track.setFadeIn({
-                "shape": this.fadeType,
-                "end": end
-            });
-
+        ee.on('fadein', (duration, track) => {
+            track.setFadeIn(duration, this.fadeType);
             this.draw(this.render());
         });
 
-        ee.on('fadeout', (start, track) => {
-            track.setFadeOut({
-                "shape": this.fadeType,
-                "start": start
-            });
-
+        ee.on('fadeout', (duration, track) => {
+            track.setFadeOut(duration, this.fadeType);
             this.draw(this.render());
         });
 
