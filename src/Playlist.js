@@ -153,7 +153,14 @@ export default class {
         });
 
         ee.on('trim', () => {
+            let track = this.getActiveTrack();
+            let timeSelection = this.getTimeSelection();
 
+            track.trim(timeSelection.start, timeSelection.end);
+            track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+
+            this.setTimeSelection(0, 0);
+            this.draw(this.render());
         });
 
         ee.on('zoomin', () => {

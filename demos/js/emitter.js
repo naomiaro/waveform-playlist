@@ -186,6 +186,10 @@ $container.on("click", ".btn-zoom-out", function() {
   ee.emit("zoomout");
 });
 
+$container.on("click", ".btn-trim-audio", function() {
+  ee.emit("trim");
+});
+
 //track drop
 $container.on("dragenter", ".track-drop", function(e) {
   e.preventDefault();

@@ -46,6 +46,16 @@ export default class {
         this.cueIn = cueIn;
         this.cueOut = cueOut;
         this.duration = this.cueOut - this.cueIn;
+        this.endTime = this.startTime + this.duration;
+    }
+
+    /*
+    *   start, end in seconds relative to the entire playlist.
+    */
+    trim(start, end) {
+        let offset = this.getStartTime() + this.cueIn;
+
+        this.setCues(start - offset, end - offset);
     }
 
     setStartTime(start) {
