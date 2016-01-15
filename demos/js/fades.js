@@ -1,5 +1,5 @@
 var playlist = new WaveformPlaylist.init({
-  samplesPerPixel: 9000,
+  samplesPerPixel: 5000,
   zoomLevels: [1000, 5000, 9000],
   waveHeight: 100,
   container: document.getElementById("playlist"),
@@ -23,10 +23,10 @@ playlist.load([
       "shift": false
     },
     "fadeIn": {
-      "end": 0.5
+      "duration": 0.5
     },
     "fadeOut": {
-      "start": 29.5
+      "duration": 0.5
     }
   },
   {
@@ -35,11 +35,11 @@ playlist.load([
     "start": 30,
     "fadeIn": {
       "shape": "logarithmic",
-      "end": 0.50
+      "duration": 0.75
     },
     "fadeOut": {
       "shape": "logarithmic",
-      "start": 29.5
+      "duration": 1.5
     }
   }
 ]).then(function() {

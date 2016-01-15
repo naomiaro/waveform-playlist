@@ -216,11 +216,11 @@ export default class {
                 track.setCues(cueIn, cueOut);
 
                 if (fadeIn !== undefined) {
-                    track.setFadeIn(fadeIn);
+                    track.setFadeIn(fadeIn.duration, fadeIn.shape);
                 }
 
                 if (fadeOut !== undefined) {
-                    track.setFadeOut(fadeOut);
+                    track.setFadeOut(fadeOut.duration, fadeIn.shape);
                 }
 
                 track.setState(this.getState());

@@ -73,11 +73,15 @@ export default class {
         this.enabledStates = _assign(defaultStatesEnabled, enabledStates);
     }
 
-    setFadeIn(options={}) {
-        let d = {
-            "shape": "logarithmic",
+    setFadeIn(duration, shape="logarithmic") {
+        if (duration > this.duration) {
+            throw new Error("Invalid Fade In");
+        }
+
+        let fade = {
+            "shape": shape,
             "start": 0,
-            "end": this.duration
+            "end": duration
         };
 
         if (this.fadeIn) {
@@ -85,14 +89,17 @@ export default class {
             this.fadeIn = undefined;
         }
 
-        let fade = _assign(d, options);
         this.fadeIn = this.saveFade(FADEIN, fade.shape, fade.start, fade.end);
     }
 
-    setFadeOut(options={}) {
-        let d = {
-            "shape": "logarithmic",
-            "start": 0,
+    setFadeOut(duration, shape="logarithmic") {
+        if (duration > this.duration) {
+            throw new Error("Invalid Fade Out");
+        }
+
+        let fade = {
+            "shape": shape,
+            "start": this.duration - duration,
             "end": this.duration
         };
 
@@ -101,7 +108,6 @@ export default class {
             this.fadeOut = undefined;
         }
 
-        let fade = _assign(d, options);
         this.fadeOut = this.saveFade(FADEOUT, fade.shape, fade.start, fade.end);
     }
 

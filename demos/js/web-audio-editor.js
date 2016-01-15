@@ -21,37 +21,39 @@ playlist.load([
     "src": "/media/audio/Vocals30.mp3",
     "name": "Vocals",
     "fadeIn": {
-      "end": 0.5
+      "duration": 0.5
     },
     "fadeOut": {
-      "start": 29.5
-    }
+      "duration": 0.5
+    },
+    "cuein": 5.918,
+    "cueout": 14.5
   },
   {
     "src": "/media/audio/BassDrums30.mp3",
     "name": "Drums",
-    "start": 30,
+    "start": 8.5,
     "fadeIn": {
       "shape": "logarithmic",
-      "end": 0.50
+      "duration": 0.5
     },
     "fadeOut": {
       "shape": "logarithmic",
-      "start": 29.5
+      "duration": 0.5
     }
   }
   ,
   {
     "src": "/media/audio/Guitar30.mp3",
     "name": "Guitar",
-    "start": 45,
+    "start": 23.5,
     "fadeIn": {
       "shape": "linear",
-      "end": 0.50
+      "duration": 0.5
     },
     "fadeOut": {
       "shape": "linear",
-      "start": 14.5
+      "duration": 0.5
     },
     "cuein": 15
   }
