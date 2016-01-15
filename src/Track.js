@@ -389,7 +389,6 @@ export default class {
                     attributes: {
                         "width": currentWidth,
                         "height": data.height,
-                        "data-offset": offset,
                         "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                     },
                     "hook": new CanvasHook(peaks, offset, data.colors.waveOutlineColor)
