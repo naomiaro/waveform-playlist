@@ -16,7 +16,7 @@ module.exports = function(config) {
     files: [
       'test-main.js',
       {pattern: 'test/index.test.js', included: false},
-      {pattern: 'media/**', watched: false, included: false, served: true}
+      {pattern: 'test/media/**', watched: false, included: false, served: true}
     ],
 
 

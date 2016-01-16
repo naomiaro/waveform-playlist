@@ -1,19 +1,43 @@
 'use strict';
 
+//import "web-audio-test-api";
+
 import {expect} from 'chai';
 import peaks from './../../src/utils/peaks';
 
-// describe('peak extractor', function() {
-//     it('min peaks should be zeros for a zero array', function() {
-//         var result = peaks(new Float32Array(5), 1);
-//         expect(result.minPeaks).to.deep.equal(new Float32Array(5));
-//     });
-//     it('max peaks should be zeros for a zero array', function() {
-//         var result = peaks(new Float32Array(5), 1);
-//         expect(result.maxPeaks).to.deep.equal(new Float32Array(5));
-//     });
-//     it('max peak should be zero for a zero array', function() {
-//         var result = peaks(new Float32Array(5), 1);
-//         expect(result.maxPeak).to.equal(0);
-//     });
-// });
+describe('peak extractor', function() {
+    var ac = new AudioContext();
+    var decodedAudio;
+    
+    before(function() {
+        return new Promise(function(resolve, reject) {
+            var req = new XMLHttpRequest();
+            req.open('GET', "/base/test/media/silence.ogg");
+            req.responseType = 'arraybuffer';
+
+            req.onload = function() {
+                ac.decodeAudioData(req.response, function(buffer) {
+                    decodedAudio = buffer;
+                    resolve(buffer);
+                  },
+                  function(e) {
+                    reject(e);
+                  });
+            };
+
+            req.onerror = function() {
+                reject(Error('Network Error'));
+            };
+
+            req.send();
+        });
+    });
+
+    describe('Peaks extractor', function() {
+        it('calculates the requested number of peaks', function() {
+            var result = peaks(decodedAudio, 0, decodedAudio.length, 1, true);
+            expect(decodedAudio.sampleRate).to.equal(result.length);
+            expect(decodedAudio.sampleRate*2).to.equal(result.data[0].length)
+        });
+    });
+});
