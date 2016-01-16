@@ -1,5 +1,37 @@
 'use strict';
 
+//http://jsperf.com/typed-array-min-max/2
+//plain for loop for finding min/max is way faster than anything else.
+function findMin(typeArray) {
+    let min = Infinity;
+    let i = 0;
+    let len = typeArray.length;
+
+    for (; i < len; i++) {
+        if (min > typeArray[i]) {
+            min = typeArray[i];
+        }
+    }
+
+    return min;
+}
+
+//http://jsperf.com/typed-array-min-max/2
+//plain for loop for finding min/max is way faster than anything else.
+function findMax(typeArray) {
+    let max = -Infinity;
+    let i = 0;
+    let len = typeArray.length;
+
+    for (; i < len; i++) {
+        if (max < typeArray[i]) {
+            max = typeArray[i];
+        }
+    }
+
+    return max;
+}
+
 /**
 * @param {Float32Array} channel  Audio track frames to calculate peaks from.
 * @param {Number} samplesPerPixel Audio frames per peak
@@ -23,8 +55,8 @@ function extractPeaks(channel, samplesPerPixel) {
         end = (i + 1) * samplesPerPixel > chanLength ? chanLength : (i + 1) * samplesPerPixel;
 
         segment = channel.subarray(start, end);
-        min = Math.min.apply(Math, segment);
-        max = Math.max.apply(Math, segment);
+        min = findMin(segment);
+        max = findMax(segment);
 
         peaks[i*2] = min;
         peaks[i*2+1] = max;
