@@ -14,6 +14,31 @@ var startTime = 0;
 var endTime = 0;
 var audioPos = 0;
 
+var userMediaStream;
+
+navigator.getUserMedia = (navigator.getUserMedia ||
+  navigator.webkitGetUserMedia ||
+  navigator.mozGetUserMedia ||
+  navigator.msGetUserMedia);
+
+if (navigator.getUserMedia && 'MediaRecorder' in window) {
+  navigator.getUserMedia(
+    {
+       audio: true
+    },
+    function(stream) {
+      userMediaStream = stream;
+      $(".btn-record").removeClass("disabled");
+    },
+    function(err) {
+       console.error(err);
+    }
+  );
+}
+else {
+  console.log('getUserMedia or MediaRecorder not supported in your browser!');
+}
+
 function toggleActive(node) {
   var active = node.parentNode.querySelectorAll('.active');
   var i = 0, len = active.length;
