@@ -35,9 +35,6 @@ if (navigator.getUserMedia && 'MediaRecorder' in window && $(".btn-record").leng
     }
   );
 }
-else {
-  console.log('getUserMedia or MediaRecorder not supported in your browser!');
-}
 
 function toggleActive(node) {
   var active = node.parentNode.querySelectorAll('.active');
