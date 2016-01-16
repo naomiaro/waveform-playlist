@@ -7,9 +7,10 @@ function findMinMax(typeArray) {
     let max = -Infinity;
     let i = 0;
     let len = typeArray.length;
+    let curr;
 
     for (; i < len; i++) {
-        let curr = typeArray[i];
+        curr = typeArray[i];
         if (min > curr) {
             min = curr;
         }
