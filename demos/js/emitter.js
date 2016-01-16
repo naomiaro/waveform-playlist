@@ -21,7 +21,7 @@ navigator.getUserMedia = (navigator.getUserMedia ||
   navigator.mozGetUserMedia ||
   navigator.msGetUserMedia);
 
-if (navigator.getUserMedia && 'MediaRecorder' in window) {
+if (navigator.getUserMedia && 'MediaRecorder' in window && $(".btn-record").length > 0) {
   navigator.getUserMedia(
     {
        audio: true

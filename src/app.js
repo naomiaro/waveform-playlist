@@ -11,9 +11,11 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
         throw new Error("DOM element container must be given.");
     }
 
+    let audioContext = new (window.AudioContext || window.webkitAudioContext);
+
     let defaults = {
-        ac: new (window.AudioContext || window.webkitAudioContext),
-        sampleRate: 44100,
+        ac: audioContext,
+        sampleRate: audioContext.sampleRate,
         samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
         timeFormat: 'hh:mm:ss.uu',
         mono: true, //whether to draw multiple channels or combine them.
