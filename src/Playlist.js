@@ -1,7 +1,6 @@
 'use strict';
 
 import _defaults from 'lodash.defaults';
-import _throttle from 'lodash.throttle';
 
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';
@@ -557,10 +556,10 @@ export default class {
                 "attributes": {
                     "style": "overflow: auto;"
                 },
-                "ev-scroll": _throttle((e) => {
+                "ev-scroll": (e) => {
                     this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
                     this.ee.emit("scroll", this.scrollLeft);
-                }, 200),
+                },
                 "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)
             }, trackElements)
         ]);
