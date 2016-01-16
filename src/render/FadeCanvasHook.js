@@ -1,5 +1,3 @@
-import _isEqual from 'lodash/lang/isEqual';
-
 import {FADEIN, FADEOUT, SCURVE, LINEAR, EXPONENTIAL, LOGARITHMIC} from './../utils/fades';
 import {sCurve, logarithmic, linear, exponential} from './../utils/curves';
 
@@ -52,20 +50,24 @@ function drawFadeCurve(ctx, shape, type, width, height) {
 * virtual-dom hook for drawing the fade curve to the canvas element.
 */
 export default class {
-    constructor(fade, samplesPerPixel) {
-        this.fade = fade;
+    constructor(type, shape, duration, samplesPerPixel) {
+        this.type = type;
+        this.shape = shape;
+        this.duration = duration;
         this.samplesPerPixel = samplesPerPixel;
     }
 
     hook(canvas, prop, prev) {
         //node is up to date.
         if (prev !== undefined &&
-            _isEqual(prev.fade, this.fade) &&
+            prev.shape === this.shape &&
+            prev.type === this.type &&
+            prev.duration === this.duration &&
             prev.samplesPerPixel === this.samplesPerPixel) {
             return;
         }
 
         let cc = canvas.getContext('2d');
-        drawFadeCurve(cc, this.fade.shape, this.fade.type, canvas.width, canvas.height);
+        drawFadeCurve(cc, this.shape, this.type, canvas.width, canvas.height);
     }
 }

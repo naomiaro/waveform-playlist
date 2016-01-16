@@ -1,7 +1,7 @@
 'use strict';
 
-import _assign from 'lodash/object/assign';
-import _forOwn from 'lodash/object/forOwn';
+import _assign from 'lodash.assign';
+import _forOwn from 'lodash.forown';
 
 import uuid from 'uuid';
 import h from 'virtual-dom/h';
@@ -414,7 +414,7 @@ export default class {
                             "width": width,
                             "height": data.height
                         },
-                        "hook": new FadeCanvasHook(fadeIn, data.resolution)
+                        "hook": new FadeCanvasHook(fadeIn.type, fadeIn.shape, fadeIn.end - fadeIn.start, data.resolution)
                     })
                 ]));
             }
@@ -432,7 +432,7 @@ export default class {
                             "width": width,
                             "height": data.height
                         },
-                        "hook": new FadeCanvasHook(fadeOut, data.resolution)
+                        "hook": new FadeCanvasHook(fadeOut.type, fadeOut.shape, fadeOut.end - fadeOut.start, data.resolution)
                     })
                 ]));
             }

@@ -1,7 +1,7 @@
 'use strict';
 
-import _defaults from 'lodash/object/defaults';
-import _throttle from 'lodash/function/throttle';
+import _defaults from 'lodash.defaults';
+import _throttle from 'lodash.throttle';
 
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';

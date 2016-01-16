@@ -1,5 +1,4 @@
 import {pixelsToSeconds} from '../../utils/conversions';
-import _throttle from 'lodash/function/throttle';
 
 export default class {
     constructor(track, samplesPerPixel, sampleRate) {
@@ -22,10 +21,10 @@ export default class {
         };
 
         //dynamically put an event on the element.
-        el.onmousemove = _throttle((e) => {
+        el.onmousemove = (e) => {
             e.preventDefault();
             emitShift(e.offsetX);
-        }, 150);
+        };
 
         let complete = (e) => {
             e.preventDefault();

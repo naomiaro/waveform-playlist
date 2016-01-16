@@ -49,7 +49,10 @@
   "dependencies": {
     "dom-delegator": "^13.1.0",
     "event-emitter": "^0.3.4",
-    "lodash": "^4.0.0",
+    "lodash.assign": "^4.0.0",
+    "lodash.defaults": "^4.0.0",
+    "lodash.forown": "^4.0.0",
+    "lodash.throttle": "^4.0.0",
     "uuid": "^2.0.1",
     "virtual-dom": "^2.1.1",
     "worker-loader": "^0.7.0"

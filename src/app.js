@@ -1,4 +1,4 @@
-import _assign from 'lodash/object/assign';
+import _assign from 'lodash.assign';
 import createElement from 'virtual-dom/create-element';
 
 import Delegator from 'dom-delegator';
