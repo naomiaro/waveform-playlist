@@ -2,34 +2,26 @@
 
 //http://jsperf.com/typed-array-min-max/2
 //plain for loop for finding min/max is way faster than anything else.
-function findMin(typeArray) {
+function findMinMax(typeArray) {
     let min = Infinity;
-    let i = 0;
-    let len = typeArray.length;
-
-    for (; i < len; i++) {
-        if (min > typeArray[i]) {
-            min = typeArray[i];
-        }
-    }
-
-    return min;
-}
-
-//http://jsperf.com/typed-array-min-max/2
-//plain for loop for finding min/max is way faster than anything else.
-function findMax(typeArray) {
     let max = -Infinity;
     let i = 0;
     let len = typeArray.length;
 
     for (; i < len; i++) {
-        if (max < typeArray[i]) {
-            max = typeArray[i];
+        let curr = typeArray[i];
+        if (min > curr) {
+            min = curr;
+        }
+        if (max < curr) {
+            max = curr;
         }
     }
 
-    return max;
+    return {
+        min,
+        max
+    };
 }
 
 /**
@@ -46,6 +38,7 @@ function extractPeaks(channel, samplesPerPixel) {
     let segment;
     let max; 
     let min;
+    let extrema;
     //create interleaved array of min,max
     let peaks = new Float32Array(numPeaks*2);
 
@@ -55,8 +48,9 @@ function extractPeaks(channel, samplesPerPixel) {
         end = (i + 1) * samplesPerPixel > chanLength ? chanLength : (i + 1) * samplesPerPixel;
 
         segment = channel.subarray(start, end);
-        min = findMin(segment);
-        max = findMax(segment);
+        extrema = findMinMax(segment);
+        min = extrema.min;
+        max = extrema.max;
 
         peaks[i*2] = min;
         peaks[i*2+1] = max;
