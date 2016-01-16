@@ -189,12 +189,15 @@ export default class {
     }
 
     load(trackList, options={}) {
+        console.time("load");
+
         let loadPromises = trackList.map((trackInfo) => {
             let loader = LoaderFactory.createLoader(trackInfo.src, this.ac);
             return loader.load();
         });
 
         return Promise.all(loadPromises).then((audioBuffers) => {
+            console.timeEnd("load");
             let tracks = audioBuffers.map((audioBuffer, index) => {
                 let name = trackList[index].name || "Untitled";
                 let start = trackList[index].start || 0;

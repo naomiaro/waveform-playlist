@@ -37,9 +37,11 @@ export default class {
         this.ee.emit('audiorequeststatechange', this);
 
         return new Promise((resolve, reject) => {
+            console.time('decode ' + this.src);
             this.ac.decodeAudioData(
                 audioData,
                 (audioBuffer) => {
+                    console.timeEnd('decode ' + this.src);
                     this.audioBuffer = audioBuffer;
 
                     this.audioRequestState = STATE_FINISHED;

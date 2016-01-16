@@ -150,7 +150,9 @@ export default class {
         let cueIn = secondsToSamples(this.cueIn, sampleRate);
         let cueOut = secondsToSamples(this.cueOut, sampleRate);
 
+        console.time("peaks " + this.name);
         this.peaks = extractPeaks(this.buffer, cueIn, cueOut, samplesPerPixel, this.peakData.mono);
+        console.timeEnd("peaks " + this.name);
     }
 
     setState(state) {
