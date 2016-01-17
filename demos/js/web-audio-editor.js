@@ -1,6 +1,6 @@
 var playlist = new WaveformPlaylist.init({
   samplesPerPixel: 3000,
-  mono: true,
+  mono: false,
   waveHeight: 70,
   container: document.getElementById("playlist"),
   state: 'cursor',
@@ -27,11 +27,7 @@ playlist.load([
       "duration": 0.5
     },
     "cuein": 5.918,
-    "cueout": 14.5,
-    "peaks": {
-      type: "WebAudio",
-      mono: false
-    }
+    "cueout": 14.5
   },
   {
     "src": "/media/audio/BassDrums30.mp3",
@@ -44,10 +40,6 @@ playlist.load([
     "fadeOut": {
       "shape": "logarithmic",
       "duration": 0.5
-    },
-    "peaks": {
-      type: "WebAudio",
-      mono: false
     }
   }
   ,
@@ -59,11 +51,7 @@ playlist.load([
       "shape": "linear",
       "duration": 0.5
     },
-    "cuein": 15,
-    "peaks": {
-      type: "WebAudio",
-      mono: false
-    }
+    "cuein": 15
   }
 ]).then(function() {
   //can do stuff with the playlist.

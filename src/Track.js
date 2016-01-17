@@ -26,7 +26,7 @@ export default class {
         this.fades = {};
         this.peakData = {
             type: "WebAudio",
-            mono: true
+            mono: false
         };
 
         this.cueIn = 0;

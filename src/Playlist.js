@@ -80,6 +80,10 @@ export default class {
         };
     }
 
+    setMono(mono) {
+        this.mono = mono;
+    }
+
     setSampleRate(sampleRate) {
         this.sampleRate = sampleRate;
     }
@@ -255,7 +259,7 @@ export default class {
                 let cueIn = trackList[index].cuein || 0;
                 let cueOut = trackList[index].cueout || audioBuffer.duration;
                 let selection = trackList[index].selected;
-                let peaks = trackList[index].peaks;
+                let peaks = trackList[index].peaks || {type: "WebAudio", mono: this.mono};
 
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);

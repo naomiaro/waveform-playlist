@@ -55,6 +55,7 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     playlist.setColors(config.colors);
     playlist.setZoomLevels(config.zoomLevels);
     playlist.setZoomIndex(zoomIndex);
+    playlist.setMono(config.mono);
 
     //take care of initial virtual dom rendering.
     let tree = playlist.render();
