@@ -29,7 +29,7 @@ function findMinMax(typeArray) {
 * @param {Float32Array} channel  Audio track frames to calculate peaks from.
 * @param {Number} samplesPerPixel Audio frames per peak
 */
-function extractPeaks(channel, samplesPerPixel) {
+export function extractPeaks(channel, samplesPerPixel) {
 
     let i;
     let chanLength = channel.length;
@@ -60,7 +60,7 @@ function extractPeaks(channel, samplesPerPixel) {
     return {
         type: "float",
         length: numPeaks,
-        data: peaks
+        data: [peaks]
     };
 }
 
@@ -79,8 +79,8 @@ function makeMono(channelPeaks) {
         max = 0;
 
         for (c = 0; c < numChan; c++) {
-            min += weight * channelPeaks[c]['data'][i*2];
-            max += weight * channelPeaks[c]['data'][i*2+1];
+            min += weight * channelPeaks[c]['data'][0][i*2];
+            max += weight * channelPeaks[c]['data'][0][i*2+1];
         }
 
         peaks[i*2] = min;

@@ -15,6 +15,8 @@ import TimeScale from './TimeScale';
 import Track from './Track';
 import Playout from './Playout';
 
+import RecorderWorker from 'worker!./track/recorderWorker.js';
+
 export default class {
 
     constructor() {
@@ -30,6 +32,52 @@ export default class {
         this.scrollLeft = 0;
 
         this.fadeType = "logarithmic";
+    }
+
+    initRecorder(stream) {
+        if (stream === undefined ||
+            stream instanceof LocalMediaStream !== true) {
+            throw new Error("Must provide a LocalMediaStream to record from");
+        }
+
+        this.mediaRecorder = new MediaRecorder(stream);
+
+        this.mediaRecorder.onstart = (e) => {
+            let track = new Track();
+            track.setName("Recording");
+            track.setEnabledStates();
+            track.setEventEmitter(this.ee);
+
+            this.recordingTrack = track;
+            this.tracks.push(track);
+
+            this.chunks = [];
+        };
+
+        this.mediaRecorder.ondataavailable = (e) => {
+            this.chunks.push(e.data);
+
+            let recording = new Blob(this.chunks, {'type': 'audio/ogg; codecs=opus'});
+            let loader = LoaderFactory.createLoader(recording, this.ac);
+            loader.load().then((audioBuffer) => {
+                //ask web worker for peaks.
+                this.recorderWorker.postMessage({
+                    samples: audioBuffer.getChannelData(0),
+                    samplesPerPixel: this.samplesPerPixel
+                });
+                this.recordingTrack.setCues(0, audioBuffer.duration);
+                this.recordingTrack.setBuffer(audioBuffer);
+                this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
+                this.adjustDuration();
+            });
+        };
+
+        //use a worker for calculating recording peaks, keeping track of recorded Blob chunks.
+        this.recorderWorker = new RecorderWorker();
+        this.recorderWorker.onmessage = (e) => {
+            this.recordingTrack.setPeaks(e.data);
+            this.draw(this.render());
+        };
     }
 
     setSampleRate(sampleRate) {
@@ -92,6 +140,10 @@ export default class {
             track.setStartTime(track.getStartTime() + deltaTime);
             this.adjustDuration();
             this.draw(this.render());
+        });
+
+        ee.on('record', () => {
+            this.record();
         });
 
         ee.on('play', () => {
@@ -188,15 +240,12 @@ export default class {
     }
 
     load(trackList, options={}) {
-        console.time("load");
-
         let loadPromises = trackList.map((trackInfo) => {
             let loader = LoaderFactory.createLoader(trackInfo.src, this.ac);
             return loader.load();
         });
 
         return Promise.all(loadPromises).then((audioBuffers) => {
-            console.timeEnd("load");
             let tracks = audioBuffers.map((audioBuffer, index) => {
                 let name = trackList[index].name || "Untitled";
                 let start = trackList[index].start || 0;
@@ -426,6 +475,8 @@ export default class {
     }
 
     stop() {
+        this.mediaRecorder && this.mediaRecorder.state === "recording" && this.mediaRecorder.stop();
+
         this.pausedAt = undefined;
         this.playbackSeconds = 0;
         return this.playbackReset();
@@ -463,6 +514,10 @@ export default class {
 
             this.ee.emit('select', this.duration, this.duration);
         });
+    }
+
+    record() {
+        this.mediaRecorder.start(200);
     }
 
     startAnimation(startTime) {

@@ -14,28 +14,6 @@ var startTime = 0;
 var endTime = 0;
 var audioPos = 0;
 
-var userMediaStream;
-
-navigator.getUserMedia = (navigator.getUserMedia ||
-  navigator.webkitGetUserMedia ||
-  navigator.mozGetUserMedia ||
-  navigator.msGetUserMedia);
-
-if (navigator.getUserMedia && 'MediaRecorder' in window && $(".btn-record").length > 0) {
-  navigator.getUserMedia(
-    {
-       audio: true
-    },
-    function(stream) {
-      userMediaStream = stream;
-      $(".btn-record").removeClass("disabled");
-    },
-    function(err) {
-       console.error(err);
-    }
-  );
-}
-
 function toggleActive(node) {
   var active = node.parentNode.querySelectorAll('.active');
   var i = 0, len = active.length;
@@ -150,6 +128,10 @@ $container.on("click", ".btn-rewind", function() {
 
 $container.on("click", ".btn-fast-forward", function() {
   ee.emit("fastforward");
+});
+
+$container.on("click", ".btn-record", function() {
+  ee.emit("record");
 });
 
 //track interaction states

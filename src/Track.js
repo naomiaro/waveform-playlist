@@ -19,15 +19,21 @@ const MAX_CANVAS_WIDTH = 1000;
 
 export default class {
 
-    constructor(name="Untitled") {
+    constructor() {
 
-        this.name = name;
+        this.name = "Untitled";
         this.gain = 1;
         this.fades = {};
         this.peakData = {
             type: "WebAudio",
             mono: true
         };
+
+        this.cueIn = 0;
+        this.cueOut = 0;
+        this.duration = 0;
+        this.startTime = 0;
+        this.endTime = 0;
     }
 
     setEventEmitter(ee) {
@@ -59,10 +65,6 @@ export default class {
     }
 
     setStartTime(start) {
-        if (this.duration === undefined) {
-            throw new Error("Must set track cues before start time.");
-        }
-
         this.startTime = start;
         this.endTime = start + this.duration;
     }
@@ -150,9 +152,11 @@ export default class {
         let cueIn = secondsToSamples(this.cueIn, sampleRate);
         let cueOut = secondsToSamples(this.cueOut, sampleRate);
 
-        console.time("peaks " + this.name);
-        this.peaks = extractPeaks(this.buffer, cueIn, cueOut, samplesPerPixel, this.peakData.mono);
-        console.timeEnd("peaks " + this.name);
+        this.setPeaks(extractPeaks(this.buffer, cueIn, cueOut, samplesPerPixel, this.peakData.mono));
+    }
+
+    setPeaks(peaks) {
+        this.peaks = peaks;
     }
 
     setState(state) {
@@ -302,7 +306,7 @@ export default class {
 
         let stateClass = "";
 
-        if (this.enabledStates[this.state]) {
+        if (this.state && this.enabledStates[this.state]) {
             let state = new stateClasses[this.state](this, data.resolution, data.sampleRate);
             let stateEvents = state.getEvents();
 
@@ -352,7 +356,7 @@ export default class {
     }
 
     render(data) {
-        let width = secondsToPixels(this.duration, data.resolution, data.sampleRate);
+        let width = this.peaks.length;
         let playbackX = secondsToPixels(data.playbackSeconds, data.resolution, data.sampleRate);
         let startX = secondsToPixels(this.startTime, data.resolution, data.sampleRate);
         let endX = secondsToPixels(this.endTime, data.resolution, data.sampleRate);

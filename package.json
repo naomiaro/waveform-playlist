@@ -72,7 +72,9 @@
     "multitrack",
     "playlist",
     "music",
-    "editor"
+    "editor",
+    "record",
+    "recording"
   ],
   "bugs": {
     "url": "https://github.com/naomiaro/waveform-playlist/issues"
