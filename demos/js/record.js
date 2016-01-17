@@ -23,7 +23,7 @@ if (navigator.getUserMedia && 'MediaRecorder' in window) {
 }
 
 playlist = new WaveformPlaylist.init({
-  samplesPerPixel: 9000,
+  samplesPerPixel: 5000,
   zoomLevels: [1000, 5000, 9000],
   waveHeight: 100,
   container: document.getElementById("playlist"),

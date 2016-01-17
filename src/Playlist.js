@@ -72,7 +72,7 @@ export default class {
             });
         };
 
-        //use a worker for calculating recording peaks, keeping track of recorded Blob chunks.
+        //use a worker for calculating recording peaks.
         this.recorderWorker = new RecorderWorker();
         this.recorderWorker.onmessage = (e) => {
             this.recordingTrack.setPeaks(e.data);
@@ -526,7 +526,17 @@ export default class {
     }
 
     record() {
-        this.mediaRecorder.start(200);
+        let playoutPromises = [];
+        this.mediaRecorder.start(300);
+
+        this.tracks.forEach((track) => {
+            track.setState('none');
+            playoutPromises.push(track.schedulePlay(this.ac.currentTime, 0, undefined, {
+                masterGain: this.shouldTrackPlay(track) ? 1 : 0
+            }));
+        });
+
+        this.playoutPromises = playoutPromises;
     }
 
     startAnimation(startTime) {
