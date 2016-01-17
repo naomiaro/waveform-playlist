@@ -251,20 +251,22 @@ export default class {
 
         return Promise.all(loadPromises).then((audioBuffers) => {
             let tracks = audioBuffers.map((audioBuffer, index) => {
-                let name = trackList[index].name || "Untitled";
-                let start = trackList[index].start || 0;
-                let states = trackList[index].states || {};
-                let fadeIn = trackList[index].fadeIn;
-                let fadeOut = trackList[index].fadeOut;
-                let cueIn = trackList[index].cuein || 0;
-                let cueOut = trackList[index].cueout || audioBuffer.duration;
-                let selection = trackList[index].selected;
-                let peaks = trackList[index].peaks || {type: "WebAudio", mono: this.mono};
+                let info = trackList[index];
+                let name = info.name || "Untitled";
+                let start = info.start || 0;
+                let states = info.states || {};
+                let fadeIn = info.fadeIn;
+                let fadeOut = info.fadeOut;
+                let cueIn = info.cuein || 0;
+                let cueOut = info.cueout || audioBuffer.duration;
+                let selection = info.selected;
+                let peaks = info.peaks || {type: "WebAudio", mono: this.mono};
 
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);
 
                 let track = new Track();
+                track.src = info.src;
                 track.setBuffer(audioBuffer);
                 track.setName(name);
                 track.setEventEmitter(this.ee);
@@ -637,5 +639,15 @@ export default class {
                 "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)
             }, trackElements)
         ]);
-    }  
+    }
+
+    getInfo() {
+        var info = [];
+
+        this.tracks.forEach((track) => {
+            info.push(track.getTrackDetails());
+        });
+
+        return info;
+    }
 }

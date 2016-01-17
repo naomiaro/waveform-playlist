@@ -496,4 +496,34 @@ export default class {
             channelChildren
         );
     }
+
+    getTrackDetails() {
+        let info =  {
+            src: this.src,
+            start: this.startTime,
+            name: this.name,
+            cuein: this.cueIn,
+            cueout: this.cueOut
+        };
+
+        if (this.fadeIn) {
+            let fadeIn = this.fades[this.fadeIn];
+
+            info["fadeIn"] = {
+                shape: fadeIn.shape,
+                duration: fadeIn.end - fadeIn.start
+            }
+        }
+
+        if (this.fadeOut) {
+            let fadeOut = this.fades[this.fadeOut];
+
+            info["fadeOut"] = {
+                shape: fadeOut.shape,
+                duration: fadeOut.end - fadeOut.start
+            }
+        }
+
+        return info;
+    }
 }

@@ -194,6 +194,10 @@ $container.on("click", ".btn-trim-audio", function() {
   ee.emit("trim");
 });
 
+$container.on("click", ".btn-info", function() {
+  console.log(playlist.getInfo());
+});
+
 //track drop
 $container.on("dragenter", ".track-drop", function(e) {
   e.preventDefault();
