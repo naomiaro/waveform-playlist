@@ -323,10 +323,11 @@ export default class {
     renderControls(data) {
         let muteClass = data.muted ? ".active" : "";
         let soloClass = data.soloed ? ".active" : "";
+        let numChan = this.peaks.data.length;
 
         return h("div.controls", {
             attributes: {
-                "style": `height: ${data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`
+                "style": `height: ${numChan * data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`
             }},
             [
                 h("header", [ this.name ]),
@@ -361,6 +362,7 @@ export default class {
         let startX = secondsToPixels(this.startTime, data.resolution, data.sampleRate);
         let endX = secondsToPixels(this.endTime, data.resolution, data.sampleRate);
         let progressWidth = 0;
+        let numChan = this.peaks.data.length;
 
         if (playbackX > 0 && playbackX > startX) {
             if (playbackX < endX) {
@@ -442,7 +444,7 @@ export default class {
             }
 
             return h(`div.channel.channel-${channelNum}`, {attributes: {
-                    "style": `height: ${data.height}px; width: ${width}px; top: 0; left: ${startX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`
+                    "style": `height: ${data.height}px; width: ${width}px; top: ${channelNum*data.height}px; left: ${startX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`
                 }},
                 channelChildren
             );
@@ -460,7 +462,7 @@ export default class {
 
         let waveform = h("div.waveform", {
             attributes: {
-                "style": `height: ${data.height}px; position: relative;`
+                "style": `height: ${numChan * data.height}px; position: relative;`
             }}, 
             waveformChildren
         );
@@ -477,7 +479,7 @@ export default class {
 
         return h(`div.channel-wrapper${audibleClass}`, {
             attributes: {
-                "style": `margin-left: ${channelMargin}px; height: ${data.height}px;`
+                "style": `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`
             }},
             channelChildren
         );

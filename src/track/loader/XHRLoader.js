@@ -9,7 +9,6 @@ export default class extends Loader {
      */
     load() {
         return new Promise((resolve, reject) => {
-            console.time('download ' + this.src)
             let xhr = new XMLHttpRequest();
 
             xhr.open('GET', this.src, true);
@@ -21,8 +20,6 @@ export default class extends Loader {
             });
 
             xhr.addEventListener('load', (e) => {
-                console.timeEnd('download ' + this.src);
-
                 let decoderPromise = super.fileLoad(e);
 
                 decoderPromise.then((audioBuffer) => {

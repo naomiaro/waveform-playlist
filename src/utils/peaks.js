@@ -57,17 +57,13 @@ export function extractPeaks(channel, samplesPerPixel) {
         peaks[i*2+1] = max;
     }
 
-    return {
-        type: "float",
-        length: numPeaks,
-        data: [peaks]
-    };
+    return peaks;
 }
 
 function makeMono(channelPeaks) {
     let numChan = channelPeaks.length;
     let weight = 1 / numChan;
-    let numPeaks = channelPeaks[0]['length'];
+    let numPeaks = channelPeaks[0].length / 2;
     let c = 0;
     let i = 0;
     let min;
@@ -79,8 +75,8 @@ function makeMono(channelPeaks) {
         max = 0;
 
         for (c = 0; c < numChan; c++) {
-            min += weight * channelPeaks[c]['data'][0][i*2];
-            max += weight * channelPeaks[c]['data'][0][i*2+1];
+            min += weight * channelPeaks[c][i*2];
+            max += weight * channelPeaks[c][i*2+1];
         }
 
         peaks[i*2] = min;
@@ -88,17 +84,14 @@ function makeMono(channelPeaks) {
     }
 
     //return in array so channel number counts still work.
-    return {
-        type: "float",
-        length: numPeaks,
-        data: [peaks]
-    };
+    return [peaks];
 }
 
 export default function(buffer, cueIn, cueOut, samplesPerPixel=10000, isMono=false) {
     let numChan = buffer.numberOfChannels;
     let peaks = [];
     let c;
+    let numPeaks;
 
     for (c = 0; c < numChan; c++) {
         let channel = buffer.getChannelData(c);
@@ -106,9 +99,15 @@ export default function(buffer, cueIn, cueOut, samplesPerPixel=10000, isMono=fal
         peaks.push(extractPeaks(slice, samplesPerPixel));
     }
 
-    if (isMono) {
+    if (isMono && peaks.length > 1) {
         peaks = makeMono(peaks);
     }
 
-    return peaks;
+    numPeaks = peaks[0].length / 2;
+
+    return {
+        type: "Float32",
+        length: numPeaks,
+        data: peaks
+    };
 }
