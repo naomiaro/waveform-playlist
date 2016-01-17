@@ -59,9 +59,21 @@ export default class {
     *   start, end in seconds relative to the entire playlist.
     */
     trim(start, end) {
-        let offset = this.getStartTime() + this.cueIn;
+        let trackStart = this.getStartTime();
+        let trackEnd = this.getEndTime();
+        let offset = this.cueIn - trackStart;
 
-        this.setCues(start - offset, end - offset);
+        if ((trackStart <= start && trackEnd >= start) ||
+            (trackStart <= end && trackEnd >= end)) {
+
+            let cueIn = (start < trackStart) ? trackStart : start;
+            let cueOut = (end > trackEnd) ? trackEnd : end;
+
+            this.setCues(cueIn + offset, cueOut + offset);
+            if (start > trackStart) {
+                this.setStartTime(start);
+            }
+        }
     }
 
     setStartTime(start) {
