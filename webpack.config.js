@@ -1,32 +1,30 @@
-module.exports = {
+var createVariants = require('parallel-webpack').createVariants;
+
+function createConfig(options) {
+  return {
     entry: __dirname + "/src/app.js",
     output: {
-        path: __dirname + "/dist",
-        filename: "waveform-playlist.js",
-        chunkFilename: "[id].bundle.js",
-        publicPath: "",
-
-        // export itself to a global var
-        libraryTarget: "var",
-        // name of the global var: "Foo"
-        library: "WaveformPlaylist"
-    },
-    externals: {
-        // require("jquery") is external and available
-        //  on the global var jQuery
-        //"jquery": "jQuery"
+      path:  __dirname + "/dist/js",
+      filename: 'waveform-playlist.' + options.target + '.js',
+      library: 'WaveformPlaylist',
+      libraryTarget: options.target
     },
     module: {
-        loaders: [
-            { test: /\.css$/, loader: "style!css" },
-            {
-                test: /\.js?$/,
-                exclude: /(node_modules|bower_components)/,
-                loader: 'babel',
-                query: {
-                    presets: ['es2015', 'stage-0']
-                }
-            }
-        ]
+      loaders: [
+        { test: /\.css$/, loader: "style!css" },
+        {
+          test: /\.js?$/,
+          exclude: /(node_modules|bower_components)/,
+          loader: 'babel',
+          query: {
+            presets: ['es2015', 'stage-0']
+          }
+        }
+      ]
     }
-};
+  };
+}
+
+module.exports = createVariants({
+  target: ['var', 'commonjs2', 'umd', 'amd']
+}, createConfig);
