@@ -24,10 +24,10 @@ html, body {
 }
 
 .cursor {
-  border-right: 1px solid #000;
+  background: black;
 }
 
-.playlist-fade {
+.wp-fade {
   background-color: rgba(0,0,0,0.1);
 }
 
@@ -44,23 +44,23 @@ html, body {
   cursor: text;
 }
 
-.state-fadein .channel {
+.state-fadein {
   cursor: w-resize;
 }
 
-.state-fadeout .channel {
+.state-fadeout {
   cursor: e-resize;
 }
 
-.state-shift .channel {
+.state-shift {
   cursor: ew-resize;
 }
 
-.selection-cursor {
+.selection.point {
   background: red;
 }
 
-.selection-segment {
+.selection.segment {
   background: rgba(0,0,0,0.1);
 }
 
