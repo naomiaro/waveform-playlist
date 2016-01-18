@@ -24,6 +24,8 @@ I've written up some demos on github for the different [audio fade types](https:
 ## Basic Usage
 
 ```javascript
+var WaveformPlaylist = require('waveform-playlist');
+
 var playlist = new WaveformPlaylist.init({
   samplesPerPixel: 3000,
   mono: false,
