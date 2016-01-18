@@ -4,7 +4,7 @@
   "version": "0.4.0",
   "author": "Naomi Aro",
   "license": "MIT",
-  "website": "http://naomiaro.github.io/waveform-playlist",
+  "website": "http://naomiaro.github.io",
   "babel": {
     "presets": [
       "es2015",
@@ -46,7 +46,7 @@
   },
   "main": "Gulpfile.js",
   "directories": {
-    "example": "examples"
+    "example": "dist/examples"
   },
   "dependencies": {
     "dom-delegator": "^13.1.0",
@@ -81,5 +81,5 @@
   "bugs": {
     "url": "https://github.com/naomiaro/waveform-playlist/issues"
   },
-  "homepage": "https://github.com/naomiaro/waveform-playlist#readme"
+  "homepage": "http://naomiaro.github.io/waveform-playlist"
 }
