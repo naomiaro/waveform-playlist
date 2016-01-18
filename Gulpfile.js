@@ -1,5 +1,6 @@
 var gulp = require("gulp");
 var gutil = require("gulp-util");
+var ghPages = require('gulp-gh-pages');
 var webpack = require("webpack");
 var WebpackDevServer = require("webpack-dev-server");
 var Server = require('karma').Server;
@@ -26,6 +27,11 @@ var webpackConfig = {
     ]
   }
 };
+
+gulp.task('deploy', function() {
+  return gulp.src('./dist/**/*')
+    .pipe(ghPages());
+});
 
 gulp.task("webpack-dev-server", function(callback) {
   // modify some webpack config options
