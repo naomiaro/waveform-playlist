@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=utf-8 />
+    <title>Waveform Playlist | Pre-selected range on audio track</title>
+
+    <meta name="description" content="Basic web audio single track mono display waveform editor. Play, stop, pause audio. Live seeking enabled." />
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
+    <link rel="stylesheet" type="text/css" href="/css/playlist.css">
+
+    <script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
+    <script type="text/javascript" src="/js/waveform-playlist.var.js"></script>
+
+  </head>
+  <body>
+    <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
+
+    <h1>Load track with selection</h1>
+    <p>Pass a start time and end time in seconds to pre select an area on a track</p>
+
+    <div id="top-bar" class="playlist-top-bar">
+      <div class="playlist-toolbar">
+        <div class="btn-group">
+          <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
+          <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+          <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+        </div>
+      </div>
+    </div>
+    <div id="playlist"></div>
+   
+    <script type="text/javascript" src="/examples/js/preselected.js"></script>
+    <script type="text/javascript" src="/examples/js/emitter.js"></script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-62186746-1', 'auto');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>

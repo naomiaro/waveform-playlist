@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <meta name="description" content="Waveform Playlist: The multitrack javascript web audio editor and player. Example index for the project on Github." />
+
+    <link rel="screenshot" itemprop="screenshot" href="img/multitrack.png" />
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" media="screen" href="css/ghpages.css" />
+
+    <title>Waveform Playlist | Multitrack Web Audio Editor in Javascript</title>
+  </head>
+
+  <body>
+
+    <div class="wrapper">
+      <article class="container">
+        <div class="inner">
+          <!-- HEADER -->
+          <div class="header">
+              <header>
+                <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
+
+                <h1>Waveform Playlist</h1>
+                <h2>Multitrack Web Audio Editor and Player</h2>
+              </header>
+          </div>
+
+          <!-- MAIN CONTENT -->
+          <div class="main">
+            <section class="examples">
+              <ul>
+                <li>
+                  <h4>
+                    <a href="examples/minimal.html">Minimal Example</a>
+                  </h4>
+                  <p>One audio file with combined channel waveform visual and basic cursor selection for start/stop</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/preselected.html">Load Track With Selection Example</a>
+                  </h4>
+                  <p>Pass a start time and end time in seconds to pre select an area on a track</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/stationarytrack.html">Individual Track State Example</a>
+                  </h4>
+                  <p>Set one track as stationary, will not be able to shift this track in time</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/stem-tracks.html">Stem Tracks Example</a>
+                  </h4>
+                  <p>Try muting and soloing individual tracks that make up a composition.</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/fades.html">Track Fades Example</a>
+                  </h4>
+                  <p>Add fade in and fade out to tracks.</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/newtracks.html">Create New Tracks From Your Local Files Example</a>
+                  </h4>
+                  <p>Drag your own music into a new track in the editor.</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/track-zoom.html">Track Zoom Configuration Example</a>
+                  </h4>
+                  <p>Set max, min and initial track zoom in an array of acceptable zoom levels. Multiple Canvases will be used if necessary to draw the track, avoiding errors with a canvas exceding max dimensions in the browser.</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/record.html">Recorded Track Example</a>
+                  </h4>
+                  <p>Record a track in MediaRecorder enabled browsers. Allows recording over tracks, shows recording update as it is happening.</p>
+                </li>
+                <li>
+                  <h4>
+                    <a href="examples/web-audio-editor.html">Full Waveform Editor Example</a>
+                  </h4>
+                  <p>Every control and state available. All colours can be chosen as needed.</p>
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <!-- FOOTER  -->
+          <div class="footer">
+            <footer>
+              <p>Originally written for <a href="https://www.sourcefabric.org/en/airtime" rel="nofollow">Airtime</a> at <a href="https://www.sourcefabric.org" rel="nofollow">Sourcefabric</a>
+              <p>Demo music by: <a href="http://muse.mu/" rel="nofollow"><cite>Muse</cite></a></p>
+              <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
+              <p>Licensed under the MIT License</p>
+            </footer>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-62186746-1', 'auto');
+      ga('send', 'pageview');
+
+    </script>    
+
+  </body>
+</html>
