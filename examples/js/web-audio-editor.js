@@ -18,7 +18,7 @@ var playlist = new WaveformPlaylist.init({
 
 playlist.load([
   {
-    "src": "/media/audio/Vocals30.mp3",
+    "src": "media/audio/Vocals30.mp3",
     "name": "Vocals",
     "fadeIn": {
       "duration": 0.5
@@ -30,7 +30,7 @@ playlist.load([
     "cueout": 14.5
   },
   {
-    "src": "/media/audio/BassDrums30.mp3",
+    "src": "media/audio/BassDrums30.mp3",
     "name": "Drums",
     "start": 8.5,
     "fadeIn": {
@@ -44,7 +44,7 @@ playlist.load([
   }
   ,
   {
-    "src": "/media/audio/Guitar30.mp3",
+    "src": "media/audio/Guitar30.mp3",
     "name": "Guitar",
     "start": 23.5,
     "fadeOut": {

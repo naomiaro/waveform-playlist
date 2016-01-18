@@ -15,19 +15,19 @@ var playlist = new WaveformPlaylist.init({
 
 playlist.load([
   {
-    "src": "/media/audio/Vocals30.mp3",
+    "src": "media/audio/Vocals30.mp3",
     "name": "Vocals"
   },
   {
-    "src": "/media/audio/Guitar30.mp3",
+    "src": "media/audio/Guitar30.mp3",
     "name": "Guitar"
   },
   {
-    "src": "/media/audio/PianoSynth30.mp3",
+    "src": "media/audio/PianoSynth30.mp3",
     "name": "Pianos & Synth"
   },
   {
-    "src": "/media/audio/BassDrums30.mp3",
+    "src": "media/audio/BassDrums30.mp3",
     "name": "Drums"
   }
 ]).then(function() {
