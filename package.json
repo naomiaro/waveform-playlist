@@ -1,8 +1,8 @@
 {
   "name": "waveform-playlist",
   "description": "Multiple track web audio editor and player with waveform preview",
-  "version": "1.0.0",
-  "main": "dist/js/waveform-playlist.commonjs2.js",
+  "version": "1.0.1",
+  "main": "dist/js/waveform-playlist.umd.js",
   "author": "Naomi Aro",
   "license": "MIT",
   "website": "http://naomiaro.github.io",
