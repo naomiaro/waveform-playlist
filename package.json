@@ -1,7 +1,7 @@
 {
   "name": "waveform-playlist",
   "description": "Multiple track web audio editor and player with waveform preview",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "author": "Naomi Aro",
   "license": "MIT",
   "website": "http://naomiaro.github.io",
