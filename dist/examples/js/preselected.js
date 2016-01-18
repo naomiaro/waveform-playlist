@@ -8,7 +8,7 @@ var playlist = new WaveformPlaylist.init({
 
 playlist.load([
   {
-    src: "/media/audio/BassDrums30.mp3",
+    src: "media/audio/BassDrums30.mp3",
     selected: {
       start: 5,
       end: 15
