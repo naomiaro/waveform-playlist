@@ -106,8 +106,6 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-	__webpack_require__.p = "js/";
-
 	function init() {
 	    var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
 	    var ee = arguments.length <= 1 || arguments[1] === undefined ? (0, _eventEmitter2.default)() : arguments[1];
@@ -120,6 +118,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
 	    var defaults = {
+	        jsLocation: "js/", //needed for the webworker.
 	        ac: audioContext,
 	        sampleRate: audioContext.sampleRate,
 	        samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
@@ -173,6 +172,8 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	    //have to add extra events that aren't followed by default.
 	    delegator.listenTo("scroll");
+
+	    __webpack_require__.p = config.jsLocation;
 
 	    return playlist;
 	}
