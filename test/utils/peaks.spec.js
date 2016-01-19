@@ -1,7 +1,6 @@
 'use strict';
 
-//import "web-audio-test-api";
-
+require("@mohayonao/web-audio-api-shim");
 import {expect} from 'chai';
 import peaks from './../../src/utils/peaks';
 
