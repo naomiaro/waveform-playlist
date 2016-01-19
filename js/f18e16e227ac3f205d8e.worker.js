@@ -44,18 +44,18 @@
 /* 0 */
 /***/ function(module, exports, __webpack_require__) {
 
-	"use strict";
+	'use strict';
 
 	var _peaks = __webpack_require__(1);
 
-	onmessage = function (e) {
-	    var peaks = (0, _peaks.extractPeaks)(e.data.samples, e.data.samplesPerPixel);
+	var _peaks2 = _interopRequireDefault(_peaks);
 
-	    postMessage({
-	        type: "Float32",
-	        length: peaks.length / 2,
-	        data: [peaks]
-	    });
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	onmessage = function (e) {
+	  var peaks = (0, _peaks2.default)(e.data.samples, e.data.samplesPerPixel);
+
+	  postMessage(peaks);
 	};
 
 /***/ },
@@ -66,49 +66,66 @@
 
 	//http://jsperf.com/typed-array-min-max/2
 	//plain for loop for finding min/max is way faster than anything else.
+	/**
+	* @param {TypedArray} array - Subarray of audio to calculate peaks from.
+	*/
 
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
-	exports.extractPeaks = extractPeaks;
 
-	exports.default = function (buffer, cueIn, cueOut) {
-	    var samplesPerPixel = arguments.length <= 3 || arguments[3] === undefined ? 10000 : arguments[3];
-	    var isMono = arguments.length <= 4 || arguments[4] === undefined ? false : arguments[4];
+	exports.default = function (source) {
+	    var samplesPerPixel = arguments.length <= 1 || arguments[1] === undefined ? 10000 : arguments[1];
+	    var isMono = arguments.length <= 2 || arguments[2] === undefined ? true : arguments[2];
+	    var cueIn = arguments.length <= 3 || arguments[3] === undefined ? undefined : arguments[3];
+	    var cueOut = arguments.length <= 4 || arguments[4] === undefined ? undefined : arguments[4];
+	    var bits = arguments.length <= 5 || arguments[5] === undefined ? 8 : arguments[5];
 
-	    var numChan = buffer.numberOfChannels;
+	    if ([8, 16, 32].indexOf(bits) < 0) {
+	        throw new Error("Invalid number of bits specified for peaks.");
+	    }
+
+	    var numChan = source.numberOfChannels;
 	    var peaks = [];
 	    var c = undefined;
 	    var numPeaks = undefined;
 
-	    for (c = 0; c < numChan; c++) {
-	        var channel = buffer.getChannelData(c);
-	        var slice = channel.subarray(cueIn, cueOut);
-	        peaks.push(extractPeaks(slice, samplesPerPixel));
+	    if (source.constructor.name === 'AudioBuffer') {
+	        for (c = 0; c < numChan; c++) {
+	            var channel = source.getChannelData(c);
+	            cueIn = cueIn || 0;
+	            cueOut = cueOut || channel.length;
+	            var slice = channel.subarray(cueIn, cueOut);
+	            peaks.push(extractPeaks(slice, samplesPerPixel, bits));
+	        }
+	    } else {
+	        cueIn = cueIn || 0;
+	        cueOut = cueOut || source.length;
+	        peaks.push(extractPeaks(source.subarray(cueIn, cueOut), samplesPerPixel, bits));
 	    }
 
 	    if (isMono && peaks.length > 1) {
-	        peaks = makeMono(peaks);
+	        peaks = makeMono(peaks, bits);
 	    }
 
 	    numPeaks = peaks[0].length / 2;
 
 	    return {
-	        type: "Float32",
 	        length: numPeaks,
-	        data: peaks
+	        data: peaks,
+	        bits: bits
 	    };
 	};
 
-	function findMinMax(typeArray) {
+	function findMinMax(array) {
 	    var min = Infinity;
 	    var max = -Infinity;
 	    var i = 0;
-	    var len = typeArray.length;
+	    var len = array.length;
 	    var curr = undefined;
 
 	    for (; i < len; i++) {
-	        curr = typeArray[i];
+	        curr = array[i];
 	        if (min > curr) {
 	            min = curr;
 	        }
@@ -124,11 +141,20 @@
 	}
 
 	/**
-	* @param {Float32Array} channel  Audio track frames to calculate peaks from.
-	* @param {Number} samplesPerPixel Audio frames per peak
+	* @param {Number} n - peak to convert from float to Int8, Int16 etc.
+	* @param {Number} bits - convert to #bits two's complement signed integer
 	*/
-	function extractPeaks(channel, samplesPerPixel) {
+	function convert(n, bits) {
+	    var max = Math.pow(2, bits - 1);
+	    var v = n < 0 ? n * max : n * max - 1;
+	    return Math.max(-max, Math.min(max - 1, v));
+	}
 
+	/**
+	* @param {TypedArray} channel - Audio track frames to calculate peaks from.
+	* @param {Number} samplesPerPixel - Audio frames per peak
+	*/
+	function extractPeaks(channel, samplesPerPixel, bits) {
 	    var i = undefined;
 	    var chanLength = channel.length;
 	    var numPeaks = Math.ceil(chanLength / samplesPerPixel);
@@ -138,8 +164,9 @@
 	    var max = undefined;
 	    var min = undefined;
 	    var extrema = undefined;
+
 	    //create interleaved array of min,max
-	    var peaks = new Float32Array(numPeaks * 2);
+	    var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
 
 	    for (i = 0; i < numPeaks; i++) {
 
@@ -148,8 +175,8 @@
 
 	        segment = channel.subarray(start, end);
 	        extrema = findMinMax(segment);
-	        min = extrema.min;
-	        max = extrema.max;
+	        min = convert(extrema.min, bits);
+	        max = convert(extrema.max, bits);
 
 	        peaks[i * 2] = min;
 	        peaks[i * 2 + 1] = max;
@@ -159,6 +186,8 @@
 	}
 
 	function makeMono(channelPeaks) {
+	    var bits = arguments.length <= 1 || arguments[1] === undefined ? 8 : arguments[1];
+
 	    var numChan = channelPeaks.length;
 	    var weight = 1 / numChan;
 	    var numPeaks = channelPeaks[0].length / 2;
@@ -166,7 +195,7 @@
 	    var i = 0;
 	    var min = undefined;
 	    var max = undefined;
-	    var peaks = new Float32Array(numPeaks * 2);
+	    var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
 
 	    for (i = 0; i < numPeaks; i++) {
 	        min = 0;
@@ -184,6 +213,13 @@
 	    //return in array so channel number counts still work.
 	    return [peaks];
 	}
+
+	/**
+	* @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.
+	* @param {Number} samplesPerPixel - Number of audio samples per peak.
+	* @param {Number} cueIn - index in channel to start peak calculations from.
+	* @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).
+	*/
 
 /***/ }
 /******/ ]);

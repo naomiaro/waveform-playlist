@@ -41,8 +41,7 @@ playlist.load([
       "shape": "logarithmic",
       "duration": 0.5
     }
-  }
-  ,
+  },
   {
     "src": "media/audio/Guitar30.mp3",
     "name": "Guitar",
