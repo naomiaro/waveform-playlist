@@ -40,13 +40,11 @@
     "node-sass": "^3.4.2",
     "parallel-webpack": "^1.2.0",
     "requirejs": "^2.1.22",
-    "sass-loader": "^3.1.2",
-    "style-loader": "^0.13.0",
     "webpack": "^1.12.9",
     "webpack-dev-server": "^1.14.0"
   },
   "directories": {
-    "example": "dist/examples"
+    "example": "dist/"
   },
   "dependencies": {
     "dom-delegator": "^13.1.0",

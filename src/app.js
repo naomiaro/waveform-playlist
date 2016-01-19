@@ -1,3 +1,5 @@
+__webpack_public_path__ = "js/";
+
 import _assign from 'lodash.assign';
 import createElement from 'virtual-dom/create-element';
 
