@@ -1,5 +1,3 @@
-__webpack_public_path__ = "js/";
-
 import _assign from 'lodash.assign';
 import createElement from 'virtual-dom/create-element';
 
@@ -16,6 +14,7 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     let audioContext = new (window.AudioContext || window.webkitAudioContext);
 
     let defaults = {
+        jsLocation: "js/", //needed for the webworker.
         ac: audioContext,
         sampleRate: audioContext.sampleRate,
         samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
@@ -69,6 +68,8 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
 
     //have to add extra events that aren't followed by default.
     delegator.listenTo("scroll");
+
+    __webpack_public_path__ = config.jsLocation;
 
     return playlist;
 }

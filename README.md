@@ -27,6 +27,7 @@ I've written up some demos on github for the different [audio fade types](https:
 var WaveformPlaylist = require('waveform-playlist');
 
 var playlist = new WaveformPlaylist.init({
+  jsLocation: "js/", //needed for the webworker (If you're recording).
   samplesPerPixel: 3000,
   mono: false,
   waveHeight: 70,
