@@ -12,27 +12,35 @@ function drawFrame(cc, h2, x, minPeak, maxPeak) {
 * virtual-dom hook for drawing to the canvas element.
 */
 export default class {
-    constructor(peaks, offset, color) {
+    constructor(peaks, offset, bits, color) {
         this.peaks = peaks
         this.offset = offset;  //http://stackoverflow.com/questions/6081483/maximum-size-of-a-canvas-element
         this.color = color;
+        this.bits = bits;
     }
 
     hook(canvas, prop, prev) {
         //canvas is up to date
-        if (prev !== undefined && (prev.peaks.length === this.peaks.length)) {
+        if (prev !== undefined &&
+            (prev.peaks.length === this.peaks.length)) {
             return;
         }
 
         let i;
         let len = canvas.width;
         let cc = canvas.getContext('2d');
-        let h2 = canvas.height/2;
+        let h2 = canvas.height / 2;
+        let maxValue = Math.pow(2, this.bits-1);
+
+        let minPeak;
+        let maxPeak;
 
         cc.fillStyle = this.color;
 
         for (i = 0; i < len; i++) {
-            drawFrame(cc, h2, i, this.peaks[(i+this.offset)*2], this.peaks[(i+this.offset)*2+1]);
+            minPeak = this.peaks[(i+this.offset)*2] / maxValue;
+            maxPeak = this.peaks[(i+this.offset)*2+1] / maxValue;
+            drawFrame(cc, h2, i, minPeak, maxPeak);
         }
     }
 }

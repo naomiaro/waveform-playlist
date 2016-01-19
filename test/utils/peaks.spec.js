@@ -35,7 +35,7 @@ describe('peak extractor', function() {
 
     describe('Peaks extractor', function() {
         it('calculates the requested number of peaks', function() {
-            var result = peaks(decodedAudio, 0, decodedAudio.length, 1, true);
+            var result = peaks(decodedAudio, 1, true);
             expect(decodedAudio.sampleRate).to.equal(result.length);
             expect(decodedAudio.sampleRate*2).to.equal(result.data[0].length)
         });

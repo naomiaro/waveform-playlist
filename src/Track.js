@@ -164,7 +164,7 @@ export default class {
         let cueIn = secondsToSamples(this.cueIn, sampleRate);
         let cueOut = secondsToSamples(this.cueOut, sampleRate);
 
-        this.setPeaks(extractPeaks(this.buffer, cueIn, cueOut, samplesPerPixel, this.peakData.mono));
+        this.setPeaks(extractPeaks(this.buffer, samplesPerPixel, this.peakData.mono, cueIn, cueOut));
     }
 
     setPeaks(peaks) {
@@ -411,7 +411,7 @@ export default class {
                         "height": data.height,
                         "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                     },
-                    "hook": new CanvasHook(peaks, offset, data.colors.waveOutlineColor)
+                    "hook": new CanvasHook(peaks, offset, this.peaks.bits, data.colors.waveOutlineColor)
                 }));
 
                 totalWidth -= currentWidth;
