@@ -116,6 +116,8 @@ export default function(source, samplesPerPixel=10000, isMono=true, cueIn=undefi
     let c;
     let numPeaks;
 
+    console.log(source.constructor.name);
+
     if (source.constructor.name === 'AudioBuffer') {
         for (c = 0; c < numChan; c++) {
             let channel = source.getChannelData(c);

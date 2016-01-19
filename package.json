@@ -77,7 +77,9 @@
     "music",
     "editor",
     "record",
-    "recording"
+    "recording",
+    "player",
+    "webaudio"
   ],
   "bugs": {
     "url": "https://github.com/naomiaro/waveform-playlist/issues"
