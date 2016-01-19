@@ -97,6 +97,8 @@ var WaveformPlaylist =
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	__webpack_require__.p = "js/";
+
 	function init() {
 	    var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
 	    var ee = arguments.length <= 1 || arguments[1] === undefined ? (0, _eventEmitter2.default)() : arguments[1];
@@ -2910,7 +2912,7 @@ var WaveformPlaylist =
 	            var cueIn = (0, _conversions.secondsToSamples)(this.cueIn, sampleRate);
 	            var cueOut = (0, _conversions.secondsToSamples)(this.cueOut, sampleRate);
 
-	            this.setPeaks((0, _peaks2.default)(this.buffer, cueIn, cueOut, samplesPerPixel, this.peakData.mono));
+	            this.setPeaks((0, _peaks2.default)(this.buffer, samplesPerPixel, this.peakData.mono, cueIn, cueOut));
 	        }
 	    }, {
 	        key: 'setPeaks',
@@ -3164,7 +3166,7 @@ var WaveformPlaylist =
 	                            "height": data.height,
 	                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
 	                        },
-	                        "hook": new _CanvasHook2.default(peaks, offset, data.colors.waveOutlineColor)
+	                        "hook": new _CanvasHook2.default(peaks, offset, _this4.peaks.bits, data.colors.waveOutlineColor)
 	                    }));
 
 	                    totalWidth -= currentWidth;
@@ -3306,12 +3308,13 @@ var WaveformPlaylist =
 	*/
 
 	var _class = function () {
-	    function _class(peaks, offset, color) {
+	    function _class(peaks, offset, bits, color) {
 	        _classCallCheck(this, _class);
 
 	        this.peaks = peaks;
 	        this.offset = offset; //http://stackoverflow.com/questions/6081483/maximum-size-of-a-canvas-element
 	        this.color = color;
+	        this.bits = bits;
 	    }
 
 	    _createClass(_class, [{
@@ -3326,11 +3329,17 @@ var WaveformPlaylist =
 	            var len = canvas.width;
 	            var cc = canvas.getContext('2d');
 	            var h2 = canvas.height / 2;
+	            var maxValue = Math.pow(2, this.bits - 1);
+
+	            var minPeak = undefined;
+	            var maxPeak = undefined;
 
 	            cc.fillStyle = this.color;
 
 	            for (i = 0; i < len; i++) {
-	                drawFrame(cc, h2, i, this.peaks[(i + this.offset) * 2], this.peaks[(i + this.offset) * 2 + 1]);
+	                minPeak = this.peaks[(i + this.offset) * 2] / maxValue;
+	                maxPeak = this.peaks[(i + this.offset) * 2 + 1] / maxValue;
+	                drawFrame(cc, h2, i, minPeak, maxPeak);
 	            }
 	        }
 	    }]);
@@ -4099,49 +4108,66 @@ var WaveformPlaylist =
 
 	//http://jsperf.com/typed-array-min-max/2
 	//plain for loop for finding min/max is way faster than anything else.
+	/**
+	* @param {TypedArray} array - Subarray of audio to calculate peaks from.
+	*/
 
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
-	exports.extractPeaks = extractPeaks;
 
-	exports.default = function (buffer, cueIn, cueOut) {
-	    var samplesPerPixel = arguments.length <= 3 || arguments[3] === undefined ? 10000 : arguments[3];
-	    var isMono = arguments.length <= 4 || arguments[4] === undefined ? false : arguments[4];
+	exports.default = function (source) {
+	    var samplesPerPixel = arguments.length <= 1 || arguments[1] === undefined ? 10000 : arguments[1];
+	    var isMono = arguments.length <= 2 || arguments[2] === undefined ? true : arguments[2];
+	    var cueIn = arguments.length <= 3 || arguments[3] === undefined ? undefined : arguments[3];
+	    var cueOut = arguments.length <= 4 || arguments[4] === undefined ? undefined : arguments[4];
+	    var bits = arguments.length <= 5 || arguments[5] === undefined ? 8 : arguments[5];
 
-	    var numChan = buffer.numberOfChannels;
+	    if ([8, 16, 32].indexOf(bits) < 0) {
+	        throw new Error("Invalid number of bits specified for peaks.");
+	    }
+
+	    var numChan = source.numberOfChannels;
 	    var peaks = [];
 	    var c = undefined;
 	    var numPeaks = undefined;
 
-	    for (c = 0; c < numChan; c++) {
-	        var channel = buffer.getChannelData(c);
-	        var slice = channel.subarray(cueIn, cueOut);
-	        peaks.push(extractPeaks(slice, samplesPerPixel));
+	    if (source.constructor.name === 'AudioBuffer') {
+	        for (c = 0; c < numChan; c++) {
+	            var channel = source.getChannelData(c);
+	            cueIn = cueIn || 0;
+	            cueOut = cueOut || channel.length;
+	            var slice = channel.subarray(cueIn, cueOut);
+	            peaks.push(extractPeaks(slice, samplesPerPixel, bits));
+	        }
+	    } else {
+	        cueIn = cueIn || 0;
+	        cueOut = cueOut || source.length;
+	        peaks.push(extractPeaks(source.subarray(cueIn, cueOut), samplesPerPixel, bits));
 	    }
 
 	    if (isMono && peaks.length > 1) {
-	        peaks = makeMono(peaks);
+	        peaks = makeMono(peaks, bits);
 	    }
 
 	    numPeaks = peaks[0].length / 2;
 
 	    return {
-	        type: "Float32",
 	        length: numPeaks,
-	        data: peaks
+	        data: peaks,
+	        bits: bits
 	    };
 	};
 
-	function findMinMax(typeArray) {
+	function findMinMax(array) {
 	    var min = Infinity;
 	    var max = -Infinity;
 	    var i = 0;
-	    var len = typeArray.length;
+	    var len = array.length;
 	    var curr = undefined;
 
 	    for (; i < len; i++) {
-	        curr = typeArray[i];
+	        curr = array[i];
 	        if (min > curr) {
 	            min = curr;
 	        }
@@ -4157,11 +4183,20 @@ var WaveformPlaylist =
 	}
 
 	/**
-	* @param {Float32Array} channel  Audio track frames to calculate peaks from.
-	* @param {Number} samplesPerPixel Audio frames per peak
+	* @param {Number} n - peak to convert from float to Int8, Int16 etc.
+	* @param {Number} bits - convert to #bits two's complement signed integer
 	*/
-	function extractPeaks(channel, samplesPerPixel) {
+	function convert(n, bits) {
+	    var max = Math.pow(2, bits - 1);
+	    var v = n < 0 ? n * max : n * max - 1;
+	    return Math.max(-max, Math.min(max - 1, v));
+	}
 
+	/**
+	* @param {TypedArray} channel - Audio track frames to calculate peaks from.
+	* @param {Number} samplesPerPixel - Audio frames per peak
+	*/
+	function extractPeaks(channel, samplesPerPixel, bits) {
 	    var i = undefined;
 	    var chanLength = channel.length;
 	    var numPeaks = Math.ceil(chanLength / samplesPerPixel);
@@ -4171,8 +4206,9 @@ var WaveformPlaylist =
 	    var max = undefined;
 	    var min = undefined;
 	    var extrema = undefined;
+
 	    //create interleaved array of min,max
-	    var peaks = new Float32Array(numPeaks * 2);
+	    var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
 
 	    for (i = 0; i < numPeaks; i++) {
 
@@ -4181,8 +4217,8 @@ var WaveformPlaylist =
 
 	        segment = channel.subarray(start, end);
 	        extrema = findMinMax(segment);
-	        min = extrema.min;
-	        max = extrema.max;
+	        min = convert(extrema.min, bits);
+	        max = convert(extrema.max, bits);
 
 	        peaks[i * 2] = min;
 	        peaks[i * 2 + 1] = max;
@@ -4192,6 +4228,8 @@ var WaveformPlaylist =
 	}
 
 	function makeMono(channelPeaks) {
+	    var bits = arguments.length <= 1 || arguments[1] === undefined ? 8 : arguments[1];
+
 	    var numChan = channelPeaks.length;
 	    var weight = 1 / numChan;
 	    var numPeaks = channelPeaks[0].length / 2;
@@ -4199,7 +4237,7 @@ var WaveformPlaylist =
 	    var i = 0;
 	    var min = undefined;
 	    var max = undefined;
-	    var peaks = new Float32Array(numPeaks * 2);
+	    var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
 
 	    for (i = 0; i < numPeaks; i++) {
 	        min = 0;
@@ -4217,6 +4255,13 @@ var WaveformPlaylist =
 	    //return in array so channel number counts still work.
 	    return [peaks];
 	}
+
+	/**
+	* @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.
+	* @param {Number} samplesPerPixel - Number of audio samples per peak.
+	* @param {Number} cueIn - index in channel to start peak calculations from.
+	* @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).
+	*/
 
 /***/ },
 /* 42 */
@@ -8234,7 +8279,7 @@ var WaveformPlaylist =
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function() {
-		return new Worker(__webpack_require__.p + "fc7e09f73d6230e2cfc4.worker.js");
+		return new Worker(__webpack_require__.p + "f18e16e227ac3f205d8e.worker.js");
 	};
 
 /***/ },
