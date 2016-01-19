@@ -15,7 +15,7 @@ I've written up some demos on github for the different [audio fade types](https:
 ![Screenshot](img/stemtracks.png?raw=true "stem tracks mute solo volume control")
 (code for picture shown can be found in dist/examples/stem-tracks.html)
 
-[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/examples/web-audio-editor.html)
+[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/web-audio-editor.html)
 
 ## Installation
 
