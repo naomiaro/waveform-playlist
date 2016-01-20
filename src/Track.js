@@ -7,7 +7,7 @@ import uuid from 'uuid';
 import h from 'virtual-dom/h';
 
 import {secondsToPixels, secondsToSamples} from './utils/conversions';
-import extractPeaks from './utils/peaks';
+import extractPeaks from 'webaudio-peaks';
 import stateClasses from './track/states';
 
 import CanvasHook from './render/CanvasHook';
