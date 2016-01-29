@@ -27,7 +27,7 @@ I've written up some demos on github for the different [audio fade types](https:
 var WaveformPlaylist = require('waveform-playlist');
 
 var playlist = new WaveformPlaylist.init({
-  jsLocation: "js/", //needed for the webworker (If you're recording, but good to set for future uses of a webworker.).
+  jsLocation: "js/",
   samplesPerPixel: 3000,
   mono: false,
   waveHeight: 70,
@@ -39,8 +39,8 @@ var playlist = new WaveformPlaylist.init({
     fadeColor: 'black'
   },
   controls: {
-    show: true, //whether or not to include the track controls
-    width: 200 //width of controls in pixels
+    show: true,
+    width: 200
   },
   zoomLevels: [500, 1000, 3000, 5000]
 });
@@ -77,7 +77,7 @@ playlist.load([
 });
 ```
 
-# Waveform Playlist Options
+### Waveform Playlist Options
 
 ```javascript
 var options = {
