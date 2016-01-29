@@ -29,9 +29,9 @@ I've written up some demos on github for the different [audio fade types](https:
 
   `<script type="text/javascript" src="waveform-playlist.var.js"></script>`
 
-  * Source is located in /dist/js
-  * Minified version waveform-playlist.var.min.js
-  * Library will be available in global var WaveformPlaylist
+  * Source is located in `/dist/js`
+  * Minified version `waveform-playlist.var.min.js`
+  * Library will be available in global `var WaveformPlaylist`
 
 ## Basic Usage
 
