@@ -224,14 +224,17 @@ Waveform Playlist uses an instance of [event-emitter](https://www.npmjs.com/pack
 | `statechange` | (`cursor | select | fadein | fadeout | shift`) | Changes interaction state to the state given. |
 | `fadetype` | (`logarithmic | linear | sCurve | exponential`) | Changes playlist default fade type. |
 | `newtrack` | `File` | Loads `File` object into the playlist. |
+| `select` | `start, end, track:optional` | Sets cursor selection from `start` to `end` optionally with active track `track`. |
 
 #### Events to Listen to
 
 | event | arguments | description |
 | --- | --- | --- |
-| `select` | start, end, track | Cursor selection has occurred from `start` to `end` on `track`. |
-| `timeupdate` | seconds | Sends current position of playout in seconds. |
-| `scroll` | seconds | Sends current position of scroll in seconds. |
+| `select` | `start, end, track` | Cursor selection has occurred from `start` to `end` with active Track `track`. |
+| `timeupdate` | `playbackPosition` | Sends current position of playout `playbackPosition` in seconds. |
+| `scroll` | `scrollLeft` | Sends current position of scroll `scrollLeft` in seconds. |
+| `statechange` | `state` | Sends current interaction state `state`. |
+| `shift` | `deltaTime, track` | Sends `deltaTime` in seconds change for Track `track` |
 
 ## Tests
 
