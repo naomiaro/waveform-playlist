@@ -77,6 +77,65 @@ playlist.load([
 });
 ```
 
+# Waveform Playlist Options
+
+```javascript
+var options = {
+  //Location of the js relative to the html page. Needed for the webworker.
+  jsLocation: "js/",
+
+  //webaudio api AudioContext
+  ac: new (window.AudioContext || window.webkitAudioContext),
+
+  //DOM container element REQUIRED
+  container: document.getElementById("playlist"),
+
+  //sample rate of the project. (used for correct peaks rendering)
+  sampleRate: new (window.AudioContext || window.webkitAudioContext).sampleRate,
+
+  //number of audio samples per waveform peak.
+  //must be an entry in option: zoomLevels.
+  samplesPerPixel: 4096,
+
+  //whether to draw multiple channels or combine them.
+  mono: true,
+
+  //default fade curve type.
+  fadeType: 'logarithmic', // (logarithmic | linear | sCurve | exponential)
+
+  //whether or not to include the time measure.
+  timescale: false,
+
+  //control panel on left side of waveform
+  controls: {
+    //whether or not to include the track controls
+    show: false,
+    //width of controls in pixels
+    width: 150
+  },
+
+  colors: {
+    //color of the wave background
+    waveOutlineColor: 'white',
+
+    //color of the time ticks on the canvas
+    timeColor: 'grey',
+
+    //color of the fade drawn on canvas
+    fadeColor: 'black'
+  },
+
+  //height in pixels of each canvas element a waveform is on.
+  waveHeight: 128,
+
+  //interaction state of the playlist
+  state: 'cursor', // (cursor | select | fadein | fadeout | shift)
+
+  //Array of zoom levels in samples per pixel.
+  zoomLevels: [512, 1024, 2048, 4096]
+};
+```
+
 ## Tests
 
   `npm test`
