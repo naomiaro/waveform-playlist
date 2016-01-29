@@ -5,8 +5,9 @@ Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a mult
 
 [See examples in action](http://naomiaro.github.io/waveform-playlist)
 
+[![GitHub license](https://img.shields.io/github/license/mashape/apistatus.svg)]()
+[![npm](https://img.shields.io/npm/dm/waveform-playlist.svg)](https://www.npmjs.com/package/waveform-playlist)
 [![Build Status](https://travis-ci.org/naomiaro/waveform-playlist.svg)](https://travis-ci.org/naomiaro/waveform-playlist)
-
 [![Coverage Status](https://coveralls.io/repos/naomiaro/waveform-playlist/badge.svg?branch=master&service=github)](https://coveralls.io/github/naomiaro/waveform-playlist?branch=master)
 
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
