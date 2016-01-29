@@ -208,6 +208,23 @@ var options = {
 
 Waveform Playlist uses an instance of [event-emitter](https://www.npmjs.com/package/event-emitter) to send & receive messages from the playlist.
 
+```javascript
+var EventEmitter = require('event-emitter');
+var WaveformPlaylist = require('waveform-playlist');
+
+var playlist = new WaveformPlaylist.init(
+  {
+    container: document.getElementById("playlist")
+  },
+  EventEmitter() //you can pass your own event emitter
+);
+
+//retrieves the event emitter the playlist is using.
+var ee = playlist.getEventEmitter();
+```
+
+An example of using the event emitter to control the playlist can be found in [/dist/js/examples/emitter.js](https://github.com/naomiaro/waveform-playlist/blob/master/dist/js/examples/emitter.js)
+
 #### Events to Invoke
 
 | event | arguments | description |
