@@ -136,6 +136,72 @@ var options = {
 };
 ```
 
+### Waveform Playlist Track Options
+
+```javascript
+{
+  //a media path for XHR or a File object.
+  "src": "media/audio/BassDrums30.mp3",
+
+  //name that will display in the playlist control panel.
+  "name": "Drums",
+
+  //time in seconds relative to the playlist
+  //ex (track will start after 8.5 seconds)
+  //DEFAULT 0 - track starts at beginning of playlist
+  "start": 8.5,
+
+  //track fade in details
+  "fadeIn": {
+    //fade curve shape
+    "shape": "logarithmic", // (logarithmic | linear | sCurve | exponential)
+
+    //length of fade starting from the beginning of this track, in seconds.
+    "duration": 0.5
+  },
+
+  //track fade out details
+  "fadeOut": {
+    //fade curve shape
+    "shape": "logarithmic", // (logarithmic | linear | sCurve | exponential)
+
+    //length of fade which reaches the end of this track, in seconds.
+    "duration": 0.5
+  }
+
+  //where the waveform for this track should begin from
+  //ex (Waveform will begin 15 seconds into this track)
+  //DEFAULT start at the beginning - 0 seconds
+  "cuein": 15,
+
+  //where the waveform for this track should end
+  //ex (Waveform will end at 30 second into this track)
+  //DEFAULT duration of the track
+  "cueout": 30,
+
+  //interaction states allowed on this track.
+  //DEFAULT - all true
+  "states": {
+    'cursor': true,
+    'fadein': true,
+    'fadeout': true,
+    'select': true,
+    'shift': true
+  },
+
+  //pre-selected section on track. 
+  //ONLY ONE selection is permitted in a list of tracks, will take most recently set if multiple passed.
+  //This track is marked as 'active'
+  selected: {
+    //start time of selection in seconds, relative to the playlist
+    start: 5,
+
+    //end time of selection in seconds, relative to the playlist
+    end: 15
+  }
+}
+```
+
 ## Tests
 
   `npm test`
