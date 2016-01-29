@@ -77,7 +77,7 @@ playlist.load([
 });
 ```
 
-### Waveform Playlist Options
+### Playlist Options
 
 ```javascript
 var options = {
@@ -110,6 +110,7 @@ var options = {
   controls: {
     //whether or not to include the track controls
     show: false,
+
     //width of controls in pixels
     width: 150
   },
@@ -132,11 +133,12 @@ var options = {
   state: 'cursor', // (cursor | select | fadein | fadeout | shift)
 
   //Array of zoom levels in samples per pixel.
+  //Smaller numbers have a greater zoom in.
   zoomLevels: [512, 1024, 2048, 4096]
 };
 ```
 
-### Waveform Playlist Track Options
+### Track Options
 
 ```javascript
 {
@@ -201,6 +203,35 @@ var options = {
   }
 }
 ```
+
+### Playlist Events
+
+Waveform Playlist uses an instance of [event-emitter](https://www.npmjs.com/package/event-emitter) to send & receive messages from the playlist.
+
+#### Events to Invoke
+
+| event | arguments | description |
+| --- | --- | --- |
+| `play` | _none_ | Starts playout of the playlist. |
+| `pause` | _none_ | Pauses playout of the playlist. |
+| `stop` | _none_ | Stops playout of the playlist. |
+| `rewind` | _none_ | Stops playout if playlist is playing, resets cursor to the beginning of the playlist. |
+| `fastforward` | _none_ | Stops playout if playlist is playing, resets cursor to the end of the playlist. |
+| `record` | _none_ | Starts recording an audio track. Begins playout of other tracks in playlist if there are any. |
+| `zoomin` | _none_ | Changes zoom level to the next smallest entry (if one exists) from the array `zoomLevels`. |
+| `zoomout` | _none_ | Changes zoom level to the next largest entry (if one exists) from the array `zoomLevels`. |
+| `trim` | _none_ | Trims currently active track to the cursor selection. |
+| `statechange` | (`cursor` | `select` | `fadein` | `fadeout` | `shift`) | Changes interaction state to the state given. |
+| `fadetype` | (`logarithmic` | `linear` | `sCurve` | `exponential`) | Changes playlist default fade type. |
+| `newtrack` | `File` | Loads `File` object into the playlist. |
+
+#### Events to Listen to
+
+| event | arguments | description |
+| --- | --- | --- |
+| `select` | start, end, track | Cursor selection has occurred from `start` to `end` on `track`. |
+| `timeupdate` | seconds | Sends current position of playout in seconds. |
+| `scroll` | seconds | Sends current position of scroll in seconds. |
 
 ## Tests
 
