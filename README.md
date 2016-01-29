@@ -221,8 +221,8 @@ Waveform Playlist uses an instance of [event-emitter](https://www.npmjs.com/pack
 | `zoomin` | _none_ | Changes zoom level to the next smallest entry (if one exists) from the array `zoomLevels`. |
 | `zoomout` | _none_ | Changes zoom level to the next largest entry (if one exists) from the array `zoomLevels`. |
 | `trim` | _none_ | Trims currently active track to the cursor selection. |
-| `statechange` | (`cursor` | `select` | `fadein` | `fadeout` | `shift`) | Changes interaction state to the state given. |
-| `fadetype` | (`logarithmic` | `linear` | `sCurve` | `exponential`) | Changes playlist default fade type. |
+| `statechange` | (`cursor | select | fadein | fadeout | shift`) | Changes interaction state to the state given. |
+| `fadetype` | (`logarithmic | linear | sCurve | exponential`) | Changes playlist default fade type. |
 | `newtrack` | `File` | Loads `File` object into the playlist. |
 
 #### Events to Listen to
