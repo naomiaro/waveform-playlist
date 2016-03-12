@@ -1,5 +1,5 @@
-import {FADEIN, FADEOUT, SCURVE, LINEAR, EXPONENTIAL, LOGARITHMIC} from './../utils/fades';
-import {sCurve, logarithmic, linear, exponential} from './../utils/curves';
+import {FADEIN, FADEOUT, SCURVE, LINEAR, EXPONENTIAL, LOGARITHMIC} from 'fade-maker';
+import {sCurve, logarithmic, linear, exponential} from 'fade-curves';
 
 function createCurve(shape, type, width) {
     let reflection = (type === FADEIN) ? 1 : -1;

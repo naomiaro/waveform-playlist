@@ -48,6 +48,8 @@
   "dependencies": {
     "dom-delegator": "^13.1.0",
     "event-emitter": "^0.3.4",
+    "fade-curves": "^1.0.2",
+    "fade-maker": "^1.0.3",
     "lodash.assign": "^4.0.0",
     "lodash.defaults": "^4.0.0",
     "lodash.forown": "^4.0.0",

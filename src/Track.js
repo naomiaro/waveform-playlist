@@ -13,7 +13,7 @@ import stateClasses from './track/states';
 import CanvasHook from './render/CanvasHook';
 import FadeCanvasHook from './render/FadeCanvasHook';
 
-import {FADEIN, FADEOUT} from './utils/fades';
+import {FADEIN, FADEOUT} from 'fade-maker';
 
 const MAX_CANVAS_WIDTH = 1000;
 

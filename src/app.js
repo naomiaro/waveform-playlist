@@ -18,13 +18,12 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
         ac: audioContext,
         sampleRate: audioContext.sampleRate,
         samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
-        timeFormat: 'hh:mm:ss.uu',
         mono: true, //whether to draw multiple channels or combine them.
         fadeType: 'logarithmic',
         timescale: false, //whether or not to include the time measure.
         controls: {
             show: false, //whether or not to include the track controls
-            width: 150, //width of controls in pixels
+            width: 150 //width of controls in pixels
         },
         colors: {
             waveOutlineColor: 'white',

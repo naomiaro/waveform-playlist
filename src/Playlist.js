@@ -35,8 +35,7 @@ export default class {
     }
 
     initRecorder(stream) {
-        if (stream === undefined ||
-            stream instanceof LocalMediaStream !== true) {
+        if (stream instanceof LocalMediaStream !== true) {
             throw new Error("Must provide a LocalMediaStream to record from");
         }
 
