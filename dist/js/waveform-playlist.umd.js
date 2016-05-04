@@ -88,15 +88,15 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	var _lodash2 = _interopRequireDefault(_lodash);
 
-	var _createElement = __webpack_require__(76);
+	var _createElement = __webpack_require__(75);
 
 	var _createElement2 = _interopRequireDefault(_createElement);
 
-	var _domDelegator = __webpack_require__(47);
+	var _domDelegator = __webpack_require__(46);
 
 	var _domDelegator2 = _interopRequireDefault(_domDelegator);
 
-	var _eventEmitter = __webpack_require__(16);
+	var _eventEmitter = __webpack_require__(15);
 
 	var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
 
@@ -122,14 +122,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	        ac: audioContext,
 	        sampleRate: audioContext.sampleRate,
 	        samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
-	        timeFormat: 'hh:mm:ss.uu',
 	        mono: true, //whether to draw multiple channels or combine them.
 	        fadeType: 'logarithmic',
 	        timescale: false, //whether or not to include the time measure.
 	        controls: {
 	            show: false, //whether or not to include the track controls
-	            width: 150 },
-	        //width of controls in pixels
+	            width: 150 //width of controls in pixels
+	        },
 	        colors: {
 	            waveOutlineColor: 'white',
 	            timeColor: 'grey',
@@ -254,7 +253,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	'use strict';
 
-	var OneVersionConstraint = __webpack_require__(65);
+	var OneVersionConstraint = __webpack_require__(64);
 
 	var MY_VERSION = '7';
 	OneVersionConstraint('ev-store', MY_VERSION);
@@ -324,7 +323,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	exports.createFadeIn = createFadeIn;
 	exports.createFadeOut = createFadeOut;
 
-	var _curves = __webpack_require__(14);
+	var _fadeCurves = __webpack_require__(16);
 
 	var SCURVE = exports.SCURVE = "sCurve";
 	var LINEAR = exports.LINEAR = "linear";
@@ -335,12 +334,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	var FADEOUT = exports.FADEOUT = "FadeOut";
 
 	function sCurveFadeIn(start, duration) {
-	    var curve = (0, _curves.sCurve)(10000, 1);
+	    var curve = (0, _fadeCurves.sCurve)(10000, 1);
 	    this.setValueCurveAtTime(curve, start, duration);
 	}
 
 	function sCurveFadeOut(start, duration) {
-	    var curve = (0, _curves.sCurve)(10000, -1);
+	    var curve = (0, _fadeCurves.sCurve)(10000, -1);
 	    this.setValueCurveAtTime(curve, start, duration);
 	}
 
@@ -365,12 +364,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 	function logarithmicFadeIn(start, duration) {
-	    var curve = (0, _curves.logarithmic)(10000, 10, 1);
+	    var curve = (0, _fadeCurves.logarithmic)(10000, 10, 1);
 	    this.setValueCurveAtTime(curve, start, duration);
 	}
 
 	function logarithmicFadeOut(start, duration) {
-	    var curve = (0, _curves.logarithmic)(10000, 10, -1);
+	    var curve = (0, _fadeCurves.logarithmic)(10000, 10, -1);
 	    this.setValueCurveAtTime(curve, start, duration);
 	}
 
@@ -411,6 +410,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            throw new Error("Unsupported Fade type");
 	    }
 	}
+
 
 /***/ },
 /* 10 */
@@ -672,7 +672,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var h = __webpack_require__(85)
+	var h = __webpack_require__(84)
 
 	module.exports = h
 
@@ -704,7 +704,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	});
 	exports.STATE_FINISHED = exports.STATE_DECODING = exports.STATE_LOADING = exports.STATE_UNINITIALIZED = undefined;
 
-	var _eventEmitter = __webpack_require__(16);
+	var _eventEmitter = __webpack_require__(15);
 
 	var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
 
@@ -775,93 +775,14 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ },
 /* 14 */
-/***/ function(module, exports) {
-
-	'use strict';
-
-	Object.defineProperty(exports, "__esModule", {
-	    value: true
-	});
-	exports.linear = linear;
-	exports.exponential = exponential;
-	exports.sCurve = sCurve;
-	exports.logarithmic = logarithmic;
-	function linear(length, rotation) {
-	    var curve = new Float32Array(length),
-	        i,
-	        x,
-	        scale = length - 1;
-
-	    for (i = 0; i < length; i++) {
-	        x = i / scale;
-
-	        if (rotation > 0) {
-	            curve[i] = x;
-	        } else {
-	            curve[i] = 1 - x;
-	        }
-	    }
-
-	    return curve;
-	}
-
-	function exponential(length, rotation) {
-	    var curve = new Float32Array(length),
-	        i,
-	        x,
-	        scale = length - 1,
-	        index;
-
-	    for (i = 0; i < length; i++) {
-	        x = i / scale;
-	        index = rotation > 0 ? i : length - 1 - i;
-
-	        curve[index] = Math.exp(2 * x - 1) / Math.exp(1);
-	    }
-
-	    return curve;
-	}
-
-	//creating a curve to simulate an S-curve with setValueCurveAtTime.
-	function sCurve(length, rotation) {
-	    var curve = new Float32Array(length),
-	        i,
-	        phase = rotation > 0 ? Math.PI / 2 : -(Math.PI / 2);
-
-	    for (i = 0; i < length; ++i) {
-	        curve[i] = Math.sin(Math.PI * i / length - phase) / 2 + 0.5;
-	    }
-	    return curve;
-	}
-
-	//creating a curve to simulate a logarithmic curve with setValueCurveAtTime.
-	function logarithmic(length, base, rotation) {
-	    var curve = new Float32Array(length),
-	        index,
-	        x = 0,
-	        i;
-
-	    for (i = 0; i < length; i++) {
-	        //index for the curve array.
-	        index = rotation > 0 ? i : length - 1 - i;
-
-	        x = i / length;
-	        curve[index] = Math.log(1 + base * x) / Math.log(1 + base);
-	    }
-
-	    return curve;
-	}
-
-/***/ },
-/* 15 */
 [96, 94],
-/* 16 */
+/* 15 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var d        = __webpack_require__(44)
-	  , callable = __webpack_require__(59)
+	var d        = __webpack_require__(43)
+	  , callable = __webpack_require__(58)
 
 	  , apply = Function.prototype.apply, call = Function.prototype.call
 	  , create = Object.create, defineProperty = Object.defineProperty
@@ -993,6 +914,86 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
+/* 16 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	    value: true
+	});
+	exports.linear = linear;
+	exports.exponential = exponential;
+	exports.sCurve = sCurve;
+	exports.logarithmic = logarithmic;
+	function linear(length, rotation) {
+	    var curve = new Float32Array(length),
+	        i,
+	        x,
+	        scale = length - 1;
+
+	    for (i = 0; i < length; i++) {
+	        x = i / scale;
+
+	        if (rotation > 0) {
+	            curve[i] = x;
+	        } else {
+	            curve[i] = 1 - x;
+	        }
+	    }
+
+	    return curve;
+	}
+
+	function exponential(length, rotation) {
+	    var curve = new Float32Array(length),
+	        i,
+	        x,
+	        scale = length - 1,
+	        index;
+
+	    for (i = 0; i < length; i++) {
+	        x = i / scale;
+	        index = rotation > 0 ? i : length - 1 - i;
+
+	        curve[index] = Math.exp(2 * x - 1) / Math.exp(1);
+	    }
+
+	    return curve;
+	}
+
+	//creating a curve to simulate an S-curve with setValueCurveAtTime.
+	function sCurve(length, rotation) {
+	    var curve = new Float32Array(length),
+	        i,
+	        phase = rotation > 0 ? Math.PI / 2 : -(Math.PI / 2);
+
+	    for (i = 0; i < length; ++i) {
+	        curve[i] = Math.sin(Math.PI * i / length - phase) / 2 + 0.5;
+	    }
+	    return curve;
+	}
+
+	//creating a curve to simulate a logarithmic curve with setValueCurveAtTime.
+	function logarithmic(length, base, rotation) {
+	    var curve = new Float32Array(length),
+	        index,
+	        x = 0,
+	        i;
+
+	    for (i = 0; i < length; i++) {
+	        //index for the curve array.
+	        index = rotation > 0 ? i : length - 1 - i;
+
+	        x = i / length;
+	        curve[index] = Math.log(1 + base * x) / Math.log(1 + base);
+	    }
+
+	    return curve;
+	}
+
+
+/***/ },
 /* 17 */
 /***/ function(module, exports) {
 
@@ -1015,7 +1016,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * Copyright 2009-2016 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <https://lodash.com/license>
 	 */
-	var keys = __webpack_require__(68),
+	var keys = __webpack_require__(67),
 	    rest = __webpack_require__(10);
 
 	/** Used as references for various `Number` constants. */
@@ -1616,7 +1617,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    value: true
 	});
 
-	var _lodash = __webpack_require__(70);
+	var _lodash = __webpack_require__(69);
 
 	var _lodash2 = _interopRequireDefault(_lodash);
 
@@ -1624,11 +1625,11 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	var _h2 = _interopRequireDefault(_h);
 
-	var _diff = __webpack_require__(77);
+	var _diff = __webpack_require__(76);
 
 	var _diff2 = _interopRequireDefault(_diff);
 
-	var _patch = __webpack_require__(78);
+	var _patch = __webpack_require__(77);
 
 	var _patch2 = _interopRequireDefault(_patch);
 
@@ -1684,7 +1685,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        value: function initRecorder(stream) {
 	            var _this = this;
 
-	            if (stream === undefined || stream instanceof LocalMediaStream !== true) {
+	            if (stream instanceof LocalMediaStream !== true) {
 	                throw new Error("Must provide a LocalMediaStream to record from");
 	            }
 
@@ -2384,7 +2385,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    value: true
 	});
 
-	var _fades = __webpack_require__(9);
+	var _fadeMaker = __webpack_require__(9);
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -2407,9 +2408,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	            var shape = arguments.length <= 3 || arguments[3] === undefined ? "logarithmic" : arguments[3];
 
 	            if (type === FADEIN) {
-	                (0, _fades.createFadeIn)(this.fadeGain.gain, shape, start, duration);
+	                (0, _fadeMaker.createFadeIn)(this.fadeGain.gain, shape, start, duration);
 	            } else if (type === FADEOUT) {
-	                (0, _fades.createFadeOut)(this.fadeGain.gain, shape, start, duration);
+	                (0, _fadeMaker.createFadeOut)(this.fadeGain.gain, shape, start, duration);
 	            } else {
 	                throw new Error("Unsupported fade type");
 	            }
@@ -2715,11 +2716,11 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	var _lodash2 = _interopRequireDefault(_lodash);
 
-	var _lodash3 = __webpack_require__(71);
+	var _lodash3 = __webpack_require__(70);
 
 	var _lodash4 = _interopRequireDefault(_lodash3);
 
-	var _uuid = __webpack_require__(75);
+	var _uuid = __webpack_require__(74);
 
 	var _uuid2 = _interopRequireDefault(_uuid);
 
@@ -2729,9 +2730,9 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	var _conversions = __webpack_require__(1);
 
-	var _peaks = __webpack_require__(41);
+	var _webaudioPeaks = __webpack_require__(92);
 
-	var _peaks2 = _interopRequireDefault(_peaks);
+	var _webaudioPeaks2 = _interopRequireDefault(_webaudioPeaks);
 
 	var _states = __webpack_require__(35);
 
@@ -2745,7 +2746,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	var _FadeCanvasHook2 = _interopRequireDefault(_FadeCanvasHook);
 
-	var _fades = __webpack_require__(9);
+	var _fadeMaker = __webpack_require__(9);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -2863,7 +2864,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                this.fadeIn = undefined;
 	            }
 
-	            this.fadeIn = this.saveFade(_fades.FADEIN, fade.shape, fade.start, fade.end);
+	            this.fadeIn = this.saveFade(_fadeMaker.FADEIN, fade.shape, fade.start, fade.end);
 	        }
 	    }, {
 	        key: 'setFadeOut',
@@ -2885,7 +2886,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                this.fadeOut = undefined;
 	            }
 
-	            this.fadeOut = this.saveFade(_fades.FADEOUT, fade.shape, fade.start, fade.end);
+	            this.fadeOut = this.saveFade(_fadeMaker.FADEOUT, fade.shape, fade.start, fade.end);
 	        }
 	    }, {
 	        key: 'saveFade',
@@ -2922,7 +2923,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            var cueIn = (0, _conversions.secondsToSamples)(this.cueIn, sampleRate);
 	            var cueOut = (0, _conversions.secondsToSamples)(this.cueOut, sampleRate);
 
-	            this.setPeaks((0, _peaks2.default)(this.buffer, samplesPerPixel, this.peakData.mono, cueIn, cueOut));
+	            this.setPeaks((0, _webaudioPeaks2.default)(this.buffer, samplesPerPixel, this.peakData.mono, cueIn, cueOut));
 	        }
 	    }, {
 	        key: 'setPeaks',
@@ -3037,10 +3038,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    }
 
 	                    switch (fade.type) {
-	                        case _fades.FADEIN:
+	                        case _fadeMaker.FADEIN:
 	                            _this.playout.applyFadeIn(startTime, duration, fade.shape);
 	                            break;
-	                        case _fades.FADEOUT:
+	                        case _fadeMaker.FADEOUT:
 	                            _this.playout.applyFadeOut(startTime, duration, fade.shape);
 	                            break;
 	                        default:
@@ -3371,28 +3372,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	    value: true
 	});
 
-	var _fades = __webpack_require__(9);
+	var _fadeMaker = __webpack_require__(9);
 
-	var _curves = __webpack_require__(14);
+	var _fadeCurves = __webpack_require__(16);
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 	function createCurve(shape, type, width) {
-	    var reflection = type === _fades.FADEIN ? 1 : -1;
+	    var reflection = type === _fadeMaker.FADEIN ? 1 : -1;
 	    var curve = undefined;
 
 	    switch (shape) {
-	        case _fades.SCURVE:
-	            curve = (0, _curves.sCurve)(width, reflection);
+	        case _fadeMaker.SCURVE:
+	            curve = (0, _fadeCurves.sCurve)(width, reflection);
 	            break;
-	        case _fades.LINEAR:
-	            curve = (0, _curves.linear)(width, reflection);
+	        case _fadeMaker.LINEAR:
+	            curve = (0, _fadeCurves.linear)(width, reflection);
 	            break;
-	        case _fades.EXPONENTIAL:
-	            curve = (0, _curves.exponential)(width, reflection);
+	        case _fadeMaker.EXPONENTIAL:
+	            curve = (0, _fadeCurves.exponential)(width, reflection);
 	            break;
-	        case _fades.LOGARITHMIC:
-	            curve = (0, _curves.logarithmic)(width, 10, reflection);
+	        case _fadeMaker.LOGARITHMIC:
+	            curve = (0, _fadeCurves.logarithmic)(width, 10, reflection);
 	            break;
 	        default:
 	            throw new Error("Unsupported Fade type");
@@ -4114,169 +4115,6 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 41 */
 /***/ function(module, exports) {
 
-	'use strict';
-
-	//http://jsperf.com/typed-array-min-max/2
-	//plain for loop for finding min/max is way faster than anything else.
-	/**
-	* @param {TypedArray} array - Subarray of audio to calculate peaks from.
-	*/
-
-	Object.defineProperty(exports, "__esModule", {
-	    value: true
-	});
-
-	exports.default = function (source) {
-	    var samplesPerPixel = arguments.length <= 1 || arguments[1] === undefined ? 10000 : arguments[1];
-	    var isMono = arguments.length <= 2 || arguments[2] === undefined ? true : arguments[2];
-	    var cueIn = arguments.length <= 3 || arguments[3] === undefined ? undefined : arguments[3];
-	    var cueOut = arguments.length <= 4 || arguments[4] === undefined ? undefined : arguments[4];
-	    var bits = arguments.length <= 5 || arguments[5] === undefined ? 8 : arguments[5];
-
-	    if ([8, 16, 32].indexOf(bits) < 0) {
-	        throw new Error("Invalid number of bits specified for peaks.");
-	    }
-
-	    var numChan = source.numberOfChannels;
-	    var peaks = [];
-	    var c = undefined;
-	    var numPeaks = undefined;
-
-	    if (source.constructor.name === 'AudioBuffer') {
-	        for (c = 0; c < numChan; c++) {
-	            var channel = source.getChannelData(c);
-	            cueIn = cueIn || 0;
-	            cueOut = cueOut || channel.length;
-	            var slice = channel.subarray(cueIn, cueOut);
-	            peaks.push(extractPeaks(slice, samplesPerPixel, bits));
-	        }
-	    } else {
-	        cueIn = cueIn || 0;
-	        cueOut = cueOut || source.length;
-	        peaks.push(extractPeaks(source.subarray(cueIn, cueOut), samplesPerPixel, bits));
-	    }
-
-	    if (isMono && peaks.length > 1) {
-	        peaks = makeMono(peaks, bits);
-	    }
-
-	    numPeaks = peaks[0].length / 2;
-
-	    return {
-	        length: numPeaks,
-	        data: peaks,
-	        bits: bits
-	    };
-	};
-
-	function findMinMax(array) {
-	    var min = Infinity;
-	    var max = -Infinity;
-	    var i = 0;
-	    var len = array.length;
-	    var curr = undefined;
-
-	    for (; i < len; i++) {
-	        curr = array[i];
-	        if (min > curr) {
-	            min = curr;
-	        }
-	        if (max < curr) {
-	            max = curr;
-	        }
-	    }
-
-	    return {
-	        min: min,
-	        max: max
-	    };
-	}
-
-	/**
-	* @param {Number} n - peak to convert from float to Int8, Int16 etc.
-	* @param {Number} bits - convert to #bits two's complement signed integer
-	*/
-	function convert(n, bits) {
-	    var max = Math.pow(2, bits - 1);
-	    var v = n < 0 ? n * max : n * max - 1;
-	    return Math.max(-max, Math.min(max - 1, v));
-	}
-
-	/**
-	* @param {TypedArray} channel - Audio track frames to calculate peaks from.
-	* @param {Number} samplesPerPixel - Audio frames per peak
-	*/
-	function extractPeaks(channel, samplesPerPixel, bits) {
-	    var i = undefined;
-	    var chanLength = channel.length;
-	    var numPeaks = Math.ceil(chanLength / samplesPerPixel);
-	    var start = undefined;
-	    var end = undefined;
-	    var segment = undefined;
-	    var max = undefined;
-	    var min = undefined;
-	    var extrema = undefined;
-
-	    //create interleaved array of min,max
-	    var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
-
-	    for (i = 0; i < numPeaks; i++) {
-
-	        start = i * samplesPerPixel;
-	        end = (i + 1) * samplesPerPixel > chanLength ? chanLength : (i + 1) * samplesPerPixel;
-
-	        segment = channel.subarray(start, end);
-	        extrema = findMinMax(segment);
-	        min = convert(extrema.min, bits);
-	        max = convert(extrema.max, bits);
-
-	        peaks[i * 2] = min;
-	        peaks[i * 2 + 1] = max;
-	    }
-
-	    return peaks;
-	}
-
-	function makeMono(channelPeaks) {
-	    var bits = arguments.length <= 1 || arguments[1] === undefined ? 8 : arguments[1];
-
-	    var numChan = channelPeaks.length;
-	    var weight = 1 / numChan;
-	    var numPeaks = channelPeaks[0].length / 2;
-	    var c = 0;
-	    var i = 0;
-	    var min = undefined;
-	    var max = undefined;
-	    var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
-
-	    for (i = 0; i < numPeaks; i++) {
-	        min = 0;
-	        max = 0;
-
-	        for (c = 0; c < numChan; c++) {
-	            min += weight * channelPeaks[c][i * 2];
-	            max += weight * channelPeaks[c][i * 2 + 1];
-	        }
-
-	        peaks[i * 2] = min;
-	        peaks[i * 2 + 1] = max;
-	    }
-
-	    //return in array so channel number counts still work.
-	    return [peaks];
-	}
-
-	/**
-	* @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.
-	* @param {Number} samplesPerPixel - Number of audio samples per peak.
-	* @param {Number} cueIn - index in channel to start peak calculations from.
-	* @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).
-	*/
-
-/***/ },
-/* 42 */
-/***/ function(module, exports) {
-
 	/*!
 	 * Cross-Browser Split 1.1.1
 	 * Copyright 2007-2012 Steven Levithan <stevenlevithan.com>
@@ -4386,7 +4224,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 43 */
+/* 42 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -4502,15 +4340,15 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 44 */
+/* 43 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var assign        = __webpack_require__(51)
-	  , normalizeOpts = __webpack_require__(58)
-	  , isCallable    = __webpack_require__(54)
-	  , contains      = __webpack_require__(61)
+	var assign        = __webpack_require__(50)
+	  , normalizeOpts = __webpack_require__(57)
+	  , isCallable    = __webpack_require__(53)
+	  , contains      = __webpack_require__(60)
 
 	  , d;
 
@@ -4571,7 +4409,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 45 */
+/* 44 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var EvStore = __webpack_require__(5)
@@ -4595,16 +4433,16 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 46 */
+/* 45 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var globalDocument = __webpack_require__(15)
+	var globalDocument = __webpack_require__(14)
 	var EvStore = __webpack_require__(5)
-	var createStore = __webpack_require__(91)
+	var createStore = __webpack_require__(90)
 
-	var addEvent = __webpack_require__(45)
-	var removeEvent = __webpack_require__(50)
-	var ProxyEvent = __webpack_require__(49)
+	var addEvent = __webpack_require__(44)
+	var removeEvent = __webpack_require__(49)
+	var ProxyEvent = __webpack_require__(48)
 
 	var HANDLER_STORE = createStore()
 
@@ -4788,14 +4626,14 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 47 */
+/* 46 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Individual = __webpack_require__(48)
-	var cuid = __webpack_require__(43)
-	var globalDocument = __webpack_require__(15)
+	var Individual = __webpack_require__(47)
+	var cuid = __webpack_require__(42)
+	var globalDocument = __webpack_require__(14)
 
-	var DOMDelegator = __webpack_require__(46)
+	var DOMDelegator = __webpack_require__(45)
 
 	var versionKey = "13"
 	var cacheKey = "__DOM_DELEGATOR_CACHE@" + versionKey
@@ -4854,7 +4692,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 48 */
+/* 47 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {var root = typeof window !== 'undefined' ?
@@ -4879,10 +4717,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 49 */
+/* 48 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var inherits = __webpack_require__(66)
+	var inherits = __webpack_require__(65)
 
 	var ALL_PROPS = [
 	    "altKey", "bubbles", "cancelable", "ctrlKey",
@@ -4963,7 +4801,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 50 */
+/* 49 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var EvStore = __webpack_require__(5)
@@ -4988,18 +4826,18 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 51 */
+/* 50 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	module.exports = __webpack_require__(52)()
+	module.exports = __webpack_require__(51)()
 		? Object.assign
-		: __webpack_require__(53);
+		: __webpack_require__(52);
 
 
 /***/ },
-/* 52 */
+/* 51 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5014,13 +4852,13 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 53 */
+/* 52 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var keys  = __webpack_require__(55)
-	  , value = __webpack_require__(60)
+	var keys  = __webpack_require__(54)
+	  , value = __webpack_require__(59)
 
 	  , max = Math.max;
 
@@ -5042,7 +4880,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 54 */
+/* 53 */
 /***/ function(module, exports) {
 
 	// Deprecated
@@ -5053,18 +4891,18 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 55 */
+/* 54 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	module.exports = __webpack_require__(56)()
+	module.exports = __webpack_require__(55)()
 		? Object.keys
-		: __webpack_require__(57);
+		: __webpack_require__(56);
 
 
 /***/ },
-/* 56 */
+/* 55 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5078,7 +4916,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 57 */
+/* 56 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5091,7 +4929,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 58 */
+/* 57 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5114,7 +4952,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 59 */
+/* 58 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5126,7 +4964,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 60 */
+/* 59 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5138,18 +4976,18 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 61 */
+/* 60 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	module.exports = __webpack_require__(62)()
+	module.exports = __webpack_require__(61)()
 		? String.prototype.contains
-		: __webpack_require__(63);
+		: __webpack_require__(62);
 
 
 /***/ },
-/* 62 */
+/* 61 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5163,7 +5001,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 63 */
+/* 62 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -5176,7 +5014,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 64 */
+/* 63 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
@@ -5202,12 +5040,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 65 */
+/* 64 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var Individual = __webpack_require__(64);
+	var Individual = __webpack_require__(63);
 
 	module.exports = OneVersion;
 
@@ -5230,7 +5068,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 66 */
+/* 65 */
 /***/ function(module, exports) {
 
 	if (typeof Object.create === 'function') {
@@ -5259,7 +5097,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 67 */
+/* 66 */
 /***/ function(module, exports) {
 
 	/**
@@ -5313,7 +5151,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 68 */
+/* 67 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {/**
@@ -5759,7 +5597,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 69 */
+/* 68 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {/**
@@ -5770,7 +5608,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * Copyright 2009-2016 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <https://lodash.com/license>
 	 */
-	var keysIn = __webpack_require__(73),
+	var keysIn = __webpack_require__(72),
 	    rest = __webpack_require__(10);
 
 	/** Used as references for various `Number` constants. */
@@ -6113,7 +5951,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 70 */
+/* 69 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {/**
@@ -6124,7 +5962,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * Copyright 2009-2016 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <https://lodash.com/license>
 	 */
-	var assignInWith = __webpack_require__(69),
+	var assignInWith = __webpack_require__(68),
 	    rest = __webpack_require__(10);
 
 	/**
@@ -6235,7 +6073,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 71 */
+/* 70 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -6246,8 +6084,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * Copyright 2009-2016 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <https://lodash.com/license>
 	 */
-	var baseFor = __webpack_require__(67),
-	    keys = __webpack_require__(72);
+	var baseFor = __webpack_require__(66),
+	    keys = __webpack_require__(71);
 
 	/**
 	 * The base implementation of `_.forOwn` without support for iteratee shorthands.
@@ -6325,9 +6163,9 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
+/* 71 */
+67,
 /* 72 */
-68,
-/* 73 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {/**
@@ -6779,7 +6617,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 74 */
+/* 73 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {
@@ -6817,7 +6655,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 75 */
+/* 74 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//     uuid.js
@@ -6828,7 +6666,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	// Unique ID creation requires a high quality random # generator.  We feature
 	// detect to determine the best RNG source, normalizing to a function that
 	// returns 128-bits of randomness, since that's what's usually required
-	var _rng = __webpack_require__(74);
+	var _rng = __webpack_require__(73);
 
 	// Maps for number <-> hex string conversion
 	var _byteToHex = [];
@@ -7006,7 +6844,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 76 */
+/* 75 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var createElement = __webpack_require__(21)
@@ -7015,25 +6853,25 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 77 */
+/* 76 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var diff = __webpack_require__(90)
+	var diff = __webpack_require__(89)
 
 	module.exports = diff
 
 
 /***/ },
-/* 78 */
+/* 77 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var patch = __webpack_require__(81)
+	var patch = __webpack_require__(80)
 
 	module.exports = patch
 
 
 /***/ },
-/* 79 */
+/* 78 */
 /***/ function(module, exports) {
 
 	// Maps a virtual DOM tree onto a real DOM tree in an efficient manner.
@@ -7124,7 +6962,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 80 */
+/* 79 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var applyProperties = __webpack_require__(20)
@@ -7132,7 +6970,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var isWidget = __webpack_require__(2)
 	var VPatch = __webpack_require__(23)
 
-	var updateWidget = __webpack_require__(82)
+	var updateWidget = __webpack_require__(81)
 
 	module.exports = applyPatch
 
@@ -7281,15 +7119,15 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 81 */
+/* 80 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var document = __webpack_require__(19)
 	var isArray = __webpack_require__(12)
 
 	var render = __webpack_require__(21)
-	var domIndex = __webpack_require__(79)
-	var patchOp = __webpack_require__(80)
+	var domIndex = __webpack_require__(78)
+	var patchOp = __webpack_require__(79)
 	module.exports = patch
 
 	function patch(rootNode, patches, renderOptions) {
@@ -7367,7 +7205,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 82 */
+/* 81 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var isWidget = __webpack_require__(2)
@@ -7388,7 +7226,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 83 */
+/* 82 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -7421,7 +7259,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 84 */
+/* 83 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -7444,24 +7282,24 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 85 */
+/* 84 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
 	var isArray = __webpack_require__(12);
 
-	var VNode = __webpack_require__(87);
-	var VText = __webpack_require__(88);
+	var VNode = __webpack_require__(86);
+	var VText = __webpack_require__(87);
 	var isVNode = __webpack_require__(3);
 	var isVText = __webpack_require__(8);
 	var isWidget = __webpack_require__(2);
 	var isHook = __webpack_require__(7);
 	var isVThunk = __webpack_require__(6);
 
-	var parseTag = __webpack_require__(86);
-	var softSetHook = __webpack_require__(84);
-	var evHook = __webpack_require__(83);
+	var parseTag = __webpack_require__(85);
+	var softSetHook = __webpack_require__(83);
+	var evHook = __webpack_require__(82);
 
 	module.exports = h;
 
@@ -7587,12 +7425,12 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 86 */
+/* 85 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var split = __webpack_require__(42);
+	var split = __webpack_require__(41);
 
 	var classIdSplit = /([\.#]?[a-zA-Z0-9\u007F-\uFFFF_:-]+)/;
 	var notClassId = /^\.|#/;
@@ -7647,7 +7485,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 87 */
+/* 86 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var version = __webpack_require__(4)
@@ -7725,7 +7563,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 88 */
+/* 87 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var version = __webpack_require__(4)
@@ -7741,7 +7579,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 89 */
+/* 88 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var isObject = __webpack_require__(17)
@@ -7805,7 +7643,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 90 */
+/* 89 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var isArray = __webpack_require__(12)
@@ -7817,7 +7655,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var isThunk = __webpack_require__(6)
 	var handleThunk = __webpack_require__(22)
 
-	var diffProps = __webpack_require__(89)
+	var diffProps = __webpack_require__(88)
 
 	module.exports = diff
 
@@ -8238,10 +8076,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 91 */
+/* 90 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var hiddenStore = __webpack_require__(92);
+	var hiddenStore = __webpack_require__(91);
 
 	module.exports = createStore;
 
@@ -8263,7 +8101,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 92 */
+/* 91 */
 /***/ function(module, exports) {
 
 	module.exports = hiddenStore;
@@ -8285,11 +8123,167 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
+/* 92 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	//http://jsperf.com/typed-array-min-max/2
+	//plain for loop for finding min/max is way faster than anything else.
+	/**
+	* @param {TypedArray} array - Subarray of audio to calculate peaks from.
+	*/
+	function findMinMax(array) {
+	    var min = Infinity;
+	    var max = -Infinity;
+	    var i = 0;
+	    var len = array.length;
+	    var curr;
+
+	    for (; i < len; i++) {
+	        curr = array[i];
+	        if (min > curr) {
+	            min = curr;
+	        }
+	        if (max < curr) {
+	            max = curr;
+	        }
+	    }
+
+	    return {
+	        min: min,
+	        max: max
+	    };
+	}
+
+	/**
+	* @param {Number} n - peak to convert from float to Int8, Int16 etc.
+	* @param {Number} bits - convert to #bits two's complement signed integer
+	*/
+	function convert(n, bits) {
+	    var max = Math.pow(2, bits-1);
+	    var v = n < 0 ? n * max : n * max - 1;
+	    return Math.max(-max, Math.min(max-1, v));
+	}
+
+	/**
+	* @param {TypedArray} channel - Audio track frames to calculate peaks from.
+	* @param {Number} samplesPerPixel - Audio frames per peak
+	*/
+	function extractPeaks(channel, samplesPerPixel, bits) {
+	    var i;
+	    var chanLength = channel.length;
+	    var numPeaks = Math.ceil(chanLength / samplesPerPixel);
+	    var start;
+	    var end;
+	    var segment;
+	    var max; 
+	    var min;
+	    var extrema;
+
+	    //create interleaved array of min,max
+	    var peaks = new (eval("Int"+bits+"Array"))(numPeaks*2);
+
+	    for (i = 0; i < numPeaks; i++) {
+
+	        start = i * samplesPerPixel;
+	        end = (i + 1) * samplesPerPixel > chanLength ? chanLength : (i + 1) * samplesPerPixel;
+
+	        segment = channel.subarray(start, end);
+	        extrema = findMinMax(segment);
+	        min = convert(extrema.min, bits);
+	        max = convert(extrema.max, bits);
+
+	        peaks[i*2] = min;
+	        peaks[i*2+1] = max;
+	    }
+
+	    return peaks;
+	}
+
+	function makeMono(channelPeaks, bits) {
+	    var numChan = channelPeaks.length;
+	    var weight = 1 / numChan;
+	    var numPeaks = channelPeaks[0].length / 2;
+	    var c = 0;
+	    var i = 0;
+	    var min;
+	    var max;
+	    var peaks = new (eval("Int"+bits+"Array"))(numPeaks*2);
+
+	    for (i = 0; i < numPeaks; i++) {
+	        min = 0;
+	        max = 0;
+
+	        for (c = 0; c < numChan; c++) {
+	            min += weight * channelPeaks[c][i*2];
+	            max += weight * channelPeaks[c][i*2+1];
+	        }
+
+	        peaks[i*2] = min;
+	        peaks[i*2+1] = max;
+	    }
+
+	    //return in array so channel number counts still work.
+	    return [peaks];
+	}
+
+	/**
+	* @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.
+	* @param {Number} samplesPerPixel - Number of audio samples per peak.
+	* @param {Number} cueIn - index in channel to start peak calculations from.
+	* @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).
+	*/
+	module.exports = function(source, samplesPerPixel, isMono, cueIn, cueOut, bits) {
+	    samplesPerPixel = samplesPerPixel || 10000;
+	    bits = bits || 8;
+	    isMono = isMono || true;
+
+	    if ([8, 16, 32].indexOf(bits) < 0) {
+	        throw new Error("Invalid number of bits specified for peaks.");
+	    }
+
+	    var numChan = source.numberOfChannels;
+	    var peaks = [];
+	    var c;
+	    var numPeaks;
+	    var channel;
+	    var slice;
+
+	    if (typeof source.subarray === "undefined") {
+	        for (c = 0; c < numChan; c++) {
+	            channel = source.getChannelData(c);
+	            cueIn = cueIn || 0;
+	            cueOut = cueOut || channel.length;
+	            slice = channel.subarray(cueIn, cueOut);
+	            peaks.push(extractPeaks(slice, samplesPerPixel, bits));
+	        }
+	    }
+	    else {
+	        cueIn = cueIn || 0;
+	        cueOut = cueOut || source.length;
+	        peaks.push(extractPeaks(source.subarray(cueIn, cueOut), samplesPerPixel, bits));
+	    }
+
+	    if (isMono && peaks.length > 1) {
+	        peaks = makeMono(peaks, bits);
+	    }
+
+	    numPeaks = peaks[0].length / 2;
+
+	    return {
+	        length: numPeaks,
+	        data: peaks,
+	        bits: bits
+	    };
+	};
+
+/***/ },
 /* 93 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function() {
-		return new Worker(__webpack_require__.p + "f18e16e227ac3f205d8e.worker.js");
+		return new Worker(__webpack_require__.p + "f33623ca62a3dc982a82.worker.js");
 	};
 
 /***/ },
