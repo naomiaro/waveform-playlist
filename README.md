@@ -21,9 +21,11 @@ I've written up some demos on github for the different [audio fade types](https:
 
   `npm install waveform-playlist`
 
-  `bower install waveform-playlist`
-
   `var WaveformPlaylist = require('waveform-playlist');`
+
+  ---
+
+  `bower install waveform-playlist`
 
   ---
 
