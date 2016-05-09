@@ -149,8 +149,8 @@ export default class {
             this.record();
         });
 
-        ee.on('play', () => {
-            this.play();
+        ee.on('play', (start, end) => {
+            this.play(start, end);
         });
 
         ee.on('pause', () => {
@@ -445,18 +445,17 @@ export default class {
             editor.scheduleStop();
         });
 
-        return Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
+        return Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos, undefined));
     }
 
-    play(startTime) {
+    play(startTime, endTime) {
         var currentTime = this.ac.currentTime,
-            endTime,
             selected = this.getTimeSelection(),
             playoutPromises = [];
 
         startTime = startTime || this.pausedAt || this.cursor;
 
-        if (selected.end !== selected.start && selected.end > startTime) {
+        if (!endTime && selected.end !== selected.start && selected.end > startTime) {
             endTime = selected.end;
         }
 
