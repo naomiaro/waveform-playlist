@@ -245,7 +245,7 @@ An example of using the event emitter to control the playlist can be found in [/
 
 | event | arguments | description |
 | --- | --- | --- |
-| `play` | 'start:optional, end:optional'| Starts playout of the playlist. Takes optional Number parameters in seconds `start` and `end` to play just an audio segment. `start` can be passed without an `end` to play to the end of the track. |
+| `play` | `start:optional, end:optional` | Starts playout of the playlist. Takes optional Number parameters in seconds `start` and `end` to play just an audio segment. `start` can be passed without an `end` to play to the end of the track. |
 | `pause` | _none_ | Pauses playout of the playlist. |
 | `stop` | _none_ | Stops playout of the playlist. |
 | `rewind` | _none_ | Stops playout if playlist is playing, resets cursor to the beginning of the playlist. |
