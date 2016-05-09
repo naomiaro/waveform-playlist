@@ -1801,8 +1801,8 @@ var WaveformPlaylist =
 	                _this2.record();
 	            });
 
-	            ee.on('play', function () {
-	                _this2.play();
+	            ee.on('play', function (start, end) {
+	                _this2.play(start, end);
 	            });
 
 	            ee.on('pause', function () {
@@ -2128,21 +2128,20 @@ var WaveformPlaylist =
 	                editor.scheduleStop();
 	            });
 
-	            return Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos));
+	            return Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos, undefined));
 	        }
 	    }, {
 	        key: 'play',
-	        value: function play(startTime) {
+	        value: function play(startTime, endTime) {
 	            var _this6 = this;
 
 	            var currentTime = this.ac.currentTime,
-	                endTime,
 	                selected = this.getTimeSelection(),
 	                playoutPromises = [];
 
 	            startTime = startTime || this.pausedAt || this.cursor;
 
-	            if (selected.end !== selected.start && selected.end > startTime) {
+	            if (!endTime && selected.end !== selected.start && selected.end > startTime) {
 	                endTime = selected.end;
 	            }
 

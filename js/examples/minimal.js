@@ -8,4 +8,6 @@ playlist.load([
   }
 ]).then(function() {
   //can do stuff with the playlist.
+  var ee = playlist.getEventEmitter();
+  ee.emit('play', 29, 35);
 });
