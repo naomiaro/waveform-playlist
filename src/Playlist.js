@@ -630,7 +630,7 @@ export default class {
                 "attributes": {
                     "style": "overflow: auto;"
                 },
-                "ev-scroll": (e) => {
+                "onscroll": (e) => {
                     this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
                     this.ee.emit("scroll", this.scrollLeft);
                 },

@@ -1,12 +1,10 @@
 import _assign from 'lodash.assign';
 import createElement from 'virtual-dom/create-element';
-
-import Delegator from 'dom-delegator';
 import EventEmitter from 'event-emitter';
-
 import Playlist from './Playlist';
 
-export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
+
+export function init(options={}, ee=EventEmitter()) {
     if (options.container === undefined) {
         throw new Error("DOM element container must be given.");
     }
@@ -64,9 +62,6 @@ export function init(options={}, ee=EventEmitter(), delegator=Delegator()) {
     config.container.appendChild(rootNode);
     playlist.tree = tree;
     playlist.rootNode = rootNode;
-
-    //have to add extra events that aren't followed by default.
-    delegator.listenTo("scroll");
 
     __webpack_public_path__ = config.jsLocation;
 

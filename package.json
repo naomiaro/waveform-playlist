@@ -46,7 +46,6 @@
     "example": "dist/"
   },
   "dependencies": {
-    "dom-delegator": "^13.1.0",
     "event-emitter": "^0.3.4",
     "fade-curves": "^1.0.2",
     "fade-maker": "^1.0.3",

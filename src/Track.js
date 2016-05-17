@@ -323,7 +323,7 @@ export default class {
             let stateEvents = state.getEvents();
 
             Object.keys(stateEvents).map((event) => {
-                config[`ev-${event}`] = stateEvents[event].bind(state);
+                config[`on${event}`] = stateEvents[event].bind(state);
             });
 
             stateClass = state.getClasses();
@@ -344,10 +344,10 @@ export default class {
             [
                 h("header", [ this.name ]),
                 h("div.btn-group", [
-                    h(`span.btn.btn-default.btn-xs.btn-mute${muteClass}`, {"ev-click": () => {
+                    h(`span.btn.btn-default.btn-xs.btn-mute${muteClass}`, {"onclick": () => {
                         this.ee.emit("mute", this);
                     }}, [ "Mute" ]),
-                    h(`span.btn.btn-default.btn-xs.btn-solo${soloClass}`, {"ev-click": () => {
+                    h(`span.btn.btn-default.btn-xs.btn-solo${soloClass}`, {"onclick": () => {
                         this.ee.emit("solo", this);
                     }}, [ "Solo" ])
                 ]),
@@ -359,7 +359,7 @@ export default class {
                             "max": 100,
                             "value": 100
                         },
-                        "ev-input": (e) => {
+                        "oninput": (e) => {
                             this.ee.emit("volumechange", e.target.value, this);
                         }
                     })
