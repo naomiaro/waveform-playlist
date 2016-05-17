@@ -438,14 +438,14 @@ export default class {
         return this.ac.currentTime - this.lastPlay;
     }
 
-    restartPlayFrom(cursorPos) {
+    restartPlayFrom(start, end) {
         this.stopAnimation();
 
         this.tracks.forEach((editor) => {
             editor.scheduleStop();
         });
 
-        return Promise.all(this.playoutPromises).then(this.play.bind(this, cursorPos, undefined));
+        return Promise.all(this.playoutPromises).then(this.play.bind(this, start, end));
     }
 
     play(startTime, endTime) {
@@ -457,6 +457,11 @@ export default class {
 
         if (!endTime && selected.end !== selected.start && selected.end > startTime) {
             endTime = selected.end;
+        }
+
+        if (this.isPlaying()) {
+            this.restartPlayFrom(startTime, endTime);
+            return;
         }
 
         this.tracks.forEach((track) => {
