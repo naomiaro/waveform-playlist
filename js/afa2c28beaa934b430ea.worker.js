@@ -34,7 +34,7 @@
 /******/ 	__webpack_require__.c = installedModules;
 
 /******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "";
+/******/ 	__webpack_require__.p = "/js/";
 
 /******/ 	// Load entry module and return exports
 /******/ 	return __webpack_require__(0);
@@ -52,7 +52,7 @@
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-	onmessage = function (e) {
+	onmessage = function onmessage(e) {
 	    var peaks = (0, _webaudioPeaks2.default)(e.data.samples, e.data.samplesPerPixel);
 
 	    postMessage(peaks);
