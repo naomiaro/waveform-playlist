@@ -35,7 +35,6 @@
     "karma-sourcemap-loader": "^0.3.6",
     "karma-webpack": "^1.7.0",
     "mocha": "^2.3.4",
-    "parallel-webpack": "^1.2.0",
     "requirejs": "^2.1.22",
     "gh-pages": "^0.11.0",
     "webpack": "^1.13.0",
@@ -61,8 +60,8 @@
     "compile": "babel src/app.js --out-file index.js",
     "deploy": "npm run clean && webpack && gh-pages -d dist",
     "prepublish": "npm run compile && npm run deploy",
-    "start": "node_modules/webpack-dev-server/bin/webpack-dev-server.js --content-base dist/ --colors --config dev.webpack.config.js",
-    "test": "./node_modules/karma/bin/karma start --browsers Firefox --single-run"
+    "start": "node_modules/webpack-dev-server/bin/webpack-dev-server.js --content-base dist/ --colors",
+    "test": "node_modules/karma/bin/karma start --browsers Firefox --single-run"
   },
   "repository": {
     "type": "git",
