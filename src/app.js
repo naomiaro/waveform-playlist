@@ -12,7 +12,6 @@ export function init(options={}, ee=EventEmitter()) {
     let audioContext = new (window.AudioContext || window.webkitAudioContext);
 
     let defaults = {
-        jsLocation: "js/", //needed for the webworker.
         ac: audioContext,
         sampleRate: audioContext.sampleRate,
         samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
@@ -62,8 +61,6 @@ export function init(options={}, ee=EventEmitter()) {
     config.container.appendChild(rootNode);
     playlist.tree = tree;
     playlist.rootNode = rootNode;
-
-    __webpack_public_path__ = config.jsLocation;
 
     return playlist;
 }

@@ -3,8 +3,8 @@ var createVariants = require('parallel-webpack').createVariants;
 
 function createConfig(options) {
   var plugins = [
-    new webpack.optimize.DedupePlugin(),
-    new webpack.optimize.OccurenceOrderPlugin()
+    new webpack.optimize.OccurenceOrderPlugin(),
+    new webpack.optimize.DedupePlugin()
   ];
   if (options.minified) {
     plugins.push(new webpack.optimize.UglifyJsPlugin({
@@ -19,6 +19,7 @@ function createConfig(options) {
     entry: __dirname + "/src/app.js",
     output: {
       path:  __dirname + "/dist/js",
+      publicPath: "js/",
       filename: 'waveform-playlist.' +
         options.target +
         (options.minified ? '.min' : '')
@@ -27,16 +28,11 @@ function createConfig(options) {
       libraryTarget: options.target
     },
     module: {
-      loaders: [
-        {
-          test: /\.js?$/,
-          exclude: /(node_modules|bower_components)/,
-          loader: 'babel',
-          query: {
-            presets: ['es2015', 'stage-0']
-          }
-        }
-      ]
+      loaders: [{
+        test: /\.js?$/,
+        exclude: /node_modules/,
+        loader: 'babel-loader'
+      }]
     },
     plugins: plugins
   };
@@ -44,5 +40,5 @@ function createConfig(options) {
 
 module.exports = createVariants({
   minified: [true, false],
-  target: ['var', 'commonjs2', 'umd', 'amd']
+  target: ['var']
 }, createConfig);

@@ -21,21 +21,6 @@ I've written up some demos on github for the different [audio fade types](https:
 
   `npm install waveform-playlist`
 
-  `var WaveformPlaylist = require('waveform-playlist');`
-
-  ---
-
-  `bower install waveform-playlist`
-
-  ---
-
-  or use a script tag
-
-  `<script type="text/javascript" src="waveform-playlist.var.js"></script>`
-
-  * Source is located in `/dist/js`
-  * Minified version `waveform-playlist.var.min.js`
-  * Library will be available in global `var WaveformPlaylist`
 
 ## Basic Usage
 
@@ -43,7 +28,6 @@ I've written up some demos on github for the different [audio fade types](https:
 var WaveformPlaylist = require('waveform-playlist');
 
 var playlist = new WaveformPlaylist.init({
-  jsLocation: "js/",
   samplesPerPixel: 3000,
   mono: false,
   waveHeight: 70,
@@ -97,8 +81,6 @@ playlist.load([
 
 ```javascript
 var options = {
-  //Location of the js relative to the html page. Needed for the webworker.
-  jsLocation: "js/",
 
   //webaudio api AudioContext
   ac: new (window.AudioContext || window.webkitAudioContext),
@@ -275,9 +257,9 @@ An example of using the event emitter to control the playlist can be found in [/
 
 ## Development
 
-  `gulp webpack-dev-server`
+  `npm start`
 
-  `https://localhost:8080/webpack-dev-server/index.html`
+  `http://localhost:8080/webpack-dev-server/index.html`
 
   load and run the library examples.
 
