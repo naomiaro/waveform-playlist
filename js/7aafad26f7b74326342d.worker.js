@@ -1,4 +1,73 @@
-!function(e){function n(t){if(a[t])return a[t].exports;var r=a[t]={exports:{},id:t,loaded:!1};return e[t].call(r.exports,r,r.exports,n),r.loaded=!0,r.exports}var a={};return n.m=e,n.c=a,n.p="js/",n(0)}([function(e,n,a){"use strict";function t(e){return e&&e.__esModule?e:{"default":e}}var r=a(1),s=t(r);onmessage=function(e){var n=(0,s["default"])(e.data.samples,e.data.samplesPerPixel);postMessage(n)}},function(module,exports){"use strict";function findMinMax(e){for(var n,a=1/0,t=-(1/0),r=0,s=e.length;s>r;r++)n=e[r],a>n&&(a=n),n>t&&(t=n);return{min:a,max:t}}function convert(e,n){var a=Math.pow(2,n-1),t=0>e?e*a:e*a-1;return Math.max(-a,Math.min(a-1,t))}function extractPeaks(channel,samplesPerPixel,bits){var i,chanLength=channel.length,numPeaks=Math.ceil(chanLength/samplesPerPixel),start,end,segment,max,min,extrema,peaks=new(eval("Int"+bits+"Array"))(2*numPeaks);for(i=0;numPeaks>i;i++)start=i*samplesPerPixel,end=(i+1)*samplesPerPixel>chanLength?chanLength:(i+1)*samplesPerPixel,segment=channel.subarray(start,end),extrema=findMinMax(segment),min=convert(extrema.min,bits),max=convert(extrema.max,bits),peaks[2*i]=min,peaks[2*i+1]=max;return peaks}function makeMono(channelPeaks,bits){var numChan=channelPeaks.length,weight=1/numChan,numPeaks=channelPeaks[0].length/2,c=0,i=0,min,max,peaks=new(eval("Int"+bits+"Array"))(2*numPeaks);for(i=0;numPeaks>i;i++){for(min=0,max=0,c=0;numChan>c;c++)min+=weight*channelPeaks[c][2*i],max+=weight*channelPeaks[c][2*i+1];peaks[2*i]=min,peaks[2*i+1]=max}return[peaks]}module.exports=function(e,n,a,t,r,s){if(n=n||1e4,s=s||8,a=a||!0,[8,16,32].indexOf(s)<0)throw new Error("Invalid number of bits specified for peaks.");var i,m,l,u,o=e.numberOfChannels,c=[];if("undefined"==typeof e.subarray)for(i=0;o>i;i++)l=e.getChannelData(i),t=t||0,r=r||l.length,u=l.subarray(t,r),c.push(extractPeaks(u,n,s));else t=t||0,r=r||e.length,c.push(extractPeaks(e.subarray(t,r),n,s));return a&&c.length>1&&(c=makeMono(c,s)),m=c[0].length/2,{length:m,data:c,bits:s}}}]);ray of audio to calculate peaks from.
+/******/ (function(modules) { // webpackBootstrap
+/******/ 	// The module cache
+/******/ 	var installedModules = {};
+
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+
+/******/ 		// Check if module is in cache
+/******/ 		if(installedModules[moduleId])
+/******/ 			return installedModules[moduleId].exports;
+
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = installedModules[moduleId] = {
+/******/ 			exports: {},
+/******/ 			id: moduleId,
+/******/ 			loaded: false
+/******/ 		};
+
+/******/ 		// Execute the module function
+/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+
+/******/ 		// Flag the module as loaded
+/******/ 		module.loaded = true;
+
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+
+
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = modules;
+
+/******/ 	// expose the module cache
+/******/ 	__webpack_require__.c = installedModules;
+
+/******/ 	// __webpack_public_path__
+/******/ 	__webpack_require__.p = "js/";
+
+/******/ 	// Load entry module and return exports
+/******/ 	return __webpack_require__(0);
+/******/ })
+/************************************************************************/
+/******/ ([
+/* 0 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var _webaudioPeaks = __webpack_require__(1);
+
+	var _webaudioPeaks2 = _interopRequireDefault(_webaudioPeaks);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	onmessage = function onmessage(e) {
+	    var peaks = (0, _webaudioPeaks2.default)(e.data.samples, e.data.samplesPerPixel);
+
+	    postMessage(peaks);
+	};
+
+/***/ },
+/* 1 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	//http://jsperf.com/typed-array-min-max/2
+	//plain for loop for finding min/max is way faster than anything else.
+	/**
+	* @param {TypedArray} array - Subarray of audio to calculate peaks from.
 	*/
 	function findMinMax(array) {
 	    var min = Infinity;
