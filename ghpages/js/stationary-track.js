@@ -1,5 +1,6 @@
 var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
+  zoomLevels: [500, 1000, 3000, 5000],
   mono: true,
   waveHeight: 100,
   container: document.getElementById("playlist"),
