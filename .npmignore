@@ -5,3 +5,8 @@
 /img
 /experiments
 /dist
+deploy.sh
+.travis.yml
+karma.conf.js
+test-main.js
+webpack.config.js
