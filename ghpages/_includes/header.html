@@ -1,9 +1,8 @@
 <header class="site-header">
 
-  <div class="wrapper">
-
-    <a class="site-title" href="{{ site.baseurl }}/">{{ site.title }}</a>
-
-  </div>
+  <ol class="breadcrumb">
+    <li><a href="{{ site.baseurl }}/">{{ site.title }}</a></li>
+    <li class="active">{{ page.title | escape }}</li>
+  </ol>
 
 </header>
