@@ -9,10 +9,10 @@ layout: default
   <ul class="post-list">
     {% for example in site.pages %}
       <li>
-        <h2>
+        <h3>
           <a class="post-link" href="{{ example.url | prepend: site.baseurl }}">{{ example.title }}</a>
-        </h2>
-        <p>{{ example.lead }}</p>
+        </h3>
+        <p class="lead">{{ example.lead }}</p>
       </li>
     {% endfor %}
   </ul>
