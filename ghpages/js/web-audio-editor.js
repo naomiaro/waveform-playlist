@@ -1,7 +1,7 @@
 var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
   mono: false,
-  waveHeight: 70,
+  waveHeight: 100,
   container: document.getElementById("playlist"),
   state: 'cursor',
   colors: {
