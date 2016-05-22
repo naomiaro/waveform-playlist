@@ -2,7 +2,7 @@
   "name": "waveform-playlist",
   "description": "Multiple track web audio editor and player with waveform preview",
   "version": "1.0.9",
-  "main": "index.js",
+  "main": "lib/app.js",
   "author": "Naomi Aro",
   "license": "MIT",
   "website": "http://naomiaro.github.io",
@@ -57,7 +57,7 @@
   },
   "scripts": {
     "clean": "rm -f dist/js/*.js",
-    "compile": "babel src/app.js --out-file index.js",
+    "compile": "babel src --out-dir lib",
     "ghpages": "gh-pages --repo https://$GH_TOKEN@github.com/naomiaro/waveform-playlist.git -d dist",
     "deploy": "npm run clean && webpack && npm run ghpages",
     "prepublish": "npm run compile && npm run deploy",

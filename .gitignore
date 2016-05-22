@@ -2,6 +2,6 @@
 /coverage
 
 # compiled files
-index.js
+/lib
 /dist/js/*.js
 /dist/js/*.map
