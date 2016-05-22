@@ -4,7 +4,7 @@ layout: default
 
 <div class="home">
 
-  <h1 class="page-heading">Posts</h1>
+  <h1 class="page-heading">Examples</h1>
 
   <ul class="post-list">
     {% for example in site.pages %}
@@ -12,10 +12,9 @@ layout: default
         <h2>
           <a class="post-link" href="{{ example.url | prepend: site.baseurl }}">{{ example.title }}</a>
         </h2>
+        <p>{{ example.lead }}</p>
       </li>
     {% endfor %}
   </ul>
-
-  <p class="rss-subscribe">subscribe <a href="{{ "/feed.xml" | prepend: site.baseurl }}">via RSS</a></p>
 
 </div>
