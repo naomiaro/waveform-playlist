@@ -27,7 +27,7 @@ I've written up some demos on github for the different [audio fade types](https:
 ```javascript
 var WaveformPlaylist = require('waveform-playlist');
 
-var playlist = new WaveformPlaylist.init({
+var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
   mono: false,
   waveHeight: 70,
@@ -210,7 +210,7 @@ Waveform Playlist uses an instance of [event-emitter](https://www.npmjs.com/pack
 var EventEmitter = require('event-emitter');
 var WaveformPlaylist = require('waveform-playlist');
 
-var playlist = new WaveformPlaylist.init(
+var playlist = WaveformPlaylist.init(
   {
     container: document.getElementById("playlist")
   },
