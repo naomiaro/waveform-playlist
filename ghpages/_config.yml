@@ -19,3 +19,8 @@ github_username: naomiaro
 
 # Build settings
 markdown: kramdown
+collections:
+  examples:
+    output: true
+    output_ext: html
+
