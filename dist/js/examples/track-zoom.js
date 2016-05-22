@@ -1,4 +1,4 @@
-var playlist = new WaveformPlaylist.init({
+var playlist = WaveformPlaylist.init({
   samplesPerPixel: 256, //samples per pixel to draw, must be an entry in zoomLevels.
   waveHeight: 100,
   container: document.getElementById("playlist"),
