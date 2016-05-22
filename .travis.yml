@@ -4,7 +4,8 @@ node_js:
   - stable
 
 before_install:
-  - chmod +x ./deploy.sh && ./deploy.sh
+  - git config --global user.email "travis@dev"
+  - git config --global user.name "Travis"
 
 install:
   - npm install
