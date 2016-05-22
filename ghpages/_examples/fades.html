@@ -1,0 +1,46 @@
+---
+layout: page
+title: Track Fades
+lead: Set fade in and fade out.
+permalink: fades.html
+javascript: fades.js
+---
+
+<div id="top-bar" class="playlist-top-bar">
+  <div class="playlist-toolbar">
+    <div class="btn-group">
+      <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
+      <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+      <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+      <span class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></span>
+      <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
+    </div>
+    <div class="btn-group">
+      <span class="btn-cursor btn btn-default active" title="select cursor"><i class="fa fa-headphones"></i></span>
+      <span class="btn-fadein btn btn-default" title="set audio fade in"><i class="fa fa-long-arrow-left"></i></span>
+      <span class="btn-fadeout btn btn-default" title="set audio fade out"><i class="fa fa-long-arrow-right"></i></span>
+    </div>
+    <div class="btn-group">
+      <span class="btn btn-default btn-logarithmic active">logarithmic</span>
+      <span class="btn btn-default btn-linear">linear</span>
+      <span class="btn btn-default btn-exponential">exponential</span>
+      <span class="btn btn-default btn-scurve">s-curve</span>
+    </div>
+  </div>
+</div>
+<div id="playlist"></div>
+<div class="playlist-bottom-bar">
+  <form class="form-inline">
+    <select class="time-format form-control">
+      <option value="seconds">seconds</option>
+      <option value="thousandths">thousandths</option>
+      <option value="hh:mm:ss">hh:mm:ss</option>
+      <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
+      <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
+      <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
+    </select>
+    <input type="text" class="audio-start input-small form-control">
+    <input type="text" class="audio-end input-small form-control">
+    <label class="audio-pos">00:00:00.0</label>
+  </form>
+</div>
