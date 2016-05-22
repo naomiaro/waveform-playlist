@@ -1,4 +1,4 @@
-var playlist = new WaveformPlaylist.init({
+var playlist = WaveformPlaylist.init({
   waveHeight: 100,
   container: document.getElementById("playlist"),
   colors: {

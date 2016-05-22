@@ -1,4 +1,4 @@
-var playlist = new WaveformPlaylist.init({
+var playlist = WaveformPlaylist.init({
   container: document.getElementById("playlist")
 });
 

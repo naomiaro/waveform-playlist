@@ -1,4 +1,4 @@
-var playlist = new WaveformPlaylist.init({
+var playlist = WaveformPlaylist.init({
   samplesPerPixel: 9000,
   zoomLevels: [1000, 5000, 9000],
   waveHeight: 100,

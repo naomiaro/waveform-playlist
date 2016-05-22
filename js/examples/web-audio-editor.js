@@ -1,4 +1,4 @@
-var playlist = new WaveformPlaylist.init({
+var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
   mono: false,
   waveHeight: 70,
