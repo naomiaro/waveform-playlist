@@ -41,7 +41,7 @@
     "webpack-dev-server": "^1.14.0"
   },
   "directories": {
-    "example": "dist/"
+    "lib" : "lib"
   },
   "dependencies": {
     "event-emitter": "^0.3.4",
