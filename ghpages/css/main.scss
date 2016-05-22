@@ -4,3 +4,18 @@
 @charset "utf-8";
 
 @import "playlist";
+
+.track-drop {
+  border: 2px dashed blue;
+  height: 100px;
+  width: 200px;
+  margin: 1em 0;
+
+  &::before {
+    content: "Drop audio file(s) here!";
+  }
+
+  &.drag-enter {
+    border: 2px solid orange;
+  }
+}
