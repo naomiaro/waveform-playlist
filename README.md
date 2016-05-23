@@ -259,9 +259,13 @@ An example of using the event emitter to control the playlist can be found in [/
 
   `npm start`
 
-  `http://localhost:8080/`
+  `http://localhost:8080/waveform-playlist/`
 
-  load and run the library examples.
+  This will build the jekyll site and startup the webpack dev server.
+
+  `npm run jekyll:dev`
+
+  This can be run to continuously build the jekyll pages as well if they are modified.
 
 ## Credits
 
