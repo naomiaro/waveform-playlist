@@ -30,6 +30,7 @@ export default class {
         this.playbackSeconds = 0;
         this.duration = 0;
         this.scrollLeft = 0;
+        this.showTimescale = false;
 
         this.fadeType = "logarithmic";
     }
@@ -77,6 +78,10 @@ export default class {
             this.recordingTrack.setPeaks(e.data);
             this.draw(this.render());
         };
+    }
+
+    setShowTimeScale(show) {
+        this.showTimescale = show;
     }
 
     setMono(mono) {
@@ -624,24 +629,31 @@ export default class {
             }));
         });
 
+        let trackSection = h("div.playlist-tracks", {
+            "attributes": {
+                "style": "overflow: auto;"
+            },
+            "onscroll": (e) => {
+                this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
+                this.ee.emit("scroll", this.scrollLeft);
+            },
+            "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)
+        }, trackElements);
+
+        let containerChildren = [];
+
+        if (this.showTimescale) {
+            containerChildren.push(timeScale.render());
+        }
+
+        containerChildren.push(trackSection);
+
         return h("div.playlist", {
             "attributes": {
                 "style": "overflow: hidden; position: relative;"
-            }}, [
-
-            timeScale.render(),
-
-            h("div.playlist-tracks", {
-                "attributes": {
-                    "style": "overflow: auto;"
-                },
-                "onscroll": (e) => {
-                    this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
-                    this.ee.emit("scroll", this.scrollLeft);
-                },
-                "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)
-            }, trackElements)
-        ]);
+            }},
+            containerChildren
+        );
     }
 
     getInfo() {

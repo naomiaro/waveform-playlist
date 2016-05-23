@@ -9,6 +9,7 @@ var playlist = WaveformPlaylist.init({
       timeColor: 'grey',
       fadeColor: 'black'
   },
+  timescale: true,
   controls: {
     show: true, //whether or not to include the track controls
     width: 200 //width of controls in pixels
