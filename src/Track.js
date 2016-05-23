@@ -501,6 +501,7 @@ export default class {
         let info =  {
             src: this.src,
             start: this.startTime,
+            end: this.endTime,
             name: this.name,
             cuein: this.cueIn,
             cueout: this.cueOut
