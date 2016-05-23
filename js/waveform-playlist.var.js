@@ -35,7 +35,7 @@ var WaveformPlaylist =
 /******/ 	__webpack_require__.c = installedModules;
 /******/
 /******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "waveform-playlist/js/";
+/******/ 	__webpack_require__.p = "/waveform-playlist/js/";
 /******/
 /******/ 	// Load entry module and return exports
 /******/ 	return __webpack_require__(0);
@@ -10981,7 +10981,7 @@ var WaveformPlaylist =
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function() {
-		return new Worker(__webpack_require__.p + "4463b48a3decbd8b83e2.worker.js");
+		return new Worker(__webpack_require__.p + "301ffd7b6b1f9a16c47c.worker.js");
 	};
 
 /***/ }
