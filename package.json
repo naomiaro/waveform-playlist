@@ -56,10 +56,11 @@
     "worker-loader": "^0.7.0"
   },
   "scripts": {
-    "clean": "rm -f dist/js/*.js",
+    "clean": "rm -Rf dist",
     "compile": "babel src --out-dir lib",
+    "jekyll": "jekyll build -s ghpages -d dist/waveform-playlist",
     "ghpages": "gh-pages --repo https://$GH_TOKEN@github.com/naomiaro/waveform-playlist.git -d dist/waveform-playlist",
-    "deploy": "npm run clean && webpack && npm run ghpages",
+    "deploy": "npm run clean && npm run jekyll && webpack && npm run ghpages",
     "prepublish": "npm run compile",
     "start": "node_modules/webpack-dev-server/bin/webpack-dev-server.js --content-base dist/ --colors --host 0.0.0.0 --inline",
     "test": "node_modules/karma/bin/karma start --browsers Firefox --single-run"
