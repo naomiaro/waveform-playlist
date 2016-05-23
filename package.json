@@ -41,7 +41,8 @@
     "webpack-dev-server": "^1.14.0"
   },
   "directories": {
-    "lib": "lib"
+    "lib": "lib",
+    "css": "styles"
   },
   "dependencies": {
     "event-emitter": "^0.3.4",
@@ -56,13 +57,14 @@
     "worker-loader": "^0.7.0"
   },
   "scripts": {
-    "clean": "rm -Rf dist",
+    "clean": "rm -Rf dist && rm -Rf lib && rm -Rf styles",
+    "styles": "mkdir styles && cp ghpages/_sass/_playlist.scss styles/playlist.scss",
     "compile": "babel src --out-dir lib",
     "jekyll": "jekyll build -s ghpages -d dist/waveform-playlist",
     "jekyll:dev": "jekyll build -s ghpages -d dist/waveform-playlist --watch",
     "ghpages": "gh-pages --repo https://$GH_TOKEN@github.com/naomiaro/waveform-playlist.git -d dist/waveform-playlist",
     "deploy": "npm run clean && npm run jekyll && webpack && npm run ghpages",
-    "prepublish": "npm run compile",
+    "prepublish": "npm run clean && npm run compile && npm run styles",
     "webpack:server": "node_modules/webpack-dev-server/bin/webpack-dev-server.js --content-base dist/ --colors --host 0.0.0.0 --inline",
     "start": "npm run jekyll && npm run webpack:server",
     "test": "node_modules/karma/bin/karma start --browsers Firefox --single-run"
