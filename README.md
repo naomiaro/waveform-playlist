@@ -259,7 +259,7 @@ An example of using the event emitter to control the playlist can be found in [/
 
   `npm start`
 
-  `http://localhost:8080/webpack-dev-server/index.html`
+  `http://localhost:8080/`
 
   load and run the library examples.
 

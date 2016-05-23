@@ -10,3 +10,5 @@ deploy.sh
 karma.conf.js
 test-main.js
 webpack.config.js
+.sass-cache
+/ghpages

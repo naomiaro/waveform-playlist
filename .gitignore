@@ -3,5 +3,5 @@
 
 # compiled files
 /lib
-/dist/js/*.js
-/dist/js/*.map
+/dist
+.sass-cache

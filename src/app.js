@@ -53,6 +53,7 @@ export function init(options={}, ee=EventEmitter()) {
     playlist.setZoomLevels(config.zoomLevels);
     playlist.setZoomIndex(zoomIndex);
     playlist.setMono(config.mono);
+    playlist.setShowTimeScale(config.timescale);
 
     //take care of initial virtual dom rendering.
     let tree = playlist.render();
