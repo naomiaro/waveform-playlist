@@ -1,60 +1,103 @@
 <!DOCTYPE html>
 <html>
+
   <head>
-    <meta charset=utf-8 />
-    <title>Waveform Playlist | Record Track Example</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <meta name="description" content="Record audio tracks in the browser with the MediaRecorder API." />
+  <title>Record An Audio Track</title>
+  <meta name="description" content="Waveform Playlist experimental recording feature using MediaRecorder.">
 
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
-    <link rel="stylesheet" type="text/css" href="css/playlist.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="/waveform-playlist/css/main.css">
+  <link rel="canonical" href="https://naomiaro.github.io/waveform-playlist/record.html">
+  <link rel="alternate" type="application/rss+xml" title="Waveform Playlist" href="https://naomiaro.github.io/waveform-playlist/feed.xml">
+</head>
 
-    <script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
-    <script type="text/javascript" src="js/waveform-playlist.var.js"></script>
 
-  </head>
   <body>
+
+    <header class="site-header">
+
+  <ol class="breadcrumb">
+    <li><a href="/waveform-playlist/">Waveform Playlist</a></li>
+    <li class="active">Record An Audio Track</li>
+  </ol>
+
+</header>
+
+
     <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
 
-    <h1>Record An Audio Track</h1>
-    <p>Experimental recording feature using <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder">MediaRecorder</a>, only works in Firefox. Tested in Firefox >= 41.0.2.</p>
-    <p>Best to access the page over https for getUserMedia</p>
-    <p>Can record a track on top of the previously recorded track! Drop some tracks into the container below if you'd like to try recording over them.</p>
+    <div class="container">
+      <div class="wrapper">
+        <article class="post">
 
-    <div id="top-bar" class="playlist-top-bar">
-      <div class="playlist-toolbar">
-        <div class="btn-group">
-          <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
-          <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
-          <span class="btn-record btn btn-danger disabled"><i class="fa fa-microphone"></i></span>
-        </div>
-        <div class="btn-group">
-          <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
-          <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
-        </div>
+  <header class="post-header">
+    <h1 class="post-title">Record An Audio Track</h1>
+    <p class="lead">Record a track in MediaRecorder enabled browsers. Allows recording over tracks, shows real-time recording progress.</p>
+  </header>
+
+  <div class="post-content">
+    <p>Experimental recording feature using <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder">MediaRecorder</a>, only works in Firefox. Tested in Firefox >= 41.0.2.</p>
+<p><em>PAGE NEEDS HTTPS ACCESS</em></p>
+<p>Can record a track on top of the previously recorded track! Drop some tracks into the container below if you'd like to try recording over them.</p>
+
+<div id="top-bar" class="playlist-top-bar">
+  <div class="playlist-toolbar">
+    <div class="btn-group">
+      <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+      <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+      <span class="btn-record btn btn-danger disabled"><i class="fa fa-microphone"></i></span>
+    </div>
+    <div class="btn-group">
+      <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
+      <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
+    </div>
+  </div>
+</div>
+<div id="playlist"></div>
+<div class="playlist-bottom-bar">
+  <form class="form-inline">
+    <select class="time-format form-control">
+      <option value="seconds">seconds</option>
+      <option value="thousandths">thousandths</option>
+      <option value="hh:mm:ss">hh:mm:ss</option>
+      <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
+      <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
+      <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
+    </select>
+    <input type="text" class="audio-start input-small form-control">
+    <input type="text" class="audio-end input-small form-control">
+    <label class="audio-pos">00:00:00.0</label>
+  </form>
+  <div class="track-drop"></div>
+</div>
+
+  </div>
+
+</article>
+
+<script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
+<script type="text/javascript" src="js/waveform-playlist.var.js"></script>
+<script type="text/javascript" src="js/record.js"></script>
+<script type="text/javascript" src="js/emitter.js"></script>
+
       </div>
     </div>
-    <div id="playlist"></div>
-    <div class="playlist-bottom-bar">
-      <form class="form-inline">
-        <select class="time-format form-control">
-          <option value="seconds">seconds</option>
-          <option value="thousandths">thousandths</option>
-          <option value="hh:mm:ss">hh:mm:ss</option>
-          <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
-          <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
-          <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
-        </select>
-        <input type="text" class="audio-start input-small form-control">
-        <input type="text" class="audio-end input-small form-control">
-        <label class="audio-pos">00:00:00.0</label>
-      </form>
-      <div class="track-drop"></div>
-    </div>
-   
-    <script type="text/javascript" src="js/examples/record.js"></script>
-    <script type="text/javascript" src="js/examples/emitter.js"></script>
+
+    <footer class="well well-lg">
+
+  <p>Originally written for <a href="https://www.sourcefabric.org/en/airtime" rel="nofollow">Airtime</a> at <a href="https://www.sourcefabric.org" rel="nofollow">Sourcefabric</a>
+  <p>Music: <cite>Starlight</cite> by <a href="http://muse.mu/" rel="nofollow">Muse</a></p>
+  <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
+  <p>Licensed under the MIT License</p>
+
+</footer>
+
+
     <script>
       (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
       (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -65,5 +108,7 @@
       ga('send', 'pageview');
 
     </script>
+
   </body>
+
 </html>

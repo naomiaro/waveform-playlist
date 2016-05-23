@@ -34,7 +34,7 @@
 /******/ 	__webpack_require__.c = installedModules;
 /******/
 /******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "js/";
+/******/ 	__webpack_require__.p = "waveform-playlist/js/";
 /******/
 /******/ 	// Load entry module and return exports
 /******/ 	return __webpack_require__(0);
@@ -216,4 +216,4 @@
 
 /***/ }
 /******/ ]);
-//# sourceMappingURL=7aafad26f7b74326342d.worker.js.map
+//# sourceMappingURL=4463b48a3decbd8b83e2.worker.js.map

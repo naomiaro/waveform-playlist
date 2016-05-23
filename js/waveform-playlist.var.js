@@ -35,7 +35,7 @@ var WaveformPlaylist =
 /******/ 	__webpack_require__.c = installedModules;
 /******/
 /******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "js/";
+/******/ 	__webpack_require__.p = "waveform-playlist/js/";
 /******/
 /******/ 	// Load entry module and return exports
 /******/ 	return __webpack_require__(0);
@@ -122,6 +122,7 @@ var WaveformPlaylist =
 	    playlist.setZoomLevels(config.zoomLevels);
 	    playlist.setZoomIndex(zoomIndex);
 	    playlist.setMono(config.mono);
+	    playlist.setShowTimeScale(config.timescale);
 	
 	    //take care of initial virtual dom rendering.
 	    var tree = playlist.render();
@@ -2144,6 +2145,7 @@ var WaveformPlaylist =
 	        this.playbackSeconds = 0;
 	        this.duration = 0;
 	        this.scrollLeft = 0;
+	        this.showTimescale = false;
 	
 	        this.fadeType = "logarithmic";
 	    }
@@ -2195,6 +2197,11 @@ var WaveformPlaylist =
 	                _this.recordingTrack.setPeaks(e.data);
 	                _this.draw(_this.render());
 	            };
+	        }
+	    }, {
+	        key: 'setShowTimeScale',
+	        value: function setShowTimeScale(show) {
+	            this.showTimescale = show;
 	        }
 	    }, {
 	        key: 'setMono',
@@ -2813,10 +2820,7 @@ var WaveformPlaylist =
 	                }));
 	            });
 	
-	            return (0, _h2.default)("div.playlist", {
-	                "attributes": {
-	                    "style": "overflow: hidden; position: relative;"
-	                } }, [timeScale.render(), (0, _h2.default)("div.playlist-tracks", {
+	            var trackSection = (0, _h2.default)("div.playlist-tracks", {
 	                "attributes": {
 	                    "style": "overflow: auto;"
 	                },
@@ -2825,7 +2829,20 @@ var WaveformPlaylist =
 	                    _this12.ee.emit("scroll", _this12.scrollLeft);
 	                },
 	                "hook": new _ScrollHook2.default(this, this.samplesPerPixel, this.sampleRate)
-	            }, trackElements)]);
+	            }, trackElements);
+	
+	            var containerChildren = [];
+	
+	            if (this.showTimescale) {
+	                containerChildren.push(timeScale.render());
+	            }
+	
+	            containerChildren.push(trackSection);
+	
+	            return (0, _h2.default)("div.playlist", {
+	                "attributes": {
+	                    "style": "overflow: hidden; position: relative;"
+	                } }, containerChildren);
 	        }
 	    }, {
 	        key: 'getInfo',
@@ -6501,6 +6518,7 @@ var WaveformPlaylist =
 	            var info = {
 	                src: this.src,
 	                start: this.startTime,
+	                end: this.endTime,
 	                name: this.name,
 	                cuein: this.cueIn,
 	                cueout: this.cueOut
@@ -10963,7 +10981,7 @@ var WaveformPlaylist =
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function() {
-		return new Worker(__webpack_require__.p + "7aafad26f7b74326342d.worker.js");
+		return new Worker(__webpack_require__.p + "4463b48a3decbd8b83e2.worker.js");
 	};
 
 /***/ }
