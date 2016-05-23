@@ -24,7 +24,7 @@ I've written up some demos on github for the different [audio fade types](https:
 
 ## Basic Usage
 
-Starter styles can be found in `styles/playlist.scss`
+Starter styles can be found in the npm package download at `waveform-playlist/styles/playlist.scss`
 
 ```javascript
 var WaveformPlaylist = require('waveform-playlist');
