@@ -4,7 +4,7 @@ var playlist = WaveformPlaylist.init({
   mono: true,
   waveHeight: 100,
   container: document.getElementById("playlist"),
-  state: 'cursor',
+  state: 'shift',
   waveOutlineColor: '#E0EFF1',
   colors: {
       waveOutlineColor: '#E0EFF1',
