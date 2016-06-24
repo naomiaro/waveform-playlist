@@ -263,6 +263,7 @@ export default class {
                 let fadeOut = info.fadeOut;
                 let cueIn = info.cuein || 0;
                 let cueOut = info.cueout || audioBuffer.duration;
+                let gain = info.gain || 1;
                 let selection = info.selected;
                 let peaks = info.peaks || {type: "WebAudio", mono: this.mono};
 
@@ -297,6 +298,8 @@ export default class {
                 track.setState(this.getState());
                 track.setStartTime(start);
                 track.setPlayout(playout);
+
+                track.setGainLevel(gain);
 
                 //extract peaks with AudioContext for now.
                 track.calculatePeaks(this.samplesPerPixel, this.sampleRate);

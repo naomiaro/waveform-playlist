@@ -12,6 +12,7 @@ import stateClasses from './track/states';
 
 import CanvasHook from './render/CanvasHook';
 import FadeCanvasHook from './render/FadeCanvasHook';
+import VolumeSliderHook from './render/VolumeSliderHook';
 
 import {FADEIN, FADEOUT} from 'fade-maker';
 
@@ -359,6 +360,7 @@ export default class {
                             "max": 100,
                             "value": 100
                         },
+                        "hook": new VolumeSliderHook(this.gain),
                         "oninput": (e) => {
                             this.ee.emit("volumechange", e.target.value, this);
                         }

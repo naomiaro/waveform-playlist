@@ -50,7 +50,8 @@ var playlist = WaveformPlaylist.init({
 playlist.load([
   {
     "src": "media/audio/Vocals30.mp3",
-    "name": "Vocals"
+    "name": "Vocals",
+    "gain": 0.5
   },
   {
     "src": "media/audio/BassDrums30.mp3",
@@ -147,6 +148,9 @@ var options = {
 
   //name that will display in the playlist control panel.
   "name": "Drums",
+
+  //volume level of the track between [0-1]
+  "gain": 1,
 
   //time in seconds relative to the playlist
   //ex (track will start after 8.5 seconds)

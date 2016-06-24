@@ -17,7 +17,8 @@ var playlist = WaveformPlaylist.init({
 playlist.load([
   {
     "src": "media/audio/Vocals30.mp3",
-    "name": "Vocals"
+    "name": "Vocals",
+    "gain": 0.5
   },
   {
     "src": "media/audio/Guitar30.mp3",
@@ -25,7 +26,8 @@ playlist.load([
   },
   {
     "src": "media/audio/PianoSynth30.mp3",
-    "name": "Pianos & Synth"
+    "name": "Pianos & Synth",
+    "gain": 0.75
   },
   {
     "src": "media/audio/BassDrums30.mp3",
