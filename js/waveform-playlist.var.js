@@ -2120,11 +2120,11 @@ var WaveformPlaylist =
 	
 	var _Track2 = _interopRequireDefault(_Track);
 	
-	var _Playout = __webpack_require__(85);
+	var _Playout = __webpack_require__(86);
 	
 	var _Playout2 = _interopRequireDefault(_Playout);
 	
-	var _recorderWorker = __webpack_require__(86);
+	var _recorderWorker = __webpack_require__(87);
 	
 	var _recorderWorker2 = _interopRequireDefault(_recorderWorker);
 	
@@ -2399,6 +2399,7 @@ var WaveformPlaylist =
 	                    var fadeOut = info.fadeOut;
 	                    var cueIn = info.cuein || 0;
 	                    var cueOut = info.cueout || audioBuffer.duration;
+	                    var gain = info.gain || 1;
 	                    var selection = info.selected;
 	                    var peaks = info.peaks || { type: "WebAudio", mono: _this3.mono };
 	
@@ -2433,6 +2434,8 @@ var WaveformPlaylist =
 	                    track.setState(_this3.getState());
 	                    track.setStartTime(start);
 	                    track.setPlayout(playout);
+	
+	                    track.setGainLevel(gain);
 	
 	                    //extract peaks with AudioContext for now.
 	                    track.calculatePeaks(_this3.samplesPerPixel, _this3.sampleRate);
@@ -6006,6 +6009,10 @@ var WaveformPlaylist =
 	
 	var _FadeCanvasHook2 = _interopRequireDefault(_FadeCanvasHook);
 	
+	var _VolumeSliderHook = __webpack_require__(85);
+	
+	var _VolumeSliderHook2 = _interopRequireDefault(_VolumeSliderHook);
+	
 	var _fadeMaker = __webpack_require__(83);
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -6390,6 +6397,7 @@ var WaveformPlaylist =
 	                    "max": 100,
 	                    "value": 100
 	                },
+	                "hook": new _VolumeSliderHook2.default(this.gain),
 	                "oninput": function oninput(e) {
 	                    _this3.ee.emit("volumechange", e.target.value, _this3);
 	                }
@@ -10835,6 +10843,43 @@ var WaveformPlaylist =
 
 /***/ },
 /* 85 */
+/***/ function(module, exports) {
+
+	"use strict";
+	
+	Object.defineProperty(exports, "__esModule", {
+	    value: true
+	});
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	/*
+	* virtual-dom hook for setting the volume input programmatically.
+	*/
+	
+	var _class = function () {
+	    function _class(gain) {
+	        _classCallCheck(this, _class);
+	
+	        this.gain = gain;
+	    }
+	
+	    _createClass(_class, [{
+	        key: "hook",
+	        value: function hook(volumeInput, propertyName, previousValue) {
+	            volumeInput.value = this.gain * 100;
+	        }
+	    }]);
+
+	    return _class;
+	}();
+
+	exports.default = _class;
+
+/***/ },
+/* 86 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -10977,7 +11022,7 @@ var WaveformPlaylist =
 	exports.default = _class;
 
 /***/ },
-/* 86 */
+/* 87 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function() {
