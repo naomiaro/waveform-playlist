@@ -17,9 +17,15 @@ I've written up some demos on github for the different [audio fade types](https:
 
 [Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/web-audio-editor.html)
 
+
+## Browser Support
+
+Waveform Playlist requires webaudio in the browser to function correctly: [Can I Use?](http://caniuse.com/#search=webaudio)
+
+
 ## Installation
 
-  `npm install waveform-playlist`
+`npm install waveform-playlist`
 
 
 ## Basic Usage
