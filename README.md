@@ -28,7 +28,7 @@ Waveform Playlist requires webaudio in the browser to function correctly: [Can I
 `npm install waveform-playlist`
 
 
-* If you just want the already compiled files from the website, you can switch to branch `gh-pages` to get the source from there.
+* If you want to download and run the already compiled website, navigate to folder `/dist` and run `python -m SimpleHTTPServer 8000`. The website will be available at `localhost:8000/waveform-playlist`.
 
 
 ## Basic Usage
