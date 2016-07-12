@@ -28,6 +28,9 @@ Waveform Playlist requires webaudio in the browser to function correctly: [Can I
 `npm install waveform-playlist`
 
 
+* If you just want the already compiled files from the website, you can switch to branch `gh-pages` to get the source from there.
+
+
 ## Basic Usage
 
 Starter styles can be found in the npm package download at `waveform-playlist/styles/playlist.scss`
