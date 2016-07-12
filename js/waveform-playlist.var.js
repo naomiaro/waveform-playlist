@@ -10537,7 +10537,7 @@ var WaveformPlaylist =
 	        key: 'hook',
 	        value: function hook(canvas, prop, prev) {
 	            //canvas is up to date
-	            if (prev !== undefined && prev.peaks.length === this.peaks.length) {
+	            if (prev !== undefined && prev.peaks === this.peaks) {
 	                return;
 	            }
 	
@@ -10550,6 +10550,7 @@ var WaveformPlaylist =
 	            var minPeak = void 0;
 	            var maxPeak = void 0;
 	
+	            cc.clearRect(0, 0, canvas.width, canvas.height);
 	            cc.fillStyle = this.color;
 	
 	            for (i = 0; i < len; i++) {
