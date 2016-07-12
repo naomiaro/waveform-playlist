@@ -22,7 +22,7 @@ export default class {
     hook(canvas, prop, prev) {
         //canvas is up to date
         if (prev !== undefined &&
-            (prev.peaks.length === this.peaks.length)) {
+            (prev.peaks === this.peaks)) {
             return;
         }
 
@@ -35,6 +35,7 @@ export default class {
         let minPeak;
         let maxPeak;
 
+        cc.clearRect(0, 0, canvas.width, canvas.height);
         cc.fillStyle = this.color;
 
         for (i = 0; i < len; i++) {
