@@ -3,6 +3,5 @@
 
 # compiled files
 /lib
-/dist
 .sass-cache
 /styles
