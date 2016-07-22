@@ -55,11 +55,14 @@ export default class {
                 this.fadeGain.disconnect();
                 this.outputGain.disconnect();
                 this.masterGain.disconnect();
+                this.superMasterGain.disconnect();
+
 
                 this.source = undefined;
                 this.fadeGain = undefined;
                 this.outputGain = undefined;
                 this.masterGain = undefined;
+                this.superMasterGain = undefined;
 
                 resolve();
             }
@@ -70,11 +73,13 @@ export default class {
         this.outputGain = this.ac.createGain();
         //used for solo/mute
         this.masterGain = this.ac.createGain();
+        this.superMasterGain = this.ac.createGain();
 
         this.source.connect(this.fadeGain);
         this.fadeGain.connect(this.outputGain);
         this.outputGain.connect(this.masterGain);
-        this.masterGain.connect(this.destination);
+        this.masterGain.connect(this.superMasterGain);
+        this.superMasterGain.connect(this.destination);
 
         return sourcePromise;
     }
@@ -83,8 +88,14 @@ export default class {
         this.outputGain && (this.outputGain.gain.value = level);
     }
 
+
+
     setMasterGainLevel(level) {
         this.masterGain && (this.masterGain.gain.value = level);
+    }
+
+    setSuperMasterGainLevel(level){
+        this.superMasterGain && (this.superMasterGain.gain.value = level);
     }
 
     /*
