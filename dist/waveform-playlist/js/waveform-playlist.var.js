@@ -2321,6 +2321,13 @@ var WaveformPlaylist =
 	                track.setGainLevel(volume / 100);
 	            });
 	
+	            ee.on('supermastervolumechange', function (volume) {
+	                //track.setGainLevel(volume/100);
+	                _this2.tracks.forEach(function (track) {
+	                    track.setSuperMasterGainLevel(volume / 100);
+	                });
+	            });
+	
 	            ee.on('fadein', function (duration, track) {
 	                track.setFadeIn(duration, _this2.fadeType);
 	                _this2.draw(_this2.render());
@@ -2607,6 +2614,11 @@ var WaveformPlaylist =
 	            return this.ac.currentTime - this.lastPlay;
 	        }
 	    }, {
+	        key: 'setSuperMasterVolume',
+	        value: function setSuperMasterVolume(volume) {
+	            this.ee.emit('supermastervolumechange', volume);
+	        }
+	    }, {
 	        key: 'restartPlayFrom',
 	        value: function restartPlayFrom(start, end) {
 	            this.stopAnimation();
@@ -2640,7 +2652,8 @@ var WaveformPlaylist =
 	            this.tracks.forEach(function (track) {
 	                track.setState('cursor');
 	                playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
-	                    masterGain: _this6.shouldTrackPlay(track) ? 1 : 0
+	                    masterGain: _this6.shouldTrackPlay(track) ? 1 : 0,
+	                    superMasterGain: track.superMasterGain
 	                }));
 	            });
 	
@@ -5383,11 +5396,11 @@ var WaveformPlaylist =
 	}
 	
 	function samplesToPixels(samples, resolution) {
-	    return ~ ~(samples / resolution);
+	    return ~~(samples / resolution);
 	}
 	
 	function pixelsToSamples(pixels, resolution) {
-	    return ~ ~(pixels * resolution);
+	    return ~~(pixels * resolution);
 	}
 	
 	function pixelsToSeconds(pixels, resolution, sampleRate) {
@@ -5700,7 +5713,6 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for scrolling the track container.
 	*/
-	
 	var _class = function () {
 	    function _class(track, resolution, sampleRate) {
 	        _classCallCheck(this, _class);
@@ -5866,7 +5878,7 @@ var WaveformPlaylist =
 	
 	            for (i = 0; i < end; i = i + pixPerSec * scaleInfo.secondStep) {
 	
-	                pixIndex = ~ ~i;
+	                pixIndex = ~~i;
 	                pix = pixIndex - pixOffset;
 	
 	                if (pixIndex >= pixOffset) {
@@ -5923,7 +5935,6 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for rendering the time scale canvas.
 	*/
-	
 	var _class = function () {
 	    function _class(tickInfo, offset, samplesPerPixel, duration) {
 	        _classCallCheck(this, _class);
@@ -6027,6 +6038,7 @@ var WaveformPlaylist =
 	
 	        this.name = "Untitled";
 	        this.gain = 1;
+	        this.superMasterGain = 1;
 	        this.fades = {};
 	        this.peakData = {
 	            type: "WebAudio",
@@ -6229,6 +6241,12 @@ var WaveformPlaylist =
 	            this.playout.setGainLevel(level);
 	        }
 	    }, {
+	        key: 'setSuperMasterGainLevel',
+	        value: function setSuperMasterGainLevel(level) {
+	            this.superMasterGain = level;
+	            this.playout.setSuperMasterGainLevel(level);
+	        }
+	    }, {
 	        key: 'setMasterGainLevel',
 	        value: function setMasterGainLevel(level) {
 	            this.playout.setMasterGainLevel(level);
@@ -6319,6 +6337,7 @@ var WaveformPlaylist =
 	
 	            this.playout.setGainLevel(this.gain);
 	            this.playout.setMasterGainLevel(options.masterGain);
+	            this.playout.setSuperMasterGainLevel(options.superMasterGain);
 	            this.playout.play(when, start, duration);
 	
 	            return sourcePromise;
@@ -10859,7 +10878,6 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for setting the volume input programmatically.
 	*/
-	
 	var _class = function () {
 	    function _class(gain) {
 	        _classCallCheck(this, _class);
@@ -10962,11 +10980,13 @@ var WaveformPlaylist =
 	                    _this.fadeGain.disconnect();
 	                    _this.outputGain.disconnect();
 	                    _this.masterGain.disconnect();
+	                    _this.superMasterGain.disconnect();
 	
 	                    _this.source = undefined;
 	                    _this.fadeGain = undefined;
 	                    _this.outputGain = undefined;
 	                    _this.masterGain = undefined;
+	                    _this.superMasterGain = undefined;
 	
 	                    resolve();
 	                };
@@ -10977,11 +10997,13 @@ var WaveformPlaylist =
 	            this.outputGain = this.ac.createGain();
 	            //used for solo/mute
 	            this.masterGain = this.ac.createGain();
+	            this.superMasterGain = this.ac.createGain();
 	
 	            this.source.connect(this.fadeGain);
 	            this.fadeGain.connect(this.outputGain);
 	            this.outputGain.connect(this.masterGain);
-	            this.masterGain.connect(this.destination);
+	            this.masterGain.connect(this.superMasterGain);
+	            this.superMasterGain.connect(this.destination);
 	
 	            return sourcePromise;
 	        }
@@ -10994,6 +11016,11 @@ var WaveformPlaylist =
 	        key: 'setMasterGainLevel',
 	        value: function setMasterGainLevel(level) {
 	            this.masterGain && (this.masterGain.gain.value = level);
+	        }
+	    }, {
+	        key: 'setSuperMasterGainLevel',
+	        value: function setSuperMasterGainLevel(level) {
+	            this.superMasterGain && (this.superMasterGain.gain.value = level);
 	        }
 	
 	        /*

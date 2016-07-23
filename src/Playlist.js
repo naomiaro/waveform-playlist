@@ -190,6 +190,13 @@ export default class {
             track.setGainLevel(volume/100);
         });
 
+        ee.on('supermastervolumechange', (volume) => {
+            //track.setGainLevel(volume/100);
+            this.tracks.forEach((track) => {
+                track.setSuperMasterGainLevel(volume/100);
+            });
+        });
+
         ee.on('fadein', (duration, track) => {
             track.setFadeIn(duration, this.fadeType);
             this.draw(this.render());
@@ -446,6 +453,10 @@ export default class {
         return this.ac.currentTime - this.lastPlay;
     }
 
+    setSuperMasterVolume(volume){
+        this.ee.emit('supermastervolumechange', volume);
+    }
+
     restartPlayFrom(start, end) {
         this.stopAnimation();
 
@@ -475,7 +486,8 @@ export default class {
         this.tracks.forEach((track) => {
             track.setState('cursor');
             playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
-                masterGain: this.shouldTrackPlay(track) ? 1 : 0
+                masterGain: this.shouldTrackPlay(track) ? 1 : 0,
+                superMasterGain : track.superMasterGain
             }));
         });
 

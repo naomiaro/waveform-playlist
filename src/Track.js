@@ -24,6 +24,7 @@ export default class {
 
         this.name = "Untitled";
         this.gain = 1;
+        this.superMasterGain = 1;
         this.fades = {};
         this.peakData = {
             type: "WebAudio",
@@ -197,6 +198,11 @@ export default class {
         this.playout.setGainLevel(level);
     }
 
+    setSuperMasterGainLevel(level) {
+        this.superMasterGain = level;
+        this.playout.setSuperMasterGainLevel(level);
+    }
+
     setMasterGainLevel(level) {
         this.playout.setMasterGainLevel(level);
     }
@@ -286,6 +292,7 @@ export default class {
 
         this.playout.setGainLevel(this.gain);
         this.playout.setMasterGainLevel(options.masterGain);
+        this.playout.setSuperMasterGainLevel(options.superMasterGain);
         this.playout.play(when, start, duration);
 
         return sourcePromise;
