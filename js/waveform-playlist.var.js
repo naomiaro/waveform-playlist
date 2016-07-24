@@ -5610,7 +5610,7 @@ var WaveformPlaylist =
 	
 	                    resolve(audioBuffer);
 	                }, function (err) {
-	                    reject(Error('Unable to decode Audio Data for ' + _this.src));
+	                    reject(Error('Unable to decode Audio Data for src ' + _this.src));
 	                });
 	            });
 	        }
