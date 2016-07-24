@@ -90,6 +90,14 @@ export default class {
         this.mono = mono;
     }
 
+    setSeekStyle(style){
+        this.seekStyle = style
+    }
+
+    getSeekStyle(){
+        return this.seekStyle;
+    }
+
     setSampleRate(sampleRate) {
         this.sampleRate = sampleRate;
     }
@@ -133,7 +141,7 @@ export default class {
             }
             else {
                 //reset if it was paused.
-                this.seekToTime(start)
+                this.seekToTime(start, end)
                 this.setTimeSelection(start, end);
                 this.setActiveTrack(track);
                 this.draw(this.render());
@@ -587,7 +595,7 @@ export default class {
         this.lastDraw = undefined;
     }
 
-    seekToTime(time=0){
+    seekToTime(time=0, end ){
         if (this.getState() != 'cursor')
         {
             this.stop();
@@ -601,8 +609,10 @@ export default class {
         }
 
         this.setTimeSelection(time, time);
+        if (this.getSeekStyle() == 'fill'){
+            this.playbackSeconds = time;
+        }
         this.pausedAt = time;
-        this.playbackSeconds = time;
         this.ee.emit('timeupdate', time);
         this.draw(this.render());
     }
@@ -670,7 +680,7 @@ export default class {
         let activeTrack = this.getActiveTrack();
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "isActive": (this.getState()!='select')?true:((activeTrack === track) ? true : false),
+                "isActive": (this.getTimeSelection().start!=this.getTimeSelection().end)?((activeTrack === track) ? true : false):true,
                 "shouldPlay": this.shouldTrackPlay(track),
                 "soloed": this.soloedTracks.indexOf(track) > -1,
                 "muted": this.mutedTracks.indexOf(track) > -1

@@ -141,7 +141,7 @@ var options = {
 
   //interaction state of the playlist
   state: 'cursor', // (cursor | select | fadein | fadeout | shift)
-
+  seekStyle : 'line', // (line | fill)
   //Array of zoom levels in samples per pixel.
   //Smaller numbers have a greater zoom in.
   zoomLevels: [512, 1024, 2048, 4096]

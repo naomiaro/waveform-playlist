@@ -96,6 +96,7 @@ var WaveformPlaylist =
 	            timeColor: 'grey',
 	            fadeColor: 'black'
 	        },
+	        seekStyle: 'line',
 	        waveHeight: 128, //height of each canvas element a waveform is on.
 	        state: 'cursor',
 	        zoomLevels: [512, 1024, 2048, 4096] //zoom levels in samples per pixel
@@ -123,6 +124,7 @@ var WaveformPlaylist =
 	    playlist.setZoomIndex(zoomIndex);
 	    playlist.setMono(config.mono);
 	    playlist.setShowTimeScale(config.timescale);
+	    playlist.setSeekStyle(config.seekStyle);
 	
 	    //take care of initial virtual dom rendering.
 	    var tree = playlist.render();
@@ -2210,6 +2212,16 @@ var WaveformPlaylist =
 	            this.mono = mono;
 	        }
 	    }, {
+	        key: 'setSeekStyle',
+	        value: function setSeekStyle(style) {
+	            this.seekStyle = style;
+	        }
+	    }, {
+	        key: 'getSeekStyle',
+	        value: function getSeekStyle() {
+	            return this.seekStyle;
+	        }
+	    }, {
 	        key: 'setSampleRate',
 	        value: function setSampleRate(sampleRate) {
 	            this.sampleRate = sampleRate;
@@ -2263,7 +2275,7 @@ var WaveformPlaylist =
 	                    _this2.restartPlayFrom(start);
 	                } else {
 	                    //reset if it was paused.
-	                    _this2.seekToTime(start);
+	                    _this2.seekToTime(start, end);
 	                    _this2.setTimeSelection(start, end);
 	                    _this2.setActiveTrack(track);
 	                    _this2.draw(_this2.render());
@@ -2770,6 +2782,7 @@ var WaveformPlaylist =
 	        key: 'seekToTime',
 	        value: function seekToTime() {
 	            var time = arguments.length <= 0 || arguments[0] === undefined ? 0 : arguments[0];
+	            var end = arguments[1];
 	
 	            if (this.getState() != 'cursor') {
 	                this.stop();
@@ -2782,8 +2795,10 @@ var WaveformPlaylist =
 	            }
 	
 	            this.setTimeSelection(time, time);
+	            if (this.getSeekStyle() == 'fill') {
+	                this.playbackSeconds = time;
+	            }
 	            this.pausedAt = time;
-	            this.playbackSeconds = time;
 	            this.ee.emit('timeupdate', time);
 	            this.draw(this.render());
 	        }
@@ -2862,7 +2877,7 @@ var WaveformPlaylist =
 	            var activeTrack = this.getActiveTrack();
 	            var trackElements = this.tracks.map(function (track) {
 	                return track.render(_this12.getTrackRenderData({
-	                    "isActive": _this12.getState() != 'select' ? true : activeTrack === track ? true : false,
+	                    "isActive": _this12.getTimeSelection().start != _this12.getTimeSelection().end ? activeTrack === track ? true : false : true,
 	                    "shouldPlay": _this12.shouldTrackPlay(track),
 	                    "soloed": _this12.soloedTracks.indexOf(track) > -1,
 	                    "muted": _this12.mutedTracks.indexOf(track) > -1

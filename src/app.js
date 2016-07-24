@@ -27,6 +27,7 @@ export function init(options={}, ee=EventEmitter()) {
             timeColor: 'grey',
             fadeColor: 'black'
         },
+        seekStyle : 'line',
         waveHeight: 128, //height of each canvas element a waveform is on.
         state: 'cursor',
         zoomLevels: [512, 1024, 2048, 4096] //zoom levels in samples per pixel
@@ -54,6 +55,7 @@ export function init(options={}, ee=EventEmitter()) {
     playlist.setZoomIndex(zoomIndex);
     playlist.setMono(config.mono);
     playlist.setShowTimeScale(config.timescale);
+    playlist.setSeekStyle(config.seekStyle);
 
     //take care of initial virtual dom rendering.
     let tree = playlist.render();
