@@ -265,6 +265,10 @@ An example of using the event emitter to control the playlist can be found in [/
 | `scroll` | `scrollLeft` | Sends current position of scroll `scrollLeft` in seconds. |
 | `statechange` | `state` | Sends current interaction state `state`. |
 | `shift` | `deltaTime, track` | Sends `deltaTime` in seconds change for Track `track` |
+| `mute` | `track` | Mute button has been pressed for `track` |
+| `solo` | `track` | Solo button has been pressed for `track` |
+| `volumechange` | `volume, track` | Volume of `track` has changed to `volume` (0-100) |
+| `mastervolumechange` | `volume` | Master volume of the playlist has changed to `volume` (0-100) |
 
 ## Tests
 
