@@ -634,6 +634,9 @@ export default class {
             this.ee.emit('timeupdate', playbackSeconds);
             this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
        } else {
+            if ((cursorPos+elapsed) >= this.duration){
+                this.ee.emit('finished');
+            }
             this.stopAnimation();
             this.pausedAt = undefined;
             this.lastSeeked = undefined;

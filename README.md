@@ -279,7 +279,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `mastervolumechange` | `volume` | Master volume of the playlist has changed to `volume` (0-100) |
 | `audiorequeststatechange` | `state, src` | Loading audio `src` (`string` or `File`) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number) |
 | `loadprogress` | `percent, src` | Loading audio `src` has loaded percent `percent` (0-100) |
-
+| `finished` | _none_ | event fired when cursor ( while playing ) reaches the end (maximum duration) |
 
 ## Tests
 
