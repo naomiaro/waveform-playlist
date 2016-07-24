@@ -2257,18 +2257,23 @@ var WaveformPlaylist =
 	            var ee = this.ee;
 	
 	            ee.on('select', function (start, end, track) {
-	
 	                if (_this2.isPlaying()) {
 	                    _this2.lastSeeked = start;
 	                    _this2.pausedAt = undefined;
 	                    _this2.restartPlayFrom(start);
 	                } else {
 	                    //reset if it was paused.
-	                    _this2.playbackSeconds = 0;
+	                    _this2.seekToTime(start);
 	                    _this2.setTimeSelection(start, end);
 	                    _this2.setActiveTrack(track);
 	                    _this2.draw(_this2.render());
 	                }
+	            });
+	
+	            ee.on('seek', function () {
+	                var time = arguments.length <= 0 || arguments[0] === undefined ? 0 : arguments[0];
+	
+	                _this2.seekToTime(time);
 	            });
 	
 	            ee.on('statechange', function (state) {
@@ -2493,7 +2498,6 @@ var WaveformPlaylist =
 	                start: start,
 	                end: end
 	            };
-	
 	            this.cursor = start;
 	        }
 	    }, {
@@ -2761,6 +2765,27 @@ var WaveformPlaylist =
 	        value: function stopAnimation() {
 	            window.cancelAnimationFrame(this.animationRequest);
 	            this.lastDraw = undefined;
+	        }
+	    }, {
+	        key: 'seekToTime',
+	        value: function seekToTime() {
+	            var time = arguments.length <= 0 || arguments[0] === undefined ? 0 : arguments[0];
+	
+	            if (this.getState() != 'cursor') {
+	                this.stop();
+	                return;
+	            }
+	
+	            if (this.isPlaying()) {
+	                this.restartPlayFrom(time);
+	                return;
+	            }
+	
+	            this.setTimeSelection(time, time);
+	            this.pausedAt = time;
+	            this.playbackSeconds = time;
+	            this.ee.emit('timeupdate', time);
+	            this.draw(this.render());
 	        }
 	
 	        /*

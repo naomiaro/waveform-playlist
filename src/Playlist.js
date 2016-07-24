@@ -134,7 +134,6 @@ export default class {
             else {
                 //reset if it was paused.
                 this.seekToTime(start)
-                //this.playbackSeconds = 0;
                 this.setTimeSelection(start, end);
                 this.setActiveTrack(track);
                 this.draw(this.render());
@@ -603,7 +602,6 @@ export default class {
 
         this.setTimeSelection(time, time);
         this.pausedAt = time;
-      //  this.lastSeeked = time;
         this.playbackSeconds = time;
         this.ee.emit('timeupdate', time);
         this.draw(this.render());
@@ -612,7 +610,7 @@ export default class {
     /*
     * Animation function for the playlist.
     */
-    updateEditor(cursorPos, time) {
+    updateEditor(cursorPos) {
         let currentTime = this.ac.currentTime;
         let playbackSeconds = 0;
         let elapsed;
@@ -624,7 +622,7 @@ export default class {
         if (this.isPlaying()) {
             playbackSeconds = cursorPos + elapsed;
             this.ee.emit('timeupdate', playbackSeconds);
-            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds, cursorPos));
+            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
        } else {
             this.stopAnimation();
             this.pausedAt = undefined;
