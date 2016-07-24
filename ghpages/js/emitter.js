@@ -239,6 +239,11 @@ function displaySoundStatus(status) {
   $(".sound-status").html(status);
 }
 
+function displayLoadingData(data) {
+  var info = $("<div/>").append(data);
+  $(".loading-data").append(info);
+}
+
 
 
 /*
@@ -262,5 +267,28 @@ ee.on("volumechange", function(volume, track) {
 
 ee.on("mastervolumechange", function(volume) {
   displaySoundStatus("Master volume now has volume " + volume + ".");
+});
+
+
+var audioStates = ["uninitialized", "loading", "decoding", "finished"];
+
+ee.on("audiorequeststatechange", function(state, src) {
+  var name = src;
+
+  if (src instanceof File) {
+    name = src.name;
+  }
+
+  displayLoadingData("Track " + name + " is in state " + audioStates[state]);
+});
+
+ee.on("loadprogress", function(percent, src) {
+  var name = src;
+
+  if (src instanceof File) {
+    name = src.name;
+  }
+
+  displayLoadingData("Track " + name + " has loaded " + percent + "%");
 });
 
