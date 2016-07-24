@@ -273,10 +273,22 @@ ee.on("mastervolumechange", function(volume) {
 var audioStates = ["uninitialized", "loading", "decoding", "finished"];
 
 ee.on("audiorequeststatechange", function(state, src) {
-  displayLoadingData("Track " + src + " is in state " + audioStates[state]);
+  var name = src;
+
+  if (src instanceof File) {
+    name = src.name;
+  }
+
+  displayLoadingData("Track " + name + " is in state " + audioStates[state]);
 });
 
 ee.on("loadprogress", function(percent, src) {
-  displayLoadingData("Track " + src + " has loaded " + percent + "%");
+  var name = src;
+
+  if (src instanceof File) {
+    name = src.name;
+  }
+
+  displayLoadingData("Track " + name + " has loaded " + percent + "%");
 });
 
