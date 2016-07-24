@@ -161,6 +161,12 @@ var options = {
   //volume level of the track between [0-1]
   "gain": 1,
 
+  //whether the track should initially be muted.
+  "muted": false,
+
+  //whether the track should initially be soloed.
+  "soloed": false,
+
   //time in seconds relative to the playlist
   //ex (track will start after 8.5 seconds)
   //DEFAULT 0 - track starts at beginning of playlist

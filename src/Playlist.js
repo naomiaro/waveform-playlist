@@ -271,6 +271,8 @@ export default class {
                 let cueIn = info.cuein || 0;
                 let cueOut = info.cueout || audioBuffer.duration;
                 let gain = info.gain || 1;
+                let muted = info.muted || false;
+                let soloed = info.soloed || false;
                 let selection = info.selected;
                 let peaks = info.peaks || {type: "WebAudio", mono: this.mono};
 
@@ -307,6 +309,14 @@ export default class {
                 track.setPlayout(playout);
 
                 track.setGainLevel(gain);
+
+                if (muted) {
+                    this.muteTrack(track);
+                }
+
+                if (soloed) {
+                    this.soloTrack(track);
+                }
 
                 //extract peaks with AudioContext for now.
                 track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
