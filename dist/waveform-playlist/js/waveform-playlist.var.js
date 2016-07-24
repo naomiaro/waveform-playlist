@@ -2862,7 +2862,7 @@ var WaveformPlaylist =
 	            var activeTrack = this.getActiveTrack();
 	            var trackElements = this.tracks.map(function (track) {
 	                return track.render(_this12.getTrackRenderData({
-	                    "isActive": activeTrack === track ? true : false,
+	                    "isActive": _this12.getState() != 'select' ? true : activeTrack === track ? true : false,
 	                    "shouldPlay": _this12.shouldTrackPlay(track),
 	                    "soloed": _this12.soloedTracks.indexOf(track) > -1,
 	                    "muted": _this12.mutedTracks.indexOf(track) > -1

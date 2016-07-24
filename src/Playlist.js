@@ -670,7 +670,7 @@ export default class {
         let activeTrack = this.getActiveTrack();
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "isActive": (activeTrack === track) ? true : false,
+                "isActive": (this.getState()!='select')?true:((activeTrack === track) ? true : false),
                 "shouldPlay": this.shouldTrackPlay(track),
                 "soloed": this.soloedTracks.indexOf(track) > -1,
                 "muted": this.mutedTracks.indexOf(track) > -1
