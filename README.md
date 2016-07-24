@@ -255,6 +255,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `fadetype` | (`logarithmic | linear | sCurve | exponential`) | Changes playlist default fade type. |
 | `newtrack` | `File` | Loads `File` object into the playlist. |
 | `select` | `start, end, track:optional` | Sets cursor selection from `start` to `end` optionally with active track `track`. |
+| `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
 
 #### Events to Listen to
 
