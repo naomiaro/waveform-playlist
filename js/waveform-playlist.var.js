@@ -2323,8 +2323,9 @@ var WaveformPlaylist =
 	            });
 	
 	            ee.on('mastervolumechange', function (volume) {
+	                _this2.masterGain = volume / 100;
 	                _this2.tracks.forEach(function (track) {
-	                    track.setMasterGainLevel(volume / 100);
+	                    track.setMasterGainLevel(_this2.masterGain);
 	                });
 	            });
 	
