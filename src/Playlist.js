@@ -7,6 +7,7 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 
 import {pixelsToSeconds} from './utils/conversions';
+
 import LoaderFactory from './track/loader/LoaderFactory';
 
 import ScrollHook from './render/ScrollHook';
@@ -125,7 +126,6 @@ export default class {
         let ee = this.ee;
 
         ee.on('select', (start, end, track) => {
-
             if (this.isPlaying()) {
                 this.lastSeeked = start;
                 this.pausedAt = undefined;
@@ -133,11 +133,18 @@ export default class {
             }
             else {
                 //reset if it was paused.
-                this.playbackSeconds = 0;
+                this.seekToTime(start)
+                //this.playbackSeconds = 0;
                 this.setTimeSelection(start, end);
                 this.setActiveTrack(track);
                 this.draw(this.render());
+
+
             }
+        });
+
+        ee.on('seek', (time=0)=>{
+           this.seekToTime(time);
         });
 
         ee.on('statechange', (state) => {
@@ -350,7 +357,6 @@ export default class {
             start,
             end,
         };
-
         this.cursor = start;
     }
 
@@ -383,7 +389,7 @@ export default class {
         this.zoomIndex = this.zoomLevels.indexOf(zoom);
         this.tracks.forEach((track) => {
             track.calculatePeaks(zoom, this.sampleRate);
-        }); 
+        });
     }
 
     muteTrack(track) {
@@ -582,10 +588,31 @@ export default class {
         this.lastDraw = undefined;
     }
 
+    seekToTime(time=0){
+        if (this.getState() != 'cursor')
+        {
+            this.stop();
+            return;
+        }
+
+        if (this.isPlaying())
+        {
+            this.restartPlayFrom(time);
+            return;
+        }
+
+        this.setTimeSelection(time, time);
+        this.pausedAt = time;
+      //  this.lastSeeked = time;
+        this.playbackSeconds = time;
+        this.ee.emit('timeupdate', time);
+        this.draw(this.render());
+    }
+
     /*
     * Animation function for the playlist.
     */
-    updateEditor(cursorPos) {
+    updateEditor(cursorPos, time) {
         let currentTime = this.ac.currentTime;
         let playbackSeconds = 0;
         let elapsed;
@@ -593,12 +620,12 @@ export default class {
         cursorPos = cursorPos || this.cursor;
         elapsed = currentTime - this.lastDraw;
 
+
         if (this.isPlaying()) {
             playbackSeconds = cursorPos + elapsed;
             this.ee.emit('timeupdate', playbackSeconds);
-            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
-        }
-        else {
+            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds, cursorPos));
+       } else {
             this.stopAnimation();
             this.pausedAt = undefined;
             this.lastSeeked = undefined;

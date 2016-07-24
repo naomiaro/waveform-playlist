@@ -5404,11 +5404,11 @@ var WaveformPlaylist =
 	}
 	
 	function samplesToPixels(samples, resolution) {
-	    return ~ ~(samples / resolution);
+	    return ~~(samples / resolution);
 	}
 	
 	function pixelsToSamples(pixels, resolution) {
-	    return ~ ~(pixels * resolution);
+	    return ~~(pixels * resolution);
 	}
 	
 	function pixelsToSeconds(pixels, resolution, sampleRate) {
@@ -5721,7 +5721,6 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for scrolling the track container.
 	*/
-	
 	var _class = function () {
 	    function _class(track, resolution, sampleRate) {
 	        _classCallCheck(this, _class);
@@ -5887,7 +5886,7 @@ var WaveformPlaylist =
 	
 	            for (i = 0; i < end; i = i + pixPerSec * scaleInfo.secondStep) {
 	
-	                pixIndex = ~ ~i;
+	                pixIndex = ~~i;
 	                pix = pixIndex - pixOffset;
 	
 	                if (pixIndex >= pixOffset) {
@@ -5944,7 +5943,6 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for rendering the time scale canvas.
 	*/
-	
 	var _class = function () {
 	    function _class(tickInfo, offset, samplesPerPixel, duration) {
 	        _classCallCheck(this, _class);
@@ -6263,7 +6261,7 @@ var WaveformPlaylist =
 	        /*
 	            startTime, endTime in seconds (float).
 	            segment is for a highlighted section in the UI.
-	             returns a Promise that will resolve when the AudioBufferSource
+	              returns a Promise that will resolve when the AudioBufferSource
 	            is either stopped or plays out naturally.
 	        */
 	
@@ -10886,7 +10884,6 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for setting the volume input programmatically.
 	*/
-	
 	var _class = function () {
 	    function _class(gain) {
 	        _classCallCheck(this, _class);
