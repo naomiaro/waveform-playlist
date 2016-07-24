@@ -276,7 +276,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `solo` | `track` | Solo button has been pressed for `track` |
 | `volumechange` | `volume, track` | Volume of `track` has changed to `volume` (0-100) |
 | `mastervolumechange` | `volume` | Master volume of the playlist has changed to `volume` (0-100) |
-| `audiorequeststatechange` | `state, src` | Loading audio `src` (string|File) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number) |
+| `audiorequeststatechange` | `state, src` | Loading audio `src` (`string`|`File`) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number) |
 | `loadprogress` | `percent, src` | Loading audio `src` has loaded percent `percent` (0-100) |
 
 
