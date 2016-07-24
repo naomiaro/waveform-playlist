@@ -24,7 +24,6 @@ export default class {
 
         this.name = "Untitled";
         this.gain = 1;
-        this.superMasterGain = 1;
         this.fades = {};
         this.peakData = {
             type: "WebAudio",
@@ -193,14 +192,13 @@ export default class {
         return this.playout.isPlaying();
     }
 
-    setGainLevel(level) {
-        this.gain = level;
-        this.playout.setGainLevel(level);
+    setShouldPlay(bool) {
+        this.playout.setShouldPlay(bool);
     }
 
-    setSuperMasterGainLevel(level) {
-        this.superMasterGain = level;
-        this.playout.setSuperMasterGainLevel(level);
+    setGainLevel(level) {
+        this.gain = level;
+        this.playout.setVolumeGainLevel(level);
     }
 
     setMasterGainLevel(level) {
@@ -290,9 +288,9 @@ export default class {
             }
         });
 
-        this.playout.setGainLevel(this.gain);
+        this.playout.setVolumeGainLevel(this.gain);
+        this.playout.setShouldPlay(options.shouldPlay);
         this.playout.setMasterGainLevel(options.masterGain);
-        this.playout.setSuperMasterGainLevel(options.superMasterGain);
         this.playout.play(when, start, duration);
 
         return sourcePromise;
@@ -471,7 +469,7 @@ export default class {
             );
         });
 
-        let audibleClass = data.masterGain ? "" : ".silent";
+        let audibleClass = data.shouldPlay ? "" : ".silent";
 
         waveformChildren.push(channels);
         waveformChildren.push(this.renderOverlay(data));

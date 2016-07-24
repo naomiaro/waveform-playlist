@@ -53,16 +53,16 @@ export default class {
             this.source.onended = (e) => {
                 this.source.disconnect();
                 this.fadeGain.disconnect();
-                this.outputGain.disconnect();
+                this.volumeGain.disconnect();
+                this.shouldPlayGain.disconnect();
                 this.masterGain.disconnect();
-                this.superMasterGain.disconnect();
 
 
                 this.source = undefined;
                 this.fadeGain = undefined;
-                this.outputGain = undefined;
+                this.volumeGain = undefined;
+                this.shouldPlayGain = undefined;
                 this.masterGain = undefined;
-                this.superMasterGain = undefined;
 
                 resolve();
             }
@@ -70,32 +70,30 @@ export default class {
 
         this.fadeGain = this.ac.createGain();
         //used for track volume slider
-        this.outputGain = this.ac.createGain();
+        this.volumeGain = this.ac.createGain();
         //used for solo/mute
+        this.shouldPlayGain = this.ac.createGain();
         this.masterGain = this.ac.createGain();
-        this.superMasterGain = this.ac.createGain();
 
         this.source.connect(this.fadeGain);
-        this.fadeGain.connect(this.outputGain);
-        this.outputGain.connect(this.masterGain);
-        this.masterGain.connect(this.superMasterGain);
-        this.superMasterGain.connect(this.destination);
+        this.fadeGain.connect(this.volumeGain);
+        this.volumeGain.connect(this.shouldPlayGain);
+        this.shouldPlayGain.connect(this.masterGain);
+        this.masterGain.connect(this.destination);
 
         return sourcePromise;
     }
 
-    setGainLevel(level) {
-        this.outputGain && (this.outputGain.gain.value = level);
+    setVolumeGainLevel(level) {
+        this.volumeGain && (this.volumeGain.gain.value = level);
     }
 
-
+    setShouldPlay(bool){
+        this.shouldPlayGain && (this.shouldPlayGain.gain.value = bool ? 1 : 0);
+    }
 
     setMasterGainLevel(level) {
         this.masterGain && (this.masterGain.gain.value = level);
-    }
-
-    setSuperMasterGainLevel(level){
-        this.superMasterGain && (this.superMasterGain.gain.value = level);
     }
 
     /*

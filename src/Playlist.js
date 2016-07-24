@@ -33,6 +33,7 @@ export default class {
         this.showTimescale = false;
 
         this.fadeType = "logarithmic";
+        this.masterGain = 1;
     }
 
     initRecorder(stream) {
@@ -190,10 +191,9 @@ export default class {
             track.setGainLevel(volume/100);
         });
 
-        ee.on('supermastervolumechange', (volume) => {
-            //track.setGainLevel(volume/100);
+        ee.on('mastervolumechange', (volume) => {
             this.tracks.forEach((track) => {
-                track.setSuperMasterGainLevel(volume/100);
+                track.setMasterGainLevel(volume/100);
             });
         });
 
@@ -400,11 +400,8 @@ export default class {
     }
 
     adjustTrackPlayout() {
-        var masterGain;
-
         this.tracks.forEach((track) => {
-            masterGain = this.shouldTrackPlay(track) ? 1 : 0;
-            track.setMasterGainLevel(masterGain);
+            track.setShouldPlay(this.shouldTrackPlay(track));
         });
     }
 
@@ -453,8 +450,8 @@ export default class {
         return this.ac.currentTime - this.lastPlay;
     }
 
-    setSuperMasterVolume(volume){
-        this.ee.emit('supermastervolumechange', volume);
+    setMasterGain(gain){
+        this.ee.emit('mastervolumechange', gain);
     }
 
     restartPlayFrom(start, end) {
@@ -486,8 +483,8 @@ export default class {
         this.tracks.forEach((track) => {
             track.setState('cursor');
             playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
-                masterGain: this.shouldTrackPlay(track) ? 1 : 0,
-                superMasterGain : track.superMasterGain
+                shouldPlay: this.shouldTrackPlay(track),
+                masterGain : this.masterGain
             }));
         });
 
@@ -557,7 +554,7 @@ export default class {
         this.tracks.forEach((track) => {
             track.setState('none');
             playoutPromises.push(track.schedulePlay(this.ac.currentTime, 0, undefined, {
-                masterGain: this.shouldTrackPlay(track) ? 1 : 0
+                shouldPlay: this.shouldTrackPlay(track)
             }));
         });
 
@@ -638,7 +635,7 @@ export default class {
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
                 "isActive": (activeTrack === track) ? true : false,
-                "masterGain": this.shouldTrackPlay(track) ? 1 : 0,
+                "shouldPlay": this.shouldTrackPlay(track),
                 "soloed": this.soloedTracks.indexOf(track) > -1,
                 "muted": this.mutedTracks.indexOf(track) > -1
             }));

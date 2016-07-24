@@ -53,8 +53,12 @@ javascript: web-audio-editor.js
       <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
     </select>
     <input type="text" class="audio-start input-small form-control">
-    <input type="text" class="audio-end input-small form-control">
+    <input type="text" class="audio-end form-control">
     <label class="audio-pos">00:00:00.0</label>
   </form>
+  <form>
+    <label>Master Gain: <input type="range" min="0" max="100" value="100" class="master-gain input-small form-control"></label>
+  </form>
+  <div class="sound-status"></div>
   <div class="track-drop"></div>
 </div>
