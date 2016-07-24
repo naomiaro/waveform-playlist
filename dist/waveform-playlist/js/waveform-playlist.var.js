@@ -2393,7 +2393,7 @@ var WaveformPlaylist =
 	            var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 	
 	            var loadPromises = trackList.map(function (trackInfo) {
-	                var loader = _LoaderFactory2.default.createLoader(trackInfo.src, _this3.ac);
+	                var loader = _LoaderFactory2.default.createLoader(trackInfo.src, _this3.ac, _this3.ee);
 	                return loader.load();
 	            });
 	
@@ -5450,11 +5450,11 @@ var WaveformPlaylist =
 	
 	    _createClass(_class, null, [{
 	        key: 'createLoader',
-	        value: function createLoader(src, audioContext) {
+	        value: function createLoader(src, audioContext, ee) {
 	            if (src instanceof Blob) {
-	                return new _BlobLoader2.default(src, audioContext);
+	                return new _BlobLoader2.default(src, audioContext, ee);
 	            } else if (typeof src === "string") {
-	                return new _XHRLoader2.default(src, audioContext);
+	                return new _XHRLoader2.default(src, audioContext, ee);
 	            } else {
 	                throw new Error("Unsupported src type");
 	            }
@@ -5546,22 +5546,15 @@ var WaveformPlaylist =
 
 /***/ },
 /* 61 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ function(module, exports) {
 
 	'use strict';
 	
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
-	exports.STATE_FINISHED = exports.STATE_DECODING = exports.STATE_LOADING = exports.STATE_UNINITIALIZED = undefined;
 	
 	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-	
-	var _eventEmitter = __webpack_require__(17);
-	
-	var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
-	
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 	
@@ -5571,30 +5564,35 @@ var WaveformPlaylist =
 	var STATE_FINISHED = exports.STATE_FINISHED = 3;
 	
 	var _class = function () {
-	    function _class(src, audioContext) {
+	    function _class(src, audioContext, ee) {
 	        _classCallCheck(this, _class);
 	
 	        this.src = src;
 	        this.ac = audioContext;
 	        this.audioRequestState = STATE_UNINITIALIZED;
-	        this.ee = (0, _eventEmitter2.default)();
+	        this.ee = ee;
 	    }
 	
 	    _createClass(_class, [{
+	        key: 'setStateChange',
+	        value: function setStateChange(state) {
+	            this.audioRequestState = state;
+	            this.ee.emit('audiorequeststatechange', this.audioRequestState, this.src);
+	        }
+	    }, {
 	        key: 'fileProgress',
 	        value: function fileProgress(e) {
 	            var percentComplete = 0;
 	
 	            if (this.audioRequestState === STATE_UNINITIALIZED) {
-	                this.audioRequestState = STATE_LOADING;
-	                this.ee.emit('audiorequeststatechange', this);
+	                this.setStateChange(STATE_LOADING);
 	            }
 	
 	            if (e.lengthComputable) {
 	                percentComplete = e.loaded / e.total * 100;
 	            }
 	
-	            this.ee.emit('progress', percentComplete);
+	            this.ee.emit('loadprogress', percentComplete, this.src);
 	        }
 	    }, {
 	        key: 'fileLoad',
@@ -5603,15 +5601,12 @@ var WaveformPlaylist =
 	
 	            var audioData = e.target.response || e.target.result;
 	
-	            this.audioRequestState = STATE_DECODING;
-	            this.ee.emit('audiorequeststatechange', this);
+	            this.setStateChange(STATE_DECODING);
 	
 	            return new Promise(function (resolve, reject) {
 	                _this.ac.decodeAudioData(audioData, function (audioBuffer) {
 	                    _this.audioBuffer = audioBuffer;
-	
-	                    _this.audioRequestState = STATE_FINISHED;
-	                    _this.ee.emit('audiorequeststatechange', _this);
+	                    _this.setStateChange(STATE_FINISHED);
 	
 	                    resolve(audioBuffer);
 	                }, function (err) {
