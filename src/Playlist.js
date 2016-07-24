@@ -192,8 +192,9 @@ export default class {
         });
 
         ee.on('mastervolumechange', (volume) => {
+            this.masterGain = volume/100
             this.tracks.forEach((track) => {
-                track.setMasterGainLevel(volume/100);
+                track.setMasterGainLevel(this.masterGain);
             });
         });
 
