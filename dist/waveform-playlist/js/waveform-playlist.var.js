@@ -2148,6 +2148,7 @@ var WaveformPlaylist =
 	        this.showTimescale = false;
 	
 	        this.fadeType = "logarithmic";
+	        this.masterGain = 1;
 	    }
 	
 	    _createClass(_class, [{
@@ -2321,10 +2322,9 @@ var WaveformPlaylist =
 	                track.setGainLevel(volume / 100);
 	            });
 	
-	            ee.on('supermastervolumechange', function (volume) {
-	                //track.setGainLevel(volume/100);
+	            ee.on('mastervolumechange', function (volume) {
 	                _this2.tracks.forEach(function (track) {
-	                    track.setSuperMasterGainLevel(volume / 100);
+	                    track.setMasterGainLevel(volume / 100);
 	                });
 	            });
 	
@@ -2407,6 +2407,8 @@ var WaveformPlaylist =
 	                    var cueIn = info.cuein || 0;
 	                    var cueOut = info.cueout || audioBuffer.duration;
 	                    var gain = info.gain || 1;
+	                    var muted = info.muted || false;
+	                    var soloed = info.soloed || false;
 	                    var selection = info.selected;
 	                    var peaks = info.peaks || { type: "WebAudio", mono: _this3.mono };
 	
@@ -2443,6 +2445,14 @@ var WaveformPlaylist =
 	                    track.setPlayout(playout);
 	
 	                    track.setGainLevel(gain);
+	
+	                    if (muted) {
+	                        _this3.muteTrack(track);
+	                    }
+	
+	                    if (soloed) {
+	                        _this3.soloTrack(track);
+	                    }
 	
 	                    //extract peaks with AudioContext for now.
 	                    track.calculatePeaks(_this3.samplesPerPixel, _this3.sampleRate);
@@ -2554,11 +2564,8 @@ var WaveformPlaylist =
 	        value: function adjustTrackPlayout() {
 	            var _this5 = this;
 	
-	            var masterGain;
-	
 	            this.tracks.forEach(function (track) {
-	                masterGain = _this5.shouldTrackPlay(track) ? 1 : 0;
-	                track.setMasterGainLevel(masterGain);
+	                track.setShouldPlay(_this5.shouldTrackPlay(track));
 	            });
 	        }
 	    }, {
@@ -2614,9 +2621,9 @@ var WaveformPlaylist =
 	            return this.ac.currentTime - this.lastPlay;
 	        }
 	    }, {
-	        key: 'setSuperMasterVolume',
-	        value: function setSuperMasterVolume(volume) {
-	            this.ee.emit('supermastervolumechange', volume);
+	        key: 'setMasterGain',
+	        value: function setMasterGain(gain) {
+	            this.ee.emit('mastervolumechange', gain);
 	        }
 	    }, {
 	        key: 'restartPlayFrom',
@@ -2652,8 +2659,8 @@ var WaveformPlaylist =
 	            this.tracks.forEach(function (track) {
 	                track.setState('cursor');
 	                playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
-	                    masterGain: _this6.shouldTrackPlay(track) ? 1 : 0,
-	                    superMasterGain: track.superMasterGain
+	                    shouldPlay: _this6.shouldTrackPlay(track),
+	                    masterGain: _this6.masterGain
 	                }));
 	            });
 	
@@ -2736,7 +2743,7 @@ var WaveformPlaylist =
 	            this.tracks.forEach(function (track) {
 	                track.setState('none');
 	                playoutPromises.push(track.schedulePlay(_this10.ac.currentTime, 0, undefined, {
-	                    masterGain: _this10.shouldTrackPlay(track) ? 1 : 0
+	                    shouldPlay: _this10.shouldTrackPlay(track)
 	                }));
 	            });
 	
@@ -2830,7 +2837,7 @@ var WaveformPlaylist =
 	            var trackElements = this.tracks.map(function (track) {
 	                return track.render(_this12.getTrackRenderData({
 	                    "isActive": activeTrack === track ? true : false,
-	                    "masterGain": _this12.shouldTrackPlay(track) ? 1 : 0,
+	                    "shouldPlay": _this12.shouldTrackPlay(track),
 	                    "soloed": _this12.soloedTracks.indexOf(track) > -1,
 	                    "muted": _this12.mutedTracks.indexOf(track) > -1
 	                }));
@@ -5396,11 +5403,11 @@ var WaveformPlaylist =
 	}
 	
 	function samplesToPixels(samples, resolution) {
-	    return ~~(samples / resolution);
+	    return ~ ~(samples / resolution);
 	}
 	
 	function pixelsToSamples(pixels, resolution) {
-	    return ~~(pixels * resolution);
+	    return ~ ~(pixels * resolution);
 	}
 	
 	function pixelsToSeconds(pixels, resolution, sampleRate) {
@@ -5713,6 +5720,7 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for scrolling the track container.
 	*/
+	
 	var _class = function () {
 	    function _class(track, resolution, sampleRate) {
 	        _classCallCheck(this, _class);
@@ -5878,7 +5886,7 @@ var WaveformPlaylist =
 	
 	            for (i = 0; i < end; i = i + pixPerSec * scaleInfo.secondStep) {
 	
-	                pixIndex = ~~i;
+	                pixIndex = ~ ~i;
 	                pix = pixIndex - pixOffset;
 	
 	                if (pixIndex >= pixOffset) {
@@ -5935,6 +5943,7 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for rendering the time scale canvas.
 	*/
+	
 	var _class = function () {
 	    function _class(tickInfo, offset, samplesPerPixel, duration) {
 	        _classCallCheck(this, _class);
@@ -6038,7 +6047,6 @@ var WaveformPlaylist =
 	
 	        this.name = "Untitled";
 	        this.gain = 1;
-	        this.superMasterGain = 1;
 	        this.fades = {};
 	        this.peakData = {
 	            type: "WebAudio",
@@ -6235,16 +6243,15 @@ var WaveformPlaylist =
 	            return this.playout.isPlaying();
 	        }
 	    }, {
+	        key: 'setShouldPlay',
+	        value: function setShouldPlay(bool) {
+	            this.playout.setShouldPlay(bool);
+	        }
+	    }, {
 	        key: 'setGainLevel',
 	        value: function setGainLevel(level) {
 	            this.gain = level;
-	            this.playout.setGainLevel(level);
-	        }
-	    }, {
-	        key: 'setSuperMasterGainLevel',
-	        value: function setSuperMasterGainLevel(level) {
-	            this.superMasterGain = level;
-	            this.playout.setSuperMasterGainLevel(level);
+	            this.playout.setVolumeGainLevel(level);
 	        }
 	    }, {
 	        key: 'setMasterGainLevel',
@@ -6335,9 +6342,9 @@ var WaveformPlaylist =
 	                }
 	            });
 	
-	            this.playout.setGainLevel(this.gain);
+	            this.playout.setVolumeGainLevel(this.gain);
+	            this.playout.setShouldPlay(options.shouldPlay);
 	            this.playout.setMasterGainLevel(options.masterGain);
-	            this.playout.setSuperMasterGainLevel(options.superMasterGain);
 	            this.playout.play(when, start, duration);
 	
 	            return sourcePromise;
@@ -6509,7 +6516,7 @@ var WaveformPlaylist =
 	                    } }, channelChildren);
 	            });
 	
-	            var audibleClass = data.masterGain ? "" : ".silent";
+	            var audibleClass = data.shouldPlay ? "" : ".silent";
 	
 	            waveformChildren.push(channels);
 	            waveformChildren.push(this.renderOverlay(data));
@@ -10878,6 +10885,7 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for setting the volume input programmatically.
 	*/
+	
 	var _class = function () {
 	    function _class(gain) {
 	        _classCallCheck(this, _class);
@@ -10978,15 +10986,15 @@ var WaveformPlaylist =
 	                _this.source.onended = function (e) {
 	                    _this.source.disconnect();
 	                    _this.fadeGain.disconnect();
-	                    _this.outputGain.disconnect();
+	                    _this.volumeGain.disconnect();
+	                    _this.shouldPlayGain.disconnect();
 	                    _this.masterGain.disconnect();
-	                    _this.superMasterGain.disconnect();
 	
 	                    _this.source = undefined;
 	                    _this.fadeGain = undefined;
-	                    _this.outputGain = undefined;
+	                    _this.volumeGain = undefined;
+	                    _this.shouldPlayGain = undefined;
 	                    _this.masterGain = undefined;
-	                    _this.superMasterGain = undefined;
 	
 	                    resolve();
 	                };
@@ -10994,33 +11002,33 @@ var WaveformPlaylist =
 	
 	            this.fadeGain = this.ac.createGain();
 	            //used for track volume slider
-	            this.outputGain = this.ac.createGain();
+	            this.volumeGain = this.ac.createGain();
 	            //used for solo/mute
+	            this.shouldPlayGain = this.ac.createGain();
 	            this.masterGain = this.ac.createGain();
-	            this.superMasterGain = this.ac.createGain();
 	
 	            this.source.connect(this.fadeGain);
-	            this.fadeGain.connect(this.outputGain);
-	            this.outputGain.connect(this.masterGain);
-	            this.masterGain.connect(this.superMasterGain);
-	            this.superMasterGain.connect(this.destination);
+	            this.fadeGain.connect(this.volumeGain);
+	            this.volumeGain.connect(this.shouldPlayGain);
+	            this.shouldPlayGain.connect(this.masterGain);
+	            this.masterGain.connect(this.destination);
 	
 	            return sourcePromise;
 	        }
 	    }, {
-	        key: 'setGainLevel',
-	        value: function setGainLevel(level) {
-	            this.outputGain && (this.outputGain.gain.value = level);
+	        key: 'setVolumeGainLevel',
+	        value: function setVolumeGainLevel(level) {
+	            this.volumeGain && (this.volumeGain.gain.value = level);
+	        }
+	    }, {
+	        key: 'setShouldPlay',
+	        value: function setShouldPlay(bool) {
+	            this.shouldPlayGain && (this.shouldPlayGain.gain.value = bool ? 1 : 0);
 	        }
 	    }, {
 	        key: 'setMasterGainLevel',
 	        value: function setMasterGainLevel(level) {
 	            this.masterGain && (this.masterGain.gain.value = level);
-	        }
-	    }, {
-	        key: 'setSuperMasterGainLevel',
-	        value: function setSuperMasterGainLevel(level) {
-	            this.superMasterGain && (this.superMasterGain.gain.value = level);
 	        }
 	
 	        /*

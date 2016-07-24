@@ -18,7 +18,9 @@ playlist.load([
   {
     "src": "media/audio/Vocals30.mp3",
     "name": "Vocals",
-    "gain": 0.5
+    "gain": 0.75,
+    "muted": false,
+    "soloed": false
   },
   {
     "src": "media/audio/Guitar30.mp3",
@@ -27,7 +29,7 @@ playlist.load([
   {
     "src": "media/audio/PianoSynth30.mp3",
     "name": "Pianos & Synth",
-    "gain": 0.75
+    "gain": 1
   },
   {
     "src": "media/audio/BassDrums30.mp3",

@@ -231,10 +231,36 @@ $container.on("change", ".time-format", function(e) {
   updateTime(audioPos);
 });
 
+$container.on("input change", ".master-gain", function(node){
+  ee.emit("mastervolumechange", node.target.value);
+});
+
+function displaySoundStatus(status) {
+  $(".sound-status").html(status);
+}
+
 
 
 /*
 * Code below receives updates from the playlist.
 */
 ee.on("select", updateSelect);
+
 ee.on("timeupdate", updateTime);
+
+ee.on("mute", function(track) {
+  displaySoundStatus("Mute button pressed for " + track.name);
+});
+
+ee.on("solo", function(track) {
+  displaySoundStatus("Solo button pressed for " + track.name);
+});
+
+ee.on("volumechange", function(volume, track) {
+  displaySoundStatus(track.name + " now has volume " + volume + ".");
+});
+
+ee.on("mastervolumechange", function(volume) {
+  displaySoundStatus("Master volume now has volume " + volume + ".");
+});
+
