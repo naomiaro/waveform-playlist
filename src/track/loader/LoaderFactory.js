@@ -4,12 +4,12 @@ import BlobLoader from './BlobLoader';
 import XHRLoader from './XHRLoader';
 
 export default class {
-    static createLoader(src, audioContext) {
+    static createLoader(src, audioContext, ee) {
         if (src instanceof Blob) {
-            return new BlobLoader(src, audioContext);
+            return new BlobLoader(src, audioContext, ee);
         }
         else if (typeof(src) === "string") {
-        	return new XHRLoader(src, audioContext);
+        	return new XHRLoader(src, audioContext, ee);
         }
         else {
         	throw new Error("Unsupported src type");

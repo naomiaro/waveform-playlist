@@ -257,7 +257,7 @@ export default class {
 
     load(trackList, options={}) {
         let loadPromises = trackList.map((trackInfo) => {
-            let loader = LoaderFactory.createLoader(trackInfo.src, this.ac);
+            let loader = LoaderFactory.createLoader(trackInfo.src, this.ac, this.ee);
             return loader.load();
         });
 
