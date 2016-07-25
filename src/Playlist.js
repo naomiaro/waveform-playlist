@@ -142,7 +142,6 @@ export default class {
             else {
                 //reset if it was paused.
                 this.seekToTime(start, end)
-                this.setTimeSelection(start, end);
                 this.setActiveTrack(track);
                 this.draw(this.render());
 
@@ -150,7 +149,7 @@ export default class {
             }
         });
 
-        ee.on('seek', (time=0)=>{
+        ee.on('seek', (time)=>{
            this.seekToTime(time);
         });
 
@@ -596,6 +595,11 @@ export default class {
     }
 
     seekToTime(time=0, end ){
+
+        this.pausedAt = time;
+        this.setTimeSelection(time, end);
+
+
         if (this.getState() != 'cursor')
         {
             this.stop();
@@ -608,11 +612,10 @@ export default class {
             return;
         }
 
-        this.setTimeSelection(time, time);
         if (this.getSeekStyle() == 'fill'){
             this.playbackSeconds = time;
         }
-        this.pausedAt = time;
+
         this.ee.emit('timeupdate', time);
         this.draw(this.render());
     }

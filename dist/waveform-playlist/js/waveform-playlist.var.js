@@ -2276,15 +2276,12 @@ var WaveformPlaylist =
 	                } else {
 	                    //reset if it was paused.
 	                    _this2.seekToTime(start, end);
-	                    _this2.setTimeSelection(start, end);
 	                    _this2.setActiveTrack(track);
 	                    _this2.draw(_this2.render());
 	                }
 	            });
 	
-	            ee.on('seek', function () {
-	                var time = arguments.length <= 0 || arguments[0] === undefined ? 0 : arguments[0];
-	
+	            ee.on('seek', function (time) {
 	                _this2.seekToTime(time);
 	            });
 	
@@ -2784,6 +2781,10 @@ var WaveformPlaylist =
 	            var time = arguments.length <= 0 || arguments[0] === undefined ? 0 : arguments[0];
 	            var end = arguments[1];
 	
+	
+	            this.pausedAt = time;
+	            this.setTimeSelection(time, end);
+	
 	            if (this.getState() != 'cursor') {
 	                this.stop();
 	                return;
@@ -2794,11 +2795,10 @@ var WaveformPlaylist =
 	                return;
 	            }
 	
-	            this.setTimeSelection(time, time);
 	            if (this.getSeekStyle() == 'fill') {
 	                this.playbackSeconds = time;
 	            }
-	            this.pausedAt = time;
+	
 	            this.ee.emit('timeupdate', time);
 	            this.draw(this.render());
 	        }
