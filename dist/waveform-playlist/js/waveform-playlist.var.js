@@ -2130,6 +2130,10 @@ var WaveformPlaylist =
 	
 	var _recorderWorker2 = _interopRequireDefault(_recorderWorker);
 	
+	var _exportWavWorker = __webpack_require__(88);
+	
+	var _exportWavWorker2 = _interopRequireDefault(_exportWavWorker);
+	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -2283,6 +2287,10 @@ var WaveformPlaylist =
 	
 	            ee.on('seek', function (time) {
 	                _this2.seekToTime(time);
+	            });
+	
+	            ee.on('startaudiorendering', function (type) {
+	                _this2.startOfflineRender(type);
 	            });
 	
 	            ee.on('statechange', function (state) {
@@ -2505,9 +2513,82 @@ var WaveformPlaylist =
 	        value: function setTimeSelection(start, end) {
 	            this.timeSelection = {
 	                start: start,
-	                end: end
+	                end: end,
+	                isSegment: start != end
 	            };
 	            this.cursor = start;
+	        }
+	    }, {
+	        key: 'startOfflineRender',
+	        value: function startOfflineRender(type) {
+	            var _this4 = this;
+	
+	            console.log("received");
+	            var wasPlaying = false;
+	            if (this.isPlaying()) wasPlaying = true;
+	            this.pause();
+	            this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100 * this.duration, 44100);
+	
+	            var currentTime = this.offlineAudioContext.currentTime,
+	                startTime = 0,
+	                endTime = 0;
+	
+	            this.tracks.forEach(function (track) {
+	                track.setPlayout(new _Playout2.default(_this4.offlineAudioContext, track.buffer));
+	                track.setState('cursor');
+	                track.schedulePlay(currentTime, startTime, endTime, {
+	                    shouldPlay: _this4.shouldTrackPlay(track),
+	                    masterGain: _this4.masterGain
+	                });
+	            });
+	
+	            this.offlineAudioContext.startRendering().then(function (audioBuffer) {
+	
+	                if (type == "buffer") {
+	                    _this4.ee.emit('audiorenderingfinished', type, audioBuffer);
+	                    return;
+	                }
+	
+	                if (type == 'wav') {
+	
+	                    //TODO : REMOVE
+	                    //this.exportWorker = new ExportWavWorker();
+	                    _this4.exportWorker = new Worker('js/libs/exportWavWorker.js');
+	
+	                    _this4.exportWorker.postMessage({
+	                        command: 'init',
+	                        config: {
+	                            sampleRate: 44100
+	                        }
+	                    });
+	                    var that = _this4;
+	                    // callback for `exportWAV`
+	                    _this4.exportWorker.onmessage = function (e) {
+	                        that.ee.emit('audiorenderingfinished', type, e.data);
+	                    };
+	
+	                    // send the channel data from our buffer to the worker
+	                    _this4.exportWorker.postMessage({
+	                        command: 'record',
+	                        buffer: [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)]
+	                    });
+	
+	                    // ask the worker for a WAV
+	                    _this4.exportWorker.postMessage({
+	                        command: 'exportWAV',
+	                        type: 'audio/wav'
+	                    });
+	                }
+	
+	                //Setting previous playout.
+	                _this4.tracks.forEach(function (track) {
+	                    track.setPlayout(new _Playout2.default(_this4.ac, track.buffer));
+	                });
+	
+	                if (wasPlaying) _this4.play();
+	            }).catch(function (e) {
+	                console.log(e);
+	            });
 	        }
 	    }, {
 	        key: 'getTimeSelection',
@@ -2541,12 +2622,12 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'setZoom',
 	        value: function setZoom(zoom) {
-	            var _this4 = this;
+	            var _this5 = this;
 	
 	            this.samplesPerPixel = zoom;
 	            this.zoomIndex = this.zoomLevels.indexOf(zoom);
 	            this.tracks.forEach(function (track) {
-	                track.calculatePeaks(zoom, _this4.sampleRate);
+	                track.calculatePeaks(zoom, _this5.sampleRate);
 	            });
 	        }
 	    }, {
@@ -2576,10 +2657,10 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'adjustTrackPlayout',
 	        value: function adjustTrackPlayout() {
-	            var _this5 = this;
+	            var _this6 = this;
 	
 	            this.tracks.forEach(function (track) {
-	                track.setShouldPlay(_this5.shouldTrackPlay(track));
+	                track.setShouldPlay(_this6.shouldTrackPlay(track));
 	            });
 	        }
 	    }, {
@@ -2653,7 +2734,7 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'play',
 	        value: function play(startTime, endTime) {
-	            var _this6 = this;
+	            var _this7 = this;
 	
 	            var currentTime = this.ac.currentTime,
 	                selected = this.getTimeSelection(),
@@ -2673,8 +2754,8 @@ var WaveformPlaylist =
 	            this.tracks.forEach(function (track) {
 	                track.setState('cursor');
 	                playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
-	                    shouldPlay: _this6.shouldTrackPlay(track),
-	                    masterGain: _this6.masterGain
+	                    shouldPlay: _this7.shouldTrackPlay(track),
+	                    masterGain: _this7.masterGain
 	                }));
 	            });
 	
@@ -2707,14 +2788,14 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'playbackReset',
 	        value: function playbackReset() {
-	            var _this7 = this;
+	            var _this8 = this;
 	
 	            this.lastSeeked = undefined;
 	            this.stopAnimation();
 	
 	            this.tracks.forEach(function (track) {
 	                track.scheduleStop();
-	                track.setState(_this7.getState());
+	                track.setState(_this8.getState());
 	            });
 	
 	            this.draw(this.render());
@@ -2724,40 +2805,40 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'rewind',
 	        value: function rewind() {
-	            var _this8 = this;
+	            var _this9 = this;
 	
 	            return this.stop().then(function () {
-	                _this8.scrollLeft = 0;
-	                _this8.ee.emit('select', 0, 0);
+	                _this9.scrollLeft = 0;
+	                _this9.ee.emit('select', 0, 0);
 	            });
 	        }
 	    }, {
 	        key: 'fastForward',
 	        value: function fastForward() {
-	            var _this9 = this;
+	            var _this10 = this;
 	
 	            return this.stop().then(function () {
-	                if (_this9.viewDuration < _this9.duration) {
-	                    _this9.scrollLeft = _this9.duration - _this9.viewDuration;
+	                if (_this10.viewDuration < _this10.duration) {
+	                    _this10.scrollLeft = _this10.duration - _this10.viewDuration;
 	                } else {
-	                    _this9.scrollLeft = 0;
+	                    _this10.scrollLeft = 0;
 	                }
 	
-	                _this9.ee.emit('select', _this9.duration, _this9.duration);
+	                _this10.ee.emit('select', _this10.duration, _this10.duration);
 	            });
 	        }
 	    }, {
 	        key: 'record',
 	        value: function record() {
-	            var _this10 = this;
+	            var _this11 = this;
 	
 	            var playoutPromises = [];
 	            this.mediaRecorder.start(300);
 	
 	            this.tracks.forEach(function (track) {
 	                track.setState('none');
-	                playoutPromises.push(track.schedulePlay(_this10.ac.currentTime, 0, undefined, {
-	                    shouldPlay: _this10.shouldTrackPlay(track)
+	                playoutPromises.push(track.schedulePlay(_this11.ac.currentTime, 0, undefined, {
+	                    shouldPlay: _this11.shouldTrackPlay(track)
 	                }));
 	            });
 	
@@ -2822,7 +2903,7 @@ var WaveformPlaylist =
 	                this.ee.emit('timeupdate', playbackSeconds);
 	                this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
 	            } else {
-	                if (cursorPos + elapsed >= (this.getTimeSelection().end != this.getTimeSelection().start) ? this.getTimeSelection().end : this.duration) {
+	                if (cursorPos + elapsed >= this.getTimeSelection().isSegment ? this.getTimeSelection().end : this.duration) {
 	                    this.ee.emit('finished');
 	                }
 	                this.stopAnimation();
@@ -2839,15 +2920,15 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'draw',
 	        value: function draw(newTree) {
-	            var _this11 = this;
+	            var _this12 = this;
 	
 	            window.requestAnimationFrame(function () {
-	                var patches = (0, _diff2.default)(_this11.tree, newTree);
-	                _this11.rootNode = (0, _patch2.default)(_this11.rootNode, patches);
-	                _this11.tree = newTree;
+	                var patches = (0, _diff2.default)(_this12.tree, newTree);
+	                _this12.rootNode = (0, _patch2.default)(_this12.rootNode, patches);
+	                _this12.tree = newTree;
 	
 	                //use for fast forwarding.
-	                _this11.viewDuration = (0, _conversions.pixelsToSeconds)(_this11.rootNode.clientWidth - _this11.controls.width, _this11.samplesPerPixel, _this11.sampleRate);
+	                _this12.viewDuration = (0, _conversions.pixelsToSeconds)(_this12.rootNode.clientWidth - _this12.controls.width, _this12.samplesPerPixel, _this12.sampleRate);
 	            });
 	        }
 	    }, {
@@ -2872,18 +2953,18 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'render',
 	        value: function render() {
-	            var _this12 = this;
+	            var _this13 = this;
 	
 	            var controlWidth = this.controls.show ? this.controls.width : 0;
 	            var timeScale = new _TimeScale2.default(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate, controlWidth);
 	
 	            var activeTrack = this.getActiveTrack();
 	            var trackElements = this.tracks.map(function (track) {
-	                return track.render(_this12.getTrackRenderData({
-	                    "isActive": _this12.getTimeSelection().start != _this12.getTimeSelection().end ? activeTrack === track ? true : false : true,
-	                    "shouldPlay": _this12.shouldTrackPlay(track),
-	                    "soloed": _this12.soloedTracks.indexOf(track) > -1,
-	                    "muted": _this12.mutedTracks.indexOf(track) > -1
+	                return track.render(_this13.getTrackRenderData({
+	                    "isActive": _this13.getTimeSelection().isSegment ? activeTrack === track ? true : false : true,
+	                    "shouldPlay": _this13.shouldTrackPlay(track),
+	                    "soloed": _this13.soloedTracks.indexOf(track) > -1,
+	                    "muted": _this13.mutedTracks.indexOf(track) > -1
 	                }));
 	            });
 	
@@ -2892,8 +2973,8 @@ var WaveformPlaylist =
 	                    "style": "overflow: auto;"
 	                },
 	                "onscroll": function onscroll(e) {
-	                    _this12.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this12.samplesPerPixel, _this12.sampleRate);
-	                    _this12.ee.emit("scroll", _this12.scrollLeft);
+	                    _this13.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this13.samplesPerPixel, _this13.sampleRate);
+	                    _this13.ee.emit("scroll", _this13.scrollLeft);
 	                },
 	                "hook": new _ScrollHook2.default(this, this.samplesPerPixel, this.sampleRate)
 	            }, trackElements);
@@ -11008,6 +11089,12 @@ var WaveformPlaylist =
 	            return this.buffer.duration;
 	        }
 	    }, {
+	        key: 'setAudioContext',
+	        value: function setAudioContext(audioContext) {
+	            this.ac = audioContext;
+	            this.destination = this.ac.destination;
+	        }
+	    }, {
 	        key: 'setUpSource',
 	        value: function setUpSource() {
 	            var _this = this;
@@ -11099,6 +11186,14 @@ var WaveformPlaylist =
 
 	module.exports = function() {
 		return new Worker(__webpack_require__.p + "301ffd7b6b1f9a16c47c.worker.js");
+	};
+
+/***/ },
+/* 88 */
+/***/ function(module, exports, __webpack_require__) {
+
+	module.exports = function() {
+		return new Worker(__webpack_require__.p + "aea31cc86230658a079b.worker.js");
 	};
 
 /***/ }
