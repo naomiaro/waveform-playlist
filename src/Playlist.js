@@ -362,6 +362,7 @@ export default class {
         this.timeSelection = {
             start,
             end,
+            isSegment : (start!=end)
         };
         this.cursor = start;
     }
@@ -637,7 +638,7 @@ export default class {
             this.ee.emit('timeupdate', playbackSeconds);
             this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
        } else {
-            if ((cursorPos+elapsed) >= (this.getTimeSelection().end!=this.getTimeSelection().start)?this.getTimeSelection().end:this.duration){
+            if ((cursorPos+elapsed) >= (this.getTimeSelection().isSegment)?this.getTimeSelection().end:this.duration){
                 this.ee.emit('finished');
             }
             this.stopAnimation();
@@ -686,7 +687,7 @@ export default class {
         let activeTrack = this.getActiveTrack();
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "isActive": (this.getTimeSelection().start!=this.getTimeSelection().end)?((activeTrack === track) ? true : false):true,
+                "isActive": (this.getTimeSelection().isSegment)?((activeTrack === track) ? true : false):true,
                 "shouldPlay": this.shouldTrackPlay(track),
                 "soloed": this.soloedTracks.indexOf(track) > -1,
                 "muted": this.mutedTracks.indexOf(track) > -1
