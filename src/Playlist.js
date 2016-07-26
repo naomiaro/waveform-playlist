@@ -17,6 +17,7 @@ import Track from './Track';
 import Playout from './Playout';
 
 import RecorderWorker from 'worker!./track/recorderWorker.js';
+import ExportWavWorker from 'worker!./utils/exportWavWorker.js';
 
 export default class {
 
@@ -35,6 +36,8 @@ export default class {
 
         this.fadeType = "logarithmic";
         this.masterGain = 1;
+
+
     }
 
     initRecorder(stream) {
@@ -110,6 +113,7 @@ export default class {
         this.ac = ac;
     }
 
+
     setControlOptions(controlOptions) {
         this.controls = controlOptions;
     }
@@ -151,6 +155,10 @@ export default class {
 
         ee.on('seek', (time)=>{
            this.seekToTime(time);
+        });
+
+        ee.on('startaudiorendering', (type)=>{
+           this.startOfflineRender(type);
         });
 
         ee.on('statechange', (state) => {
@@ -365,6 +373,81 @@ export default class {
             isSegment : (start!=end)
         };
         this.cursor = start;
+    }
+
+    startOfflineRender(type){
+        console.log("received");
+        var wasPlaying = false;
+        if (this.isPlaying())
+            wasPlaying = true;
+        this.pause();
+        this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100*this.duration, 44100);
+
+        var currentTime = this.offlineAudioContext.currentTime,
+            startTime = 0,
+            endTime = 0;
+
+        this.tracks.forEach((track) => {
+            track.setPlayout(new Playout(this.offlineAudioContext, track.buffer));
+            track.setState('cursor');
+            track.schedulePlay(currentTime, startTime, endTime, {
+                shouldPlay: this.shouldTrackPlay(track),
+                masterGain : this.masterGain
+            });
+        });
+
+
+        this.offlineAudioContext.startRendering().then((audioBuffer) => {
+
+            if (type=="buffer"){
+                this.ee.emit('audiorenderingfinished', type, audioBuffer);
+                return;
+            }
+
+            if (type=='wav')
+            {
+
+                this.exportWorker = new ExportWavWorker();
+
+                this.exportWorker.postMessage({
+                    command: 'init',
+                    config: {
+                        sampleRate: 44100
+                    }
+                });
+                var that = this;
+                // callback for `exportWAV`
+                this.exportWorker.onmessage = function(e) {
+                    that.ee.emit('audiorenderingfinished', type, e.data);
+                };
+
+                // send the channel data from our buffer to the worker
+                this.exportWorker.postMessage({
+                    command: 'record',
+                    buffer: [
+                        audioBuffer.getChannelData(0),
+                        audioBuffer.getChannelData(1)
+                    ]
+                });
+
+                // ask the worker for a WAV
+                this.exportWorker.postMessage({
+                    command: 'exportWAV',
+                    type: 'audio/wav'
+                });
+            }
+
+            //Setting previous playout.
+            this.tracks.forEach((track) => {
+                track.setPlayout(new Playout(this.ac, track.buffer));
+            });
+
+            if (wasPlaying)
+                this.play();
+
+        }).catch((e)=>{
+                console.log(e);
+        });
     }
 
     getTimeSelection() {

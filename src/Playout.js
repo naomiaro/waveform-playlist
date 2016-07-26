@@ -42,6 +42,11 @@ export default class {
         return this.buffer.duration;
     }
 
+    setAudioContext(audioContext){
+        this.ac = audioContext;
+        this.destination = this.ac.destination;
+    }
+
     setUpSource() {
         var sourcePromise;
 
