@@ -2523,10 +2523,15 @@ var WaveformPlaylist =
 	        value: function startOfflineRender(type) {
 	            var _this4 = this;
 	
-	            console.log("received");
-	            var wasPlaying = false;
-	            if (this.isPlaying()) wasPlaying = true;
-	            this.pause();
+	            if (this.isRendering) return;
+	
+	            this.isRendering = true;
+	
+	            //  var wasPlaying = false;
+	            //   if (this.isPlaying())
+	            //      wasPlaying = true;
+	            //   this.pause();
+	
 	            this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100 * this.duration, 44100);
 	
 	            var currentTime = this.offlineAudioContext.currentTime,
@@ -2534,11 +2539,11 @@ var WaveformPlaylist =
 	                endTime = 0;
 	
 	            this.tracks.forEach(function (track) {
-	                track.setPlayout(new _Playout2.default(_this4.offlineAudioContext, track.buffer));
-	                track.setState('cursor');
+	                track.setOfflinePlayout(new _Playout2.default(_this4.offlineAudioContext, track.buffer));
 	                track.schedulePlay(currentTime, startTime, endTime, {
 	                    shouldPlay: _this4.shouldTrackPlay(track),
-	                    masterGain: _this4.masterGain
+	                    masterGain: 0.8,
+	                    isOffline: true
 	                });
 	            });
 	
@@ -2546,6 +2551,7 @@ var WaveformPlaylist =
 	
 	                if (type == "buffer") {
 	                    _this4.ee.emit('audiorenderingfinished', type, audioBuffer);
+	                    _this4.isRendering = false;
 	                    return;
 	                }
 	
@@ -2565,6 +2571,7 @@ var WaveformPlaylist =
 	                    // callback for `exportWAV`
 	                    _this4.exportWorker.onmessage = function (e) {
 	                        that.ee.emit('audiorenderingfinished', type, e.data);
+	                        this.isRendering = false;
 	                    };
 	
 	                    // send the channel data from our buffer to the worker
@@ -2579,13 +2586,6 @@ var WaveformPlaylist =
 	                        type: 'audio/wav'
 	                    });
 	                }
-	
-	                //Setting previous playout.
-	                _this4.tracks.forEach(function (track) {
-	                    track.setPlayout(new _Playout2.default(_this4.ac, track.buffer));
-	                });
-	
-	                if (wasPlaying) _this4.play();
 	            }).catch(function (e) {
 	                console.log(e);
 	            });
@@ -6235,6 +6235,11 @@ var WaveformPlaylist =
 	            this.playout = playout;
 	        }
 	    }, {
+	        key: 'setOfflinePlayout',
+	        value: function setOfflinePlayout(playout) {
+	            this.offlinePlayout = playout;
+	        }
+	    }, {
 	        key: 'setEnabledStates',
 	        value: function setEnabledStates() {
 	            var enabledStates = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
@@ -6387,14 +6392,14 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'schedulePlay',
 	        value: function schedulePlay(now, startTime, endTime, options) {
-	            var _this = this;
-	
 	            var start,
 	                duration,
 	                relPos,
 	                when = now,
 	                segment = endTime ? endTime - startTime : undefined,
 	                sourcePromise;
+	
+	            var desiredPlayout = options.isOffline ? this.offlinePlayout : this.playout;
 	
 	            //1) track has no content to play.
 	            //2) track does not play in this selection.
@@ -6429,7 +6434,7 @@ var WaveformPlaylist =
 	            start = start + this.cueIn;
 	            relPos = startTime - this.startTime;
 	
-	            sourcePromise = this.playout.setUpSource();
+	            sourcePromise = desiredPlayout.setUpSource();
 	
 	            //param relPos: cursor position in seconds relative to this track.
 	            //can be negative if the cursor is placed before the start of this track etc.
@@ -6449,10 +6454,10 @@ var WaveformPlaylist =
 	
 	                    switch (fade.type) {
 	                        case _fadeMaker.FADEIN:
-	                            _this.playout.applyFadeIn(startTime, duration, fade.shape);
+	                            desiredPlayout.applyFadeIn(startTime, duration, fade.shape);
 	                            break;
 	                        case _fadeMaker.FADEOUT:
-	                            _this.playout.applyFadeOut(startTime, duration, fade.shape);
+	                            desiredPlayout.applyFadeOut(startTime, duration, fade.shape);
 	                            break;
 	                        default:
 	                            throw new Error("Invalid fade type saved on track.");
@@ -6460,10 +6465,10 @@ var WaveformPlaylist =
 	                }
 	            });
 	
-	            this.playout.setVolumeGainLevel(this.gain);
-	            this.playout.setShouldPlay(options.shouldPlay);
-	            this.playout.setMasterGainLevel(options.masterGain);
-	            this.playout.play(when, start, duration);
+	            desiredPlayout.setVolumeGainLevel(this.gain);
+	            desiredPlayout.setShouldPlay(options.shouldPlay);
+	            desiredPlayout.setMasterGainLevel(options.masterGain);
+	            desiredPlayout.play(when, start, duration);
 	
 	            return sourcePromise;
 	        }
@@ -6491,7 +6496,7 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'renderOverlay',
 	        value: function renderOverlay(data) {
-	            var _this2 = this;
+	            var _this = this;
 	
 	            var channelPixels = (0, _conversions.secondsToPixels)(data.playlistLength, data.resolution, data.sampleRate);
 	
@@ -6505,7 +6510,7 @@ var WaveformPlaylist =
 	
 	            if (this.state && this.enabledStates[this.state]) {
 	                (function () {
-	                    var state = new _states2.default[_this2.state](_this2, data.resolution, data.sampleRate);
+	                    var state = new _states2.default[_this.state](_this, data.resolution, data.sampleRate);
 	                    var stateEvents = state.getEvents();
 	
 	                    Object.keys(stateEvents).map(function (event) {
@@ -6521,7 +6526,7 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'renderControls',
 	        value: function renderControls(data) {
-	            var _this3 = this;
+	            var _this2 = this;
 	
 	            var muteClass = data.muted ? ".active" : "";
 	            var soloClass = data.soloed ? ".active" : "";
@@ -6531,9 +6536,9 @@ var WaveformPlaylist =
 	                attributes: {
 	                    "style": 'height: ' + numChan * data.height + 'px; width: ' + data.controls.width + 'px; position: absolute; left: 0; z-index: 10;'
 	                } }, [(0, _h2.default)("header", [this.name]), (0, _h2.default)("div.btn-group", [(0, _h2.default)('span.btn.btn-default.btn-xs.btn-mute' + muteClass, { "onclick": function onclick() {
-	                    _this3.ee.emit("mute", _this3);
+	                    _this2.ee.emit("mute", _this2);
 	                } }, ["Mute"]), (0, _h2.default)('span.btn.btn-default.btn-xs.btn-solo' + soloClass, { "onclick": function onclick() {
-	                    _this3.ee.emit("solo", _this3);
+	                    _this2.ee.emit("solo", _this2);
 	                } }, ["Solo"])]), (0, _h2.default)("label", [(0, _h2.default)("input.volume-slider", {
 	                attributes: {
 	                    "type": "range",
@@ -6543,14 +6548,14 @@ var WaveformPlaylist =
 	                },
 	                "hook": new _VolumeSliderHook2.default(this.gain),
 	                "oninput": function oninput(e) {
-	                    _this3.ee.emit("volumechange", e.target.value, _this3);
+	                    _this2.ee.emit("volumechange", e.target.value, _this2);
 	                }
 	            })])]);
 	        }
 	    }, {
 	        key: 'render',
 	        value: function render(data) {
-	            var _this4 = this;
+	            var _this3 = this;
 	
 	            var width = this.peaks.length;
 	            var playbackX = (0, _conversions.secondsToPixels)(data.playbackSeconds, data.resolution, data.sampleRate);
@@ -6578,7 +6583,7 @@ var WaveformPlaylist =
 	                    } })];
 	                var offset = 0;
 	                var totalWidth = width;
-	                var peaks = _this4.peaks.data[channelNum];
+	                var peaks = _this3.peaks.data[channelNum];
 	
 	                while (totalWidth > 0) {
 	                    var currentWidth = Math.min(totalWidth, MAX_CANVAS_WIDTH);
@@ -6589,7 +6594,7 @@ var WaveformPlaylist =
 	                            "height": data.height,
 	                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
 	                        },
-	                        "hook": new _CanvasHook2.default(peaks, offset, _this4.peaks.bits, data.colors.waveOutlineColor)
+	                        "hook": new _CanvasHook2.default(peaks, offset, _this3.peaks.bits, data.colors.waveOutlineColor)
 	                    }));
 	
 	                    totalWidth -= currentWidth;
@@ -6597,8 +6602,8 @@ var WaveformPlaylist =
 	                }
 	
 	                //if there are fades, display them.
-	                if (_this4.fadeIn) {
-	                    var fadeIn = _this4.fades[_this4.fadeIn];
+	                if (_this3.fadeIn) {
+	                    var fadeIn = _this3.fades[_this3.fadeIn];
 	                    var _width = (0, _conversions.secondsToPixels)(fadeIn.end - fadeIn.start, data.resolution, data.sampleRate);
 	
 	                    channelChildren.push((0, _h2.default)("div.wp-fade.wp-fadein", {
@@ -6613,8 +6618,8 @@ var WaveformPlaylist =
 	                    })]));
 	                }
 	
-	                if (_this4.fadeOut) {
-	                    var fadeOut = _this4.fades[_this4.fadeOut];
+	                if (_this3.fadeOut) {
+	                    var fadeOut = _this3.fades[_this3.fadeOut];
 	                    var _width2 = (0, _conversions.secondsToPixels)(fadeOut.end - fadeOut.start, data.resolution, data.sampleRate);
 	
 	                    channelChildren.push((0, _h2.default)("div.wp-fade.wp-fadeout", {
