@@ -376,11 +376,10 @@ export default class {
     }
 
     startOfflineRender(type){
-        console.log("received");
-        var wasPlaying = false;
-        if (this.isPlaying())
-            wasPlaying = true;
-        this.pause();
+        if (this.isRendering)
+            return;
+
+        this.isRendering = true;
         this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100*this.duration, 44100);
 
         var currentTime = this.offlineAudioContext.currentTime,
@@ -388,11 +387,11 @@ export default class {
             endTime = 0;
 
         this.tracks.forEach((track) => {
-            track.setPlayout(new Playout(this.offlineAudioContext, track.buffer));
-            track.setState('cursor');
+            track.setOfflinePlayout(new Playout(this.offlineAudioContext, track.buffer));
             track.schedulePlay(currentTime, startTime, endTime, {
                 shouldPlay: this.shouldTrackPlay(track),
-                masterGain : this.masterGain
+                masterGain : 0.8,
+                isOffline : true
             });
         });
 
@@ -401,6 +400,7 @@ export default class {
 
             if (type=="buffer"){
                 this.ee.emit('audiorenderingfinished', type, audioBuffer);
+                this.isRendering = false;
                 return;
             }
 
@@ -419,6 +419,8 @@ export default class {
                 // callback for `exportWAV`
                 this.exportWorker.onmessage = function(e) {
                     that.ee.emit('audiorenderingfinished', type, e.data);
+                    this.isRendering = false;
+
                 };
 
                 // send the channel data from our buffer to the worker
@@ -436,14 +438,6 @@ export default class {
                     type: 'audio/wav'
                 });
             }
-
-            //Setting previous playout.
-            this.tracks.forEach((track) => {
-                track.setPlayout(new Playout(this.ac, track.buffer));
-            });
-
-            if (wasPlaying)
-                this.play();
 
         }).catch((e)=>{
                 console.log(e);

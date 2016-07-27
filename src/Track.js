@@ -86,6 +86,10 @@ export default class {
         this.playout = playout;
     }
 
+    setOfflinePlayout(playout) {
+        this.offlinePlayout = playout;
+    }
+
     setEnabledStates(enabledStates={}) {
         let defaultStatesEnabled = {
             'cursor': true,
@@ -220,6 +224,8 @@ export default class {
             segment = (endTime) ? (endTime - startTime) : undefined,
             sourcePromise;
 
+        var desiredPlayout = (options.isOffline)?this.offlinePlayout:this.playout;
+
         //1) track has no content to play.
         //2) track does not play in this selection.
         if ((this.endTime <= startTime) || (segment && (startTime + segment) < this.startTime)) {
@@ -256,7 +262,7 @@ export default class {
         start = start + this.cueIn;
         relPos = startTime - this.startTime;
 
-        sourcePromise = this.playout.setUpSource();
+        sourcePromise = desiredPlayout.setUpSource();
 
         //param relPos: cursor position in seconds relative to this track.
         //can be negative if the cursor is placed before the start of this track etc.
@@ -277,10 +283,10 @@ export default class {
 
                 switch (fade.type) {
                     case FADEIN:
-                        this.playout.applyFadeIn(startTime, duration, fade.shape);
+                        desiredPlayout.applyFadeIn(startTime, duration, fade.shape);
                         break;
                     case FADEOUT:
-                        this.playout.applyFadeOut(startTime, duration, fade.shape);
+                        desiredPlayout.applyFadeOut(startTime, duration, fade.shape);
                         break;
                     default:
                         throw new Error("Invalid fade type saved on track.");
@@ -288,13 +294,14 @@ export default class {
             }
         });
 
-        this.playout.setVolumeGainLevel(this.gain);
-        this.playout.setShouldPlay(options.shouldPlay);
-        this.playout.setMasterGainLevel(options.masterGain);
-        this.playout.play(when, start, duration);
+        desiredPlayout.setVolumeGainLevel(this.gain);
+        desiredPlayout.setShouldPlay(options.shouldPlay);
+        desiredPlayout.setMasterGainLevel(options.masterGain);
+        desiredPlayout.play(when, start, duration);
 
         return sourcePromise;
     }
+
 
     scheduleStop(when=0) {
         this.playout.stop(when);
