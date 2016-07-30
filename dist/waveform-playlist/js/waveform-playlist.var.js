@@ -2218,6 +2218,7 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'setSeekStyle',
 	        value: function setSeekStyle(style) {
+	            this.stop();
 	            this.seekStyle = style;
 	        }
 	    }, {
