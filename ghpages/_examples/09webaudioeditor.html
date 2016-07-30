@@ -39,6 +39,9 @@ javascript: web-audio-editor.js
     <div class="btn-group">
       <span title="Prints playlist info to console" class="btn btn-info">Print Playlist Info to Console</span>
     </div>
+    <div class="btn-group">
+      <span title="Download the current work as Wav file" class="btn btn-download btn-primary"><i class="fa fa-download"></i></span>
+    </div>
   </div>
 </div>
 <div id="playlist"></div>
@@ -58,6 +61,20 @@ javascript: web-audio-editor.js
   </form>
   <form>
     <label>Master Volume: <input type="range" min="0" max="100" value="100" class="master-gain input-small form-control"></label>
+  </form>
+  <form class="form-inline">
+    <div class="control-group">
+      <label for="time">Seek to time :</label>
+      <input type="number" class="form-control" value="14" id="time"/>
+      <button type="button" class="btn btn-primary btn-seektotime">Seek !</button>
+    </div>
+    <div class="control-group">
+      <label for="seektype">Seek fill</label>
+      <select name="seektype" class="select-seek-style form-control" id="seektype">
+        <option value="line">line</option>
+        <option value="fill">fill</option>
+      </select>
+    </div>
   </form>
   <div class="sound-status"></div>
   <div class="track-drop"></div>

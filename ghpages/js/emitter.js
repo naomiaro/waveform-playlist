@@ -198,6 +198,18 @@ $container.on("click", ".btn-info", function() {
   console.log(playlist.getInfo());
 });
 
+$container.on("click", ".btn-download", function () {
+   ee.emit('startaudiorendering', 'wav');
+});
+
+$container.on("click", ".btn-seektotime", function () {
+   ee.emit("seek", document.getElementById("time").value);
+});
+
+$container.on("change", ".select-seek-style", function (node) {
+    playlist.setSeekStyle(node.target.value);
+});
+
 //track drop
 $container.on("dragenter", ".track-drop", function(e) {
   e.preventDefault();
@@ -292,3 +304,17 @@ ee.on("loadprogress", function(percent, src) {
   displayLoadingData("Track " + name + " has loaded " + percent + "%");
 });
 
+ee.on('audiorenderingfinished', function (type, data) {
+    if (type == 'wav'){
+        var url = window.URL.createObjectURL(data);
+        var link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.innerHTML = "Download Audio";
+        link.setAttribute("download","audio.wav");
+        displayLoadingData(link);
+    }
+});
+
+ee.on('finished', function () {
+    displayLoadingData("The cursor has reached the end of the selection !");
+});

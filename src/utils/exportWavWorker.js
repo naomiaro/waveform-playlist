@@ -22,7 +22,7 @@ var recLength = 0,
   recBuffersR = [],
   sampleRate;
 
-this.onmessage = function(e){
+onmessage = function(e){
   switch(e.data.command){
     case 'init':
       init(e.data.config);
@@ -62,7 +62,7 @@ function exportWAV(type){
   var dataview = encodeWAV(interleaved);
   var audioBlob = new Blob([dataview], { type: type });
 
-  this.postMessage(audioBlob);
+  postMessage(audioBlob);
 }
 
 function exportMonoWAV(type){
@@ -70,14 +70,14 @@ function exportMonoWAV(type){
   var dataview = encodeWAV(bufferL, true);
   var audioBlob = new Blob([dataview], { type: type });
 
-  this.postMessage(audioBlob);
+  postMessage(audioBlob);
 }
 
 function getBuffers() {
   var buffers = [];
   buffers.push( mergeBuffers(recBuffersL, recLength) );
   buffers.push( mergeBuffers(recBuffersR, recLength) );
-  this.postMessage(buffers);
+  postMessage(buffers);
 }
 
 function clear(){

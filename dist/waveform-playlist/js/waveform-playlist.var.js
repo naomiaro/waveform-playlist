@@ -2526,12 +2526,6 @@ var WaveformPlaylist =
 	            if (this.isRendering) return;
 	
 	            this.isRendering = true;
-	
-	            //  var wasPlaying = false;
-	            //   if (this.isPlaying())
-	            //      wasPlaying = true;
-	            //   this.pause();
-	
 	            this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100 * this.duration, 44100);
 	
 	            var currentTime = this.offlineAudioContext.currentTime,
@@ -2557,9 +2551,7 @@ var WaveformPlaylist =
 	
 	                if (type == 'wav') {
 	
-	                    //TODO : REMOVE
-	                    //this.exportWorker = new ExportWavWorker();
-	                    _this4.exportWorker = new Worker('js/libs/exportWavWorker.js');
+	                    _this4.exportWorker = new _exportWavWorker2.default();
 	
 	                    _this4.exportWorker.postMessage({
 	                        command: 'init',
@@ -6385,7 +6377,7 @@ var WaveformPlaylist =
 	        /*
 	            startTime, endTime in seconds (float).
 	            segment is for a highlighted section in the UI.
-	              returns a Promise that will resolve when the AudioBufferSource
+	             returns a Promise that will resolve when the AudioBufferSource
 	            is either stopped or plays out naturally.
 	        */
 	
@@ -11198,7 +11190,7 @@ var WaveformPlaylist =
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function() {
-		return new Worker(__webpack_require__.p + "aea31cc86230658a079b.worker.js");
+		return new Worker(__webpack_require__.p + "9d6412a286f347dccc73.worker.js");
 	};
 
 /***/ }
