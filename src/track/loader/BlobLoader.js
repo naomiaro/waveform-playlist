@@ -9,7 +9,9 @@ export default class extends Loader {
     */
     load() {
         return new Promise((resolve, reject) => {
-            if (this.src.type.match(/audio.*/)) {
+            if (this.src.type.match(/audio.*/) ||
+                //added for problems with Firefox mime types + ogg.
+                this.src.type.match(/video\/ogg/)) {
                 let fr = new FileReader();
 
                 fr.readAsArrayBuffer(this.src);

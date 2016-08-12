@@ -142,7 +142,7 @@ export default class {
 
     saveFade(type, shape, start, end) {
         let id = uuid.v4();
-        
+
         this.fades[id] = {
             type: type,
             shape: shape,
@@ -216,15 +216,16 @@ export default class {
         returns a Promise that will resolve when the AudioBufferSource
         is either stopped or plays out naturally.
     */
-    schedulePlay(now, startTime, endTime, options) { 
+    schedulePlay(now, startTime, endTime, options) {
         var start,
             duration,
             relPos,
             when = now,
             segment = (endTime) ? (endTime - startTime) : undefined,
-            sourcePromise;
+            sourcePromise,
+            playoutSystem;
 
-        var desiredPlayout = (options.isOffline)?this.offlinePlayout:this.playout;
+        playoutSystem = options.isOffline ? this.offlinePlayout : this.playout;
 
         //1) track has no content to play.
         //2) track does not play in this selection.
@@ -262,7 +263,7 @@ export default class {
         start = start + this.cueIn;
         relPos = startTime - this.startTime;
 
-        sourcePromise = desiredPlayout.setUpSource();
+        sourcePromise = playoutSystem.setUpSource();
 
         //param relPos: cursor position in seconds relative to this track.
         //can be negative if the cursor is placed before the start of this track etc.
@@ -283,10 +284,10 @@ export default class {
 
                 switch (fade.type) {
                     case FADEIN:
-                        desiredPlayout.applyFadeIn(startTime, duration, fade.shape);
+                        playoutSystem.applyFadeIn(startTime, duration, fade.shape);
                         break;
                     case FADEOUT:
-                        desiredPlayout.applyFadeOut(startTime, duration, fade.shape);
+                        playoutSystem.applyFadeOut(startTime, duration, fade.shape);
                         break;
                     default:
                         throw new Error("Invalid fade type saved on track.");
@@ -294,10 +295,10 @@ export default class {
             }
         });
 
-        desiredPlayout.setVolumeGainLevel(this.gain);
-        desiredPlayout.setShouldPlay(options.shouldPlay);
-        desiredPlayout.setMasterGainLevel(options.masterGain);
-        desiredPlayout.play(when, start, duration);
+        playoutSystem.setVolumeGainLevel(this.gain);
+        playoutSystem.setShouldPlay(options.shouldPlay || true);
+        playoutSystem.setMasterGainLevel(options.masterGain || 1);
+        playoutSystem.play(when, start, duration);
 
         return sourcePromise;
     }
@@ -489,7 +490,7 @@ export default class {
         let waveform = h("div.waveform", {
             attributes: {
                 "style": `height: ${numChan * data.height}px; position: relative;`
-            }}, 
+            }},
             waveformChildren
         );
 

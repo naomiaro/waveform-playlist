@@ -36,8 +36,6 @@ export default class {
 
         this.fadeType = "logarithmic";
         this.masterGain = 1;
-
-
     }
 
     initRecorder(stream) {
@@ -63,7 +61,7 @@ export default class {
             this.chunks.push(e.data);
 
             let recording = new Blob(this.chunks, {'type': 'audio/ogg; codecs=opus'});
-            let loader = LoaderFactory.createLoader(recording, this.ac);
+            let loader = LoaderFactory.createLoader(recording, this.ac, this.ee);
             loader.load().then((audioBuffer) => {
                 //ask web worker for peaks.
                 this.recorderWorker.postMessage({
@@ -75,6 +73,10 @@ export default class {
                 this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
                 this.adjustDuration();
             });
+        };
+
+        this.mediaRecorder.onstop = (e) => {
+            //this.recordingTrack = null;
         };
 
         //use a worker for calculating recording peaks.
@@ -608,7 +610,6 @@ export default class {
 
     stop() {
         this.mediaRecorder && this.mediaRecorder.state === "recording" && this.mediaRecorder.stop();
-
         this.pausedAt = undefined;
         this.playbackSeconds = 0;
         return this.playbackReset();
