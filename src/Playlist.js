@@ -7,6 +7,7 @@ import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
 
 import {pixelsToSeconds} from './utils/conversions';
+
 import LoaderFactory from './track/loader/LoaderFactory';
 
 import ScrollHook from './render/ScrollHook';
@@ -16,6 +17,7 @@ import Track from './Track';
 import Playout from './Playout';
 
 import RecorderWorker from 'worker!./track/recorderWorker.js';
+import ExportWavWorker from 'worker!./utils/exportWavWorker.js';
 
 export default class {
 
@@ -34,6 +36,8 @@ export default class {
 
         this.fadeType = "logarithmic";
         this.masterGain = 1;
+
+
     }
 
     initRecorder(stream) {
@@ -89,6 +93,14 @@ export default class {
         this.mono = mono;
     }
 
+    setSeekStyle(style){
+        this.seekStyle = style
+    }
+
+    getSeekStyle(){
+        return this.seekStyle;
+    }
+
     setSampleRate(sampleRate) {
         this.sampleRate = sampleRate;
     }
@@ -100,6 +112,7 @@ export default class {
     setAudioContext(ac) {
         this.ac = ac;
     }
+
 
     setControlOptions(controlOptions) {
         this.controls = controlOptions;
@@ -125,7 +138,6 @@ export default class {
         let ee = this.ee;
 
         ee.on('select', (start, end, track) => {
-
             if (this.isPlaying()) {
                 this.lastSeeked = start;
                 this.pausedAt = undefined;
@@ -133,11 +145,20 @@ export default class {
             }
             else {
                 //reset if it was paused.
-                this.playbackSeconds = 0;
-                this.setTimeSelection(start, end);
+                this.seekToTime(start, end)
                 this.setActiveTrack(track);
                 this.draw(this.render());
+
+
             }
+        });
+
+        ee.on('seek', (time)=>{
+           this.seekToTime(time);
+        });
+
+        ee.on('startaudiorendering', (type)=>{
+           this.startOfflineRender(type);
         });
 
         ee.on('statechange', (state) => {
@@ -349,9 +370,78 @@ export default class {
         this.timeSelection = {
             start,
             end,
+            isSegment : (start!=end)
         };
-
         this.cursor = start;
+    }
+
+    startOfflineRender(type){
+        if (this.isRendering)
+            return;
+
+        this.isRendering = true;
+        this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100*this.duration, 44100);
+
+        var currentTime = this.offlineAudioContext.currentTime,
+            startTime = 0,
+            endTime = 0;
+
+        this.tracks.forEach((track) => {
+            track.setOfflinePlayout(new Playout(this.offlineAudioContext, track.buffer));
+            track.schedulePlay(currentTime, startTime, endTime, {
+                shouldPlay: this.shouldTrackPlay(track),
+                masterGain : 0.8,
+                isOffline : true
+            });
+        });
+
+
+        this.offlineAudioContext.startRendering().then((audioBuffer) => {
+
+            if (type=="buffer"){
+                this.ee.emit('audiorenderingfinished', type, audioBuffer);
+                this.isRendering = false;
+                return;
+            }
+
+            if (type=='wav')
+            {
+
+                this.exportWorker = new ExportWavWorker();
+
+                this.exportWorker.postMessage({
+                    command: 'init',
+                    config: {
+                        sampleRate: 44100
+                    }
+                });
+                var that = this;
+                // callback for `exportWAV`
+                this.exportWorker.onmessage = function(e) {
+                    that.ee.emit('audiorenderingfinished', type, e.data);
+                    this.isRendering = false;
+
+                };
+
+                // send the channel data from our buffer to the worker
+                this.exportWorker.postMessage({
+                    command: 'record',
+                    buffer: [
+                        audioBuffer.getChannelData(0),
+                        audioBuffer.getChannelData(1)
+                    ]
+                });
+
+                // ask the worker for a WAV
+                this.exportWorker.postMessage({
+                    command: 'exportWAV',
+                    type: 'audio/wav'
+                });
+            }
+
+        }).catch((e)=>{
+                console.log(e);
+        });
     }
 
     getTimeSelection() {
@@ -383,7 +473,7 @@ export default class {
         this.zoomIndex = this.zoomLevels.indexOf(zoom);
         this.tracks.forEach((track) => {
             track.calculatePeaks(zoom, this.sampleRate);
-        }); 
+        });
     }
 
     muteTrack(track) {
@@ -582,6 +672,32 @@ export default class {
         this.lastDraw = undefined;
     }
 
+    seekToTime(time=0, end ){
+
+        this.pausedAt = time;
+        this.setTimeSelection(time, end);
+
+
+        if (this.getState() != 'cursor')
+        {
+            this.stop();
+            return;
+        }
+
+        if (this.isPlaying())
+        {
+            this.restartPlayFrom(time);
+            return;
+        }
+
+        if (this.getSeekStyle() == 'fill'){
+            this.playbackSeconds = time;
+        }
+
+        this.ee.emit('timeupdate', time);
+        this.draw(this.render());
+    }
+
     /*
     * Animation function for the playlist.
     */
@@ -593,12 +709,15 @@ export default class {
         cursorPos = cursorPos || this.cursor;
         elapsed = currentTime - this.lastDraw;
 
+
         if (this.isPlaying()) {
             playbackSeconds = cursorPos + elapsed;
             this.ee.emit('timeupdate', playbackSeconds);
             this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
-        }
-        else {
+       } else {
+            if ((cursorPos+elapsed) >= (this.getTimeSelection().isSegment)?this.getTimeSelection().end:this.duration){
+                this.ee.emit('finished');
+            }
             this.stopAnimation();
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
@@ -645,7 +764,7 @@ export default class {
         let activeTrack = this.getActiveTrack();
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "isActive": (activeTrack === track) ? true : false,
+                "isActive": (this.getTimeSelection().isSegment)?((activeTrack === track) ? true : false):true,
                 "shouldPlay": this.shouldTrackPlay(track),
                 "soloed": this.soloedTracks.indexOf(track) > -1,
                 "muted": this.mutedTracks.indexOf(track) > -1
