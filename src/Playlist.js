@@ -150,16 +150,14 @@ export default class {
                 this.seekToTime(start, end)
                 this.setActiveTrack(track);
                 this.draw(this.render());
-
-
             }
         });
 
-        ee.on('seek', (time)=>{
+        ee.on('seek', (time) => {
            this.seekToTime(time);
         });
 
-        ee.on('startaudiorendering', (type)=>{
+        ee.on('startaudiorendering', (type) => {
            this.startOfflineRender(type);
         });
 
@@ -673,11 +671,10 @@ export default class {
         this.lastDraw = undefined;
     }
 
-    seekToTime(time=0, end ){
+    seekToTime(time=0, end){
 
         this.pausedAt = time;
         this.setTimeSelection(time, end);
-
 
         if (this.getState() != 'cursor')
         {

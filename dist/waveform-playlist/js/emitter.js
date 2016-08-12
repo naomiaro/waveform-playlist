@@ -38,7 +38,9 @@ function cueFormatters(format) {
       secs = seconds % 60;
       secs = secs.toFixed(decimals);
 
-      result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
+      result = (hours < 10 ? "0" + hours : hours) + ":"
+        + (minutes < 10 ? "0" + minutes : minutes) + ":"
+        + (secs < 10 ? "0" + secs : secs);
 
       return result;
   }
@@ -51,16 +53,16 @@ function cueFormatters(format) {
           return seconds.toFixed(3);
       },
       "hh:mm:ss": function (seconds) {
-          return clockFormat(seconds, 0);   
+          return clockFormat(seconds, 0);
       },
       "hh:mm:ss.u": function (seconds) {
-          return clockFormat(seconds, 1);   
+          return clockFormat(seconds, 1);
       },
       "hh:mm:ss.uu": function (seconds) {
-          return clockFormat(seconds, 2);   
+          return clockFormat(seconds, 2);
       },
       "hh:mm:ss.uuu": function (seconds) {
-          return clockFormat(seconds, 3);   
+          return clockFormat(seconds, 3);
       }
   };
 
@@ -105,7 +107,8 @@ $container.on("click", ".btn-playlist-state-group", function() {
     $('.btn-select-state-group').removeClass('hidden');
   }
 
-  if ($('.btn-fadein').hasClass('active') || $('.btn-fadeout').hasClass('active')) {
+  if ($('.btn-fadein').hasClass('active') ||
+      $('.btn-fadeout').hasClass('active')) {
     $('.btn-fade-state-group').removeClass('hidden');
   }
 });
@@ -203,7 +206,7 @@ $container.on("click", ".btn-download", function () {
 });
 
 $container.on("click", ".btn-seektotime", function () {
-   ee.emit("seek", document.getElementById("time").value);
+  ee.emit("seek", parseInt(document.getElementById("time").value, 10));
 });
 
 $container.on("change", ".select-seek-style", function (node) {
@@ -297,7 +300,7 @@ ee.on("audiorequeststatechange", function(state, src) {
 ee.on("loadprogress", function(percent, src) {
   var name = src;
 
-  if (src instanceof File) {
+  if (src instanceof File || src instanceof Blob) {
     name = src.name;
   }
 
@@ -305,16 +308,16 @@ ee.on("loadprogress", function(percent, src) {
 });
 
 ee.on('audiorenderingfinished', function (type, data) {
-    if (type == 'wav'){
-        var url = window.URL.createObjectURL(data);
-        var link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.innerHTML = "Download Audio";
-        link.setAttribute("download","audio.wav");
-        displayLoadingData(link);
-    }
+  if (type == 'wav'){
+    var url = window.URL.createObjectURL(data);
+    var link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.innerHTML = "Download Audio";
+    link.setAttribute("download", "audio.wav");
+    displayLoadingData(link);
+  }
 });
 
 ee.on('finished', function () {
-    displayLoadingData("The cursor has reached the end of the selection !");
+  displayLoadingData("The cursor has reached the end of the selection !");
 });
