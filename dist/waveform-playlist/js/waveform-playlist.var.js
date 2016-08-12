@@ -2184,7 +2184,7 @@ var WaveformPlaylist =
 	                _this.chunks.push(e.data);
 	
 	                var recording = new Blob(_this.chunks, { 'type': 'audio/ogg; codecs=opus' });
-	                var loader = _LoaderFactory2.default.createLoader(recording, _this.ac);
+	                var loader = _LoaderFactory2.default.createLoader(recording, _this.ac, _this.ee);
 	                loader.load().then(function (audioBuffer) {
 	                    //ask web worker for peaks.
 	                    _this.recorderWorker.postMessage({
@@ -2196,6 +2196,10 @@ var WaveformPlaylist =
 	                    _this.recordingTrack.setPlayout(new _Playout2.default(_this.ac, audioBuffer));
 	                    _this.adjustDuration();
 	                });
+	            };
+	
+	            this.mediaRecorder.onstop = function (e) {
+	                //this.recordingTrack = null;
 	            };
 	
 	            //use a worker for calculating recording peaks.
@@ -2218,7 +2222,6 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'setSeekStyle',
 	        value: function setSeekStyle(style) {
-	            this.stop();
 	            this.seekStyle = style;
 	        }
 	    }, {
@@ -2773,7 +2776,6 @@ var WaveformPlaylist =
 	        key: 'stop',
 	        value: function stop() {
 	            this.mediaRecorder && this.mediaRecorder.state === "recording" && this.mediaRecorder.stop();
-	
 	            this.pausedAt = undefined;
 	            this.playbackSeconds = 0;
 	            return this.playbackReset();
@@ -5521,11 +5523,11 @@ var WaveformPlaylist =
 	}
 	
 	function samplesToPixels(samples, resolution) {
-	    return ~~(samples / resolution);
+	    return ~ ~(samples / resolution);
 	}
 	
 	function pixelsToSamples(pixels, resolution) {
-	    return ~~(pixels * resolution);
+	    return ~ ~(pixels * resolution);
 	}
 	
 	function pixelsToSeconds(pixels, resolution, sampleRate) {
@@ -5629,7 +5631,9 @@ var WaveformPlaylist =
 	            var _this2 = this;
 	
 	            return new Promise(function (resolve, reject) {
-	                if (_this2.src.type.match(/audio.*/)) {
+	                if (_this2.src.type.match(/audio.*/) ||
+	                //added for problems with Firefox mime types + ogg.
+	                _this2.src.type.match(/video\/ogg/)) {
 	                    var fr = new FileReader();
 	
 	                    fr.readAsArrayBuffer(_this2.src);
@@ -5833,6 +5837,7 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for scrolling the track container.
 	*/
+	
 	var _class = function () {
 	    function _class(track, resolution, sampleRate) {
 	        _classCallCheck(this, _class);
@@ -5998,7 +6003,7 @@ var WaveformPlaylist =
 	
 	            for (i = 0; i < end; i = i + pixPerSec * scaleInfo.secondStep) {
 	
-	                pixIndex = ~~i;
+	                pixIndex = ~ ~i;
 	                pix = pixIndex - pixOffset;
 	
 	                if (pixIndex >= pixOffset) {
@@ -6055,6 +6060,7 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for rendering the time scale canvas.
 	*/
+	
 	var _class = function () {
 	    function _class(tickInfo, offset, samplesPerPixel, duration) {
 	        _classCallCheck(this, _class);
@@ -6390,9 +6396,10 @@ var WaveformPlaylist =
 	                relPos,
 	                when = now,
 	                segment = endTime ? endTime - startTime : undefined,
-	                sourcePromise;
+	                sourcePromise,
+	                playoutSystem;
 	
-	            var desiredPlayout = options.isOffline ? this.offlinePlayout : this.playout;
+	            playoutSystem = options.isOffline ? this.offlinePlayout : this.playout;
 	
 	            //1) track has no content to play.
 	            //2) track does not play in this selection.
@@ -6427,7 +6434,7 @@ var WaveformPlaylist =
 	            start = start + this.cueIn;
 	            relPos = startTime - this.startTime;
 	
-	            sourcePromise = desiredPlayout.setUpSource();
+	            sourcePromise = playoutSystem.setUpSource();
 	
 	            //param relPos: cursor position in seconds relative to this track.
 	            //can be negative if the cursor is placed before the start of this track etc.
@@ -6447,10 +6454,10 @@ var WaveformPlaylist =
 	
 	                    switch (fade.type) {
 	                        case _fadeMaker.FADEIN:
-	                            desiredPlayout.applyFadeIn(startTime, duration, fade.shape);
+	                            playoutSystem.applyFadeIn(startTime, duration, fade.shape);
 	                            break;
 	                        case _fadeMaker.FADEOUT:
-	                            desiredPlayout.applyFadeOut(startTime, duration, fade.shape);
+	                            playoutSystem.applyFadeOut(startTime, duration, fade.shape);
 	                            break;
 	                        default:
 	                            throw new Error("Invalid fade type saved on track.");
@@ -6458,10 +6465,10 @@ var WaveformPlaylist =
 	                }
 	            });
 	
-	            desiredPlayout.setVolumeGainLevel(this.gain);
-	            desiredPlayout.setShouldPlay(options.shouldPlay);
-	            desiredPlayout.setMasterGainLevel(options.masterGain);
-	            desiredPlayout.play(when, start, duration);
+	            playoutSystem.setVolumeGainLevel(this.gain);
+	            playoutSystem.setShouldPlay(options.shouldPlay || true);
+	            playoutSystem.setMasterGainLevel(options.masterGain || 1);
+	            playoutSystem.play(when, start, duration);
 	
 	            return sourcePromise;
 	        }
@@ -11001,6 +11008,7 @@ var WaveformPlaylist =
 	/*
 	* virtual-dom hook for setting the volume input programmatically.
 	*/
+	
 	var _class = function () {
 	    function _class(gain) {
 	        _classCallCheck(this, _class);
