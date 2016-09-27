@@ -96,6 +96,7 @@ var WaveformPlaylist =
 	            timeColor: 'grey',
 	            fadeColor: 'black'
 	        },
+	        seekStyle: 'line',
 	        waveHeight: 128, //height of each canvas element a waveform is on.
 	        state: 'cursor',
 	        zoomLevels: [512, 1024, 2048, 4096] //zoom levels in samples per pixel
@@ -123,6 +124,7 @@ var WaveformPlaylist =
 	    playlist.setZoomIndex(zoomIndex);
 	    playlist.setMono(config.mono);
 	    playlist.setShowTimeScale(config.timescale);
+	    playlist.setSeekStyle(config.seekStyle);
 	
 	    //take care of initial virtual dom rendering.
 	    var tree = playlist.render();
@@ -2128,6 +2130,10 @@ var WaveformPlaylist =
 	
 	var _recorderWorker2 = _interopRequireDefault(_recorderWorker);
 	
+	var _exportWavWorker = __webpack_require__(88);
+	
+	var _exportWavWorker2 = _interopRequireDefault(_exportWavWorker);
+	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -2210,6 +2216,16 @@ var WaveformPlaylist =
 	            this.mono = mono;
 	        }
 	    }, {
+	        key: 'setSeekStyle',
+	        value: function setSeekStyle(style) {
+	            this.seekStyle = style;
+	        }
+	    }, {
+	        key: 'getSeekStyle',
+	        value: function getSeekStyle() {
+	            return this.seekStyle;
+	        }
+	    }, {
 	        key: 'setSampleRate',
 	        value: function setSampleRate(sampleRate) {
 	            this.sampleRate = sampleRate;
@@ -2257,18 +2273,20 @@ var WaveformPlaylist =
 	            var ee = this.ee;
 	
 	            ee.on('select', function (start, end, track) {
-	
 	                if (_this2.isPlaying()) {
 	                    _this2.lastSeeked = start;
 	                    _this2.pausedAt = undefined;
 	                    _this2.restartPlayFrom(start);
 	                } else {
 	                    //reset if it was paused.
-	                    _this2.playbackSeconds = 0;
-	                    _this2.setTimeSelection(start, end);
-	                    _this2.setActiveTrack(track);
+	                    _this2.seek(start, end, track);
+	                    _this2.ee.emit('timeupdate', start);
 	                    _this2.draw(_this2.render());
 	                }
+	            });
+	
+	            ee.on('startaudiorendering', function (type) {
+	                _this2.startOfflineRender(type);
 	            });
 	
 	            ee.on('statechange', function (state) {
@@ -2481,6 +2499,11 @@ var WaveformPlaylist =
 	        value: function getActiveTrack() {
 	            return this.activeTrack;
 	        }
+	    }, {
+	        key: 'isSegmentSelection',
+	        value: function isSegmentSelection() {
+	            return this.timeSelection.start !== this.timeSelection.end;
+	        }
 	
 	        /*
 	            start, end in seconds.
@@ -2488,13 +2511,90 @@ var WaveformPlaylist =
 	
 	    }, {
 	        key: 'setTimeSelection',
-	        value: function setTimeSelection(start, end) {
+	        value: function setTimeSelection() {
+	            var start = arguments.length <= 0 || arguments[0] === undefined ? 0 : arguments[0];
+	            var end = arguments.length <= 1 || arguments[1] === undefined ? undefined : arguments[1];
+	
 	            this.timeSelection = {
 	                start: start,
-	                end: end
+	                end: end === undefined ? start : end
 	            };
 	
 	            this.cursor = start;
+	        }
+	    }, {
+	        key: 'startOfflineRender',
+	        value: function startOfflineRender(type) {
+	            var _this4 = this;
+	
+	            if (this.isRendering) {
+	                return;
+	            }
+	
+	            this.isRendering = true;
+	            this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100 * this.duration, 44100);
+	
+	            var currentTime = this.offlineAudioContext.currentTime,
+	                startTime = 0,
+	                endTime = 0;
+	
+	            this.tracks.forEach(function (track) {
+	                track.setOfflinePlayout(new _Playout2.default(_this4.offlineAudioContext, track.buffer));
+	                track.schedulePlay(currentTime, startTime, endTime, {
+	                    shouldPlay: _this4.shouldTrackPlay(track),
+	                    masterGain: 0.8,
+	                    isOffline: true
+	                });
+	            });
+	
+	            /*
+	                TODO cleanup of different audio playouts handling.
+	            */
+	            this.offlineAudioContext.startRendering().then(function (audioBuffer) {
+	                if (type == 'buffer') {
+	                    _this4.ee.emit('audiorenderingfinished', type, audioBuffer);
+	                    _this4.isRendering = false;
+	                    return;
+	                }
+	
+	                if (type == 'wav') {
+	                    if (_this4.exportWorker == undefined) {
+	                        _this4.exportWorker = new _exportWavWorker2.default();
+	                    }
+	
+	                    _this4.exportWorker.postMessage({
+	                        command: 'init',
+	                        config: {
+	                            sampleRate: 44100
+	                        }
+	                    });
+	
+	                    // callback for `exportWAV`
+	                    _this4.exportWorker.onmessage = function (e) {
+	                        _this4.ee.emit('audiorenderingfinished', type, e.data);
+	                        _this4.isRendering = false;
+	
+	                        // clear out the buffer for next renderings.
+	                        _this4.exportWorker.postMessage({
+	                            command: 'clear'
+	                        });
+	                    };
+	
+	                    // send the channel data from our buffer to the worker
+	                    _this4.exportWorker.postMessage({
+	                        command: 'record',
+	                        buffer: [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)]
+	                    });
+	
+	                    // ask the worker for a WAV
+	                    _this4.exportWorker.postMessage({
+	                        command: 'exportWAV',
+	                        type: 'audio/wav'
+	                    });
+	                }
+	            }).catch(function (e) {
+	                console.log(e);
+	            });
 	        }
 	    }, {
 	        key: 'getTimeSelection',
@@ -2528,12 +2628,12 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'setZoom',
 	        value: function setZoom(zoom) {
-	            var _this4 = this;
+	            var _this5 = this;
 	
 	            this.samplesPerPixel = zoom;
 	            this.zoomIndex = this.zoomLevels.indexOf(zoom);
 	            this.tracks.forEach(function (track) {
-	                track.calculatePeaks(zoom, _this4.sampleRate);
+	                track.calculatePeaks(zoom, _this5.sampleRate);
 	            });
 	        }
 	    }, {
@@ -2563,10 +2663,10 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'adjustTrackPlayout',
 	        value: function adjustTrackPlayout() {
-	            var _this5 = this;
+	            var _this6 = this;
 	
 	            this.tracks.forEach(function (track) {
-	                track.setShouldPlay(_this5.shouldTrackPlay(track));
+	                track.setShouldPlay(_this6.shouldTrackPlay(track));
 	            });
 	        }
 	    }, {
@@ -2640,7 +2740,7 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'play',
 	        value: function play(startTime, endTime) {
-	            var _this6 = this;
+	            var _this7 = this;
 	
 	            var currentTime = this.ac.currentTime,
 	                selected = this.getTimeSelection(),
@@ -2660,8 +2760,8 @@ var WaveformPlaylist =
 	            this.tracks.forEach(function (track) {
 	                track.setState('cursor');
 	                playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
-	                    shouldPlay: _this6.shouldTrackPlay(track),
-	                    masterGain: _this6.masterGain
+	                    shouldPlay: _this7.shouldTrackPlay(track),
+	                    masterGain: _this7.masterGain
 	                }));
 	            });
 	
@@ -2686,7 +2786,6 @@ var WaveformPlaylist =
 	        key: 'stop',
 	        value: function stop() {
 	            this.mediaRecorder && this.mediaRecorder.state === "recording" && this.mediaRecorder.stop();
-	
 	            this.pausedAt = undefined;
 	            this.playbackSeconds = 0;
 	            return this.playbackReset();
@@ -2694,14 +2793,14 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'playbackReset',
 	        value: function playbackReset() {
-	            var _this7 = this;
+	            var _this8 = this;
 	
 	            this.lastSeeked = undefined;
 	            this.stopAnimation();
 	
 	            this.tracks.forEach(function (track) {
 	                track.scheduleStop();
-	                track.setState(_this7.getState());
+	                track.setState(_this8.getState());
 	            });
 	
 	            this.draw(this.render());
@@ -2711,40 +2810,40 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'rewind',
 	        value: function rewind() {
-	            var _this8 = this;
+	            var _this9 = this;
 	
 	            return this.stop().then(function () {
-	                _this8.scrollLeft = 0;
-	                _this8.ee.emit('select', 0, 0);
+	                _this9.scrollLeft = 0;
+	                _this9.ee.emit('select', 0, 0);
 	            });
 	        }
 	    }, {
 	        key: 'fastForward',
 	        value: function fastForward() {
-	            var _this9 = this;
+	            var _this10 = this;
 	
 	            return this.stop().then(function () {
-	                if (_this9.viewDuration < _this9.duration) {
-	                    _this9.scrollLeft = _this9.duration - _this9.viewDuration;
+	                if (_this10.viewDuration < _this10.duration) {
+	                    _this10.scrollLeft = _this10.duration - _this10.viewDuration;
 	                } else {
-	                    _this9.scrollLeft = 0;
+	                    _this10.scrollLeft = 0;
 	                }
 	
-	                _this9.ee.emit('select', _this9.duration, _this9.duration);
+	                _this10.ee.emit('select', _this10.duration, _this10.duration);
 	            });
 	        }
 	    }, {
 	        key: 'record',
 	        value: function record() {
-	            var _this10 = this;
+	            var _this11 = this;
 	
 	            var playoutPromises = [];
 	            this.mediaRecorder.start(300);
 	
 	            this.tracks.forEach(function (track) {
 	                track.setState('none');
-	                playoutPromises.push(track.schedulePlay(_this10.ac.currentTime, 0, undefined, {
-	                    shouldPlay: _this10.shouldTrackPlay(track)
+	                playoutPromises.push(track.schedulePlay(_this11.ac.currentTime, 0, undefined, {
+	                    shouldPlay: _this11.shouldTrackPlay(track)
 	                }));
 	            });
 	
@@ -2762,6 +2861,23 @@ var WaveformPlaylist =
 	            window.cancelAnimationFrame(this.animationRequest);
 	            this.lastDraw = undefined;
 	        }
+	    }, {
+	        key: 'seek',
+	        value: function seek(start, end, track) {
+	            if (this.isPlaying()) {
+	                this.lastSeeked = start;
+	                this.pausedAt = undefined;
+	                this.restartPlayFrom(start);
+	            } else {
+	                //reset if it was paused.
+	                this.setActiveTrack(track || this.tracks[0]);
+	                this.pausedAt = start;
+	                this.setTimeSelection(start, end);
+	                if (this.getSeekStyle() == 'fill') {
+	                    this.playbackSeconds = start;
+	                }
+	            }
+	        }
 	
 	        /*
 	        * Animation function for the playlist.
@@ -2773,6 +2889,7 @@ var WaveformPlaylist =
 	            var currentTime = this.ac.currentTime;
 	            var playbackSeconds = 0;
 	            var elapsed = void 0;
+	            var selection = this.getTimeSelection();
 	
 	            cursorPos = cursorPos || this.cursor;
 	            elapsed = currentTime - this.lastDraw;
@@ -2782,6 +2899,10 @@ var WaveformPlaylist =
 	                this.ee.emit('timeupdate', playbackSeconds);
 	                this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
 	            } else {
+	                if (cursorPos + elapsed >= this.isSegmentSelection() ? selection.end : this.duration) {
+	                    this.ee.emit('finished');
+	                }
+	
 	                this.stopAnimation();
 	                this.pausedAt = undefined;
 	                this.lastSeeked = undefined;
@@ -2796,15 +2917,15 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'draw',
 	        value: function draw(newTree) {
-	            var _this11 = this;
+	            var _this12 = this;
 	
 	            window.requestAnimationFrame(function () {
-	                var patches = (0, _diff2.default)(_this11.tree, newTree);
-	                _this11.rootNode = (0, _patch2.default)(_this11.rootNode, patches);
-	                _this11.tree = newTree;
+	                var patches = (0, _diff2.default)(_this12.tree, newTree);
+	                _this12.rootNode = (0, _patch2.default)(_this12.rootNode, patches);
+	                _this12.tree = newTree;
 	
 	                //use for fast forwarding.
-	                _this11.viewDuration = (0, _conversions.pixelsToSeconds)(_this11.rootNode.clientWidth - _this11.controls.width, _this11.samplesPerPixel, _this11.sampleRate);
+	                _this12.viewDuration = (0, _conversions.pixelsToSeconds)(_this12.rootNode.clientWidth - _this12.controls.width, _this12.samplesPerPixel, _this12.sampleRate);
 	            });
 	        }
 	    }, {
@@ -2827,20 +2948,25 @@ var WaveformPlaylist =
 	            return (0, _lodash2.default)(data, defaults);
 	        }
 	    }, {
+	        key: 'isActiveTrack',
+	        value: function isActiveTrack(track) {
+	            var activeTrack = this.getActiveTrack();
+	            return this.isSegmentSelection() ? activeTrack === track ? true : false : true;
+	        }
+	    }, {
 	        key: 'render',
 	        value: function render() {
-	            var _this12 = this;
+	            var _this13 = this;
 	
 	            var controlWidth = this.controls.show ? this.controls.width : 0;
 	            var timeScale = new _TimeScale2.default(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate, controlWidth);
 	
-	            var activeTrack = this.getActiveTrack();
 	            var trackElements = this.tracks.map(function (track) {
-	                return track.render(_this12.getTrackRenderData({
-	                    "isActive": activeTrack === track ? true : false,
-	                    "shouldPlay": _this12.shouldTrackPlay(track),
-	                    "soloed": _this12.soloedTracks.indexOf(track) > -1,
-	                    "muted": _this12.mutedTracks.indexOf(track) > -1
+	                return track.render(_this13.getTrackRenderData({
+	                    "isActive": _this13.isActiveTrack(track),
+	                    "shouldPlay": _this13.shouldTrackPlay(track),
+	                    "soloed": _this13.soloedTracks.indexOf(track) > -1,
+	                    "muted": _this13.mutedTracks.indexOf(track) > -1
 	                }));
 	            });
 	
@@ -2849,8 +2975,8 @@ var WaveformPlaylist =
 	                    "style": "overflow: auto;"
 	                },
 	                "onscroll": function onscroll(e) {
-	                    _this12.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this12.samplesPerPixel, _this12.sampleRate);
-	                    _this12.ee.emit("scroll", _this12.scrollLeft);
+	                    _this13.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this13.samplesPerPixel, _this13.sampleRate);
+	                    _this13.ee.emit("scroll", _this13.scrollLeft);
 	                },
 	                "hook": new _ScrollHook2.default(this, this.samplesPerPixel, this.sampleRate)
 	            }, trackElements);
@@ -5512,7 +5638,9 @@ var WaveformPlaylist =
 	            var _this2 = this;
 	
 	            return new Promise(function (resolve, reject) {
-	                if (_this2.src.type.match(/audio.*/)) {
+	                if (_this2.src.type.match(/audio.*/) ||
+	                //added for problems with Firefox mime types + ogg.
+	                _this2.src.type.match(/video\/ogg/)) {
 	                    var fr = new FileReader();
 	
 	                    fr.readAsArrayBuffer(_this2.src);
@@ -5546,15 +5674,22 @@ var WaveformPlaylist =
 
 /***/ },
 /* 61 */
-/***/ function(module, exports) {
+/***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
+	exports.STATE_FINISHED = exports.STATE_DECODING = exports.STATE_LOADING = exports.STATE_UNINITIALIZED = undefined;
 	
 	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	var _eventEmitter = __webpack_require__(17);
+	
+	var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 	
@@ -5564,7 +5699,9 @@ var WaveformPlaylist =
 	var STATE_FINISHED = exports.STATE_FINISHED = 3;
 	
 	var _class = function () {
-	    function _class(src, audioContext, ee) {
+	    function _class(src, audioContext) {
+	        var ee = arguments.length <= 2 || arguments[2] === undefined ? (0, _eventEmitter2.default)() : arguments[2];
+	
 	        _classCallCheck(this, _class);
 	
 	        this.src = src;
@@ -6113,6 +6250,11 @@ var WaveformPlaylist =
 	            this.playout = playout;
 	        }
 	    }, {
+	        key: 'setOfflinePlayout',
+	        value: function setOfflinePlayout(playout) {
+	            this.offlinePlayout = playout;
+	        }
+	    }, {
 	        key: 'setEnabledStates',
 	        value: function setEnabledStates() {
 	            var enabledStates = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
@@ -6265,14 +6407,23 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'schedulePlay',
 	        value: function schedulePlay(now, startTime, endTime, options) {
-	            var _this = this;
-	
 	            var start,
 	                duration,
 	                relPos,
 	                when = now,
 	                segment = endTime ? endTime - startTime : undefined,
-	                sourcePromise;
+	                sourcePromise,
+	                playoutSystem;
+	
+	            var defaultOptions = {
+	                shouldPlay: true,
+	                masterGain: 1,
+	                isOffline: false
+	            };
+	
+	            options = (0, _lodash2.default)(defaultOptions, options);
+	
+	            playoutSystem = options.isOffline ? this.offlinePlayout : this.playout;
 	
 	            //1) track has no content to play.
 	            //2) track does not play in this selection.
@@ -6307,7 +6458,7 @@ var WaveformPlaylist =
 	            start = start + this.cueIn;
 	            relPos = startTime - this.startTime;
 	
-	            sourcePromise = this.playout.setUpSource();
+	            sourcePromise = playoutSystem.setUpSource();
 	
 	            //param relPos: cursor position in seconds relative to this track.
 	            //can be negative if the cursor is placed before the start of this track etc.
@@ -6327,10 +6478,10 @@ var WaveformPlaylist =
 	
 	                    switch (fade.type) {
 	                        case _fadeMaker.FADEIN:
-	                            _this.playout.applyFadeIn(startTime, duration, fade.shape);
+	                            playoutSystem.applyFadeIn(startTime, duration, fade.shape);
 	                            break;
 	                        case _fadeMaker.FADEOUT:
-	                            _this.playout.applyFadeOut(startTime, duration, fade.shape);
+	                            playoutSystem.applyFadeOut(startTime, duration, fade.shape);
 	                            break;
 	                        default:
 	                            throw new Error("Invalid fade type saved on track.");
@@ -6338,10 +6489,10 @@ var WaveformPlaylist =
 	                }
 	            });
 	
-	            this.playout.setVolumeGainLevel(this.gain);
-	            this.playout.setShouldPlay(options.shouldPlay);
-	            this.playout.setMasterGainLevel(options.masterGain);
-	            this.playout.play(when, start, duration);
+	            playoutSystem.setVolumeGainLevel(this.gain);
+	            playoutSystem.setShouldPlay(options.shouldPlay);
+	            playoutSystem.setMasterGainLevel(options.masterGain);
+	            playoutSystem.play(when, start, duration);
 	
 	            return sourcePromise;
 	        }
@@ -6369,7 +6520,7 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'renderOverlay',
 	        value: function renderOverlay(data) {
-	            var _this2 = this;
+	            var _this = this;
 	
 	            var channelPixels = (0, _conversions.secondsToPixels)(data.playlistLength, data.resolution, data.sampleRate);
 	
@@ -6383,7 +6534,7 @@ var WaveformPlaylist =
 	
 	            if (this.state && this.enabledStates[this.state]) {
 	                (function () {
-	                    var state = new _states2.default[_this2.state](_this2, data.resolution, data.sampleRate);
+	                    var state = new _states2.default[_this.state](_this, data.resolution, data.sampleRate);
 	                    var stateEvents = state.getEvents();
 	
 	                    Object.keys(stateEvents).map(function (event) {
@@ -6399,7 +6550,7 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'renderControls',
 	        value: function renderControls(data) {
-	            var _this3 = this;
+	            var _this2 = this;
 	
 	            var muteClass = data.muted ? ".active" : "";
 	            var soloClass = data.soloed ? ".active" : "";
@@ -6409,9 +6560,9 @@ var WaveformPlaylist =
 	                attributes: {
 	                    "style": 'height: ' + numChan * data.height + 'px; width: ' + data.controls.width + 'px; position: absolute; left: 0; z-index: 10;'
 	                } }, [(0, _h2.default)("header", [this.name]), (0, _h2.default)("div.btn-group", [(0, _h2.default)('span.btn.btn-default.btn-xs.btn-mute' + muteClass, { "onclick": function onclick() {
-	                    _this3.ee.emit("mute", _this3);
+	                    _this2.ee.emit("mute", _this2);
 	                } }, ["Mute"]), (0, _h2.default)('span.btn.btn-default.btn-xs.btn-solo' + soloClass, { "onclick": function onclick() {
-	                    _this3.ee.emit("solo", _this3);
+	                    _this2.ee.emit("solo", _this2);
 	                } }, ["Solo"])]), (0, _h2.default)("label", [(0, _h2.default)("input.volume-slider", {
 	                attributes: {
 	                    "type": "range",
@@ -6421,14 +6572,14 @@ var WaveformPlaylist =
 	                },
 	                "hook": new _VolumeSliderHook2.default(this.gain),
 	                "oninput": function oninput(e) {
-	                    _this3.ee.emit("volumechange", e.target.value, _this3);
+	                    _this2.ee.emit("volumechange", e.target.value, _this2);
 	                }
 	            })])]);
 	        }
 	    }, {
 	        key: 'render',
 	        value: function render(data) {
-	            var _this4 = this;
+	            var _this3 = this;
 	
 	            var width = this.peaks.length;
 	            var playbackX = (0, _conversions.secondsToPixels)(data.playbackSeconds, data.resolution, data.sampleRate);
@@ -6456,7 +6607,7 @@ var WaveformPlaylist =
 	                    } })];
 	                var offset = 0;
 	                var totalWidth = width;
-	                var peaks = _this4.peaks.data[channelNum];
+	                var peaks = _this3.peaks.data[channelNum];
 	
 	                while (totalWidth > 0) {
 	                    var currentWidth = Math.min(totalWidth, MAX_CANVAS_WIDTH);
@@ -6467,7 +6618,7 @@ var WaveformPlaylist =
 	                            "height": data.height,
 	                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
 	                        },
-	                        "hook": new _CanvasHook2.default(peaks, offset, _this4.peaks.bits, data.colors.waveOutlineColor)
+	                        "hook": new _CanvasHook2.default(peaks, offset, _this3.peaks.bits, data.colors.waveOutlineColor)
 	                    }));
 	
 	                    totalWidth -= currentWidth;
@@ -6475,8 +6626,8 @@ var WaveformPlaylist =
 	                }
 	
 	                //if there are fades, display them.
-	                if (_this4.fadeIn) {
-	                    var fadeIn = _this4.fades[_this4.fadeIn];
+	                if (_this3.fadeIn) {
+	                    var fadeIn = _this3.fades[_this3.fadeIn];
 	                    var _width = (0, _conversions.secondsToPixels)(fadeIn.end - fadeIn.start, data.resolution, data.sampleRate);
 	
 	                    channelChildren.push((0, _h2.default)("div.wp-fade.wp-fadein", {
@@ -6491,8 +6642,8 @@ var WaveformPlaylist =
 	                    })]));
 	                }
 	
-	                if (_this4.fadeOut) {
-	                    var fadeOut = _this4.fades[_this4.fadeOut];
+	                if (_this3.fadeOut) {
+	                    var fadeOut = _this3.fades[_this3.fadeOut];
 	                    var _width2 = (0, _conversions.secondsToPixels)(fadeOut.end - fadeOut.start, data.resolution, data.sampleRate);
 	
 	                    channelChildren.push((0, _h2.default)("div.wp-fade.wp-fadeout", {
@@ -10968,6 +11119,12 @@ var WaveformPlaylist =
 	            return this.buffer.duration;
 	        }
 	    }, {
+	        key: 'setAudioContext',
+	        value: function setAudioContext(audioContext) {
+	            this.ac = audioContext;
+	            this.destination = this.ac.destination;
+	        }
+	    }, {
 	        key: 'setUpSource',
 	        value: function setUpSource() {
 	            var _this = this;
@@ -11059,6 +11216,14 @@ var WaveformPlaylist =
 
 	module.exports = function() {
 		return new Worker(__webpack_require__.p + "301ffd7b6b1f9a16c47c.worker.js");
+	};
+
+/***/ },
+/* 88 */
+/***/ function(module, exports, __webpack_require__) {
+
+	module.exports = function() {
+		return new Worker(__webpack_require__.p + "9d6412a286f347dccc73.worker.js");
 	};
 
 /***/ }

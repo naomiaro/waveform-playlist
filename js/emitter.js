@@ -13,6 +13,7 @@ var format = "seconds";
 var startTime = 0;
 var endTime = 0;
 var audioPos = 0;
+var downloadUrl = undefined;
 
 function toggleActive(node) {
   var active = node.parentNode.querySelectorAll('.active');
@@ -28,40 +29,40 @@ function toggleActive(node) {
 function cueFormatters(format) {
 
   function clockFormat(seconds, decimals) {
-      var hours,
-          minutes,
-          secs,
-          result;
+    var hours,
+        minutes,
+        secs,
+        result;
 
-      hours = parseInt(seconds / 3600, 10) % 24;
-      minutes = parseInt(seconds / 60, 10) % 60;
-      secs = seconds % 60;
-      secs = secs.toFixed(decimals);
+    hours = parseInt(seconds / 3600, 10) % 24;
+    minutes = parseInt(seconds / 60, 10) % 60;
+    secs = seconds % 60;
+    secs = secs.toFixed(decimals);
 
-      result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
+    result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
 
-      return result;
+    return result;
   }
 
   var formats = {
-      "seconds": function (seconds) {
-          return seconds.toFixed(0);
-      },
-      "thousandths": function (seconds) {
-          return seconds.toFixed(3);
-      },
-      "hh:mm:ss": function (seconds) {
-          return clockFormat(seconds, 0);   
-      },
-      "hh:mm:ss.u": function (seconds) {
-          return clockFormat(seconds, 1);   
-      },
-      "hh:mm:ss.uu": function (seconds) {
-          return clockFormat(seconds, 2);   
-      },
-      "hh:mm:ss.uuu": function (seconds) {
-          return clockFormat(seconds, 3);   
-      }
+    "seconds": function (seconds) {
+        return seconds.toFixed(0);
+    },
+    "thousandths": function (seconds) {
+        return seconds.toFixed(3);
+    },
+    "hh:mm:ss": function (seconds) {
+        return clockFormat(seconds, 0);   
+    },
+    "hh:mm:ss.u": function (seconds) {
+        return clockFormat(seconds, 1);   
+    },
+    "hh:mm:ss.uu": function (seconds) {
+        return clockFormat(seconds, 2);   
+    },
+    "hh:mm:ss.uuu": function (seconds) {
+        return clockFormat(seconds, 3);   
+    }
   };
 
   return formats[format];
@@ -198,6 +199,19 @@ $container.on("click", ".btn-info", function() {
   console.log(playlist.getInfo());
 });
 
+$container.on("click", ".btn-download", function () {
+  ee.emit('startaudiorendering', 'wav');
+});
+
+$container.on("click", ".btn-seektotime", function () {
+  var time = parseInt(document.getElementById("seektime").value, 10);
+  ee.emit("select", time, time);
+});
+
+$container.on("change", ".select-seek-style", function (node) {
+  playlist.setSeekStyle(node.target.value);
+});
+
 //track drop
 $container.on("dragenter", ".track-drop", function(e) {
   e.preventDefault();
@@ -244,6 +258,18 @@ function displayLoadingData(data) {
   $(".loading-data").append(info);
 }
 
+function displayDownloadLink(link) {
+  var dateString = (new Date()).toISOString();
+  var $link = $("<a/>", {
+    'href': link,
+    'download': 'waveformplaylist' + dateString + '.wav',
+    'text': 'Download mix ' + dateString,
+    'class': 'btn btn-small btn-download-link'
+  });
+
+  $('.btn-download-link').remove();
+  $('.btn-download').after($link);
+}
 
 
 /*
@@ -292,3 +318,17 @@ ee.on("loadprogress", function(percent, src) {
   displayLoadingData("Track " + name + " has loaded " + percent + "%");
 });
 
+ee.on('audiorenderingfinished', function (type, data) {
+  if (type == 'wav'){
+    if (downloadUrl) {
+      window.URL.revokeObjectURL(downloadUrl);
+    }
+
+    downloadUrl = window.URL.createObjectURL(data);
+    displayDownloadLink(downloadUrl);
+  }
+});
+
+ee.on('finished', function () {
+  console.log("The cursor has reached the end of the selection !");
+});
