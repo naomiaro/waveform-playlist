@@ -306,16 +306,16 @@ ee.on("loadprogress", function(percent, src) {
 });
 
 ee.on('audiorenderingfinished', function (type, data) {
-    if (type == 'wav'){
-        var url = window.URL.createObjectURL(data);
-        var link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.innerHTML = "Download Audio";
-        link.setAttribute("download","audio.wav");
-        displayLoadingData(link);
-    }
+  if (type == 'wav'){
+      var url = window.URL.createObjectURL(data);
+      var link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.innerHTML = "Download Audio";
+      link.setAttribute("download","audio.wav");
+      displayLoadingData(link);
+  }
 });
 
 ee.on('finished', function () {
-    displayLoadingData("The cursor has reached the end of the selection !");
+  console.log("The cursor has reached the end of the selection !");
 });

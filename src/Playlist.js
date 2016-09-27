@@ -691,6 +691,7 @@ export default class {
         let currentTime = this.ac.currentTime;
         let playbackSeconds = 0;
         let elapsed;
+        let selection = this.getTimeSelection();
 
         cursorPos = cursorPos || this.cursor;
         elapsed = currentTime - this.lastDraw;
