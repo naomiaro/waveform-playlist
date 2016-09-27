@@ -111,7 +111,6 @@ export default class {
         this.ac = ac;
     }
 
-
     setControlOptions(controlOptions) {
         this.controls = controlOptions;
     }
@@ -391,7 +390,6 @@ export default class {
                 isOffline : true
             });
         });
-
 
         /*
             TODO cleanup of different audio playouts handling.

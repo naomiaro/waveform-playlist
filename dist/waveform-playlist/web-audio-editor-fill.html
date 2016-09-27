@@ -6,7 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Full Waveform Editor with seek style set to fill</title>
+  <title>Waveform Editor with seek style set to fill</title>
   <meta name="description" content="Waveform Playlist, the multitrack javascript web audio editor and player. Set audio cue in and cue out. Set linear, exponential, logarithmic, and s-curve fad...">
 
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
@@ -23,7 +23,7 @@
 
   <ol class="breadcrumb">
     <li><a href="/waveform-playlist/">Waveform Playlist</a></li>
-    <li class="active">Full Waveform Editor with seek style set to fill</li>
+    <li class="active">Waveform Editor with seek style set to fill</li>
   </ol>
 
 </header>
@@ -36,8 +36,8 @@
         <article class="post">
 
   <header class="post-header">
-    <h1 class="post-title">Full Waveform Editor with seek style set to fill</h1>
-    <p class="lead">Every control and state available, and seek style set to 'fill'.</p>
+    <h1 class="post-title">Waveform Editor with seek style set to fill</h1>
+    <p class="lead">Initialization property 'seekStyle' set to 'fill'.</p>
   </header>
 
   <div class="post-content">
@@ -49,32 +49,6 @@
       <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
       <span class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></span>
       <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
-    </div>
-    <div class="btn-group">
-      <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
-      <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
-    </div>
-    <div class="btn-group btn-playlist-state-group">
-      <span class="btn-cursor btn btn-default active" title="select cursor"><i class="fa fa-headphones"></i></span>
-      <span class="btn-select btn btn-default" title="select audio region"><i class="fa fa-italic"></i></span>
-      <span class="btn-shift btn btn-default" title="shift audio in time"><i class="fa fa-arrows-h"></i></span>
-      <span class="btn-fadein btn btn-default" title="set audio fade in"><i class="fa fa-long-arrow-left"></i></span>
-      <span class="btn-fadeout btn btn-default" title="set audio fade out"><i class="fa fa-long-arrow-right"></i></span>
-    </div>
-    <div class="btn-group btn-fade-state-group hidden">
-      <span class="btn btn-default btn-logarithmic active">logarithmic</span>
-      <span class="btn btn-default btn-linear">linear</span>
-      <span class="btn btn-default btn-exponential">exponential</span>
-      <span class="btn btn-default btn-scurve">s-curve</span>
-    </div>
-    <div class="btn-group btn-select-state-group hidden">
-      <span title="keep only the selected audio region for a track" class="btn-trim-audio btn btn-primary disabled">Trim Audio</span>
-    </div>
-    <div class="btn-group">
-      <span title="Prints playlist info to console" class="btn btn-info">Print Playlist Info to Console</span>
-    </div>
-    <div class="btn-group">
-      <span title="Download the current work as Wav file" class="btn btn-download btn-primary"><i class="fa fa-download"></i></span>
     </div>
   </div>
 </div>
@@ -93,19 +67,6 @@
     <input type="text" class="audio-end form-control">
     <label class="audio-pos">00:00:00.0</label>
   </form>
-  <form>
-    <label>Master Volume: <input type="range" min="0" max="100" value="100" class="master-gain input-small form-control"></label>
-  </form>
-  <form class="form-inline">
-    <div class="control-group">
-      <label for="time">Seek to time :</label>
-      <input type="number" class="form-control" value="14" id="time"/>
-      <button type="button" class="btn btn-primary btn-seektotime">Seek !</button>
-    </div>
-  </form>
-  <div class="sound-status"></div>
-  <div class="track-drop"></div>
-  <div class="loading-data"></div>
 </div>
 
   </div>
