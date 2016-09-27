@@ -225,6 +225,14 @@ export default class {
             sourcePromise,
             playoutSystem;
 
+        let defaultOptions = {
+            shouldPlay: true,
+            masterGain: 1,
+            isOffline: false
+        }
+
+        options = _assign(defaultOptions, options);
+
         playoutSystem = options.isOffline ? this.offlinePlayout : this.playout;
 
         //1) track has no content to play.
@@ -296,8 +304,8 @@ export default class {
         });
 
         playoutSystem.setVolumeGainLevel(this.gain);
-        playoutSystem.setShouldPlay(options.shouldPlay || true);
-        playoutSystem.setMasterGainLevel(options.masterGain || 1);
+        playoutSystem.setShouldPlay(options.shouldPlay);
+        playoutSystem.setMasterGainLevel(options.masterGain);
         playoutSystem.play(when, start, duration);
 
         return sourcePromise;
