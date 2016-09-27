@@ -262,7 +262,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `newtrack` | `File` | Loads `File` object into the playlist. |
 | `select` | `start, end, track:optional` | Sets cursor selection from `start` to `end` optionally with active track `track`. |
 | `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
-| `seek` | `time` | Seek to the time |
+| `select` | `start, end, track:optional` | Seek to the start time or start/end selection |
 | `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
 
 #### Events to Listen to

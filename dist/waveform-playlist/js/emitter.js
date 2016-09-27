@@ -204,7 +204,7 @@ $container.on("click", ".btn-download", function () {
 
 $container.on("click", ".btn-seektotime", function () {
   var time = parseInt(document.getElementById("seektime").value, 10);
-  ee.emit("seek", time);
+  ee.emit("select", time, time);
 });
 
 $container.on("change", ".select-seek-style", function (node) {

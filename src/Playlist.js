@@ -91,11 +91,11 @@ export default class {
         this.mono = mono;
     }
 
-    setSeekStyle(style){
+    setSeekStyle(style) {
         this.seekStyle = style
     }
 
-    getSeekStyle(){
+    getSeekStyle() {
         return this.seekStyle;
     }
 
@@ -143,14 +143,10 @@ export default class {
             }
             else {
                 //reset if it was paused.
-                this.seekToTime(start, end)
-                this.setActiveTrack(track);
+                this.seek(start, end, track)
+                this.ee.emit('timeupdate', start);
                 this.draw(this.render());
             }
-        });
-
-        ee.on('seek', (time) => {
-           this.seekToTime(time);
         });
 
         ee.on('startaudiorendering', (type) => {
@@ -359,15 +355,19 @@ export default class {
         return this.activeTrack;
     }
 
+    isSegmentSelection() {
+        return this.timeSelection.start !== this.timeSelection.end;
+    }
+
     /*
         start, end in seconds.
     */
-    setTimeSelection(start, end) {
+    setTimeSelection(start=0, end=undefined) {
         this.timeSelection = {
             start,
-            end,
-            isSegment : (start!=end)
+            end: (end === undefined) ? start : end
         };
+
         this.cursor = start;
     }
 
@@ -667,29 +667,21 @@ export default class {
         this.lastDraw = undefined;
     }
 
-    seekToTime(time=0, end){
-
-        this.pausedAt = time;
-        this.setTimeSelection(time, end);
-
-        if (this.getState() != 'cursor')
-        {
-            this.stop();
-            return;
+    seek(start, end, track) {
+        if (this.isPlaying()) {
+            this.lastSeeked = start;
+            this.pausedAt = undefined;
+            this.restartPlayFrom(start);
         }
-
-        if (this.isPlaying())
-        {
-            this.restartPlayFrom(time);
-            return;
+        else {
+            //reset if it was paused.
+            this.setActiveTrack(track || this.tracks[0]);
+            this.pausedAt = start;
+            this.setTimeSelection(start, end);
+            if (this.getSeekStyle() == 'fill'){
+                this.playbackSeconds = start;
+            }
         }
-
-        if (this.getSeekStyle() == 'fill'){
-            this.playbackSeconds = time;
-        }
-
-        this.ee.emit('timeupdate', time);
-        this.draw(this.render());
     }
 
     /*
@@ -699,7 +691,6 @@ export default class {
         let currentTime = this.ac.currentTime;
         let playbackSeconds = 0;
         let elapsed;
-        let selection = this.getTimeSelection();
 
         cursorPos = cursorPos || this.cursor;
         elapsed = currentTime - this.lastDraw;
@@ -708,12 +699,12 @@ export default class {
             playbackSeconds = cursorPos + elapsed;
             this.ee.emit('timeupdate', playbackSeconds);
             this.animationRequest = window.requestAnimationFrame(
-              this.updateEditor.bind(this, playbackSeconds)
+                this.updateEditor.bind(this, playbackSeconds)
             );
         }
         else {
             if ((cursorPos + elapsed) >=
-              (selection.isSegment) ? selection.end : this.duration) {
+              (this.isSegmentSelection()) ? selection.end : this.duration) {
                 this.ee.emit('finished');
             }
 
@@ -762,7 +753,7 @@ export default class {
 
     isActiveTrack(track) {
       let activeTrack = this.getActiveTrack();
-      return this.getTimeSelection().isSegment ?
+      return this.isSegmentSelection() ?
         ((activeTrack === track) ? true : false) : true;
     }
 
