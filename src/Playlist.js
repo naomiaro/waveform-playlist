@@ -393,17 +393,20 @@ export default class {
         });
 
 
+        /*
+            TODO cleanup of different audio playouts handling.
+        */
         this.offlineAudioContext.startRendering().then((audioBuffer) => {
-
-            if (type == "buffer") {
+            if (type == 'buffer') {
                 this.ee.emit('audiorenderingfinished', type, audioBuffer);
                 this.isRendering = false;
                 return;
             }
 
             if (type == 'wav') {
-
-                this.exportWorker = new ExportWavWorker();
+                if (this.exportWorker == undefined) {
+                    this.exportWorker = new ExportWavWorker();
+                }
 
                 this.exportWorker.postMessage({
                     command: 'init',
