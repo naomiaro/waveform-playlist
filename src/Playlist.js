@@ -395,13 +395,13 @@ export default class {
 
         this.offlineAudioContext.startRendering().then((audioBuffer) => {
 
-            if (type=="buffer") {
+            if (type == "buffer") {
                 this.ee.emit('audiorenderingfinished', type, audioBuffer);
                 this.isRendering = false;
                 return;
             }
 
-            if (type=='wav') {
+            if (type == 'wav') {
 
                 this.exportWorker = new ExportWavWorker();
 
@@ -411,12 +411,16 @@ export default class {
                         sampleRate: 44100
                     }
                 });
-                var that = this;
+
                 // callback for `exportWAV`
-                this.exportWorker.onmessage = function(e) {
-                    that.ee.emit('audiorenderingfinished', type, e.data);
+                this.exportWorker.onmessage = (e) => {
+                    this.ee.emit('audiorenderingfinished', type, e.data);
                     this.isRendering = false;
 
+                    // clear out the buffer for next renderings.
+                    this.exportWorker.postMessage({
+                        command: 'clear'
+                    });
                 };
 
                 // send the channel data from our buffer to the worker
