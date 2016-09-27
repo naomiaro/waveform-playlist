@@ -75,10 +75,6 @@ export default class {
             });
         };
 
-        this.mediaRecorder.onstop = (e) => {
-            //this.recordingTrack = null;
-        };
-
         //use a worker for calculating recording peaks.
         this.recorderWorker = new RecorderWorker();
         this.recorderWorker.onmessage = (e) => {
@@ -376,8 +372,9 @@ export default class {
     }
 
     startOfflineRender(type){
-        if (this.isRendering)
+        if (this.isRendering) {
             return;
+        }
 
         this.isRendering = true;
         this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100*this.duration, 44100);
@@ -398,14 +395,13 @@ export default class {
 
         this.offlineAudioContext.startRendering().then((audioBuffer) => {
 
-            if (type=="buffer"){
+            if (type=="buffer") {
                 this.ee.emit('audiorenderingfinished', type, audioBuffer);
                 this.isRendering = false;
                 return;
             }
 
-            if (type=='wav')
-            {
+            if (type=='wav') {
 
                 this.exportWorker = new ExportWavWorker();
 
@@ -439,8 +435,8 @@ export default class {
                 });
             }
 
-        }).catch((e)=>{
-                console.log(e);
+        }).catch((e) => {
+            console.log(e);
         });
     }
 
@@ -703,19 +699,24 @@ export default class {
         let currentTime = this.ac.currentTime;
         let playbackSeconds = 0;
         let elapsed;
+        let selection = this.getTimeSelection();
 
         cursorPos = cursorPos || this.cursor;
         elapsed = currentTime - this.lastDraw;
 
-
         if (this.isPlaying()) {
             playbackSeconds = cursorPos + elapsed;
             this.ee.emit('timeupdate', playbackSeconds);
-            this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
-       } else {
-            if ((cursorPos+elapsed) >= (this.getTimeSelection().isSegment)?this.getTimeSelection().end:this.duration){
+            this.animationRequest = window.requestAnimationFrame(
+              this.updateEditor.bind(this, playbackSeconds)
+            );
+        }
+        else {
+            if ((cursorPos + elapsed) >=
+              (selection.isSegment) ? selection.end : this.duration) {
                 this.ee.emit('finished');
             }
+
             this.stopAnimation();
             this.pausedAt = undefined;
             this.lastSeeked = undefined;
@@ -735,7 +736,11 @@ export default class {
             this.tree = newTree;
 
             //use for fast forwarding.
-            this.viewDuration = pixelsToSeconds(this.rootNode.clientWidth - this.controls.width, this.samplesPerPixel, this.sampleRate);
+            this.viewDuration = pixelsToSeconds(
+              this.rootNode.clientWidth - this.controls.width,
+              this.samplesPerPixel,
+              this.sampleRate
+            );
         });
     }
 
@@ -755,14 +760,20 @@ export default class {
         return _defaults(data, defaults);
     }
 
+    isActiveTrack(track) {
+      let activeTrack = this.getActiveTrack();
+      return this.getTimeSelection().isSegment ?
+        ((activeTrack === track) ? true : false) : true;
+    }
+
     render() {
         let controlWidth = this.controls.show ? this.controls.width : 0;
-        let timeScale = new TimeScale(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate, controlWidth);
+        let timeScale = new TimeScale(this.duration, this.scrollLeft,
+          this.samplesPerPixel, this.sampleRate, controlWidth);
 
-        let activeTrack = this.getActiveTrack();
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
-                "isActive": (this.getTimeSelection().isSegment)?((activeTrack === track) ? true : false):true,
+                "isActive": this.isActiveTrack(track),
                 "shouldPlay": this.shouldTrackPlay(track),
                 "soloed": this.soloedTracks.indexOf(track) > -1,
                 "muted": this.mutedTracks.indexOf(track) > -1
@@ -774,7 +785,11 @@ export default class {
                 "style": "overflow: auto;"
             },
             "onscroll": (e) => {
-                this.scrollLeft = pixelsToSeconds(e.target.scrollLeft, this.samplesPerPixel, this.sampleRate);
+                this.scrollLeft = pixelsToSeconds(
+                  e.target.scrollLeft,
+                  this.samplesPerPixel,
+                  this.sampleRate
+                );
                 this.ee.emit("scroll", this.scrollLeft);
             },
             "hook": new ScrollHook(this, this.samplesPerPixel, this.sampleRate)

@@ -199,15 +199,16 @@ $container.on("click", ".btn-info", function() {
 });
 
 $container.on("click", ".btn-download", function () {
-   ee.emit('startaudiorendering', 'wav');
+  ee.emit('startaudiorendering', 'wav');
 });
 
 $container.on("click", ".btn-seektotime", function () {
-   ee.emit("seek", document.getElementById("time").value);
+  var time = parseInt(document.getElementById("seektime").value, 10);
+  ee.emit("seek", time);
 });
 
 $container.on("change", ".select-seek-style", function (node) {
-    playlist.setSeekStyle(node.target.value);
+  playlist.setSeekStyle(node.target.value);
 });
 
 //track drop
