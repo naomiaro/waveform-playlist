@@ -1,5 +1,7 @@
 'use strict';
 
+import EventEmitter from 'event-emitter';
+
 export const STATE_UNINITIALIZED = 0;
 export const STATE_LOADING = 1;
 export const STATE_DECODING = 2;
@@ -7,7 +9,7 @@ export const STATE_FINISHED = 3;
 
 
 export default class {
-    constructor(src, audioContext, ee) {
+    constructor(src, audioContext, ee=EventEmitter()) {
         this.src = src;
         this.ac = audioContext;
         this.audioRequestState = STATE_UNINITIALIZED;

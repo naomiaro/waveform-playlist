@@ -61,7 +61,7 @@ export default class {
             this.chunks.push(e.data);
 
             let recording = new Blob(this.chunks, {'type': 'audio/ogg; codecs=opus'});
-            let loader = LoaderFactory.createLoader(recording, this.ac, this.ee);
+            let loader = LoaderFactory.createLoader(recording, this.ac);
             loader.load().then((audioBuffer) => {
                 //ask web worker for peaks.
                 this.recorderWorker.postMessage({
