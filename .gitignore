@@ -5,3 +5,7 @@
 /lib
 .sass-cache
 /styles
+
+#Ide files
+.idea/*
+.idea
