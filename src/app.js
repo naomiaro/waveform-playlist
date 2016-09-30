@@ -42,6 +42,7 @@ export function init(options={}, ee=EventEmitter()) {
 
     let playlist = new Playlist();
     playlist.setSampleRate(config.sampleRate);
+    playlist.setSpeed(1);
     playlist.setSamplesPerPixel(config.samplesPerPixel);
     playlist.setAudioContext(config.ac);
     playlist.setEventEmitter(ee);

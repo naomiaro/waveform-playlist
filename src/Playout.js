@@ -1,6 +1,6 @@
 'use strict';
 
-import {createFadeIn, createFadeOut} from 'fade-maker';
+import {createFadeIn, createFadeOut} from "fade-maker";
 
 const FADEIN = "FadeIn";
 const FADEOUT = "FadeOut";
@@ -14,7 +14,7 @@ export default class {
         this.destination = this.ac.destination;
     }
 
-    applyFade(type, start, duration, shape="logarithmic") {
+    applyFade(type, start, duration, shape = "logarithmic") {
         if (type === FADEIN) {
             createFadeIn(this.fadeGain.gain, shape, start, duration);
         }
@@ -26,11 +26,11 @@ export default class {
         }
     }
 
-    applyFadeIn(start, duration, shape="logarithmic") {
+    applyFadeIn(start, duration, shape = "logarithmic") {
         this.applyFade(FADEIN, start, duration, shape);
     }
 
-    applyFadeOut(start, duration, shape="logarithmic") {
+    applyFadeOut(start, duration, shape = "logarithmic") {
         this.applyFade(FADEOUT, start, duration, shape);
     }
 
@@ -42,7 +42,7 @@ export default class {
         return this.buffer.duration;
     }
 
-    setAudioContext(audioContext){
+    setAudioContext(audioContext) {
         this.ac = audioContext;
         this.destination = this.ac.destination;
     }
@@ -73,6 +73,7 @@ export default class {
             }
         });
 
+        this.setSpeed(1);
         this.fadeGain = this.ac.createGain();
         //used for track volume slider
         this.volumeGain = this.ac.createGain();
@@ -93,7 +94,7 @@ export default class {
         this.volumeGain && (this.volumeGain.gain.value = level);
     }
 
-    setShouldPlay(bool){
+    setShouldPlay(bool) {
         this.shouldPlayGain && (this.shouldPlayGain.gain.value = bool ? 1 : 0);
     }
 
@@ -101,17 +102,21 @@ export default class {
         this.masterGain && (this.masterGain.gain.value = level);
     }
 
+    setSpeed(speed) {
+        this.source && (this.source.playbackRate.value = speed);
+    }
+
     /*
-        source.start is picky when passing the end time. 
-        If rounding error causes a number to make the source think 
-        it is playing slightly more samples than it has it won't play at all.
-        Unfortunately it doesn't seem to work if you just give it a start time.
-    */
+     source.start is picky when passing the end time.
+     If rounding error causes a number to make the source think
+     it is playing slightly more samples than it has it won't play at all.
+     Unfortunately it doesn't seem to work if you just give it a start time.
+     */
     play(when, start, duration) {
         this.source.start(when, start, duration);
     }
 
-    stop(when=0) {
+    stop(when = 0) {
         this.source && this.source.stop(when);
     }
 }

@@ -209,6 +209,11 @@ export default class {
         this.playout.setMasterGainLevel(level);
     }
 
+    setSpeed(speed){
+        this.speed = speed;
+        this.playout.setSpeed(speed);
+    }
+
     /*
         startTime, endTime in seconds (float).
         segment is for a highlighted section in the UI.
@@ -270,6 +275,9 @@ export default class {
 
         start = start + this.cueIn;
         relPos = startTime - this.startTime;
+
+        console.log("now "+ now);
+        console.log("start " + start);
 
         sourcePromise = playoutSystem.setUpSource();
 

@@ -134,6 +134,10 @@ export default class {
     setUpEventEmitter() {
         let ee = this.ee;
 
+        ee.on('speedchange', (speed) => {
+           this.setSpeed(speed);
+        });
+
         ee.on('select', (start, end, track) => {
             if (this.isPlaying()) {
                 this.lastSeeked = start;
@@ -477,6 +481,13 @@ export default class {
         });
     }
 
+    setSpeed(speed){
+        this.speed = (speed>=0.5 && speed <= 2)? speed : 1;
+        this.tracks.forEach((track) => {
+            track.setSpeed(this.speed);
+        })
+    }
+
     muteTrack(track) {
         let mutedList = this.mutedTracks;
         let index = mutedList.indexOf(track);
@@ -700,9 +711,11 @@ export default class {
 
         cursorPos = cursorPos || this.cursor;
         elapsed = currentTime - this.lastDraw;
+        //console.log(elapsed);
 
         if (this.isPlaying()) {
-            playbackSeconds = cursorPos + elapsed;
+            //console.log("speed " + this.speed);
+            playbackSeconds = cursorPos + elapsed*this.speed;
             this.ee.emit('timeupdate', playbackSeconds);
             this.animationRequest = window.requestAnimationFrame(
                 this.updateEditor.bind(this, playbackSeconds)
