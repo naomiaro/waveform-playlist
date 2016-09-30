@@ -222,6 +222,8 @@ export default class {
         is either stopped or plays out naturally.
     */
     schedulePlay(now, startTime, endTime, options) {
+        //console.log("now" + now + " startTime" + startTime + " endTime " + endTime + ' duration '+ this.duration);
+
         var start,
             duration,
             relPos,
@@ -234,7 +236,7 @@ export default class {
             shouldPlay: true,
             masterGain: 1,
             isOffline: false
-        }
+        };
 
         options = _assign(defaultOptions, options);
 
@@ -252,17 +254,19 @@ export default class {
         //the track starts in the future or on the cursor position
         if (this.startTime >= startTime) {
             start = 0;
-            when = when + this.startTime - startTime; //schedule additional delay for this audio node.
+            when = when + (this.startTime - startTime)/this.speed; //schedule additional delay for this audio node.
 
             if (endTime) {
                 segment = segment - (this.startTime - startTime);
                 duration = Math.min(segment, this.duration);
+
             }
             else {
                 duration = this.duration;
             }
         }
         else {
+            console.log('HEre !! ');
             start = startTime - this.startTime;
 
             if (endTime) {
@@ -276,9 +280,6 @@ export default class {
         start = start + this.cueIn;
         relPos = startTime - this.startTime;
 
-        console.log("now "+ now);
-        console.log("start " + start);
-
         sourcePromise = playoutSystem.setUpSource();
 
         //param relPos: cursor position in seconds relative to this track.
@@ -290,20 +291,20 @@ export default class {
             //only apply fade if it's ahead of the cursor.
             if (relPos < fade.end) {
                 if (relPos <= fade.start) {
-                    startTime = now + (fade.start - relPos);
+                    startTime = now + (fade.start - relPos)/this.speed;
                     duration = fade.end - fade.start;
                 }
                 else if (relPos > fade.start && relPos < fade.end) {
-                    startTime = now - (relPos - fade.start);
+                    startTime = now - (relPos - fade.start)/this.speed;
                     duration = fade.end - fade.start;
                 }
 
                 switch (fade.type) {
                     case FADEIN:
-                        playoutSystem.applyFadeIn(startTime, duration, fade.shape);
+                        playoutSystem.applyFadeIn(startTime, duration/this.speed, fade.shape);
                         break;
                     case FADEOUT:
-                        playoutSystem.applyFadeOut(startTime, duration, fade.shape);
+                        playoutSystem.applyFadeOut(startTime, duration/this.speed, fade.shape);
                         break;
                     default:
                         throw new Error("Invalid fade type saved on track.");
@@ -311,6 +312,7 @@ export default class {
             }
         });
 
+        playoutSystem.setSpeed(this.speed);
         playoutSystem.setVolumeGainLevel(this.gain);
         playoutSystem.setShouldPlay(options.shouldPlay);
         playoutSystem.setMasterGainLevel(options.masterGain);

@@ -73,7 +73,6 @@ export default class {
             }
         });
 
-        this.setSpeed(1);
         this.fadeGain = this.ac.createGain();
         //used for track volume slider
         this.volumeGain = this.ac.createGain();
@@ -103,7 +102,8 @@ export default class {
     }
 
     setSpeed(speed) {
-        this.source && (this.source.playbackRate.value = speed);
+        console.log("callaed ! " + speed);
+        this.speed = speed;
     }
 
     /*
@@ -114,6 +114,7 @@ export default class {
      */
     play(when, start, duration) {
         this.source.start(when, start, duration);
+        this.source.playbackRate.value = this.speed;
     }
 
     stop(when = 0) {

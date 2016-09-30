@@ -324,6 +324,8 @@ export default class {
                 track.setState(this.getState());
                 track.setStartTime(start);
                 track.setPlayout(playout);
+                track.setSpeed(1);
+
 
                 track.setGainLevel(gain);
 
