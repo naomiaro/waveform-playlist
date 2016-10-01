@@ -266,7 +266,6 @@ export default class {
             }
         }
         else {
-            console.log('HEre !! ');
             start = startTime - this.startTime;
 
             if (endTime) {
