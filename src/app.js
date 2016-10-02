@@ -1,7 +1,7 @@
-import _assign from 'lodash.assign';
-import createElement from 'virtual-dom/create-element';
-import EventEmitter from 'event-emitter';
-import Playlist from './Playlist';
+import _assign from "lodash.assign";
+import createElement from "virtual-dom/create-element";
+import EventEmitter from "event-emitter";
+import Playlist from "./Playlist";
 
 
 export function init(options={}, ee=EventEmitter()) {
@@ -42,7 +42,6 @@ export function init(options={}, ee=EventEmitter()) {
 
     let playlist = new Playlist();
     playlist.setSampleRate(config.sampleRate);
-    playlist.setSpeed(1);
     playlist.setSamplesPerPixel(config.samplesPerPixel);
     playlist.setAudioContext(config.ac);
     playlist.setEventEmitter(ee);
@@ -57,6 +56,7 @@ export function init(options={}, ee=EventEmitter()) {
     playlist.setMono(config.mono);
     playlist.setShowTimeScale(config.timescale);
     playlist.setSeekStyle(config.seekStyle);
+    playlist.setSpeed(1);
 
     //take care of initial virtual dom rendering.
     let tree = playlist.render();

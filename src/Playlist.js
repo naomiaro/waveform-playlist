@@ -1,23 +1,17 @@
 'use strict';
 
-import _defaults from 'lodash.defaults';
-
-import h from 'virtual-dom/h';
-import diff from 'virtual-dom/diff';
-import patch from 'virtual-dom/patch';
-
-import {pixelsToSeconds} from './utils/conversions';
-
-import LoaderFactory from './track/loader/LoaderFactory';
-
-import ScrollHook from './render/ScrollHook';
-
-import TimeScale from './TimeScale';
-import Track from './Track';
-import Playout from './Playout';
-
-import RecorderWorker from 'worker!./track/recorderWorker.js';
-import ExportWavWorker from 'worker!./utils/exportWavWorker.js';
+import _defaults from "lodash.defaults";
+import h from "virtual-dom/h";
+import diff from "virtual-dom/diff";
+import patch from "virtual-dom/patch";
+import {pixelsToSeconds} from "./utils/conversions";
+import LoaderFactory from "./track/loader/LoaderFactory";
+import ScrollHook from "./render/ScrollHook";
+import TimeScale from "./TimeScale";
+import Track from "./Track";
+import Playout from "./Playout";
+import RecorderWorker from "worker!./track/recorderWorker.js";
+import ExportWavWorker from "worker!./utils/exportWavWorker.js";
 
 export default class {
 
@@ -487,7 +481,11 @@ export default class {
         this.speed = (speed>=0.5 && speed <= 2)? speed : 1;
         this.tracks.forEach((track) => {
             track.setSpeed(this.speed);
-        })
+        });
+
+        if (this.isPlaying())
+            this.restartPlayFrom(this.playbackSeconds);
+        this.ee.emit('speedchanged', this.speed);
     }
 
     muteTrack(track) {
