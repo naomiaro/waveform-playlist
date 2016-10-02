@@ -208,7 +208,6 @@ export default class {
 
     setSpeed(speed){
         this.speed = speed;
-        this.playout.setSpeed(speed);
     }
 
     /*

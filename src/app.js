@@ -56,7 +56,6 @@ export function init(options={}, ee=EventEmitter()) {
     playlist.setMono(config.mono);
     playlist.setShowTimeScale(config.timescale);
     playlist.setSeekStyle(config.seekStyle);
-    playlist.setSpeed(1);
 
     //take care of initial virtual dom rendering.
     let tree = playlist.render();

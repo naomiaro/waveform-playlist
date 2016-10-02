@@ -30,6 +30,7 @@ export default class {
 
         this.fadeType = "logarithmic";
         this.masterGain = 1;
+        this.speed = 1;
     }
 
     initRecorder(stream) {
@@ -129,7 +130,7 @@ export default class {
         let ee = this.ee;
 
         ee.on('speedchange', (speed) => {
-           this.setSpeed(speed);
+            this.setSpeed(speed);
         });
 
         ee.on('select', (start, end, track) => {
@@ -147,7 +148,7 @@ export default class {
         });
 
         ee.on('startaudiorendering', (type) => {
-           this.startOfflineRender(type);
+            this.startOfflineRender(type);
         });
 
         ee.on('statechange', (state) => {
@@ -198,11 +199,11 @@ export default class {
         });
 
         ee.on('volumechange', (volume, track) => {
-            track.setGainLevel(volume/100);
+            track.setGainLevel(volume / 100);
         });
 
         ee.on('mastervolumechange', (volume) => {
-            this.masterGain = volume/100
+            this.masterGain = volume / 100
             this.tracks.forEach((track) => {
                 track.setMasterGainLevel(this.masterGain);
             });
@@ -241,7 +242,7 @@ export default class {
         });
 
         ee.on('zoomin', () => {
-            let zoomIndex = Math.max(0, this.zoomIndex-1);
+            let zoomIndex = Math.max(0, this.zoomIndex - 1);
             let zoom = this.zoomLevels[zoomIndex];
 
             if (zoom !== this.samplesPerPixel) {
@@ -251,7 +252,7 @@ export default class {
         });
 
         ee.on('zoomout', () => {
-            let zoomIndex = Math.min(this.zoomLevels.length-1, this.zoomIndex+1);
+            let zoomIndex = Math.min(this.zoomLevels.length - 1, this.zoomIndex + 1);
             let zoom = this.zoomLevels[zoomIndex];
 
             if (zoom !== this.samplesPerPixel) {
@@ -265,7 +266,7 @@ export default class {
         });
     }
 
-    load(trackList, options={}) {
+    load(trackList, options = {}) {
         let loadPromises = trackList.map((trackInfo) => {
             let loader = LoaderFactory.createLoader(trackInfo.src, this.ac, this.ee);
             return loader.load();
@@ -344,8 +345,8 @@ export default class {
     }
 
     /*
-        track instance of Track.
-    */
+     track instance of Track.
+     */
     setActiveTrack(track) {
         this.activeTrack = track;
     }
@@ -359,9 +360,9 @@ export default class {
     }
 
     /*
-        start, end in seconds.
-    */
-    setTimeSelection(start=0, end=undefined) {
+     start, end in seconds.
+     */
+    setTimeSelection(start = 0, end = undefined) {
         this.timeSelection = {
             start,
             end: (end === undefined) ? start : end
@@ -370,13 +371,13 @@ export default class {
         this.cursor = start;
     }
 
-    startOfflineRender(type){
+    startOfflineRender(type) {
         if (this.isRendering) {
             return;
         }
 
         this.isRendering = true;
-        this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100*this.duration, 44100);
+        this.offlineAudioContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100 * this.duration, 44100);
 
         var currentTime = this.offlineAudioContext.currentTime,
             startTime = 0,
@@ -386,14 +387,14 @@ export default class {
             track.setOfflinePlayout(new Playout(this.offlineAudioContext, track.buffer));
             track.schedulePlay(currentTime, startTime, endTime, {
                 shouldPlay: this.shouldTrackPlay(track),
-                masterGain : 0.8,
-                isOffline : true
+                masterGain: 0.8,
+                isOffline: true
             });
         });
 
         /*
-            TODO cleanup of different audio playouts handling.
-        */
+         TODO cleanup of different audio playouts handling.
+         */
         this.offlineAudioContext.startRendering().then((audioBuffer) => {
             if (type == 'buffer') {
                 this.ee.emit('audiorenderingfinished', type, audioBuffer);
@@ -477,12 +478,8 @@ export default class {
         });
     }
 
-    setSpeed(speed){
-        this.speed = (speed>=0.5 && speed <= 2)? speed : 1;
-        this.tracks.forEach((track) => {
-            track.setSpeed(this.speed);
-        });
-
+    setSpeed(speed) {
+        this.speed = (speed >= 0.5 && speed <= 4) ? speed : 1;
         if (this.isPlaying())
             this.restartPlayFrom(this.playbackSeconds);
         this.ee.emit('speedchanged', this.speed);
@@ -551,8 +548,8 @@ export default class {
     }
 
     /*
-    *   returns the current point of time in the playlist in seconds.
-    */
+     *   returns the current point of time in the playlist in seconds.
+     */
     getCurrentTime() {
         let cursorPos = this.lastSeeked || this.pausedAt || this.cursor;
 
@@ -563,7 +560,7 @@ export default class {
         return this.ac.currentTime - this.lastPlay;
     }
 
-    setMasterGain(gain){
+    setMasterGain(gain) {
         this.ee.emit('mastervolumechange', gain);
     }
 
@@ -594,10 +591,11 @@ export default class {
         }
 
         this.tracks.forEach((track) => {
+            track.setSpeed(this.speed);
             track.setState('cursor');
             playoutPromises.push(track.schedulePlay(currentTime, startTime, endTime, {
                 shouldPlay: this.shouldTrackPlay(track),
-                masterGain : this.masterGain
+                masterGain: this.masterGain
             }));
         });
 
@@ -694,15 +692,15 @@ export default class {
             this.setActiveTrack(track || this.tracks[0]);
             this.pausedAt = start;
             this.setTimeSelection(start, end);
-            if (this.getSeekStyle() == 'fill'){
+            if (this.getSeekStyle() == 'fill') {
                 this.playbackSeconds = start;
             }
         }
     }
 
     /*
-    * Animation function for the playlist.
-    */
+     * Animation function for the playlist.
+     */
     updateEditor(cursorPos) {
         let currentTime = this.ac.currentTime;
         let playbackSeconds = 0;
@@ -715,7 +713,7 @@ export default class {
 
         if (this.isPlaying()) {
             //console.log("speed " + this.speed);
-            playbackSeconds = cursorPos + elapsed*this.speed;
+            playbackSeconds = cursorPos + elapsed * this.speed;
             this.ee.emit('timeupdate', playbackSeconds);
             this.animationRequest = window.requestAnimationFrame(
                 this.updateEditor.bind(this, playbackSeconds)
@@ -723,7 +721,7 @@ export default class {
         }
         else {
             if ((cursorPos + elapsed) >=
-              (this.isSegmentSelection()) ? selection.end : this.duration) {
+                (this.isSegmentSelection()) ? selection.end : this.duration) {
                 this.ee.emit('finished');
             }
 
@@ -747,14 +745,14 @@ export default class {
 
             //use for fast forwarding.
             this.viewDuration = pixelsToSeconds(
-              this.rootNode.clientWidth - this.controls.width,
-              this.samplesPerPixel,
-              this.sampleRate
+                this.rootNode.clientWidth - this.controls.width,
+                this.samplesPerPixel,
+                this.sampleRate
             );
         });
     }
 
-    getTrackRenderData(data={}) {
+    getTrackRenderData(data = {}) {
         let defaults = {
             "height": this.waveHeight,
             "resolution": this.samplesPerPixel,
@@ -771,15 +769,15 @@ export default class {
     }
 
     isActiveTrack(track) {
-      let activeTrack = this.getActiveTrack();
-      return this.isSegmentSelection() ?
-        ((activeTrack === track) ? true : false) : true;
+        let activeTrack = this.getActiveTrack();
+        return this.isSegmentSelection() ?
+            ((activeTrack === track) ? true : false) : true;
     }
 
     render() {
         let controlWidth = this.controls.show ? this.controls.width : 0;
         let timeScale = new TimeScale(this.duration, this.scrollLeft,
-          this.samplesPerPixel, this.sampleRate, controlWidth);
+            this.samplesPerPixel, this.sampleRate, controlWidth);
 
         let trackElements = this.tracks.map((track) => {
             return track.render(this.getTrackRenderData({
@@ -796,9 +794,9 @@ export default class {
             },
             "onscroll": (e) => {
                 this.scrollLeft = pixelsToSeconds(
-                  e.target.scrollLeft,
-                  this.samplesPerPixel,
-                  this.sampleRate
+                    e.target.scrollLeft,
+                    this.samplesPerPixel,
+                    this.sampleRate
                 );
                 this.ee.emit("scroll", this.scrollLeft);
             },
@@ -814,9 +812,10 @@ export default class {
         containerChildren.push(trackSection);
 
         return h("div.playlist", {
-            "attributes": {
-                "style": "overflow: hidden; position: relative;"
-            }},
+                "attributes": {
+                    "style": "overflow: hidden; position: relative;"
+                }
+            },
             containerChildren
         );
     }
