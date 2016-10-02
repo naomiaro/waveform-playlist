@@ -264,6 +264,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `select` | `start, end, track:optional` | Seek to the start time or start/end selection optionally with active track `track`. |
 | `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
 | `speedchange` | `speed` | Change de playback speed. Minimum is 0.5x and maximum is 4x |
+| `loopnumber` | `number` | -1 : infinite loop. `number` > 1 : perform `number` loops. 0 : disable loops |
 
 #### Events to Listen to
 
@@ -283,6 +284,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `finished` | _none_ | Event fired when cursor ( while playing ) reaches the end (maximum duration) |
 | `audiorenderingfinished` | `type, data` | Return the result of the rendering in the desired format. `type` can be `buffer` or `wav` and can be used to dertermine the  `data` type. When `type` is `wav`, data is a `blob` object that represent the wav file. |
 | `speedchanged` | `speed` | When speed is changed, return the value applied to tracks. |
+| `newloop` | `remaining` |Event fired when one loop finish, and give the number of remaining loops to come |
 
 ## Tests
 
