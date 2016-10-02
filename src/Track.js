@@ -1,20 +1,16 @@
 'use strict';
 
-import _assign from 'lodash.assign';
-import _forOwn from 'lodash.forown';
-
-import uuid from 'uuid';
-import h from 'virtual-dom/h';
-
-import {secondsToPixels, secondsToSamples} from './utils/conversions';
-import extractPeaks from 'webaudio-peaks';
-import stateClasses from './track/states';
-
-import CanvasHook from './render/CanvasHook';
-import FadeCanvasHook from './render/FadeCanvasHook';
-import VolumeSliderHook from './render/VolumeSliderHook';
-
-import {FADEIN, FADEOUT} from 'fade-maker';
+import _assign from "lodash.assign";
+import _forOwn from "lodash.forown";
+import uuid from "uuid";
+import h from "virtual-dom/h";
+import {secondsToPixels, secondsToSamples} from "./utils/conversions";
+import extractPeaks from "webaudio-peaks";
+import stateClasses from "./track/states";
+import CanvasHook from "./render/CanvasHook";
+import FadeCanvasHook from "./render/FadeCanvasHook";
+import VolumeSliderHook from "./render/VolumeSliderHook";
+import {FADEIN, FADEOUT} from "fade-maker";
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -24,6 +20,7 @@ export default class {
 
         this.name = "Untitled";
         this.gain = 1;
+        this.speed = 1;
         this.fades = {};
         this.peakData = {
             type: "WebAudio",
