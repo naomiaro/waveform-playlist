@@ -31,6 +31,7 @@ export default class {
         this.fadeType = "logarithmic";
         this.masterGain = 1;
         this.speed = 1;
+        this.loopNumber = 0;
     }
 
     initRecorder(stream) {
@@ -131,6 +132,10 @@ export default class {
 
         ee.on('speedchange', (speed) => {
             this.setSpeed(speed);
+        });
+
+        ee.on('loopnumber', (number) => {
+            this.setLoop(number);
         });
 
         ee.on('select', (start, end, track) => {
@@ -478,6 +483,11 @@ export default class {
         });
     }
 
+    setLoop(number) {
+        this.loopNumber = number
+    }
+
+
     setSpeed(speed) {
         this.speed = (speed >= 0.5 && speed <= 4) ? speed : 1;
         if (this.isPlaying())
@@ -720,9 +730,19 @@ export default class {
             );
         }
         else {
-            if ((cursorPos + elapsed) >=
-                (this.isSegmentSelection()) ? selection.end : this.duration) {
-                this.ee.emit('finished');
+            if ((cursorPos + elapsed) >= (this.isSegmentSelection()) ? selection.end : this.duration) {
+                if (this.loopNumber > 0) {
+                    this.loopNumber--;
+                    this.ee.emit('newloop', this.loopNumber);
+                    this.restartPlayFrom(selection.start, selection.end)
+                }
+                else if (this.loopNumber == -1) {
+                    this.ee.emit('newloop', this.loopNumber);
+                    this.restartPlayFrom(selection.start, selection.end)
+
+                }
+                else
+                    this.ee.emit('finished');
             }
 
             this.stopAnimation();

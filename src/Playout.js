@@ -102,7 +102,6 @@ export default class {
     }
 
     setSpeed(speed) {
-        console.log("callaed ! " + speed);
         this.speed = speed;
     }
 
