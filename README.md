@@ -263,6 +263,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
 | `select` | `start, end, track:optional` | Seek to the start time or start/end selection optionally with active track `track`. |
 | `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
+| `speedchange` | `speed` | Change de playback speed. In memory until the next play action. If currently playing doesn't do anything |
 
 #### Events to Listen to
 
