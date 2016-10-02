@@ -263,7 +263,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
 | `select` | `start, end, track:optional` | Seek to the start time or start/end selection optionally with active track `track`. |
 | `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
-| `speedchange` | `speed` | Change de playback speed. In memory until the next play action. If currently playing doesn't do anything |
+| `speedchange` | `speed` | Change de playback speed.|
 
 #### Events to Listen to
 
@@ -282,6 +282,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `loadprogress` | `percent, src` | Loading audio `src` has loaded percent `percent` (0-100) |
 | `finished` | _none_ | Event fired when cursor ( while playing ) reaches the end (maximum duration) |
 | `audiorenderingfinished` | `type, data` | Return the result of the rendering in the desired format. `type` can be `buffer` or `wav` and can be used to dertermine the  `data` type. When `type` is `wav`, data is a `blob` object that represent the wav file. |
+| `speedchanged` | `speed` | When speed is changed, return the value applied to tracks. |
 
 ## Tests
 

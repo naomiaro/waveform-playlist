@@ -1,7 +1,7 @@
 /*
  * This script is provided to give an example how the playlist can be controlled using the event emitter.
  * This enables projects to create/control the useability of the project.
-*/
+ */
 var ee = playlist.getEventEmitter();
 var $container = $("body");
 var $timeFormat = $container.find('.time-format');
@@ -16,319 +16,336 @@ var audioPos = 0;
 var downloadUrl = undefined;
 
 function toggleActive(node) {
-  var active = node.parentNode.querySelectorAll('.active');
-  var i = 0, len = active.length;
+    var active = node.parentNode.querySelectorAll('.active');
+    var i = 0, len = active.length;
 
-  for (; i < len; i++) {
-    active[i].classList.remove('active');
-  }
+    for (; i < len; i++) {
+        active[i].classList.remove('active');
+    }
 
-  node.classList.toggle('active');
+    node.classList.toggle('active');
 }
 
 function cueFormatters(format) {
 
-  function clockFormat(seconds, decimals) {
-    var hours,
-        minutes,
-        secs,
-        result;
+    function clockFormat(seconds, decimals) {
+        var hours,
+            minutes,
+            secs,
+            result;
 
-    hours = parseInt(seconds / 3600, 10) % 24;
-    minutes = parseInt(seconds / 60, 10) % 60;
-    secs = seconds % 60;
-    secs = secs.toFixed(decimals);
+        hours = parseInt(seconds / 3600, 10) % 24;
+        minutes = parseInt(seconds / 60, 10) % 60;
+        secs = seconds % 60;
+        secs = secs.toFixed(decimals);
 
-    result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
+        result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
 
-    return result;
-  }
-
-  var formats = {
-    "seconds": function (seconds) {
-        return seconds.toFixed(0);
-    },
-    "thousandths": function (seconds) {
-        return seconds.toFixed(3);
-    },
-    "hh:mm:ss": function (seconds) {
-        return clockFormat(seconds, 0);   
-    },
-    "hh:mm:ss.u": function (seconds) {
-        return clockFormat(seconds, 1);   
-    },
-    "hh:mm:ss.uu": function (seconds) {
-        return clockFormat(seconds, 2);   
-    },
-    "hh:mm:ss.uuu": function (seconds) {
-        return clockFormat(seconds, 3);   
+        return result;
     }
-  };
 
-  return formats[format];
+    var formats = {
+        "seconds": function (seconds) {
+            return seconds.toFixed(0);
+        },
+        "thousandths": function (seconds) {
+            return seconds.toFixed(3);
+        },
+        "hh:mm:ss": function (seconds) {
+            return clockFormat(seconds, 0);
+        },
+        "hh:mm:ss.u": function (seconds) {
+            return clockFormat(seconds, 1);
+        },
+        "hh:mm:ss.uu": function (seconds) {
+            return clockFormat(seconds, 2);
+        },
+        "hh:mm:ss.uuu": function (seconds) {
+            return clockFormat(seconds, 3);
+        }
+    };
+
+    return formats[format];
 }
 
 function updateSelect(start, end) {
-  if (start < end) {
-    $('.btn-trim-audio').removeClass('disabled');
-  }
-  else {
-    $('.btn-trim-audio').addClass('disabled');
-  }
+    if (start < end) {
+        $('.btn-trim-audio').removeClass('disabled');
+    }
+    else {
+        $('.btn-trim-audio').addClass('disabled');
+    }
 
-  $audioStart.val(cueFormatters(format)(start));
-  $audioEnd.val(cueFormatters(format)(end));
+    $audioStart.val(cueFormatters(format)(start));
+    $audioEnd.val(cueFormatters(format)(end));
 
-  startTime = start;
-  endTime = end;
+    startTime = start;
+    endTime = end;
 }
 
 function updateTime(time) {
-  $time.html(cueFormatters(format)(time));
+    $time.html(cueFormatters(format)(time));
 
-  audioPos = time;
+    audioPos = time;
 }
 
 updateSelect(startTime, endTime);
 updateTime(audioPos);
 
 
-
 /*
-* Code below sets up events to send messages to the playlist.
-*/
-$container.on("click", ".btn-playlist-state-group", function() {
-  //reset these for now.
-  $('.btn-fade-state-group').addClass('hidden');
-  $('.btn-select-state-group').addClass('hidden');
+ * Code below sets up events to send messages to the playlist.
+ */
+$container.on("click", ".btn-playlist-state-group", function () {
+    //reset these for now.
+    $('.btn-fade-state-group').addClass('hidden');
+    $('.btn-select-state-group').addClass('hidden');
 
-  if ($('.btn-select').hasClass('active')) {
-    $('.btn-select-state-group').removeClass('hidden');
-  }
+    if ($('.btn-select').hasClass('active')) {
+        $('.btn-select-state-group').removeClass('hidden');
+    }
 
-  if ($('.btn-fadein').hasClass('active') || $('.btn-fadeout').hasClass('active')) {
-    $('.btn-fade-state-group').removeClass('hidden');
-  }
+    if ($('.btn-fadein').hasClass('active') || $('.btn-fadeout').hasClass('active')) {
+        $('.btn-fade-state-group').removeClass('hidden');
+    }
 });
 
-$container.on("click", ".btn-play", function() {
-  ee.emit("play");
+$container.on("click", ".btn-play", function () {
+    ee.emit("play");
 });
 
-$container.on("click", ".btn-pause", function() {
-  ee.emit("pause");
+$container.on("click", ".btn-pause", function () {
+    ee.emit("pause");
 });
 
-$container.on("click", ".btn-stop", function() {
-  ee.emit("stop");
+$container.on("click", ".btn-stop", function () {
+    ee.emit("stop");
 });
 
-$container.on("click", ".btn-rewind", function() {
-  ee.emit("rewind");
+$container.on("click", ".btn-rewind", function () {
+    ee.emit("rewind");
 });
 
-$container.on("click", ".btn-fast-forward", function() {
-  ee.emit("fastforward");
+$container.on("click", ".btn-fast-forward", function () {
+    ee.emit("fastforward");
 });
 
-$container.on("click", ".btn-record", function() {
-  ee.emit("record");
+$container.on("click", ".btn-record", function () {
+    ee.emit("record");
 });
 
 //track interaction states
-$container.on("click", ".btn-cursor", function() {
-  ee.emit("statechange", "cursor");
-  toggleActive(this);
+$container.on("click", ".btn-cursor", function () {
+    ee.emit("statechange", "cursor");
+    toggleActive(this);
 });
 
-$container.on("click", ".btn-select", function() {
-  ee.emit("statechange", "select");
-  toggleActive(this);
+$container.on("click", ".btn-select", function () {
+    ee.emit("statechange", "select");
+    toggleActive(this);
 });
 
-$container.on("click", ".btn-shift", function() {
-  ee.emit("statechange", "shift");
-  toggleActive(this);
+$container.on("click", ".btn-shift", function () {
+    ee.emit("statechange", "shift");
+    toggleActive(this);
 });
 
-$container.on("click", ".btn-fadein", function() {
-  ee.emit("statechange", "fadein");
-  toggleActive(this);
+$container.on("click", ".btn-fadein", function () {
+    ee.emit("statechange", "fadein");
+    toggleActive(this);
 });
 
-$container.on("click", ".btn-fadeout", function() {
-  ee.emit("statechange", "fadeout");
-  toggleActive(this);
+$container.on("click", ".btn-fadeout", function () {
+    ee.emit("statechange", "fadeout");
+    toggleActive(this);
 });
 
 //fade types
-$container.on("click", ".btn-logarithmic", function() {
-  ee.emit("fadetype", "logarithmic");
-  toggleActive(this);
+$container.on("click", ".btn-logarithmic", function () {
+    ee.emit("fadetype", "logarithmic");
+    toggleActive(this);
 });
 
-$container.on("click", ".btn-linear", function() {
-  ee.emit("fadetype", "linear");
-  toggleActive(this);
+$container.on("click", ".btn-linear", function () {
+    ee.emit("fadetype", "linear");
+    toggleActive(this);
 });
 
-$container.on("click", ".btn-scurve", function() {
-  ee.emit("fadetype", "sCurve");
-  toggleActive(this);
+$container.on("click", ".btn-scurve", function () {
+    ee.emit("fadetype", "sCurve");
+    toggleActive(this);
 });
 
-$container.on("click", ".btn-exponential", function() {
-  ee.emit("fadetype", "exponential");
-  toggleActive(this);
+$container.on("click", ".btn-exponential", function () {
+    ee.emit("fadetype", "exponential");
+    toggleActive(this);
 });
 
 //zoom buttons
-$container.on("click", ".btn-zoom-in", function() {
-  ee.emit("zoomin");
+$container.on("click", ".btn-zoom-in", function () {
+    ee.emit("zoomin");
 });
 
-$container.on("click", ".btn-zoom-out", function() {
-  ee.emit("zoomout");
+$container.on("click", ".btn-zoom-out", function () {
+    ee.emit("zoomout");
 });
 
-$container.on("click", ".btn-trim-audio", function() {
-  ee.emit("trim");
+$container.on("click", ".btn-trim-audio", function () {
+    ee.emit("trim");
 });
 
-$container.on("click", ".btn-info", function() {
-  console.log(playlist.getInfo());
+$container.on("click", ".btn-info", function () {
+    console.log(playlist.getInfo());
 });
 
 $container.on("click", ".btn-download", function () {
-  ee.emit('startaudiorendering', 'wav');
+    ee.emit('startaudiorendering', 'wav');
 });
 
 $container.on("click", ".btn-seektotime", function () {
-  var time = parseInt(document.getElementById("seektime").value, 10);
-  ee.emit("select", time, time);
+    var time = parseInt(document.getElementById("seektime").value, 10);
+    ee.emit("select", time, time);
 });
 
 $container.on("change", ".select-seek-style", function (node) {
-  playlist.setSeekStyle(node.target.value);
+    playlist.setSeekStyle(node.target.value);
 });
 
 //track drop
-$container.on("dragenter", ".track-drop", function(e) {
-  e.preventDefault();
-  e.target.classList.add("drag-enter");
+$container.on("dragenter", ".track-drop", function (e) {
+    e.preventDefault();
+    e.target.classList.add("drag-enter");
 });
 
-$container.on("dragover", ".track-drop", function(e) {
-  e.preventDefault();
+$container.on("dragover", ".track-drop", function (e) {
+    e.preventDefault();
 });
 
-$container.on("dragleave", ".track-drop", function(e) {
-  e.preventDefault();
-  e.target.classList.remove("drag-enter");
+$container.on("dragleave", ".track-drop", function (e) {
+    e.preventDefault();
+    e.target.classList.remove("drag-enter");
 });
 
-$container.on("drop", ".track-drop", function(e) {
-  e.preventDefault();
-  e.target.classList.remove("drag-enter");
+$container.on("drop", ".track-drop", function (e) {
+    e.preventDefault();
+    e.target.classList.remove("drag-enter");
 
-  var dropEvent = e.originalEvent;
+    var dropEvent = e.originalEvent;
 
-  for (var i = 0; i < dropEvent.dataTransfer.files.length; i++) {
-    ee.emit("newtrack", dropEvent.dataTransfer.files[i]);
-  }
+    for (var i = 0; i < dropEvent.dataTransfer.files.length; i++) {
+        ee.emit("newtrack", dropEvent.dataTransfer.files[i]);
+    }
 });
 
-$container.on("change", ".time-format", function(e) {
-  format = $timeFormat.val();
+$container.on("change", ".time-format", function (e) {
+    format = $timeFormat.val();
 
-  updateSelect(startTime, endTime);
-  updateTime(audioPos);
+    updateSelect(startTime, endTime);
+    updateTime(audioPos);
 });
 
-$container.on("input change", ".master-gain", function(node){
-  ee.emit("mastervolumechange", node.target.value);
+$container.on("input change", ".master-gain", function (node) {
+    ee.emit("mastervolumechange", node.target.value);
+});
+
+$container.on("input change", ".speed-slider", function (node) {
+    document.getElementById('speedValue').value = node.target.value;
+    ee.emit("speedchange", node.target.value);
+    displaySoundStatus("Playback speed is now " + node.target.value + "x !");
+});
+
+$container.on("click", ".btn-speed-change", function () {
+    var value = document.getElementById('speedValue').value;
+    ee.emit("speedchange", value);
+    displaySoundStatus("Playback speed is now " + value + "x !");
 });
 
 function displaySoundStatus(status) {
-  $(".sound-status").html(status);
+    $(".sound-status").html(status);
 }
 
 function displayLoadingData(data) {
-  var info = $("<div/>").append(data);
-  $(".loading-data").append(info);
+    var info = $("<div/>").append(data);
+    $(".loading-data").append(info);
 }
 
 function displayDownloadLink(link) {
-  var dateString = (new Date()).toISOString();
-  var $link = $("<a/>", {
-    'href': link,
-    'download': 'waveformplaylist' + dateString + '.wav',
-    'text': 'Download mix ' + dateString,
-    'class': 'btn btn-small btn-download-link'
-  });
+    var dateString = (new Date()).toISOString();
+    var $link = $("<a/>", {
+        'href': link,
+        'download': 'waveformplaylist' + dateString + '.wav',
+        'text': 'Download mix ' + dateString,
+        'class': 'btn btn-small btn-download-link'
+    });
 
-  $('.btn-download-link').remove();
-  $('.btn-download').after($link);
+    $('.btn-download-link').remove();
+    $('.btn-download').after($link);
 }
 
 
 /*
-* Code below receives updates from the playlist.
-*/
+ * Code below receives updates from the playlist.
+ */
 ee.on("select", updateSelect);
 
 ee.on("timeupdate", updateTime);
 
-ee.on("mute", function(track) {
-  displaySoundStatus("Mute button pressed for " + track.name);
+ee.on("mute", function (track) {
+    displaySoundStatus("Mute button pressed for " + track.name);
 });
 
-ee.on("solo", function(track) {
-  displaySoundStatus("Solo button pressed for " + track.name);
+ee.on("solo", function (track) {
+    displaySoundStatus("Solo button pressed for " + track.name);
 });
 
-ee.on("volumechange", function(volume, track) {
-  displaySoundStatus(track.name + " now has volume " + volume + ".");
+ee.on("volumechange", function (volume, track) {
+    displaySoundStatus(track.name + " now has volume " + volume + ".");
 });
 
-ee.on("mastervolumechange", function(volume) {
-  displaySoundStatus("Master volume now has volume " + volume + ".");
+ee.on("mastervolumechange", function (volume) {
+    displaySoundStatus("Master volume now has volume " + volume + ".");
 });
 
 
 var audioStates = ["uninitialized", "loading", "decoding", "finished"];
 
-ee.on("audiorequeststatechange", function(state, src) {
-  var name = src;
+ee.on("audiorequeststatechange", function (state, src) {
+    var name = src;
 
-  if (src instanceof File) {
-    name = src.name;
-  }
+    if (src instanceof File) {
+        name = src.name;
+    }
 
-  displayLoadingData("Track " + name + " is in state " + audioStates[state]);
+    displayLoadingData("Track " + name + " is in state " + audioStates[state]);
 });
 
-ee.on("loadprogress", function(percent, src) {
-  var name = src;
+ee.on("loadprogress", function (percent, src) {
+    var name = src;
 
-  if (src instanceof File) {
-    name = src.name;
-  }
+    if (src instanceof File) {
+        name = src.name;
+    }
 
-  displayLoadingData("Track " + name + " has loaded " + percent + "%");
+    displayLoadingData("Track " + name + " has loaded " + percent + "%");
 });
 
 ee.on('audiorenderingfinished', function (type, data) {
-  if (type == 'wav'){
-    if (downloadUrl) {
-      window.URL.revokeObjectURL(downloadUrl);
-    }
+    if (type == 'wav') {
+        if (downloadUrl) {
+            window.URL.revokeObjectURL(downloadUrl);
+        }
 
-    downloadUrl = window.URL.createObjectURL(data);
-    displayDownloadLink(downloadUrl);
-  }
+        downloadUrl = window.URL.createObjectURL(data);
+        displayDownloadLink(downloadUrl);
+    }
 });
 
 ee.on('finished', function () {
-  console.log("The cursor has reached the end of the selection !");
+    console.log("The cursor has reached the end of the selection !");
+});
+
+ee.on('speedchanged', function (speed) {
+    document.getElementById('speedValue').value = speed;
+    document.querySelector(".speed-slider").value = speed;
+    displaySoundStatus("Received speed : " + speed + "x ");
 });
