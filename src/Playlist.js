@@ -16,8 +16,8 @@ import TimeScale from './TimeScale';
 import Track from './Track';
 import Playout from './Playout';
 
-import RecorderWorker from 'worker!./track/recorderWorker.js';
-import ExportWavWorker from 'worker!./utils/exportWavWorker.js';
+import RecorderWorker from 'worker?inline!./track/recorderWorker.js';
+import ExportWavWorker from 'worker?inline!./utils/exportWavWorker.js';
 
 export default class {
 
