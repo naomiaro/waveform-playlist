@@ -16,11 +16,12 @@ import TimeScale from './TimeScale';
 import Track from './Track';
 import Playout from './Playout';
 
-import RecorderWorker from 'worker?inline!./track/recorderWorker.js';
-import ExportWavWorker from 'worker?inline!./utils/exportWavWorker.js';
+const InlineWorker = require("inline-worker");
+
+import RecorderWorkerFunction from './utils/recorderWorker';
+import ExportWavWorkerFunction from './utils/exportWavWorker';
 
 export default class {
-
     constructor() {
 
         this.tracks = [];
@@ -38,10 +39,16 @@ export default class {
         this.masterGain = 1;
     }
 
+    //TODO extract into a plugin
+    initExporter() {
+        this.exportWorker = new InlineWorker(ExportWavWorkerFunction);
+    }
+
+    //TODO extract into a plugin
     initRecorder(stream) {
-        if (stream instanceof LocalMediaStream !== true) {
-            throw new Error("Must provide a LocalMediaStream to record from");
-        }
+        // if (stream instanceof LocalMediaStream !== true) {
+        //     throw new Error("Must provide a LocalMediaStream to record from");
+        // }
 
         this.mediaRecorder = new MediaRecorder(stream);
 
@@ -75,11 +82,16 @@ export default class {
             });
         };
 
+        this.recorderWorker = new InlineWorker(RecorderWorkerFunction);
+        //this.recorderWorker.postMessage({url: document.location.protocol + '//' + document.location.host});
         //use a worker for calculating recording peaks.
-        this.recorderWorker = new RecorderWorker();
         this.recorderWorker.onmessage = (e) => {
             this.recordingTrack.setPeaks(e.data);
             this.draw(this.render());
+        };
+
+        this.recorderWorker.onerror = (e) => {
+            console.log(e);
         };
     }
 
@@ -402,10 +414,6 @@ export default class {
             }
 
             if (type == 'wav') {
-                if (this.exportWorker == undefined) {
-                    this.exportWorker = new ExportWavWorker();
-                }
-
                 this.exportWorker.postMessage({
                     command: 'init',
                     config: {
