@@ -1546,13 +1546,15 @@ var WaveformPlaylist =
 	
 	var _recorderWorker2 = _interopRequireDefault(_recorderWorker);
 	
-	var _exportWavWorker = __webpack_require__(80);
+	var _exportWavWorker = __webpack_require__(79);
 	
 	var _exportWavWorker2 = _interopRequireDefault(_exportWavWorker);
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	var InlineWorker = __webpack_require__(80);
 	
 	var _class = function () {
 	    function _class() {
@@ -1573,14 +1575,25 @@ var WaveformPlaylist =
 	        this.masterGain = 1;
 	    }
 	
+	    //TODO extract into a plugin
+	
+	
 	    _createClass(_class, [{
+	        key: 'initExporter',
+	        value: function initExporter() {
+	            this.exportWorker = new InlineWorker(_exportWavWorker2.default);
+	        }
+	
+	        //TODO extract into a plugin
+	
+	    }, {
 	        key: 'initRecorder',
 	        value: function initRecorder(stream) {
 	            var _this = this;
 	
-	            if (stream instanceof LocalMediaStream !== true) {
-	                throw new Error("Must provide a LocalMediaStream to record from");
-	            }
+	            // if (stream instanceof LocalMediaStream !== true) {
+	            //     throw new Error("Must provide a LocalMediaStream to record from");
+	            // }
 	
 	            this.mediaRecorder = new MediaRecorder(stream);
 	
@@ -1614,11 +1627,16 @@ var WaveformPlaylist =
 	                });
 	            };
 	
+	            this.recorderWorker = new InlineWorker(_recorderWorker2.default);
+	            //this.recorderWorker.postMessage({url: document.location.protocol + '//' + document.location.host});
 	            //use a worker for calculating recording peaks.
-	            this.recorderWorker = new _recorderWorker2.default();
 	            this.recorderWorker.onmessage = function (e) {
 	                _this.recordingTrack.setPeaks(e.data);
 	                _this.draw(_this.render());
+	            };
+	
+	            this.recorderWorker.onerror = function (e) {
+	                console.log(e);
 	            };
 	        }
 	    }, {
@@ -1974,10 +1992,6 @@ var WaveformPlaylist =
 	                }
 	
 	                if (type == 'wav') {
-	                    if (_this4.exportWorker == undefined) {
-	                        _this4.exportWorker = new _exportWavWorker2.default();
-	                    }
-	
 	                    _this4.exportWorker.postMessage({
 	                        command: 'init',
 	                        config: {
@@ -7587,47 +7601,376 @@ var WaveformPlaylist =
 
 /***/ },
 /* 78 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ function(module, exports) {
 
-	module.exports = function() {
-		return __webpack_require__(79)("/******/ (function(modules) { // webpackBootstrap\n/******/ \t// The module cache\n/******/ \tvar installedModules = {};\n/******/\n/******/ \t// The require function\n/******/ \tfunction __webpack_require__(moduleId) {\n/******/\n/******/ \t\t// Check if module is in cache\n/******/ \t\tif(installedModules[moduleId])\n/******/ \t\t\treturn installedModules[moduleId].exports;\n/******/\n/******/ \t\t// Create a new module (and put it into the cache)\n/******/ \t\tvar module = installedModules[moduleId] = {\n/******/ \t\t\texports: {},\n/******/ \t\t\tid: moduleId,\n/******/ \t\t\tloaded: false\n/******/ \t\t};\n/******/\n/******/ \t\t// Execute the module function\n/******/ \t\tmodules[moduleId].call(module.exports, module, module.exports, __webpack_require__);\n/******/\n/******/ \t\t// Flag the module as loaded\n/******/ \t\tmodule.loaded = true;\n/******/\n/******/ \t\t// Return the exports of the module\n/******/ \t\treturn module.exports;\n/******/ \t}\n/******/\n/******/\n/******/ \t// expose the modules object (__webpack_modules__)\n/******/ \t__webpack_require__.m = modules;\n/******/\n/******/ \t// expose the module cache\n/******/ \t__webpack_require__.c = installedModules;\n/******/\n/******/ \t// __webpack_public_path__\n/******/ \t__webpack_require__.p = \"/waveform-playlist/js/\";\n/******/\n/******/ \t// Load entry module and return exports\n/******/ \treturn __webpack_require__(0);\n/******/ })\n/************************************************************************/\n/******/ ([\n/* 0 */\n/***/ function(module, exports, __webpack_require__) {\n\n\t'use strict';\n\t\n\tvar _webaudioPeaks = __webpack_require__(1);\n\t\n\tvar _webaudioPeaks2 = _interopRequireDefault(_webaudioPeaks);\n\t\n\tfunction _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }\n\t\n\tonmessage = function onmessage(e) {\n\t    var peaks = (0, _webaudioPeaks2.default)(e.data.samples, e.data.samplesPerPixel);\n\t\n\t    postMessage(peaks);\n\t};\n\n/***/ },\n/* 1 */\n/***/ function(module, exports) {\n\n\t'use strict';\n\t\n\t//http://jsperf.com/typed-array-min-max/2\n\t//plain for loop for finding min/max is way faster than anything else.\n\t/**\n\t* @param {TypedArray} array - Subarray of audio to calculate peaks from.\n\t*/\n\tfunction findMinMax(array) {\n\t    var min = Infinity;\n\t    var max = -Infinity;\n\t    var i = 0;\n\t    var len = array.length;\n\t    var curr;\n\t\n\t    for (; i < len; i++) {\n\t        curr = array[i];\n\t        if (min > curr) {\n\t            min = curr;\n\t        }\n\t        if (max < curr) {\n\t            max = curr;\n\t        }\n\t    }\n\t\n\t    return {\n\t        min: min,\n\t        max: max\n\t    };\n\t}\n\t\n\t/**\n\t* @param {Number} n - peak to convert from float to Int8, Int16 etc.\n\t* @param {Number} bits - convert to #bits two's complement signed integer\n\t*/\n\tfunction convert(n, bits) {\n\t    var max = Math.pow(2, bits-1);\n\t    var v = n < 0 ? n * max : n * max - 1;\n\t    return Math.max(-max, Math.min(max-1, v));\n\t}\n\t\n\t/**\n\t* @param {TypedArray} channel - Audio track frames to calculate peaks from.\n\t* @param {Number} samplesPerPixel - Audio frames per peak\n\t*/\n\tfunction extractPeaks(channel, samplesPerPixel, bits) {\n\t    var i;\n\t    var chanLength = channel.length;\n\t    var numPeaks = Math.ceil(chanLength / samplesPerPixel);\n\t    var start;\n\t    var end;\n\t    var segment;\n\t    var max; \n\t    var min;\n\t    var extrema;\n\t\n\t    //create interleaved array of min,max\n\t    var peaks = new (eval(\"Int\"+bits+\"Array\"))(numPeaks*2);\n\t\n\t    for (i = 0; i < numPeaks; i++) {\n\t\n\t        start = i * samplesPerPixel;\n\t        end = (i + 1) * samplesPerPixel > chanLength ? chanLength : (i + 1) * samplesPerPixel;\n\t\n\t        segment = channel.subarray(start, end);\n\t        extrema = findMinMax(segment);\n\t        min = convert(extrema.min, bits);\n\t        max = convert(extrema.max, bits);\n\t\n\t        peaks[i*2] = min;\n\t        peaks[i*2+1] = max;\n\t    }\n\t\n\t    return peaks;\n\t}\n\t\n\tfunction makeMono(channelPeaks, bits) {\n\t    var numChan = channelPeaks.length;\n\t    var weight = 1 / numChan;\n\t    var numPeaks = channelPeaks[0].length / 2;\n\t    var c = 0;\n\t    var i = 0;\n\t    var min;\n\t    var max;\n\t    var peaks = new (eval(\"Int\"+bits+\"Array\"))(numPeaks*2);\n\t\n\t    for (i = 0; i < numPeaks; i++) {\n\t        min = 0;\n\t        max = 0;\n\t\n\t        for (c = 0; c < numChan; c++) {\n\t            min += weight * channelPeaks[c][i*2];\n\t            max += weight * channelPeaks[c][i*2+1];\n\t        }\n\t\n\t        peaks[i*2] = min;\n\t        peaks[i*2+1] = max;\n\t    }\n\t\n\t    //return in array so channel number counts still work.\n\t    return [peaks];\n\t}\n\t\n\t/**\n\t* @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.\n\t* @param {Number} samplesPerPixel - Number of audio samples per peak.\n\t* @param {Number} cueIn - index in channel to start peak calculations from.\n\t* @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).\n\t*/\n\tmodule.exports = function(source, samplesPerPixel, isMono, cueIn, cueOut, bits) {\n\t    samplesPerPixel = samplesPerPixel || 10000;\n\t    bits = bits || 8;\n\t    isMono = isMono || true;\n\t\n\t    if ([8, 16, 32].indexOf(bits) < 0) {\n\t        throw new Error(\"Invalid number of bits specified for peaks.\");\n\t    }\n\t\n\t    var numChan = source.numberOfChannels;\n\t    var peaks = [];\n\t    var c;\n\t    var numPeaks;\n\t    var channel;\n\t    var slice;\n\t\n\t    if (typeof source.subarray === \"undefined\") {\n\t        for (c = 0; c < numChan; c++) {\n\t            channel = source.getChannelData(c);\n\t            cueIn = cueIn || 0;\n\t            cueOut = cueOut || channel.length;\n\t            slice = channel.subarray(cueIn, cueOut);\n\t            peaks.push(extractPeaks(slice, samplesPerPixel, bits));\n\t        }\n\t    }\n\t    else {\n\t        cueIn = cueIn || 0;\n\t        cueOut = cueOut || source.length;\n\t        peaks.push(extractPeaks(source.subarray(cueIn, cueOut), samplesPerPixel, bits));\n\t    }\n\t\n\t    if (isMono && peaks.length > 1) {\n\t        peaks = makeMono(peaks, bits);\n\t    }\n\t\n\t    numPeaks = peaks[0].length / 2;\n\t\n\t    return {\n\t        length: numPeaks,\n\t        data: peaks,\n\t        bits: bits\n\t    };\n\t};\n\n/***/ }\n/******/ ]);\n//# sourceMappingURL=301ffd7b6b1f9a16c47c.worker.js.map", __webpack_require__.p + "301ffd7b6b1f9a16c47c.worker.js");
+	"use strict";
+	
+	Object.defineProperty(exports, "__esModule", {
+	    value: true
+	});
+	
+	exports.default = function () {
+	    //http://jsperf.com/typed-array-min-max/2
+	    //plain for loop for finding min/max is way faster than anything else.
+	    /**
+	    * @param {TypedArray} array - Subarray of audio to calculate peaks from.
+	    */
+	    function findMinMax(array) {
+	        var min = Infinity;
+	        var max = -Infinity;
+	        var i;
+	        var curr;
+	
+	        for (i = 0; i < array.length; i++) {
+	            curr = array[i];
+	            if (min > curr) {
+	                min = curr;
+	            }
+	            if (max < curr) {
+	                max = curr;
+	            }
+	        }
+	
+	        return {
+	            min: min,
+	            max: max
+	        };
+	    }
+	
+	    /**
+	    * @param {Number} n - peak to convert from float to Int8, Int16 etc.
+	    * @param {Number} bits - convert to #bits two's complement signed integer
+	    */
+	    function convert(n, bits) {
+	        var max = Math.pow(2, bits - 1);
+	        var v = n < 0 ? n * max : n * max - 1;
+	        return Math.max(-max, Math.min(max - 1, v));
+	    }
+	
+	    /**
+	    * @param {TypedArray} channel - Audio track frames to calculate peaks from.
+	    * @param {Number} samplesPerPixel - Audio frames per peak
+	    */
+	    function extractPeaks(channel, samplesPerPixel, bits) {
+	        var i;
+	        var chanLength = channel.length;
+	        var numPeaks = Math.ceil(chanLength / samplesPerPixel);
+	        var start;
+	        var end;
+	        var segment;
+	        var max;
+	        var min;
+	        var extrema;
+	
+	        //create interleaved array of min,max
+	        var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
+	
+	        for (i = 0; i < numPeaks; i++) {
+	
+	            start = i * samplesPerPixel;
+	            end = (i + 1) * samplesPerPixel > chanLength ? chanLength : (i + 1) * samplesPerPixel;
+	
+	            segment = channel.subarray(start, end);
+	            extrema = findMinMax(segment);
+	            min = convert(extrema.min, bits);
+	            max = convert(extrema.max, bits);
+	
+	            peaks[i * 2] = min;
+	            peaks[i * 2 + 1] = max;
+	        }
+	
+	        return peaks;
+	    }
+	
+	    function makeMono(channelPeaks, bits) {
+	        var numChan = channelPeaks.length;
+	        var weight = 1 / numChan;
+	        var numPeaks = channelPeaks[0].length / 2;
+	        var c = 0;
+	        var i = 0;
+	        var min;
+	        var max;
+	        var peaks = new (eval("Int" + bits + "Array"))(numPeaks * 2);
+	
+	        for (i = 0; i < numPeaks; i++) {
+	            min = 0;
+	            max = 0;
+	
+	            for (c = 0; c < numChan; c++) {
+	                min += weight * channelPeaks[c][i * 2];
+	                max += weight * channelPeaks[c][i * 2 + 1];
+	            }
+	
+	            peaks[i * 2] = min;
+	            peaks[i * 2 + 1] = max;
+	        }
+	
+	        //return in array so channel number counts still work.
+	        return [peaks];
+	    }
+	
+	    /**
+	    * @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.
+	    * @param {Number} samplesPerPixel - Number of audio samples per peak.
+	    * @param {Number} cueIn - index in channel to start peak calculations from.
+	    * @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).
+	    */
+	    function audioPeaks(source, samplesPerPixel, isMono, cueIn, cueOut, bits) {
+	        samplesPerPixel = samplesPerPixel || 10000;
+	        bits = bits || 8;
+	        isMono = isMono || true;
+	
+	        if ([8, 16, 32].indexOf(bits) < 0) {
+	            throw new Error("Invalid number of bits specified for peaks.");
+	        }
+	
+	        var numChan = source.numberOfChannels;
+	        var peaks = [];
+	        var c;
+	        var numPeaks;
+	        var channel;
+	        var slice;
+	
+	        if (typeof source.subarray === "undefined") {
+	            for (c = 0; c < numChan; c++) {
+	                channel = source.getChannelData(c);
+	                cueIn = cueIn || 0;
+	                cueOut = cueOut || channel.length;
+	                slice = channel.subarray(cueIn, cueOut);
+	                peaks.push(extractPeaks(slice, samplesPerPixel, bits));
+	            }
+	        } else {
+	            cueIn = cueIn || 0;
+	            cueOut = cueOut || source.length;
+	            peaks.push(extractPeaks(source.subarray(cueIn, cueOut), samplesPerPixel, bits));
+	        }
+	
+	        if (isMono && peaks.length > 1) {
+	            peaks = makeMono(peaks, bits);
+	        }
+	
+	        numPeaks = peaks[0].length / 2;
+	
+	        return {
+	            length: numPeaks,
+	            data: peaks,
+	            bits: bits
+	        };
+	    }
+	
+	    onmessage = function onmessage(e) {
+	        // if (e.data.url) {
+	        //     importScripts(e.data.url + '/peaks.js');
+	        //     return;
+	        // }
+	
+	        var peaks = audioPeaks(e.data.samples, e.data.samplesPerPixel);
+	
+	        postMessage(peaks);
+	    };
 	};
 
 /***/ },
 /* 79 */
 /***/ function(module, exports) {
 
-	// http://stackoverflow.com/questions/10343913/how-to-create-a-web-worker-from-a-string
+	'use strict';
 	
-	var URL = window.URL || window.webkitURL;
-	module.exports = function(content, url) {
-		try {
-			try {
-				var blob;
-				try { // BlobBuilder = Deprecated, but widely implemented
-					var BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder || window.MSBlobBuilder;
-					blob = new BlobBuilder();
-					blob.append(content);
-					blob = blob.getBlob();
-				} catch(e) { // The proposed API
-					blob = new Blob([content]);
-				}
-				return new Worker(URL.createObjectURL(blob));
-			} catch(e) {
-				return new Worker('data:application/javascript,' + encodeURIComponent(content));
-			}
-		} catch(e) {
-			return new Worker(url);
-		}
-	}
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	exports.default = function () {
+	
+	  var recLength = 0,
+	      recBuffersL = [],
+	      recBuffersR = [],
+	      sampleRate;
+	
+	  onmessage = function onmessage(e) {
+	    switch (e.data.command) {
+	      case 'init':
+	        init(e.data.config);
+	        break;
+	      case 'record':
+	        record(e.data.buffer);
+	        break;
+	      case 'exportWAV':
+	        exportWAV(e.data.type);
+	        break;
+	      case 'exportMonoWAV':
+	        exportMonoWAV(e.data.type);
+	        break;
+	      case 'getBuffers':
+	        getBuffers();
+	        break;
+	      case 'clear':
+	        clear();
+	        break;
+	    }
+	  };
+	
+	  function init(config) {
+	    sampleRate = config.sampleRate;
+	  }
+	
+	  function record(inputBuffer) {
+	    recBuffersL.push(inputBuffer[0]);
+	    recBuffersR.push(inputBuffer[1]);
+	    recLength += inputBuffer[0].length;
+	  }
+	
+	  function exportWAV(type) {
+	    var bufferL = mergeBuffers(recBuffersL, recLength);
+	    var bufferR = mergeBuffers(recBuffersR, recLength);
+	    var interleaved = interleave(bufferL, bufferR);
+	    var dataview = encodeWAV(interleaved);
+	    var audioBlob = new Blob([dataview], { type: type });
+	
+	    postMessage(audioBlob);
+	  }
+	
+	  function exportMonoWAV(type) {
+	    var bufferL = mergeBuffers(recBuffersL, recLength);
+	    var dataview = encodeWAV(bufferL, true);
+	    var audioBlob = new Blob([dataview], { type: type });
+	
+	    postMessage(audioBlob);
+	  }
+	
+	  function getBuffers() {
+	    var buffers = [];
+	    buffers.push(mergeBuffers(recBuffersL, recLength));
+	    buffers.push(mergeBuffers(recBuffersR, recLength));
+	    postMessage(buffers);
+	  }
+	
+	  function clear() {
+	    recLength = 0;
+	    recBuffersL = [];
+	    recBuffersR = [];
+	  }
+	
+	  function mergeBuffers(recBuffers, recLength) {
+	    var result = new Float32Array(recLength);
+	    var offset = 0;
+	    for (var i = 0; i < recBuffers.length; i++) {
+	      result.set(recBuffers[i], offset);
+	      offset += recBuffers[i].length;
+	    }
+	    return result;
+	  }
+	
+	  function interleave(inputL, inputR) {
+	    var length = inputL.length + inputR.length;
+	    var result = new Float32Array(length);
+	
+	    var index = 0,
+	        inputIndex = 0;
+	
+	    while (index < length) {
+	      result[index++] = inputL[inputIndex];
+	      result[index++] = inputR[inputIndex];
+	      inputIndex++;
+	    }
+	    return result;
+	  }
+	
+	  function floatTo16BitPCM(output, offset, input) {
+	    for (var i = 0; i < input.length; i++, offset += 2) {
+	      var s = Math.max(-1, Math.min(1, input[i]));
+	      output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+	    }
+	  }
+	
+	  function writeString(view, offset, string) {
+	    for (var i = 0; i < string.length; i++) {
+	      view.setUint8(offset + i, string.charCodeAt(i));
+	    }
+	  }
+	
+	  function encodeWAV(samples, mono) {
+	    var buffer = new ArrayBuffer(44 + samples.length * 2);
+	    var view = new DataView(buffer);
+	
+	    /* RIFF identifier */
+	    writeString(view, 0, 'RIFF');
+	    /* file length */
+	    view.setUint32(4, 32 + samples.length * 2, true);
+	    /* RIFF type */
+	    writeString(view, 8, 'WAVE');
+	    /* format chunk identifier */
+	    writeString(view, 12, 'fmt ');
+	    /* format chunk length */
+	    view.setUint32(16, 16, true);
+	    /* sample format (raw) */
+	    view.setUint16(20, 1, true);
+	    /* channel count */
+	    view.setUint16(22, mono ? 1 : 2, true);
+	    /* sample rate */
+	    view.setUint32(24, sampleRate, true);
+	    /* byte rate (sample rate * block align) */
+	    view.setUint32(28, sampleRate * 4, true);
+	    /* block align (channel count * bytes per sample) */
+	    view.setUint16(32, 4, true);
+	    /* bits per sample */
+	    view.setUint16(34, 16, true);
+	    /* data chunk identifier */
+	    writeString(view, 36, 'data');
+	    /* data chunk length */
+	    view.setUint32(40, samples.length * 2, true);
+	
+	    floatTo16BitPCM(view, 44, samples);
+	
+	    return view;
+	  }
+	};
 
 /***/ },
 /* 80 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ function(module, exports) {
 
-	module.exports = function() {
-		return __webpack_require__(79)("/******/ (function(modules) { // webpackBootstrap\n/******/ \t// The module cache\n/******/ \tvar installedModules = {};\n/******/\n/******/ \t// The require function\n/******/ \tfunction __webpack_require__(moduleId) {\n/******/\n/******/ \t\t// Check if module is in cache\n/******/ \t\tif(installedModules[moduleId])\n/******/ \t\t\treturn installedModules[moduleId].exports;\n/******/\n/******/ \t\t// Create a new module (and put it into the cache)\n/******/ \t\tvar module = installedModules[moduleId] = {\n/******/ \t\t\texports: {},\n/******/ \t\t\tid: moduleId,\n/******/ \t\t\tloaded: false\n/******/ \t\t};\n/******/\n/******/ \t\t// Execute the module function\n/******/ \t\tmodules[moduleId].call(module.exports, module, module.exports, __webpack_require__);\n/******/\n/******/ \t\t// Flag the module as loaded\n/******/ \t\tmodule.loaded = true;\n/******/\n/******/ \t\t// Return the exports of the module\n/******/ \t\treturn module.exports;\n/******/ \t}\n/******/\n/******/\n/******/ \t// expose the modules object (__webpack_modules__)\n/******/ \t__webpack_require__.m = modules;\n/******/\n/******/ \t// expose the module cache\n/******/ \t__webpack_require__.c = installedModules;\n/******/\n/******/ \t// __webpack_public_path__\n/******/ \t__webpack_require__.p = \"/waveform-playlist/js/\";\n/******/\n/******/ \t// Load entry module and return exports\n/******/ \treturn __webpack_require__(0);\n/******/ })\n/************************************************************************/\n/******/ ([\n/* 0 */\n/***/ function(module, exports) {\n\n\t'use strict';\n\t\n\t/*License (MIT)\n\t\n\tCopyright © 2013 Matt Diamond\n\t\n\tPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated \n\tdocumentation files (the \"Software\"), to deal in the Software without restriction, including without limitation \n\tthe rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and \n\tto permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\t\n\tThe above copyright notice and this permission notice shall be included in all copies or substantial portions of \n\tthe Software.\n\t\n\tTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO \n\tTHE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE \n\tAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF \n\tCONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER \n\tDEALINGS IN THE SOFTWARE.\n\t*/\n\t\n\tvar recLength = 0,\n\t    recBuffersL = [],\n\t    recBuffersR = [],\n\t    sampleRate;\n\t\n\tonmessage = function onmessage(e) {\n\t  switch (e.data.command) {\n\t    case 'init':\n\t      init(e.data.config);\n\t      break;\n\t    case 'record':\n\t      record(e.data.buffer);\n\t      break;\n\t    case 'exportWAV':\n\t      exportWAV(e.data.type);\n\t      break;\n\t    case 'exportMonoWAV':\n\t      exportMonoWAV(e.data.type);\n\t      break;\n\t    case 'getBuffers':\n\t      getBuffers();\n\t      break;\n\t    case 'clear':\n\t      clear();\n\t      break;\n\t  }\n\t};\n\t\n\tfunction init(config) {\n\t  sampleRate = config.sampleRate;\n\t}\n\t\n\tfunction record(inputBuffer) {\n\t  recBuffersL.push(inputBuffer[0]);\n\t  recBuffersR.push(inputBuffer[1]);\n\t  recLength += inputBuffer[0].length;\n\t}\n\t\n\tfunction exportWAV(type) {\n\t  var bufferL = mergeBuffers(recBuffersL, recLength);\n\t  var bufferR = mergeBuffers(recBuffersR, recLength);\n\t  var interleaved = interleave(bufferL, bufferR);\n\t  var dataview = encodeWAV(interleaved);\n\t  var audioBlob = new Blob([dataview], { type: type });\n\t\n\t  postMessage(audioBlob);\n\t}\n\t\n\tfunction exportMonoWAV(type) {\n\t  var bufferL = mergeBuffers(recBuffersL, recLength);\n\t  var dataview = encodeWAV(bufferL, true);\n\t  var audioBlob = new Blob([dataview], { type: type });\n\t\n\t  postMessage(audioBlob);\n\t}\n\t\n\tfunction getBuffers() {\n\t  var buffers = [];\n\t  buffers.push(mergeBuffers(recBuffersL, recLength));\n\t  buffers.push(mergeBuffers(recBuffersR, recLength));\n\t  postMessage(buffers);\n\t}\n\t\n\tfunction clear() {\n\t  recLength = 0;\n\t  recBuffersL = [];\n\t  recBuffersR = [];\n\t}\n\t\n\tfunction mergeBuffers(recBuffers, recLength) {\n\t  var result = new Float32Array(recLength);\n\t  var offset = 0;\n\t  for (var i = 0; i < recBuffers.length; i++) {\n\t    result.set(recBuffers[i], offset);\n\t    offset += recBuffers[i].length;\n\t  }\n\t  return result;\n\t}\n\t\n\tfunction interleave(inputL, inputR) {\n\t  var length = inputL.length + inputR.length;\n\t  var result = new Float32Array(length);\n\t\n\t  var index = 0,\n\t      inputIndex = 0;\n\t\n\t  while (index < length) {\n\t    result[index++] = inputL[inputIndex];\n\t    result[index++] = inputR[inputIndex];\n\t    inputIndex++;\n\t  }\n\t  return result;\n\t}\n\t\n\tfunction floatTo16BitPCM(output, offset, input) {\n\t  for (var i = 0; i < input.length; i++, offset += 2) {\n\t    var s = Math.max(-1, Math.min(1, input[i]));\n\t    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);\n\t  }\n\t}\n\t\n\tfunction writeString(view, offset, string) {\n\t  for (var i = 0; i < string.length; i++) {\n\t    view.setUint8(offset + i, string.charCodeAt(i));\n\t  }\n\t}\n\t\n\tfunction encodeWAV(samples, mono) {\n\t  var buffer = new ArrayBuffer(44 + samples.length * 2);\n\t  var view = new DataView(buffer);\n\t\n\t  /* RIFF identifier */\n\t  writeString(view, 0, 'RIFF');\n\t  /* file length */\n\t  view.setUint32(4, 32 + samples.length * 2, true);\n\t  /* RIFF type */\n\t  writeString(view, 8, 'WAVE');\n\t  /* format chunk identifier */\n\t  writeString(view, 12, 'fmt ');\n\t  /* format chunk length */\n\t  view.setUint32(16, 16, true);\n\t  /* sample format (raw) */\n\t  view.setUint16(20, 1, true);\n\t  /* channel count */\n\t  view.setUint16(22, mono ? 1 : 2, true);\n\t  /* sample rate */\n\t  view.setUint32(24, sampleRate, true);\n\t  /* byte rate (sample rate * block align) */\n\t  view.setUint32(28, sampleRate * 4, true);\n\t  /* block align (channel count * bytes per sample) */\n\t  view.setUint16(32, 4, true);\n\t  /* bits per sample */\n\t  view.setUint16(34, 16, true);\n\t  /* data chunk identifier */\n\t  writeString(view, 36, 'data');\n\t  /* data chunk length */\n\t  view.setUint32(40, samples.length * 2, true);\n\t\n\t  floatTo16BitPCM(view, 44, samples);\n\t\n\t  return view;\n\t}\n\n/***/ }\n/******/ ]);\n//# sourceMappingURL=82de9152acebe48d98cc.worker.js.map", __webpack_require__.p + "82de9152acebe48d98cc.worker.js");
+	/* WEBPACK VAR INJECTION */(function(global) {var WORKER_ENABLED = !!(global === global.window && global.URL && global.Blob && global.Worker);
+	
+	function InlineWorker(func, self) {
+	  var _this = this;
+	  var functionBody;
+	
+	  self = self || {};
+	
+	  if (WORKER_ENABLED) {
+	    functionBody = func.toString().trim().match(
+	      /^function\s*\w*\s*\([\w\s,]*\)\s*{([\w\W]*?)}$/
+	    )[1];
+	
+	    return new global.Worker(global.URL.createObjectURL(
+	      new global.Blob([ functionBody ], { type: "text/javascript" })
+	    ));
+	  }
+	
+	  function postMessage(data) {
+	    setTimeout(function() {
+	      _this.onmessage({ data: data });
+	    }, 0);
+	  }
+	
+	  this.self = self;
+	  this.self.postMessage = postMessage;
+	
+	  setTimeout(func.bind(self, self), 0);
+	}
+	
+	InlineWorker.prototype.postMessage = function postMessage(data) {
+	  var _this = this;
+	
+	  setTimeout(function() {
+	    _this.self.onmessage({ data: data });
+	  }, 0);
 	};
+	
+	module.exports = InlineWorker;
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ }
 /******/ ]);
