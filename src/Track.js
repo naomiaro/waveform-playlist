@@ -23,6 +23,7 @@ export default class {
     constructor() {
 
         this.name = "Untitled";
+        this.id = 'track'
         this.gain = 1;
         this.fades = {};
         this.peakData = {
@@ -43,6 +44,10 @@ export default class {
 
     setName(name) {
         this.name = name;
+    }
+
+    setId(id) {
+        this.id = id;
     }
 
     setCues(cueIn, cueOut) {
@@ -361,7 +366,7 @@ export default class {
 
         return h("div.controls", {
             attributes: {
-                "style": `height: ${numChan * data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`
+                "style": `height: ${numChan * data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`,
             }},
             [
                 h("header", [ this.name ]),
@@ -514,7 +519,8 @@ export default class {
 
         return h(`div.channel-wrapper${audibleClass}`, {
             attributes: {
-                "style": `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`
+                "style": `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`,
+                "id": this.id,
             }},
             channelChildren
         );
@@ -526,6 +532,7 @@ export default class {
             start: this.startTime,
             end: this.endTime,
             name: this.name,
+            id: this.id,
             cuein: this.cueIn,
             cueout: this.cueOut
         };

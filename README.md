@@ -200,6 +200,9 @@ var options = {
   //DEFAULT duration of the track
   "cueout": 30,
 
+  //custom track id for unique styles
+  "id" : 'vocals',
+
   //interaction states allowed on this track.
   //DEFAULT - all true
   "states": {
@@ -210,7 +213,7 @@ var options = {
     'shift': true
   },
 
-  //pre-selected section on track. 
+  //pre-selected section on track.
   //ONLY ONE selection is permitted in a list of tracks, will take most recently set if multiple passed.
   //This track is marked as 'active'
   selected: {
