@@ -15,3 +15,6 @@ var playlist = WaveformPlaylist.init({
     width: 200 //width of controls in pixels
   }
 });
+
+//initialize the WAV exporter.
+playlist.initExporter();
