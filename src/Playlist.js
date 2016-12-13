@@ -103,6 +103,10 @@ export default class {
         this.mono = mono;
     }
 
+    setExclSolo(exclSolo) {
+        this.exclSolo = exclSolo;
+    }
+
     setSeekStyle(style) {
         this.seekStyle = style
     }
@@ -296,6 +300,7 @@ export default class {
                 let cueIn = info.cuein || 0;
                 let cueOut = info.cueout || audioBuffer.duration;
                 let gain = info.gain || 1;
+                let exclSolo = info.exclSolo || false;
                 let muted = info.muted || false;
                 let soloed = info.soloed || false;
                 let selection = info.selected;
@@ -505,7 +510,11 @@ export default class {
             soloedList.splice(index, 1);
         }
         else {
-            soloedList.push(track);
+            if (this.exclSolo) {
+                this.soloedTracks = [track];
+            } else {
+                soloedList.push(track);
+            }
         }
     }
 

@@ -17,6 +17,7 @@ export function init(options={}, ee=EventEmitter()) {
         samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
         mono: true, //whether to draw multiple channels or combine them.
         fadeType: 'logarithmic',
+        exclSolo: false, //enables "exclusive solo" where solo switches tracks
         timescale: false, //whether or not to include the time measure.
         controls: {
             show: false, //whether or not to include the track controls
@@ -54,6 +55,7 @@ export function init(options={}, ee=EventEmitter()) {
     playlist.setZoomLevels(config.zoomLevels);
     playlist.setZoomIndex(zoomIndex);
     playlist.setMono(config.mono);
+    playlist.setExclSolo(config.exclSolo);
     playlist.setShowTimeScale(config.timescale);
     playlist.setSeekStyle(config.seekStyle);
 
