@@ -126,6 +126,8 @@ var WaveformPlaylist =
 	    playlist.setShowTimeScale(config.timescale);
 	    playlist.setSeekStyle(config.seekStyle);
 	
+	    playlist.initExporter();
+	
 	    //take care of initial virtual dom rendering.
 	    var tree = playlist.render();
 	    var rootNode = (0, _createElement2.default)(tree);
