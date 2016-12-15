@@ -110,6 +110,9 @@ var options = {
   //whether to draw multiple channels or combine them.
   mono: true,
 
+  //enables "exclusive solo" where solo switches between tracks
+  exclSolo: false,
+
   //default fade curve type.
   fadeType: 'logarithmic', // (logarithmic | linear | sCurve | exponential)
 
@@ -210,7 +213,7 @@ var options = {
     'shift': true
   },
 
-  //pre-selected section on track. 
+  //pre-selected section on track.
   //ONLY ONE selection is permitted in a list of tracks, will take most recently set if multiple passed.
   //This track is marked as 'active'
   selected: {
