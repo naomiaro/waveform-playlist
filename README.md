@@ -260,6 +260,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `statechange` | (`cursor | select | fadein | fadeout | shift`) | Changes interaction state to the state given. |
 | `fadetype` | (`logarithmic | linear | sCurve | exponential`) | Changes playlist default fade type. |
 | `newtrack` | `File` | Loads `File` object into the playlist. |
+| `volumechange` | `volume, track` | Set volume of `track` to `volume` (0-100) |
 | `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
 | `select` | `start, end, track:optional` | Seek to the start time or start/end selection optionally with active track `track`. |
 | `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
