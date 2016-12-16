@@ -46,10 +46,6 @@ export default class {
 
     //TODO extract into a plugin
     initRecorder(stream) {
-        // if (stream instanceof LocalMediaStream !== true) {
-        //     throw new Error("Must provide a LocalMediaStream to record from");
-        // }
-
         this.mediaRecorder = new MediaRecorder(stream);
 
         this.mediaRecorder.onstart = (e) => {
@@ -83,7 +79,6 @@ export default class {
         };
 
         this.recorderWorker = new InlineWorker(RecorderWorkerFunction);
-        //this.recorderWorker.postMessage({url: document.location.protocol + '//' + document.location.host});
         //use a worker for calculating recording peaks.
         this.recorderWorker.onmessage = (e) => {
             this.recordingTrack.setPeaks(e.data);
@@ -201,6 +196,12 @@ export default class {
 
         ee.on('fastforward', () => {
             this.fastForward();
+        });
+
+        ee.on('clear', () => {
+            this.clear().then(() => {
+                this.draw(this.render());
+            });
         });
 
         ee.on('solo', (track) => {
@@ -663,6 +664,12 @@ export default class {
 
             this.ee.emit('select', this.duration, this.duration);
         });
+    }
+
+    clear() {
+       return this.stop().then(() => {
+            this.tracks = [];
+        }); 
     }
 
     record() {
