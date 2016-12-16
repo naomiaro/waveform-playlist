@@ -256,6 +256,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `stop` | _none_ | Stops playout of the playlist. |
 | `rewind` | _none_ | Stops playout if playlist is playing, resets cursor to the beginning of the playlist. |
 | `fastforward` | _none_ | Stops playout if playlist is playing, resets cursor to the end of the playlist. |
+| `clear` | _none_ | Stops playout if playlist is playing, removes all tracks from the playlist. |
 | `record` | _none_ | Starts recording an audio track. Begins playout of other tracks in playlist if there are any. |
 | `zoomin` | _none_ | Changes zoom level to the next smallest entry (if one exists) from the array `zoomLevels`. |
 | `zoomout` | _none_ | Changes zoom level to the next largest entry (if one exists) from the array `zoomLevels`. |

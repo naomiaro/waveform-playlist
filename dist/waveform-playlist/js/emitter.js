@@ -131,6 +131,10 @@ $container.on("click", ".btn-fast-forward", function() {
   ee.emit("fastforward");
 });
 
+$container.on("click", ".btn-clear", function() {
+  ee.emit("clear");
+});
+
 $container.on("click", ".btn-record", function() {
   ee.emit("record");
 });
