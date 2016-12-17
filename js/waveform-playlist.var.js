@@ -86,6 +86,7 @@ var WaveformPlaylist =
 	        samplesPerPixel: 4096, //samples per pixel to draw, must be an entry in zoomLevels.
 	        mono: true, //whether to draw multiple channels or combine them.
 	        fadeType: 'logarithmic',
+	        exclSolo: false, //enables "exclusive solo" where solo switches tracks
 	        timescale: false, //whether or not to include the time measure.
 	        controls: {
 	            show: false, //whether or not to include the track controls
@@ -123,6 +124,7 @@ var WaveformPlaylist =
 	    playlist.setZoomLevels(config.zoomLevels);
 	    playlist.setZoomIndex(zoomIndex);
 	    playlist.setMono(config.mono);
+	    playlist.setExclSolo(config.exclSolo);
 	    playlist.setShowTimeScale(config.timescale);
 	    playlist.setSeekStyle(config.seekStyle);
 	
@@ -1591,10 +1593,6 @@ var WaveformPlaylist =
 	        value: function initRecorder(stream) {
 	            var _this = this;
 	
-	            // if (stream instanceof LocalMediaStream !== true) {
-	            //     throw new Error("Must provide a LocalMediaStream to record from");
-	            // }
-	
 	            this.mediaRecorder = new MediaRecorder(stream);
 	
 	            this.mediaRecorder.onstart = function (e) {
@@ -1628,7 +1626,6 @@ var WaveformPlaylist =
 	            };
 	
 	            this.recorderWorker = new InlineWorker(_recorderWorker2.default);
-	            //this.recorderWorker.postMessage({url: document.location.protocol + '//' + document.location.host});
 	            //use a worker for calculating recording peaks.
 	            this.recorderWorker.onmessage = function (e) {
 	                _this.recordingTrack.setPeaks(e.data);
@@ -1648,6 +1645,11 @@ var WaveformPlaylist =
 	        key: 'setMono',
 	        value: function setMono(mono) {
 	            this.mono = mono;
+	        }
+	    }, {
+	        key: 'setExclSolo',
+	        value: function setExclSolo(exclSolo) {
+	            this.exclSolo = exclSolo;
 	        }
 	    }, {
 	        key: 'setSeekStyle',
@@ -1758,6 +1760,12 @@ var WaveformPlaylist =
 	                _this2.fastForward();
 	            });
 	
+	            ee.on('clear', function () {
+	                _this2.clear().then(function () {
+	                    _this2.draw(_this2.render());
+	                });
+	            });
+	
 	            ee.on('solo', function (track) {
 	                _this2.soloTrack(track);
 	                _this2.adjustTrackPlayout();
@@ -1860,6 +1868,7 @@ var WaveformPlaylist =
 	                    var cueIn = info.cuein || 0;
 	                    var cueOut = info.cueout || audioBuffer.duration;
 	                    var gain = info.gain || 1;
+	                    var exclSolo = info.exclSolo || false;
 	                    var muted = info.muted || false;
 	                    var soloed = info.soloed || false;
 	                    var selection = info.selected;
@@ -2087,7 +2096,11 @@ var WaveformPlaylist =
 	            if (index > -1) {
 	                soloedList.splice(index, 1);
 	            } else {
-	                soloedList.push(track);
+	                if (this.exclSolo) {
+	                    this.soloedTracks = [track];
+	                } else {
+	                    soloedList.push(track);
+	                }
 	            }
 	        }
 	    }, {
@@ -2263,17 +2276,26 @@ var WaveformPlaylist =
 	            });
 	        }
 	    }, {
+	        key: 'clear',
+	        value: function clear() {
+	            var _this11 = this;
+	
+	            return this.stop().then(function () {
+	                _this11.tracks = [];
+	            });
+	        }
+	    }, {
 	        key: 'record',
 	        value: function record() {
-	            var _this11 = this;
+	            var _this12 = this;
 	
 	            var playoutPromises = [];
 	            this.mediaRecorder.start(300);
 	
 	            this.tracks.forEach(function (track) {
 	                track.setState('none');
-	                playoutPromises.push(track.schedulePlay(_this11.ac.currentTime, 0, undefined, {
-	                    shouldPlay: _this11.shouldTrackPlay(track)
+	                playoutPromises.push(track.schedulePlay(_this12.ac.currentTime, 0, undefined, {
+	                    shouldPlay: _this12.shouldTrackPlay(track)
 	                }));
 	            });
 	
@@ -2347,15 +2369,15 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'draw',
 	        value: function draw(newTree) {
-	            var _this12 = this;
+	            var _this13 = this;
 	
 	            window.requestAnimationFrame(function () {
-	                var patches = (0, _diff2.default)(_this12.tree, newTree);
-	                _this12.rootNode = (0, _patch2.default)(_this12.rootNode, patches);
-	                _this12.tree = newTree;
+	                var patches = (0, _diff2.default)(_this13.tree, newTree);
+	                _this13.rootNode = (0, _patch2.default)(_this13.rootNode, patches);
+	                _this13.tree = newTree;
 	
 	                //use for fast forwarding.
-	                _this12.viewDuration = (0, _conversions.pixelsToSeconds)(_this12.rootNode.clientWidth - _this12.controls.width, _this12.samplesPerPixel, _this12.sampleRate);
+	                _this13.viewDuration = (0, _conversions.pixelsToSeconds)(_this13.rootNode.clientWidth - _this13.controls.width, _this13.samplesPerPixel, _this13.sampleRate);
 	            });
 	        }
 	    }, {
@@ -2386,17 +2408,17 @@ var WaveformPlaylist =
 	    }, {
 	        key: 'render',
 	        value: function render() {
-	            var _this13 = this;
+	            var _this14 = this;
 	
 	            var controlWidth = this.controls.show ? this.controls.width : 0;
 	            var timeScale = new _TimeScale2.default(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate, controlWidth);
 	
 	            var trackElements = this.tracks.map(function (track) {
-	                return track.render(_this13.getTrackRenderData({
-	                    "isActive": _this13.isActiveTrack(track),
-	                    "shouldPlay": _this13.shouldTrackPlay(track),
-	                    "soloed": _this13.soloedTracks.indexOf(track) > -1,
-	                    "muted": _this13.mutedTracks.indexOf(track) > -1
+	                return track.render(_this14.getTrackRenderData({
+	                    "isActive": _this14.isActiveTrack(track),
+	                    "shouldPlay": _this14.shouldTrackPlay(track),
+	                    "soloed": _this14.soloedTracks.indexOf(track) > -1,
+	                    "muted": _this14.mutedTracks.indexOf(track) > -1
 	                }));
 	            });
 	
@@ -2405,8 +2427,8 @@ var WaveformPlaylist =
 	                    "style": "overflow: auto;"
 	                },
 	                "onscroll": function onscroll(e) {
-	                    _this13.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this13.samplesPerPixel, _this13.sampleRate);
-	                    _this13.ee.emit("scroll", _this13.scrollLeft);
+	                    _this14.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this14.samplesPerPixel, _this14.sampleRate);
+	                    _this14.ee.emit("scroll", _this14.scrollLeft);
 	                },
 	                "hook": new _ScrollHook2.default(this, this.samplesPerPixel, this.sampleRate)
 	            }, trackElements);
