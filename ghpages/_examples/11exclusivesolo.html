@@ -1,0 +1,26 @@
+---
+layout: page
+title: Stem Tracks with exclusive solo
+lead: Mute or exclusive solo the different tracks that make up the composition.
+excerpt: Create a playlist with multiple stem tracks. Mute or solo the different stems in the playlist.
+permalink: exclusive-solo.html
+javascript: exclusivesolo.js
+---
+
+<div id="top-bar" class="playlist-top-bar">
+  <div class="playlist-toolbar">
+    <div class="btn-group">
+      <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
+      <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+      <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+      <span class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></span>
+      <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
+    </div>
+  </div>
+</div>
+<div id="playlist"></div>
+<form>
+    <label>Master Volume: <input type="range" min="0" max="100" value="100" class="master-gain input-small form-control"></label>
+</form>
+<div class="sound-status"></div>
+<div class="loading-data"></div>
