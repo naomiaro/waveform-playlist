@@ -291,6 +291,8 @@ export default class {
         });
 
         return Promise.all(loadPromises).then((audioBuffers) => {
+            this.ee.emit('audiosourcesloaded');
+
             let tracks = audioBuffers.map((audioBuffer, index) => {
                 let info = trackList[index];
                 let name = info.name || "Untitled";
@@ -358,6 +360,8 @@ export default class {
             this.tracks = this.tracks.concat(tracks);
             this.adjustDuration();
             this.draw(this.render());
+
+            this.ee.emit('audiosourcesrendered');
         });
     }
 
