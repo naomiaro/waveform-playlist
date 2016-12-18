@@ -23,7 +23,7 @@ export default class {
     constructor() {
 
         this.name = "Untitled";
-        this.id = 'track'
+        this.id = undefined;
         this.gain = 1;
         this.fades = {};
         this.peakData = {
@@ -517,11 +517,13 @@ export default class {
 
         channelChildren.push(waveform);
 
-        return h(`div.channel-wrapper${audibleClass}`, {
-            attributes: {
-                "style": `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`,
-                "id": this.id,
-            }},
+        var channel_attributes = {}
+        channel_attributes['style'] = `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`;
+
+        if (this.id === undefined) channel_attributes['id'] = this.id;
+
+        return h(`div.channel-wrapper${audibleClass}`,
+            { attributes: channel_attributes},
             channelChildren
         );
     }
