@@ -322,6 +322,14 @@ ee.on("loadprogress", function(percent, src) {
   displayLoadingData("Track " + name + " has loaded " + percent + "%");
 });
 
+ee.on("audiosourcesloaded", function() {
+  displayLoadingData("Tracks have all finished decoding.");
+});
+
+ee.on("audiosourcesrendered", function() {
+  displayLoadingData("Tracks have been rendered");
+});
+
 ee.on('audiorenderingfinished', function (type, data) {
   if (type == 'wav'){
     if (downloadUrl) {

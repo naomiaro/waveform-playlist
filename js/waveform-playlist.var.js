@@ -1858,6 +1858,8 @@ var WaveformPlaylist =
 	            });
 	
 	            return Promise.all(loadPromises).then(function (audioBuffers) {
+	                _this3.ee.emit('audiosourcesloaded');
+	
 	                var tracks = audioBuffers.map(function (audioBuffer, index) {
 	                    var info = trackList[index];
 	                    var name = info.name || "Untitled";
@@ -1925,6 +1927,8 @@ var WaveformPlaylist =
 	                _this3.tracks = _this3.tracks.concat(tracks);
 	                _this3.adjustDuration();
 	                _this3.draw(_this3.render());
+	
+	                _this3.ee.emit('audiosourcesrendered');
 	            });
 	        }
 	
