@@ -23,7 +23,7 @@ export default class {
     constructor() {
 
         this.name = "Untitled";
-        this.id = undefined;
+        this.customClass = undefined;
         this.gain = 1;
         this.fades = {};
         this.peakData = {
@@ -46,8 +46,8 @@ export default class {
         this.name = name;
     }
 
-    setId(id) {
-        this.id = id;
+    setCustomClass(className) {
+        this.customClass = className;
     }
 
     setCues(cueIn, cueOut) {
@@ -520,9 +520,7 @@ export default class {
         var channel_attributes = {}
         channel_attributes['style'] = `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`;
 
-        if (this.id === undefined) channel_attributes['id'] = this.id;
-
-        return h(`div.channel-wrapper${audibleClass}`,
+        return h(`div.channel-wrapper${audibleClass}${ (this.customClass === undefined) ? "" : "." + this.customClass }`,
             { attributes: channel_attributes},
             channelChildren
         );
@@ -534,7 +532,7 @@ export default class {
             start: this.startTime,
             end: this.endTime,
             name: this.name,
-            id: this.id,
+            customClass: this.customClass,
             cuein: this.cueIn,
             cueout: this.cueOut
         };

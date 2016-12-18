@@ -201,7 +201,7 @@ var options = {
   "cueout": 30,
 
   //custom track id for unique styles
-  "id" : 'vocals',
+  "customClass" : 'vocals',
 
   //interaction states allowed on this track.
   //DEFAULT - all true
