@@ -284,6 +284,8 @@ An example of using the event emitter to control the playlist can be found in [/
 | `mastervolumechange` | `volume` | Master volume of the playlist has changed to `volume` (0-100) |
 | `audiorequeststatechange` | `state, src` | Loading audio `src` (`string` or `File`) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number) |
 | `loadprogress` | `percent, src` | Loading audio `src` has loaded percent `percent` (0-100) |
+| `audiosourcesloaded` | _none_ | Audio decoding has finished for all tracks |
+| `audiosourcesrendered` | _none_ | Tracks are rendered to the playlist |
 | `finished` | _none_ | Event fired when cursor ( while playing ) reaches the end (maximum duration) |
 | `audiorenderingfinished` | `type, data` | Return the result of the rendering in the desired format. `type` can be `buffer` or `wav` and can be used to dertermine the  `data` type. When `type` is `wav`, data is a `blob` object that represent the wav file. |
 
