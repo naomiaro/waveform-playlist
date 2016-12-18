@@ -2286,6 +2286,16 @@ var WaveformPlaylist =
 	
 	            return this.stop().then(function () {
 	                _this11.tracks = [];
+	                _this11.soloedTracks = [];
+	                _this11.mutedTracks = [];
+	                _this11.playoutPromises = [];
+	
+	                _this11.cursor = 0;
+	                _this11.playbackSeconds = 0;
+	                _this11.duration = 0;
+	                _this11.scrollLeft = 0;
+	
+	                _this11.seek(0, 0, undefined);
 	            });
 	        }
 	    }, {

@@ -673,6 +673,16 @@ export default class {
     clear() {
        return this.stop().then(() => {
             this.tracks = [];
+            this.soloedTracks = [];
+            this.mutedTracks = [];
+            this.playoutPromises = [];
+
+            this.cursor = 0;
+            this.playbackSeconds = 0;
+            this.duration = 0;
+            this.scrollLeft = 0;
+
+            this.seek(0, 0, undefined);
         }); 
     }
 
