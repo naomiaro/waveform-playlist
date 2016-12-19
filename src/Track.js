@@ -23,6 +23,7 @@ export default class {
     constructor() {
 
         this.name = "Untitled";
+        this.customClass = undefined;
         this.gain = 1;
         this.fades = {};
         this.peakData = {
@@ -43,6 +44,10 @@ export default class {
 
     setName(name) {
         this.name = name;
+    }
+
+    setCustomClass(className) {
+        this.customClass = className;
     }
 
     setCues(cueIn, cueOut) {
@@ -361,7 +366,7 @@ export default class {
 
         return h("div.controls", {
             attributes: {
-                "style": `height: ${numChan * data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`
+                "style": `height: ${numChan * data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`,
             }},
             [
                 h("header", [ this.name ]),
@@ -512,10 +517,11 @@ export default class {
 
         channelChildren.push(waveform);
 
-        return h(`div.channel-wrapper${audibleClass}`, {
-            attributes: {
-                "style": `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`
-            }},
+        var channel_attributes = {}
+        channel_attributes['style'] = `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`;
+
+        return h(`div.channel-wrapper${audibleClass}${ (this.customClass === undefined) ? "" : "." + this.customClass }`,
+            { attributes: channel_attributes},
             channelChildren
         );
     }
@@ -526,6 +532,7 @@ export default class {
             start: this.startTime,
             end: this.endTime,
             name: this.name,
+            customClass: this.customClass,
             cuein: this.cueIn,
             cueout: this.cueOut
         };
