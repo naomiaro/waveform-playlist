@@ -366,7 +366,7 @@ export default class {
 
         return h("div.controls", {
             attributes: {
-                "style": `height: ${numChan * data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`,
+                "style": `height: ${numChan * data.height}px; width: ${data.controls.width}px; position: absolute; left: 0; z-index: 10;`
             }},
             [
                 h("header", [ this.name ]),
@@ -490,8 +490,6 @@ export default class {
             );
         });
 
-        let audibleClass = data.shouldPlay ? "" : ".silent";
-
         waveformChildren.push(channels);
         waveformChildren.push(this.renderOverlay(data));
 
@@ -517,11 +515,13 @@ export default class {
 
         channelChildren.push(waveform);
 
-        var channel_attributes = {}
-        channel_attributes['style'] = `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`;
+        let audibleClass = data.shouldPlay ? "" : ".silent";
+        let customClass = (this.customClass === undefined) ? "" : "." + this.customClass;
 
-        return h(`div.channel-wrapper${audibleClass}${ (this.customClass === undefined) ? "" : "." + this.customClass }`,
-            { attributes: channel_attributes},
+        return h(`div.channel-wrapper${audibleClass}${customClass}`, {
+            attributes: {
+                style: `margin-left: ${channelMargin}px; height: ${data.height * numChan}px;`
+            }},
             channelChildren
         );
     }

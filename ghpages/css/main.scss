@@ -5,6 +5,10 @@
 
 @import "playlist";
 
+.playlist .vocals header {
+  background-color: green;
+}
+
 .track-drop {
   border: 2px dashed blue;
   height: 100px;

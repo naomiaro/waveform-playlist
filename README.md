@@ -203,7 +203,7 @@ var options = {
   //DEFAULT duration of the track
   "cueout": 30,
 
-  //custom track id for unique styles
+  //custom class for unique track styling
   "customClass" : 'vocals',
 
   //interaction states allowed on this track.

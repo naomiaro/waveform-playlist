@@ -1875,6 +1875,7 @@ var WaveformPlaylist =
 	                    var soloed = info.soloed || false;
 	                    var selection = info.selected;
 	                    var peaks = info.peaks || { type: "WebAudio", mono: _this3.mono };
+	                    var customClass = info.customClass || undefined;
 	
 	                    //webaudio specific playout for now.
 	                    var playout = new _Playout2.default(_this3.ac, audioBuffer);
@@ -1886,6 +1887,7 @@ var WaveformPlaylist =
 	                    track.setEventEmitter(_this3.ee);
 	                    track.setEnabledStates(states);
 	                    track.setCues(cueIn, cueOut);
+	                    track.setCustomClass(customClass);
 	
 	                    if (fadeIn !== undefined) {
 	                        track.setFadeIn(fadeIn.duration, fadeIn.shape);
@@ -5289,6 +5291,7 @@ var WaveformPlaylist =
 	        _classCallCheck(this, _class);
 	
 	        this.name = "Untitled";
+	        this.customClass = undefined;
 	        this.gain = 1;
 	        this.fades = {};
 	        this.peakData = {
@@ -5312,6 +5315,11 @@ var WaveformPlaylist =
 	        key: 'setName',
 	        value: function setName(name) {
 	            this.name = name;
+	        }
+	    }, {
+	        key: 'setCustomClass',
+	        value: function setCustomClass(className) {
+	            this.customClass = className;
 	        }
 	    }, {
 	        key: 'setCues',
@@ -5773,8 +5781,6 @@ var WaveformPlaylist =
 	                    } }, channelChildren);
 	            });
 	
-	            var audibleClass = data.shouldPlay ? "" : ".silent";
-	
 	            waveformChildren.push(channels);
 	            waveformChildren.push(this.renderOverlay(data));
 	
@@ -5798,9 +5804,12 @@ var WaveformPlaylist =
 	
 	            channelChildren.push(waveform);
 	
-	            return (0, _h2.default)('div.channel-wrapper' + audibleClass, {
+	            var audibleClass = data.shouldPlay ? "" : ".silent";
+	            var customClass = this.customClass === undefined ? "" : "." + this.customClass;
+	
+	            return (0, _h2.default)('div.channel-wrapper' + audibleClass + customClass, {
 	                attributes: {
-	                    "style": 'margin-left: ' + channelMargin + 'px; height: ' + data.height * numChan + 'px;'
+	                    style: 'margin-left: ' + channelMargin + 'px; height: ' + data.height * numChan + 'px;'
 	                } }, channelChildren);
 	        }
 	    }, {
@@ -5811,6 +5820,7 @@ var WaveformPlaylist =
 	                start: this.startTime,
 	                end: this.endTime,
 	                name: this.name,
+	                customClass: this.customClass,
 	                cuein: this.cueIn,
 	                cueout: this.cueOut
 	            };
