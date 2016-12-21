@@ -5,8 +5,12 @@
 
 @import "playlist";
 
-.playlist .vocals header {
-  background-color: green;
+.playlist .vocals {
+  header {
+    background-color: green;
+  }
+
+  background: #337ab7;
 }
 
 .track-drop {

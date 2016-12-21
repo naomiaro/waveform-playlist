@@ -101,8 +101,10 @@
     .playlist .controls input[type=range]:focus::-moz-range-track {
       background: #ccc; }
 
-.playlist .vocals header {
-  background-color: green; }
+.playlist .vocals {
+  background: #337ab7; }
+  .playlist .vocals header {
+    background-color: green; }
 
 .track-drop {
   border: 2px dashed blue;

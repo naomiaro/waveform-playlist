@@ -6606,7 +6606,7 @@ var WaveformPlaylist =
 	    var len = array.length;
 	    var curr;
 	
-	    for (; i < len; i++) {
+	    for(; i < len; i++) {
 	        curr = array[i];
 	        if (min > curr) {
 	            min = curr;
@@ -6703,7 +6703,10 @@ var WaveformPlaylist =
 	module.exports = function(source, samplesPerPixel, isMono, cueIn, cueOut, bits) {
 	    samplesPerPixel = samplesPerPixel || 10000;
 	    bits = bits || 8;
-	    isMono = isMono || true;
+	    
+	    if (isMono === null || isMono === undefined) {
+	        isMono = true;
+	    }
 	
 	    if ([8, 16, 32].indexOf(bits) < 0) {
 	        throw new Error("Invalid number of bits specified for peaks.");

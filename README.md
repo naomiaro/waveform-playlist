@@ -40,7 +40,7 @@ var WaveformPlaylist = require('waveform-playlist');
 
 var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
-  mono: false,
+  mono: true,
   waveHeight: 70,
   container: document.getElementById("playlist"),
   state: 'cursor',
