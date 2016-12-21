@@ -309,6 +309,7 @@ export default class {
                 let selection = info.selected;
                 let peaks = info.peaks || {type: "WebAudio", mono: this.mono};
                 let customClass = info.customClass || undefined;
+                let waveOutlineColor = info.waveOutlineColor || undefined;
 
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);
@@ -321,6 +322,7 @@ export default class {
                 track.setEnabledStates(states);
                 track.setCues(cueIn, cueOut);
                 track.setCustomClass(customClass);
+                track.setWaveOutlineColor(waveOutlineColor);
 
                 if (fadeIn !== undefined) {
                     track.setFadeIn(fadeIn.duration, fadeIn.shape);
@@ -685,7 +687,7 @@ export default class {
             this.scrollLeft = 0;
 
             this.seek(0, 0, undefined);
-        }); 
+        });
     }
 
     record() {

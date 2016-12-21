@@ -206,6 +206,9 @@ var options = {
   //custom class for unique track styling
   "customClass" : 'vocals',
 
+  //custom background-color for the canvas-drawn waveform
+  "waveOutlineColor": "#f3f3f3",
+
   //interaction states allowed on this track.
   //DEFAULT - all true
   "states": {

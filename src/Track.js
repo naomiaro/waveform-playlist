@@ -24,6 +24,7 @@ export default class {
 
         this.name = "Untitled";
         this.customClass = undefined;
+        this.waveOutlineColor = undefined;
         this.gain = 1;
         this.fades = {};
         this.peakData = {
@@ -48,6 +49,10 @@ export default class {
 
     setCustomClass(className) {
         this.customClass = className;
+    }
+
+    setWaveOutlineColor(color) {
+        this.waveOutlineColor = color;
     }
 
     setCues(cueIn, cueOut) {
@@ -439,7 +444,7 @@ export default class {
                         "height": data.height,
                         "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
                     },
-                    "hook": new CanvasHook(peaks, offset, this.peaks.bits, data.colors.waveOutlineColor)
+                    "hook": new CanvasHook(peaks, offset, this.peaks.bits, this.waveOutlineColor ? this.waveOutlineColor : data.colors.waveOutlineColor)
                 }));
 
                 totalWidth -= currentWidth;
