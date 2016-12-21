@@ -1876,6 +1876,7 @@ var WaveformPlaylist =
 	                    var selection = info.selected;
 	                    var peaks = info.peaks || { type: "WebAudio", mono: _this3.mono };
 	                    var customClass = info.customClass || undefined;
+	                    var waveOutlineColor = info.waveOutlineColor || undefined;
 	
 	                    //webaudio specific playout for now.
 	                    var playout = new _Playout2.default(_this3.ac, audioBuffer);
@@ -1888,6 +1889,7 @@ var WaveformPlaylist =
 	                    track.setEnabledStates(states);
 	                    track.setCues(cueIn, cueOut);
 	                    track.setCustomClass(customClass);
+	                    track.setWaveOutlineColor(waveOutlineColor);
 	
 	                    if (fadeIn !== undefined) {
 	                        track.setFadeIn(fadeIn.duration, fadeIn.shape);
@@ -5292,6 +5294,7 @@ var WaveformPlaylist =
 	
 	        this.name = "Untitled";
 	        this.customClass = undefined;
+	        this.waveOutlineColor = undefined;
 	        this.gain = 1;
 	        this.fades = {};
 	        this.peakData = {
@@ -5320,6 +5323,11 @@ var WaveformPlaylist =
 	        key: 'setCustomClass',
 	        value: function setCustomClass(className) {
 	            this.customClass = className;
+	        }
+	    }, {
+	        key: 'setWaveOutlineColor',
+	        value: function setWaveOutlineColor(color) {
+	            this.waveOutlineColor = color;
 	        }
 	    }, {
 	        key: 'setCues',
@@ -5736,7 +5744,7 @@ var WaveformPlaylist =
 	                            "height": data.height,
 	                            "style": "float: left; position: relative; margin: 0; padding: 0; z-index: 3;"
 	                        },
-	                        "hook": new _CanvasHook2.default(peaks, offset, _this3.peaks.bits, data.colors.waveOutlineColor)
+	                        "hook": new _CanvasHook2.default(peaks, offset, _this3.peaks.bits, _this3.waveOutlineColor ? _this3.waveOutlineColor : data.colors.waveOutlineColor)
 	                    }));
 	
 	                    totalWidth -= currentWidth;
@@ -6606,7 +6614,7 @@ var WaveformPlaylist =
 	    var len = array.length;
 	    var curr;
 	
-	    for (; i < len; i++) {
+	    for(; i < len; i++) {
 	        curr = array[i];
 	        if (min > curr) {
 	            min = curr;
@@ -6703,7 +6711,10 @@ var WaveformPlaylist =
 	module.exports = function(source, samplesPerPixel, isMono, cueIn, cueOut, bits) {
 	    samplesPerPixel = samplesPerPixel || 10000;
 	    bits = bits || 8;
-	    isMono = isMono || true;
+	    
+	    if (isMono === null || isMono === undefined) {
+	        isMono = true;
+	    }
 	
 	    if ([8, 16, 32].indexOf(bits) < 0) {
 	        throw new Error("Invalid number of bits specified for peaks.");
