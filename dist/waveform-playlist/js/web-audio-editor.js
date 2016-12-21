@@ -30,7 +30,7 @@ playlist.load([
     "cuein": 5.918,
     "cueout": 14.5,
     "customClass": "vocals",
-    "waveOutlineColor": '#337ab7'
+    "waveOutlineColor": '#c0dce0'
   },
   {
     "src": "media/audio/BassDrums30.mp3",
