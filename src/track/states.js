@@ -1,13 +1,13 @@
-import CursorState from './states/CursorState';
-import SelectState from './states/SelectState';
-import ShiftState from './states/ShiftState';
-import FadeInState from './states/FadeInState';
-import FadeOutState from './states/FadeOutState';
+import cursor from './states/CursorState';
+import select from './states/SelectState';
+import shift from './states/ShiftState';
+import fadein from './states/FadeInState';
+import fadeout from './states/FadeOutState';
 
 export default {
-    'cursor': CursorState,
-    'select': SelectState,
-    'shift': ShiftState,
-    'fadein': FadeInState,
-    'fadeout': FadeOutState
+  cursor,
+  select,
+  shift,
+  fadein,
+  fadeout,
 };

@@ -1,47 +1,62 @@
-import {pixelsToSeconds} from '../../utils/conversions';
+import { pixelsToSeconds } from '../../utils/conversions';
 
 export default class {
-    constructor(track, samplesPerPixel, sampleRate) {
-        this.track = track;
-        this.samplesPerPixel = samplesPerPixel;
-        this.sampleRate = sampleRate;
+  constructor(track) {
+    this.track = track;
+    this.active = false;
+  }
+
+  setup(samplesPerPixel, sampleRate) {
+    this.samplesPerPixel = samplesPerPixel;
+    this.sampleRate = sampleRate;
+  }
+
+  emitShift(x) {
+    const deltaX = x - this.prevX;
+    const deltaTime = pixelsToSeconds(deltaX, this.samplesPerPixel, this.sampleRate);
+    this.prevX = x;
+    this.track.ee.emit('shift', deltaTime, this.track);
+  }
+
+  complete(x) {
+    this.emitShift(x);
+    this.active = false;
+  }
+
+  mousedown(e) {
+    e.preventDefault();
+
+    this.active = true;
+    this.el = e.target;
+    this.prevX = e.offsetX;
+  }
+
+  mousemove(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.emitShift(e.offsetX);
     }
+  }
 
-    mousedown(e) {
-        e.preventDefault();
-
-        let el = e.target;
-        var prevX = e.offsetX;
-
-        let emitShift = (x) => {
-            let deltaX = x - prevX;
-            let deltaTime = pixelsToSeconds(deltaX, this.samplesPerPixel, this.sampleRate);
-            prevX = x;
-            this.track.ee.emit('shift', deltaTime, this.track);
-        };
-
-        //dynamically put an event on the element.
-        el.onmousemove = (e) => {
-            e.preventDefault();
-            emitShift(e.offsetX);
-        };
-
-        let complete = (e) => {
-            e.preventDefault();
-            emitShift(e.offsetX);
-            el.onmousemove = el.onmouseup = el.onmouseleave = null;
-        };
-
-        el.onmouseup = el.onmouseleave = complete;
+  mouseup(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.complete(e.offsetX);
     }
+  }
 
-    getClasses() {
-        return ".state-shift";
+  mouseleave(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.complete(e.offsetX);
     }
+  }
 
-    getEvents() {
-        return {
-            "mousedown": this.mousedown
-        }
-    }
+  static getClass() {
+    return '.state-shift';
+  }
+
+  static getEvents() {
+    return ['mousedown', 'mousemove', 'mouseup', 'mouseleave'];
+  }
 }

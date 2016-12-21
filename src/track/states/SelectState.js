@@ -1,55 +1,66 @@
-import {pixelsToSeconds} from '../../utils/conversions';
+import { pixelsToSeconds } from '../../utils/conversions';
 
 export default class {
-    constructor(track, samplesPerPixel, sampleRate) {
-        this.track = track;
-        this.samplesPerPixel = samplesPerPixel;
-        this.sampleRate = sampleRate;
+  constructor(track) {
+    this.track = track;
+    this.active = false;
+  }
+
+  setup(samplesPerPixel, sampleRate) {
+    this.samplesPerPixel = samplesPerPixel;
+    this.sampleRate = sampleRate;
+  }
+
+  emitSelection(x) {
+    const minX = Math.min(x, this.startX);
+    const maxX = Math.max(x, this.startX);
+    const startTime = pixelsToSeconds(minX, this.samplesPerPixel, this.sampleRate);
+    const endTime = pixelsToSeconds(maxX, this.samplesPerPixel, this.sampleRate);
+
+    this.track.ee.emit('select', startTime, endTime, this.track);
+  }
+
+  complete(x) {
+    this.emitSelection(x);
+    this.active = false;
+  }
+
+  mousedown(e) {
+    e.preventDefault();
+    this.active = true;
+
+    this.startX = e.offsetX;
+    const startTime = pixelsToSeconds(this.startX, this.samplesPerPixel, this.sampleRate);
+
+    this.track.ee.emit('select', startTime, startTime, this.track);
+  }
+
+  mousemove(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.emitSelection(e.offsetX);
     }
+  }
 
-    mousedown(e) {
-        e.preventDefault();
-
-        var el = e.target;
-        var startX = e.offsetX;
-        let startTime = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
-
-        this.track.ee.emit('select', startTime, startTime, this.track);
-
-        let emitSelection = (x) => {
-            let minX = Math.min(x, startX);
-            let maxX = Math.max(x, startX);
-            let startTime = pixelsToSeconds(minX, this.samplesPerPixel, this.sampleRate);
-            let endTime = pixelsToSeconds(maxX, this.samplesPerPixel, this.sampleRate);
-
-            this.track.ee.emit('select', startTime, endTime, this.track);
-        }
-
-        let complete = (ev) => {
-            ev.preventDefault();
-
-            emitSelection(ev.offsetX);
-
-            el.onmousemove = el.onmouseup = el.onmouseleave = null;
-        };
-
-        //dynamically put an event on the element.
-        el.onmousemove = (ev) => {
-            ev.preventDefault();
-
-            emitSelection(ev.offsetX);
-        };
-
-        el.onmouseup = el.onmouseleave = complete;
+  mouseup(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.complete(e.offsetX);
     }
+  }
 
-    getClasses() {
-        return ".state-select";
+  mouseleave(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.complete(e.offsetX);
     }
+  }
 
-    getEvents() {
-        return {
-            "mousedown": this.mousedown
-        }
-    }
+  static getClass() {
+    return '.state-select';
+  }
+
+  static getEvents() {
+    return ['mousedown', 'mousemove', 'mouseup', 'mouseleave'];
+  }
 }
