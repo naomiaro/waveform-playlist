@@ -309,7 +309,7 @@ export default class {
                 let selection = info.selected;
                 let peaks = info.peaks || {type: "WebAudio", mono: this.mono};
                 let customClass = info.customClass || undefined;
-                let waveBackgroundColor = info.waveBackgroundColor || undefined;
+                let waveOutlineColor = info.waveOutlineColor || undefined;
 
                 //webaudio specific playout for now.
                 let playout = new Playout(this.ac, audioBuffer);
@@ -322,7 +322,7 @@ export default class {
                 track.setEnabledStates(states);
                 track.setCues(cueIn, cueOut);
                 track.setCustomClass(customClass);
-                track.setWaveBackgroundColor(waveBackgroundColor);
+                track.setWaveOutlineColor(waveOutlineColor);
 
                 if (fadeIn !== undefined) {
                     track.setFadeIn(fadeIn.duration, fadeIn.shape);
@@ -815,8 +815,7 @@ export default class {
                 "isActive": this.isActiveTrack(track),
                 "shouldPlay": this.shouldTrackPlay(track),
                 "soloed": this.soloedTracks.indexOf(track) > -1,
-                "muted": this.mutedTracks.indexOf(track) > -1,
-                "waveBackgroundColor": track.waveBackgroundColor
+                "muted": this.mutedTracks.indexOf(track) > -1
             }));
         });
 
