@@ -1,0 +1,11 @@
+{
+    "extends": "airbnb-base",
+    "plugins": [
+        "import"
+    ],
+    "env": {
+        "browser": true,
+        "worker": true,
+        "es6": true
+    }
+}

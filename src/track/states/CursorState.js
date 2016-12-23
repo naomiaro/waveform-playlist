@@ -1,28 +1,29 @@
-import {pixelsToSeconds} from '../../utils/conversions';
+import { pixelsToSeconds } from '../../utils/conversions';
 
 export default class {
-    constructor(track, samplesPerPixel, sampleRate) {
-        this.track = track;
-        this.samplesPerPixel = samplesPerPixel;
-        this.sampleRate = sampleRate;
-    }
+  constructor(track) {
+    this.track = track;
+  }
 
-    click(e) {
-        e.preventDefault();
+  setup(samplesPerPixel, sampleRate) {
+    this.samplesPerPixel = samplesPerPixel;
+    this.sampleRate = sampleRate;
+  }
 
-        let startX = e.offsetX;
-        let startTime = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
+  click(e) {
+    e.preventDefault();
 
-        this.track.ee.emit('select', startTime, startTime, this.track);
-    }
+    const startX = e.offsetX;
+    const startTime = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
 
-    getClasses() {
-        return ".state-cursor";
-    }
+    this.track.ee.emit('select', startTime, startTime, this.track);
+  }
 
-    getEvents() {
-        return {
-            "click": this.click
-        }
-    }
+  static getClass() {
+    return '.state-cursor';
+  }
+
+  static getEvents() {
+    return ['click'];
+  }
 }
