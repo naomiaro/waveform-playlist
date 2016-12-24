@@ -2221,7 +2221,7 @@ var WaveformPlaylist =
 	      this.lastPlay = currentTime;
 	      // use these to track when the playlist has fully stopped.
 	      this.playoutPromises = playoutPromises;
-	      this.startAnimation(startTime);
+	      this.startAnimation(start);
 	
 	      return Promise.all(this.playoutPromises);
 	    }
