@@ -1,13 +1,12 @@
 var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
-  mono: false,
   waveHeight: 100,
   container: document.getElementById("playlist"),
   state: 'cursor',
   colors: {
-      waveOutlineColor: '#E0EFF1',
-      timeColor: 'grey',
-      fadeColor: 'black'
+    waveOutlineColor: '#E0EFF1',
+    timeColor: 'grey',
+    fadeColor: 'black'
   },
   timescale: true,
   controls: {
@@ -29,7 +28,9 @@ playlist.load([
       "duration": 0.5
     },
     "cuein": 5.918,
-    "cueout": 14.5
+    "cueout": 14.5,
+    "customClass": "vocals",
+    "waveOutlineColor": '#c0dce0'
   },
   {
     "src": "media/audio/BassDrums30.mp3",
@@ -56,4 +57,7 @@ playlist.load([
   }
 ]).then(function() {
   //can do stuff with the playlist.
+
+  //initialize the WAV exporter.
+  playlist.initExporter();
 });

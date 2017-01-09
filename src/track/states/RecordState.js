@@ -1,9 +1,9 @@
 export default class {
-    constructor(track) {
-        this.track = track;
-    }
+  constructor(track) {
+    this.track = track;
+  }
 
-    getClasses() {
-        return "state-record";
-    }
+  static getClass() {
+    return '.state-record';
+  }
 }

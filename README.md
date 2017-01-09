@@ -40,9 +40,9 @@ var WaveformPlaylist = require('waveform-playlist');
 
 var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
-  mono: false,
+  mono: true,
   waveHeight: 70,
-  container: document.getElementById("playlist"),
+  container: document.getElementById('playlist'),
   state: 'cursor',
   colors: {
     waveOutlineColor: '#E0EFF1',
@@ -58,34 +58,34 @@ var playlist = WaveformPlaylist.init({
 
 playlist.load([
   {
-    "src": "media/audio/Vocals30.mp3",
-    "name": "Vocals",
-    "gain": 0.5
+    src: 'media/audio/Vocals30.mp3',
+    name: 'Vocals',
+    gain: 0.5,
   },
   {
-    "src": "media/audio/BassDrums30.mp3",
-    "name": "Drums",
-    "start": 8.5,
-    "fadeIn": {
-      "duration": 0.5
+    src: 'media/audio/BassDrums30.mp3',
+    name: 'Drums',
+    start: 8.5,
+    fadeIn: {
+      duration: 0.5,
     },
-    "fadeOut": {
-      "shape": "logarithmic",
-      "duration": 0.5
-    }
+    fadeOut: {
+      shape: 'logarithmic',
+      duration: 0.5,
+    },
   },
   {
-    "src": "media/audio/Guitar30.mp3",
-    "name": "Guitar",
-    "start": 23.5,
-    "fadeOut": {
-      "shape": "linear",
-      "duration": 0.5
+    src: 'media/audio/Guitar30.mp3',
+    name: 'Guitar',
+    start: 23.5,
+    fadeOut: {
+      shape: 'linear',
+      duration: 0.5,
     },
-    "cuein": 15
+    cuein: 15,
   }
 ]).then(function() {
-  //can do stuff with the playlist.
+  // can do stuff with the playlist.
 });
 ```
 
@@ -94,57 +94,64 @@ playlist.load([
 ```javascript
 var options = {
 
-  //webaudio api AudioContext
+  // webaudio api AudioContext
   ac: new (window.AudioContext || window.webkitAudioContext),
 
-  //DOM container element REQUIRED
-  container: document.getElementById("playlist"),
+  // DOM container element REQUIRED
+  container: document.getElementById('playlist'),
 
-  //sample rate of the project. (used for correct peaks rendering)
+  // sample rate of the project. (used for correct peaks rendering)
   sampleRate: new (window.AudioContext || window.webkitAudioContext).sampleRate,
 
-  //number of audio samples per waveform peak.
-  //must be an entry in option: zoomLevels.
+  // number of audio samples per waveform peak.
+  // must be an entry in option: zoomLevels.
   samplesPerPixel: 4096,
 
-  //whether to draw multiple channels or combine them.
+  // whether to draw multiple channels or combine them.
   mono: true,
 
-  //default fade curve type.
+  // enables "exclusive solo" where solo switches between tracks
+  exclSolo: false,
+
+  // default fade curve type.
   fadeType: 'logarithmic', // (logarithmic | linear | sCurve | exponential)
 
-  //whether or not to include the time measure.
+  // whether or not to include the time measure.
   timescale: false,
 
-  //control panel on left side of waveform
+  // control panel on left side of waveform
   controls: {
-    //whether or not to include the track controls
+    // whether or not to include the track controls
     show: false,
 
-    //width of controls in pixels
-    width: 150
+    // width of controls in pixels
+    width: 150,
   },
 
   colors: {
-    //color of the wave background
+    // color of the wave background
     waveOutlineColor: 'white',
 
-    //color of the time ticks on the canvas
+    // color of the time ticks on the canvas
     timeColor: 'grey',
 
-    //color of the fade drawn on canvas
-    fadeColor: 'black'
+    // color of the fade drawn on canvas
+    fadeColor: 'black',
   },
 
-  //height in pixels of each canvas element a waveform is on.
+  // height in pixels of each canvas element a waveform is on.
   waveHeight: 128,
 
-  //interaction state of the playlist
-  state: 'cursor', // (cursor | select | fadein | fadeout | shift)
-  seekStyle : 'line', // (line | fill)
-  //Array of zoom levels in samples per pixel.
-  //Smaller numbers have a greater zoom in.
-  zoomLevels: [512, 1024, 2048, 4096]
+  // interaction state of the playlist
+  // (cursor | select | fadein | fadeout | shift)
+  state: 'cursor',
+
+  // (line | fill)
+  seekStyle : 'line',
+
+  // Array of zoom levels in samples per pixel.
+  // Smaller numbers have a greater zoom in.
+  zoomLevels: [512, 1024, 2048, 4096],
 };
 ```
 
@@ -152,74 +159,82 @@ var options = {
 
 ```javascript
 {
-  //a media path for XHR or a File object.
-  "src": "media/audio/BassDrums30.mp3",
+  // a media path for XHR or a File object.
+  src: 'media/audio/BassDrums30.mp3',
 
-  //name that will display in the playlist control panel.
-  "name": "Drums",
+  // name that will display in the playlist control panel.
+  name: 'Drums',
 
-  //volume level of the track between [0-1]
-  "gain": 1,
+  // volume level of the track between [0-1]
+  gain: 1,
 
-  //whether the track should initially be muted.
-  "muted": false,
+  // whether the track should initially be muted.
+  muted: false,
 
-  //whether the track should initially be soloed.
-  "soloed": false,
+  // whether the track should initially be soloed.
+  soloed: false,
 
-  //time in seconds relative to the playlist
-  //ex (track will start after 8.5 seconds)
-  //DEFAULT 0 - track starts at beginning of playlist
-  "start": 8.5,
+  // time in seconds relative to the playlist
+  // ex (track will start after 8.5 seconds)
+  / /DEFAULT 0 - track starts at beginning of playlist
+  start: 8.5,
 
-  //track fade in details
-  "fadeIn": {
-    //fade curve shape
-    "shape": "logarithmic", // (logarithmic | linear | sCurve | exponential)
+  // track fade in details
+  fadeIn: {
+    // fade curve shape
+    // (logarithmic | linear | sCurve | exponential)
+    shape: 'logarithmic',
 
-    //length of fade starting from the beginning of this track, in seconds.
-    "duration": 0.5
+    // length of fade starting from the beginning of this track, in seconds.
+    duration: 0.5,
   },
 
-  //track fade out details
-  "fadeOut": {
-    //fade curve shape
-    "shape": "logarithmic", // (logarithmic | linear | sCurve | exponential)
+  // track fade out details
+  fadeOut: {
+    // fade curve shape
+    // (logarithmic | linear | sCurve | exponential)
+    shape: 'logarithmic',
 
     //length of fade which reaches the end of this track, in seconds.
-    "duration": 0.5
+    duration: 0.5,
   }
 
-  //where the waveform for this track should begin from
-  //ex (Waveform will begin 15 seconds into this track)
-  //DEFAULT start at the beginning - 0 seconds
-  "cuein": 15,
+  // where the waveform for this track should begin from
+  // ex (Waveform will begin 15 seconds into this track)
+  // DEFAULT start at the beginning - 0 seconds
+  cuein: 15,
 
-  //where the waveform for this track should end
-  //ex (Waveform will end at 30 second into this track)
-  //DEFAULT duration of the track
-  "cueout": 30,
+  // where the waveform for this track should end
+  // ex (Waveform will end at 30 second into this track)
+  // DEFAULT duration of the track
+  cueout: 30,
 
-  //interaction states allowed on this track.
-  //DEFAULT - all true
-  "states": {
-    'cursor': true,
-    'fadein': true,
-    'fadeout': true,
-    'select': true,
-    'shift': true
+  // custom class for unique track styling
+  customClass: 'vocals',
+
+  // custom background-color for the canvas-drawn waveform
+  waveOutlineColor: '#f3f3f3',
+
+  // interaction states allowed on this track.
+  // DEFAULT - all true
+  states: {
+    cursor: true,
+    fadein: true,
+    fadeout: true,
+    select: true,
+    shift: true,
   },
 
-  //pre-selected section on track. 
-  //ONLY ONE selection is permitted in a list of tracks, will take most recently set if multiple passed.
-  //This track is marked as 'active'
+  // pre-selected section on track.
+  // ONLY ONE selection is permitted in a list of tracks, will take most recently set if multiple passed.
+  // This track is marked as 'active'
   selected: {
-    //start time of selection in seconds, relative to the playlist
+    // start time of selection in seconds, relative to the playlist
     start: 5,
 
-    //end time of selection in seconds, relative to the playlist
-    end: 15
-  }
+    // end time of selection in seconds, relative to the playlist
+    end: 15,
+  },
 }
 ```
 
@@ -233,12 +248,14 @@ var WaveformPlaylist = require('waveform-playlist');
 
 var playlist = WaveformPlaylist.init(
   {
-    container: document.getElementById("playlist")
+    container: document.getElementById('playlist'),
   },
-  EventEmitter() //you can pass your own event emitter
+
+  // you can pass your own event emitter
+  EventEmitter(),
 );
 
-//retrieves the event emitter the playlist is using.
+// retrieves the event emitter the playlist is using.
 var ee = playlist.getEventEmitter();
 ```
 
@@ -253,6 +270,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `stop` | _none_ | Stops playout of the playlist. |
 | `rewind` | _none_ | Stops playout if playlist is playing, resets cursor to the beginning of the playlist. |
 | `fastforward` | _none_ | Stops playout if playlist is playing, resets cursor to the end of the playlist. |
+| `clear` | _none_ | Stops playout if playlist is playing, removes all tracks from the playlist. |
 | `record` | _none_ | Starts recording an audio track. Begins playout of other tracks in playlist if there are any. |
 | `zoomin` | _none_ | Changes zoom level to the next smallest entry (if one exists) from the array `zoomLevels`. |
 | `zoomout` | _none_ | Changes zoom level to the next largest entry (if one exists) from the array `zoomLevels`. |
@@ -260,6 +278,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `statechange` | (`cursor | select | fadein | fadeout | shift`) | Changes interaction state to the state given. |
 | `fadetype` | (`logarithmic | linear | sCurve | exponential`) | Changes playlist default fade type. |
 | `newtrack` | `File` | Loads `File` object into the playlist. |
+| `volumechange` | `volume, track` | Set volume of `track` to `volume` (0-100) |
 | `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
 | `select` | `start, end, track:optional` | Seek to the start time or start/end selection optionally with active track `track`. |
 | `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
@@ -281,6 +300,8 @@ An example of using the event emitter to control the playlist can be found in [/
 | `mastervolumechange` | `volume` | Master volume of the playlist has changed to `volume` (0-100) |
 | `audiorequeststatechange` | `state, src` | Loading audio `src` (`string` or `File`) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number) |
 | `loadprogress` | `percent, src` | Loading audio `src` has loaded percent `percent` (0-100) |
+| `audiosourcesloaded` | _none_ | Audio decoding has finished for all tracks |
+| `audiosourcesrendered` | _none_ | Tracks are rendered to the playlist |
 | `finished` | _none_ | Event fired when cursor ( while playing ) reaches the end (maximum duration) |
 | `audiorenderingfinished` | `type, data` | Return the result of the rendering in the desired format. `type` can be `buffer` or `wav` and can be used to dertermine the  `data` type. When `type` is `wav`, data is a `blob` object that represent the wav file. |
 | `speedchanged` | `speed` | When speed is changed, return the value applied to tracks. |

@@ -1,7 +1,7 @@
 {
   "name": "waveform-playlist",
   "description": "Multiple track web audio editor and player with waveform preview",
-  "version": "2.4.0",
+  "version": "2.8.0",
   "main": "lib/app.js",
   "author": "Naomi Aro",
   "license": "MIT",
@@ -22,6 +22,10 @@
     "chai": "^3.4.1",
     "chai-as-promised": "^5.1.0",
     "coveralls": "^2.11.4",
+    "eslint": "^3.12.2",
+    "eslint-config-airbnb-base": "^11.0.0",
+    "eslint-plugin-import": "^2.2.0",
+    "gh-pages": "^0.11.0",
     "istanbul": "^0.4.1",
     "karma": "^0.13.15",
     "karma-chai": "^0.1.0",
@@ -36,7 +40,6 @@
     "karma-webpack": "^1.7.0",
     "mocha": "^2.3.4",
     "requirejs": "^2.1.22",
-    "gh-pages": "^0.11.0",
     "webpack": "^1.13.0",
     "webpack-dev-server": "^1.14.0"
   },
@@ -48,17 +51,17 @@
     "event-emitter": "^0.3.4",
     "fade-curves": "^1.0.2",
     "fade-maker": "^1.0.3",
+    "inline-worker": "^1.1.0",
     "lodash.assign": "^4.0.0",
     "lodash.defaults": "^4.0.0",
     "lodash.forown": "^4.0.0",
     "uuid": "^2.0.1",
     "virtual-dom": "^2.1.1",
-    "webaudio-peaks": "^0.0.5",
-    "worker-loader": "^0.7.0"
+    "webaudio-peaks": "^0.0.6"
   },
   "scripts": {
     "clean": "rm -Rf dist && rm -Rf lib && rm -Rf styles",
-    "styles": "mkdir styles && cp ghpages/_sass/_playlist.scss styles/playlist.scss",
+    "styles": "mkdir -p styles && cp ghpages/_sass/_playlist.scss styles/playlist.scss",
     "compile": "babel src --out-dir lib",
     "jekyll": "jekyll build -s ghpages -d dist/waveform-playlist",
     "jekyll:dev": "jekyll build -s ghpages -d dist/waveform-playlist --watch",
@@ -70,7 +73,8 @@
     "prepublish": "npm run compile && npm run styles",
     "webpack:server": "node_modules/webpack-dev-server/bin/webpack-dev-server.js --content-base dist/ --colors --host 0.0.0.0 --inline",
     "start": "npm run jekyll && npm run webpack:server",
-    "test": "node_modules/karma/bin/karma start --browsers Firefox --single-run"
+    "test": "node_modules/karma/bin/karma start --browsers Firefox --single-run",
+    "eslint": "node_modules/.bin/eslint src"
   },
   "repository": {
     "type": "git",

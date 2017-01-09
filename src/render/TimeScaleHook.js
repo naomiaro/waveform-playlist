@@ -2,32 +2,32 @@
 * virtual-dom hook for rendering the time scale canvas.
 */
 export default class {
-	constructor(tickInfo, offset, samplesPerPixel, duration) {
-        this.tickInfo = tickInfo;
-        this.offset = offset;
-        this.samplesPerPixel = samplesPerPixel;
-        this.duration = duration;
+  constructor(tickInfo, offset, samplesPerPixel, duration) {
+    this.tickInfo = tickInfo;
+    this.offset = offset;
+    this.samplesPerPixel = samplesPerPixel;
+    this.duration = duration;
+  }
+
+  hook(canvas, prop, prev) {
+    // canvas is up to date
+    if (prev !== undefined
+      && (prev.offset === this.offset)
+      && (prev.duration === this.duration)
+      && (prev.samplesPerPixel === this.samplesPerPixel)) {
+      return;
     }
 
-    hook(canvas, prop, prev) {
-    	//canvas is up to date
-        if (prev !== undefined 
-        	&& (prev.offset === this.offset)
-        	&& (prev.duration === this.duration)
-        	&& (prev.samplesPerPixel === this.samplesPerPixel)) {
-            return;
-        }
+    const width = canvas.width;
+    const height = canvas.height;
+    const ctx = canvas.getContext('2d');
 
-    	let width = canvas.width;
-    	let height = canvas.height;
-    	let cc = canvas.getContext('2d');
+    ctx.clearRect(0, 0, width, height);
 
-    	cc.clearRect(0, 0, width, height);
-    	
-        Object.keys(this.tickInfo).forEach((x) => {
-        	let scaleHeight = this.tickInfo[x];
-        	let scaleY = height - scaleHeight;
-        	cc.fillRect(x, scaleY, 1, scaleHeight);
-        });
-    }
+    Object.keys(this.tickInfo).forEach((x) => {
+      const scaleHeight = this.tickInfo[x];
+      const scaleY = height - scaleHeight;
+      ctx.fillRect(x, scaleY, 1, scaleHeight);
+    });
+  }
 }
