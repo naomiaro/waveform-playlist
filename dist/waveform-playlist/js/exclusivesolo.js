@@ -32,6 +32,6 @@ playlist.load([
     "src": "media/audio/BassDrums30.mp3",
     "name": "Drums"
   }
-]).then(function() {
+]).then(function () {
   //can do stuff with the playlist.
 });

@@ -18,6 +18,6 @@ playlist.load([
     src: "media/audio/BassDrums30.mp3",
     name: "Bass & Drums"
   }
-]).then(function() {
+]).then(function () {
   //can do stuff with the playlist.
 });

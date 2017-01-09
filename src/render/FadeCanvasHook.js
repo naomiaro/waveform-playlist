@@ -1,5 +1,5 @@
-import {FADEIN, FADEOUT, SCURVE, LINEAR, EXPONENTIAL, LOGARITHMIC} from "fade-maker";
-import {sCurve, logarithmic, linear, exponential} from "fade-curves";
+import { FADEIN, FADEOUT, SCURVE, LINEAR, EXPONENTIAL, LOGARITHMIC } from 'fade-maker';
+import { sCurve, logarithmic, linear, exponential } from 'fade-curves';
 
 /*
  * virtual-dom hook for drawing the fade curve to the canvas element.

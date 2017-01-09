@@ -1,5 +1,5 @@
-import BlobLoader from "./BlobLoader";
-import XHRLoader from "./XHRLoader";
+import BlobLoader from './BlobLoader';
+import XHRLoader from './XHRLoader';
 
 export default class {
   static createLoader(src, audioContext, ee) {

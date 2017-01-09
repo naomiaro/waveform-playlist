@@ -1,16 +1,16 @@
-import _defaults from "lodash.defaults";
-import h from "virtual-dom/h";
-import diff from "virtual-dom/diff";
-import patch from "virtual-dom/patch";
-import InlineWorker from "inline-worker";
-import {pixelsToSeconds} from "./utils/conversions";
-import LoaderFactory from "./track/loader/LoaderFactory";
-import ScrollHook from "./render/ScrollHook";
-import TimeScale from "./TimeScale";
-import Track from "./Track";
-import Playout from "./Playout";
-import RecorderWorkerFunction from "./utils/recorderWorker";
-import ExportWavWorkerFunction from "./utils/exportWavWorker";
+import _defaults from 'lodash.defaults';
+import h from 'virtual-dom/h';
+import diff from 'virtual-dom/diff';
+import patch from 'virtual-dom/patch';
+import InlineWorker from 'inline-worker';
+import { pixelsToSeconds } from './utils/conversions';
+import LoaderFactory from './track/loader/LoaderFactory';
+import ScrollHook from './render/ScrollHook';
+import TimeScale from './TimeScale';
+import Track from './Track';
+import Playout from './Playout';
+import RecorderWorkerFunction from './utils/recorderWorker';
+import ExportWavWorkerFunction from './utils/exportWavWorker';
 
 export default class {
   constructor() {
@@ -54,7 +54,7 @@ export default class {
     this.mediaRecorder.ondataavailable = (e) => {
       this.chunks.push(e.data);
 
-      const recording = new Blob(this.chunks, {type: 'audio/ogg; codecs=opus'});
+      const recording = new Blob(this.chunks, { type: 'audio/ogg; codecs=opus' });
       const loader = LoaderFactory.createLoader(recording, this.ac);
       loader.load().then((audioBuffer) => {
         // ask web worker for peaks.
@@ -149,9 +149,8 @@ export default class {
         this.lastSeeked = start;
         this.pausedAt = undefined;
         this.restartPlayFrom(start);
-      }
-      else {
-        //reset if it was paused.
+      } else {
+        // reset if it was paused.
         this.seek(start, end, track);
         this.ee.emit('timeupdate', start);
         this.draw(this.render());
@@ -305,7 +304,7 @@ export default class {
         const muted = info.muted || false;
         const soloed = info.soloed || false;
         const selection = info.selected;
-        const peaks = info.peaks || {type: 'WebAudio', mono: this.mono};
+        const peaks = info.peaks || { type: 'WebAudio', mono: this.mono };
         const customClass = info.customClass || undefined;
         const waveOutlineColor = info.waveOutlineColor || undefined;
 
@@ -496,14 +495,15 @@ export default class {
   }
 
   setLoop(number) {
-    this.loopNumber = number
+    this.loopNumber = number;
   }
 
 
   setSpeed(speed) {
     this.speed = (speed >= 0.5 && speed <= 4) ? speed : 1;
-    if (this.isPlaying())
+    if (this.isPlaying()) {
       this.restartPlayFrom(this.playbackSeconds);
+    }
     this.ee.emit('speedchanged', this.speed);
   }
 
@@ -747,27 +747,23 @@ export default class {
     const elapsed = currentTime - this.lastDraw;
 
     if (this.isPlaying()) {
-      //console.log("speed " + this.speed);
-      playbackSeconds = cursorPos + elapsed * this.speed;
+      playbackSeconds = cursorPos + (elapsed * this.speed);
       this.ee.emit('timeupdate', playbackSeconds);
       this.animationRequest = window.requestAnimationFrame(
         this.updateEditor.bind(this, playbackSeconds),
       );
-    }
-    else {
-      if ((cursorPos + elapsed) >=
-        (this.isSegmentSelection()) ? selection.end : this.duration) {
+    } else {
+      if ((cursorPos + elapsed) >= (this.isSegmentSelection()) ? selection.end : this.duration) {
         if (this.loopNumber > 0) {
-          this.loopNumber--;
+          this.loopNumber -= 1;
           this.ee.emit('newloop', this.loopNumber);
-          this.restartPlayFrom(selection.start, selection.end)
-        }
-        else if (this.loopNumber == -1) {
+          this.restartPlayFrom(selection.start, selection.end);
+        } else if (this.loopNumber === -1) {
           this.ee.emit('newloop', this.loopNumber);
-          this.restartPlayFrom(selection.start, selection.end)
-        }
-        else
+          this.restartPlayFrom(selection.start, selection.end);
+        } else {
           this.ee.emit('finished');
+        }
       }
 
       this.stopAnimation();
@@ -788,7 +784,7 @@ export default class {
       this.rootNode = patch(this.rootNode, patches);
       this.tree = newTree;
 
-      //use for fast forwarding.
+      // use for fast forwarding.
       this.viewDuration = pixelsToSeconds(
         this.rootNode.clientWidth - this.controls.width,
         this.samplesPerPixel,
