@@ -1,7 +1,6 @@
-import h from 'virtual-dom/h';
-
-import { secondsToPixels } from './utils/conversions';
-import TimeScaleHook from './render/TimeScaleHook';
+import h from "virtual-dom/h";
+import {secondsToPixels} from "./utils/conversions";
+import TimeScaleHook from "./render/TimeScaleHook";
 
 class TimeScale {
   constructor(duration, offset, samplesPerPixel, sampleRate, marginLeft = 0) {
@@ -73,8 +72,8 @@ class TimeScale {
   }
 
   /*
-    Return time in format mm:ss
-  */
+   Return time in format mm:ss
+   */
   static formatTime(milliseconds) {
     const seconds = milliseconds / 1000;
     let s = seconds % 60;

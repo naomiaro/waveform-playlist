@@ -102,9 +102,12 @@
       background: #ccc; }
 
 .playlist .vocals {
-  background-color: #c0dce0; }
-  .playlist .vocals header {
-    background-color: green; }
+    background-color: #c0dce0;
+}
+
+.playlist .vocals header {
+    background-color: green;
+}
 
 .track-drop {
   border: 2px dashed blue;

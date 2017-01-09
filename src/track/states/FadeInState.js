@@ -1,4 +1,4 @@
-import { pixelsToSeconds } from '../../utils/conversions';
+import {pixelsToSeconds} from "../../utils/conversions";
 
 export default class {
   constructor(track) {

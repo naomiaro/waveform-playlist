@@ -1,7 +1,7 @@
 /*
  * This script is provided to give an example how the playlist can be controlled using the event emitter.
  * This enables projects to create/control the useability of the project.
-*/
+ */
 var ee = playlist.getEventEmitter();
 var $container = $("body");
 var $timeFormat = $container.find('.time-format');
@@ -30,9 +30,9 @@ function cueFormatters(format) {
 
   function clockFormat(seconds, decimals) {
     var hours,
-        minutes,
-        secs,
-        result;
+      minutes,
+      secs,
+      result;
 
     hours = parseInt(seconds / 3600, 10) % 24;
     minutes = parseInt(seconds / 60, 10) % 60;
@@ -46,22 +46,22 @@ function cueFormatters(format) {
 
   var formats = {
     "seconds": function (seconds) {
-        return seconds.toFixed(0);
+      return seconds.toFixed(0);
     },
     "thousandths": function (seconds) {
-        return seconds.toFixed(3);
+      return seconds.toFixed(3);
     },
     "hh:mm:ss": function (seconds) {
-        return clockFormat(seconds, 0);   
+      return clockFormat(seconds, 0);
     },
     "hh:mm:ss.u": function (seconds) {
-        return clockFormat(seconds, 1);   
+      return clockFormat(seconds, 1);
     },
     "hh:mm:ss.uu": function (seconds) {
-        return clockFormat(seconds, 2);   
+      return clockFormat(seconds, 2);
     },
     "hh:mm:ss.uuu": function (seconds) {
-        return clockFormat(seconds, 3);   
+      return clockFormat(seconds, 3);
     }
   };
 
@@ -95,9 +95,9 @@ updateTime(audioPos);
 
 
 /*
-* Code below sets up events to send messages to the playlist.
-*/
-$container.on("click", ".btn-playlist-state-group", function() {
+ * Code below sets up events to send messages to the playlist.
+ */
+$container.on("click", ".btn-playlist-state-group", function () {
   //reset these for now.
   $('.btn-fade-state-group').addClass('hidden');
   $('.btn-select-state-group').addClass('hidden');
@@ -111,27 +111,27 @@ $container.on("click", ".btn-playlist-state-group", function() {
   }
 });
 
-$container.on("click", ".btn-play", function() {
+$container.on("click", ".btn-play", function () {
   ee.emit("play");
 });
 
-$container.on("click", ".btn-pause", function() {
+$container.on("click", ".btn-pause", function () {
   ee.emit("pause");
 });
 
-$container.on("click", ".btn-stop", function() {
+$container.on("click", ".btn-stop", function () {
   ee.emit("stop");
 });
 
-$container.on("click", ".btn-rewind", function() {
+$container.on("click", ".btn-rewind", function () {
   ee.emit("rewind");
 });
 
-$container.on("click", ".btn-fast-forward", function() {
+$container.on("click", ".btn-fast-forward", function () {
   ee.emit("fastforward");
 });
 
-$container.on("click", ".btn-clear", function() {
+$container.on("click", ".btn-clear", function () {
   ee.emit("clear");
 });
 
@@ -140,66 +140,66 @@ $container.on("click", ".btn-record", function () {
 });
 
 //track interaction states
-$container.on("click", ".btn-cursor", function() {
+$container.on("click", ".btn-cursor", function () {
   ee.emit("statechange", "cursor");
   toggleActive(this);
 });
 
-$container.on("click", ".btn-select", function() {
+$container.on("click", ".btn-select", function () {
   ee.emit("statechange", "select");
   toggleActive(this);
 });
 
-$container.on("click", ".btn-shift", function() {
+$container.on("click", ".btn-shift", function () {
   ee.emit("statechange", "shift");
   toggleActive(this);
 });
 
-$container.on("click", ".btn-fadein", function() {
+$container.on("click", ".btn-fadein", function () {
   ee.emit("statechange", "fadein");
   toggleActive(this);
 });
 
-$container.on("click", ".btn-fadeout", function() {
+$container.on("click", ".btn-fadeout", function () {
   ee.emit("statechange", "fadeout");
   toggleActive(this);
 });
 
 //fade types
-$container.on("click", ".btn-logarithmic", function() {
+$container.on("click", ".btn-logarithmic", function () {
   ee.emit("fadetype", "logarithmic");
   toggleActive(this);
 });
 
-$container.on("click", ".btn-linear", function() {
+$container.on("click", ".btn-linear", function () {
   ee.emit("fadetype", "linear");
   toggleActive(this);
 });
 
-$container.on("click", ".btn-scurve", function() {
+$container.on("click", ".btn-scurve", function () {
   ee.emit("fadetype", "sCurve");
   toggleActive(this);
 });
 
-$container.on("click", ".btn-exponential", function() {
+$container.on("click", ".btn-exponential", function () {
   ee.emit("fadetype", "exponential");
   toggleActive(this);
 });
 
 //zoom buttons
-$container.on("click", ".btn-zoom-in", function() {
+$container.on("click", ".btn-zoom-in", function () {
   ee.emit("zoomin");
 });
 
-$container.on("click", ".btn-zoom-out", function() {
+$container.on("click", ".btn-zoom-out", function () {
   ee.emit("zoomout");
 });
 
-$container.on("click", ".btn-trim-audio", function() {
+$container.on("click", ".btn-trim-audio", function () {
   ee.emit("trim");
 });
 
-$container.on("click", ".btn-info", function() {
+$container.on("click", ".btn-info", function () {
   console.log(playlist.getInfo());
 });
 
@@ -217,21 +217,21 @@ $container.on("change", ".select-seek-style", function (node) {
 });
 
 //track drop
-$container.on("dragenter", ".track-drop", function(e) {
+$container.on("dragenter", ".track-drop", function (e) {
   e.preventDefault();
   e.target.classList.add("drag-enter");
 });
 
-$container.on("dragover", ".track-drop", function(e) {
+$container.on("dragover", ".track-drop", function (e) {
   e.preventDefault();
 });
 
-$container.on("dragleave", ".track-drop", function(e) {
+$container.on("dragleave", ".track-drop", function (e) {
   e.preventDefault();
   e.target.classList.remove("drag-enter");
 });
 
-$container.on("drop", ".track-drop", function(e) {
+$container.on("drop", ".track-drop", function (e) {
   e.preventDefault();
   e.target.classList.remove("drag-enter");
 
@@ -242,14 +242,14 @@ $container.on("drop", ".track-drop", function(e) {
   }
 });
 
-$container.on("change", ".time-format", function(e) {
+$container.on("change", ".time-format", function (e) {
   format = $timeFormat.val();
 
   updateSelect(startTime, endTime);
   updateTime(audioPos);
 });
 
-$container.on("input change", ".master-gain", function(node){
+$container.on("input change", ".master-gain", function (node) {
   ee.emit("mastervolumechange", node.target.value);
 });
 
@@ -293,32 +293,32 @@ function displayDownloadLink(link) {
 
 
 /*
-* Code below receives updates from the playlist.
-*/
+ * Code below receives updates from the playlist.
+ */
 ee.on("select", updateSelect);
 
 ee.on("timeupdate", updateTime);
 
-ee.on("mute", function(track) {
+ee.on("mute", function (track) {
   displaySoundStatus("Mute button pressed for " + track.name);
 });
 
-ee.on("solo", function(track) {
+ee.on("solo", function (track) {
   displaySoundStatus("Solo button pressed for " + track.name);
 });
 
-ee.on("volumechange", function(volume, track) {
+ee.on("volumechange", function (volume, track) {
   displaySoundStatus(track.name + " now has volume " + volume + ".");
 });
 
-ee.on("mastervolumechange", function(volume) {
+ee.on("mastervolumechange", function (volume) {
   displaySoundStatus("Master volume now has volume " + volume + ".");
 });
 
 
 var audioStates = ["uninitialized", "loading", "decoding", "finished"];
 
-ee.on("audiorequeststatechange", function(state, src) {
+ee.on("audiorequeststatechange", function (state, src) {
   var name = src;
 
   if (src instanceof File) {
@@ -328,7 +328,7 @@ ee.on("audiorequeststatechange", function(state, src) {
   displayLoadingData("Track " + name + " is in state " + audioStates[state]);
 });
 
-ee.on("loadprogress", function(percent, src) {
+ee.on("loadprogress", function (percent, src) {
   var name = src;
 
   if (src instanceof File) {
@@ -338,16 +338,16 @@ ee.on("loadprogress", function(percent, src) {
   displayLoadingData("Track " + name + " has loaded " + percent + "%");
 });
 
-ee.on("audiosourcesloaded", function() {
+ee.on("audiosourcesloaded", function () {
   displayLoadingData("Tracks have all finished decoding.");
 });
 
-ee.on("audiosourcesrendered", function() {
+ee.on("audiosourcesrendered", function () {
   displayLoadingData("Tracks have been rendered");
 });
 
 ee.on('audiorenderingfinished', function (type, data) {
-  if (type == 'wav'){
+  if (type == 'wav') {
     if (downloadUrl) {
       window.URL.revokeObjectURL(downloadUrl);
     }

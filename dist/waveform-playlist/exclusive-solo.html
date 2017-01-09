@@ -1,97 +1,112 @@
 <!DOCTYPE html>
 <html>
 
-  <head>
-  <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Stem Tracks with exclusive solo</title>
-  <meta name="description" content="Create a playlist with multiple stem tracks. Mute or solo the different stems in the playlist.">
+    <title>Stem Tracks with exclusive solo</title>
+    <meta name="description"
+          content="Create a playlist with multiple stem tracks. Mute or solo the different stems in the playlist.">
 
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
-  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
-  <link rel="stylesheet" href="/waveform-playlist/css/main.css">
-  <link rel="canonical" href="https://naomiaro.github.io/waveform-playlist/exclusive-solo.html">
-  <link rel="alternate" type="application/rss+xml" title="Waveform Playlist" href="https://naomiaro.github.io/waveform-playlist/feed.xml">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css"/>
+    <link rel="stylesheet" href="/waveform-playlist/css/main.css">
+    <link rel="canonical" href="https://naomiaro.github.io/waveform-playlist/exclusive-solo.html">
+    <link rel="alternate" type="application/rss+xml" title="Waveform Playlist"
+          href="https://naomiaro.github.io/waveform-playlist/feed.xml">
 </head>
 
 
-  <body>
+<body>
 
-    <header class="site-header">
+<header class="site-header">
 
-  <ol class="breadcrumb">
-    <li><a href="/waveform-playlist/">Waveform Playlist</a></li>
-    <li class="active">Stem Tracks with exclusive solo</li>
-  </ol>
+    <ol class="breadcrumb">
+        <li><a href="/waveform-playlist/">Waveform Playlist</a></li>
+        <li class="active">Stem Tracks with exclusive solo</li>
+    </ol>
 
 </header>
 
 
-    <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
+<a href="https://github.com/naomiaro/waveform-playlist"
+   style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img
+        src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67"
+        alt="Fork me on GitHub"
+        data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
 
-    <div class="container">
-      <div class="wrapper">
+<div class="container">
+    <div class="wrapper">
         <article class="post">
 
-  <header class="post-header">
-    <h1 class="post-title">Stem Tracks with exclusive solo</h1>
-    <p class="lead">Mute or exclusive solo the different tracks that make up the composition.</p>
-  </header>
+            <header class="post-header">
+                <h1 class="post-title">Stem Tracks with exclusive solo</h1>
+                <p class="lead">Mute or exclusive solo the different tracks that make up the composition.</p>
+            </header>
 
-  <div class="post-content">
-    <div id="top-bar" class="playlist-top-bar">
-  <div class="playlist-toolbar">
-    <div class="btn-group">
-      <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
-      <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
-      <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
-      <span class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></span>
-      <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
+            <div class="post-content">
+                <div id="top-bar" class="playlist-top-bar">
+                    <div class="playlist-toolbar">
+                        <div class="btn-group">
+                            <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
+                            <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+                            <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+                            <span class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></span>
+                            <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
+                        </div>
+                    </div>
+                </div>
+                <div id="playlist"></div>
+                <form>
+                    <label>Master Volume: <input type="range" min="0" max="100" value="100"
+                                                 class="master-gain input-small form-control"></label>
+                </form>
+                <div class="sound-status"></div>
+                <div class="loading-data"></div>
+
+            </div>
+
+        </article>
+
+        <script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
+        <script type="text/javascript" src="js/waveform-playlist.var.js"></script>
+        <script type="text/javascript" src="js/exclusivesolo.js"></script>
+        <script type="text/javascript" src="js/emitter.js"></script>
+
     </div>
-  </div>
 </div>
-<div id="playlist"></div>
-<form>
-    <label>Master Volume: <input type="range" min="0" max="100" value="100" class="master-gain input-small form-control"></label>
-</form>
-<div class="sound-status"></div>
-<div class="loading-data"></div>
 
-  </div>
+<footer class="well well-lg">
 
-</article>
-
-<script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
-<script type="text/javascript" src="js/waveform-playlist.var.js"></script>
-<script type="text/javascript" src="js/exclusivesolo.js"></script>
-<script type="text/javascript" src="js/emitter.js"></script>
-
-      </div>
-    </div>
-
-    <footer class="well well-lg">
-
-  <p>Originally written for <a href="https://www.sourcefabric.org/en/airtime" rel="nofollow">Airtime</a> at <a href="https://www.sourcefabric.org" rel="nofollow">Sourcefabric</a>
-  <p>Music: <cite>Starlight</cite> by <a href="http://muse.mu/" rel="nofollow">Muse</a></p>
-  <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
-  <p>Licensed under the MIT License</p>
+    <p>Originally written for <a href="https://www.sourcefabric.org/en/airtime" rel="nofollow">Airtime</a> at <a
+            href="https://www.sourcefabric.org" rel="nofollow">Sourcefabric</a>
+    <p>Music: <cite>Starlight</cite> by <a href="http://muse.mu/" rel="nofollow">Muse</a></p>
+    <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
+    <p>Licensed under the MIT License</p>
 
 </footer>
 
 
-    <script>
-      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+<script>
+  (function (i, s, o, g, r, a, m) {
+    i['GoogleAnalyticsObject'] = r;
+    i[r] = i[r] || function () {
+        (i[r].q = i[r].q || []).push(arguments)
+      }, i[r].l = 1 * new Date();
+    a = s.createElement(o),
+      m = s.getElementsByTagName(o)[0];
+    a.async = 1;
+    a.src = g;
+    m.parentNode.insertBefore(a, m)
+  })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
 
-      ga('create', 'UA-62186746-1', 'auto');
-      ga('send', 'pageview');
+  ga('create', 'UA-62186746-1', 'auto');
+  ga('send', 'pageview');
 
-    </script>
+</script>
 
-  </body>
+</body>
 
 </html>

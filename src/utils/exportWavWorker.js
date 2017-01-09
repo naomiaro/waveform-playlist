@@ -96,7 +96,7 @@ export default function () {
     const bufferR = mergeBuffers(recBuffersR, recLength);
     const interleaved = interleave(bufferL, bufferR);
     const dataview = encodeWAV(interleaved);
-    const audioBlob = new Blob([dataview], { type });
+    const audioBlob = new Blob([dataview], {type});
 
     postMessage(audioBlob);
   }

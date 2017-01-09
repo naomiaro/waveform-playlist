@@ -1,18 +1,14 @@
-import _assign from 'lodash.assign';
-import _forOwn from 'lodash.forown';
-
-import uuid from 'uuid';
-import h from 'virtual-dom/h';
-
-import extractPeaks from 'webaudio-peaks';
-import { FADEIN, FADEOUT } from 'fade-maker';
-
-import { secondsToPixels, secondsToSamples } from './utils/conversions';
-import stateClasses from './track/states';
-
-import CanvasHook from './render/CanvasHook';
-import FadeCanvasHook from './render/FadeCanvasHook';
-import VolumeSliderHook from './render/VolumeSliderHook';
+import _assign from "lodash.assign";
+import _forOwn from "lodash.forown";
+import uuid from "uuid";
+import h from "virtual-dom/h";
+import extractPeaks from "webaudio-peaks";
+import {FADEIN, FADEOUT} from "fade-maker";
+import {secondsToPixels, secondsToSamples} from "./utils/conversions";
+import stateClasses from "./track/states";
+import CanvasHook from "./render/CanvasHook";
+import FadeCanvasHook from "./render/FadeCanvasHook";
+import VolumeSliderHook from "./render/VolumeSliderHook";
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -20,22 +16,23 @@ export default class {
 
     constructor() {
 
-        this.name = 'Untitled';
-    this.customClass = undefined;
-    this.waveOutlineColor = undefined;
+      this.name = 'Untitled';
+      this.customClass = undefined;
+      this.waveOutlineColor = undefined;
         this.gain = 1;
-        this.speed = 1;this.fades = {};
+      this.speed = 1;
+      this.fades = {};
         this.peakData = {
-            type: 'WebAudio',
-            mono: false,
+          type: 'WebAudio',
+          mono: false,
         };
 
-    this.cueIn = 0;
-    this.cueOut = 0;
-    this.duration = 0;
-    this.startTime = 0;
-    this.endTime = 0;
-  }
+      this.cueIn = 0;
+      this.cueOut = 0;
+      this.duration = 0;
+      this.startTime = 0;
+      this.endTime = 0;
+    }
 
   setEventEmitter(ee) {
     this.ee = ee;
@@ -65,8 +62,8 @@ export default class {
   }
 
   /*
-  *   start, end in seconds relative to the entire playlist.
-  */
+   *   start, end in seconds relative to the entire playlist.
+   */
   trim(start, end) {
     const trackStart = this.getStartTime();
     const trackEnd = this.getEndTime();
@@ -230,9 +227,9 @@ export default class {
         startTime, endTime in seconds (float).
         segment is for a highlighted section in the UI.
 
-    returns a Promise that will resolve when the AudioBufferSource
-    is either stopped or plays out naturally.
-  */
+     returns a Promise that will resolve when the AudioBufferSource
+     is either stopped or plays out naturally.
+     */
   schedulePlay(now, startTime, endTime, config) {
     let start;
     let duration;
@@ -261,7 +258,7 @@ export default class {
     if (this.startTime >= startTime) {
       start = 0;
       // schedule additional delay for this audio node.
-      when += (this.startTime - startTime);
+      when += (this.startTime - startTime)/this.speed;
 
       if (endTime) {
         segment -= (this.startTime - startTime);
@@ -292,11 +289,11 @@ export default class {
       // only apply fade if it's ahead of the cursor.
       if (relPos < fade.end) {
         if (relPos <= fade.start) {
-          fadeStart = now + (fade.start - relPos)/this.speed;
-          fadeDuration = (fade.end - fade.start)/this.speed;
+          fadeStart = now + (fade.start - relPos) / this.speed;
+          fadeDuration = (fade.end - fade.start) / this.speed;
         } else if (relPos > fade.start && relPos < fade.end) {
-          fadeStart = now - (relPos - fade.start)/this.speed;
-          fadeDuration = (fade.end - fade.start)/this.speed;
+          fadeStart = now - (relPos - fade.start) / this.speed;
+          fadeDuration = (fade.end - fade.start) / this.speed;
         }
 
         switch (fade.type) {

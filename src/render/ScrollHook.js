@@ -1,4 +1,4 @@
-import { secondsToPixels } from '../utils/conversions';
+import {secondsToPixels} from "../utils/conversions";
 
 /*
 * virtual-dom hook for scrolling the track container.

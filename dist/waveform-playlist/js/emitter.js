@@ -135,8 +135,8 @@ $container.on("click", ".btn-clear", function() {
   ee.emit("clear");
 });
 
-$container.on("click", ".btn-record", function() {
-  ee.emit("record");
+$container.on("click", ".btn-record", function () {
+    ee.emit("record");
 });
 
 //track interaction states
@@ -253,6 +253,22 @@ $container.on("input change", ".master-gain", function(node){
   ee.emit("mastervolumechange", node.target.value);
 });
 
+$container.on("input change", ".speed-slider", function (node) {
+    document.getElementById('speedValue').value = node.target.value;
+    ee.emit("speedchange", node.target.value);
+    displaySoundStatus("Playback speed is now " + node.target.value + "x !");
+});
+
+$container.on('click', ".set-loop-number", function () {
+    ee.emit("loopnumber", document.getElementById("loopValue").value);
+});
+
+$container.on("click", ".btn-speed-change", function () {
+    var value = document.getElementById('speedValue').value;
+    ee.emit("speedchange", value);
+    displaySoundStatus("Playback speed is now " + value + "x !");
+});
+
 function displaySoundStatus(status) {
   $(".sound-status").html(status);
 }
@@ -343,4 +359,15 @@ ee.on('audiorenderingfinished', function (type, data) {
 
 ee.on('finished', function () {
   console.log("The cursor has reached the end of the selection !");
+});
+
+ee.on('speedchanged', function (speed) {
+    document.getElementById('speedValue').value = speed;
+    document.querySelector(".speed-slider").value = speed;
+    displaySoundStatus("Received speed : " + speed + "x ");
+});
+
+ee.on('newloop', function (number) {
+    //document.getElementById("loopValue").value = number;
+    displaySoundStatus(number + " remaining loop ...");
 });

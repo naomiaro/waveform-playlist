@@ -1,23 +1,16 @@
-import _defaults from 'lodash.defaults';
-
-import h from 'virtual-dom/h';
-import diff from 'virtual-dom/diff';
-import patch from 'virtual-dom/patch';
-
-import InlineWorker from 'inline-worker';
-
-import { pixelsToSeconds } from './utils/conversions';
-
-import LoaderFactory from './track/loader/LoaderFactory';
-
-import ScrollHook from './render/ScrollHook';
-
-import TimeScale from './TimeScale';
-import Track from './Track';
-import Playout from './Playout';
-
-import RecorderWorkerFunction from './utils/recorderWorker';
-import ExportWavWorkerFunction from './utils/exportWavWorker';
+import _defaults from "lodash.defaults";
+import h from "virtual-dom/h";
+import diff from "virtual-dom/diff";
+import patch from "virtual-dom/patch";
+import InlineWorker from "inline-worker";
+import {pixelsToSeconds} from "./utils/conversions";
+import LoaderFactory from "./track/loader/LoaderFactory";
+import ScrollHook from "./render/ScrollHook";
+import TimeScale from "./TimeScale";
+import Track from "./Track";
+import Playout from "./Playout";
+import RecorderWorkerFunction from "./utils/recorderWorker";
+import ExportWavWorkerFunction from "./utils/exportWavWorker";
 
 export default class {
   constructor() {
@@ -34,6 +27,7 @@ export default class {
 
     this.fadeType = 'logarithmic';
     this.masterGain = 1;
+    this.speed = 1;
   }
 
   // TODO extract into a plugin
@@ -60,7 +54,7 @@ export default class {
     this.mediaRecorder.ondataavailable = (e) => {
       this.chunks.push(e.data);
 
-      const recording = new Blob(this.chunks, { type: 'audio/ogg; codecs=opus' });
+      const recording = new Blob(this.chunks, {type: 'audio/ogg; codecs=opus'});
       const loader = LoaderFactory.createLoader(recording, this.ac);
       loader.load().then((audioBuffer) => {
         // ask web worker for peaks.
@@ -142,27 +136,27 @@ export default class {
   setUpEventEmitter() {
     const ee = this.ee;
 
-        ee.on('speedchange', (speed) => {
-            this.setSpeed(speed);
-        });
+    ee.on('speedchange', (speed) => {
+      this.setSpeed(speed);
+    });
 
-        ee.on('loopnumber', (number) => {
-            this.setLoop(number);
-        });
+    ee.on('loopnumber', (number) => {
+      this.setLoop(number);
+    });
 
-        ee.on('select', (start, end, track) => {
-            if (this.isPlaying()) {
-                this.lastSeeked = start;
-                this.pausedAt = undefined;
-                this.restartPlayFrom(start);
-            }
-            else {
-                //reset if it was paused.
-                this.seek(start, end, track);
-                this.ee.emit('timeupdate', start);
-                this.draw(this.render());
-            }
-        });
+    ee.on('select', (start, end, track) => {
+      if (this.isPlaying()) {
+        this.lastSeeked = start;
+        this.pausedAt = undefined;
+        this.restartPlayFrom(start);
+      }
+      else {
+        //reset if it was paused.
+        this.seek(start, end, track);
+        this.ee.emit('timeupdate', start);
+        this.draw(this.render());
+      }
+    });
 
     ee.on('startaudiorendering', (type) => {
       this.startOfflineRender(type);
@@ -311,7 +305,7 @@ export default class {
         const muted = info.muted || false;
         const soloed = info.soloed || false;
         const selection = info.selected;
-        const peaks = info.peaks || { type: 'WebAudio', mono: this.mono };
+        const peaks = info.peaks || {type: 'WebAudio', mono: this.mono};
         const customClass = info.customClass || undefined;
         const waveOutlineColor = info.waveOutlineColor || undefined;
 
@@ -348,7 +342,7 @@ export default class {
         track.setState(this.getState());
         track.setStartTime(start);
         track.setPlayout(playout);
-                track.setSpeed(1);
+        track.setSpeed(1);
 
         track.setGainLevel(gain);
 
@@ -374,12 +368,12 @@ export default class {
     });
   }
 
-    /*
-        track instance of Track.
-    */
-    setActiveTrack(track) {
-        this.activeTrack = track;
-    }
+  /*
+   track instance of Track.
+   */
+  setActiveTrack(track) {
+    this.activeTrack = track;
+  }
 
   getActiveTrack() {
     return this.activeTrack;
@@ -389,14 +383,14 @@ export default class {
     return this.timeSelection.start !== this.timeSelection.end;
   }
 
-    /*
-        start, end in seconds.
-    */
-    setTimeSelection(start=0, end) {
-        this.timeSelection = {
-            start,
-            end: (end === undefined) ? start : end,
-        };
+  /*
+   start, end in seconds.
+   */
+  setTimeSelection(start = 0, end) {
+    this.timeSelection = {
+      start,
+      end: (end === undefined) ? start : end,
+    };
 
     this.cursor = start;
   }
@@ -421,8 +415,8 @@ export default class {
     });
 
     /*
-      TODO cleanup of different audio playouts handling.
-    */
+     TODO cleanup of different audio playouts handling.
+     */
     this.offlineAudioContext.startRendering().then((audioBuffer) => {
       if (type === 'buffer') {
         this.ee.emit('audiorenderingfinished', type, audioBuffer);
@@ -501,20 +495,20 @@ export default class {
     });
   }
 
-    setLoop(number) {
-        this.loopNumber = number
-    }
+  setLoop(number) {
+    this.loopNumber = number
+  }
 
 
-    setSpeed(speed) {
-        this.speed = (speed >= 0.5 && speed <= 4) ? speed : 1;
-        if (this.isPlaying())
-            this.restartPlayFrom(this.playbackSeconds);
-        this.ee.emit('speedchanged', this.speed);
-    }
+  setSpeed(speed) {
+    this.speed = (speed >= 0.5 && speed <= 4) ? speed : 1;
+    if (this.isPlaying())
+      this.restartPlayFrom(this.playbackSeconds);
+    this.ee.emit('speedchanged', this.speed);
+  }
 
-    muteTrack(track) {
-        const index = this.mutedTracks.indexOf(track);
+  muteTrack(track) {
+    const index = this.mutedTracks.indexOf(track);
 
     if (index > -1) {
       this.mutedTracks.splice(index, 1);
@@ -575,8 +569,8 @@ export default class {
   }
 
   /*
-  *   returns the current point of time in the playlist in seconds.
-  */
+   *   returns the current point of time in the playlist in seconds.
+   */
   getCurrentTime() {
     const cursorPos = this.lastSeeked || this.pausedAt || this.cursor;
 
@@ -617,13 +611,14 @@ export default class {
       return this.restartPlayFrom(start, end);
     }
 
-        this.tracks.forEach((track) => {
-            track.setSpeed(this.speed);track.setState('cursor');
-            playoutPromises.push(track.schedulePlay(currentTime, start, end, {
-                shouldPlay: this.shouldTrackPlay(track),
-                masterGain : this.masterGain,
-            }));
-        });
+    this.tracks.forEach((track) => {
+      track.setSpeed(this.speed);
+      track.setState('cursor');
+      playoutPromises.push(track.schedulePlay(currentTime, start, end, {
+        shouldPlay: this.shouldTrackPlay(track),
+        masterGain: this.masterGain,
+      }));
+    });
 
     this.lastPlay = currentTime;
     // use these to track when the playlist has fully stopped.
@@ -741,8 +736,8 @@ export default class {
   }
 
   /*
-  * Animation function for the playlist.
-  */
+   * Animation function for the playlist.
+   */
   updateEditor(cursor) {
     const currentTime = this.ac.currentTime;
     let playbackSeconds = 0;
@@ -751,29 +746,29 @@ export default class {
     const cursorPos = cursor || this.cursor;
     const elapsed = currentTime - this.lastDraw;
 
-        if (this.isPlaying()) {
-            //console.log("speed " + this.speed);
-            playbackSeconds = cursorPos + elapsed* this.speed;
-            this.ee.emit('timeupdate', playbackSeconds);
-            this.animationRequest = window.requestAnimationFrame(
-                this.updateEditor.bind(this, playbackSeconds),
-            );
+    if (this.isPlaying()) {
+      //console.log("speed " + this.speed);
+      playbackSeconds = cursorPos + elapsed * this.speed;
+      this.ee.emit('timeupdate', playbackSeconds);
+      this.animationRequest = window.requestAnimationFrame(
+        this.updateEditor.bind(this, playbackSeconds),
+      );
+    }
+    else {
+      if ((cursorPos + elapsed) >=
+        (this.isSegmentSelection()) ? selection.end : this.duration) {
+        if (this.loopNumber > 0) {
+          this.loopNumber--;
+          this.ee.emit('newloop', this.loopNumber);
+          this.restartPlayFrom(selection.start, selection.end)
         }
-        else {
-            if ((cursorPos + elapsed) >=
-              (this.isSegmentSelection()) ? selection.end : this.duration) {if (this.loopNumber > 0) {
-                    this.loopNumber--;
-                    this.ee.emit('newloop', this.loopNumber);
-                    this.restartPlayFrom(selection.start, selection.end)
-                }
-                else if (this.loopNumber == -1) {
-                    this.ee.emit('newloop', this.loopNumber);
-                    this.restartPlayFrom(selection.start, selection.end)
-
-                }
-                else
-                this.ee.emit('finished');
-            }
+        else if (this.loopNumber == -1) {
+          this.ee.emit('newloop', this.loopNumber);
+          this.restartPlayFrom(selection.start, selection.end)
+        }
+        else
+          this.ee.emit('finished');
+      }
 
       this.stopAnimation();
       this.pausedAt = undefined;
@@ -793,14 +788,14 @@ export default class {
       this.rootNode = patch(this.rootNode, patches);
       this.tree = newTree;
 
-            //use for fast forwarding.
-            this.viewDuration = pixelsToSeconds(
-              this.rootNode.clientWidth - this.controls.width,
-              this.samplesPerPixel,
-              this.sampleRate,
-            );
-        });
-    }
+      //use for fast forwarding.
+      this.viewDuration = pixelsToSeconds(
+        this.rootNode.clientWidth - this.controls.width,
+        this.samplesPerPixel,
+        this.sampleRate,
+      );
+    });
+  }
 
   getTrackRenderData(data = {}) {
     const defaults = {
@@ -818,10 +813,10 @@ export default class {
     return _defaults(data, defaults);
   }
 
-    isActiveTrack(track) {
-      const activeTrack = this.getActiveTrack();
-      if ( this.isSegmentSelection() ) {
-        return activeTrack === track;
+  isActiveTrack(track) {
+    const activeTrack = this.getActiveTrack();
+    if (this.isSegmentSelection()) {
+      return activeTrack === track;
     }
 
     return true;

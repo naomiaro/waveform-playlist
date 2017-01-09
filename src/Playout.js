@@ -1,4 +1,4 @@
-import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from 'fade-maker';
+import {FADEIN, FADEOUT, createFadeIn, createFadeOut} from "fade-maker";
 
 export default class {
 
@@ -100,15 +100,18 @@ export default class {
 
     setSpeed(speed) {
         this.speed = speed;
-    }/*
-        source.start is picky when passing the end time.
-        If rounding error causes a number to make the source think
-        it is playing slightly more samples than it has it won't play at all.
-        Unfortunately it doesn't seem to work if you just give it a start time.
-    */
+    }
+
+  /*
+   source.start is picky when passing the end time.
+   If rounding error causes a number to make the source think
+   it is playing slightly more samples than it has it won't play at all.
+   Unfortunately it doesn't seem to work if you just give it a start time.
+   */
     play(when, start, duration) {
         this.source.start(when, start, duration);
-    this.source.playbackRate.value = this.speed;}
+      this.source.playbackRate.value = this.speed;
+    }
 
   stop(when = 0) {
     if (this.source) {

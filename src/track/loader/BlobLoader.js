@@ -1,10 +1,10 @@
-import Loader from './Loader';
+import Loader from "./Loader";
 
 export default class extends Loader {
 
   /*
-  * Loads an audio file via a FileReader
-  */
+   * Loads an audio file via a FileReader
+   */
   load() {
     return new Promise((resolve, reject) => {
       if (this.src.type.match(/audio.*/) ||
