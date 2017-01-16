@@ -35,6 +35,10 @@ export function init(options = {}, ee = EventEmitter()) {
     waveHeight: 128,
     state: 'cursor',
     zoomLevels: [512, 1024, 2048, 4096],
+    annotations: [],
+    isAutomaticScroll: false,
+    isContinuousPlay: false,
+    linkedEndpoints: false,
   };
 
   const config = _assign(defaults, options);
@@ -61,6 +65,10 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.setExclSolo(config.exclSolo);
   playlist.setShowTimeScale(config.timescale);
   playlist.setSeekStyle(config.seekStyle);
+  playlist.setAnnotations(config.annotations);
+  playlist.isAutomaticScroll = config.isAutomaticScroll;
+  playlist.isContinuousPlay = config.isContinuousPlay;
+  playlist.linkedEndpoints = config.linkedEndpoints;
 
   // take care of initial virtual dom rendering.
   const tree = playlist.render();

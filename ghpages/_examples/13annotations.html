@@ -1,0 +1,52 @@
+---
+layout: page
+title: Playlist Annotations
+excerpt: Annotate the playlist with timed text segments. Drag boundries to adjust timing.
+lead: Annotate the playlist with timed text segments. Drag boundries to adjust timing. Annotations cannot overlap. Dragging an annotation into the space of its neighbour will change the timing of the neighbour's start/end time.
+permalink: annotations.html
+javascript: annotations.js
+audio_title: Sonnet
+audio_artist: LibriVox
+---
+
+<div class="lead">Currently supporting input and output in the <a href="https://github.com/readbeyond/aeneas">Aeneas</a> JSON format.</div>
+
+<div id="top-bar" class="playlist-top-bar">
+  <div class="playlist-toolbar">
+    <div class="btn-group">
+      <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
+      <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+      <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+      <span class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></span>
+      <span class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></span>
+    </div>
+    <div class="btn-group">
+      <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
+      <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
+      <span title="Download the annotations as json" class="btn-annotations-download btn btn-default">Download JSON</span>
+    </div>
+  </div>
+</div>
+<div id="playlist"></div>
+<form class="form-inline">
+  <div class="form-group">
+    <label for="master-gain">Master Volume</label>
+    <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
+  </div>
+  <div class="checkbox">
+    <label>
+      <input type="checkbox" class="automatic-scroll"> Automatic Scroll
+    </label>
+  </div>
+  <div class="checkbox">
+    <label>
+      <input type="checkbox" class="continuous-play"> Continuous Play
+    </label>
+  </div>
+  <div class="checkbox">
+    <label>
+      <input type="checkbox" class="link-endpoints"> Link Endpoints
+    </label>
+  </div>
+</form>
+{% include timeformat.html %}

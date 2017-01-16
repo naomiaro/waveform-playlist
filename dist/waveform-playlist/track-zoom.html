@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
   <head>
   <meta charset="utf-8">
@@ -9,7 +9,7 @@
   <title>Track Zoom Configuration</title>
   <meta name="description" content="Set an array of zoom levels in samples per pixel. Multiple canvas elements are used to avoid maximum dimension limits.">
 
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
   <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
   <link rel="stylesheet" href="/waveform-playlist/css/main.css">
   <link rel="canonical" href="https://naomiaro.github.io/waveform-playlist/track-zoom.html">
@@ -32,16 +32,14 @@
     <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
 
     <div class="container">
-      <div class="wrapper">
-        <article class="post">
-
-  <header class="post-header">
-    <h1 class="post-title">Track Zoom Configuration</h1>
-    <p class="lead">Set an array of zoom levels in samples per pixel. Multiple canvas elements are used to avoid maximum dimension limits.</p>
-  </header>
-
-  <div class="post-content">
-    <div id="top-bar" class="playlist-top-bar">
+  <div class="wrapper">
+    <article class="post">
+      <header class="post-header">
+        <h1 class="post-title">Track Zoom Configuration</h1>
+        <p class="lead">Set an array of zoom levels in samples per pixel. Multiple canvas elements are used to avoid maximum dimension limits.</p>
+      </header>
+      <div class="post-content">
+        <div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
     <div class="btn-group">
       <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
@@ -57,40 +55,39 @@
 <div id="playlist"></div>
 <div class="playlist-bottom-bar">
   <form class="form-inline">
-    <select class="time-format form-control">
-      <option value="seconds" selected="selected">seconds</option>
-      <option value="thousandths">thousandths</option>
-      <option value="hh:mm:ss">hh:mm:ss</option>
-      <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
-      <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
-      <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
-    </select>
-    <input type="text" class="audio-start input-small form-control" value="0">
-    <input type="text" class="audio-end input-small form-control" value="0">
-    <label class="audio-pos">0</label>
-  </form>
+  <select class="time-format form-control">
+    <option value="seconds">seconds</option>
+    <option value="thousandths">thousandths</option>
+    <option value="hh:mm:ss">hh:mm:ss</option>
+    <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
+    <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
+    <option value="hh:mm:ss.uuu" selected="selected">hh:mm:ss + milliseconds</option>
+  </select>
+  <input type="text" class="audio-start input-small form-control">
+  <input type="text" class="audio-end form-control">
+  <label class="audio-pos">00:00:00.0</label>
+</form>
+
 </div>
 
+      </div>
+    </article>
   </div>
+</div>
 
-</article>
+<footer class="well well-lg">
+  <p>Waveform Playlist originally written for <a href="https://www.sourcefabric.org/en/airtime">Airtime</a> at <a href="https://www.sourcefabric.org">Sourcefabric</a>
+  
+  <p>Music: <cite>Starlight</cite> by Muse</p>
+  
+  <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
+  <p>Licensed under the MIT License</p>
+</footer>
 
 <script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
 <script type="text/javascript" src="js/waveform-playlist.var.js"></script>
 <script type="text/javascript" src="js/track-zoom.js"></script>
 <script type="text/javascript" src="js/emitter.js"></script>
-
-      </div>
-    </div>
-
-    <footer class="well well-lg">
-
-  <p>Originally written for <a href="https://www.sourcefabric.org/en/airtime" rel="nofollow">Airtime</a> at <a href="https://www.sourcefabric.org" rel="nofollow">Sourcefabric</a>
-  <p>Music: <cite>Starlight</cite> by <a href="http://muse.mu/" rel="nofollow">Muse</a></p>
-  <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
-  <p>Licensed under the MIT License</p>
-
-</footer>
 
 
     <script>

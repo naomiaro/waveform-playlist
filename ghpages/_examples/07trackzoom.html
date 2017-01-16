@@ -5,6 +5,8 @@ lead: Set an array of zoom levels in samples per pixel. Multiple canvas elements
 excerpt: Set an array of zoom levels in samples per pixel. Multiple canvas elements are used to avoid maximum dimension limits.
 permalink: track-zoom.html
 javascript: track-zoom.js
+audio_title: Starlight
+audio_artist: Muse
 ---
 
 <div id="top-bar" class="playlist-top-bar">
@@ -22,17 +24,5 @@ javascript: track-zoom.js
 </div>
 <div id="playlist"></div>
 <div class="playlist-bottom-bar">
-  <form class="form-inline">
-    <select class="time-format form-control">
-      <option value="seconds" selected="selected">seconds</option>
-      <option value="thousandths">thousandths</option>
-      <option value="hh:mm:ss">hh:mm:ss</option>
-      <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
-      <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
-      <option value="hh:mm:ss.uuu">hh:mm:ss + milliseconds</option>
-    </select>
-    <input type="text" class="audio-start input-small form-control" value="0">
-    <input type="text" class="audio-end input-small form-control" value="0">
-    <label class="audio-pos">0</label>
-  </form>
+  {% include timeformat.html %}
 </div>

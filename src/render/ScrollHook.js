@@ -9,12 +9,23 @@ export default class {
   }
 
   hook(node) {
-    if (!this.playlist.isScrolling) {
+    const playlist = this.playlist;
+    if (!playlist.isScrolling) {
       const el = node;
+
+      if (playlist.isAutomaticScroll && playlist.isPlaying()) {
+        const rect = node.getBoundingClientRect();
+        const cursorRect = node.querySelector('.cursor').getBoundingClientRect();
+
+        if (cursorRect.right > rect.right) {
+          playlist.scrollLeft = playlist.playbackSeconds;
+        }
+      }
+
       const left = secondsToPixels(
-          this.playlist.scrollLeft,
-          this.playlist.samplesPerPixel,
-          this.playlist.sampleRate,
+          playlist.scrollLeft,
+          playlist.samplesPerPixel,
+          playlist.sampleRate,
       );
 
       el.scrollLeft = left;
