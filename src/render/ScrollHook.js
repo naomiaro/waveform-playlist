@@ -4,14 +4,20 @@ import { secondsToPixels } from '../utils/conversions';
 * virtual-dom hook for scrolling the track container.
 */
 export default class {
-  constructor(track, resolution, sampleRate) {
-    this.track = track;
-    this.resolution = resolution;
-    this.sampleRate = sampleRate;
+  constructor(playlist) {
+    this.playlist = playlist;
   }
 
   hook(node) {
-    const trackArea = node;
-    trackArea.scrollLeft = secondsToPixels(this.track.scrollLeft, this.resolution, this.sampleRate);
+    if (!this.playlist.isScrolling) {
+      const el = node;
+      const left = secondsToPixels(
+          this.playlist.scrollLeft,
+          this.playlist.samplesPerPixel,
+          this.playlist.sampleRate,
+      );
+
+      el.scrollLeft = left;
+    }
   }
 }

@@ -30,6 +30,7 @@ export default class {
     this.playbackSeconds = 0;
     this.duration = 0;
     this.scrollLeft = 0;
+    this.scrollTimer = undefined;
     this.showTimescale = false;
 
     this.fadeType = 'logarithmic';
@@ -79,7 +80,7 @@ export default class {
     // use a worker for calculating recording peaks.
     this.recorderWorker.onmessage = (e) => {
       this.recordingTrack.setPeaks(e.data);
-      this.draw(this.render());
+      this.drawRequest();
     };
 
     this.recorderWorker.onerror = (e) => {
@@ -151,7 +152,7 @@ export default class {
         // reset if it was paused.
         this.seek(start, end, track);
         this.ee.emit('timeupdate', start);
-        this.draw(this.render());
+        this.drawRequest();
       }
     });
 
@@ -161,13 +162,13 @@ export default class {
 
     ee.on('statechange', (state) => {
       this.setState(state);
-      this.draw(this.render());
+      this.drawRequest();
     });
 
     ee.on('shift', (deltaTime, track) => {
       track.setStartTime(track.getStartTime() + deltaTime);
       this.adjustDuration();
-      this.draw(this.render());
+      this.drawRequest();
     });
 
     ee.on('record', () => {
@@ -196,20 +197,20 @@ export default class {
 
     ee.on('clear', () => {
       this.clear().then(() => {
-        this.draw(this.render());
+        this.drawRequest();
       });
     });
 
     ee.on('solo', (track) => {
       this.soloTrack(track);
       this.adjustTrackPlayout();
-      this.draw(this.render());
+      this.drawRequest();
     });
 
     ee.on('mute', (track) => {
       this.muteTrack(track);
       this.adjustTrackPlayout();
-      this.draw(this.render());
+      this.drawRequest();
     });
 
     ee.on('volumechange', (volume, track) => {
@@ -225,12 +226,12 @@ export default class {
 
     ee.on('fadein', (duration, track) => {
       track.setFadeIn(duration, this.fadeType);
-      this.draw(this.render());
+      this.drawRequest();
     });
 
     ee.on('fadeout', (duration, track) => {
       track.setFadeOut(duration, this.fadeType);
-      this.draw(this.render());
+      this.drawRequest();
     });
 
     ee.on('fadetype', (type) => {
@@ -252,7 +253,7 @@ export default class {
       track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
 
       this.setTimeSelection(0, 0);
-      this.draw(this.render());
+      this.drawRequest();
     });
 
     ee.on('zoomin', () => {
@@ -261,7 +262,7 @@ export default class {
 
       if (zoom !== this.samplesPerPixel) {
         this.setZoom(zoom);
-        this.draw(this.render());
+        this.drawRequest();
       }
     });
 
@@ -271,12 +272,17 @@ export default class {
 
       if (zoom !== this.samplesPerPixel) {
         this.setZoom(zoom);
-        this.draw(this.render());
+        this.drawRequest();
       }
     });
 
     ee.on('scroll', () => {
-      this.draw(this.render());
+      this.isScrolling = true;
+      this.drawRequest();
+      clearTimeout(this.scrollTimer);
+      this.scrollTimer = setTimeout(() => {
+        this.isScrolling = false;
+      }, 200);
     });
   }
 
@@ -639,7 +645,7 @@ export default class {
       track.setState(this.getState());
     });
 
-    this.draw(this.render());
+    this.drawRequest();
     return Promise.all(this.playoutPromises);
   }
 
@@ -753,19 +759,23 @@ export default class {
     this.lastDraw = currentTime;
   }
 
-  draw(newTree) {
+  drawRequest() {
     window.requestAnimationFrame(() => {
-      const patches = diff(this.tree, newTree);
-      this.rootNode = patch(this.rootNode, patches);
-      this.tree = newTree;
-
-      // use for fast forwarding.
-      this.viewDuration = pixelsToSeconds(
-        this.rootNode.clientWidth - this.controls.width,
-        this.samplesPerPixel,
-        this.sampleRate,
-      );
+      this.draw(this.render());
     });
+  }
+
+  draw(newTree) {
+    const patches = diff(this.tree, newTree);
+    this.rootNode = patch(this.rootNode, patches);
+    this.tree = newTree;
+
+    // use for fast forwarding.
+    this.viewDuration = pixelsToSeconds(
+      this.rootNode.clientWidth - this.controls.width,
+      this.samplesPerPixel,
+      this.sampleRate,
+    );
   }
 
   getTrackRenderData(data = {}) {
@@ -819,9 +829,10 @@ export default class {
             this.samplesPerPixel,
             this.sampleRate,
           );
+
           this.ee.emit('scroll', this.scrollLeft);
         },
-        hook: new ScrollHook(this, this.samplesPerPixel, this.sampleRate),
+        hook: new ScrollHook(this),
       },
       trackElements,
     );
