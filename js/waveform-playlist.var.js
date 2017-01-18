@@ -1583,6 +1583,7 @@ var WaveformPlaylist =
 	    this.playbackSeconds = 0;
 	    this.duration = 0;
 	    this.scrollLeft = 0;
+	    this.scrollTimer = undefined;
 	    this.showTimescale = false;
 	
 	    this.fadeType = 'logarithmic';
@@ -1641,7 +1642,7 @@ var WaveformPlaylist =
 	      // use a worker for calculating recording peaks.
 	      this.recorderWorker.onmessage = function (e) {
 	        _this.recordingTrack.setPeaks(e.data);
-	        _this.draw(_this.render());
+	        _this.drawRequest();
 	      };
 	
 	      this.recorderWorker.onerror = function (e) {
@@ -1729,7 +1730,7 @@ var WaveformPlaylist =
 	          // reset if it was paused.
 	          _this2.seek(start, end, track);
 	          _this2.ee.emit('timeupdate', start);
-	          _this2.draw(_this2.render());
+	          _this2.drawRequest();
 	        }
 	      });
 	
@@ -1739,13 +1740,13 @@ var WaveformPlaylist =
 	
 	      ee.on('statechange', function (state) {
 	        _this2.setState(state);
-	        _this2.draw(_this2.render());
+	        _this2.drawRequest();
 	      });
 	
 	      ee.on('shift', function (deltaTime, track) {
 	        track.setStartTime(track.getStartTime() + deltaTime);
 	        _this2.adjustDuration();
-	        _this2.draw(_this2.render());
+	        _this2.drawRequest();
 	      });
 	
 	      ee.on('record', function () {
@@ -1774,20 +1775,20 @@ var WaveformPlaylist =
 	
 	      ee.on('clear', function () {
 	        _this2.clear().then(function () {
-	          _this2.draw(_this2.render());
+	          _this2.drawRequest();
 	        });
 	      });
 	
 	      ee.on('solo', function (track) {
 	        _this2.soloTrack(track);
 	        _this2.adjustTrackPlayout();
-	        _this2.draw(_this2.render());
+	        _this2.drawRequest();
 	      });
 	
 	      ee.on('mute', function (track) {
 	        _this2.muteTrack(track);
 	        _this2.adjustTrackPlayout();
-	        _this2.draw(_this2.render());
+	        _this2.drawRequest();
 	      });
 	
 	      ee.on('volumechange', function (volume, track) {
@@ -1803,12 +1804,12 @@ var WaveformPlaylist =
 	
 	      ee.on('fadein', function (duration, track) {
 	        track.setFadeIn(duration, _this2.fadeType);
-	        _this2.draw(_this2.render());
+	        _this2.drawRequest();
 	      });
 	
 	      ee.on('fadeout', function (duration, track) {
 	        track.setFadeOut(duration, _this2.fadeType);
-	        _this2.draw(_this2.render());
+	        _this2.drawRequest();
 	      });
 	
 	      ee.on('fadetype', function (type) {
@@ -1830,7 +1831,7 @@ var WaveformPlaylist =
 	        track.calculatePeaks(_this2.samplesPerPixel, _this2.sampleRate);
 	
 	        _this2.setTimeSelection(0, 0);
-	        _this2.draw(_this2.render());
+	        _this2.drawRequest();
 	      });
 	
 	      ee.on('zoomin', function () {
@@ -1839,7 +1840,7 @@ var WaveformPlaylist =
 	
 	        if (zoom !== _this2.samplesPerPixel) {
 	          _this2.setZoom(zoom);
-	          _this2.draw(_this2.render());
+	          _this2.drawRequest();
 	        }
 	      });
 	
@@ -1849,12 +1850,17 @@ var WaveformPlaylist =
 	
 	        if (zoom !== _this2.samplesPerPixel) {
 	          _this2.setZoom(zoom);
-	          _this2.draw(_this2.render());
+	          _this2.drawRequest();
 	        }
 	      });
 	
 	      ee.on('scroll', function () {
-	        _this2.draw(_this2.render());
+	        _this2.isScrolling = true;
+	        _this2.drawRequest();
+	        clearTimeout(_this2.scrollTimer);
+	        _this2.scrollTimer = setTimeout(function () {
+	          _this2.isScrolling = false;
+	        }, 200);
 	      });
 	    }
 	  }, {
@@ -2259,7 +2265,7 @@ var WaveformPlaylist =
 	        track.setState(_this8.getState());
 	      });
 	
-	      this.draw(this.render());
+	      this.drawRequest();
 	      return Promise.all(this.playoutPromises);
 	    }
 	  }, {
@@ -2388,18 +2394,23 @@ var WaveformPlaylist =
 	      this.lastDraw = currentTime;
 	    }
 	  }, {
-	    key: 'draw',
-	    value: function draw(newTree) {
+	    key: 'drawRequest',
+	    value: function drawRequest() {
 	      var _this13 = this;
 	
 	      window.requestAnimationFrame(function () {
-	        var patches = (0, _diff2.default)(_this13.tree, newTree);
-	        _this13.rootNode = (0, _patch2.default)(_this13.rootNode, patches);
-	        _this13.tree = newTree;
-	
-	        // use for fast forwarding.
-	        _this13.viewDuration = (0, _conversions.pixelsToSeconds)(_this13.rootNode.clientWidth - _this13.controls.width, _this13.samplesPerPixel, _this13.sampleRate);
+	        _this13.draw(_this13.render());
 	      });
+	    }
+	  }, {
+	    key: 'draw',
+	    value: function draw(newTree) {
+	      var patches = (0, _diff2.default)(this.tree, newTree);
+	      this.rootNode = (0, _patch2.default)(this.rootNode, patches);
+	      this.tree = newTree;
+	
+	      // use for fast forwarding.
+	      this.viewDuration = (0, _conversions.pixelsToSeconds)(this.rootNode.clientWidth - this.controls.width, this.samplesPerPixel, this.sampleRate);
 	    }
 	  }, {
 	    key: 'getTrackRenderData',
@@ -2454,9 +2465,10 @@ var WaveformPlaylist =
 	        },
 	        onscroll: function onscroll(e) {
 	          _this14.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this14.samplesPerPixel, _this14.sampleRate);
+	
 	          _this14.ee.emit('scroll', _this14.scrollLeft);
 	        },
-	        hook: new _ScrollHook2.default(this, this.samplesPerPixel, this.sampleRate)
+	        hook: new _ScrollHook2.default(this)
 	      }, trackElements);
 	
 	      var containerChildren = [];
@@ -5025,19 +5037,21 @@ var WaveformPlaylist =
 	* virtual-dom hook for scrolling the track container.
 	*/
 	var _class = function () {
-	  function _class(track, resolution, sampleRate) {
+	  function _class(playlist) {
 	    _classCallCheck(this, _class);
 	
-	    this.track = track;
-	    this.resolution = resolution;
-	    this.sampleRate = sampleRate;
+	    this.playlist = playlist;
 	  }
 	
 	  _createClass(_class, [{
 	    key: 'hook',
 	    value: function hook(node) {
-	      var trackArea = node;
-	      trackArea.scrollLeft = (0, _conversions.secondsToPixels)(this.track.scrollLeft, this.resolution, this.sampleRate);
+	      if (!this.playlist.isScrolling) {
+	        var el = node;
+	        var left = (0, _conversions.secondsToPixels)(this.playlist.scrollLeft, this.playlist.samplesPerPixel, this.playlist.sampleRate);
+	
+	        el.scrollLeft = left;
+	      }
 	    }
 	  }]);
 
