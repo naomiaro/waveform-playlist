@@ -66,7 +66,7 @@
     "jekyll": "jekyll build -s ghpages -d dist/waveform-playlist",
     "jekyll:dev": "jekyll build -s ghpages -d dist/waveform-playlist --watch",
     "ghpages": "gh-pages --repo https://$GH_TOKEN@github.com/naomiaro/waveform-playlist.git -d dist/waveform-playlist",
-    "build": "npm run jekyll && webpack",
+    "build": "npm run clean && npm run jekyll && webpack",
     "preversion": "npm run clean",
     "version": "npm run build && git add -A dist",
     "postversion": "git push && git push --tags",
