@@ -100,6 +100,28 @@
       background: #ccc; }
     .playlist .controls input[type=range]:focus::-moz-range-track {
       background: #ccc; }
+  .playlist .annotations .annotations-boxes {
+    text-align: center; }
+  .playlist .annotations .annotation-box {
+    border: 2px dashed grey;
+    padding: 0 10px; }
+    .playlist .annotations .annotation-box .resize-handle {
+      background: grey;
+      opacity: 0.3;
+      cursor: ew-resize; }
+    .playlist .annotations .annotation-box .id {
+      cursor: pointer; }
+  .playlist .annotations .annotation {
+    padding: 1em; }
+  .playlist .annotations .annotations-text {
+    font-size: 19px;
+    font-weight: 300;
+    margin-top: 1em;
+    height: 160px;
+    overflow-x: hidden;
+    overflow-y: auto; }
+  .playlist .annotations .current {
+    background-color: #EBF4F6; }
 
 .playlist .vocals {
   background-color: #c0dce0; }

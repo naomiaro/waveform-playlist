@@ -110,7 +110,10 @@ var WaveformPlaylist =
 	    seekStyle: 'line',
 	    waveHeight: 128,
 	    state: 'cursor',
-	    zoomLevels: [512, 1024, 2048, 4096]
+	    zoomLevels: [512, 1024, 2048, 4096],
+	    annotations: [],
+	    isAutomaticScroll: false,
+	    isContinuousPlay: false
 	  };
 	
 	  var config = (0, _lodash2.default)(defaults, options);
@@ -137,6 +140,9 @@ var WaveformPlaylist =
 	  playlist.setExclSolo(config.exclSolo);
 	  playlist.setShowTimeScale(config.timescale);
 	  playlist.setSeekStyle(config.seekStyle);
+	  playlist.setAnnotations(config.annotations);
+	  playlist.isAutomaticScroll = config.isAutomaticScroll;
+	  playlist.isContinuousPlay = config.isContinuousPlay;
 	
 	  // take care of initial virtual dom rendering.
 	  var tree = playlist.render();
@@ -1558,11 +1564,15 @@ var WaveformPlaylist =
 	
 	var _Playout2 = _interopRequireDefault(_Playout);
 	
-	var _recorderWorker = __webpack_require__(79);
+	var _AnnotationList = __webpack_require__(79);
+	
+	var _AnnotationList2 = _interopRequireDefault(_AnnotationList);
+	
+	var _recorderWorker = __webpack_require__(86);
 	
 	var _recorderWorker2 = _interopRequireDefault(_recorderWorker);
 	
-	var _exportWavWorker = __webpack_require__(80);
+	var _exportWavWorker = __webpack_require__(87);
 	
 	var _exportWavWorker2 = _interopRequireDefault(_exportWavWorker);
 	
@@ -1585,9 +1595,14 @@ var WaveformPlaylist =
 	    this.scrollLeft = 0;
 	    this.scrollTimer = undefined;
 	    this.showTimescale = false;
+	    // whether a user is scrolling the waveform
+	    this.isScrolling = false;
 	
 	    this.fadeType = 'logarithmic';
 	    this.masterGain = 1;
+	    this.annotations = [];
+	    this.durationFormat = 'hh:mm:ss.uuu';
+	    this.isAutomaticScroll = false;
 	  }
 	
 	  // TODO extract into a plugin
@@ -1705,6 +1720,11 @@ var WaveformPlaylist =
 	      this.colors = colors;
 	    }
 	  }, {
+	    key: 'setAnnotations',
+	    value: function setAnnotations(annotations) {
+	      this.annotationList = new _AnnotationList2.default(this, annotations);
+	    }
+	  }, {
 	    key: 'setEventEmitter',
 	    value: function setEventEmitter(ee) {
 	      this.ee = ee;
@@ -1720,6 +1740,15 @@ var WaveformPlaylist =
 	      var _this2 = this;
 	
 	      var ee = this.ee;
+	
+	      ee.on('automaticscroll', function (val) {
+	        _this2.isAutomaticScroll = val;
+	      });
+	
+	      ee.on('durationformat', function (format) {
+	        _this2.durationFormat = format;
+	        _this2.drawRequest();
+	      });
 	
 	      ee.on('select', function (start, end, track) {
 	        if (_this2.isPlaying()) {
@@ -2332,8 +2361,12 @@ var WaveformPlaylist =
 	  }, {
 	    key: 'startAnimation',
 	    value: function startAnimation(startTime) {
+	      var _this13 = this;
+	
 	      this.lastDraw = this.ac.currentTime;
-	      this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, startTime));
+	      this.animationRequest = window.requestAnimationFrame(function () {
+	        _this13.updateEditor(startTime);
+	      });
 	    }
 	  }, {
 	    key: 'stopAnimation',
@@ -2361,11 +2394,14 @@ var WaveformPlaylist =
 	
 	    /*
 	    * Animation function for the playlist.
+	    * Keep under 16.7 milliseconds based on a typical screen refresh rate of 60fps.
 	    */
 	
 	  }, {
 	    key: 'updateEditor',
 	    value: function updateEditor(cursor) {
+	      var _this14 = this;
+	
 	      var currentTime = this.ac.currentTime;
 	      var playbackSeconds = 0;
 	      var selection = this.getTimeSelection();
@@ -2376,7 +2412,9 @@ var WaveformPlaylist =
 	      if (this.isPlaying()) {
 	        playbackSeconds = cursorPos + elapsed;
 	        this.ee.emit('timeupdate', playbackSeconds);
-	        this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, playbackSeconds));
+	        this.animationRequest = window.requestAnimationFrame(function () {
+	          _this14.updateEditor(playbackSeconds);
+	        });
 	      } else {
 	        if (cursorPos + elapsed >= this.isSegmentSelection() ? selection.end : this.duration) {
 	          this.ee.emit('finished');
@@ -2396,10 +2434,10 @@ var WaveformPlaylist =
 	  }, {
 	    key: 'drawRequest',
 	    value: function drawRequest() {
-	      var _this13 = this;
+	      var _this15 = this;
 	
 	      window.requestAnimationFrame(function () {
-	        _this13.draw(_this13.render());
+	        _this15.draw(_this15.render());
 	      });
 	    }
 	  }, {
@@ -2443,41 +2481,58 @@ var WaveformPlaylist =
 	      return true;
 	    }
 	  }, {
-	    key: 'render',
-	    value: function render() {
-	      var _this14 = this;
-	
+	    key: 'renderAnnotations',
+	    value: function renderAnnotations() {
+	      return this.annotationList.render();
+	    }
+	  }, {
+	    key: 'renderTimeScale',
+	    value: function renderTimeScale() {
 	      var controlWidth = this.controls.show ? this.controls.width : 0;
 	      var timeScale = new _TimeScale2.default(this.duration, this.scrollLeft, this.samplesPerPixel, this.sampleRate, controlWidth);
 	
+	      return timeScale.render();
+	    }
+	  }, {
+	    key: 'renderTrackSection',
+	    value: function renderTrackSection() {
+	      var _this16 = this;
+	
 	      var trackElements = this.tracks.map(function (track) {
-	        return track.render(_this14.getTrackRenderData({
-	          isActive: _this14.isActiveTrack(track),
-	          shouldPlay: _this14.shouldTrackPlay(track),
-	          soloed: _this14.soloedTracks.indexOf(track) > -1,
-	          muted: _this14.mutedTracks.indexOf(track) > -1
+	        return track.render(_this16.getTrackRenderData({
+	          isActive: _this16.isActiveTrack(track),
+	          shouldPlay: _this16.shouldTrackPlay(track),
+	          soloed: _this16.soloedTracks.indexOf(track) > -1,
+	          muted: _this16.mutedTracks.indexOf(track) > -1
 	        }));
 	      });
 	
-	      var trackSection = (0, _h2.default)('div.playlist-tracks', {
+	      return (0, _h2.default)('div.playlist-tracks', {
 	        attributes: {
 	          style: 'overflow: auto;'
 	        },
 	        onscroll: function onscroll(e) {
-	          _this14.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this14.samplesPerPixel, _this14.sampleRate);
+	          _this16.scrollLeft = (0, _conversions.pixelsToSeconds)(e.target.scrollLeft, _this16.samplesPerPixel, _this16.sampleRate);
 	
-	          _this14.ee.emit('scroll', _this14.scrollLeft);
+	          _this16.ee.emit('scroll', _this16.scrollLeft);
 	        },
 	        hook: new _ScrollHook2.default(this)
 	      }, trackElements);
-	
+	    }
+	  }, {
+	    key: 'render',
+	    value: function render() {
 	      var containerChildren = [];
 	
 	      if (this.showTimescale) {
-	        containerChildren.push(timeScale.render());
+	        containerChildren.push(this.renderTimeScale());
 	      }
 	
-	      containerChildren.push(trackSection);
+	      containerChildren.push(this.renderTrackSection());
+	
+	      if (this.annotationList.length) {
+	        containerChildren.push(this.renderAnnotations());
+	      }
 	
 	      return (0, _h2.default)('div.playlist', {
 	        attributes: {
@@ -5046,9 +5101,20 @@ var WaveformPlaylist =
 	  _createClass(_class, [{
 	    key: 'hook',
 	    value: function hook(node) {
-	      if (!this.playlist.isScrolling) {
+	      var playlist = this.playlist;
+	      if (!playlist.isScrolling) {
 	        var el = node;
-	        var left = (0, _conversions.secondsToPixels)(this.playlist.scrollLeft, this.playlist.samplesPerPixel, this.playlist.sampleRate);
+	
+	        if (playlist.isAutomaticScroll && playlist.isPlaying()) {
+	          var rect = node.getBoundingClientRect();
+	          var cursorRect = node.querySelector('.cursor').getBoundingClientRect();
+	
+	          if (cursorRect.right > rect.right) {
+	            playlist.scrollLeft = playlist.playbackSeconds;
+	          }
+	        }
+	
+	        var left = (0, _conversions.secondsToPixels)(playlist.scrollLeft, playlist.samplesPerPixel, playlist.sampleRate);
 	
 	        el.scrollLeft = left;
 	      }
@@ -7800,6 +7866,478 @@ var WaveformPlaylist =
 
 /***/ },
 /* 79 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	var _h = __webpack_require__(32);
+	
+	var _h2 = _interopRequireDefault(_h);
+	
+	var _aeneas = __webpack_require__(80);
+	
+	var _aeneas2 = _interopRequireDefault(_aeneas);
+	
+	var _aeneas3 = __webpack_require__(82);
+	
+	var _aeneas4 = _interopRequireDefault(_aeneas3);
+	
+	var _conversions = __webpack_require__(54);
+	
+	var _DragInteraction = __webpack_require__(83);
+	
+	var _DragInteraction2 = _interopRequireDefault(_DragInteraction);
+	
+	var _ScrollTopHook = __webpack_require__(84);
+	
+	var _ScrollTopHook2 = _interopRequireDefault(_ScrollTopHook);
+	
+	var _timeformat = __webpack_require__(85);
+	
+	var _timeformat2 = _interopRequireDefault(_timeformat);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	var AnnotationList = function () {
+	  function AnnotationList(playlist, annotations) {
+	    _classCallCheck(this, AnnotationList);
+	
+	    this.playlist = playlist;
+	    this.annotations = annotations.map(function (a, i) {
+	      // TODO support different formats later on.
+	      var note = (0, _aeneas2.default)(a);
+	      note.leftShift = new _DragInteraction2.default(playlist, {
+	        direction: 'left',
+	        index: i
+	      });
+	      note.rightShift = new _DragInteraction2.default(playlist, {
+	        direction: 'right',
+	        index: i
+	      });
+	
+	      return note;
+	    });
+	    this.setupEE(playlist.ee);
+	
+	    // TODO actually make a real plugin system that's not terrible.
+	    this.playlist.isContinuousPlay = false;
+	    this.length = this.annotations.length;
+	  }
+	
+	  _createClass(AnnotationList, [{
+	    key: 'setupEE',
+	    value: function setupEE(ee) {
+	      var _this = this;
+	
+	      ee.on('dragged', function (deltaTime, data) {
+	        var annotationIndex = data.index;
+	        var annotations = _this.annotations;
+	        var note = annotations[annotationIndex];
+	
+	        // resizing to the left
+	        if (data.direction === 'left') {
+	          note.start += deltaTime;
+	
+	          if (note.start < 0) {
+	            note.start = 0;
+	          }
+	
+	          if (annotationIndex && annotations[annotationIndex - 1].end > note.start) {
+	            annotations[annotationIndex - 1].end = note.start;
+	          }
+	        } else {
+	          // resizing to the right
+	          note.end += deltaTime;
+	
+	          if (note.end > _this.playlist.duration) {
+	            note.end = _this.playlist.duration;
+	          }
+	
+	          if (annotationIndex < annotations.length - 1 && annotations[annotationIndex + 1].start < note.end) {
+	            annotations[annotationIndex + 1].start = note.end;
+	          }
+	        }
+	
+	        _this.playlist.drawRequest();
+	      });
+	
+	      ee.on('continuousplay', function (val) {
+	        _this.playlist.isContinuousPlay = val;
+	      });
+	
+	      ee.on('annotationsrequest', function () {
+	        _this.export();
+	      });
+	
+	      return ee;
+	    }
+	  }, {
+	    key: 'export',
+	    value: function _export() {
+	      var output = this.annotations.map(function (a) {
+	        return (0, _aeneas4.default)(a);
+	      });
+	      var dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(output));
+	      var a = document.createElement('a');
+	
+	      document.body.appendChild(a);
+	      a.href = dataStr;
+	      a.download = 'annotations.json';
+	      a.click();
+	      document.removeChild(a);
+	    }
+	  }, {
+	    key: 'render',
+	    value: function render() {
+	      var _this2 = this;
+	
+	      var boxes = (0, _h2.default)('div.annotations-boxes', {
+	        attributes: {
+	          style: 'height: 30px;'
+	        }
+	      }, this.annotations.map(function (note, i) {
+	        var samplesPerPixel = _this2.playlist.samplesPerPixel;
+	        var sampleRate = _this2.playlist.sampleRate;
+	        var pixPerSec = sampleRate / samplesPerPixel;
+	        var pixOffset = (0, _conversions.secondsToPixels)(_this2.playlist.scrollLeft, samplesPerPixel, sampleRate);
+	        var left = Math.floor(note.start * pixPerSec - pixOffset);
+	        var width = Math.ceil(note.end * pixPerSec - note.start * pixPerSec);
+	
+	        return (0, _h2.default)('div.annotation-box', {
+	          attributes: {
+	            style: 'position: absolute; height: 30px; width: ' + width + 'px; left: ' + left + 'px',
+	            'data-id': note.id
+	          }
+	        }, [AnnotationList.renderResizeLeft(note), (0, _h2.default)('span.id', {
+	          onclick: function onclick() {
+	            if (_this2.playlist.isContinuousPlay) {
+	              _this2.playlist.ee.emit('play', _this2.annotations[i].start);
+	            } else {
+	              _this2.playlist.ee.emit('play', _this2.annotations[i].start, _this2.annotations[i].end);
+	            }
+	          }
+	        }, [note.id]), AnnotationList.renderResizeRight(note)]);
+	      }));
+	
+	      var boxesWrapper = (0, _h2.default)('div.annotations-boxes-wrapper', {
+	        attributes: {
+	          style: 'overflow: hidden;'
+	        }
+	      }, [boxes]);
+	
+	      var text = (0, _h2.default)('div.annotations-text', {
+	        hook: new _ScrollTopHook2.default()
+	      }, this.annotations.map(function (note) {
+	        var format = (0, _timeformat2.default)(_this2.playlist.durationFormat);
+	        var start = format(note.start);
+	        var end = format(note.end);
+	
+	        var segmentClass = '';
+	        if (_this2.playlist.isPlaying() && _this2.playlist.playbackSeconds >= note.start && _this2.playlist.playbackSeconds <= note.end) {
+	          segmentClass = '.current';
+	        }
+	
+	        return (0, _h2.default)('div.row' + segmentClass, [(0, _h2.default)('span.annotation.id', [note.id]), (0, _h2.default)('span.annotation.start', [start]), (0, _h2.default)('span.annotation.end', [end]), (0, _h2.default)('span.annotation.text', [note.lines])]);
+	      }));
+	
+	      return (0, _h2.default)('div.annotations', [boxesWrapper, text]);
+	    }
+	  }], [{
+	    key: 'renderResizeLeft',
+	    value: function renderResizeLeft(note) {
+	      var events = _DragInteraction2.default.getEvents();
+	      var config = { attributes: {
+	          style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
+	          draggable: true
+	        } };
+	
+	      events.forEach(function (event) {
+	        config['on' + event] = note.leftShift[event].bind(note.leftShift);
+	      });
+	
+	      return (0, _h2.default)('div.resize-handle.resize-w', config);
+	    }
+	  }, {
+	    key: 'renderResizeRight',
+	    value: function renderResizeRight(note) {
+	      var events = _DragInteraction2.default.getEvents();
+	      var config = { attributes: {
+	          style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
+	          draggable: true
+	        } };
+	
+	      events.forEach(function (event) {
+	        config['on' + event] = note.rightShift[event].bind(note.rightShift);
+	      });
+	
+	      return (0, _h2.default)('div.resize-handle.resize-e', config);
+	    }
+	  }]);
+	
+	  return AnnotationList;
+	}();
+	
+	exports.default = AnnotationList;
+
+/***/ },
+/* 80 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	exports.default = function (aeneas) {
+	  var annotation = new _Annotation2.default();
+	  annotation.id = aeneas.id;
+	  annotation.start = Number(aeneas.begin);
+	  annotation.end = Number(aeneas.end);
+	  annotation.lines = aeneas.lines;
+	  annotation.lang = aeneas.language;
+	
+	  return annotation;
+	};
+	
+	var _Annotation = __webpack_require__(81);
+	
+	var _Annotation2 = _interopRequireDefault(_Annotation);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/***/ },
+/* 81 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	var _uuid = __webpack_require__(64);
+	
+	var _uuid2 = _interopRequireDefault(_uuid);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	var _class = function _class() {
+	  var id = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : _uuid2.default.v4();
+	  var start = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+	  var end = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+	  var lines = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : [];
+	  var lang = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 'en';
+	
+	  _classCallCheck(this, _class);
+	
+	  this.id = id;
+	  this.start = start;
+	  this.end = end;
+	  this.lines = lines;
+	  this.lang = lang;
+	};
+	
+	exports.default = _class;
+
+/***/ },
+/* 82 */
+/***/ function(module, exports) {
+
+	"use strict";
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	exports.default = function (annotation) {
+	  return {
+	    begin: String(annotation.start.toFixed(3)),
+	    end: String(annotation.end.toFixed(3)),
+	    id: String(annotation.id),
+	    language: annotation.lang,
+	    lines: annotation.lines
+	  };
+	};
+
+/***/ },
+/* 83 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	var _conversions = __webpack_require__(54);
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	var _class = function () {
+	  function _class(playlist) {
+	    var _this = this;
+	
+	    var data = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+	
+	    _classCallCheck(this, _class);
+	
+	    this.playlist = playlist;
+	    this.data = data;
+	    this.active = false;
+	
+	    this.ondragover = function (e) {
+	      if (_this.active) {
+	        e.preventDefault();
+	        _this.emitDrag(e.clientX);
+	      }
+	    };
+	  }
+	
+	  _createClass(_class, [{
+	    key: 'emitDrag',
+	    value: function emitDrag(x) {
+	      var deltaX = x - this.prevX;
+	
+	      // emit shift event if not 0
+	      if (deltaX) {
+	        var deltaTime = (0, _conversions.pixelsToSeconds)(deltaX, this.playlist.samplesPerPixel, this.playlist.sampleRate);
+	        this.prevX = x;
+	        this.playlist.ee.emit('dragged', deltaTime, this.data);
+	      }
+	    }
+	  }, {
+	    key: 'complete',
+	    value: function complete() {
+	      this.active = false;
+	      document.removeEventListener('dragover', this.ondragover);
+	    }
+	  }, {
+	    key: 'dragstart',
+	    value: function dragstart(e) {
+	      var ev = e;
+	      this.active = true;
+	      this.el = e.target;
+	      this.prevX = e.clientX;
+	
+	      ev.dataTransfer.dropEffect = 'move';
+	      ev.dataTransfer.effectAllowed = 'move';
+	      ev.dataTransfer.setData('text/plain', '');
+	      document.addEventListener('dragover', this.ondragover);
+	    }
+	  }, {
+	    key: 'dragend',
+	    value: function dragend(e) {
+	      if (this.active) {
+	        e.preventDefault();
+	        this.complete();
+	      }
+	    }
+	  }], [{
+	    key: 'getClass',
+	    value: function getClass() {
+	      return '.shift';
+	    }
+	  }, {
+	    key: 'getEvents',
+	    value: function getEvents() {
+	      return ['dragstart', 'dragend'];
+	    }
+	  }]);
+
+	  return _class;
+	}();
+
+	exports.default = _class;
+
+/***/ },
+/* 84 */
+/***/ function(module, exports) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	/*
+	* virtual-dom hook for scrolling to the text annotation.
+	*/
+	var Hook = function ScrollTopHook() {};
+	Hook.prototype.hook = function hook(node) {
+	  var el = node.querySelector('.current');
+	  if (el) {
+	    var box = node.getBoundingClientRect();
+	    var row = el.getBoundingClientRect();
+	    var diff = row.top - box.top;
+	    var list = node;
+	    list.scrollTop += diff;
+	  }
+	};
+	
+	exports.default = Hook;
+
+/***/ },
+/* 85 */
+/***/ function(module, exports) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	exports.default = function (format) {
+	  function clockFormat(seconds, decimals) {
+	    var hours = parseInt(seconds / 3600, 10) % 24;
+	    var minutes = parseInt(seconds / 60, 10) % 60;
+	    var secs = (seconds % 60).toFixed(decimals);
+	
+	    var sHours = hours < 10 ? '0' + hours : hours;
+	    var sMinutes = minutes < 10 ? '0' + minutes : minutes;
+	    var sSeconds = secs < 10 ? '0' + secs : secs;
+	
+	    return sHours + ':' + sMinutes + ':' + sSeconds;
+	  }
+	
+	  var formats = {
+	    seconds: function seconds(_seconds) {
+	      return _seconds.toFixed(0);
+	    },
+	    thousandths: function thousandths(seconds) {
+	      return seconds.toFixed(3);
+	    },
+	
+	    'hh:mm:ss': function hhmmss(seconds) {
+	      return clockFormat(seconds, 0);
+	    },
+	    'hh:mm:ss.u': function hhmmssu(seconds) {
+	      return clockFormat(seconds, 1);
+	    },
+	    'hh:mm:ss.uu': function hhmmssuu(seconds) {
+	      return clockFormat(seconds, 2);
+	    },
+	    'hh:mm:ss.uuu': function hhmmssuuu(seconds) {
+	      return clockFormat(seconds, 3);
+	    }
+	  };
+	
+	  return formats[format];
+	};
+
+/***/ },
+/* 86 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -7958,7 +8496,7 @@ var WaveformPlaylist =
 	};
 
 /***/ },
-/* 80 */
+/* 87 */
 /***/ function(module, exports) {
 
 	'use strict';
