@@ -110,7 +110,10 @@
       opacity: 0.3;
       cursor: ew-resize; }
     .playlist .annotations .annotation-box .id {
-      cursor: pointer; }
+      cursor: pointer;
+      display: inline-block;
+      width: 100%;
+      height: 100%; }
   .playlist .annotations .annotation {
     padding: 1em; }
   .playlist .annotations .annotations-text {

@@ -113,11 +113,6 @@ $container.on("click", ".btn-playlist-state-group", function() {
 
 $container.on("click", ".btn-annotations-download", function() {
   ee.emit("annotationsrequest");
-
-  var link = document.createElement('a');
-  link.setAttribute('href', dataStr);
-  link.setAttribute('download', 'annotations.json');
-  link.click();
 });
 
 $container.on("click", ".btn-play", function() {
@@ -265,6 +260,10 @@ $container.on("input change", ".master-gain", function(e){
 
 $container.on("change", ".continuous-play", function(e){
   ee.emit("continuousplay", $(e.target).is(':checked'));
+});
+
+$container.on("change", ".link-endpoints", function(e){
+  ee.emit("linkendpoints", $(e.target).is(':checked'));
 });
 
 $container.on("change", ".automatic-scroll", function(e){
