@@ -1,18 +1,29 @@
 ---
 layout: default
 ---
-<article class="post">
 
-  <header class="post-header">
-    <h1 class="post-title">{{ page.title }}</h1>
-    <p class="lead">{{ page.lead }}</p>
-  </header>
-
-  <div class="post-content">
-    {{ content }}
+<div class="container">
+  <div class="wrapper">
+    <article class="post">
+      <header class="post-header">
+        <h1 class="post-title">{{ page.title }}</h1>
+        <p class="lead">{{ page.lead }}</p>
+      </header>
+      <div class="post-content">
+        {{ content }}
+      </div>
+    </article>
   </div>
+</div>
 
-</article>
+<footer class="well well-lg">
+  <p>Waveform Playlist originally written for <a href="https://www.sourcefabric.org/en/airtime">Airtime</a> at <a href="https://www.sourcefabric.org">Sourcefabric</a>
+  {% if page.audio_title && page.audio_artist %}
+  <p>Music: <cite>{{ page.audio_title }}</cite> by {{ page.audio_artist }}</p>
+  {% endif %}
+  <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
+  <p>Licensed under the MIT License</p>
+</footer>
 
 <script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
 <script type="text/javascript" src="js/waveform-playlist.var.js"></script>

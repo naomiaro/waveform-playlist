@@ -9,7 +9,7 @@ var $audioStart = $container.find('.audio-start');
 var $audioEnd = $container.find('.audio-end');
 var $time = $container.find('.audio-pos');
 
-var format = "seconds";
+var format = "hh:mm:ss.uuu";
 var startTime = 0;
 var endTime = 0;
 var audioPos = 0;
@@ -109,6 +109,10 @@ $container.on("click", ".btn-playlist-state-group", function() {
   if ($('.btn-fadein').hasClass('active') || $('.btn-fadeout').hasClass('active')) {
     $('.btn-fade-state-group').removeClass('hidden');
   }
+});
+
+$container.on("click", ".btn-annotations-download", function() {
+  ee.emit("annotationsrequest");
 });
 
 $container.on("click", ".btn-play", function() {
@@ -244,13 +248,26 @@ $container.on("drop", ".track-drop", function(e) {
 
 $container.on("change", ".time-format", function(e) {
   format = $timeFormat.val();
+  ee.emit("durationformat", format);
 
   updateSelect(startTime, endTime);
   updateTime(audioPos);
 });
 
-$container.on("input change", ".master-gain", function(node){
-  ee.emit("mastervolumechange", node.target.value);
+$container.on("input change", ".master-gain", function(e){
+  ee.emit("mastervolumechange", e.target.value);
+});
+
+$container.on("change", ".continuous-play", function(e){
+  ee.emit("continuousplay", $(e.target).is(':checked'));
+});
+
+$container.on("change", ".link-endpoints", function(e){
+  ee.emit("linkendpoints", $(e.target).is(':checked'));
+});
+
+$container.on("change", ".automatic-scroll", function(e){
+  ee.emit("automaticscroll", $(e.target).is(':checked'));
 });
 
 function displaySoundStatus(status) {

@@ -156,4 +156,45 @@
       background: #ccc;
     }
   }
+
+  .annotations {
+    .annotations-boxes {
+      text-align: center;
+    }
+
+    .annotation-box {
+      border: 2px dashed grey;
+      padding: 0 10px;
+
+      .resize-handle {
+        background: grey;
+        opacity: 0.3;
+        cursor: ew-resize;
+      }
+
+      .id {
+        cursor: pointer;
+        display: inline-block;
+        width: 100%;
+        height: 100%;
+      }
+    }
+
+    .annotation {
+      padding: 1em;
+    }
+
+    .annotations-text {
+      font-size: 19px;
+      font-weight: 300;
+      margin-top: 1em;
+      height: 160px;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .current {
+      background-color: #EBF4F6;
+    }
+  }
 }

@@ -152,6 +152,20 @@ var options = {
   // Array of zoom levels in samples per pixel.
   // Smaller numbers have a greater zoom in.
   zoomLevels: [512, 1024, 2048, 4096],
+
+  // Array of annotations in [Aeneas](https://github.com/readbeyond/aeneas) JSON format
+  annotations: [],
+
+  // Whether to automatically scroll the waveform while playing
+  isAutomaticScroll: false,
+
+  // If false when clicking an annotation id segment
+  // playback will stop after segment completion.
+  isContinuousPlay: false,
+
+  // If true annotation endpoints will remain linked when dragged
+  // if they were the same value before dragging started.
+  linkEndpoints: false,
 };
 ```
 
@@ -176,7 +190,7 @@ var options = {
 
   // time in seconds relative to the playlist
   // ex (track will start after 8.5 seconds)
-  / /DEFAULT 0 - track starts at beginning of playlist
+  // DEFAULT 0 - track starts at beginning of playlist
   start: 8.5,
 
   // track fade in details
@@ -282,6 +296,11 @@ An example of using the event emitter to control the playlist can be found in [/
 | `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
 | `select` | `start, end, track:optional` | Seek to the start time or start/end selection optionally with active track `track`. |
 | `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
+| `automaticscroll` | `true`/`false` | Change property `isAutomaticScroll`. |
+| `continuousplay` | `true`/`false` | Change property `isContinuousPlay`.|
+| `linkendpoints` | `true`/`false` | Change property `linkEndpoints`.|
+| `annotationsrequest` | _none_ | Requests to download the annotations to a json file. |
+
 
 #### Events to Listen to
 
@@ -307,17 +326,23 @@ An example of using the event emitter to control the playlist can be found in [/
 
   `npm test`
 
-## Development
+## Development without example changes
 
-  `npm start`
+  `npm install && npm start`
 
-  `http://localhost:8080/waveform-playlist/`
+  This will install dependencies and start the webpack server.
 
-  This will build the jekyll site and startup the webpack dev server.
 
-  `npm run jekyll:dev`
+## Development with example changes
 
-  This can be run to continuously build the jekyll pages as well if they are modified.
+  `gem install jekyll`
+
+  Jekyll is needed if changes to the example pages will be done.
+
+  `npm install && npm run dev`
+
+  This will build and watch the jekyll site and startup the webpack dev server.
+
 
 ## Credits
 

@@ -3,18 +3,15 @@ import _defaults from 'lodash.defaults';
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';
 import patch from 'virtual-dom/patch';
-
 import InlineWorker from 'inline-worker';
 
 import { pixelsToSeconds } from './utils/conversions';
-
 import LoaderFactory from './track/loader/LoaderFactory';
-
 import ScrollHook from './render/ScrollHook';
-
 import TimeScale from './TimeScale';
 import Track from './Track';
 import Playout from './Playout';
+import AnnotationList from './annotation/AnnotationList';
 
 import RecorderWorkerFunction from './utils/recorderWorker';
 import ExportWavWorkerFunction from './utils/exportWavWorker';
@@ -32,9 +29,14 @@ export default class {
     this.scrollLeft = 0;
     this.scrollTimer = undefined;
     this.showTimescale = false;
+    // whether a user is scrolling the waveform
+    this.isScrolling = false;
 
     this.fadeType = 'logarithmic';
     this.masterGain = 1;
+    this.annotations = [];
+    this.durationFormat = 'hh:mm:ss.uuu';
+    this.isAutomaticScroll = false;
   }
 
   // TODO extract into a plugin
@@ -132,6 +134,10 @@ export default class {
     this.colors = colors;
   }
 
+  setAnnotations(annotations) {
+    this.annotationList = new AnnotationList(this, annotations);
+  }
+
   setEventEmitter(ee) {
     this.ee = ee;
   }
@@ -142,6 +148,15 @@ export default class {
 
   setUpEventEmitter() {
     const ee = this.ee;
+
+    ee.on('automaticscroll', (val) => {
+      this.isAutomaticScroll = val;
+    });
+
+    ee.on('durationformat', (format) => {
+      this.durationFormat = format;
+      this.drawRequest();
+    });
 
     ee.on('select', (start, end, track) => {
       if (this.isPlaying()) {
@@ -700,7 +715,9 @@ export default class {
 
   startAnimation(startTime) {
     this.lastDraw = this.ac.currentTime;
-    this.animationRequest = window.requestAnimationFrame(this.updateEditor.bind(this, startTime));
+    this.animationRequest = window.requestAnimationFrame(() => {
+      this.updateEditor(startTime);
+    });
   }
 
   stopAnimation() {
@@ -726,6 +743,7 @@ export default class {
 
   /*
   * Animation function for the playlist.
+  * Keep under 16.7 milliseconds based on a typical screen refresh rate of 60fps.
   */
   updateEditor(cursor) {
     const currentTime = this.ac.currentTime;
@@ -738,9 +756,9 @@ export default class {
     if (this.isPlaying()) {
       playbackSeconds = cursorPos + elapsed;
       this.ee.emit('timeupdate', playbackSeconds);
-      this.animationRequest = window.requestAnimationFrame(
-        this.updateEditor.bind(this, playbackSeconds),
-      );
+      this.animationRequest = window.requestAnimationFrame(() => {
+        this.updateEditor(playbackSeconds);
+      });
     } else {
       if ((cursorPos + elapsed) >=
         (this.isSegmentSelection()) ? selection.end : this.duration) {
@@ -804,11 +822,19 @@ export default class {
     return true;
   }
 
-  render() {
+  renderAnnotations() {
+    return this.annotationList.render();
+  }
+
+  renderTimeScale() {
     const controlWidth = this.controls.show ? this.controls.width : 0;
     const timeScale = new TimeScale(this.duration, this.scrollLeft,
       this.samplesPerPixel, this.sampleRate, controlWidth);
 
+    return timeScale.render();
+  }
+
+  renderTrackSection() {
     const trackElements = this.tracks.map(track =>
       track.render(this.getTrackRenderData({
         isActive: this.isActiveTrack(track),
@@ -818,7 +844,7 @@ export default class {
       })),
     );
 
-    const trackSection = h('div.playlist-tracks',
+    return h('div.playlist-tracks',
       {
         attributes: {
           style: 'overflow: auto;',
@@ -836,14 +862,20 @@ export default class {
       },
       trackElements,
     );
+  }
 
+  render() {
     const containerChildren = [];
 
     if (this.showTimescale) {
-      containerChildren.push(timeScale.render());
+      containerChildren.push(this.renderTimeScale());
     }
 
-    containerChildren.push(trackSection);
+    containerChildren.push(this.renderTrackSection());
+
+    if (this.annotationList.length) {
+      containerChildren.push(this.renderAnnotations());
+    }
 
     return h('div.playlist',
       {
