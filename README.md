@@ -10,15 +10,14 @@ Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a mult
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
 I've written up some demos on github for the different [audio fade types](https://github.com/naomiaro/Web-Audio-Fades) in the project.
 
-[See examples in action](http://naomiaro.github.io/waveform-playlist)
+- [See examples in action](http://naomiaro.github.io/waveform-playlist)
+- [Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/web-audio-editor.html)
 
 ![Screenshot](img/stemtracks.png?raw=true "stem tracks mute solo volume control")
 (code for picture shown can be found in ghpages/_examples/04stemtracks.html)
 
 ![Screenshot](img/annotations.png?raw=true "Aeneas annotations adjust alignment json export")
 (code for picture shown can be found in ghpages/_examples/13annotations.html)
-
-[Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/web-audio-editor.html)
 
 
 ## Browser Support
