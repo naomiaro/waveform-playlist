@@ -13,7 +13,10 @@ I've written up some demos on github for the different [audio fade types](https:
 [See examples in action](http://naomiaro.github.io/waveform-playlist)
 
 ![Screenshot](img/stemtracks.png?raw=true "stem tracks mute solo volume control")
-(code for picture shown can be found in dist/examples/stem-tracks.html)
+(code for picture shown can be found in ghpages/_examples/04stemtracks.html)
+
+![Screenshot](img/annotations.png?raw=true "Aeneas annotations adjust alignment json export")
+(code for picture shown can be found in ghpages/_examples/13annotations.html)
 
 [Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/web-audio-editor.html)
 
