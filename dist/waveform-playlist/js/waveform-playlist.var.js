@@ -2432,7 +2432,6 @@ var WaveformPlaylist =
 	        this.stopAnimation();
 	
 	        this.resetDrawTimer = setTimeout(function () {
-	          _this14.stopAnimation();
 	          _this14.pausedAt = undefined;
 	          _this14.lastSeeked = undefined;
 	          _this14.setState(_this14.getState());
