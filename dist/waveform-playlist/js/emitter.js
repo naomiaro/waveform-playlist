@@ -14,6 +14,8 @@ var startTime = 0;
 var endTime = 0;
 var audioPos = 0;
 var downloadUrl = undefined;
+var isLooping = false;
+var playoutPromises;
 
 function toggleActive(node) {
   var active = node.parentNode.querySelectorAll('.active');
@@ -71,9 +73,11 @@ function cueFormatters(format) {
 function updateSelect(start, end) {
   if (start < end) {
     $('.btn-trim-audio').removeClass('disabled');
+    $('.btn-loop').removeClass('disabled');
   }
   else {
     $('.btn-trim-audio').addClass('disabled');
+    $('.btn-loop').addClass('disabled');
   }
 
   $audioStart.val(cueFormatters(format)(start));
@@ -97,22 +101,27 @@ updateTime(audioPos);
 /*
 * Code below sets up events to send messages to the playlist.
 */
-$container.on("click", ".btn-playlist-state-group", function() {
-  //reset these for now.
-  $('.btn-fade-state-group').addClass('hidden');
-  $('.btn-select-state-group').addClass('hidden');
+// $container.on("click", ".btn-playlist-state-group", function() {
+//   //reset these for now.
+//   $('.btn-fade-state-group').addClass('hidden');
+//   $('.btn-select-state-group').addClass('hidden');
 
-  if ($('.btn-select').hasClass('active')) {
-    $('.btn-select-state-group').removeClass('hidden');
-  }
+//   if ($('.btn-select').hasClass('active')) {
+//     $('.btn-select-state-group').removeClass('hidden');
+//   }
 
-  if ($('.btn-fadein').hasClass('active') || $('.btn-fadeout').hasClass('active')) {
-    $('.btn-fade-state-group').removeClass('hidden');
-  }
-});
+//   if ($('.btn-fadein').hasClass('active') || $('.btn-fadeout').hasClass('active')) {
+//     $('.btn-fade-state-group').removeClass('hidden');
+//   }
+// });
 
 $container.on("click", ".btn-annotations-download", function() {
   ee.emit("annotationsrequest");
+});
+
+$container.on("click", ".btn-loop", function() {
+  isLooping = true;
+  playoutPromises = playlist.play(startTime, endTime);
 });
 
 $container.on("click", ".btn-play", function() {
@@ -120,22 +129,27 @@ $container.on("click", ".btn-play", function() {
 });
 
 $container.on("click", ".btn-pause", function() {
+  isLooping = false;
   ee.emit("pause");
 });
 
 $container.on("click", ".btn-stop", function() {
+  isLooping = false;
   ee.emit("stop");
 });
 
 $container.on("click", ".btn-rewind", function() {
+  isLooping = false;
   ee.emit("rewind");
 });
 
 $container.on("click", ".btn-fast-forward", function() {
+  isLooping = false;
   ee.emit("fastforward");
 });
 
 $container.on("click", ".btn-clear", function() {
+  isLooping = false;
   ee.emit("clear");
 });
 
@@ -360,4 +374,10 @@ ee.on('audiorenderingfinished', function (type, data) {
 
 ee.on('finished', function () {
   console.log("The cursor has reached the end of the selection !");
+
+  if (isLooping) {
+    playoutPromises.then(function() {
+      playoutPromises = playlist.play(startTime, endTime);
+    });
+  }
 });
