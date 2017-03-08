@@ -37,6 +37,7 @@ export default class {
     this.annotations = [];
     this.durationFormat = 'hh:mm:ss.uuu';
     this.isAutomaticScroll = false;
+    this.resetDrawTimer = undefined;
   }
 
   // TODO extract into a plugin
@@ -601,6 +602,8 @@ export default class {
   }
 
   play(startTime, endTime) {
+    clearTimeout(this.resetDrawTimer);
+
     const currentTime = this.ac.currentTime;
     const selected = this.getTimeSelection();
     const playoutPromises = [];
@@ -747,18 +750,20 @@ export default class {
   */
   updateEditor(cursor) {
     const currentTime = this.ac.currentTime;
-    let playbackSeconds = 0;
     const selection = this.getTimeSelection();
-
     const cursorPos = cursor || this.cursor;
     const elapsed = currentTime - this.lastDraw;
 
     if (this.isPlaying()) {
-      playbackSeconds = cursorPos + elapsed;
+      const playbackSeconds = cursorPos + elapsed;
       this.ee.emit('timeupdate', playbackSeconds);
       this.animationRequest = window.requestAnimationFrame(() => {
         this.updateEditor(playbackSeconds);
       });
+
+      this.playbackSeconds = playbackSeconds;
+      this.draw(this.render());
+      this.lastDraw = currentTime;
     } else {
       if ((cursorPos + elapsed) >=
         (this.isSegmentSelection()) ? selection.end : this.duration) {
@@ -766,15 +771,17 @@ export default class {
       }
 
       this.stopAnimation();
-      this.pausedAt = undefined;
-      this.lastSeeked = undefined;
-      this.setState(this.getState());
+
+      this.resetDrawTimer = setTimeout(() => {
+        this.stopAnimation();
+        this.pausedAt = undefined;
+        this.lastSeeked = undefined;
+        this.setState(this.getState());
+
+        this.playbackSeconds = 0;
+        this.draw(this.render());
+      }, 0);
     }
-
-    this.playbackSeconds = playbackSeconds;
-
-    this.draw(this.render());
-    this.lastDraw = currentTime;
   }
 
   drawRequest() {
