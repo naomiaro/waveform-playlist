@@ -773,7 +773,6 @@ export default class {
       this.stopAnimation();
 
       this.resetDrawTimer = setTimeout(() => {
-        this.stopAnimation();
         this.pausedAt = undefined;
         this.lastSeeked = undefined;
         this.setState(this.getState());
