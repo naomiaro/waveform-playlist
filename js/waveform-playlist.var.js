@@ -1605,6 +1605,7 @@ var WaveformPlaylist =
 	    this.annotations = [];
 	    this.durationFormat = 'hh:mm:ss.uuu';
 	    this.isAutomaticScroll = false;
+	    this.resetDrawTimer = undefined;
 	  }
 	
 	  // TODO extract into a plugin
@@ -2232,6 +2233,8 @@ var WaveformPlaylist =
 	    value: function play(startTime, endTime) {
 	      var _this7 = this;
 	
+	      clearTimeout(this.resetDrawTimer);
+	
 	      var currentTime = this.ac.currentTime;
 	      var selected = this.getTimeSelection();
 	      var playoutPromises = [];
@@ -2405,33 +2408,38 @@ var WaveformPlaylist =
 	      var _this14 = this;
 	
 	      var currentTime = this.ac.currentTime;
-	      var playbackSeconds = 0;
 	      var selection = this.getTimeSelection();
-	
 	      var cursorPos = cursor || this.cursor;
 	      var elapsed = currentTime - this.lastDraw;
 	
 	      if (this.isPlaying()) {
-	        playbackSeconds = cursorPos + elapsed;
-	        this.ee.emit('timeupdate', playbackSeconds);
-	        this.animationRequest = window.requestAnimationFrame(function () {
-	          _this14.updateEditor(playbackSeconds);
-	        });
+	        (function () {
+	          var playbackSeconds = cursorPos + elapsed;
+	          _this14.ee.emit('timeupdate', playbackSeconds);
+	          _this14.animationRequest = window.requestAnimationFrame(function () {
+	            _this14.updateEditor(playbackSeconds);
+	          });
+	
+	          _this14.playbackSeconds = playbackSeconds;
+	          _this14.draw(_this14.render());
+	          _this14.lastDraw = currentTime;
+	        })();
 	      } else {
 	        if (cursorPos + elapsed >= this.isSegmentSelection() ? selection.end : this.duration) {
 	          this.ee.emit('finished');
 	        }
 	
 	        this.stopAnimation();
-	        this.pausedAt = undefined;
-	        this.lastSeeked = undefined;
-	        this.setState(this.getState());
+	
+	        this.resetDrawTimer = setTimeout(function () {
+	          _this14.pausedAt = undefined;
+	          _this14.lastSeeked = undefined;
+	          _this14.setState(_this14.getState());
+	
+	          _this14.playbackSeconds = 0;
+	          _this14.draw(_this14.render());
+	        }, 0);
 	      }
-	
-	      this.playbackSeconds = playbackSeconds;
-	
-	      this.draw(this.render());
-	      this.lastDraw = currentTime;
 	    }
 	  }, {
 	    key: 'drawRequest',
