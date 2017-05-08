@@ -114,8 +114,6 @@
       display: inline-block;
       width: 100%;
       height: 100%; }
-  .playlist .annotations .annotation {
-    padding: 1em; }
   .playlist .annotations .annotations-text {
     font-size: 19px;
     font-weight: 300;
@@ -123,6 +121,39 @@
     height: 160px;
     overflow-x: hidden;
     overflow-y: auto; }
+    .playlist .annotations .annotations-text .annotation {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      align-items: stretch; }
+      .playlist .annotations .annotations-text .annotation span {
+        margin: 0.3rem 0.6rem; }
+        .playlist .annotations .annotations-text .annotation span:last-of-type {
+          margin-right: 1.2rem; }
+      .playlist .annotations .annotations-text .annotation .annotation-id {
+        font-size: 16px;
+        line-height: 27px; }
+      .playlist .annotations .annotations-text .annotation .annotation-start {
+        font-size: 16px;
+        line-height: 27px; }
+      .playlist .annotations .annotations-text .annotation .annotation-end {
+        font-size: 16px;
+        line-height: 27px; }
+      .playlist .annotations .annotations-text .annotation .annotation-lines {
+        flex-grow: 10; }
+      .playlist .annotations .annotations-text .annotation .annotation-actions {
+        flex-basis: auto;
+        width: 80px;
+        text-align: right;
+        font-size: 16px; }
+        .playlist .annotations .annotations-text .annotation .annotation-actions i {
+          margin-right: 0.6rem; }
+          .playlist .annotations .annotations-text .annotation .annotation-actions i:last-of-type {
+            margin-right: 0; }
+          .playlist .annotations .annotations-text .annotation .annotation-actions i:hover {
+            color: orange;
+            cursor: pointer; }
   .playlist .annotations .current {
     background-color: #EBF4F6; }
 

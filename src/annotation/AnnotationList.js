@@ -1,4 +1,5 @@
 import h from 'virtual-dom/h';
+import _assign from 'lodash.assign';
 
 import inputAeneas from './input/aeneas';
 import outputAeneas from './output/aeneas';
@@ -8,28 +9,40 @@ import ScrollTopHook from './render/ScrollTopHook';
 import timeformat from '../utils/timeformat';
 
 class AnnotationList {
-  constructor(playlist, annotations) {
+  constructor(playlist, annotations, controls = [], editable = false,
+    linkEndpoints = false, isContinuousPlay = false) {
     this.playlist = playlist;
-    this.annotations = annotations.map((a, i) => {
+    this.resizeHandlers = [];
+    this.editable = editable;
+    this.annotations = annotations.map(a =>
       // TODO support different formats later on.
-      const note = inputAeneas(a);
-      note.leftShift = new DragInteraction(playlist, {
+      inputAeneas(a),
+    );
+    this.setupInteractions();
+
+    this.controls = controls;
+    this.setupEE(playlist.ee);
+
+    // TODO actually make a real plugin system that's not terrible.
+    this.playlist.isContinuousPlay = isContinuousPlay;
+    this.playlist.linkEndpoints = linkEndpoints;
+    this.length = this.annotations.length;
+  }
+
+  setupInteractions() {
+    this.annotations.forEach((a, i) => {
+      const leftShift = new DragInteraction(this.playlist, {
         direction: 'left',
         index: i,
       });
-      note.rightShift = new DragInteraction(playlist, {
+      const rightShift = new DragInteraction(this.playlist, {
         direction: 'right',
         index: i,
       });
 
-      return note;
+      this.resizeHandlers.push(leftShift);
+      this.resizeHandlers.push(rightShift);
     });
-    this.setupEE(playlist.ee);
-
-    // TODO actually make a real plugin system that's not terrible.
-    this.playlist.isContinuousPlay = false;
-    this.playlist.linkEndpoints = false;
-    this.length = this.annotations.length;
   }
 
   setupEE(ee) {
@@ -108,32 +121,53 @@ class AnnotationList {
     document.body.removeChild(a);
   }
 
-  static renderResizeLeft(note) {
+  renderResizeLeft(i) {
     const events = DragInteraction.getEvents();
     const config = { attributes: {
       style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
       draggable: true,
     } };
+    const handler = this.resizeHandlers[i * 2];
 
     events.forEach((event) => {
-      config[`on${event}`] = note.leftShift[event].bind(note.leftShift);
+      config[`on${event}`] = handler[event].bind(handler);
     });
 
     return h('div.resize-handle.resize-w', config);
   }
 
-  static renderResizeRight(note) {
+  renderResizeRight(i) {
     const events = DragInteraction.getEvents();
     const config = { attributes: {
       style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
       draggable: true,
     } };
+    const handler = this.resizeHandlers[(i * 2) + 1];
 
     events.forEach((event) => {
-      config[`on${event}`] = note.rightShift[event].bind(note.rightShift);
+      config[`on${event}`] = handler[event].bind(handler);
     });
 
     return h('div.resize-handle.resize-e', config);
+  }
+
+  renderControls(note, i) {
+    // seems to be a bug with references, or I'm missing something.
+    const that = this;
+    return this.controls.map(ctrl =>
+      h(`i.${ctrl.class}`, {
+        attributes: {
+          title: ctrl.title,
+        },
+        onclick: () => {
+          ctrl.action(note, i, that.annotations, {
+            linkEndpoints: that.playlist.linkEndpoints,
+          });
+          this.setupInteractions();
+          that.playlist.drawRequest();
+        },
+      }),
+    );
   }
 
   render() {
@@ -159,7 +193,7 @@ class AnnotationList {
             },
           },
           [
-            AnnotationList.renderResizeLeft(note),
+            this.renderResizeLeft(i),
             h('span.id',
               {
                 onclick: () => {
@@ -174,7 +208,7 @@ class AnnotationList {
                 note.id,
               ],
             ),
-            AnnotationList.renderResizeRight(note),
+            this.renderResizeRight(i),
           ],
         );
       }),
@@ -195,7 +229,7 @@ class AnnotationList {
       {
         hook: new ScrollTopHook(),
       },
-      this.annotations.map((note) => {
+      this.annotations.map((note, i) => {
         const format = timeformat(this.playlist.durationFormat);
         const start = format(note.start);
         const end = format(note.end);
@@ -208,20 +242,47 @@ class AnnotationList {
           segmentClass = '.current';
         }
 
-        return h(`div.row${segmentClass}`,
+        const editableConfig = {
+          attributes: {
+            contenteditable: true,
+          },
+          oninput: (e) => {
+            this.annotations[i] = _assign(
+              {},
+              note,
+              { lines: [e.target.innerText] },
+            );
+          },
+          onkeypress: (e) => {
+            if (e.which === 13 || e.keyCode === 13) {
+              e.target.blur();
+              e.preventDefault();
+            }
+          },
+        };
+
+        const linesConfig = this.editable ? editableConfig : {};
+
+        return h(`div.annotation${segmentClass}`,
           [
-            h('span.annotation.id', [
+            h('span.annotation-id', [
               note.id,
             ]),
-            h('span.annotation.start', [
+            h('span.annotation-start', [
               start,
             ]),
-            h('span.annotation.end', [
+            h('span.annotation-end', [
               end,
             ]),
-            h('span.annotation.text', [
-              note.lines,
-            ]),
+            h('span.annotation-lines',
+              linesConfig,
+              [
+                note.lines,
+              ],
+            ),
+            h('span.annotation-actions',
+              this.renderControls(note, i),
+            ),
           ],
         );
       }),

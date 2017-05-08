@@ -155,19 +155,47 @@ var options = {
   // Smaller numbers have a greater zoom in.
   zoomLevels: [512, 1024, 2048, 4096],
 
-  // Array of annotations in [Aeneas](https://github.com/readbeyond/aeneas) JSON format
-  annotations: [],
-
   // Whether to automatically scroll the waveform while playing
   isAutomaticScroll: false,
 
-  // If false when clicking an annotation id segment
-  // playback will stop after segment completion.
-  isContinuousPlay: false,
+  // configuration object for the annotations add on.
+  annotationList: {
 
-  // If true annotation endpoints will remain linked when dragged
-  // if they were the same value before dragging started.
-  linkEndpoints: false,
+    // Array of annotations in [Aeneas](https://github.com/readbeyond/aeneas) JSON format
+    annotations: [],
+
+    // Whether the annotation texts will be in updateable contenteditable html elements
+    editable: false,
+
+    // User defined functions which can manipulate the loaded annotations
+    controls: [{
+      // class names for generated <i> tag separated by '.'
+      class: 'fa.fa-minus',
+
+      // title attribute for the generated <i> tag
+      title: 'Reduce annotation end by 0.010s',
+
+      // function which acts on the given annotation row
+      // when the corresponding <i> is clicked.
+      action: (annotation, i, annotations, opts) => {
+
+        // @param Object annotation - current annotation
+        // @param Number i - index of annotation
+        // @param Array annotations - array of annotations in the playlist
+        // @param Object opts - configuration options available
+        //      - opts.linkEndpoints
+
+      }
+    }],
+
+    // If false when clicking an annotation id segment
+    // playback will stop after segment completion.
+    isContinuousPlay: false,
+
+    // If true annotation endpoints will remain linked when dragged
+    // if they were the same value before dragging started.
+    linkEndpoints: false,
+  }
 };
 ```
 

@@ -37,7 +37,6 @@ export default class {
   dragstart(e) {
     const ev = e;
     this.active = true;
-    this.el = e.target;
     this.prevX = e.clientX;
 
     ev.dataTransfer.dropEffect = 'move';

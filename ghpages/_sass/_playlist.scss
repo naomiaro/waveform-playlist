@@ -180,10 +180,6 @@
       }
     }
 
-    .annotation {
-      padding: 1em;
-    }
-
     .annotations-text {
       font-size: 19px;
       font-weight: 300;
@@ -191,6 +187,61 @@
       height: 160px;
       overflow-x: hidden;
       overflow-y: auto;
+
+      .annotation {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        align-items: stretch;
+
+        span {
+          margin: 0.3rem 0.6rem;
+
+          &:last-of-type {
+            margin-right: 1.2rem;
+          }
+        }
+
+        .annotation-id {
+          font-size: 16px;
+          line-height: 27px;
+        }
+
+        .annotation-start {
+          font-size: 16px;
+          line-height: 27px;
+        }
+
+        .annotation-end {
+          font-size: 16px;
+          line-height: 27px;
+        }
+
+        .annotation-lines {
+          flex-grow: 10;
+        }
+
+        .annotation-actions {
+          flex-basis: auto;
+          width: 80px;
+          text-align: right;
+          font-size: 16px;
+
+          i {
+            margin-right: 0.6rem;
+
+            &:last-of-type {
+              margin-right: 0;
+            }
+
+            &:hover {
+              color: orange;
+              cursor: pointer;
+            }
+          }
+        }
+      }
     }
 
     .current {

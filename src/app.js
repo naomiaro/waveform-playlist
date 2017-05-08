@@ -35,10 +35,14 @@ export function init(options = {}, ee = EventEmitter()) {
     waveHeight: 128,
     state: 'cursor',
     zoomLevels: [512, 1024, 2048, 4096],
-    annotations: [],
+    annotationList: {
+      annotations: [],
+      controls: [],
+      editable: false,
+      linkEndpoints: false,
+      isContinuousPlay: false,
+    },
     isAutomaticScroll: false,
-    isContinuousPlay: false,
-    linkedEndpoints: false,
   };
 
   const config = _assign(defaults, options);
@@ -65,7 +69,7 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.setExclSolo(config.exclSolo);
   playlist.setShowTimeScale(config.timescale);
   playlist.setSeekStyle(config.seekStyle);
-  playlist.setAnnotations(config.annotations);
+  playlist.setAnnotations(config.annotationList);
   playlist.isAutomaticScroll = config.isAutomaticScroll;
   playlist.isContinuousPlay = config.isContinuousPlay;
   playlist.linkedEndpoints = config.linkedEndpoints;
