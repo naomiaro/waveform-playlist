@@ -135,8 +135,15 @@ export default class {
     this.colors = colors;
   }
 
-  setAnnotations(annotations) {
-    this.annotationList = new AnnotationList(this, annotations);
+  setAnnotations(config) {
+    this.annotationList = new AnnotationList(
+      this,
+      config.annotations,
+      config.controls,
+      config.editable,
+      config.linkEndpoints,
+      config.isContinuousPlay,
+    );
   }
 
   setEventEmitter(ee) {

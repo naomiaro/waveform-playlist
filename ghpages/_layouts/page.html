@@ -18,7 +18,7 @@ layout: default
 
 <footer class="well well-lg">
   <p>Waveform Playlist originally written for <a href="https://www.sourcefabric.org/en/airtime">Airtime</a> at <a href="https://www.sourcefabric.org">Sourcefabric</a>
-  {% if page.audio_title && page.audio_artist %}
+  {% if page.audio_title and page.audio_artist %}
   <p>Music: <cite>{{ page.audio_title }}</cite> by {{ page.audio_artist }}</p>
   {% endif %}
   <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
