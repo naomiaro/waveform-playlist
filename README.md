@@ -378,9 +378,8 @@ An example of using the event emitter to control the playlist can be found in [/
 
 Originally created for the [Airtime](https://www.sourcefabric.org/en/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/)
 
-<<<
+
 The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber, hoping to make easier and more fun the transcription process of TEDx talks.
->>>
 
 
 ## License
