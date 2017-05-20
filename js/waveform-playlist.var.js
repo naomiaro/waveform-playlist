@@ -43,7 +43,7 @@ var WaveformPlaylist =
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -111,10 +111,14 @@ var WaveformPlaylist =
 	    waveHeight: 128,
 	    state: 'cursor',
 	    zoomLevels: [512, 1024, 2048, 4096],
-	    annotations: [],
-	    isAutomaticScroll: false,
-	    isContinuousPlay: false,
-	    linkedEndpoints: false
+	    annotationList: {
+	      annotations: [],
+	      controls: [],
+	      editable: false,
+	      linkEndpoints: false,
+	      isContinuousPlay: false
+	    },
+	    isAutomaticScroll: false
 	  };
 	
 	  var config = (0, _lodash2.default)(defaults, options);
@@ -141,7 +145,7 @@ var WaveformPlaylist =
 	  playlist.setExclSolo(config.exclSolo);
 	  playlist.setShowTimeScale(config.timescale);
 	  playlist.setSeekStyle(config.seekStyle);
-	  playlist.setAnnotations(config.annotations);
+	  playlist.setAnnotations(config.annotationList);
 	  playlist.isAutomaticScroll = config.isAutomaticScroll;
 	  playlist.isContinuousPlay = config.isContinuousPlay;
 	  playlist.linkedEndpoints = config.linkedEndpoints;
@@ -157,9 +161,9 @@ var WaveformPlaylist =
 	  return playlist;
 	}
 
-/***/ },
+/***/ }),
 /* 1 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/**
 	 * lodash (Custom Build) <https://lodash.com/>
@@ -800,18 +804,18 @@ var WaveformPlaylist =
 	module.exports = assign;
 
 
-/***/ },
+/***/ }),
 /* 2 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var createElement = __webpack_require__(3)
 	
 	module.exports = createElement
 
 
-/***/ },
+/***/ }),
 /* 3 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var document = __webpack_require__(4)
 	
@@ -861,9 +865,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 4 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {var topLevel = typeof global !== 'undefined' ? global :
 	    typeof window !== 'undefined' ? window : {}
@@ -883,15 +887,15 @@ var WaveformPlaylist =
 	
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
-/***/ },
+/***/ }),
 /* 5 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/* (ignored) */
 
-/***/ },
+/***/ }),
 /* 6 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var isObject = __webpack_require__(7)
 	var isHook = __webpack_require__(8)
@@ -992,9 +996,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 7 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	"use strict";
 	
@@ -1003,9 +1007,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 8 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	module.exports = isHook
 	
@@ -1016,9 +1020,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 9 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var version = __webpack_require__(10)
 	
@@ -1029,16 +1033,16 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 10 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	module.exports = "2"
 
 
-/***/ },
+/***/ }),
 /* 11 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var version = __webpack_require__(10)
 	
@@ -1049,9 +1053,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 12 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	module.exports = isWidget
 	
@@ -1060,9 +1064,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 13 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var isVNode = __webpack_require__(9)
 	var isVText = __webpack_require__(11)
@@ -1106,9 +1110,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 14 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	module.exports = isThunk
 	
@@ -1117,9 +1121,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 15 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -1255,9 +1259,9 @@ var WaveformPlaylist =
 	exports.methods = methods;
 
 
-/***/ },
+/***/ }),
 /* 16 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -1324,9 +1328,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 17 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -1335,9 +1339,9 @@ var WaveformPlaylist =
 		: __webpack_require__(19);
 
 
-/***/ },
+/***/ }),
 /* 18 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1350,9 +1354,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 19 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -1378,9 +1382,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 20 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -1389,9 +1393,9 @@ var WaveformPlaylist =
 		: __webpack_require__(22);
 
 
-/***/ },
+/***/ }),
 /* 21 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1403,9 +1407,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 22 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1416,9 +1420,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 23 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1428,9 +1432,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 24 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1451,9 +1455,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 25 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	// Deprecated
 	
@@ -1462,9 +1466,9 @@ var WaveformPlaylist =
 	module.exports = function (obj) { return typeof obj === 'function'; };
 
 
-/***/ },
+/***/ }),
 /* 26 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -1473,9 +1477,9 @@ var WaveformPlaylist =
 		: __webpack_require__(28);
 
 
-/***/ },
+/***/ }),
 /* 27 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1487,9 +1491,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 28 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1500,9 +1504,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 29 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -1512,9 +1516,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 30 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -1570,11 +1574,11 @@ var WaveformPlaylist =
 	
 	var _AnnotationList2 = _interopRequireDefault(_AnnotationList);
 	
-	var _recorderWorker = __webpack_require__(86);
+	var _recorderWorker = __webpack_require__(85);
 	
 	var _recorderWorker2 = _interopRequireDefault(_recorderWorker);
 	
-	var _exportWavWorker = __webpack_require__(87);
+	var _exportWavWorker = __webpack_require__(86);
 	
 	var _exportWavWorker2 = _interopRequireDefault(_exportWavWorker);
 	
@@ -1724,8 +1728,8 @@ var WaveformPlaylist =
 	    }
 	  }, {
 	    key: 'setAnnotations',
-	    value: function setAnnotations(annotations) {
-	      this.annotationList = new _AnnotationList2.default(this, annotations);
+	    value: function setAnnotations(config) {
+	      this.annotationList = new _AnnotationList2.default(this, config.annotations, config.controls, config.editable, config.linkEndpoints, config.isContinuousPlay);
 	    }
 	  }, {
 	    key: 'setEventEmitter',
@@ -2413,17 +2417,15 @@ var WaveformPlaylist =
 	      var elapsed = currentTime - this.lastDraw;
 	
 	      if (this.isPlaying()) {
-	        (function () {
-	          var playbackSeconds = cursorPos + elapsed;
-	          _this14.ee.emit('timeupdate', playbackSeconds);
-	          _this14.animationRequest = window.requestAnimationFrame(function () {
-	            _this14.updateEditor(playbackSeconds);
-	          });
+	        var playbackSeconds = cursorPos + elapsed;
+	        this.ee.emit('timeupdate', playbackSeconds);
+	        this.animationRequest = window.requestAnimationFrame(function () {
+	          _this14.updateEditor(playbackSeconds);
+	        });
 	
-	          _this14.playbackSeconds = playbackSeconds;
-	          _this14.draw(_this14.render());
-	          _this14.lastDraw = currentTime;
-	        })();
+	        this.playbackSeconds = playbackSeconds;
+	        this.draw(this.render());
+	        this.lastDraw = currentTime;
 	      } else {
 	        if (cursorPos + elapsed >= this.isSegmentSelection() ? selection.end : this.duration) {
 	          this.ee.emit('finished');
@@ -2568,9 +2570,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 31 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/**
 	 * lodash (Custom Build) <https://lodash.com/>
@@ -3242,18 +3244,18 @@ var WaveformPlaylist =
 	module.exports = defaults;
 
 
-/***/ },
+/***/ }),
 /* 32 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var h = __webpack_require__(33)
 	
 	module.exports = h
 
 
-/***/ },
+/***/ }),
 /* 33 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -3394,9 +3396,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 34 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	var nativeIsArray = Array.isArray
 	var toString = Object.prototype.toString
@@ -3408,9 +3410,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 35 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var version = __webpack_require__(10)
 	var isVNode = __webpack_require__(9)
@@ -3486,9 +3488,9 @@ var WaveformPlaylist =
 	VirtualNode.prototype.type = "VirtualNode"
 
 
-/***/ },
+/***/ }),
 /* 36 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var version = __webpack_require__(10)
 	
@@ -3502,9 +3504,9 @@ var WaveformPlaylist =
 	VirtualText.prototype.type = "VirtualText"
 
 
-/***/ },
+/***/ }),
 /* 37 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -3562,9 +3564,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 38 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/*!
 	 * Cross-Browser Split 1.1.1
@@ -3674,9 +3676,9 @@ var WaveformPlaylist =
 	})();
 
 
-/***/ },
+/***/ }),
 /* 39 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -3697,9 +3699,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 40 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -3730,9 +3732,9 @@ var WaveformPlaylist =
 	};
 
 
-/***/ },
+/***/ }),
 /* 41 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -3756,9 +3758,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 42 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -3784,9 +3786,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 43 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
 	
@@ -3810,18 +3812,18 @@ var WaveformPlaylist =
 	
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
-/***/ },
+/***/ }),
 /* 44 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var diff = __webpack_require__(45)
 	
 	module.exports = diff
 
 
-/***/ },
+/***/ }),
 /* 45 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var isArray = __webpack_require__(34)
 	
@@ -4252,9 +4254,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 46 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var version = __webpack_require__(10)
 	
@@ -4280,9 +4282,9 @@ var WaveformPlaylist =
 	VirtualPatch.prototype.type = "VirtualPatch"
 
 
-/***/ },
+/***/ }),
 /* 47 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var isObject = __webpack_require__(7)
 	var isHook = __webpack_require__(8)
@@ -4344,18 +4346,18 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 48 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var patch = __webpack_require__(49)
 	
 	module.exports = patch
 
 
-/***/ },
+/***/ }),
 /* 49 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var document = __webpack_require__(4)
 	var isArray = __webpack_require__(34)
@@ -4439,9 +4441,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 50 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	// Maps a virtual DOM tree onto a real DOM tree in an efficient manner.
 	// We don't want to read all of the DOM nodes in the tree so we use
@@ -4530,9 +4532,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 51 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var applyProperties = __webpack_require__(6)
 	
@@ -4687,9 +4689,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 52 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var isWidget = __webpack_require__(12)
 	
@@ -4708,9 +4710,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 53 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {var WORKER_ENABLED = !!(global === global.window && global.URL && global.Blob && global.Worker);
 	
@@ -4754,9 +4756,9 @@ var WaveformPlaylist =
 	
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
-/***/ },
+/***/ }),
 /* 54 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	"use strict";
 	
@@ -4793,9 +4795,9 @@ var WaveformPlaylist =
 	  return Math.ceil(seconds * sampleRate / resolution);
 	}
 
-/***/ },
+/***/ }),
 /* 55 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -4840,9 +4842,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 56 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -4920,9 +4922,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 57 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -5006,9 +5008,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 58 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -5082,9 +5084,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 59 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -5136,9 +5138,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 60 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -5314,9 +5316,9 @@ var WaveformPlaylist =
 	
 	exports.default = TimeScale;
 
-/***/ },
+/***/ }),
 /* 61 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -5370,9 +5372,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 62 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -6017,9 +6019,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 63 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/**
 	 * lodash (Custom Build) <https://lodash.com/>
@@ -6525,9 +6527,9 @@ var WaveformPlaylist =
 	module.exports = forOwn;
 
 
-/***/ },
+/***/ }),
 /* 64 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	//     uuid.js
 	//
@@ -6714,9 +6716,9 @@ var WaveformPlaylist =
 	module.exports = uuid;
 
 
-/***/ },
+/***/ }),
 /* 65 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {
 	var rng;
@@ -6753,9 +6755,9 @@ var WaveformPlaylist =
 	
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
-/***/ },
+/***/ }),
 /* 66 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -6912,9 +6914,9 @@ var WaveformPlaylist =
 	    };
 	};
 
-/***/ },
+/***/ }),
 /* 67 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7014,9 +7016,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 68 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -7094,9 +7096,9 @@ var WaveformPlaylist =
 	}
 
 
-/***/ },
+/***/ }),
 /* 69 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7134,9 +7136,9 @@ var WaveformPlaylist =
 	  fadeout: _FadeOutState2.default
 	};
 
-/***/ },
+/***/ }),
 /* 70 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7190,9 +7192,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 71 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7288,9 +7290,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 72 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7382,9 +7384,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 73 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7438,9 +7440,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 74 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7494,9 +7496,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 75 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -7562,9 +7564,9 @@ var WaveformPlaylist =
 	
 	exports.default = CanvasHook;
 
-/***/ },
+/***/ }),
 /* 76 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7677,9 +7679,9 @@ var WaveformPlaylist =
 	
 	exports.default = FadeCanvasHook;
 
-/***/ },
+/***/ }),
 /* 77 */
-/***/ function(module, exports) {
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -7713,9 +7715,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 78 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7874,9 +7876,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
+/***/ }),
 /* 79 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -7890,25 +7892,29 @@ var WaveformPlaylist =
 	
 	var _h2 = _interopRequireDefault(_h);
 	
+	var _lodash = __webpack_require__(1);
+	
+	var _lodash2 = _interopRequireDefault(_lodash);
+	
 	var _aeneas = __webpack_require__(80);
 	
 	var _aeneas2 = _interopRequireDefault(_aeneas);
 	
-	var _aeneas3 = __webpack_require__(82);
+	var _aeneas3 = __webpack_require__(81);
 	
 	var _aeneas4 = _interopRequireDefault(_aeneas3);
 	
 	var _conversions = __webpack_require__(54);
 	
-	var _DragInteraction = __webpack_require__(83);
+	var _DragInteraction = __webpack_require__(82);
 	
 	var _DragInteraction2 = _interopRequireDefault(_DragInteraction);
 	
-	var _ScrollTopHook = __webpack_require__(84);
+	var _ScrollTopHook = __webpack_require__(83);
 	
 	var _ScrollTopHook2 = _interopRequireDefault(_ScrollTopHook);
 	
-	var _timeformat = __webpack_require__(85);
+	var _timeformat = __webpack_require__(84);
 	
 	var _timeformat2 = _interopRequireDefault(_timeformat);
 	
@@ -7918,39 +7924,60 @@ var WaveformPlaylist =
 	
 	var AnnotationList = function () {
 	  function AnnotationList(playlist, annotations) {
+	    var controls = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
+	    var editable = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
+	    var linkEndpoints = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : false;
+	    var isContinuousPlay = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : false;
+	
 	    _classCallCheck(this, AnnotationList);
 	
 	    this.playlist = playlist;
-	    this.annotations = annotations.map(function (a, i) {
-	      // TODO support different formats later on.
-	      var note = (0, _aeneas2.default)(a);
-	      note.leftShift = new _DragInteraction2.default(playlist, {
-	        direction: 'left',
-	        index: i
-	      });
-	      note.rightShift = new _DragInteraction2.default(playlist, {
-	        direction: 'right',
-	        index: i
-	      });
-	
-	      return note;
+	    this.resizeHandlers = [];
+	    this.editable = editable;
+	    this.annotations = annotations.map(function (a) {
+	      return (
+	        // TODO support different formats later on.
+	        (0, _aeneas2.default)(a)
+	      );
 	    });
+	    this.setupInteractions();
+	
+	    this.controls = controls;
 	    this.setupEE(playlist.ee);
 	
 	    // TODO actually make a real plugin system that's not terrible.
-	    this.playlist.isContinuousPlay = false;
-	    this.playlist.linkEndpoints = false;
+	    this.playlist.isContinuousPlay = isContinuousPlay;
+	    this.playlist.linkEndpoints = linkEndpoints;
 	    this.length = this.annotations.length;
 	  }
 	
 	  _createClass(AnnotationList, [{
+	    key: 'setupInteractions',
+	    value: function setupInteractions() {
+	      var _this = this;
+	
+	      this.annotations.forEach(function (a, i) {
+	        var leftShift = new _DragInteraction2.default(_this.playlist, {
+	          direction: 'left',
+	          index: i
+	        });
+	        var rightShift = new _DragInteraction2.default(_this.playlist, {
+	          direction: 'right',
+	          index: i
+	        });
+	
+	        _this.resizeHandlers.push(leftShift);
+	        _this.resizeHandlers.push(rightShift);
+	      });
+	    }
+	  }, {
 	    key: 'setupEE',
 	    value: function setupEE(ee) {
-	      var _this = this;
+	      var _this2 = this;
 	
 	      ee.on('dragged', function (deltaTime, data) {
 	        var annotationIndex = data.index;
-	        var annotations = _this.annotations;
+	        var annotations = _this2.annotations;
 	        var note = annotations[annotationIndex];
 	
 	        // resizing to the left
@@ -7966,7 +7993,7 @@ var WaveformPlaylist =
 	            annotations[annotationIndex - 1].end = note.start;
 	          }
 	
-	          if (_this.playlist.linkEndpoints && annotationIndex && annotations[annotationIndex - 1].end === originalVal) {
+	          if (_this2.playlist.linkEndpoints && annotationIndex && annotations[annotationIndex - 1].end === originalVal) {
 	            annotations[annotationIndex - 1].end = note.start;
 	          }
 	        } else {
@@ -7974,32 +8001,32 @@ var WaveformPlaylist =
 	          var _originalVal = note.end;
 	          note.end += deltaTime;
 	
-	          if (note.end > _this.playlist.duration) {
-	            note.end = _this.playlist.duration;
+	          if (note.end > _this2.playlist.duration) {
+	            note.end = _this2.playlist.duration;
 	          }
 	
 	          if (annotationIndex < annotations.length - 1 && annotations[annotationIndex + 1].start < note.end) {
 	            annotations[annotationIndex + 1].start = note.end;
 	          }
 	
-	          if (_this.playlist.linkEndpoints && annotationIndex < annotations.length - 1 && annotations[annotationIndex + 1].start === _originalVal) {
+	          if (_this2.playlist.linkEndpoints && annotationIndex < annotations.length - 1 && annotations[annotationIndex + 1].start === _originalVal) {
 	            annotations[annotationIndex + 1].start = note.end;
 	          }
 	        }
 	
-	        _this.playlist.drawRequest();
+	        _this2.playlist.drawRequest();
 	      });
 	
 	      ee.on('continuousplay', function (val) {
-	        _this.playlist.isContinuousPlay = val;
+	        _this2.playlist.isContinuousPlay = val;
 	      });
 	
 	      ee.on('linkendpoints', function (val) {
-	        _this.playlist.linkEndpoints = val;
+	        _this2.playlist.linkEndpoints = val;
 	      });
 	
 	      ee.on('annotationsrequest', function () {
-	        _this.export();
+	        _this2.export();
 	      });
 	
 	      return ee;
@@ -8020,19 +8047,73 @@ var WaveformPlaylist =
 	      document.body.removeChild(a);
 	    }
 	  }, {
+	    key: 'renderResizeLeft',
+	    value: function renderResizeLeft(i) {
+	      var events = _DragInteraction2.default.getEvents();
+	      var config = { attributes: {
+	          style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
+	          draggable: true
+	        } };
+	      var handler = this.resizeHandlers[i * 2];
+	
+	      events.forEach(function (event) {
+	        config['on' + event] = handler[event].bind(handler);
+	      });
+	
+	      return (0, _h2.default)('div.resize-handle.resize-w', config);
+	    }
+	  }, {
+	    key: 'renderResizeRight',
+	    value: function renderResizeRight(i) {
+	      var events = _DragInteraction2.default.getEvents();
+	      var config = { attributes: {
+	          style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
+	          draggable: true
+	        } };
+	      var handler = this.resizeHandlers[i * 2 + 1];
+	
+	      events.forEach(function (event) {
+	        config['on' + event] = handler[event].bind(handler);
+	      });
+	
+	      return (0, _h2.default)('div.resize-handle.resize-e', config);
+	    }
+	  }, {
+	    key: 'renderControls',
+	    value: function renderControls(note, i) {
+	      var _this3 = this;
+	
+	      // seems to be a bug with references, or I'm missing something.
+	      var that = this;
+	      return this.controls.map(function (ctrl) {
+	        return (0, _h2.default)('i.' + ctrl.class, {
+	          attributes: {
+	            title: ctrl.title
+	          },
+	          onclick: function onclick() {
+	            ctrl.action(note, i, that.annotations, {
+	              linkEndpoints: that.playlist.linkEndpoints
+	            });
+	            _this3.setupInteractions();
+	            that.playlist.drawRequest();
+	          }
+	        });
+	      });
+	    }
+	  }, {
 	    key: 'render',
 	    value: function render() {
-	      var _this2 = this;
+	      var _this4 = this;
 	
 	      var boxes = (0, _h2.default)('div.annotations-boxes', {
 	        attributes: {
 	          style: 'height: 30px;'
 	        }
 	      }, this.annotations.map(function (note, i) {
-	        var samplesPerPixel = _this2.playlist.samplesPerPixel;
-	        var sampleRate = _this2.playlist.sampleRate;
+	        var samplesPerPixel = _this4.playlist.samplesPerPixel;
+	        var sampleRate = _this4.playlist.sampleRate;
 	        var pixPerSec = sampleRate / samplesPerPixel;
-	        var pixOffset = (0, _conversions.secondsToPixels)(_this2.playlist.scrollLeft, samplesPerPixel, sampleRate);
+	        var pixOffset = (0, _conversions.secondsToPixels)(_this4.playlist.scrollLeft, samplesPerPixel, sampleRate);
 	        var left = Math.floor(note.start * pixPerSec - pixOffset);
 	        var width = Math.ceil(note.end * pixPerSec - note.start * pixPerSec);
 	
@@ -8041,15 +8122,15 @@ var WaveformPlaylist =
 	            style: 'position: absolute; height: 30px; width: ' + width + 'px; left: ' + left + 'px',
 	            'data-id': note.id
 	          }
-	        }, [AnnotationList.renderResizeLeft(note), (0, _h2.default)('span.id', {
+	        }, [_this4.renderResizeLeft(i), (0, _h2.default)('span.id', {
 	          onclick: function onclick() {
-	            if (_this2.playlist.isContinuousPlay) {
-	              _this2.playlist.ee.emit('play', _this2.annotations[i].start);
+	            if (_this4.playlist.isContinuousPlay) {
+	              _this4.playlist.ee.emit('play', _this4.annotations[i].start);
 	            } else {
-	              _this2.playlist.ee.emit('play', _this2.annotations[i].start, _this2.annotations[i].end);
+	              _this4.playlist.ee.emit('play', _this4.annotations[i].start, _this4.annotations[i].end);
 	            }
 	          }
-	        }, [note.id]), AnnotationList.renderResizeRight(note)]);
+	        }, [note.id]), _this4.renderResizeRight(i)]);
 	      }));
 	
 	      var boxesWrapper = (0, _h2.default)('div.annotations-boxes-wrapper', {
@@ -8060,50 +8141,37 @@ var WaveformPlaylist =
 	
 	      var text = (0, _h2.default)('div.annotations-text', {
 	        hook: new _ScrollTopHook2.default()
-	      }, this.annotations.map(function (note) {
-	        var format = (0, _timeformat2.default)(_this2.playlist.durationFormat);
+	      }, this.annotations.map(function (note, i) {
+	        var format = (0, _timeformat2.default)(_this4.playlist.durationFormat);
 	        var start = format(note.start);
 	        var end = format(note.end);
 	
 	        var segmentClass = '';
-	        if (_this2.playlist.isPlaying() && _this2.playlist.playbackSeconds >= note.start && _this2.playlist.playbackSeconds <= note.end) {
+	        if (_this4.playlist.isPlaying() && _this4.playlist.playbackSeconds >= note.start && _this4.playlist.playbackSeconds <= note.end) {
 	          segmentClass = '.current';
 	        }
 	
-	        return (0, _h2.default)('div.row' + segmentClass, [(0, _h2.default)('span.annotation.id', [note.id]), (0, _h2.default)('span.annotation.start', [start]), (0, _h2.default)('span.annotation.end', [end]), (0, _h2.default)('span.annotation.text', [note.lines])]);
+	        var editableConfig = {
+	          attributes: {
+	            contenteditable: true
+	          },
+	          oninput: function oninput(e) {
+	            _this4.annotations[i] = (0, _lodash2.default)({}, note, { lines: [e.target.innerText] });
+	          },
+	          onkeypress: function onkeypress(e) {
+	            if (e.which === 13 || e.keyCode === 13) {
+	              e.target.blur();
+	              e.preventDefault();
+	            }
+	          }
+	        };
+	
+	        var linesConfig = _this4.editable ? editableConfig : {};
+	
+	        return (0, _h2.default)('div.annotation' + segmentClass, [(0, _h2.default)('span.annotation-id', [note.id]), (0, _h2.default)('span.annotation-start', [start]), (0, _h2.default)('span.annotation-end', [end]), (0, _h2.default)('span.annotation-lines', linesConfig, [note.lines]), (0, _h2.default)('span.annotation-actions', _this4.renderControls(note, i))]);
 	      }));
 	
 	      return (0, _h2.default)('div.annotations', [boxesWrapper, text]);
-	    }
-	  }], [{
-	    key: 'renderResizeLeft',
-	    value: function renderResizeLeft(note) {
-	      var events = _DragInteraction2.default.getEvents();
-	      var config = { attributes: {
-	          style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
-	          draggable: true
-	        } };
-	
-	      events.forEach(function (event) {
-	        config['on' + event] = note.leftShift[event].bind(note.leftShift);
-	      });
-	
-	      return (0, _h2.default)('div.resize-handle.resize-w', config);
-	    }
-	  }, {
-	    key: 'renderResizeRight',
-	    value: function renderResizeRight(note) {
-	      var events = _DragInteraction2.default.getEvents();
-	      var config = { attributes: {
-	          style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
-	          draggable: true
-	        } };
-	
-	      events.forEach(function (event) {
-	        config['on' + event] = note.rightShift[event].bind(note.rightShift);
-	      });
-	
-	      return (0, _h2.default)('div.resize-handle.resize-e', config);
 	    }
 	  }]);
 	
@@ -8112,9 +8180,9 @@ var WaveformPlaylist =
 	
 	exports.default = AnnotationList;
 
-/***/ },
+/***/ }),
 /* 80 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -8123,61 +8191,26 @@ var WaveformPlaylist =
 	});
 	
 	exports.default = function (aeneas) {
-	  var annotation = new _Annotation2.default();
-	  annotation.id = aeneas.id;
-	  annotation.start = Number(aeneas.begin);
-	  annotation.end = Number(aeneas.end);
-	  annotation.lines = aeneas.lines;
-	  annotation.lang = aeneas.language;
+	  var annotation = {
+	    id: aeneas.id || _uuid2.default.v4(),
+	    start: Number(aeneas.begin) || 0,
+	    end: Number(aeneas.end) || 0,
+	    lines: aeneas.lines || [''],
+	    lang: aeneas.language || 'en'
+	  };
 	
 	  return annotation;
 	};
 	
-	var _Annotation = __webpack_require__(81);
-	
-	var _Annotation2 = _interopRequireDefault(_Annotation);
-
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-/***/ },
-/* 81 */
-/***/ function(module, exports, __webpack_require__) {
-
-	'use strict';
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	
 	var _uuid = __webpack_require__(64);
 	
 	var _uuid2 = _interopRequireDefault(_uuid);
-	
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-	
-	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-	
-	var _class = function _class() {
-	  var id = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : _uuid2.default.v4();
-	  var start = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-	  var end = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
-	  var lines = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : [];
-	  var lang = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 'en';
-	
-	  _classCallCheck(this, _class);
-	
-	  this.id = id;
-	  this.start = start;
-	  this.end = end;
-	  this.lines = lines;
-	  this.lang = lang;
-	};
-	
-	exports.default = _class;
 
-/***/ },
-/* 82 */
-/***/ function(module, exports) {
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/***/ }),
+/* 81 */
+/***/ (function(module, exports) {
 
 	"use strict";
 	
@@ -8195,9 +8228,9 @@ var WaveformPlaylist =
 	  };
 	};
 
-/***/ },
-/* 83 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ }),
+/* 82 */
+/***/ (function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -8254,7 +8287,6 @@ var WaveformPlaylist =
 	    value: function dragstart(e) {
 	      var ev = e;
 	      this.active = true;
-	      this.el = e.target;
 	      this.prevX = e.clientX;
 	
 	      ev.dataTransfer.dropEffect = 'move';
@@ -8287,9 +8319,9 @@ var WaveformPlaylist =
 
 	exports.default = _class;
 
-/***/ },
-/* 84 */
-/***/ function(module, exports) {
+/***/ }),
+/* 83 */
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -8313,9 +8345,9 @@ var WaveformPlaylist =
 	
 	exports.default = Hook;
 
-/***/ },
-/* 85 */
-/***/ function(module, exports) {
+/***/ }),
+/* 84 */
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -8361,9 +8393,9 @@ var WaveformPlaylist =
 	  return formats[format];
 	};
 
-/***/ },
-/* 86 */
-/***/ function(module, exports) {
+/***/ }),
+/* 85 */
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -8520,9 +8552,9 @@ var WaveformPlaylist =
 	  };
 	};
 
-/***/ },
-/* 87 */
-/***/ function(module, exports) {
+/***/ }),
+/* 86 */
+/***/ (function(module, exports) {
 
 	'use strict';
 	
@@ -8671,6 +8703,6 @@ var WaveformPlaylist =
 	  };
 	};
 
-/***/ }
+/***/ })
 /******/ ]);
 //# sourceMappingURL=waveform-playlist.var.js.map
