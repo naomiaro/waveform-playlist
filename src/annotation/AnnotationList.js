@@ -1,5 +1,4 @@
 import h from 'virtual-dom/h';
-import _assign from 'lodash.assign';
 
 import inputAeneas from './input/aeneas';
 import outputAeneas from './output/aeneas';
@@ -247,11 +246,9 @@ class AnnotationList {
             contenteditable: true,
           },
           oninput: (e) => {
-            this.annotations[i] = _assign(
-              {},
-              note,
-              { lines: [e.target.innerText] },
-            );
+            // needed currently for references
+            // eslint-disable-next-line no-param-reassign
+            note.lines = [e.target.innerText];
           },
           onkeypress: (e) => {
             if (e.which === 13 || e.keyCode === 13) {

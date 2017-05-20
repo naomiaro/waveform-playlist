@@ -7892,10 +7892,6 @@ var WaveformPlaylist =
 	
 	var _h2 = _interopRequireDefault(_h);
 	
-	var _lodash = __webpack_require__(1);
-	
-	var _lodash2 = _interopRequireDefault(_lodash);
-	
 	var _aeneas = __webpack_require__(80);
 	
 	var _aeneas2 = _interopRequireDefault(_aeneas);
@@ -8156,7 +8152,9 @@ var WaveformPlaylist =
 	            contenteditable: true
 	          },
 	          oninput: function oninput(e) {
-	            _this4.annotations[i] = (0, _lodash2.default)({}, note, { lines: [e.target.innerText] });
+	            // needed currently for references
+	            // eslint-disable-next-line no-param-reassign
+	            note.lines = [e.target.innerText];
 	          },
 	          onkeypress: function onkeypress(e) {
 	            if (e.which === 13 || e.keyCode === 13) {
