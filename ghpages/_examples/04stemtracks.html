@@ -1,8 +1,8 @@
 ---
 layout: page
 title: Stem Tracks
-lead: Mute or solo the different tracks that make up the composition.
-excerpt: Create a playlist with multiple stem tracks. Mute or solo the different stems in the playlist.
+lead: Multitrack scheduling allows to layer audio for simultaneous playback. Mute, solo, or set different volume levels for each audio track that makes up the composition. Control the master volume of the mix.
+excerpt: Create a playlist with multiple stem tracks. Mute, solo, or set different volume levels for each audio track. Multitrack scheduling audio simultaneous playback. Master volume adjustment.
 permalink: stem-tracks.html
 javascript: stem-tracks.js
 audio_title: Starlight
@@ -22,8 +22,16 @@ audio_artist: Muse
   </div>
 </div>
 <div id="playlist"></div>
-<form>
-    <label>Master Volume: <input type="range" min="0" max="100" value="100" class="master-gain input-small form-control"></label>
+<form class="form-inline">
+  <div class="form-group">
+    <label for="master-gain">Master Volume</label>
+    <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
+  </div>
+  <div class="checkbox">
+    <label>
+      <input type="checkbox" class="automatic-scroll"> Automatic Scroll
+    </label>
+  </div>
 </form>
 <div class="sound-status"></div>
 <div class="loading-data"></div>
