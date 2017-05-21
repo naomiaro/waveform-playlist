@@ -13,11 +13,11 @@ export default class {
     if (!playlist.isScrolling) {
       const el = node;
 
-      if (playlist.isAutomaticScroll && playlist.isPlaying()) {
+      if (playlist.isAutomaticScroll) {
         const rect = node.getBoundingClientRect();
         const cursorRect = node.querySelector('.cursor').getBoundingClientRect();
 
-        if (cursorRect.right > rect.right) {
+        if (cursorRect.right > rect.right || cursorRect.right < 0) {
           playlist.scrollLeft = playlist.playbackSeconds;
         }
       }
