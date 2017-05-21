@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <title>Stem Tracks</title>
-  <meta name="description" content="Create a playlist with multiple stem tracks. Mute or solo the different stems in the playlist.">
+  <meta name="description" content="Create a playlist with multiple stem tracks. Mute, solo, or set different volume levels for each audio track. Multitrack scheduling audio simultaneous playback. Master volume adjustment.">
 
   <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
   <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
@@ -36,7 +36,7 @@
     <article class="post">
       <header class="post-header">
         <h1 class="post-title">Stem Tracks</h1>
-        <p class="lead">Mute or solo the different tracks that make up the composition.</p>
+        <p class="lead">Multitrack scheduling allows to layer audio for simultaneous playback. Mute, solo, or set different volume levels for each audio track that makes up the composition. Control the master volume of the mix.</p>
       </header>
       <div class="post-content">
         <div id="top-bar" class="playlist-top-bar">
@@ -52,8 +52,16 @@
   </div>
 </div>
 <div id="playlist"></div>
-<form>
-    <label>Master Volume: <input type="range" min="0" max="100" value="100" class="master-gain input-small form-control"></label>
+<form class="form-inline">
+  <div class="form-group">
+    <label for="master-gain">Master Volume</label>
+    <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
+  </div>
+  <div class="checkbox">
+    <label>
+      <input type="checkbox" class="automatic-scroll"> Automatic Scroll
+    </label>
+  </div>
 </form>
 <div class="sound-status"></div>
 <div class="loading-data"></div>
