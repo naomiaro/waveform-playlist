@@ -5117,11 +5117,11 @@ var WaveformPlaylist =
 	      if (!playlist.isScrolling) {
 	        var el = node;
 	
-	        if (playlist.isAutomaticScroll && playlist.isPlaying()) {
+	        if (playlist.isAutomaticScroll) {
 	          var rect = node.getBoundingClientRect();
 	          var cursorRect = node.querySelector('.cursor').getBoundingClientRect();
 	
-	          if (cursorRect.right > rect.right) {
+	          if (cursorRect.right > rect.right || cursorRect.right < 0) {
 	            playlist.scrollLeft = playlist.playbackSeconds;
 	          }
 	        }
