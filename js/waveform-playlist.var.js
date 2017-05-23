@@ -5615,7 +5615,9 @@ var WaveformPlaylist =
 	      var cueIn = (0, _conversions.secondsToSamples)(this.cueIn, sampleRate);
 	      var cueOut = (0, _conversions.secondsToSamples)(this.cueOut, sampleRate);
 	
+	      console.time('calculatepeaks');
 	      this.setPeaks((0, _webaudioPeaks2.default)(this.buffer, samplesPerPixel, this.peakData.mono, cueIn, cueOut));
+	      console.timeEnd('calculatepeaks');
 	    }
 	  }, {
 	    key: 'setPeaks',

@@ -37,4 +37,5 @@ playlist.load([
   }
 ]).then(function() {
   //can do stuff with the playlist.
+  playlist.ee.emit("select", 10, 10);
 });
