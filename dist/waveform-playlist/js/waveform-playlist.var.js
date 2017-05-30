@@ -1677,10 +1677,6 @@ var WaveformPlaylist =
 	        _this.working = false;
 	        _this.drawRequest();
 	      };
-	
-	      this.recorderWorker.onerror = function (e) {
-	        console.error(e);
-	      };
 	    }
 	  }, {
 	    key: 'setShowTimeScale',
@@ -8496,7 +8492,6 @@ var WaveformPlaylist =
 	      throw new Error('Invalid number of bits specified for peaks.');
 	    }
 	
-	    var numChan = source.numberOfChannels;
 	    var peaks = [];
 	    var start = 0;
 	    var end = source.length;
