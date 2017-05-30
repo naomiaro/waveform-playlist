@@ -1640,35 +1640,46 @@ var WaveformPlaylist =
 	        _this.tracks.push(track);
 	
 	        _this.chunks = [];
+	        _this.working = false;
 	      };
 	
 	      this.mediaRecorder.ondataavailable = function (e) {
 	        _this.chunks.push(e.data);
 	
-	        var recording = new Blob(_this.chunks, { type: 'audio/ogg; codecs=opus' });
-	        var loader = _LoaderFactory2.default.createLoader(recording, _this.ac);
-	        loader.load().then(function (audioBuffer) {
-	          // ask web worker for peaks.
-	          _this.recorderWorker.postMessage({
-	            samples: audioBuffer.getChannelData(0),
-	            samplesPerPixel: _this.samplesPerPixel
+	        // throttle peaks calculation
+	        if (!_this.working) {
+	          var recording = new Blob(_this.chunks, { type: 'audio/ogg; codecs=opus' });
+	          var loader = _LoaderFactory2.default.createLoader(recording, _this.ac);
+	          loader.load().then(function (audioBuffer) {
+	            // ask web worker for peaks.
+	            _this.recorderWorker.postMessage({
+	              samples: audioBuffer.getChannelData(0),
+	              samplesPerPixel: _this.samplesPerPixel
+	            });
+	            _this.recordingTrack.setCues(0, audioBuffer.duration);
+	            _this.recordingTrack.setBuffer(audioBuffer);
+	            _this.recordingTrack.setPlayout(new _Playout2.default(_this.ac, audioBuffer));
+	            _this.adjustDuration();
 	          });
-	          _this.recordingTrack.setCues(0, audioBuffer.duration);
-	          _this.recordingTrack.setBuffer(audioBuffer);
-	          _this.recordingTrack.setPlayout(new _Playout2.default(_this.ac, audioBuffer));
-	          _this.adjustDuration();
-	        });
+	          _this.working = true;
+	        }
+	      };
+	
+	      this.mediaRecorder.onstop = function () {
+	        _this.chunks = [];
+	        _this.working = false;
 	      };
 	
 	      this.recorderWorker = new _inlineWorker2.default(_recorderWorker2.default);
 	      // use a worker for calculating recording peaks.
 	      this.recorderWorker.onmessage = function (e) {
 	        _this.recordingTrack.setPeaks(e.data);
+	        _this.working = false;
 	        _this.drawRequest();
 	      };
 	
 	      this.recorderWorker.onerror = function (e) {
-	        throw e;
+	        console.error(e);
 	      };
 	    }
 	  }, {
@@ -8471,43 +8482,15 @@ var WaveformPlaylist =
 	    return peaks;
 	  }
 	
-	  function makeMono(channelPeaks, bits) {
-	    var numChan = channelPeaks.length;
-	    var weight = 1 / numChan;
-	    var numPeaks = channelPeaks[0].length / 2;
-	    var min = void 0;
-	    var max = void 0;
-	    var peaks = new self['Int' + bits + 'Array'](numPeaks * 2);
-	
-	    for (var i = 0; i < numPeaks; i += 1) {
-	      min = 0;
-	      max = 0;
-	
-	      for (var c = 0; c < numChan; c += 1) {
-	        min += weight * channelPeaks[c][i * 2];
-	        max += weight * channelPeaks[c][i * 2 + 1];
-	      }
-	
-	      peaks[i * 2] = min;
-	      peaks[i * 2 + 1] = max;
-	    }
-	
-	    // return in array so channel number counts still work.
-	    return [peaks];
-	  }
-	
 	  /**
-	  * @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.
+	  * @param {TypedArray} source - Source of audio samples for peak calculations.
 	  * @param {Number} samplesPerPixel - Number of audio samples per peak.
 	  * @param {Number} cueIn - index in channel to start peak calculations from.
 	  * @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).
 	  */
 	  function audioPeaks(source) {
 	    var samplesPerPixel = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 10000;
-	    var isMono = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
-	    var cueIn = arguments[3];
-	    var cueOut = arguments[4];
-	    var bits = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : 8;
+	    var bits = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 8;
 	
 	    if ([8, 16, 32].indexOf(bits) < 0) {
 	      throw new Error('Invalid number of bits specified for peaks.');
@@ -8515,24 +8498,9 @@ var WaveformPlaylist =
 	
 	    var numChan = source.numberOfChannels;
 	    var peaks = [];
-	
-	    if (typeof source.subarray === 'undefined') {
-	      for (var c = 0; c < numChan; c += 1) {
-	        var channel = source.getChannelData(c);
-	        var start = cueIn || 0;
-	        var end = cueOut || channel.length;
-	        var slice = channel.subarray(start, end);
-	        peaks.push(extractPeaks(slice, samplesPerPixel, bits));
-	      }
-	    } else {
-	      var _start = cueIn || 0;
-	      var _end = cueOut || source.length;
-	      peaks.push(extractPeaks(source.subarray(_start, _end), samplesPerPixel, bits));
-	    }
-	
-	    if (isMono && peaks.length > 1) {
-	      peaks = makeMono(peaks, bits);
-	    }
+	    var start = 0;
+	    var end = source.length;
+	    peaks.push(extractPeaks(source.subarray(start, end), samplesPerPixel, bits));
 	
 	    var length = peaks[0].length / 2;
 	
