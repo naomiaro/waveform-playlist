@@ -59,35 +59,42 @@ export default class {
       this.tracks.push(track);
 
       this.chunks = [];
+      this.working = false;
     };
 
     this.mediaRecorder.ondataavailable = (e) => {
       this.chunks.push(e.data);
 
-      const recording = new Blob(this.chunks, { type: 'audio/ogg; codecs=opus' });
-      const loader = LoaderFactory.createLoader(recording, this.ac);
-      loader.load().then((audioBuffer) => {
-        // ask web worker for peaks.
-        this.recorderWorker.postMessage({
-          samples: audioBuffer.getChannelData(0),
-          samplesPerPixel: this.samplesPerPixel,
+      // throttle peaks calculation
+      if (!this.working) {
+        const recording = new Blob(this.chunks, { type: 'audio/ogg; codecs=opus' });
+        const loader = LoaderFactory.createLoader(recording, this.ac);
+        loader.load().then((audioBuffer) => {
+          // ask web worker for peaks.
+          this.recorderWorker.postMessage({
+            samples: audioBuffer.getChannelData(0),
+            samplesPerPixel: this.samplesPerPixel,
+          });
+          this.recordingTrack.setCues(0, audioBuffer.duration);
+          this.recordingTrack.setBuffer(audioBuffer);
+          this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
+          this.adjustDuration();
         });
-        this.recordingTrack.setCues(0, audioBuffer.duration);
-        this.recordingTrack.setBuffer(audioBuffer);
-        this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
-        this.adjustDuration();
-      });
+        this.working = true;
+      }
+    };
+
+    this.mediaRecorder.onstop = () => {
+      this.chunks = [];
+      this.working = false;
     };
 
     this.recorderWorker = new InlineWorker(RecorderWorkerFunction);
     // use a worker for calculating recording peaks.
     this.recorderWorker.onmessage = (e) => {
       this.recordingTrack.setPeaks(e.data);
+      this.working = false;
       this.drawRequest();
-    };
-
-    this.recorderWorker.onerror = (e) => {
-      throw e;
     };
   }
 

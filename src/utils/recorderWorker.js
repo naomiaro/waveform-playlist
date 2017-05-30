@@ -68,62 +68,21 @@ export default function () {
     return peaks;
   }
 
-  function makeMono(channelPeaks, bits) {
-    const numChan = channelPeaks.length;
-    const weight = 1 / numChan;
-    const numPeaks = channelPeaks[0].length / 2;
-    let min;
-    let max;
-    const peaks = new self[`Int${bits}Array`](numPeaks * 2);
-
-    for (let i = 0; i < numPeaks; i += 1) {
-      min = 0;
-      max = 0;
-
-      for (let c = 0; c < numChan; c += 1) {
-        min += weight * channelPeaks[c][i * 2];
-        max += weight * channelPeaks[c][(i * 2) + 1];
-      }
-
-      peaks[i * 2] = min;
-      peaks[(i * 2) + 1] = max;
-    }
-
-    // return in array so channel number counts still work.
-    return [peaks];
-  }
-
   /**
-  * @param {AudioBuffer,TypedArray} source - Source of audio samples for peak calculations.
+  * @param {TypedArray} source - Source of audio samples for peak calculations.
   * @param {Number} samplesPerPixel - Number of audio samples per peak.
   * @param {Number} cueIn - index in channel to start peak calculations from.
   * @param {Number} cueOut - index in channel to end peak calculations from (non-inclusive).
   */
-  function audioPeaks(source, samplesPerPixel = 10000, isMono = true, cueIn, cueOut, bits = 8) {
+  function audioPeaks(source, samplesPerPixel = 10000, bits = 8) {
     if ([8, 16, 32].indexOf(bits) < 0) {
       throw new Error('Invalid number of bits specified for peaks.');
     }
 
-    const numChan = source.numberOfChannels;
-    let peaks = [];
-
-    if (typeof source.subarray === 'undefined') {
-      for (let c = 0; c < numChan; c += 1) {
-        const channel = source.getChannelData(c);
-        const start = cueIn || 0;
-        const end = cueOut || channel.length;
-        const slice = channel.subarray(start, end);
-        peaks.push(extractPeaks(slice, samplesPerPixel, bits));
-      }
-    } else {
-      const start = cueIn || 0;
-      const end = cueOut || source.length;
-      peaks.push(extractPeaks(source.subarray(start, end), samplesPerPixel, bits));
-    }
-
-    if (isMono && peaks.length > 1) {
-      peaks = makeMono(peaks, bits);
-    }
+    const peaks = [];
+    const start = 0;
+    const end = source.length;
+    peaks.push(extractPeaks(source.subarray(start, end), samplesPerPixel, bits));
 
     const length = peaks[0].length / 2;
 
