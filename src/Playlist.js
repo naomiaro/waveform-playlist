@@ -780,7 +780,7 @@ export default class {
       this.lastDraw = currentTime;
     } else {
       if ((cursorPos + elapsed) >=
-        (this.isSegmentSelection()) ? selection.end : this.duration) {
+        (this.isSegmentSelection() ? selection.end : this.duration)) {
         this.ee.emit('finished');
       }
 
