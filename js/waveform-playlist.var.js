@@ -2434,7 +2434,7 @@ var WaveformPlaylist =
 	        this.draw(this.render());
 	        this.lastDraw = currentTime;
 	      } else {
-	        if (cursorPos + elapsed >= this.isSegmentSelection() ? selection.end : this.duration) {
+	        if (cursorPos + elapsed >= (this.isSegmentSelection() ? selection.end : this.duration)) {
 	          this.ee.emit('finished');
 	        }
 	
