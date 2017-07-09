@@ -2,6 +2,9 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:image" content="{% if page.image %}{{ page.image }}{% else %}https://raw.githubusercontent.com/naomiaro/waveform-playlist/master/img/stemtracks.png{% endif %}">
+  <meta property="og:image:height" content="{% if page.image_height %}{{ page.image_height }}{% else %}401{% endif %}">
+  <meta property="og:image:width" content="{% if page.image_width %}{{ page.image_width }}{% else %}1039{% endif %}">
 
   <title>{% if page.title %}{{ page.title | escape }}{% else %}{{ site.title | escape }}{% endif %}</title>
   <meta name="description" content="{% if page.excerpt %}{{ page.excerpt | strip_html | strip_newlines }}{% else %}{{ site.description }}{% endif %}">
