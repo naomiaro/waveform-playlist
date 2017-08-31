@@ -7,6 +7,10 @@ Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a mult
 [![Build Status](https://travis-ci.org/naomiaro/waveform-playlist.svg)](https://travis-ci.org/naomiaro/waveform-playlist)
 [![Coverage Status](https://coveralls.io/repos/naomiaro/waveform-playlist/badge.svg?branch=master&service=github)](https://coveralls.io/github/naomiaro/waveform-playlist?branch=master)
 
+
+[NOW ON PATREON!](https://www.patreon.com/naomiaro) If you are looking for additional support or features, please consider pledging to help the work!
+
+
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
 I've written up some demos on github for the different [audio fade types](https://github.com/naomiaro/Web-Audio-Fades) in the project.
 
@@ -319,13 +323,13 @@ An example of using the event emitter to control the playlist can be found in [/
 | `zoomin` | _none_ | Changes zoom level to the next smallest entry (if one exists) from the array `zoomLevels`. |
 | `zoomout` | _none_ | Changes zoom level to the next largest entry (if one exists) from the array `zoomLevels`. |
 | `trim` | _none_ | Trims currently active track to the cursor selection. |
-| `statechange` | (`cursor | select | fadein | fadeout | shift`) | Changes interaction state to the state given. |
-| `fadetype` | (`logarithmic | linear | sCurve | exponential`) | Changes playlist default fade type. |
+| `statechange` | `cursor` / `select` / `fadein` / `fadeout` / `shift` | Changes interaction state to the state given. |
+| `fadetype` | `logarithmic` / `linear` / `sCurve` / `exponential` | Changes playlist default fade type. |
 | `newtrack` | `File` | Loads `File` object into the playlist. |
 | `volumechange` | `volume, track` | Set volume of `track` to `volume` (0-100) |
 | `mastervolumechange` | `volume` | Set a new master volume `volume` (0-100) |
 | `select` | `start, end, track:optional` | Seek to the start time or start/end selection optionally with active track `track`. |
-| `startaudiorendering` | (`wav | buffer`) | Request for a downloadable file or web Audio buffer that represent the current work |
+| `startaudiorendering` | `wav` / `buffer` | Request for a downloadable file or web Audio buffer that represent the current work |
 | `automaticscroll` | `true`/`false` | Change property `isAutomaticScroll`. |
 | `continuousplay` | `true`/`false` | Change property `isContinuousPlay`.|
 | `linkendpoints` | `true`/`false` | Change property `linkEndpoints`.|
@@ -381,6 +385,9 @@ Originally created for the [Airtime](https://www.sourcefabric.org/en/airtime/) p
 
 The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber, hoping to make easier and more fun the transcription process of TEDx talks.
 
+## Patreon
+
+Wanting to see a particular feature or blog post? [Consider supporting Waveform Playlist!](https://www.patreon.com/naomiaro)
 
 ## License
 
