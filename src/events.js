@@ -1,13 +1,13 @@
-export automaticscroll(val) => {
+export function automaticscroll(val) {
   this.isAutomaticScroll = val;
-};
+}
 
-export durationformat(format) => {
+export function durationformat(format) {
   this.durationFormat = format;
   this.drawRequest();
-};
+}
 
-export select(start, end, track) => {
+export function select(start, end, track) {
   if (this.isPlaying()) {
     this.lastSeeked = start;
     this.pausedAt = undefined;
@@ -18,98 +18,98 @@ export select(start, end, track) => {
     this.ee.emit('timeupdate', start);
     this.drawRequest();
   }
-};
+}
 
-export startaudiorendering(type) => {
+export function startaudiorendering(type) {
   this.startOfflineRender(type);
-};
+}
 
-export statechange(state) => {
+export function statechange(state) {
   this.setState(state);
   this.drawRequest();
-};
+}
 
-export shift(deltaTime, track) => {
+export function shift(deltaTime, track) {
   track.setStartTime(track.getStartTime() + deltaTime);
   this.adjustDuration();
   this.drawRequest();
-};
+}
 
-export record() => {
+export function record() {
   this.record();
-};
+}
 
-export play(start, end) => {
+export function play(start, end) {
   this.play(start, end);
-};
+}
 
-export pause() => {
+export function pause() {
   this.pause();
-};
+}
 
-export stop() => {
+export function stop() {
   this.stop();
-};
+}
 
-export rewind() => {
+export function rewind() {
   this.rewind();
-};
+}
 
-export fastforward() => {
+export function fastforward() {
   this.fastForward();
-};
+}
 
-export clear() => {
+export function clear() {
   this.clear().then(() => {
     this.drawRequest();
   });
-};
+}
 
-export solo(track) => {
+export function solo(track) {
   this.soloTrack(track);
   this.adjustTrackPlayout();
   this.drawRequest();
-};
+}
 
-export mute(track) => {
+export function mute(track) {
   this.muteTrack(track);
   this.adjustTrackPlayout();
   this.drawRequest();
-};
+}
 
-export volumechange(volume, track) => {
+export function volumechange(volume, track) {
   track.setGainLevel(volume / 100);
-};
+}
 
-export mastervolumechange(volume) => {
+export function mastervolumechange(volume) {
   this.masterGain = volume / 100;
   this.tracks.forEach((track) => {
     track.setMasterGainLevel(this.masterGain);
   });
-};
+}
 
-export fadein(duration, track) => {
+export function fadein(duration, track) {
   track.setFadeIn(duration, this.fadeType);
   this.drawRequest();
-};
+}
 
-export fadeout(duration, track) => {
+export function fadeout(duration, track) {
   track.setFadeOut(duration, this.fadeType);
   this.drawRequest();
-};
+}
 
-export fadetype(type) => {
+export function fadetype(type) {
   this.fadeType = type;
-};
+}
 
-export newtrack(file) => {
+export function newtrack(file) {
   this.load([{
     src: file,
     name: file.name,
   }]);
-};
+}
 
-export trim() => {
+export function trim() {
   const track = this.getActiveTrack();
   const timeSelection = this.getTimeSelection();
 
@@ -118,9 +118,9 @@ export trim() => {
 
   this.setTimeSelection(0, 0);
   this.drawRequest();
-};
+}
 
-export zoomin() => {
+export function zoomin() {
   const zoomIndex = Math.max(0, this.zoomIndex - 1);
   const zoom = this.zoomLevels[zoomIndex];
 
@@ -128,9 +128,9 @@ export zoomin() => {
     this.setZoom(zoom);
     this.drawRequest();
   }
-};
+}
 
-export zoomout() => {
+export function zoomout() {
   const zoomIndex = Math.min(this.zoomLevels.length - 1, this.zoomIndex + 1);
   const zoom = this.zoomLevels[zoomIndex];
 
@@ -138,13 +138,13 @@ export zoomout() => {
     this.setZoom(zoom);
     this.drawRequest();
   }
-};
+}
 
-export scroll() => {
+export function scroll() {
   this.isScrolling = true;
   this.drawRequest();
   clearTimeout(this.scrollTimer);
   this.scrollTimer = setTimeout(() => {
     this.isScrolling = false;
   }, 200);
-};
+}
