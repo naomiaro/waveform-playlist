@@ -56,6 +56,7 @@
     "lodash.assign": "^4.0.0",
     "lodash.defaults": "^4.0.0",
     "lodash.forown": "^4.0.0",
+    "mkdirp": "^0.5.1",
     "mucss": "^1.1.5",
     "uuid": "^2.0.1",
     "virtual-dom": "^2.1.1",
@@ -63,7 +64,7 @@
   },
   "scripts": {
     "clean": "rm -Rf dist && rm -Rf lib && rm -Rf styles",
-    "styles": "mkdir -p styles && cp ghpages/_sass/_playlist.scss styles/playlist.scss",
+    "styles": "mkdirp styles && cp ghpages/_sass/_playlist.scss styles/playlist.scss",
     "compile": "babel src --out-dir lib",
     "jekyll": "jekyll build -s ghpages -d dist/waveform-playlist",
     "jekyll:dev": "jekyll build -s ghpages -d dist/waveform-playlist --watch &",

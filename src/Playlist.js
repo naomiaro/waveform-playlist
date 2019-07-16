@@ -264,6 +264,10 @@ export default class {
       this.drawRequest();
     });
 
+    ee.on('stereopan', (panvalue, track) => {
+      track.setStereoPanValue(panvalue);
+    });
+
     ee.on('fadetype', (type) => {
       this.fadeType = type;
     });
@@ -341,6 +345,7 @@ export default class {
         const peaks = info.peaks || { type: 'WebAudio', mono: this.mono };
         const customClass = info.customClass || undefined;
         const waveOutlineColor = info.waveOutlineColor || undefined;
+        const stereoPan = info.stereoPan || 0;
 
         // webaudio specific playout for now.
         const playout = new Playout(this.ac, audioBuffer);
@@ -377,6 +382,7 @@ export default class {
         track.setPlayout(playout);
 
         track.setGainLevel(gain);
+        track.setStereoPanValue(stereoPan);
 
         if (muted) {
           this.muteTrack(track);
@@ -849,7 +855,7 @@ export default class {
   renderTimeScale() {
     const controlWidth = this.controls.show ? this.controls.width : 0;
     const timeScale = new TimeScale(this.duration, this.scrollLeft,
-      this.samplesPerPixel, this.sampleRate, controlWidth);
+      this.samplesPerPixel, this.sampleRate, controlWidth, this.colors);
 
     return timeScale.render();
   }

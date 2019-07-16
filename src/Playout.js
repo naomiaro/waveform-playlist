@@ -51,6 +51,7 @@ export default class {
         this.fadeGain.disconnect();
         this.volumeGain.disconnect();
         this.shouldPlayGain.disconnect();
+        this.panner.disconnect();
         this.masterGain.disconnect();
 
 
@@ -58,6 +59,7 @@ export default class {
         this.fadeGain = undefined;
         this.volumeGain = undefined;
         this.shouldPlayGain = undefined;
+        this.panner = undefined;
         this.masterGain = undefined;
 
         resolve();
@@ -70,12 +72,14 @@ export default class {
     // used for solo/mute
     this.shouldPlayGain = this.ac.createGain();
     this.masterGain = this.ac.createGain();
+    this.panner = this.ac.createStereoPanner();
 
     this.source.connect(this.fadeGain);
     this.fadeGain.connect(this.volumeGain);
     this.volumeGain.connect(this.shouldPlayGain);
     this.shouldPlayGain.connect(this.masterGain);
-    this.masterGain.connect(this.destination);
+    this.masterGain.connect(this.panner);
+    this.panner.connect(this.destination);
 
     return sourcePromise;
   }
@@ -95,6 +99,12 @@ export default class {
   setMasterGainLevel(level) {
     if (this.masterGain) {
       this.masterGain.gain.value = level;
+    }
+  }
+
+  setStereoPanValue(value) {
+    if (this.panner) {
+      this.panner.pan.value = value === undefined ? 0 : value;
     }
   }
 
