@@ -1,5 +1,10 @@
 language: node_js
 
+dist: xenial
+
+services: 
+  - xvfb
+
 node_js:
   - stable
 
