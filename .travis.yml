@@ -1,5 +1,12 @@
 language: node_js
 
+dist: xenial
+
+services: 
+  - xvfb
+
+sudo: required
+
 node_js:
   - stable
 
@@ -10,8 +17,7 @@ install:
   - npm install
 
 before_script:
-  - export DISPLAY=:99.0
-  - sh -e /etc/init.d/xvfb start
+  - "export DISPLAY=:99.0"
 
 script:
   - npm run eslint
