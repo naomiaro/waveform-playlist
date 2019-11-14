@@ -34,6 +34,7 @@ export default class {
     this.duration = 0;
     this.startTime = 0;
     this.endTime = 0;
+    this.stereoPan = 0;
   }
 
   setEventEmitter(ee) {
@@ -222,6 +223,11 @@ export default class {
     this.playout.setMasterGainLevel(level);
   }
 
+  setStereoPanValue(value) {
+    this.stereoPan = value;
+    this.playout.setStereoPanValue(value);
+  }
+
   /*
     startTime, endTime in seconds (float).
     segment is for a highlighted section in the UI.
@@ -314,6 +320,7 @@ export default class {
     playoutSystem.setVolumeGainLevel(this.gain);
     playoutSystem.setShouldPlay(options.shouldPlay);
     playoutSystem.setMasterGainLevel(options.masterGain);
+    playoutSystem.setStereoPanValue(this.stereoPan);
     playoutSystem.play(when, start, duration);
 
     return sourcePromise;
