@@ -1,8 +1,8 @@
-import { secondsToPixels } from '../utils/conversions';
+import { secondsToPixels } from "../utils/conversions";
 
 /*
-* virtual-dom hook for scrolling the track container.
-*/
+ * virtual-dom hook for scrolling the track container.
+ */
 export default class {
   constructor(playlist) {
     this.playlist = playlist;
@@ -13,9 +13,11 @@ export default class {
     if (!playlist.isScrolling) {
       const el = node;
 
-      if (playlist.isAutomaticScroll) {
+      if (playlist.isAutomaticScroll && node.querySelector(".cursor")) {
         const rect = node.getBoundingClientRect();
-        const cursorRect = node.querySelector('.cursor').getBoundingClientRect();
+        const cursorRect = node
+          .querySelector(".cursor")
+          .getBoundingClientRect();
 
         if (cursorRect.right > rect.right || cursorRect.right < 0) {
           playlist.scrollLeft = playlist.playbackSeconds;
@@ -23,9 +25,9 @@ export default class {
       }
 
       const left = secondsToPixels(
-          playlist.scrollLeft,
-          playlist.samplesPerPixel,
-          playlist.sampleRate,
+        playlist.scrollLeft,
+        playlist.samplesPerPixel,
+        playlist.sampleRate
       );
 
       el.scrollLeft = left;

@@ -72,7 +72,7 @@
     "preversion": "npm run clean",
     "version": "npm run build && git add -A dist",
     "postversion": "git push && git push --tags",
-    "prepublish": "npm run compile && npm run styles",
+    "prepare": "npm run compile && npm run styles",
     "webpack:server": "node_modules/webpack-dev-server/bin/webpack-dev-server.js --content-base dist/ --colors --host 0.0.0.0 --inline",
     "start": "npm run webpack:server",
     "dev": "npm run jekyll:dev && npm run webpack:server",

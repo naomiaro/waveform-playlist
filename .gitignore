@@ -5,3 +5,6 @@
 /lib
 .sass-cache
 /styles
+
+.DS_Store
+test/.DS_Store
