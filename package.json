@@ -42,7 +42,7 @@
     "mocha": "^2.3.4",
     "requirejs": "^2.1.22",
     "webpack": "^1.13.0",
-    "webpack-dev-server": "^1.14.0"
+    "webpack-dev-server": "^3.1.11"
   },
   "directories": {
     "lib": "lib",
