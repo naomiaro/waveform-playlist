@@ -1,4 +1,4 @@
-import { secondsToPixels } from "../utils/conversions";
+import { secondsToPixels, pixelsToSeconds } from "../utils/conversions";
 
 /*
  * virtual-dom hook for scrolling the track container.
@@ -20,7 +20,15 @@ export default class {
           .getBoundingClientRect();
 
         if (cursorRect.right > rect.right || cursorRect.right < 0) {
-          playlist.scrollLeft = playlist.playbackSeconds;
+          const width = pixelsToSeconds(
+            rect.right - rect.left,
+            playlist.samplesPerPixel,
+            playlist.sampleRate
+          );
+          playlist.scrollLeft = Math.min(
+            playlist.playbackSeconds,
+            playlist.duration - width
+          );
         }
       }
 

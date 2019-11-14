@@ -5232,7 +5232,8 @@ var WaveformPlaylist =
 	          var cursorRect = node.querySelector(".cursor").getBoundingClientRect();
 	
 	          if (cursorRect.right > rect.right || cursorRect.right < 0) {
-	            playlist.scrollLeft = playlist.playbackSeconds;
+	            var width = (0, _conversions.pixelsToSeconds)(rect.right - rect.left, playlist.samplesPerPixel, playlist.sampleRate);
+	            playlist.scrollLeft = Math.min(playlist.playbackSeconds, playlist.duration - width);
 	          }
 	        }
 	
