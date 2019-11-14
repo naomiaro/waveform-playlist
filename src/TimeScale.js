@@ -4,12 +4,13 @@ import { secondsToPixels } from './utils/conversions';
 import TimeScaleHook from './render/TimeScaleHook';
 
 class TimeScale {
-  constructor(duration, offset, samplesPerPixel, sampleRate, marginLeft = 0) {
+  constructor(duration, offset, samplesPerPixel, sampleRate, marginLeft = 0, colors) {
     this.duration = duration;
     this.offset = offset;
     this.samplesPerPixel = samplesPerPixel;
     this.sampleRate = sampleRate;
     this.marginLeft = marginLeft;
+    this.colors = colors;
 
     this.timeinfo = {
       20000: {
@@ -139,7 +140,8 @@ class TimeScale {
               height: 30,
               style: 'position: absolute; left: 0; right: 0; top: 0; bottom: 0;',
             },
-            hook: new TimeScaleHook(canvasInfo, this.offset, this.samplesPerPixel, this.duration),
+            hook: new TimeScaleHook(canvasInfo, this.offset, this.samplesPerPixel,
+              this.duration, this.colors),
           },
         ),
       ],
