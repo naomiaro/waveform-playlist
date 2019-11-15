@@ -35,9 +35,9 @@ Waveform Playlist requires webaudio in the browser to function correctly: [Can I
 Starter styles can be found in the npm package download at `waveform-playlist/styles/playlist.scss`
 
 ```javascript
-var WaveformPlaylist = require("waveform-playlist");
+import WaveformPlaylist from 'waveform-playlist';
 
-var playlist = WaveformPlaylist.init({
+var playlist = WaveformPlaylist({
   samplesPerPixel: 3000,
   mono: true,
   waveHeight: 70,
@@ -289,10 +289,10 @@ var options = {
 Waveform Playlist uses an instance of [event-emitter](https://www.npmjs.com/package/event-emitter) to send & receive messages from the playlist.
 
 ```javascript
-var EventEmitter = require("event-emitter");
-var WaveformPlaylist = require("waveform-playlist");
+import EventEmitter from "event-emitter";
+import WaveformPlaylist from "waveform-playlist";
 
-var playlist = WaveformPlaylist.init(
+var playlist = WaveformPlaylist(
   {
     container: document.getElementById("playlist")
   },
