@@ -335,25 +335,24 @@ An example of using the event emitter to control the playlist can be found in [/
 
 #### Events to Listen to
 
-| event                | arguments           | description                                                                    |
-| -------------------- | ------------------- | ------------------------------------------------------------------------------ |
-| `select`             | `start, end, track` | Cursor selection has occurred from `start` to `end` with active Track `track`. |
-| `timeupdate`         | `playbackPosition`  | Sends current position of playout `playbackPosition` in seconds.               |
-| `scroll`             | `scrollLeft`        | Sends current position of scroll `scrollLeft` in seconds.                      |
-| `statechange`        | `state`             | Sends current interaction state `state`.                                       |
-| `shift`              | `deltaTime, track`  | Sends `deltaTime` in seconds change for Track `track`                          |
-| `mute`               | `track`             | Mute button has been pressed for `track`                                       |
-| `solo`               | `track`             | Solo button has been pressed for `track`                                       |
-| `volumechange`       | `volume, track`     | Volume of `track` has changed to `volume` (0-100)                              |
-| `mastervolumechange` | `volume`            | Master volume of the playlist has changed to `volume` (0-100)                  |
-
-| `stereopan` | `panvalue, track` | Pan value of `track` has been changed to `panvalue` |
-| `audiorequeststatechange` | `state, src` | Loading audio `src` (`string` or `File`) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number) |
-| `loadprogress` | `percent, src` | Loading audio `src` has loaded percent `percent` (0-100) |
-| `audiosourcesloaded` | _none_ | Audio decoding has finished for all tracks |
-| `audiosourcesrendered` | _none_ | Tracks are rendered to the playlist |
-| `finished` | _none_ | Event fired when cursor ( while playing ) reaches the end (maximum duration) |
-| `audiorenderingfinished` | `type, data` | Return the result of the rendering in the desired format. `type` can be `buffer` or `wav` and can be used to dertermine the `data` type. When `type` is `wav`, data is a `blob` object that represent the wav file. |
+| event                     | arguments           | description                                                                                                                                                                                                         |
+| ------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `select`                  | `start, end, track` | Cursor selection has occurred from `start` to `end` with active Track `track`.                                                                                                                                      |
+| `timeupdate`              | `playbackPosition`  | Sends current position of playout `playbackPosition` in seconds.                                                                                                                                                    |
+| `scroll`                  | `scrollLeft`        | Sends current position of scroll `scrollLeft` in seconds.                                                                                                                                                           |
+| `statechange`             | `state`             | Sends current interaction state `state`.                                                                                                                                                                            |
+| `shift`                   | `deltaTime, track`  | Sends `deltaTime` in seconds change for Track `track`                                                                                                                                                               |
+| `mute`                    | `track`             | Mute button has been pressed for `track`                                                                                                                                                                            |
+| `solo`                    | `track`             | Solo button has been pressed for `track`                                                                                                                                                                            |
+| `volumechange`            | `volume, track`     | Volume of `track` has changed to `volume` (0-100)                                                                                                                                                                   |
+| `mastervolumechange`      | `volume`            | Master volume of the playlist has changed to `volume` (0-100)                                                                                                                                                       |
+| `audiorequeststatechange` | `state, src`        | Loading audio `src` (`string` or `File`) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number)                                                                |
+| `loadprogress`            | `percent, src`      | Loading audio `src` has loaded percent `percent` (0-100)                                                                                                                                                            |
+| `audiosourcesloaded`      | _none_              | Audio decoding has finished for all tracks                                                                                                                                                                          |
+| `audiosourcesrendered`    | _none_              | Tracks are rendered to the playlist                                                                                                                                                                                 |
+| `finished`                | _none_              | Event fired when cursor ( while playing ) reaches the end (maximum duration)                                                                                                                                        |
+| `audiorenderingfinished`  | `type, data`        | Return the result of the rendering in the desired format. `type` can be `buffer` or `wav` and can be used to dertermine the `data` type. When `type` is `wav`, data is a `blob` object that represent the wav file. |
+| `stereopan` | `panvalue, track` | Pan value of `track` has been changed to `panvalue`|
 
 ## Tests
 
