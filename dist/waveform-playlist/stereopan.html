@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:image" content="https://raw.githubusercontent.com/naomiaro/waveform-playlist/master/img/stemtracks.png">
+  <meta property="og:image:height" content="401">
+  <meta property="og:image:width" content="1039">
+
+  <title>Stereo Panner</title>
+  <meta name="description" content="Change the panning of audio from left to right.">
+
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="/waveform-playlist/css/main.css">
+  <link rel="canonical" href="https://naomiaro.github.io/waveform-playlist/stereopan.html">
+  <link rel="alternate" type="application/rss+xml" title="Waveform Playlist" href="https://naomiaro.github.io/waveform-playlist/feed.xml">
+</head>
+
+
+  <body>
+
+    <header class="site-header">
+
+  <ol class="breadcrumb">
+    <li><a href="/waveform-playlist/">Waveform Playlist</a></li>
+    <li class="active">Stereo Panner</li>
+  </ol>
+
+</header>
+
+
+    <a href="https://github.com/naomiaro/waveform-playlist" style="position: absolute; top: 0; right: 0; border: 0; z-index: 100;"><img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
+
+    <div class="container">
+  <div class="wrapper">
+    <article class="post">
+      <header class="post-header">
+        <h1 class="post-title">Stereo Panner</h1>
+        <p class="lead">Top audio file uses full stereo left pan, bottom audio file uses full stereo right pan.</p>
+      </header>
+      <div class="post-content">
+        <div id="top-bar" class="playlist-top-bar">
+  <div class="playlist-toolbar">
+    <div class="btn-group">
+      <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
+      <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
+      <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
+    </div>
+  </div>
+</div>
+<div id="playlist"></div>
+
+      </div>
+    </article>
+  </div>
+</div>
+
+<footer class="well well-lg">
+  
+  <p>Music: <cite>Starlight</cite> by Muse</p>
+  
+  <p>Waveform Playlist originally written for <a href="https://www.sourcefabric.org/en/airtime">Airtime</a> at <a href="https://www.sourcefabric.org">Sourcefabric</a></p>
+  <p>The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber, hoping to make easier and more fun the transcription process of TEDx talks.</p>
+  <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
+  <p>Licensed under the MIT License</p>
+</footer>
+
+<script src="//code.jquery.com/jquery-2.1.4.min.js"></script>
+<script type="text/javascript" src="js/waveform-playlist.var.js"></script>
+<script type="text/javascript" src="js/stereopan.js"></script>
+<script type="text/javascript" src="js/emitter.js"></script>
+
+
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-62186746-1', 'auto');
+      ga('send', 'pageview');
+
+    </script>
+
+  </body>
+
+</html>
