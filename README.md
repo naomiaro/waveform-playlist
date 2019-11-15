@@ -332,6 +332,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `continuousplay`      | `true`/`false`                                       | Change property `isContinuousPlay`.                                                                                                                                                                  |
 | `linkendpoints`       | `true`/`false`                                       | Change property `linkEndpoints`.                                                                                                                                                                     |
 | `annotationsrequest`  | _none_                                               | Requests to download the annotations to a json file.                                                                                                                                                 |
+| `stereopan` | `panvalue, track` | Set pan value of `track` to `panvalue` (-1-1)|
 
 #### Events to Listen to
 
