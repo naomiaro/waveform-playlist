@@ -346,6 +346,7 @@ export default class {
         const customClass = info.customClass || undefined;
         const waveOutlineColor = info.waveOutlineColor || undefined;
         const stereoPan = info.stereoPan || 0;
+        const loop = info.loop || false;
 
         // webaudio specific playout for now.
         const playout = new Playout(this.ac, audioBuffer);
@@ -383,6 +384,10 @@ export default class {
 
         track.setGainLevel(gain);
         track.setStereoPanValue(stereoPan);
+
+
+        track.setLoop(loop);
+
 
         if (muted) {
           this.muteTrack(track);
