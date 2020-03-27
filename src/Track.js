@@ -228,6 +228,11 @@ export default class {
     this.playout.setStereoPanValue(value);
   }
 
+  setLoop(value) {
+    this.loop = value;
+    this.playout.setLoop(value);
+  }
+
   /*
     startTime, endTime in seconds (float).
     segment is for a highlighted section in the UI.
@@ -249,6 +254,7 @@ export default class {
 
     const options = _assign({}, defaultOptions, config);
     const playoutSystem = options.isOffline ? this.offlinePlayout : this.playout;
+    playoutSystem.setLoop(this.loop);
 
     // 1) track has no content to play.
     // 2) track does not play in this selection.
@@ -283,6 +289,7 @@ export default class {
 
     start += this.cueIn;
     const relPos = startTime - this.startTime;
+
     const sourcePromise = playoutSystem.setUpSource();
 
     // param relPos: cursor position in seconds relative to this track.
@@ -321,7 +328,7 @@ export default class {
     playoutSystem.setShouldPlay(options.shouldPlay);
     playoutSystem.setMasterGainLevel(options.masterGain);
     playoutSystem.setStereoPanValue(this.stereoPan);
-    playoutSystem.play(when, start, duration);
+    playoutSystem.play(when, start, !this.loop ? duration : undefined);
 
     return sourcePromise;
   }
