@@ -74,7 +74,8 @@ export default class {
     // used for solo/mute
     this.shouldPlayGain = this.ac.createGain();
     this.masterGain = this.ac.createGain();
-    this.panner = this.ac.createStereoPanner();
+    // this.panner = this.ac.createStereoPanner();
+    this.panner = this.ac.createPanner();
 
     this.source.connect(this.fadeGain);
     this.fadeGain.connect(this.volumeGain);
@@ -105,9 +106,9 @@ export default class {
   }
 
   setStereoPanValue(value) {
-    if (this.panner) {
-      this.panner.pan.value = value === undefined ? 0 : value;
-    }
+    // if (this.panner) {
+    //   this.panner.pan.value = value === undefined ? 0 : value;
+    // }
   }
 
   setLoop(value) {
