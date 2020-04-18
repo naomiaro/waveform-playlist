@@ -43,6 +43,7 @@ export default class {
   setUpSource() {
     this.source = this.ac.createBufferSource();
     this.source.buffer = this.buffer;
+    this.source.loop = this.loop;
 
     const sourcePromise = new Promise((resolve) => {
       // keep track of the buffer state.
@@ -61,6 +62,7 @@ export default class {
         this.shouldPlayGain = undefined;
         this.panner = undefined;
         this.masterGain = undefined;
+        this.loop = undefined;
 
         resolve();
       };
@@ -72,7 +74,8 @@ export default class {
     // used for solo/mute
     this.shouldPlayGain = this.ac.createGain();
     this.masterGain = this.ac.createGain();
-    this.panner = this.ac.createStereoPanner();
+    // this.panner = this.ac.createStereoPanner();
+    this.panner = this.ac.createPanner();
 
     this.source.connect(this.fadeGain);
     this.fadeGain.connect(this.volumeGain);
@@ -103,9 +106,13 @@ export default class {
   }
 
   setStereoPanValue(value) {
-    if (this.panner) {
-      this.panner.pan.value = value === undefined ? 0 : value;
-    }
+    // if (this.panner) {
+    //   this.panner.pan.value = value === undefined ? 0 : value;
+    // }
+  }
+
+  setLoop(value) {
+    this.loop = value;
   }
 
   /*

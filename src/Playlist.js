@@ -346,6 +346,7 @@ export default class {
         const customClass = info.customClass || undefined;
         const waveOutlineColor = info.waveOutlineColor || undefined;
         const stereoPan = info.stereoPan || 0;
+        const loop = info.loop || false;
 
         // webaudio specific playout for now.
         const playout = new Playout(this.ac, audioBuffer);
@@ -383,6 +384,10 @@ export default class {
 
         track.setGainLevel(gain);
         track.setStereoPanValue(stereoPan);
+
+
+        track.setLoop(loop);
+
 
         if (muted) {
           this.muteTrack(track);
@@ -455,7 +460,9 @@ export default class {
     /*
       TODO cleanup of different audio playouts handling.
     */
-    this.offlineAudioContext.startRendering().then((audioBuffer) => {
+    this.offlineAudioContext.startRendering();
+    this.offlineAudioContext.oncomplete = (e) => {
+      const audioBuffer = e.renderedBuffer;
       if (type === 'buffer') {
         this.ee.emit('audiorenderingfinished', type, audioBuffer);
         this.isRendering = false;
@@ -496,9 +503,7 @@ export default class {
           type: 'audio/wav',
         });
       }
-    }).catch((e) => {
-      throw e;
-    });
+    };
   }
 
   getTimeSelection() {
