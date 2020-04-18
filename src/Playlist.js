@@ -460,7 +460,7 @@ export default class {
     /*
       TODO cleanup of different audio playouts handling.
     */
-
+    this.offlineAudioContext.startRendering();
     this.offlineAudioContext.oncomplete = (e) => {
       const audioBuffer = e.renderedBuffer;
       if (type === 'buffer') {
