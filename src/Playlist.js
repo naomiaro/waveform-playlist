@@ -460,7 +460,9 @@ export default class {
     /*
       TODO cleanup of different audio playouts handling.
     */
-    this.offlineAudioContext.startRendering().then((audioBuffer) => {
+
+    this.offlineAudioContext.oncomplete = (e) => {
+      const audioBuffer = e.renderedBuffer;
       if (type === 'buffer') {
         this.ee.emit('audiorenderingfinished', type, audioBuffer);
         this.isRendering = false;
@@ -501,9 +503,7 @@ export default class {
           type: 'audio/wav',
         });
       }
-    }).catch((e) => {
-      throw e;
-    });
+    };
   }
 
   getTimeSelection() {
