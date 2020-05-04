@@ -7949,7 +7949,7 @@ var WaveformPlaylist =
 	      // used for solo/mute
 	      this.shouldPlayGain = this.ac.createGain();
 	      this.masterGain = this.ac.createGain();
-	      this.panner = this.ac.createStereoPanner();
+	      this.panner = this.ac.createStereoPanner !== undefined ? this.ac.createStereoPanner() : this.ac.createPanner();
 	
 	      this.source.connect(this.fadeGain);
 	      this.fadeGain.connect(this.volumeGain);
@@ -7984,8 +7984,15 @@ var WaveformPlaylist =
 	  }, {
 	    key: 'setStereoPanValue',
 	    value: function setStereoPanValue(value) {
+	      var pan = value === undefined ? 0 : value;
+	
 	      if (this.panner) {
-	        this.panner.pan.value = value === undefined ? 0 : value;
+	        if (this.panner.pan !== undefined) {
+	          this.panner.pan.value = pan;
+	        } else {
+	          this.panner.panningModel = 'equalpower';
+	          this.panner.setPosition(pan, 0, 1 - Math.abs(pan));
+	        }
 	      }
 	    }
 	
