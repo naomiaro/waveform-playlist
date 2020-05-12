@@ -1751,7 +1751,7 @@ var WaveformPlaylist =
 	
 	        // throttle peaks calculation
 	        if (!_this.working) {
-	          var recording = new Blob(_this.chunks, { type: e.data.type });
+	          var recording = new Blob(_this.chunks, { type: 'audio/ogg; codecs=opus' });
 	          var loader = _LoaderFactory2.default.createLoader(recording, _this.ac);
 	          loader.load().then(function (audioBuffer) {
 	            // ask web worker for peaks.
