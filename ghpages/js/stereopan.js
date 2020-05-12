@@ -14,12 +14,12 @@ playlist
     {
       name: 'Left Panned Track',
       src: 'media/audio/PianoSynth30.mp3',
-      stereopan: -1,
+      stereoPan: -1,
     },
     {
       name: 'Right Panned Track',
       src: 'media/audio/BassDrums30.mp3',
-      stereopan: 1,
+      stereoPan: 1,
     },
   ])
   .then(() => {
