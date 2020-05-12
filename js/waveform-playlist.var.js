@@ -5985,6 +5985,7 @@ var WaveformPlaylist =
 	      var endX = (0, _conversions.secondsToPixels)(this.endTime, data.resolution, data.sampleRate);
 	      var progressWidth = 0;
 	      var numChan = this.peaks.data.length;
+	      var scale = window.devicePixelRatio;
 	
 	      if (playbackX > 0 && playbackX > startX) {
 	        if (playbackX < endX) {
@@ -6016,11 +6017,11 @@ var WaveformPlaylist =
 	
 	          channelChildren.push((0, _h2.default)('canvas', {
 	            attributes: {
-	              width: currentWidth,
-	              height: data.height,
-	              style: 'float: left; position: relative; margin: 0; padding: 0; z-index: 3;'
+	              width: currentWidth * scale,
+	              height: data.height * scale,
+	              style: 'float: left; position: relative; margin: 0; padding: 0; z-index: 3; width: ' + currentWidth + 'px; height: ' + data.height + 'px;'
 	            },
-	            hook: new _CanvasHook2.default(peaks, offset, _this3.peaks.bits, canvasColor)
+	            hook: new _CanvasHook2.default(peaks, offset, _this3.peaks.bits, canvasColor, scale)
 	          }));
 	
 	          totalWidth -= currentWidth;
@@ -7646,7 +7647,7 @@ var WaveformPlaylist =
 	* virtual-dom hook for drawing to the canvas element.
 	*/
 	var CanvasHook = function () {
-	  function CanvasHook(peaks, offset, bits, color) {
+	  function CanvasHook(peaks, offset, bits, color, scale) {
 	    _classCallCheck(this, CanvasHook);
 	
 	    this.peaks = peaks;
@@ -7654,6 +7655,7 @@ var WaveformPlaylist =
 	    this.offset = offset;
 	    this.color = color;
 	    this.bits = bits;
+	    this.scale = scale;
 	  }
 	
 	  _createClass(CanvasHook, [{
@@ -7664,13 +7666,15 @@ var WaveformPlaylist =
 	        return;
 	      }
 	
-	      var len = canvas.width;
+	      var scale = this.scale;
+	      var len = canvas.width / scale;
 	      var cc = canvas.getContext('2d');
-	      var h2 = canvas.height / 2;
+	      var h2 = canvas.height / scale / 2;
 	      var maxValue = Math.pow(2, this.bits - 1);
 	
 	      cc.clearRect(0, 0, canvas.width, canvas.height);
 	      cc.fillStyle = this.color;
+	      cc.scale(scale, scale);
 	
 	      for (var i = 0; i < len; i += 1) {
 	        var minPeak = this.peaks[(i + this.offset) * 2] / maxValue;
