@@ -79,6 +79,8 @@ export default class {
           this.recordingTrack.setBuffer(audioBuffer);
           this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
           this.adjustDuration();
+        }).catch((err) => {
+          this.working = false;
         });
         this.working = true;
       }
