@@ -22,7 +22,7 @@ export default class extends Loader {
 
         decoderPromise.then((audioBuffer) => {
           resolve(audioBuffer);
-        });
+        }).catch(reject);
       });
 
       xhr.addEventListener('error', () => {
