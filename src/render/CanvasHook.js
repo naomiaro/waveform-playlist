@@ -2,12 +2,13 @@
 * virtual-dom hook for drawing to the canvas element.
 */
 class CanvasHook {
-  constructor(peaks, offset, bits, color) {
+  constructor(peaks, offset, bits, color, scale) {
     this.peaks = peaks;
     // http://stackoverflow.com/questions/6081483/maximum-size-of-a-canvas-element
     this.offset = offset;
     this.color = color;
     this.bits = bits;
+    this.scale = scale;
   }
 
   static drawFrame(cc, h2, x, minPeak, maxPeak) {
@@ -27,13 +28,15 @@ class CanvasHook {
       return;
     }
 
-    const len = canvas.width;
+    const scale = this.scale;
+    const len = canvas.width / scale;
     const cc = canvas.getContext('2d');
-    const h2 = canvas.height / 2;
+    const h2 = canvas.height / scale / 2;
     const maxValue = 2 ** (this.bits - 1);
 
     cc.clearRect(0, 0, canvas.width, canvas.height);
     cc.fillStyle = this.color;
+    cc.scale(scale, scale);
 
     for (let i = 0; i < len; i += 1) {
       const minPeak = this.peaks[(i + this.offset) * 2] / maxValue;

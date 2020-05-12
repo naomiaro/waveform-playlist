@@ -405,6 +405,7 @@ export default class {
     const endX = secondsToPixels(this.endTime, data.resolution, data.sampleRate);
     let progressWidth = 0;
     const numChan = this.peaks.data.length;
+    const scale = window.devicePixelRatio;
 
     if (playbackX > 0 && playbackX > startX) {
       if (playbackX < endX) {
@@ -442,11 +443,11 @@ export default class {
 
         channelChildren.push(h('canvas', {
           attributes: {
-            width: currentWidth,
-            height: data.height,
-            style: 'float: left; position: relative; margin: 0; padding: 0; z-index: 3;',
+            width: currentWidth * scale,
+            height: data.height * scale,
+            style: `float: left; position: relative; margin: 0; padding: 0; z-index: 3; width: ${currentWidth}px; height: ${data.height}px;`,
           },
-          hook: new CanvasHook(peaks, offset, this.peaks.bits, canvasColor),
+          hook: new CanvasHook(peaks, offset, this.peaks.bits, canvasColor, scale),
         }));
 
         totalWidth -= currentWidth;
