@@ -67,7 +67,7 @@ export default class {
 
       // throttle peaks calculation
       if (!this.working) {
-        const recording = new Blob(this.chunks, { type: 'audio/ogg; codecs=opus' });
+        const recording = new Blob(this.chunks, { type: e.data.type });
         const loader = LoaderFactory.createLoader(recording, this.ac);
         loader.load().then((audioBuffer) => {
           // ask web worker for peaks.
@@ -79,7 +79,7 @@ export default class {
           this.recordingTrack.setBuffer(audioBuffer);
           this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
           this.adjustDuration();
-        }).catch((err) => {
+        }).catch(() => {
           this.working = false;
         });
         this.working = true;

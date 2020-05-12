@@ -1751,7 +1751,7 @@ var WaveformPlaylist =
 	
 	        // throttle peaks calculation
 	        if (!_this.working) {
-	          var recording = new Blob(_this.chunks, { type: 'audio/ogg; codecs=opus' });
+	          var recording = new Blob(_this.chunks, { type: e.data.type });
 	          var loader = _LoaderFactory2.default.createLoader(recording, _this.ac);
 	          loader.load().then(function (audioBuffer) {
 	            // ask web worker for peaks.
@@ -1763,6 +1763,8 @@ var WaveformPlaylist =
 	            _this.recordingTrack.setBuffer(audioBuffer);
 	            _this.recordingTrack.setPlayout(new _Playout2.default(_this.ac, audioBuffer));
 	            _this.adjustDuration();
+	          }).catch(function () {
+	            _this.working = false;
 	          });
 	          _this.working = true;
 	        }
@@ -5020,7 +5022,7 @@ var WaveformPlaylist =
 	
 	            decoderPromise.then(function (audioBuffer) {
 	              resolve(audioBuffer);
-	            });
+	            }).catch(reject);
 	          });
 	
 	          fr.addEventListener('error', function (err) {
@@ -5185,7 +5187,7 @@ var WaveformPlaylist =
 	
 	          decoderPromise.then(function (audioBuffer) {
 	            resolve(audioBuffer);
-	          });
+	          }).catch(reject);
 	        });
 	
 	        xhr.addEventListener('error', function () {
@@ -7869,6 +7871,7 @@ var WaveformPlaylist =
 	    this.gain = 1;
 	    this.buffer = buffer;
 	    this.destination = this.ac.destination;
+	    this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
 	  }
 	
 	  _createClass(_class, [{
@@ -7910,8 +7913,9 @@ var WaveformPlaylist =
 	    }
 	  }, {
 	    key: 'setAudioContext',
-	    value: function setAudioContext(audioContext) {
-	      this.ac = audioContext;
+	    value: function setAudioContext(ac) {
+	      this.ac = ac;
+	      this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
 	      this.destination = this.ac.destination;
 	    }
 	  }, {
@@ -7949,7 +7953,8 @@ var WaveformPlaylist =
 	      // used for solo/mute
 	      this.shouldPlayGain = this.ac.createGain();
 	      this.masterGain = this.ac.createGain();
-	      this.panner = this.ac.createStereoPanner !== undefined ? this.ac.createStereoPanner() : this.ac.createPanner();
+	
+	      this.panner = this.ac.createStereoPanner();
 	
 	      this.source.connect(this.fadeGain);
 	      this.fadeGain.connect(this.volumeGain);

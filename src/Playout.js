@@ -7,6 +7,7 @@ export default class {
     this.gain = 1;
     this.buffer = buffer;
     this.destination = this.ac.destination;
+    this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
   }
 
   applyFade(type, start, duration, shape = 'logarithmic') {
@@ -35,8 +36,9 @@ export default class {
     return this.buffer.duration;
   }
 
-  setAudioContext(audioContext) {
-    this.ac = audioContext;
+  setAudioContext(ac) {
+    this.ac = ac;
+    this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
     this.destination = this.ac.destination;
   }
 
@@ -72,7 +74,8 @@ export default class {
     // used for solo/mute
     this.shouldPlayGain = this.ac.createGain();
     this.masterGain = this.ac.createGain();
-    this.panner = this.ac.createStereoPanner !== undefined ? this.ac.createStereoPanner() : this.ac.createPanner();
+
+    this.panner = this.ac.createStereoPanner();
 
     this.source.connect(this.fadeGain);
     this.fadeGain.connect(this.volumeGain);
@@ -106,7 +109,7 @@ export default class {
     const pan = value === undefined ? 0 : value;
 
     if (this.panner) {
-      if ( this.panner.pan !== undefined ) {
+      if (this.panner.pan !== undefined) {
         this.panner.pan.value = pan;
       } else {
         this.panner.panningModel = 'equalpower';
