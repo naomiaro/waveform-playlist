@@ -5116,9 +5116,7 @@ var WaveformPlaylist =
 	          _this.setStateChange(STATE_FINISHED);
 	
 	          resolve(audioBuffer);
-	        }, function (err) {
-	          reject(err);
-	        });
+	        }, reject);
 	      });
 	    }
 	  }]);

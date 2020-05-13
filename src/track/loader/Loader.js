@@ -47,9 +47,7 @@ export default class {
 
           resolve(audioBuffer);
         },
-        (err) => {
-          reject(err);
-        },
+        reject,
       );
     });
   }

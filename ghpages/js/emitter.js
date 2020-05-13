@@ -362,7 +362,7 @@ ee.on("audiosourcesrendered", function() {
 });
 
 ee.on("audiosourceserror", function(e) {
-  displayLoadingData(e);
+  displayLoadingData(e.message);
 });
 
 ee.on('audiorenderingfinished', function (type, data) {
