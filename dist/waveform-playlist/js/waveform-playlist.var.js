@@ -5024,12 +5024,17 @@ var WaveformPlaylist =
 	
 	            decoderPromise.then(function (audioBuffer) {
 	              resolve(audioBuffer);
-	            }).catch(reject);
+	            }).catch(function (err) {
+	              // problem on Safari with null error.
+	              if (err === null) {
+	                reject(Error('Couldn\'t decode ' + _this2.src.type));
+	              } else {
+	                reject(err);
+	              }
+	            });
 	          });
 	
-	          fr.addEventListener('error', function (err) {
-	            reject(err);
-	          });
+	          fr.addEventListener('error', reject);
 	        } else {
 	          reject(Error('Unsupported file type ' + _this2.src.type));
 	        }
