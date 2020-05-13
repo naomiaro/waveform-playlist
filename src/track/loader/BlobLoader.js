@@ -23,14 +23,7 @@ export default class extends Loader {
 
           decoderPromise.then((audioBuffer) => {
             resolve(audioBuffer);
-          }).catch((err) => {
-            // problem on Safari with null error.
-            if (err === null) {
-              reject(Error(`Couldn't decode ${this.src.type}`));
-            } else {
-              reject(err);
-            }
-          });
+          }).catch(reject);
         });
 
         fr.addEventListener('error', reject);

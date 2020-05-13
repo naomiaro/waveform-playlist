@@ -5024,14 +5024,7 @@ var WaveformPlaylist =
 	
 	            decoderPromise.then(function (audioBuffer) {
 	              resolve(audioBuffer);
-	            }).catch(function (err) {
-	              // problem on Safari with null error.
-	              if (err === null) {
-	                reject(Error('Couldn\'t decode ' + _this2.src.type));
-	              } else {
-	                reject(err);
-	              }
-	            });
+	            }).catch(reject);
 	          });
 	
 	          fr.addEventListener('error', reject);
@@ -5121,7 +5114,14 @@ var WaveformPlaylist =
 	          _this.setStateChange(STATE_FINISHED);
 	
 	          resolve(audioBuffer);
-	        }, reject);
+	        }, function (err) {
+	          if (err === null) {
+	            // Safari issues with null error
+	            reject(Error('MediaDecodeAudioDataUnknownContentType'));
+	          } else {
+	            reject(err);
+	          }
+	        });
 	      });
 	    }
 	  }]);

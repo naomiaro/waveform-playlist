@@ -47,7 +47,14 @@ export default class {
 
           resolve(audioBuffer);
         },
-        reject,
+        (err) => {
+          if (err === null) {
+            // Safari issues with null error
+            reject(Error('MediaDecodeAudioDataUnknownContentType'));
+          } else {
+            reject(err);
+          }
+        },
       );
     });
   }
