@@ -361,6 +361,10 @@ ee.on("audiosourcesrendered", function() {
   displayLoadingData("Tracks have been rendered");
 });
 
+ee.on("audiosourceserror", function(e) {
+  displayLoadingData(e);
+});
+
 ee.on('audiorenderingfinished', function (type, data) {
   if (type == 'wav'){
     if (downloadUrl) {

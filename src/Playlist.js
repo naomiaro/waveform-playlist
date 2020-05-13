@@ -405,6 +405,8 @@ export default class {
       this.draw(this.render());
 
       this.ee.emit('audiosourcesrendered');
+    }).catch((e) => {
+      this.ee.emit('audiosourceserror', e);
     });
   }
 
