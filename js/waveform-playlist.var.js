@@ -5027,9 +5027,7 @@ var WaveformPlaylist =
 	            }).catch(reject);
 	          });
 	
-	          fr.addEventListener('error', function (err) {
-	            reject(err);
-	          });
+	          fr.addEventListener('error', reject);
 	        } else {
 	          reject(Error('Unsupported file type ' + _this2.src.type));
 	        }
@@ -5116,7 +5114,14 @@ var WaveformPlaylist =
 	          _this.setStateChange(STATE_FINISHED);
 	
 	          resolve(audioBuffer);
-	        }, reject);
+	        }, function (err) {
+	          if (err === null) {
+	            // Safari issues with null error
+	            reject(Error('MediaDecodeAudioDataUnknownContentType'));
+	          } else {
+	            reject(err);
+	          }
+	        });
 	      });
 	    }
 	  }]);
