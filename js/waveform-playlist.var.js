@@ -2102,6 +2102,8 @@ var WaveformPlaylist =
 	        _this3.draw(_this3.render());
 	
 	        _this3.ee.emit('audiosourcesrendered');
+	      }).catch(function (e) {
+	        _this3.ee.emit('audiosourceserror', e);
 	      });
 	    }
 	
@@ -5114,9 +5116,7 @@ var WaveformPlaylist =
 	          _this.setStateChange(STATE_FINISHED);
 	
 	          resolve(audioBuffer);
-	        }, function (err) {
-	          reject(err);
-	        });
+	        }, reject);
 	      });
 	    }
 	  }]);
