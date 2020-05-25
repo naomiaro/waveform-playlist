@@ -202,7 +202,7 @@ var options = {
 
 ```javascript
 {
-  // a media path for XHR or a File object.
+  // a media path for XHR, a Blob, a File, or an AudioBuffer object.
   src: 'media/audio/BassDrums30.mp3',
 
   // name that will display in the playlist control panel.
