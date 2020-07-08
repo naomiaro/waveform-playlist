@@ -2,11 +2,14 @@
 
 Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a multiple track playlist editor written in ES2015 using the [Web Audio API](http://webaudio.github.io/web-audio-api/).
 
+If you would like to help support the project please buy me a coffee using Ko-fi [DONATIONS :heart: :coffee: ](https://ko-fi.com/naomiaro)
+
+If you are looking for additional support or features, please consider pledging on [PATREON](https://www.patreon.com/naomiaro) to help the work!
+
 [![npm](https://img.shields.io/npm/dm/waveform-playlist.svg)](https://www.npmjs.com/package/waveform-playlist)
 [![Build Status](https://travis-ci.org/naomiaro/waveform-playlist.svg)](https://travis-ci.org/naomiaro/waveform-playlist)
 [![Coverage Status](https://coveralls.io/repos/naomiaro/waveform-playlist/badge.svg?branch=master&service=github)](https://coveralls.io/github/naomiaro/waveform-playlist?branch=master)
 
-[NOW ON PATREON!](https://www.patreon.com/naomiaro) If you are looking for additional support or features, please consider pledging to help the work!
 
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
 I've written up some demos on github for the different [audio fade types](https://github.com/naomiaro/Web-Audio-Fades) in the project.
