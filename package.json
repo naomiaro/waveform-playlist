@@ -1,5 +1,5 @@
 {
-  "name": "waveform-playlist",
+  "name": "waveform-playlist-max",
   "description": "Multiple track web audio editor and player with waveform preview",
   "version": "3.1.0",
   "main": "lib/app.js",
@@ -82,7 +82,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/naomiaro/waveform-playlist.git"
+    "url": "git+https://github.com/vasinl124/waveform-playlist.git"
   },
   "keywords": [
     "waveform",
