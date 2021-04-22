@@ -126,7 +126,7 @@ class AnnotationList {
       attributes: {
         style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
         draggable: true,
-      }
+      },
     };
     const handler = this.resizeHandlers[i * 2];
 
@@ -143,7 +143,7 @@ class AnnotationList {
       attributes: {
         style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
         draggable: true,
-      }
+      },
     };
     const handler = this.resizeHandlers[(i * 2) + 1];
 
