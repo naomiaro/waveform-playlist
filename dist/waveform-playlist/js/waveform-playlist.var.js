@@ -5240,14 +5240,15 @@ var WaveformPlaylist =
 	      if (!playlist.isScrolling) {
 	        var el = node;
 	
-	        if (playlist.isAutomaticScroll && node.querySelector('.cursor')) {
+	        if (playlist.isAutomaticScroll) {
 	          var rect = node.getBoundingClientRect();
-	          var cursorRect = node.querySelector('.cursor').getBoundingClientRect();
+	          var controlWidth = playlist.controls.show ? playlist.controls.width : 0;
+	          var width = (0, _conversions.pixelsToSeconds)(rect.width - controlWidth, playlist.samplesPerPixel, playlist.sampleRate);
 	
-	          if (cursorRect.right > rect.right || cursorRect.right < 0) {
-	            var controlWidth = playlist.controls.show ? playlist.controls.width : 0;
-	            var width = (0, _conversions.pixelsToSeconds)(rect.right - rect.left, playlist.samplesPerPixel, playlist.sampleRate);
-	            playlist.scrollLeft = Math.min(playlist.playbackSeconds, playlist.duration - (width - controlWidth));
+	          var timePoint = playlist.isPlaying() ? playlist.playbackSeconds : playlist.getTimeSelection().start;
+	
+	          if (timePoint < playlist.scrollLeft || timePoint >= playlist.scrollLeft + width) {
+	            playlist.scrollLeft = Math.min(timePoint, playlist.duration - width);
 	          }
 	        }
 	
@@ -8208,10 +8209,12 @@ var WaveformPlaylist =
 	    key: 'renderResizeLeft',
 	    value: function renderResizeLeft(i) {
 	      var events = _DragInteraction2.default.getEvents();
-	      var config = { attributes: {
+	      var config = {
+	        attributes: {
 	          style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
 	          draggable: true
-	        } };
+	        }
+	      };
 	      var handler = this.resizeHandlers[i * 2];
 	
 	      events.forEach(function (event) {
@@ -8224,10 +8227,12 @@ var WaveformPlaylist =
 	    key: 'renderResizeRight',
 	    value: function renderResizeRight(i) {
 	      var events = _DragInteraction2.default.getEvents();
-	      var config = { attributes: {
+	      var config = {
+	        attributes: {
 	          style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
 	          draggable: true
-	        } };
+	        }
+	      };
 	      var handler = this.resizeHandlers[i * 2 + 1];
 	
 	      events.forEach(function (event) {
@@ -8282,10 +8287,15 @@ var WaveformPlaylist =
 	          }
 	        }, [_this4.renderResizeLeft(i), (0, _h2.default)('span.id', {
 	          onclick: function onclick() {
+	            var start = _this4.annotations[i].start;
+	            var end = _this4.annotations[i].end;
+	
 	            if (_this4.playlist.isContinuousPlay) {
-	              _this4.playlist.ee.emit('play', _this4.annotations[i].start);
+	              _this4.playlist.seek(start, start);
+	              _this4.playlist.ee.emit('play', start);
 	            } else {
-	              _this4.playlist.ee.emit('play', _this4.annotations[i].start, _this4.annotations[i].end);
+	              _this4.playlist.seek(start, end);
+	              _this4.playlist.ee.emit('play', start, end);
 	            }
 	          }
 	        }, [note.id]), _this4.renderResizeRight(i)]);

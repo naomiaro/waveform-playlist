@@ -13,25 +13,26 @@ export default class {
     if (!playlist.isScrolling) {
       const el = node;
 
-      if (playlist.isAutomaticScroll && node.querySelector('.cursor')) {
+      if (playlist.isAutomaticScroll) {
         const rect = node.getBoundingClientRect();
-        const cursorRect = node
-          .querySelector('.cursor')
-          .getBoundingClientRect();
+        const controlWidth = playlist.controls.show
+          ? playlist.controls.width
+          : 0;
+        const width = pixelsToSeconds(
+          rect.width - controlWidth,
+          playlist.samplesPerPixel,
+          playlist.sampleRate,
+        );
 
-        if (cursorRect.right > rect.right || cursorRect.right < 0) {
-          const controlWidth = playlist.controls.show
-            ? playlist.controls.width
-            : 0;
-          const width = pixelsToSeconds(
-            rect.right - rect.left,
-            playlist.samplesPerPixel,
-            playlist.sampleRate,
-          );
-          playlist.scrollLeft = Math.min(
-            playlist.playbackSeconds,
-            playlist.duration - (width - controlWidth),
-          );
+        const timePoint = playlist.isPlaying()
+          ? playlist.playbackSeconds
+          : playlist.getTimeSelection().start;
+
+        if (
+          timePoint < playlist.scrollLeft ||
+          timePoint >= playlist.scrollLeft + width
+        ) {
+          playlist.scrollLeft = Math.min(timePoint, playlist.duration - width);
         }
       }
 

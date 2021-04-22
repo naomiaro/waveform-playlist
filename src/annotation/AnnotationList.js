@@ -122,10 +122,12 @@ class AnnotationList {
 
   renderResizeLeft(i) {
     const events = DragInteraction.getEvents();
-    const config = { attributes: {
-      style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
-      draggable: true,
-    } };
+    const config = {
+      attributes: {
+        style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
+        draggable: true,
+      },
+    };
     const handler = this.resizeHandlers[i * 2];
 
     events.forEach((event) => {
@@ -137,10 +139,12 @@ class AnnotationList {
 
   renderResizeRight(i) {
     const events = DragInteraction.getEvents();
-    const config = { attributes: {
-      style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
-      draggable: true,
-    } };
+    const config = {
+      attributes: {
+        style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
+        draggable: true,
+      },
+    };
     const handler = this.resizeHandlers[(i * 2) + 1];
 
     events.forEach((event) => {
@@ -196,10 +200,15 @@ class AnnotationList {
             h('span.id',
               {
                 onclick: () => {
+                  const start = this.annotations[i].start;
+                  const end = this.annotations[i].end;
+
                   if (this.playlist.isContinuousPlay) {
-                    this.playlist.ee.emit('play', this.annotations[i].start);
+                    this.playlist.seek(start, start);
+                    this.playlist.ee.emit('play', start);
                   } else {
-                    this.playlist.ee.emit('play', this.annotations[i].start, this.annotations[i].end);
+                    this.playlist.seek(start, end);
+                    this.playlist.ee.emit('play', start, end);
                   }
                 },
               },
