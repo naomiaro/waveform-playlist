@@ -72,6 +72,9 @@ class FadeCanvasHook {
     const len = curve.length;
     let y = height - (curve[0] * height);
 
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+
     ctx.strokeStyle = 'black';
     ctx.beginPath();
     ctx.moveTo(0, y);
@@ -81,6 +84,7 @@ class FadeCanvasHook {
       ctx.lineTo(i, y);
     }
     ctx.stroke();
+    ctx.restore();
   }
 }
 
