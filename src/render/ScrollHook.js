@@ -13,25 +13,33 @@ export default class {
     if (!playlist.isScrolling) {
       const el = node;
 
-      if (playlist.isAutomaticScroll && node.querySelector('.cursor')) {
+      if (playlist.isAutomaticScroll) {
         const rect = node.getBoundingClientRect();
-        const cursorRect = node
-          .querySelector('.cursor')
-          .getBoundingClientRect();
+        const controlWidth = playlist.controls.show
+          ? playlist.controls.width
+          : 0;
+        const width = pixelsToSeconds(
+          rect.width - controlWidth,
+          playlist.samplesPerPixel,
+          playlist.sampleRate,
+        );
 
-        if (cursorRect.right > rect.right || cursorRect.right < 0) {
-          const controlWidth = playlist.controls.show
-            ? playlist.controls.width
-            : 0;
-          const width = pixelsToSeconds(
-            rect.right - rect.left,
-            playlist.samplesPerPixel,
-            playlist.sampleRate,
-          );
-          playlist.scrollLeft = Math.min(
-            playlist.playbackSeconds,
-            playlist.duration - (width - controlWidth),
-          );
+        if (playlist.isPlaying()) {
+          if (playlist.playbackSeconds < playlist.scrollLeft || playlist.playbackSeconds >= (playlist.scrollLeft + width)) {
+            playlist.scrollLeft = Math.min(
+              playlist.playbackSeconds,
+              playlist.duration - width,
+            );
+          }
+        } else {
+          const selection = playlist.getTimeSelection();
+
+          if (selection.start < playlist.scrollLeft || selection.start >= (playlist.scrollLeft + width)) {
+            playlist.scrollLeft = Math.min(
+              selection.start,
+              playlist.duration - width,
+            );
+          }
         }
       }
 
