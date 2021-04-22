@@ -24,7 +24,7 @@ class CanvasHook {
   hook(canvas, prop, prev) {
     // canvas is up to date
     if (prev !== undefined &&
-      (prev.peaks === this.peaks)) {
+      (prev.peaks === this.peaks) && (prev.scale === this.scale)) {
       return;
     }
 
@@ -35,6 +35,8 @@ class CanvasHook {
     const maxValue = 2 ** (this.bits - 1);
 
     cc.clearRect(0, 0, canvas.width, canvas.height);
+
+    cc.save();
     cc.fillStyle = this.color;
     cc.scale(scale, scale);
 
@@ -43,6 +45,8 @@ class CanvasHook {
       const maxPeak = this.peaks[((i + this.offset) * 2) + 1] / maxValue;
       CanvasHook.drawFrame(cc, h2, i, minPeak, maxPeak);
     }
+
+    cc.restore();
   }
 }
 
