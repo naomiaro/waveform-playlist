@@ -388,7 +388,6 @@ export default class {
               min: 0,
               max: 100,
               value: 100,
-              title: `${this.gain * 100}%`,
             },
             hook: new VolumeSliderHook(this.gain),
             oninput: (e) => {
@@ -403,7 +402,6 @@ export default class {
               min: -100,
               max: 100,
               value: 100,
-              title: `${this.stereoPan}`,
             },
             hook: new StereoPanSliderHook(this.stereoPan),
             oninput: (e) => {

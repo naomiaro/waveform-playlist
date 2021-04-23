@@ -247,6 +247,7 @@ export default class {
 
     ee.on('volumechange', (volume, track) => {
       track.setGainLevel(volume / 100);
+      this.drawRequest();
     });
 
     ee.on('mastervolumechange', (volume) => {
@@ -268,6 +269,7 @@ export default class {
 
     ee.on('stereopan', (panvalue, track) => {
       track.setStereoPanValue(panvalue);
+      this.drawRequest();
     });
 
     ee.on('fadetype', (type) => {

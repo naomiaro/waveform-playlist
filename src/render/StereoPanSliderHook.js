@@ -9,6 +9,16 @@ export default class {
 
   hook(stereoPanInput) {
     stereoPanInput.value = this.stereoPan * 100;
-    stereoPanInput.title = this.stereoPan;
+
+    let panOrientation;
+    if (this.stereoPan === 0) {
+      panOrientation = 'Center';
+    } else if (this.stereoPan < 0) {
+      panOrientation = 'Left';
+    } else {
+      panOrientation = 'Right';
+    }
+    const percentage = `${Math.abs(this.stereoPan * 100)}% `;
+    stereoPanInput.title = `Pan: ${this.stereoPan !== 0 ? percentage : ''}${panOrientation}`;
   }
 }
