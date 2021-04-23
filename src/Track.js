@@ -405,7 +405,7 @@ export default class {
     const endX = secondsToPixels(this.endTime, data.resolution, data.sampleRate);
     let progressWidth = 0;
     const numChan = this.peaks.data.length;
-    const scale = window.devicePixelRatio;
+    const scale = Math.floor(window.devicePixelRatio);
 
     if (playbackX > 0 && playbackX > startX) {
       if (playbackX < endX) {
