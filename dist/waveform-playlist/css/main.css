@@ -2,7 +2,7 @@
 
 .playlist .playlist-time-scale { height: 30px; }
 
-.playlist .playlist-tracks { background: #E0EFF1; }
+.playlist .playlist-tracks { background: #e0eff1; }
 
 .playlist .channel { background: grey; }
 
@@ -28,29 +28,37 @@
 
 .playlist .controls { background: white; text-align: center; }
 
-.playlist .controls header { overflow: hidden; color: white; background-color: blueviolet; margin-bottom: 1em; height: 20px; }
+.playlist .controls header { overflow: hidden; color: white; background-color: blueviolet; height: 20px; }
 
-.playlist .controls label { margin: 1em auto; width: 100%; display: inline-block; font: normal normal normal 14px/1 FontAwesome; font-size: inherit; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transform: translate(0, 0); }
+.playlist .controls label { margin: 0 auto; width: 100%; display: inline-block; font: normal normal normal 14px/1 FontAwesome; font-size: inherit; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transform: translate(0, 0); }
 
-.playlist .controls label:before { content: "\f027"; color: black; font-size: 18px; padding-right: 5px; -moz-osx-font-smoothing: grayscale; }
+.playlist .controls label:before { color: black; font-size: 18px; padding-right: 5px; -moz-osx-font-smoothing: grayscale; }
 
-.playlist .controls label:after { content: "\f028"; color: black; font-size: 18px; padding-left: 5px; }
+.playlist .controls label:after { color: black; font-size: 18px; padding-left: 5px; }
 
-.playlist .controls input[type=range] { -webkit-appearance: none; -moz-appearance: none; appearance: none; display: inline-block; width: 75%; }
+.playlist .controls label.volume:before { content: "\f027"; }
 
-.playlist .controls input[type=range]::-webkit-slider-runnable-track { height: 8px; background: #ddd; border: none; border-radius: 3px; padding: 1px; }
+.playlist .controls label.volume:after { content: "\f028"; }
 
-.playlist .controls input[type=range]::-moz-range-track { height: 8px; background: #ddd; border: none; border-radius: 3px; padding: 1px; }
+.playlist .controls label.stereopan:before { content: "L"; }
 
-.playlist .controls input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none; height: 16px; width: 16px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
+.playlist .controls label.stereopan:after { content: "R"; }
 
-.playlist .controls input[type=range]::-moz-range-thumb { border: none; height: 16px; width: 16px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
+.playlist .controls input[type="range"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; display: inline-block; width: 75%; }
 
-.playlist .controls input[type=range]:focus { outline: none; }
+.playlist .controls input[type="range"]::-webkit-slider-runnable-track { height: 8px; background: #ddd; border: none; border-radius: 3px; padding: 1px; }
 
-.playlist .controls input[type=range]:focus::-webkit-slider-runnable-track { background: #ccc; }
+.playlist .controls input[type="range"]::-moz-range-track { height: 8px; background: #ddd; border: none; border-radius: 3px; padding: 1px; }
 
-.playlist .controls input[type=range]:focus::-moz-range-track { background: #ccc; }
+.playlist .controls input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none; height: 16px; width: 16px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
+
+.playlist .controls input[type="range"]::-moz-range-thumb { border: none; height: 16px; width: 16px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
+
+.playlist .controls input[type="range"]:focus { outline: none; }
+
+.playlist .controls input[type="range"]:focus::-webkit-slider-runnable-track { background: #ccc; }
+
+.playlist .controls input[type="range"]:focus::-moz-range-track { background: #ccc; }
 
 .playlist .annotations .annotations-boxes { text-align: center; }
 
@@ -84,7 +92,7 @@
 
 .playlist .annotations .annotations-text .annotation .annotation-actions i:hover { color: orange; cursor: pointer; }
 
-.playlist .annotations .current { background-color: #EBF4F6; }
+.playlist .annotations .current { background-color: #ebf4f6; }
 
 .playlist .vocals { background-color: #c0dce0; }
 

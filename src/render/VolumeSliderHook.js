@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 /*
 * virtual-dom hook for setting the volume input programmatically.
 */
@@ -7,6 +8,7 @@ export default class {
   }
 
   hook(volumeInput) {
-    volumeInput.setAttribute('value', this.gain * 100);
+    volumeInput.value = this.gain * 100;
+    volumeInput.title = `${this.gain * 100}%`;
   }
 }

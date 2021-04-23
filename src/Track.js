@@ -13,6 +13,7 @@ import stateClasses from './track/states';
 import CanvasHook from './render/CanvasHook';
 import FadeCanvasHook from './render/FadeCanvasHook';
 import VolumeSliderHook from './render/VolumeSliderHook';
+import StereoPanSliderHook from './render/StereoPanSliderHook';
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -380,17 +381,33 @@ export default class {
             },
           }, ['Solo']),
         ]),
-        h('label', [
+        h('label.volume', [
           h('input.volume-slider', {
             attributes: {
               type: 'range',
               min: 0,
               max: 100,
               value: 100,
+              title: `${this.gain * 100}%`,
             },
             hook: new VolumeSliderHook(this.gain),
             oninput: (e) => {
               this.ee.emit('volumechange', e.target.value, this);
+            },
+          }),
+        ]),
+        h('label.stereopan', [
+          h('input.stereopan-slider', {
+            attributes: {
+              type: 'range',
+              min: -100,
+              max: 100,
+              value: 100,
+              title: `${this.stereoPan}`,
+            },
+            hook: new StereoPanSliderHook(this.stereoPan),
+            oninput: (e) => {
+              this.ee.emit('stereopan', e.target.value / 100, this);
             },
           }),
         ]),
