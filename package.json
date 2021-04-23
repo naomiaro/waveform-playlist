@@ -60,7 +60,7 @@
     "mucss": "^1.1.5",
     "uuid": "^2.0.1",
     "virtual-dom": "^2.1.1",
-    "webaudio-peaks": "^0.0.6"
+    "webaudio-peaks": "0.0.8"
   },
   "scripts": {
     "clean": "rm -Rf dist && rm -Rf lib && rm -Rf styles",

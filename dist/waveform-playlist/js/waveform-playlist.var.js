@@ -7005,7 +7005,7 @@ var WaveformPlaylist =
 	    var extrema;
 	
 	    //create interleaved array of min,max
-	    var peaks = new (eval("Int"+bits+"Array"))(numPeaks*2);
+	    var peaks = new (new Function(`return Int${bits}Array`)())(numPeaks*2);
 	
 	    for (i = 0; i < numPeaks; i++) {
 	
@@ -7032,7 +7032,8 @@ var WaveformPlaylist =
 	    var i = 0;
 	    var min;
 	    var max;
-	    var peaks = new (eval("Int"+bits+"Array"))(numPeaks*2);
+	    var peaks = new (new Function(`return Int${bits}Array`)())(numPeaks*2);
+	    
 	
 	    for (i = 0; i < numPeaks; i++) {
 	        min = 0;
