@@ -397,6 +397,9 @@ export default class {
               attributes: {
                 type: 'button',
               },
+              onclick: () => {
+                this.ee.emit('removeTrack', this);
+              },
             },
             [h('i.fa.fa-close')],
           ),
