@@ -394,7 +394,7 @@ export default class {
               this.ee.emit('removeTrack', this);
             },
           },
-          [h('i.fa.fa-close')],
+          [h('i.fas.fa-times')],
         ),
         this.name,
         h(
@@ -410,7 +410,7 @@ export default class {
               });
             },
           },
-          [h(`i.fa.${isCollapsed ? 'fa-caret-down' : 'fa-caret-up'}`)],
+          [h(`i.fas.${isCollapsed ? 'fa-caret-down' : 'fa-caret-up'}`)],
         ),
       ]),
     ];
