@@ -25,24 +25,9 @@ image_height: 401
 </div>
 <div id="playlist"></div>
 <form class="form-inline">
-  <div class="form-group">
-    <label for="master-gain">Master Volume</label>
-    <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
-  </div>
-  <div class="checkbox">
-    <label>
-      <input type="checkbox" class="automatic-scroll"> Automatic Scroll
-    </label>
-  </div>
-  <div class="checkbox">
-    <label>
-      <input type="checkbox" class="continuous-play"> Continuous Play
-    </label>
-  </div>
-  <div class="checkbox">
-    <label>
-      <input type="checkbox" class="link-endpoints" checked> Link Endpoints
-    </label>
-  </div>
+  {% include sliders/mastergain.html %}
+  {% include checkboxes/automaticscroll.html %}
+  {% include checkboxes/continuousplay.html %}
+  {% include checkboxes/linkendpoints.html %}
 </form>
 {% include timeformat.html %}

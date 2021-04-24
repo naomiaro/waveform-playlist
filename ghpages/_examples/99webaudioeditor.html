@@ -22,15 +22,8 @@ audio_artist: Muse
 <div class="playlist-bottom-bar">
   {% include timeformat.html %}
   <form class="form-inline">
-    <div class="form-group">
-      <label for="master-gain">Master Volume</label>
-      <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
-    </div>
-    <div class="checkbox">
-      <label>
-        <input type="checkbox" class="automatic-scroll"> Automatic Scroll
-      </label>
-    </div>
+    {% include sliders/mastergain.html %}
+    {% include checkboxes/automaticscroll.html %}
   </form>
   <form class="form-inline">
     <div class="control-group">

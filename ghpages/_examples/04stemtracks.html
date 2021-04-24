@@ -12,20 +12,11 @@ audio_artist: Muse
 <div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
     {% include buttons/playback.html %}
-    <span class="audio-pos">00:00:00.0</span>
   </div>
 </div>
 <div id="playlist"></div>
 <form class="form-inline">
-  <div class="form-group">
-    <label for="master-gain">Master Volume</label>
-    <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
-  </div>
-  <div class="checkbox">
-    <label>
-      <input type="checkbox" class="automatic-scroll"> Automatic Scroll
-    </label>
-  </div>
+  {% include sliders/mastergain.html %}
+  {% include checkboxes/automaticscroll.html %}
 </form>
-<div class="sound-status"></div>
-<div class="loading-data"></div>
+{% include timeformat.html %}

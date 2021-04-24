@@ -175,23 +175,45 @@
   </button>
 </div>
 
-    <span class="audio-pos">00:00:00.0</span>
   </div>
 </div>
 <div id="playlist"></div>
 <form class="form-inline">
-  <div class="form-group">
-    <label for="master-gain">Master Volume</label>
-    <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
-  </div>
-  <div class="checkbox">
-    <label>
-      <input type="checkbox" class="automatic-scroll"> Automatic Scroll
-    </label>
-  </div>
+  <label for="master-gain" class="mr-sm-2">Master Volume</label>
+<input
+  type="range"
+  min="0"
+  max="100"
+  value="100"
+  class="master-gain form-control mr-sm-2"
+  id="master-gain"
+/>
+
+  <div class="form-check form-check-inline">
+  <input class="form-check-input automatic-scroll" type="checkbox" id="automatic_scroll" />
+  <label class="form-check-label" for="automatic_scroll"
+    >Automatic Scroll</label
+  >
+</div>
+
 </form>
-<div class="sound-status"></div>
-<div class="loading-data"></div></div>
+<form class="form-inline">
+  <select class="time-format custom-select mr-sm-2" aria-label="Time format selection">
+    <option value="seconds">seconds</option>
+    <option value="thousandths">thousandths</option>
+    <option value="hh:mm:ss">hh:mm:ss</option>
+    <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
+    <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
+    <option value="hh:mm:ss.uuu" selected="selected">hh:mm:ss + milliseconds</option>
+  </select>
+  <label class="sr-only" for="audio_start">Start of audio selection</label>
+  <input type="text" class="audio-start form-control mr-sm-2" id="audio_start">
+  <label class="sr-only" for="audio_end">End of audio selection</label>
+  <input type="text" class="audio-end form-control mr-sm-2" id="audio_end">
+  <span class="audio-pos" aria-label="Audio position">00:00:00.0</span>
+</form>
+
+</div>
   </article>
 </div>
 
