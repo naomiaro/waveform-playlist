@@ -419,7 +419,7 @@ export default class {
       controls.push(
         h('div.btn-group', [
           h(
-            `button.btn.btn-light.btn-xs.btn-mute${muteClass}`,
+            `button.btn.btn-outline-dark.btn-xs.btn-mute${muteClass}`,
             {
               attributes: {
                 type: 'button',
@@ -431,7 +431,7 @@ export default class {
             ['Mute'],
           ),
           h(
-            `button.btn.btn-light.btn-xs.btn-solo${soloClass}`,
+            `button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`,
             {
               onclick: () => {
                 this.ee.emit('solo', this);
