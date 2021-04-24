@@ -105,7 +105,7 @@
 </header>
 
 
-    <main>
+    <main class="container">
       <a
         href="https://github.com/naomiaro/waveform-playlist"
         class="github-corner"
@@ -136,15 +136,13 @@
             fill="currentColor"
             class="octo-body"
           ></path></svg></a
-      ><div class="container">
-  <div class="wrapper">
-    <article class="post">
-      <header class="post-header">
-        <h1 class="post-title">Load Track With Selection</h1>
-        <p class="lead">Pass a start time and end time in seconds to pre select an area on a track.</p>
-      </header>
-      <div class="post-content">
-        <div id="top-bar" class="playlist-top-bar">
+      ><div class="wrapper">
+  <article class="post">
+    <header class="post-header">
+      <h1 class="post-title">Load Track With Selection</h1>
+      <p class="lead">Pass a start time and end time in seconds to pre select an area on a track.</p>
+    </header>
+    <div class="post-content"><div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
     <div class="btn-group">
   <button type="button" class="btn-pause btn btn-outline-warning" title="pause">
@@ -175,26 +173,36 @@
   </div>
 </div>
 <div id="playlist"></div>
-
-      </div>
-    </article>
-  </div>
+</div>
+  </article>
 </div>
 
 <footer class="well well-lg">
   
   <p>Music: <cite>Starlight</cite> by Muse</p>
   
-  <p>Waveform Playlist originally written for <a href="https://www.sourcefabric.org/en/airtime">Airtime</a> at <a href="https://www.sourcefabric.org">Sourcefabric</a></p>
-  <p>The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber, hoping to make easier and more fun the transcription process of TEDx talks.</p>
-  <p class="copyright">waveform-playlist maintained by <a href="https://github.com/naomiaro">naomiaro</a></p>
+  <p>
+    Waveform Playlist originally written for
+    <a href="https://www.sourcefabric.org/en/airtime">Airtime</a> at
+    <a href="https://www.sourcefabric.org">Sourcefabric</a>
+  </p>
+  <p>
+    The annotation plugin has been sponsored by a fond Italian TED volunteer
+    transcriber, hoping to make easier and more fun the transcription process of
+    TEDx talks.
+  </p>
+  <p class="copyright">
+    waveform-playlist maintained by
+    <a href="https://github.com/naomiaro">naomiaro</a>
+  </p>
   <p>Licensed under the MIT License</p>
 </footer>
 
 <script
   src="https://code.jquery.com/jquery-3.6.0.min.js"
   integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
-  crossorigin="anonymous"></script>
+  crossorigin="anonymous"
+></script>
 <script type="text/javascript" src="js/waveform-playlist.var.js"></script>
 <script type="text/javascript" src="js/preselected.js"></script>
 <script type="text/javascript" src="js/emitter.js"></script>

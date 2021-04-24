@@ -33,7 +33,7 @@ export function init(options = {}, ee = EventEmitter()) {
     },
     seekStyle: 'line',
     waveHeight: 128,
-    collapsedWaveHeight: 40,
+    collapsedWaveHeight: 30,
     state: 'cursor',
     zoomLevels: [512, 1024, 2048, 4096],
     annotationList: {

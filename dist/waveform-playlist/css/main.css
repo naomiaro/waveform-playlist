@@ -30,7 +30,7 @@
 
 .playlist .controls { background: white; text-align: center; border: 1px solid black; border-radius: 0.2rem; }
 
-.playlist .controls .track-header { overflow: hidden; color: black; height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 0.2rem; }
+.playlist .controls .track-header { overflow: hidden; color: black; height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 0.2rem; font-size: 0.65rem; }
 
 .playlist .controls .track-header button { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 
