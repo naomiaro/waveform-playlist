@@ -384,7 +384,7 @@ export default class {
     const controls = [
       h('header', [
         h(
-          'button.btn.btn-danger.btn-xs.track-remove',
+          'button.btn.btn-danger.btn-sm.track-remove',
           {
             attributes: {
               type: 'button',
@@ -396,8 +396,9 @@ export default class {
           },
           [h('i.fa.fa-close')],
         ),
+        this.name,
         h(
-          'button.btn.btn-info.btn-xs.track-collapse',
+          'button.btn.btn-info.btn-sm.track-collapse',
           {
             attributes: {
               type: 'button',
@@ -411,7 +412,6 @@ export default class {
           },
           [h(`i.fa.${isCollapsed ? 'fa-caret-down' : 'fa-caret-up'}`)],
         ),
-        this.name,
       ]),
     ];
 
@@ -419,7 +419,7 @@ export default class {
       controls.push(
         h('div.btn-group', [
           h(
-            `button.btn.btn-default.btn-xs.btn-mute${muteClass}`,
+            `button.btn.btn-light.btn-xs.btn-mute${muteClass}`,
             {
               attributes: {
                 type: 'button',
@@ -431,7 +431,7 @@ export default class {
             ['Mute'],
           ),
           h(
-            `button.btn.btn-default.btn-xs.btn-solo${soloClass}`,
+            `button.btn.btn-light.btn-xs.btn-solo${soloClass}`,
             {
               onclick: () => {
                 this.ee.emit('solo', this);

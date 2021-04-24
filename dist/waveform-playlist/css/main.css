@@ -1,3 +1,5 @@
+.btn-group-xs > .btn, .btn-xs { padding: .25rem .4rem; font-size: .875rem; line-height: .5; border-radius: .2rem; }
+
 .playlist { margin: 2em 0; }
 
 .playlist .playlist-time-scale { height: 30px; }
@@ -26,17 +28,13 @@
 
 .playlist .channel-wrapper.silent .channel { opacity: 0.3; }
 
-.playlist .controls { background: white; text-align: center; }
+.playlist .controls { background: white; text-align: center; border: 1px solid black; border-radius: 0.2rem; }
 
-.playlist .controls header { overflow: hidden; color: white; background-color: blueviolet; height: 20px; position: relative; }
+.playlist .controls header { overflow: hidden; color: black; height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 0.2rem; }
 
-.playlist .controls header button { position: absolute; width: 20px; height: 20px; border-radius: 0; }
+.playlist .controls header button { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 
-.playlist .controls header button.track-remove { left: 0; }
-
-.playlist .controls header button.track-collapse { right: 0; }
-
-.playlist .controls label { padding: 2px; width: 100%; display: flex; font: normal normal normal 14px/1 FontAwesome; font-size: inherit; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transform: translate(0, 0); }
+.playlist .controls label { width: 100%; display: flex; justify-content: space-between; font: normal normal normal 14px/1 FontAwesome; font-size: inherit; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transform: translate(0, 0); padding: 0 1rem; }
 
 .playlist .controls label:before { color: black; font-size: 18px; padding-right: 5px; -moz-osx-font-smoothing: grayscale; }
 
@@ -52,13 +50,13 @@
 
 .playlist .controls input[type="range"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; display: inline-block; width: 75%; }
 
-.playlist .controls input[type="range"]::-webkit-slider-runnable-track { height: 8px; background: #ddd; border: none; border-radius: 3px; }
+.playlist .controls input[type="range"]::-webkit-slider-runnable-track { height: 5px; background: #ddd; border: none; border-radius: 3px; }
 
-.playlist .controls input[type="range"]::-moz-range-track { height: 8px; background: #ddd; border: none; border-radius: 3px; }
+.playlist .controls input[type="range"]::-moz-range-track { height: 5px; background: #ddd; border: none; border-radius: 3px; }
 
-.playlist .controls input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none; height: 16px; width: 16px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
+.playlist .controls input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none; height: 12px; width: 12px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
 
-.playlist .controls input[type="range"]::-moz-range-thumb { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none; height: 16px; width: 16px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
+.playlist .controls input[type="range"]::-moz-range-thumb { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none; height: 12px; width: 12px; border-radius: 50%; background: goldenrod; margin-top: -5px; cursor: ew-resize; }
 
 .playlist .controls input[type="range"]:focus { outline: none; }
 
