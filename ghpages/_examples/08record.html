@@ -18,17 +18,7 @@ javascript: record.js
 
 <div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
-    <div class="btn-group">
-      <button type="button" class="btn-play btn btn-success">
-        <i class="fa fa-play"></i>
-      </button>
-      <button type="button" class="btn-stop btn btn-danger">
-        <i class="fa fa-stop"></i>
-      </button>
-      <button type="button" class="btn-record btn btn-danger disabled">
-        <i class="fa fa-microphone"></i>
-      </button>
-    </div>
+    {% include buttons/playback.html %}
     <div class="btn-group btn-playlist-state-group">
       <button type="button" class="btn-cursor btn btn-default active" title="select cursor">
         <i class="fa fa-headphones"></i>

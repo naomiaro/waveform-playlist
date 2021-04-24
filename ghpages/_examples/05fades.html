@@ -11,13 +11,7 @@ audio_artist: Muse
 
 <div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
-    <div class="btn-group">
-      <button type="button" class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></button>
-      <button type="button" class="btn-play btn btn-success"><i class="fa fa-play"></i></button>
-      <button type="button" class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></button>
-      <button type="button" class="btn-rewind btn btn-success"><i class="fa fa-fast-backward"></i></button>
-      <button type="button" class="btn-fast-forward btn btn-success"><i class="fa fa-fast-forward"></i></button>
-    </div>
+    {% include buttons/playback.html %}
     <div class="btn-group">
       <button type="button" class="btn-cursor btn btn-default active" title="select cursor"><i class="fa fa-headphones"></i></button>
       <button type="button" class="btn-fadein btn btn-default" title="set audio fade in"><i class="fa fa-long-arrow-left"></i></button>
