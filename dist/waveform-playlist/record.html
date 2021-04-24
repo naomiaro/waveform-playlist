@@ -145,7 +145,7 @@
     <div class="post-content"><p>Experimental recording feature using
   <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder">
     MediaRecorder</a>, Tested in Firefox >= 41.0.2 & Chrome >= 58</p>
-<p><em>PAGE NEEDS HTTPS ACCESS</em></p>
+<p><em>PAGE NEEDS HTTPS ACCESS</em> <small>(or localhost is also fine)</small></p>
 <p>Can record a track on top of the previously recorded track!
   Drop some tracks into the container below if
   you'd like to try recording over them.</p>
@@ -175,6 +175,13 @@
     title="Fast forward"
   >
     <i class="fa fa-fast-forward"></i>
+  </button>
+  <button
+    type="button"
+    class="btn-record btn btn-outline-primary disabled"
+    title="Record"
+  >
+    <i class="fa fa-microphone"></i>
   </button>
 </div>
 
