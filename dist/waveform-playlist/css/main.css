@@ -30,7 +30,11 @@
 
 .playlist .controls header { overflow: hidden; color: white; background-color: blueviolet; height: 20px; position: relative; }
 
-.playlist .controls header .remove { position: absolute; left: 0; width: 20px; height: 20px; border-radius: 0; }
+.playlist .controls header button { position: absolute; width: 20px; height: 20px; border-radius: 0; }
+
+.playlist .controls header button.track-remove { left: 0; }
+
+.playlist .controls header button.track-collapse { right: 0; }
 
 .playlist .controls label { padding: 2px; width: 100%; display: flex; font: normal normal normal 14px/1 FontAwesome; font-size: inherit; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transform: translate(0, 0); }
 

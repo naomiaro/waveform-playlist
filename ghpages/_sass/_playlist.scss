@@ -65,12 +65,19 @@
       height: 20px;
       position: relative;
 
-      .remove {
+      button {
         position: absolute;
-        left: 0;
         width: 20px;
         height: 20px;
         border-radius: 0;
+      }
+
+      button.track-remove {
+        left: 0;
+      }
+
+      button.track-collapse {
+        right: 0;
       }
     }
 

@@ -378,33 +378,43 @@ export default class {
   renderControls(data) {
     const muteClass = data.muted ? '.active' : '';
     const soloClass = data.soloed ? '.active' : '';
+    const isCollapsed = data.collapsed;
     const numChan = this.peaks.data.length;
 
-    return h(
-      'div.controls',
-      {
-        attributes: {
-          style: `height: ${numChan * data.height}px; width: ${
-            data.controls.width
-          }px; position: absolute; left: 0; z-index: 10;`,
-        },
-      },
-      [
-        h('header', [
-          h(
-            'button.btn.btn-danger.btn-xs.remove',
-            {
-              attributes: {
-                type: 'button',
-              },
-              onclick: () => {
-                this.ee.emit('removeTrack', this);
-              },
+    const controls = [
+      h('header', [
+        h(
+          'button.btn.btn-danger.btn-xs.track-remove',
+          {
+            attributes: {
+              type: 'button',
             },
-            [h('i.fa.fa-close')],
-          ),
-          this.name,
-        ]),
+            onclick: () => {
+              this.ee.emit('removeTrack', this);
+            },
+          },
+          [h('i.fa.fa-close')],
+        ),
+        h(
+          'button.btn.btn-info.btn-xs.track-collapse',
+          {
+            attributes: {
+              type: 'button',
+            },
+            onclick: () => {
+              this.ee.emit('changeTrackView', this, {
+                collapsed: !isCollapsed,
+              });
+            },
+          },
+          [h(`i.fa.${isCollapsed ? 'fa-caret-down' : 'fa-caret-up'}`)],
+        ),
+        this.name,
+      ]),
+    ];
+
+    if (!isCollapsed) {
+      controls.push(
         h('div.btn-group', [
           h(
             `button.btn.btn-default.btn-xs.btn-mute${muteClass}`,
@@ -428,6 +438,9 @@ export default class {
             ['Solo'],
           ),
         ]),
+      );
+
+      controls.push(
         h('label.volume', [
           h('input.volume-slider', {
             attributes: {
@@ -442,6 +455,9 @@ export default class {
             },
           }),
         ]),
+      );
+
+      controls.push(
         h('label.stereopan', [
           h('input.stereopan-slider', {
             attributes: {
@@ -456,7 +472,19 @@ export default class {
             },
           }),
         ]),
-      ],
+      );
+    }
+
+    return h(
+      'div.controls',
+      {
+        attributes: {
+          style: `height: ${numChan * data.height}px; width: ${
+            data.controls.width
+          }px; position: absolute; left: 0; z-index: 10;`,
+        },
+      },
+      controls,
     );
   }
 

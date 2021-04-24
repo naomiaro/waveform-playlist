@@ -21,6 +21,7 @@ export default class {
     this.tracks = [];
     this.soloedTracks = [];
     this.mutedTracks = [];
+    this.collapsedTracks = [];
     this.playoutPromises = [];
 
     this.cursor = 0;
@@ -248,6 +249,13 @@ export default class {
     ee.on('removeTrack', (track) => {
       this.removeTrack(track);
       this.adjustTrackPlayout();
+      this.drawRequest();
+    });
+
+    ee.on('changeTrackView', (track, opts) => {
+      if (opts.collapsed) {
+        this.collapseTrack(track);
+      }
       this.drawRequest();
     });
 
@@ -564,6 +572,16 @@ export default class {
       this.soloedTracks = [track];
     } else {
       this.soloedTracks.push(track);
+    }
+  }
+
+  collapseTrack(track) {
+    const index = this.collapsedTracks.indexOf(track);
+
+    if (index > -1) {
+      this.collapsedTracks.splice(index, 1);
+    } else {
+      this.collapsedTracks.push(track);
     }
   }
 
@@ -898,6 +916,7 @@ export default class {
         shouldPlay: this.shouldTrackPlay(track),
         soloed: this.soloedTracks.indexOf(track) > -1,
         muted: this.mutedTracks.indexOf(track) > -1,
+        collapsed: this.collapsedTracks.indexOf(track) > -1,
       })),
     );
 

@@ -9,6 +9,6 @@ export default class {
 
   hook(volumeInput) {
     volumeInput.value = this.gain * 100;
-    volumeInput.title = `${this.gain * 100}%`;
+    volumeInput.title = `${this.gain * 100}% volume`;
   }
 }
