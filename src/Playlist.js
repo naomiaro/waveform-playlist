@@ -141,6 +141,10 @@ export default class {
     this.waveHeight = height;
   }
 
+  setCollapsedWaveHeight(height) {
+    this.collapsedWaveHeight = height;
+  }
+
   setColors(colors) {
     this.colors = colors;
   }
@@ -910,15 +914,17 @@ export default class {
   }
 
   renderTrackSection() {
-    const trackElements = this.tracks.map(track =>
-      track.render(this.getTrackRenderData({
+    const trackElements = this.tracks.map((track) => {
+      const collapsed = this.collapsedTracks.indexOf(track) > -1;
+      return track.render(this.getTrackRenderData({
         isActive: this.isActiveTrack(track),
         shouldPlay: this.shouldTrackPlay(track),
         soloed: this.soloedTracks.indexOf(track) > -1,
         muted: this.mutedTracks.indexOf(track) > -1,
-        collapsed: this.collapsedTracks.indexOf(track) > -1,
-      })),
-    );
+        collapsed,
+        height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
+      }));
+    });
 
     return h('div.playlist-tracks',
       {

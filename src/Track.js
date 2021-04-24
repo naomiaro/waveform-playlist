@@ -556,6 +556,7 @@ export default class {
               this.peaks.bits,
               canvasColor,
               scale,
+              data.height,
             ),
           }),
         );

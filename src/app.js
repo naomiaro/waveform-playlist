@@ -33,6 +33,7 @@ export function init(options = {}, ee = EventEmitter()) {
     },
     seekStyle: 'line',
     waveHeight: 128,
+    collapsedWaveHeight: 40,
     state: 'cursor',
     zoomLevels: [512, 1024, 2048, 4096],
     annotationList: {
@@ -62,6 +63,7 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.setState(config.state);
   playlist.setControlOptions(config.controls);
   playlist.setWaveHeight(config.waveHeight);
+  playlist.setCollapsedWaveHeight(config.collapsedWaveHeight);
   playlist.setColors(config.colors);
   playlist.setZoomLevels(config.zoomLevels);
   playlist.setZoomIndex(zoomIndex);
