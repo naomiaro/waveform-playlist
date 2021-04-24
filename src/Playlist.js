@@ -594,18 +594,13 @@ export default class {
       track.scheduleStop();
     }
 
-    let index = this.mutedTracks.indexOf(track);
-    if (index > -1) {
-      this.mutedTracks.splice(index, 1);
-    }
-
-    index = this.soloedTracks.indexOf(track);
-    if (index > -1) {
-      this.soloedTracks.splice(index, 1);
-    }
-
-    index = this.tracks.indexOf(track);
-    this.tracks.splice(index, 1);
+    const trackLists = [this.mutedTracks, this.soloedTracks, this.collapsedTracks, this.tracks];
+    trackLists.forEach((list) => {
+      const index = list.indexOf(track);
+      if (index > -1) {
+        list.splice(index, 1);
+      }
+    });
   }
 
   adjustTrackPlayout() {
