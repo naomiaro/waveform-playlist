@@ -446,6 +446,7 @@ export default class {
         h('label.volume', [
           h('input.volume-slider', {
             attributes: {
+              'aria-label': 'Track volume control',
               type: 'range',
               min: 0,
               max: 100,
@@ -463,6 +464,7 @@ export default class {
         h('label.stereopan', [
           h('input.stereopan-slider', {
             attributes: {
+              'aria-label': 'Track stereo pan control',
               type: 'range',
               min: -100,
               max: 100,
