@@ -153,7 +153,7 @@ var notes = [
 
 var actions = [
   {
-    class: 'fa.fa-minus',
+    class: 'fas.fa-minus',
     title: 'Reduce annotation end by 0.010s',
     action: (annotation, i, annotations, opts) => {
       var next;
@@ -167,7 +167,7 @@ var actions = [
     }
   },
   {
-    class: 'fa.fa-plus',
+    class: 'fas.fa-plus',
     title: 'Increase annotation end by 0.010s',
     action: (annotation, i, annotations, opts) => {
       var next;
@@ -181,7 +181,7 @@ var actions = [
     }
   },
   {
-    class: 'fa.fa-scissors',
+    class: 'fas.fa-cut',
     title: 'Split annotation in half',
     action: (annotation, i, annotations) => {
       const halfDuration = (annotation.end - annotation.start) / 2;
@@ -198,7 +198,7 @@ var actions = [
     }
   },
   {
-    class: 'fa.fa-trash',
+    class: 'fas.fa-trash',
     title: 'Delete annotation',
     action: (annotation, i, annotations) => {
       annotations.splice(i, 1);
