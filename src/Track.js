@@ -388,6 +388,7 @@ export default class {
           {
             attributes: {
               type: 'button',
+              title: 'Remove track',
             },
             onclick: () => {
               this.ee.emit('removeTrack', this);
@@ -400,6 +401,7 @@ export default class {
           {
             attributes: {
               type: 'button',
+              title: isCollapsed ? 'Expand track' : 'Collapse track',
             },
             onclick: () => {
               this.ee.emit('changeTrackView', this, {
