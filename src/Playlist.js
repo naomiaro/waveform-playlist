@@ -568,6 +568,10 @@ export default class {
   }
 
   removeTrack(track) {
+    if (track.isPlaying()) {
+      track.scheduleStop();
+    }
+
     let index = this.mutedTracks.indexOf(track);
     if (index > -1) {
       this.mutedTracks.splice(index, 1);
