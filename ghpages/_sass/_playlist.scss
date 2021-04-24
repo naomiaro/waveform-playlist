@@ -63,6 +63,15 @@
       color: white;
       background-color: blueviolet;
       height: 20px;
+      position: relative;
+
+      .remove {
+        position: absolute;
+        left: 0;
+        width: 20px;
+        height: 20px;
+        border-radius: 0;
+      }
     }
 
     label {
