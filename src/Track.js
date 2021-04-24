@@ -382,7 +382,7 @@ export default class {
     const numChan = this.peaks.data.length;
 
     const controls = [
-      h('header', [
+      h('div.track-header', [
         h(
           'button.btn.btn-danger.btn-sm.track-remove',
           {
