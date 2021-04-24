@@ -12,15 +12,14 @@ image_width: 1008
 image_height: 401
 ---
 
-<div class="lead">Currently supporting input and output in the <a href="https://github.com/readbeyond/aeneas">Aeneas</a> JSON format.</div>
+<div class="lead mb-4">Currently supporting input and output in the <a href="https://github.com/readbeyond/aeneas">Aeneas</a> JSON format.</div>
 
 <div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
     {% include buttons/playback.html %}
+    {% include buttons/zoom.html %}
     <div class="btn-group">
-      <button type="button" title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></button>
-      <button type="button" title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></button>
-      <button type="button" title="Download the annotations as json" class="btn-annotations-download btn btn-default">Download JSON</button>
+      <button type="button" title="Download the annotations as json" class="btn-annotations-download btn btn-outline-dark">Download JSON</button>
     </div>
   </div>
 </div>
