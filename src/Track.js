@@ -370,12 +370,15 @@ export default class {
       }, [
         h('header', [this.name]),
         h('div.btn-group', [
-          h(`span.btn.btn-default.btn-xs.btn-mute${muteClass}`, {
+          h(`button.btn.btn-default.btn-xs.btn-mute${muteClass}`, {
+            attributes: {
+              type: 'button',
+            },
             onclick: () => {
               this.ee.emit('mute', this);
             },
           }, ['Mute']),
-          h(`span.btn.btn-default.btn-xs.btn-solo${soloClass}`, {
+          h(`button.btn.btn-default.btn-xs.btn-solo${soloClass}`, {
             onclick: () => {
               this.ee.emit('solo', this);
             },
