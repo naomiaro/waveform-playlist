@@ -257,9 +257,7 @@ export default class {
     });
 
     ee.on('changeTrackView', (track, opts) => {
-      if (opts.collapsed) {
-        this.collapseTrack(track);
-      }
+      this.collapseTrack(track, opts);
       this.drawRequest();
     });
 
@@ -579,13 +577,15 @@ export default class {
     }
   }
 
-  collapseTrack(track) {
-    const index = this.collapsedTracks.indexOf(track);
-
-    if (index > -1) {
-      this.collapsedTracks.splice(index, 1);
-    } else {
+  collapseTrack(track, opts) {
+    if (opts.collapsed) {
       this.collapsedTracks.push(track);
+    } else {
+      const index = this.collapsedTracks.indexOf(track);
+
+      if (index > -1) {
+        this.collapsedTracks.splice(index, 1);
+      }
     }
   }
 
