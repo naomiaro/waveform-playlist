@@ -3146,7 +3146,7 @@ var WaveformPlaylist =
 	    value: function initRecorder(stream) {
 	      var _this = this;
 	
-	      this.mediaRecorder = new window.MediaRecorder(stream);
+	      this.mediaRecorder = new MediaRecorder(stream);
 	
 	      this.mediaRecorder.onstart = function () {
 	        var track = new _Track2.default();
