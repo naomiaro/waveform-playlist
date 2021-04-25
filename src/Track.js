@@ -380,103 +380,120 @@ export default class {
     const soloClass = data.soloed ? '.active' : '';
     const isCollapsed = data.collapsed;
     const numChan = this.peaks.data.length;
+    const widgets = data.controls.widgets;
+
+    const removeTrack = h(
+      'button.btn.btn-danger.btn-sm.track-remove',
+      {
+        attributes: {
+          type: 'button',
+          title: 'Remove track',
+        },
+        onclick: () => {
+          this.ee.emit('removeTrack', this);
+        },
+      },
+      [h('i.fas.fa-times')],
+    );
+
+    const collapseTrack = h(
+      'button.btn.btn-info.btn-sm.track-collapse',
+      {
+        attributes: {
+          type: 'button',
+          title: isCollapsed ? 'Expand track' : 'Collapse track',
+        },
+        onclick: () => {
+          this.ee.emit('changeTrackView', this, {
+            collapsed: !isCollapsed,
+          });
+        },
+      },
+      [h(`i.fas.${isCollapsed ? 'fa-caret-down' : 'fa-caret-up'}`)],
+    );
+
+    const headerChildren = [];
+
+    if (widgets.remove) {
+      headerChildren.push(removeTrack);
+    }
+    headerChildren.push(this.name);
+    if (widgets.collapse) {
+      headerChildren.push(collapseTrack);
+    }
 
     const controls = [
-      h('div.track-header', [
-        h(
-          'button.btn.btn-danger.btn-sm.track-remove',
-          {
-            attributes: {
-              type: 'button',
-              title: 'Remove track',
-            },
-            onclick: () => {
-              this.ee.emit('removeTrack', this);
-            },
-          },
-          [h('i.fas.fa-times')],
-        ),
-        this.name,
-        h(
-          'button.btn.btn-info.btn-sm.track-collapse',
-          {
-            attributes: {
-              type: 'button',
-              title: isCollapsed ? 'Expand track' : 'Collapse track',
-            },
-            onclick: () => {
-              this.ee.emit('changeTrackView', this, {
-                collapsed: !isCollapsed,
-              });
-            },
-          },
-          [h(`i.fas.${isCollapsed ? 'fa-caret-down' : 'fa-caret-up'}`)],
-        ),
-      ]),
+      h('div.track-header', headerChildren),
     ];
 
     if (!isCollapsed) {
-      controls.push(
-        h('div.btn-group', [
-          h(
-            `button.btn.btn-outline-dark.btn-xs.btn-mute${muteClass}`,
-            {
+      if (widgets.muteOrSolo) {
+        controls.push(
+          h('div.btn-group', [
+            h(
+              `button.btn.btn-outline-dark.btn-xs.btn-mute${muteClass}`,
+              {
+                attributes: {
+                  type: 'button',
+                },
+                onclick: () => {
+                  this.ee.emit('mute', this);
+                },
+              },
+              ['Mute'],
+            ),
+            h(
+              `button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`,
+              {
+                onclick: () => {
+                  this.ee.emit('solo', this);
+                },
+              },
+              ['Solo'],
+            ),
+          ]),
+        );
+      }
+
+      if (widgets.volume) {
+        controls.push(
+          h('label.volume', [
+            h('input.volume-slider', {
               attributes: {
-                type: 'button',
+                'aria-label': 'Track volume control',
+                type: 'range',
+                min: 0,
+                max: 100,
+                value: 100,
               },
-              onclick: () => {
-                this.ee.emit('mute', this);
+              hook: new VolumeSliderHook(this.gain),
+              oninput: (e) => {
+                this.ee.emit('volumechange', e.target.value, this);
               },
-            },
-            ['Mute'],
-          ),
-          h(
-            `button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`,
-            {
-              onclick: () => {
-                this.ee.emit('solo', this);
-              },
-            },
-            ['Solo'],
-          ),
-        ]),
-      );
+            }),
+          ]),
+        );
+      }
 
-      controls.push(
-        h('label.volume', [
-          h('input.volume-slider', {
-            attributes: {
-              'aria-label': 'Track volume control',
-              type: 'range',
-              min: 0,
-              max: 100,
-              value: 100,
-            },
-            hook: new VolumeSliderHook(this.gain),
-            oninput: (e) => {
-              this.ee.emit('volumechange', e.target.value, this);
-            },
-          }),
-        ]),
-      );
-
-      controls.push(
-        h('label.stereopan', [
-          h('input.stereopan-slider', {
-            attributes: {
-              'aria-label': 'Track stereo pan control',
-              type: 'range',
-              min: -100,
-              max: 100,
-              value: 100,
-            },
-            hook: new StereoPanSliderHook(this.stereoPan),
-            oninput: (e) => {
-              this.ee.emit('stereopan', e.target.value / 100, this);
-            },
-          }),
-        ]),
-      );
+      if (widgets.stereoPan) {
+        controls.push(
+          h('label.stereopan', [
+            h('input.stereopan-slider', {
+              attributes: {
+                'aria-label': 'Track stereo pan control',
+                type: 'range',
+                min: -100,
+                max: 100,
+                value: 100,
+              },
+              hook: new StereoPanSliderHook(this.stereoPan),
+              oninput: (e) => {
+                this.ee.emit('stereopan', e.target.value / 100, this);
+              },
+            }),
+          ]),
+        );
+      }
     }
 
     return h(

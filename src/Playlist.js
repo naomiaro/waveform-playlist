@@ -1,4 +1,4 @@
-import _defaults from 'lodash.defaults';
+import _defaults from 'lodash.defaultsdeep';
 
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';

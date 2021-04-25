@@ -1,4 +1,4 @@
-import _assign from 'lodash.assign';
+import _defaults from 'lodash.defaultsdeep';
 import createElement from 'virtual-dom/create-element';
 import EventEmitter from 'event-emitter';
 import Playlist from './Playlist';
@@ -25,6 +25,13 @@ export function init(options = {}, ee = EventEmitter()) {
     controls: {
       show: false,
       width: 150,
+      widgets: {
+        muteOrSolo: true,
+        volume: true,
+        stereoPan: true,
+        collapse: true,
+        remove: true,
+      },
     },
     colors: {
       waveOutlineColor: 'white',
@@ -46,7 +53,7 @@ export function init(options = {}, ee = EventEmitter()) {
     isAutomaticScroll: false,
   };
 
-  const config = _assign(defaults, options);
+  const config = _defaults(options, defaults);
   const zoomIndex = config.zoomLevels.indexOf(config.samplesPerPixel);
 
   if (zoomIndex === -1) {
