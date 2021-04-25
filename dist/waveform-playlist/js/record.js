@@ -44,7 +44,9 @@ playlist = WaveformPlaylist.init({
     show: true, //whether or not to include the track controls
     width: 200 //width of controls in pixels
   }
-});
+}).then(function() {
+  //can do stuff with the playlist.
 
-//initialize the WAV exporter.
-playlist.initExporter();
+  //initialize the WAV exporter.
+  playlist.initExporter();
+});
