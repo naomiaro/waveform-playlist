@@ -154,6 +154,7 @@ $container.on("click", ".btn-clear", function() {
 });
 
 $container.on("click", ".btn-record", function() {
+  console.log('clicked record');
   ee.emit("record");
 });
 

@@ -48,9 +48,13 @@ export default class {
 
   // TODO extract into a plugin
   initRecorder(stream) {
+    console.log(stream);
     this.mediaRecorder = new MediaRecorder(stream);
 
+    console.log(this.mediaRecorder.stream);
+
     this.mediaRecorder.onstart = () => {
+      console.log('recorder starting');
       const track = new Track();
       track.setName('Recording');
       track.setEnabledStates();
@@ -63,7 +67,14 @@ export default class {
       this.working = false;
     };
 
+    this.mediaRecorder.onerror = (e) => {
+      console.log('recorder error');
+      console.log(e);
+    };
+
     this.mediaRecorder.ondataavailable = (e) => {
+      console.log('recorder data');
+      console.log(e.data);
       this.chunks.push(e.data);
 
       // throttle peaks calculation
@@ -80,7 +91,8 @@ export default class {
           this.recordingTrack.setBuffer(audioBuffer);
           this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
           this.adjustDuration();
-        }).catch(() => {
+        }).catch((e) => {
+          console.log(e);
           this.working = false;
         });
         this.working = true;
@@ -88,6 +100,7 @@ export default class {
     };
 
     this.mediaRecorder.onstop = () => {
+      console.log('recorder stopped');
       this.chunks = [];
       this.working = false;
     };
@@ -773,8 +786,9 @@ export default class {
   }
 
   record() {
+    console.log('starting recording');
     const playoutPromises = [];
-    this.mediaRecorder.start(300);
+    this.mediaRecorder.start();
 
     this.tracks.forEach((track) => {
       track.setState('none');

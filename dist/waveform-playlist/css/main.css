@@ -48,7 +48,7 @@ a:focus { color: #0b0c0c; }
 
 .playlist .controls .track-header button { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 
-.playlist .controls label { width: 100%; display: flex; justify-content: space-between; font: normal normal normal 14px/1 FontAwesome; font-size: inherit; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transform: translate(0, 0); padding: 0 1rem; }
+.playlist .controls label { width: 100%; display: flex; justify-content: space-between; font: normal normal normal 14px/1 FontAwesome; font-size: inherit; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transform: translate(0, 0); padding: 0 1rem; margin-bottom: 0.2rem; }
 
 .playlist .controls label:before { color: black; font-size: 18px; padding-right: 5px; -moz-osx-font-smoothing: grayscale; }
 
