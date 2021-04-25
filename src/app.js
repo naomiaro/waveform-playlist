@@ -1,4 +1,4 @@
-import _assign from 'lodash.assign';
+import _defaults from 'lodash.defaultsdeep';
 import createElement from 'virtual-dom/create-element';
 import EventEmitter from 'event-emitter';
 import Playlist from './Playlist';
@@ -25,6 +25,13 @@ export function init(options = {}, ee = EventEmitter()) {
     controls: {
       show: false,
       width: 150,
+      widgets: {
+        muteOrSolo: true,
+        volume: true,
+        stereoPan: true,
+        collapse: true,
+        remove: true,
+      },
     },
     colors: {
       waveOutlineColor: 'white',
@@ -33,6 +40,7 @@ export function init(options = {}, ee = EventEmitter()) {
     },
     seekStyle: 'line',
     waveHeight: 128,
+    collapsedWaveHeight: 30,
     state: 'cursor',
     zoomLevels: [512, 1024, 2048, 4096],
     annotationList: {
@@ -45,7 +53,7 @@ export function init(options = {}, ee = EventEmitter()) {
     isAutomaticScroll: false,
   };
 
-  const config = _assign(defaults, options);
+  const config = _defaults({}, options, defaults);
   const zoomIndex = config.zoomLevels.indexOf(config.samplesPerPixel);
 
   if (zoomIndex === -1) {
@@ -62,6 +70,7 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.setState(config.state);
   playlist.setControlOptions(config.controls);
   playlist.setWaveHeight(config.waveHeight);
+  playlist.setCollapsedWaveHeight(config.collapsedWaveHeight);
   playlist.setColors(config.colors);
   playlist.setZoomLevels(config.zoomLevels);
   playlist.setZoomIndex(zoomIndex);

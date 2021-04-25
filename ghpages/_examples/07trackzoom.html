@@ -11,15 +11,8 @@ audio_artist: Muse
 
 <div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
-    <div class="btn-group">
-      <span class="btn-pause btn btn-warning"><i class="fa fa-pause"></i></span>
-      <span class="btn-play btn btn-success"><i class="fa fa-play"></i></span>
-      <span class="btn-stop btn btn-danger"><i class="fa fa-stop"></i></span>
-    </div>
-    <div class="btn-group">
-      <span title="zoom in" class="btn-zoom-in btn btn-default"><i class="fa fa-search-plus"></i></span>
-      <span title="zoom out" class="btn-zoom-out btn btn-default"><i class="fa fa-search-minus"></i></span>
-    </div>
+    {% include buttons/playback.html %}
+    {% include buttons/zoom.html %}
   </div>
 </div>
 <div id="playlist"></div>

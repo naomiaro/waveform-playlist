@@ -11,95 +11,22 @@ audio_artist: Muse
 
 <div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
-    <div class="btn-group">
-      <span class="btn-pause btn btn-warning">
-        <i class="fa fa-pause"></i>
-      </span>
-      <span class="btn-play btn btn-success">
-        <i class="fa fa-play"></i>
-      </span>
-      <span class="btn-stop btn btn-danger">
-        <i class="fa fa-stop"></i>
-      </span>
-      <span class="btn-rewind btn btn-success">
-        <i class="fa fa-fast-backward"></i>
-      </span>
-      <span class="btn-fast-forward btn btn-success">
-        <i class="fa fa-fast-forward"></i>
-      </span>
-    </div>
-    <div class="btn-group">
-      <span title="zoom in" class="btn-zoom-in btn btn-default">
-        <i class="fa fa-search-plus"></i>
-      </span>
-      <span title="zoom out" class="btn-zoom-out btn btn-default">
-        <i class="fa fa-search-minus"></i>
-      </span>
-    </div>
-    <div class="btn-group btn-playlist-state-group">
-      <span class="btn-cursor btn btn-default active" title="select cursor">
-        <i class="fa fa-headphones"></i>
-      </span>
-      <span class="btn-select btn btn-default" title="select audio region">
-        <i class="fa fa-italic"></i>
-      </span>
-      <span class="btn-shift btn btn-default" title="shift audio in time">
-        <i class="fa fa-arrows-h"></i>
-      </span>
-      <span class="btn-fadein btn btn-default" title="set audio fade in">
-        <i class="fa fa-long-arrow-left"></i>
-      </span>
-      <span class="btn-fadeout btn btn-default" title="set audio fade out">
-        <i class="fa fa-long-arrow-right"></i>
-      </span>
-    </div>
-    <div class="btn-group btn-fade-state-group">
-      <span class="btn btn-default btn-logarithmic active">logarithmic</span>
-      <span class="btn btn-default btn-linear">linear</span>
-      <span class="btn btn-default btn-exponential">exponential</span>
-      <span class="btn btn-default btn-scurve">s-curve</span>
-    </div>
-    <div class="btn-group btn-select-state-group">
-      <span class="btn-loop btn btn-success disabled" title="loop a selected segment of audio">
-        <i class="fa fa-repeat"></i>
-      </span>
-      <span title="keep only the selected audio region for a track"
-            class="btn-trim-audio btn btn-primary disabled">Trim</span>
-    </div>
-    <div class="btn-group">
-      <span title="Prints playlist info to console"
-            class="btn btn-info">Print</span>
-      <span title="Clear the playlist's tracks" class="btn btn-clear btn-danger">Clear</span>
-    </div>
-    <div class="btn-group">
-      <span title="Download the current work as Wav file" class="btn btn-download btn-primary">
-        <i class="fa fa-download"></i>
-      </span>
-    </div>
+    {% include buttons/playback.html %}
+    {% include buttons/zoom.html %}
+    {% include buttons/states.html %}
+    {% include buttons/fades.html %}
+    {% include buttons/random.html %}
   </div>
 </div>
 <div id="playlist"></div>
 <div class="playlist-bottom-bar">
   {% include timeformat.html %}
   <form class="form-inline">
-    <div class="form-group">
-      <label for="master-gain">Master Volume</label>
-      <input type="range" min="0" max="100" value="100" class="master-gain form-control" id="master-gain">
-    </div>
-    <div class="checkbox">
-      <label>
-        <input type="checkbox" class="automatic-scroll"> Automatic Scroll
-      </label>
-    </div>
-  </form>
-  <form class="form-inline">
-    <div class="control-group">
-      <label for="time">Seek to time :</label>
-      <input type="number" class="form-control" value="14" id="seektime"/>
-      <span class="btn btn-primary btn-seektotime">Seek !</span>
-    </div>
+    {% include sliders/mastergain.html %}
+    {% include checkboxes/automaticscroll.html %}
   </form>
   <div class="sound-status"></div>
+  {% include forms/seek.html %}
   <div class="track-drop"></div>
   <div class="loading-data"></div>
 </div>

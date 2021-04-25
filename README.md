@@ -52,8 +52,16 @@ var playlist = WaveformPlaylist({
     fadeColor: "black"
   },
   controls: {
-    show: true,
-    width: 200
+    show: false,
+    width: 150,
+    // whether to render the widget or not in the controls panel.
+    widgets: {
+      muteOrSolo: true,
+      volume: true,
+      stereoPan: true,
+      collapse: true,
+      remove: true,
+    },
   },
   zoomLevels: [500, 1000, 3000, 5000]
 });

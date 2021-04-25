@@ -1,4 +1,4 @@
-import _defaults from 'lodash.defaults';
+import _defaults from 'lodash.defaultsdeep';
 
 import h from 'virtual-dom/h';
 import diff from 'virtual-dom/diff';
@@ -21,6 +21,7 @@ export default class {
     this.tracks = [];
     this.soloedTracks = [];
     this.mutedTracks = [];
+    this.collapsedTracks = [];
     this.playoutPromises = [];
 
     this.cursor = 0;
@@ -140,6 +141,10 @@ export default class {
     this.waveHeight = height;
   }
 
+  setCollapsedWaveHeight(height) {
+    this.collapsedWaveHeight = height;
+  }
+
   setColors(colors) {
     this.colors = colors;
   }
@@ -245,8 +250,20 @@ export default class {
       this.drawRequest();
     });
 
+    ee.on('removeTrack', (track) => {
+      this.removeTrack(track);
+      this.adjustTrackPlayout();
+      this.drawRequest();
+    });
+
+    ee.on('changeTrackView', (track, opts) => {
+      this.collapseTrack(track, opts);
+      this.drawRequest();
+    });
+
     ee.on('volumechange', (volume, track) => {
       track.setGainLevel(volume / 100);
+      this.drawRequest();
     });
 
     ee.on('mastervolumechange', (volume) => {
@@ -268,6 +285,7 @@ export default class {
 
     ee.on('stereopan', (panvalue, track) => {
       track.setStereoPanValue(panvalue);
+      this.drawRequest();
     });
 
     ee.on('fadetype', (type) => {
@@ -559,6 +577,32 @@ export default class {
     }
   }
 
+  collapseTrack(track, opts) {
+    if (opts.collapsed) {
+      this.collapsedTracks.push(track);
+    } else {
+      const index = this.collapsedTracks.indexOf(track);
+
+      if (index > -1) {
+        this.collapsedTracks.splice(index, 1);
+      }
+    }
+  }
+
+  removeTrack(track) {
+    if (track.isPlaying()) {
+      track.scheduleStop();
+    }
+
+    const trackLists = [this.mutedTracks, this.soloedTracks, this.collapsedTracks, this.tracks];
+    trackLists.forEach((list) => {
+      const index = list.indexOf(track);
+      if (index > -1) {
+        list.splice(index, 1);
+      }
+    });
+  }
+
   adjustTrackPlayout() {
     this.tracks.forEach((track) => {
       track.setShouldPlay(this.shouldTrackPlay(track));
@@ -839,7 +883,7 @@ export default class {
       colors: this.colors,
     };
 
-    return _defaults(data, defaults);
+    return _defaults({}, data, defaults);
   }
 
   isActiveTrack(track) {
@@ -865,14 +909,17 @@ export default class {
   }
 
   renderTrackSection() {
-    const trackElements = this.tracks.map(track =>
-      track.render(this.getTrackRenderData({
+    const trackElements = this.tracks.map((track) => {
+      const collapsed = this.collapsedTracks.indexOf(track) > -1;
+      return track.render(this.getTrackRenderData({
         isActive: this.isActiveTrack(track),
         shouldPlay: this.shouldTrackPlay(track),
         soloed: this.soloedTracks.indexOf(track) > -1,
         muted: this.mutedTracks.indexOf(track) > -1,
-      })),
-    );
+        collapsed,
+        height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
+      }));
+    });
 
     return h('div.playlist-tracks',
       {
@@ -886,7 +933,7 @@ export default class {
             this.sampleRate,
           );
 
-          this.ee.emit('scroll', this.scrollLeft);
+          this.ee.emit('scroll');
         },
         hook: new ScrollHook(this),
       },

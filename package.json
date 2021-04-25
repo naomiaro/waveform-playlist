@@ -55,7 +55,7 @@
     "fade-maker": "^1.0.3",
     "inline-worker": "^1.1.0",
     "lodash.assign": "^4.0.0",
-    "lodash.defaults": "^4.0.0",
+    "lodash.defaultsdeep": "^4.6.1",
     "lodash.forown": "^4.0.0",
     "mucss": "^1.1.5",
     "uuid": "^2.0.1",

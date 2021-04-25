@@ -217,7 +217,7 @@ $container.on("click", ".btn-trim-audio", function() {
   ee.emit("trim");
 });
 
-$container.on("click", ".btn-info", function() {
+$container.on("click", ".btn.print", function() {
   console.log(playlist.getInfo());
 });
 
