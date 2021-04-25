@@ -747,6 +747,7 @@ export default class {
       cuein: this.cueIn,
       cueout: this.cueOut,
       stereoPan: this.stereoPan,
+      gain: this.gain,
     };
 
     if (this.fadeIn) {
