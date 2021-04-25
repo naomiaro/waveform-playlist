@@ -17,18 +17,6 @@ function logError(err) {
   console.error(err);
 }
 
-if (navigator.mediaDevices) {
-  navigator.mediaDevices.getUserMedia(constraints)
-  .then(gotStream)
-  .catch(logError);
-} else if (navigator.getUserMedia && 'MediaRecorder' in window) {
-  navigator.getUserMedia(
-    constraints,
-    gotStream,
-    logError
-  );
-}
-
 playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
   waveHeight: 100,
@@ -91,4 +79,16 @@ playlist.load([
 
   //initialize the WAV exporter.
   playlist.initExporter();
+
+  if (navigator.mediaDevices) {
+    navigator.mediaDevices.getUserMedia(constraints)
+    .then(gotStream)
+    .catch(logError);
+  } else if (navigator.getUserMedia && 'MediaRecorder' in window) {
+    navigator.getUserMedia(
+      constraints,
+      gotStream,
+      logError
+    );
+  }
 });

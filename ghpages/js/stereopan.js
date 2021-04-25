@@ -1,4 +1,4 @@
-const playlist = WaveformPlaylist.init({
+var playlist = WaveformPlaylist.init({
   container: document.getElementById('playlist'),
   controls: {
     show: true, // whether or not to include the track controls

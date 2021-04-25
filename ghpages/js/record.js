@@ -17,18 +17,6 @@ function logError(err) {
   console.error(err);
 }
 
-if (navigator.mediaDevices) {
-  navigator.mediaDevices.getUserMedia(constraints)
-  .then(gotStream)
-  .catch(logError);
-} else if (navigator.getUserMedia && 'MediaRecorder' in window) {
-  navigator.getUserMedia(
-    constraints,
-    gotStream,
-    logError
-  );
-}
-
 playlist = WaveformPlaylist.init({
   samplesPerPixel: 5000,
   zoomLevels: [1000, 5000, 9000],
@@ -44,9 +32,19 @@ playlist = WaveformPlaylist.init({
     show: true, //whether or not to include the track controls
     width: 200 //width of controls in pixels
   }
-}).then(function() {
-  //can do stuff with the playlist.
-
-  //initialize the WAV exporter.
-  playlist.initExporter();
 });
+
+//initialize the WAV exporter.
+playlist.initExporter();
+
+if (navigator.mediaDevices) {
+  navigator.mediaDevices.getUserMedia(constraints)
+  .then(gotStream)
+  .catch(logError);
+} else if (navigator.getUserMedia && 'MediaRecorder' in window) {
+  navigator.getUserMedia(
+    constraints,
+    gotStream,
+    logError
+  );
+}

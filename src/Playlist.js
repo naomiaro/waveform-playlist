@@ -48,7 +48,7 @@ export default class {
 
   // TODO extract into a plugin
   initRecorder(stream) {
-    this.mediaRecorder = new window.MediaRecorder(stream);
+    this.mediaRecorder = new MediaRecorder(stream);
 
     this.mediaRecorder.onstart = () => {
       const track = new Track();

@@ -78,7 +78,8 @@
     "start": "npm run webpack:server",
     "dev": "npm run jekyll:dev && npm run webpack:server",
     "test": "node_modules/karma/bin/karma start --browsers Firefox --single-run",
-    "eslint": "node_modules/.bin/eslint src"
+    "eslint": "node_modules/.bin/eslint src",
+    "website": "npm run build && npm run ghpages"
   },
   "repository": {
     "type": "git",
