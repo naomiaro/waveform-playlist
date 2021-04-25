@@ -3146,9 +3146,13 @@ var WaveformPlaylist =
 	    value: function initRecorder(stream) {
 	      var _this = this;
 	
+	      console.log(stream);
 	      this.mediaRecorder = new MediaRecorder(stream);
 	
+	      console.log(this.mediaRecorder.stream);
+	
 	      this.mediaRecorder.onstart = function () {
+	        console.log('recorder starting');
 	        var track = new _Track2.default();
 	        track.setName('Recording');
 	        track.setEnabledStates();
@@ -3161,7 +3165,14 @@ var WaveformPlaylist =
 	        _this.working = false;
 	      };
 	
+	      this.mediaRecorder.onerror = function (e) {
+	        console.log('recorder error');
+	        console.log(e);
+	      };
+	
 	      this.mediaRecorder.ondataavailable = function (e) {
+	        console.log('recorder data');
+	        console.log(e.data);
 	        _this.chunks.push(e.data);
 	
 	        // throttle peaks calculation
@@ -3178,7 +3189,8 @@ var WaveformPlaylist =
 	            _this.recordingTrack.setBuffer(audioBuffer);
 	            _this.recordingTrack.setPlayout(new _Playout2.default(_this.ac, audioBuffer));
 	            _this.adjustDuration();
-	          }).catch(function () {
+	          }).catch(function (e) {
+	            console.log(e);
 	            _this.working = false;
 	          });
 	          _this.working = true;
@@ -3186,6 +3198,7 @@ var WaveformPlaylist =
 	      };
 	
 	      this.mediaRecorder.onstop = function () {
+	        console.log('recorder stopped');
 	        _this.chunks = [];
 	        _this.working = false;
 	      };
@@ -3937,8 +3950,9 @@ var WaveformPlaylist =
 	    value: function record() {
 	      var _this12 = this;
 	
+	      console.log('starting recording');
 	      var playoutPromises = [];
-	      this.mediaRecorder.start(300);
+	      this.mediaRecorder.start();
 	
 	      this.tracks.forEach(function (track) {
 	        track.setState('none');

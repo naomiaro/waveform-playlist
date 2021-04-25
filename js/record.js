@@ -8,6 +8,7 @@ navigator.getUserMedia = (navigator.getUserMedia ||
   navigator.msGetUserMedia);
 
 function gotStream(stream) {
+  console.log(stream);
   userMediaStream = stream;
   playlist.initRecorder(userMediaStream);
   $(".btn-record").removeClass("disabled");
