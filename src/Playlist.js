@@ -933,7 +933,7 @@ export default class {
             this.sampleRate,
           );
 
-          this.ee.emit('scroll', this.scrollLeft);
+          this.ee.emit('scroll');
         },
         hook: new ScrollHook(this),
       },
