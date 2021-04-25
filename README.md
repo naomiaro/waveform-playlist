@@ -54,14 +54,6 @@ var playlist = WaveformPlaylist({
   controls: {
     show: false,
     width: 150,
-    // whether to render the widget or not in the controls panel.
-    widgets: {
-      muteOrSolo: true,
-      volume: true,
-      stereoPan: true,
-      collapse: true,
-      remove: true,
-    },
   },
   zoomLevels: [500, 1000, 3000, 5000]
 });
@@ -138,7 +130,25 @@ var options = {
     show: false,
 
     // width of controls in pixels
-    width: 150
+    width: 150,
+    
+    // whether to render the widget or not in the controls panel.
+    widgets: {
+      // Mute & solo button widget
+      muteOrSolo: true,
+      
+      // Volume slider
+      volume: true,
+      
+      // Stereo pan slider
+      stereoPan: true,
+      
+      // Collapse track button
+      collapse: true,
+      
+      // Remove track button
+      remove: true,
+    },
   },
 
   colors: {
