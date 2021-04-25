@@ -1,3 +1,34 @@
+var userMediaStream;
+var playlist;
+var constraints = { audio: true };
+
+navigator.getUserMedia = (navigator.getUserMedia ||
+  navigator.webkitGetUserMedia ||
+  navigator.mozGetUserMedia ||
+  navigator.msGetUserMedia);
+
+function gotStream(stream) {
+  userMediaStream = stream;
+  playlist.initRecorder(userMediaStream);
+  $(".btn-record").removeClass("disabled");
+}
+
+function logError(err) {
+  console.error(err);
+}
+
+if (navigator.mediaDevices) {
+  navigator.mediaDevices.getUserMedia(constraints)
+  .then(gotStream)
+  .catch(logError);
+} else if (navigator.getUserMedia && 'MediaRecorder' in window) {
+  navigator.getUserMedia(
+    constraints,
+    gotStream,
+    logError
+  );
+}
+
 var playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
   waveHeight: 100,
