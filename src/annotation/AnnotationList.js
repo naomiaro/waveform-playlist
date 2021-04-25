@@ -9,8 +9,9 @@ import timeformat from '../utils/timeformat';
 
 class AnnotationList {
   constructor(playlist, annotations, controls = [], editable = false,
-    linkEndpoints = false, isContinuousPlay = false) {
+    linkEndpoints = false, isContinuousPlay = false, marginLeft = 0) {
     this.playlist = playlist;
+    this.marginLeft = marginLeft;
     this.resizeHandlers = [];
     this.editable = editable;
     this.annotations = annotations.map(a =>
@@ -177,7 +178,7 @@ class AnnotationList {
     const boxes = h('div.annotations-boxes',
       {
         attributes: {
-          style: 'height: 30px;',
+          style: `height: 30px; position: relative; margin-left: ${this.marginLeft}px;`,
         },
       },
       this.annotations.map((note, i) => {
