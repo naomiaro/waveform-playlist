@@ -396,6 +396,11 @@ export default class {
       [h('i.fas.fa-times')],
     );
 
+    const trackName = h(
+      'span',
+      [this.name],
+    );
+
     const collapseTrack = h(
       'button.btn.btn-info.btn-sm.track-collapse',
       {
@@ -417,7 +422,7 @@ export default class {
     if (widgets.remove) {
       headerChildren.push(removeTrack);
     }
-    headerChildren.push(this.name);
+    headerChildren.push(trackName);
     if (widgets.collapse) {
       headerChildren.push(collapseTrack);
     }

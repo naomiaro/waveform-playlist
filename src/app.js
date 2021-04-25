@@ -53,7 +53,7 @@ export function init(options = {}, ee = EventEmitter()) {
     isAutomaticScroll: false,
   };
 
-  const config = _defaults(options, defaults);
+  const config = _defaults({}, options, defaults);
   const zoomIndex = config.zoomLevels.indexOf(config.samplesPerPixel);
 
   if (zoomIndex === -1) {

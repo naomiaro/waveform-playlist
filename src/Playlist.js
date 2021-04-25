@@ -883,7 +883,7 @@ export default class {
       colors: this.colors,
     };
 
-    return _defaults(data, defaults);
+    return _defaults({}, data, defaults);
   }
 
   isActiveTrack(track) {
