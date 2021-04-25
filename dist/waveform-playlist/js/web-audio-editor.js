@@ -29,7 +29,7 @@ if (navigator.mediaDevices) {
   );
 }
 
-var playlist = WaveformPlaylist.init({
+playlist = WaveformPlaylist.init({
   samplesPerPixel: 3000,
   waveHeight: 100,
   container: document.getElementById("playlist"),
