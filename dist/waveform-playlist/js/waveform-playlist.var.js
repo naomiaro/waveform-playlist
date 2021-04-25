@@ -3261,7 +3261,8 @@ var WaveformPlaylist =
 	  }, {
 	    key: 'setAnnotations',
 	    value: function setAnnotations(config) {
-	      this.annotationList = new _AnnotationList2.default(this, config.annotations, config.controls, config.editable, config.linkEndpoints, config.isContinuousPlay);
+	      var controlWidth = this.controls.show ? this.controls.width : 0;
+	      this.annotationList = new _AnnotationList2.default(this, config.annotations, config.controls, config.editable, config.linkEndpoints, config.isContinuousPlay, controlWidth);
 	    }
 	  }, {
 	    key: 'setEventEmitter',
@@ -9705,10 +9706,12 @@ var WaveformPlaylist =
 	    var editable = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
 	    var linkEndpoints = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : false;
 	    var isContinuousPlay = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : false;
+	    var marginLeft = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : 0;
 	
 	    _classCallCheck(this, AnnotationList);
 	
 	    this.playlist = playlist;
+	    this.marginLeft = marginLeft;
 	    this.resizeHandlers = [];
 	    this.editable = editable;
 	    this.annotations = annotations.map(function (a) {
@@ -9888,7 +9891,7 @@ var WaveformPlaylist =
 	
 	      var boxes = (0, _h2.default)('div.annotations-boxes', {
 	        attributes: {
-	          style: 'height: 30px;'
+	          style: 'height: 30px; position: relative; margin-left: ' + this.marginLeft + 'px;'
 	        }
 	      }, this.annotations.map(function (note, i) {
 	        var samplesPerPixel = _this4.playlist.samplesPerPixel;

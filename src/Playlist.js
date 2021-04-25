@@ -150,6 +150,7 @@ export default class {
   }
 
   setAnnotations(config) {
+    const controlWidth = this.controls.show ? this.controls.width : 0;
     this.annotationList = new AnnotationList(
       this,
       config.annotations,
@@ -157,6 +158,7 @@ export default class {
       config.editable,
       config.linkEndpoints,
       config.isContinuousPlay,
+      controlWidth,
     );
   }
 
