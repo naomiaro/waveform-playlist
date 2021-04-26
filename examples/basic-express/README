@@ -1,0 +1,24 @@
+A simple express demo with two pages.
+
+```localhost:3000/```
+
+```localhost:3000/track```
+
+Started with https://expressjs.com/en/starter/generator.html
+
+To quickly run the demo:
+
+```npm install```
+
+```npm start```
+
+
+To develop on the demo:
+
+```npm install```
+
+One terminal:
+```npm run build:dev```
+
+Second terminal:
+```npm run start:dev```
