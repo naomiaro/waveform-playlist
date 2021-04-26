@@ -4,6 +4,7 @@
 /coverage
 /img
 /experiments
+/examples
 /dist
 deploy.sh
 .travis.yml
