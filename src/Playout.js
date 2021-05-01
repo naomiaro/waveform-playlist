@@ -1,30 +1,32 @@
-import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from 'fade-maker';
+import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from "fade-maker";
+import { PitchShifter } from "soundtouchjs";
 
 export default class {
-
   constructor(ac, buffer) {
     this.ac = ac;
     this.gain = 1;
+    this.pitch = 1;
+    this.tempo = 1;
     this.buffer = buffer;
     this.destination = this.ac.destination;
     this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
   }
 
-  applyFade(type, start, duration, shape = 'logarithmic') {
+  applyFade(type, start, duration, shape = "logarithmic") {
     if (type === FADEIN) {
       createFadeIn(this.fadeGain.gain, shape, start, duration);
     } else if (type === FADEOUT) {
       createFadeOut(this.fadeGain.gain, shape, start, duration);
     } else {
-      throw new Error('Unsupported fade type');
+      throw new Error("Unsupported fade type");
     }
   }
 
-  applyFadeIn(start, duration, shape = 'logarithmic') {
+  applyFadeIn(start, duration, shape = "logarithmic") {
     this.applyFade(FADEIN, start, duration, shape);
   }
 
-  applyFadeOut(start, duration, shape = 'logarithmic') {
+  applyFadeOut(start, duration, shape = "logarithmic") {
     this.applyFade(FADEOUT, start, duration, shape);
   }
 
@@ -43,30 +45,60 @@ export default class {
   }
 
   setUpSource() {
-    this.source = this.ac.createBufferSource();
-    this.source.buffer = this.buffer;
+    // this.source = this.ac.createBufferSource();
+    // this.source.buffer = this.buffer;
+
+    this.shifter = this.createShifter(this.buffer);
 
     const sourcePromise = new Promise((resolve) => {
-      // keep track of the buffer state.
-      this.source.onended = () => {
-        this.source.disconnect();
-        this.fadeGain.disconnect();
-        this.volumeGain.disconnect();
-        this.shouldPlayGain.disconnect();
-        this.panner.disconnect();
-        this.masterGain.disconnect();
+      this.shifter.on(
+        "play",
+        ({ formattedTimePlayed, percentagePlayed }) => {
+          // console.log(formattedTimePlayed);
+          // console.log(percentagePlayed);
+          if (percentagePlayed === 100) {
+            console.log('ending!');
+            this.shifter.disconnect();
+            this.shifter.off();
+            this.fadeGain.disconnect();
+            this.volumeGain.disconnect();
+            this.shouldPlayGain.disconnect();
+            this.panner.disconnect();
+            this.masterGain.disconnect();
 
+            this.source = undefined;
+            this.fadeGain = undefined;
+            this.volumeGain = undefined;
+            this.shouldPlayGain = undefined;
+            this.panner = undefined;
+            this.masterGain = undefined;
 
-        this.source = undefined;
-        this.fadeGain = undefined;
-        this.volumeGain = undefined;
-        this.shouldPlayGain = undefined;
-        this.panner = undefined;
-        this.masterGain = undefined;
-
-        resolve();
-      };
+            resolve();
+          }
+        },
+      );
     });
+     
+    // const sourcePromise = new Promise((resolve) => {
+    //   // keep track of the buffer state.
+    //   this.source.onended = () => {
+    //     this.source.disconnect();
+    //     this.fadeGain.disconnect();
+    //     this.volumeGain.disconnect();
+    //     this.shouldPlayGain.disconnect();
+    //     this.panner.disconnect();
+    //     this.masterGain.disconnect();
+
+    //     this.source = undefined;
+    //     this.fadeGain = undefined;
+    //     this.volumeGain = undefined;
+    //     this.shouldPlayGain = undefined;
+    //     this.panner = undefined;
+    //     this.masterGain = undefined;
+
+    //     resolve();
+    //   };
+    // });
 
     this.fadeGain = this.ac.createGain();
     // used for track volume slider
@@ -77,7 +109,8 @@ export default class {
 
     this.panner = this.ac.createStereoPanner();
 
-    this.source.connect(this.fadeGain);
+    // this.source.connect(this.fadeGain);
+    // this.shifter.connect(this.fadeGain);
     this.fadeGain.connect(this.volumeGain);
     this.volumeGain.connect(this.shouldPlayGain);
     this.shouldPlayGain.connect(this.masterGain);
@@ -85,6 +118,13 @@ export default class {
     this.panner.connect(this.destination);
 
     return sourcePromise;
+  }
+
+  createShifter(buffer) {
+    const shifter = new PitchShifter(this.ac, buffer, 256);
+    shifter.tempo = this.tempo;
+    shifter.pitch = this.pitch;
+    return shifter;
   }
 
   setVolumeGainLevel(level) {
@@ -112,7 +152,7 @@ export default class {
       if (this.panner.pan !== undefined) {
         this.panner.pan.value = pan;
       } else {
-        this.panner.panningModel = 'equalpower';
+        this.panner.panningModel = "equalpower";
         this.panner.setPosition(pan, 0, 1 - Math.abs(pan));
       }
     }
@@ -125,12 +165,14 @@ export default class {
     Unfortunately it doesn't seem to work if you just give it a start time.
   */
   play(when, start, duration) {
-    this.source.start(when, start, duration);
+    // this.source.start(when, start, duration);
+    this.shifter.connect(this.fadeGain);
   }
 
   stop(when = 0) {
-    if (this.source) {
-      this.source.stop(when);
-    }
+    this.shifter.disconnect();
+    // if (this.source) {
+    //   this.source.stop(when);
+    // }
   }
 }
