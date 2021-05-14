@@ -48,10 +48,10 @@ export default function () {
     view.setUint16(22, mono ? 1 : 2, true);
     /* sample rate */
     view.setUint32(24, sampleRate, true);
-    /* byte rate (sample rate * block align) */
-    view.setUint32(28, sampleRate * 4, true);
+    /* byte rate (sample rate * channels * bytes per sample) */
+    view.setUint32(28, sampleRate * (mono ? 1 : 2) * 2, true);
     /* block align (channel count * bytes per sample) */
-    view.setUint16(32, 4, true);
+    view.setUint16(32, (mono ? 1 : 2) * 2, true);
     /* bits per sample */
     view.setUint16(34, 16, true);
     /* data chunk identifier */
