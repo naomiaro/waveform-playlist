@@ -14,7 +14,8 @@ module.exports = {
       type: "var",
     },
   },
-  mode: "production",
+  mode: "development",
+  devtool: "eval-source-map",
   module: {
     rules: [
       {
