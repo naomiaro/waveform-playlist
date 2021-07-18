@@ -35,6 +35,7 @@ export default class {
 
     this.fadeType = 'logarithmic';
     this.masterGain = 1;
+    this.speed = 1;
     this.annotations = [];
     this.durationFormat = 'hh:mm:ss.uuu';
     this.isAutomaticScroll = false;
@@ -340,6 +341,10 @@ export default class {
         this.isScrolling = false;
       }, 200);
     });
+
+    ee.on('speedchange', (speed) => {
+      this.setSpeed(speed);
+    });
   }
 
   load(trackList) {
@@ -402,6 +407,7 @@ export default class {
         track.setState(this.getState());
         track.setStartTime(start);
         track.setPlayout(playout);
+        track.setSpeed(1);
 
         track.setGainLevel(gain);
         track.setStereoPanValue(stereoPan);
@@ -523,6 +529,27 @@ export default class {
     }).catch((e) => {
       throw e;
     });
+  }
+
+  startRender() {
+    if (this.isRendering) {
+      return;
+    }
+
+    this.offlineAudioContext = new OfflineAudioContext(2, 44100 * this.duration, 44100);
+
+    const currentTime = this.offlineAudioContext.currentTime;
+
+    this.tracks.forEach((track) => {
+      track.setOfflinePlayout(new Playout(this.offlineAudioContext, track.buffer));
+      track.schedulePlay(currentTime, 0, 0, {
+        shouldPlay: this.shouldTrackPlay(track),
+        masterGain: 1,
+        isOffline: true,
+      });
+    });
+
+    return this.offlineAudioContext.startRendering();
   }
 
   getTimeSelection() {
@@ -690,6 +717,7 @@ export default class {
     }
 
     this.tracks.forEach((track) => {
+      track.setSpeed(this.speed);
       track.setState('cursor');
       playoutPromises.push(track.schedulePlay(currentTime, start, end, {
         shouldPlay: this.shouldTrackPlay(track),
@@ -823,9 +851,8 @@ export default class {
     const selection = this.getTimeSelection();
     const cursorPos = cursor || this.cursor;
     const elapsed = currentTime - this.lastDraw;
-
+    const playbackSeconds = cursorPos + (elapsed * this.speed);
     if (this.isPlaying()) {
-      const playbackSeconds = cursorPos + elapsed;
       this.ee.emit('timeupdate', playbackSeconds);
       this.animationRequest = window.requestAnimationFrame(() => {
         this.updateEditor(playbackSeconds);
@@ -835,7 +862,7 @@ export default class {
       this.draw(this.render());
       this.lastDraw = currentTime;
     } else {
-      if ((cursorPos + elapsed) >=
+      if (playbackSeconds >=
         (this.isSegmentSelection() ? selection.end : this.duration)) {
         this.ee.emit('finished');
       }
@@ -974,5 +1001,13 @@ export default class {
     });
 
     return info;
+  }
+
+  setSpeed(speed) {
+    this.speed = (speed >= 0.5 && speed <= 4) ? speed : 1;
+    if (this.isPlaying()) {
+      this.restartPlayFrom(this.playbackSeconds);
+    }
+    this.ee.emit('speedchanged', this.speed);
   }
 }

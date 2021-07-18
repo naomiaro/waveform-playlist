@@ -125,6 +125,7 @@ export default class {
     Unfortunately it doesn't seem to work if you just give it a start time.
   */
   play(when, start, duration) {
+    this.source.playbackRate.value = this.speed;
     this.source.start(when, start, duration);
   }
 
@@ -132,5 +133,9 @@ export default class {
     if (this.source) {
       this.source.stop(when);
     }
+  }
+
+  setSpeed(speed) {
+    this.speed = speed;
   }
 }
