@@ -35,6 +35,7 @@ export default class {
     this.startTime = 0;
     this.endTime = 0;
     this.stereoPan = 0;
+    this.speed = 1;
   }
 
   setEventEmitter(ee) {
@@ -174,6 +175,10 @@ export default class {
     this.peakData = data;
   }
 
+  setSpeed(speed) {
+    this.speed = speed;
+  }
+
   calculatePeaks(samplesPerPixel, sampleRate) {
     const cueIn = secondsToSamples(this.cueIn, sampleRate);
     const cueOut = secondsToSamples(this.cueOut, sampleRate);
@@ -278,7 +283,7 @@ export default class {
     if (this.startTime >= startTime) {
       start = 0;
       // schedule additional delay for this audio node.
-      when += this.startTime - startTime;
+      when += (this.startTime - startTime) / this.speed;
 
       if (endTime) {
         segment -= this.startTime - startTime;
@@ -309,11 +314,11 @@ export default class {
       // only apply fade if it's ahead of the cursor.
       if (relPos < fade.end) {
         if (relPos <= fade.start) {
-          fadeStart = now + (fade.start - relPos);
-          fadeDuration = fade.end - fade.start;
+          fadeStart = now + ((fade.start - relPos) / this.speed);
+          fadeDuration = ((fade.end - fade.start) / this.speed);
         } else if (relPos > fade.start && relPos < fade.end) {
-          fadeStart = now - (relPos - fade.start);
-          fadeDuration = fade.end - fade.start;
+          fadeStart = now - ((relPos - fade.start) / this.speed);
+          fadeDuration = ((fade.end - fade.start) / this.speed);
         }
 
         switch (fade.type) {
@@ -332,6 +337,7 @@ export default class {
       }
     });
 
+    playoutSystem.setSpeed(this.speed);
     playoutSystem.setVolumeGainLevel(this.gain);
     playoutSystem.setShouldPlay(options.shouldPlay);
     playoutSystem.setMasterGainLevel(options.masterGain);
