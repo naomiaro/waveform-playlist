@@ -345,6 +345,10 @@ export default class {
     ee.on('speedchange', (speed) => {
       this.setSpeed(speed);
     });
+
+    ee.on('loopnumber', (number) => {
+      this.setLoop(number);
+    });
   }
 
   load(trackList) {
@@ -864,7 +868,14 @@ export default class {
     } else {
       if (playbackSeconds >=
         (this.isSegmentSelection() ? selection.end : this.duration)) {
-        this.ee.emit('finished');
+        if (this.loopNumber > 0) {
+          this.loopNumber -= 1;
+          this.restartPlayFrom(selection.start, selection.end);
+        } else if (this.loopNumber === -1) {
+          this.restartPlayFrom(selection.start, selection.end);
+        } else {
+          this.ee.emit('finished');
+        }
       }
 
       this.stopAnimation();
@@ -1009,5 +1020,9 @@ export default class {
       this.restartPlayFrom(this.playbackSeconds);
     }
     this.ee.emit('speedchanged', this.speed);
+  }
+
+  setLoop(number) {
+    this.loopNumber = number;
   }
 }
