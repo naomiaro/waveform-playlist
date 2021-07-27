@@ -1,7 +1,6 @@
-import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from 'fade-maker';
+import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from "fade-maker";
 
 export default class {
-
   constructor(ac, buffer) {
     this.ac = ac;
     this.gain = 1;
@@ -10,21 +9,21 @@ export default class {
     this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
   }
 
-  applyFade(type, start, duration, shape = 'logarithmic') {
+  applyFade(type, start, duration, shape = "logarithmic") {
     if (type === FADEIN) {
       createFadeIn(this.fadeGain.gain, shape, start, duration);
     } else if (type === FADEOUT) {
       createFadeOut(this.fadeGain.gain, shape, start, duration);
     } else {
-      throw new Error('Unsupported fade type');
+      throw new Error("Unsupported fade type");
     }
   }
 
-  applyFadeIn(start, duration, shape = 'logarithmic') {
+  applyFadeIn(start, duration, shape = "logarithmic") {
     this.applyFade(FADEIN, start, duration, shape);
   }
 
-  applyFadeOut(start, duration, shape = 'logarithmic') {
+  applyFadeOut(start, duration, shape = "logarithmic") {
     this.applyFade(FADEOUT, start, duration, shape);
   }
 
@@ -55,7 +54,6 @@ export default class {
         this.shouldPlayGain.disconnect();
         this.panner.disconnect();
         this.masterGain.disconnect();
-
 
         this.source = undefined;
         this.fadeGain = undefined;
@@ -112,7 +110,7 @@ export default class {
       if (this.panner.pan !== undefined) {
         this.panner.pan.value = pan;
       } else {
-        this.panner.panningModel = 'equalpower';
+        this.panner.panningModel = "equalpower";
         this.panner.setPosition(pan, 0, 1 - Math.abs(pan));
       }
     }

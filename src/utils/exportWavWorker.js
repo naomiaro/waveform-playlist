@@ -24,22 +24,22 @@ export default function () {
     let writeOffset = offset;
     for (let i = 0; i < input.length; i += 1, writeOffset += 2) {
       const s = Math.max(-1, Math.min(1, input[i]));
-      output.setInt16(writeOffset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      output.setInt16(writeOffset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
     }
   }
 
   function encodeWAV(samples, mono = false) {
-    const buffer = new ArrayBuffer(44 + (samples.length * 2));
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
     const view = new DataView(buffer);
 
     /* RIFF identifier */
-    writeString(view, 0, 'RIFF');
+    writeString(view, 0, "RIFF");
     /* file length */
-    view.setUint32(4, 32 + (samples.length * 2), true);
+    view.setUint32(4, 32 + samples.length * 2, true);
     /* RIFF type */
-    writeString(view, 8, 'WAVE');
+    writeString(view, 8, "WAVE");
     /* format chunk identifier */
-    writeString(view, 12, 'fmt ');
+    writeString(view, 12, "fmt ");
     /* format chunk length */
     view.setUint32(16, 16, true);
     /* sample format (raw) */
@@ -55,7 +55,7 @@ export default function () {
     /* bits per sample */
     view.setUint16(34, 16, true);
     /* data chunk identifier */
-    writeString(view, 36, 'data');
+    writeString(view, 36, "data");
     /* data chunk length */
     view.setUint32(40, samples.length * 2, true);
 
@@ -83,8 +83,8 @@ export default function () {
     let inputIndex = 0;
 
     while (index < length) {
-      result[index += 1] = inputL[inputIndex];
-      result[index += 1] = inputR[inputIndex];
+      result[(index += 1)] = inputL[inputIndex];
+      result[(index += 1)] = inputR[inputIndex];
       inputIndex += 1;
     }
 
@@ -109,24 +109,24 @@ export default function () {
 
   onmessage = function onmessage(e) {
     switch (e.data.command) {
-      case 'init': {
+      case "init": {
         init(e.data.config);
         break;
       }
-      case 'record': {
+      case "record": {
         record(e.data.buffer);
         break;
       }
-      case 'exportWAV': {
+      case "exportWAV": {
         exportWAV(e.data.type);
         break;
       }
-      case 'clear': {
+      case "clear": {
         clear();
         break;
       }
       default: {
-        throw new Error('Unknown export worker command');
+        throw new Error("Unknown export worker command");
       }
     }
   };

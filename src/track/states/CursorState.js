@@ -1,4 +1,4 @@
-import { pixelsToSeconds } from '../../utils/conversions';
+import { pixelsToSeconds } from "../../utils/conversions";
 
 export default class {
   constructor(track) {
@@ -14,16 +14,20 @@ export default class {
     e.preventDefault();
 
     const startX = e.offsetX;
-    const startTime = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
+    const startTime = pixelsToSeconds(
+      startX,
+      this.samplesPerPixel,
+      this.sampleRate
+    );
 
-    this.track.ee.emit('select', startTime, startTime, this.track);
+    this.track.ee.emit("select", startTime, startTime, this.track);
   }
 
   static getClass() {
-    return '.state-cursor';
+    return ".state-cursor";
   }
 
   static getEvents() {
-    return ['click'];
+    return ["click"];
   }
 }

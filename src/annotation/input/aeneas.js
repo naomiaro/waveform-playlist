@@ -10,15 +10,15 @@
 },
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 
 export default function (aeneas) {
   const annotation = {
     id: aeneas.id || uuidv4(),
     start: Number(aeneas.begin) || 0,
     end: Number(aeneas.end) || 0,
-    lines: aeneas.lines || [''],
-    lang: aeneas.language || 'en',
+    lines: aeneas.lines || [""],
+    lang: aeneas.language || "en",
   };
 
   return annotation;

@@ -4,6 +4,6 @@ export default class {
   }
 
   static getClass() {
-    return '.state-record';
+    return ".state-record";
   }
 }

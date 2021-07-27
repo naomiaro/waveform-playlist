@@ -1,4 +1,4 @@
-import { pixelsToSeconds } from '../../utils/conversions';
+import { pixelsToSeconds } from "../../utils/conversions";
 
 export default class {
   constructor(track) {
@@ -15,15 +15,19 @@ export default class {
     const time = pixelsToSeconds(startX, this.samplesPerPixel, this.sampleRate);
 
     if (time > this.track.getStartTime() && time < this.track.getEndTime()) {
-      this.track.ee.emit('fadein', time - this.track.getStartTime(), this.track);
+      this.track.ee.emit(
+        "fadein",
+        time - this.track.getStartTime(),
+        this.track
+      );
     }
   }
 
   static getClass() {
-    return '.state-fadein';
+    return ".state-fadein";
   }
 
   static getEvents() {
-    return ['click'];
+    return ["click"];
   }
 }

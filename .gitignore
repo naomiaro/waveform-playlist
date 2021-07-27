@@ -1,5 +1,4 @@
 node_modules/
-/coverage
 
 # compiled files
 /lib

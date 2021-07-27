@@ -1,22 +1,29 @@
-import h from 'virtual-dom/h';
+import h from "virtual-dom/h";
 
-import inputAeneas from './input/aeneas';
-import outputAeneas from './output/aeneas';
-import { secondsToPixels } from '../utils/conversions';
-import DragInteraction from '../interaction/DragInteraction';
-import ScrollTopHook from './render/ScrollTopHook';
-import timeformat from '../utils/timeformat';
+import inputAeneas from "./input/aeneas";
+import outputAeneas from "./output/aeneas";
+import { secondsToPixels } from "../utils/conversions";
+import DragInteraction from "../interaction/DragInteraction";
+import ScrollTopHook from "./render/ScrollTopHook";
+import timeformat from "../utils/timeformat";
 
 class AnnotationList {
-  constructor(playlist, annotations, controls = [], editable = false,
-    linkEndpoints = false, isContinuousPlay = false, marginLeft = 0) {
+  constructor(
+    playlist,
+    annotations,
+    controls = [],
+    editable = false,
+    linkEndpoints = false,
+    isContinuousPlay = false,
+    marginLeft = 0
+  ) {
     this.playlist = playlist;
     this.marginLeft = marginLeft;
     this.resizeHandlers = [];
     this.editable = editable;
-    this.annotations = annotations.map(a =>
+    this.annotations = annotations.map((a) =>
       // TODO support different formats later on.
-      inputAeneas(a),
+      inputAeneas(a)
     );
     this.setupInteractions();
 
@@ -32,11 +39,11 @@ class AnnotationList {
   setupInteractions() {
     this.annotations.forEach((a, i) => {
       const leftShift = new DragInteraction(this.playlist, {
-        direction: 'left',
+        direction: "left",
         index: i,
       });
       const rightShift = new DragInteraction(this.playlist, {
-        direction: 'right',
+        direction: "right",
         index: i,
       });
 
@@ -46,13 +53,13 @@ class AnnotationList {
   }
 
   setupEE(ee) {
-    ee.on('dragged', (deltaTime, data) => {
+    ee.on("dragged", (deltaTime, data) => {
       const annotationIndex = data.index;
       const annotations = this.annotations;
       const note = annotations[annotationIndex];
 
       // resizing to the left
-      if (data.direction === 'left') {
+      if (data.direction === "left") {
         const originalVal = note.start;
         note.start += deltaTime;
 
@@ -60,14 +67,18 @@ class AnnotationList {
           note.start = 0;
         }
 
-        if (annotationIndex &&
-          (annotations[annotationIndex - 1].end > note.start)) {
+        if (
+          annotationIndex &&
+          annotations[annotationIndex - 1].end > note.start
+        ) {
           annotations[annotationIndex - 1].end = note.start;
         }
 
-        if (this.playlist.linkEndpoints &&
+        if (
+          this.playlist.linkEndpoints &&
           annotationIndex &&
-          (annotations[annotationIndex - 1].end === originalVal)) {
+          annotations[annotationIndex - 1].end === originalVal
+        ) {
           annotations[annotationIndex - 1].end = note.start;
         }
       } else {
@@ -79,14 +90,18 @@ class AnnotationList {
           note.end = this.playlist.duration;
         }
 
-        if (annotationIndex < (annotations.length - 1) &&
-          (annotations[annotationIndex + 1].start < note.end)) {
+        if (
+          annotationIndex < annotations.length - 1 &&
+          annotations[annotationIndex + 1].start < note.end
+        ) {
           annotations[annotationIndex + 1].start = note.end;
         }
 
-        if (this.playlist.linkEndpoints &&
-          (annotationIndex < (annotations.length - 1)) &&
-          (annotations[annotationIndex + 1].start === originalVal)) {
+        if (
+          this.playlist.linkEndpoints &&
+          annotationIndex < annotations.length - 1 &&
+          annotations[annotationIndex + 1].start === originalVal
+        ) {
           annotations[annotationIndex + 1].start = note.end;
         }
       }
@@ -94,15 +109,15 @@ class AnnotationList {
       this.playlist.drawRequest();
     });
 
-    ee.on('continuousplay', (val) => {
+    ee.on("continuousplay", (val) => {
       this.playlist.isContinuousPlay = val;
     });
 
-    ee.on('linkendpoints', (val) => {
+    ee.on("linkendpoints", (val) => {
       this.playlist.linkEndpoints = val;
     });
 
-    ee.on('annotationsrequest', () => {
+    ee.on("annotationsrequest", () => {
       this.export();
     });
 
@@ -110,13 +125,15 @@ class AnnotationList {
   }
 
   export() {
-    const output = this.annotations.map(a => outputAeneas(a));
-    const dataStr = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(output))}`;
-    const a = document.createElement('a');
+    const output = this.annotations.map((a) => outputAeneas(a));
+    const dataStr = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(output)
+    )}`;
+    const a = document.createElement("a");
 
     document.body.appendChild(a);
     a.href = dataStr;
-    a.download = 'annotations.json';
+    a.download = "annotations.json";
     a.click();
     document.body.removeChild(a);
   }
@@ -125,7 +142,8 @@ class AnnotationList {
     const events = DragInteraction.getEvents();
     const config = {
       attributes: {
-        style: 'position: absolute; height: 30px; width: 10px; top: 0; left: -2px',
+        style:
+          "position: absolute; height: 30px; width: 10px; top: 0; left: -2px",
         draggable: true,
       },
     };
@@ -135,30 +153,31 @@ class AnnotationList {
       config[`on${event}`] = handler[event].bind(handler);
     });
 
-    return h('div.resize-handle.resize-w', config);
+    return h("div.resize-handle.resize-w", config);
   }
 
   renderResizeRight(i) {
     const events = DragInteraction.getEvents();
     const config = {
       attributes: {
-        style: 'position: absolute; height: 30px; width: 10px; top: 0; right: -2px',
+        style:
+          "position: absolute; height: 30px; width: 10px; top: 0; right: -2px",
         draggable: true,
       },
     };
-    const handler = this.resizeHandlers[(i * 2) + 1];
+    const handler = this.resizeHandlers[i * 2 + 1];
 
     events.forEach((event) => {
       config[`on${event}`] = handler[event].bind(handler);
     });
 
-    return h('div.resize-handle.resize-e', config);
+    return h("div.resize-handle.resize-e", config);
   }
 
   renderControls(note, i) {
     // seems to be a bug with references, or I'm missing something.
     const that = this;
-    return this.controls.map(ctrl =>
+    return this.controls.map((ctrl) =>
       h(`i.${ctrl.class}`, {
         attributes: {
           title: ctrl.title,
@@ -170,12 +189,13 @@ class AnnotationList {
           this.setupInteractions();
           that.playlist.drawRequest();
         },
-      }),
+      })
     );
   }
 
   render() {
-    const boxes = h('div.annotations-boxes',
+    const boxes = h(
+      "div.annotations-boxes",
       {
         attributes: {
           style: `height: 30px; position: relative; margin-left: ${this.marginLeft}px;`,
@@ -185,20 +205,26 @@ class AnnotationList {
         const samplesPerPixel = this.playlist.samplesPerPixel;
         const sampleRate = this.playlist.sampleRate;
         const pixPerSec = sampleRate / samplesPerPixel;
-        const pixOffset = secondsToPixels(this.playlist.scrollLeft, samplesPerPixel, sampleRate);
-        const left = Math.floor((note.start * pixPerSec) - pixOffset);
-        const width = Math.ceil((note.end * pixPerSec) - (note.start * pixPerSec));
+        const pixOffset = secondsToPixels(
+          this.playlist.scrollLeft,
+          samplesPerPixel,
+          sampleRate
+        );
+        const left = Math.floor(note.start * pixPerSec - pixOffset);
+        const width = Math.ceil(note.end * pixPerSec - note.start * pixPerSec);
 
-        return h('div.annotation-box',
+        return h(
+          "div.annotation-box",
           {
             attributes: {
               style: `position: absolute; height: 30px; width: ${width}px; left: ${left}px`,
-              'data-id': note.id,
+              "data-id": note.id,
             },
           },
           [
             this.renderResizeLeft(i),
-            h('span.id',
+            h(
+              "span.id",
               {
                 onclick: () => {
                   const start = this.annotations[i].start;
@@ -206,35 +232,33 @@ class AnnotationList {
 
                   if (this.playlist.isContinuousPlay) {
                     this.playlist.seek(start, start);
-                    this.playlist.ee.emit('play', start);
+                    this.playlist.ee.emit("play", start);
                   } else {
                     this.playlist.seek(start, end);
-                    this.playlist.ee.emit('play', start, end);
+                    this.playlist.ee.emit("play", start, end);
                   }
                 },
               },
-              [
-                note.id,
-              ],
+              [note.id]
             ),
             this.renderResizeRight(i),
-          ],
+          ]
         );
-      }),
+      })
     );
 
-    const boxesWrapper = h('div.annotations-boxes-wrapper',
+    const boxesWrapper = h(
+      "div.annotations-boxes-wrapper",
       {
         attributes: {
-          style: 'overflow: hidden;',
+          style: "overflow: hidden;",
         },
       },
-      [
-        boxes,
-      ],
+      [boxes]
     );
 
-    const text = h('div.annotations-text',
+    const text = h(
+      "div.annotations-text",
       {
         hook: new ScrollTopHook(),
       },
@@ -243,12 +267,13 @@ class AnnotationList {
         const start = format(note.start);
         const end = format(note.end);
 
-
-        let segmentClass = '';
-        if (this.playlist.isPlaying() &&
-          (this.playlist.playbackSeconds >= note.start) &&
-          (this.playlist.playbackSeconds <= note.end)) {
-          segmentClass = '.current';
+        let segmentClass = "";
+        if (
+          this.playlist.isPlaying() &&
+          this.playlist.playbackSeconds >= note.start &&
+          this.playlist.playbackSeconds <= note.end
+        ) {
+          segmentClass = ".current";
         }
 
         const editableConfig = {
@@ -270,37 +295,17 @@ class AnnotationList {
 
         const linesConfig = this.editable ? editableConfig : {};
 
-        return h(`div.annotation${segmentClass}`,
-          [
-            h('span.annotation-id', [
-              note.id,
-            ]),
-            h('span.annotation-start', [
-              start,
-            ]),
-            h('span.annotation-end', [
-              end,
-            ]),
-            h('span.annotation-lines',
-              linesConfig,
-              [
-                note.lines,
-              ],
-            ),
-            h('span.annotation-actions',
-              this.renderControls(note, i),
-            ),
-          ],
-        );
-      }),
+        return h(`div.annotation${segmentClass}`, [
+          h("span.annotation-id", [note.id]),
+          h("span.annotation-start", [start]),
+          h("span.annotation-end", [end]),
+          h("span.annotation-lines", linesConfig, [note.lines]),
+          h("span.annotation-actions", this.renderControls(note, i)),
+        ]);
+      })
     );
 
-    return h('div.annotations',
-      [
-        boxesWrapper,
-        text,
-      ],
-    );
+    return h("div.annotations", [boxesWrapper, text]);
   }
 }
 

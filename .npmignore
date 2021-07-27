@@ -6,10 +6,9 @@
 /experiments
 /examples
 /dist
-deploy.sh
-.travis.yml
-karma.conf.js
-test-main.js
 webpack.config.js
+webpack.config.dev.js
 .sass-cache
+.prettierrc.json
+.prettierignore
 /ghpages

@@ -1,15 +1,15 @@
-import _defaults from 'lodash.defaultsdeep';
-import createElement from 'virtual-dom/create-element';
-import EventEmitter from 'event-emitter';
-import Playlist from './Playlist';
-
+import _defaults from "lodash.defaultsdeep";
+import createElement from "virtual-dom/create-element";
+import EventEmitter from "event-emitter";
+import Playlist from "./Playlist";
 
 export function init(options = {}, ee = EventEmitter()) {
   if (options.container === undefined) {
-    throw new Error('DOM element container must be given.');
+    throw new Error("DOM element container must be given.");
   }
 
-  window.OfflineAudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  window.OfflineAudioContext =
+    window.OfflineAudioContext || window.webkitOfflineAudioContext;
   window.AudioContext = window.AudioContext || window.webkitAudioContext;
 
   const audioContext = new window.AudioContext();
@@ -19,7 +19,7 @@ export function init(options = {}, ee = EventEmitter()) {
     sampleRate: audioContext.sampleRate,
     samplesPerPixel: 4096,
     mono: true,
-    fadeType: 'logarithmic',
+    fadeType: "logarithmic",
     exclSolo: false,
     timescale: false,
     controls: {
@@ -34,14 +34,14 @@ export function init(options = {}, ee = EventEmitter()) {
       },
     },
     colors: {
-      waveOutlineColor: 'white',
-      timeColor: 'grey',
-      fadeColor: 'black',
+      waveOutlineColor: "white",
+      timeColor: "grey",
+      fadeColor: "black",
     },
-    seekStyle: 'line',
+    seekStyle: "line",
     waveHeight: 128,
     collapsedWaveHeight: 30,
-    state: 'cursor',
+    state: "cursor",
     zoomLevels: [512, 1024, 2048, 4096],
     annotationList: {
       annotations: [],
@@ -57,7 +57,9 @@ export function init(options = {}, ee = EventEmitter()) {
   const zoomIndex = config.zoomLevels.indexOf(config.samplesPerPixel);
 
   if (zoomIndex === -1) {
-    throw new Error('initial samplesPerPixel must be included in array zoomLevels');
+    throw new Error(
+      "initial samplesPerPixel must be included in array zoomLevels"
+    );
   }
 
   const playlist = new Playlist();

@@ -1,4 +1,4 @@
-import { pixelsToSeconds } from '../utils/conversions';
+import { pixelsToSeconds } from "../utils/conversions";
 
 export default class {
   constructor(playlist, data = {}) {
@@ -22,16 +22,16 @@ export default class {
       const deltaTime = pixelsToSeconds(
         deltaX,
         this.playlist.samplesPerPixel,
-        this.playlist.sampleRate,
+        this.playlist.sampleRate
       );
       this.prevX = x;
-      this.playlist.ee.emit('dragged', deltaTime, this.data);
+      this.playlist.ee.emit("dragged", deltaTime, this.data);
     }
   }
 
   complete() {
     this.active = false;
-    document.removeEventListener('dragover', this.ondragover);
+    document.removeEventListener("dragover", this.ondragover);
   }
 
   dragstart(e) {
@@ -39,10 +39,10 @@ export default class {
     this.active = true;
     this.prevX = e.clientX;
 
-    ev.dataTransfer.dropEffect = 'move';
-    ev.dataTransfer.effectAllowed = 'move';
-    ev.dataTransfer.setData('text/plain', '');
-    document.addEventListener('dragover', this.ondragover);
+    ev.dataTransfer.dropEffect = "move";
+    ev.dataTransfer.effectAllowed = "move";
+    ev.dataTransfer.setData("text/plain", "");
+    document.addEventListener("dragover", this.ondragover);
   }
 
   dragend(e) {
@@ -53,10 +53,10 @@ export default class {
   }
 
   static getClass() {
-    return '.shift';
+    return ".shift";
   }
 
   static getEvents() {
-    return ['dragstart', 'dragend'];
+    return ["dragstart", "dragend"];
   }
 }
