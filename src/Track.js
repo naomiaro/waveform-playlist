@@ -1,7 +1,7 @@
 import _assign from 'lodash.assign';
 import _forOwn from 'lodash.forown';
 
-import uuid from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import h from 'virtual-dom/h';
 
 import extractPeaks from 'webaudio-peaks';
@@ -150,7 +150,7 @@ export default class {
   }
 
   saveFade(type, shape, start, end) {
-    const id = uuid.v4();
+    const id = uuidv4();
 
     this.fades[id] = {
       type,
