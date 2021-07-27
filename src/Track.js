@@ -1,31 +1,31 @@
-import _assign from 'lodash.assign';
-import _forOwn from 'lodash.forown';
+import _assign from "lodash.assign";
+import _forOwn from "lodash.forown";
 
-import { v4 as uuidv4 } from 'uuid';
-import h from 'virtual-dom/h';
+import { v4 as uuidv4 } from "uuid";
+import h from "virtual-dom/h";
 
-import extractPeaks from 'webaudio-peaks';
-import { FADEIN, FADEOUT } from 'fade-maker';
+import extractPeaks from "webaudio-peaks";
+import { FADEIN, FADEOUT } from "fade-maker";
 
-import { secondsToPixels, secondsToSamples } from './utils/conversions';
-import stateClasses from './track/states';
+import { secondsToPixels, secondsToSamples } from "./utils/conversions";
+import stateClasses from "./track/states";
 
-import CanvasHook from './render/CanvasHook';
-import FadeCanvasHook from './render/FadeCanvasHook';
-import VolumeSliderHook from './render/VolumeSliderHook';
-import StereoPanSliderHook from './render/StereoPanSliderHook';
+import CanvasHook from "./render/CanvasHook";
+import FadeCanvasHook from "./render/FadeCanvasHook";
+import VolumeSliderHook from "./render/VolumeSliderHook";
+import StereoPanSliderHook from "./render/StereoPanSliderHook";
 
 const MAX_CANVAS_WIDTH = 1000;
 
 export default class {
   constructor() {
-    this.name = 'Untitled';
+    this.name = "Untitled";
     this.customClass = undefined;
     this.waveOutlineColor = undefined;
     this.gain = 1;
     this.fades = {};
     this.peakData = {
-      type: 'WebAudio',
+      type: "WebAudio",
       mono: false,
     };
 
@@ -55,7 +55,7 @@ export default class {
 
   setCues(cueIn, cueOut) {
     if (cueOut < cueIn) {
-      throw new Error('cue out cannot be less than cue in');
+      throw new Error("cue out cannot be less than cue in");
     }
 
     this.cueIn = cueIn;
@@ -111,9 +111,9 @@ export default class {
     this.enabledStates = _assign({}, defaultStatesEnabled, enabledStates);
   }
 
-  setFadeIn(duration, shape = 'logarithmic') {
+  setFadeIn(duration, shape = "logarithmic") {
     if (duration > this.duration) {
-      throw new Error('Invalid Fade In');
+      throw new Error("Invalid Fade In");
     }
 
     const fade = {
@@ -130,9 +130,9 @@ export default class {
     this.fadeIn = this.saveFade(FADEIN, fade.shape, fade.start, fade.end);
   }
 
-  setFadeOut(duration, shape = 'logarithmic') {
+  setFadeOut(duration, shape = "logarithmic") {
     if (duration > this.duration) {
-      throw new Error('Invalid Fade Out');
+      throw new Error("Invalid Fade Out");
     }
 
     const fade = {
@@ -184,8 +184,8 @@ export default class {
         samplesPerPixel,
         this.peakData.mono,
         cueIn,
-        cueOut,
-      ),
+        cueOut
+      )
     );
   }
 
@@ -326,7 +326,7 @@ export default class {
             break;
           }
           default: {
-            throw new Error('Invalid fade type saved on track.');
+            throw new Error("Invalid fade type saved on track.");
           }
         }
       }
@@ -349,7 +349,7 @@ export default class {
     const channelPixels = secondsToPixels(
       data.playlistLength,
       data.resolution,
-      data.sampleRate,
+      data.sampleRate
     );
 
     const config = {
@@ -358,7 +358,7 @@ export default class {
       },
     };
 
-    let overlayClass = '';
+    let overlayClass = "";
 
     if (this.stateObj) {
       this.stateObj.setup(data.resolution, data.sampleRate);
@@ -376,45 +376,42 @@ export default class {
   }
 
   renderControls(data) {
-    const muteClass = data.muted ? '.active' : '';
-    const soloClass = data.soloed ? '.active' : '';
+    const muteClass = data.muted ? ".active" : "";
+    const soloClass = data.soloed ? ".active" : "";
     const isCollapsed = data.collapsed;
     const numChan = this.peaks.data.length;
     const widgets = data.controls.widgets;
 
     const removeTrack = h(
-      'button.btn.btn-danger.btn-sm.track-remove',
+      "button.btn.btn-danger.btn-sm.track-remove",
       {
         attributes: {
-          type: 'button',
-          title: 'Remove track',
+          type: "button",
+          title: "Remove track",
         },
         onclick: () => {
-          this.ee.emit('removeTrack', this);
+          this.ee.emit("removeTrack", this);
         },
       },
-      [h('i.fas.fa-times')],
+      [h("i.fas.fa-times")]
     );
 
-    const trackName = h(
-      'span',
-      [this.name],
-    );
+    const trackName = h("span", [this.name]);
 
     const collapseTrack = h(
-      'button.btn.btn-info.btn-sm.track-collapse',
+      "button.btn.btn-info.btn-sm.track-collapse",
       {
         attributes: {
-          type: 'button',
-          title: isCollapsed ? 'Expand track' : 'Collapse track',
+          type: "button",
+          title: isCollapsed ? "Expand track" : "Collapse track",
         },
         onclick: () => {
-          this.ee.emit('changeTrackView', this, {
+          this.ee.emit("changeTrackView", this, {
             collapsed: !isCollapsed,
           });
         },
       },
-      [h(`i.fas.${isCollapsed ? 'fa-caret-down' : 'fa-caret-up'}`)],
+      [h(`i.fas.${isCollapsed ? "fa-caret-down" : "fa-caret-up"}`)]
     );
 
     const headerChildren = [];
@@ -427,82 +424,80 @@ export default class {
       headerChildren.push(collapseTrack);
     }
 
-    const controls = [
-      h('div.track-header', headerChildren),
-    ];
+    const controls = [h("div.track-header", headerChildren)];
 
     if (!isCollapsed) {
       if (widgets.muteOrSolo) {
         controls.push(
-          h('div.btn-group', [
+          h("div.btn-group", [
             h(
               `button.btn.btn-outline-dark.btn-xs.btn-mute${muteClass}`,
               {
                 attributes: {
-                  type: 'button',
+                  type: "button",
                 },
                 onclick: () => {
-                  this.ee.emit('mute', this);
+                  this.ee.emit("mute", this);
                 },
               },
-              ['Mute'],
+              ["Mute"]
             ),
             h(
               `button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`,
               {
                 onclick: () => {
-                  this.ee.emit('solo', this);
+                  this.ee.emit("solo", this);
                 },
               },
-              ['Solo'],
+              ["Solo"]
             ),
-          ]),
+          ])
         );
       }
 
       if (widgets.volume) {
         controls.push(
-          h('label.volume', [
-            h('input.volume-slider', {
+          h("label.volume", [
+            h("input.volume-slider", {
               attributes: {
-                'aria-label': 'Track volume control',
-                type: 'range',
+                "aria-label": "Track volume control",
+                type: "range",
                 min: 0,
                 max: 100,
                 value: 100,
               },
               hook: new VolumeSliderHook(this.gain),
               oninput: (e) => {
-                this.ee.emit('volumechange', e.target.value, this);
+                this.ee.emit("volumechange", e.target.value, this);
               },
             }),
-          ]),
+          ])
         );
       }
 
       if (widgets.stereoPan) {
         controls.push(
-          h('label.stereopan', [
-            h('input.stereopan-slider', {
+          h("label.stereopan", [
+            h("input.stereopan-slider", {
               attributes: {
-                'aria-label': 'Track stereo pan control',
-                type: 'range',
+                "aria-label": "Track stereo pan control",
+                type: "range",
                 min: -100,
                 max: 100,
                 value: 100,
               },
               hook: new StereoPanSliderHook(this.stereoPan),
               oninput: (e) => {
-                this.ee.emit('stereopan', e.target.value / 100, this);
+                this.ee.emit("stereopan", e.target.value / 100, this);
               },
             }),
-          ]),
+          ])
         );
       }
     }
 
     return h(
-      'div.controls',
+      "div.controls",
       {
         attributes: {
           style: `height: ${numChan * data.height}px; width: ${
@@ -510,7 +505,7 @@ export default class {
           }px; position: absolute; left: 0; z-index: 10;`,
         },
       },
-      controls,
+      controls
     );
   }
 
@@ -519,17 +514,17 @@ export default class {
     const playbackX = secondsToPixels(
       data.playbackSeconds,
       data.resolution,
-      data.sampleRate,
+      data.sampleRate
     );
     const startX = secondsToPixels(
       this.startTime,
       data.resolution,
-      data.sampleRate,
+      data.sampleRate
     );
     const endX = secondsToPixels(
       this.endTime,
       data.resolution,
-      data.sampleRate,
+      data.sampleRate
     );
     let progressWidth = 0;
     const numChan = this.peaks.data.length;
@@ -544,7 +539,7 @@ export default class {
     }
 
     const waveformChildren = [
-      h('div.cursor', {
+      h("div.cursor", {
         attributes: {
           style: `position: absolute; width: 1px; margin: 0; padding: 0; top: 0; left: ${playbackX}px; bottom: 0; z-index: 5;`,
         },
@@ -553,7 +548,7 @@ export default class {
 
     const channels = Object.keys(this.peaks.data).map((channelNum) => {
       const channelChildren = [
-        h('div.channel-progress', {
+        h("div.channel-progress", {
           attributes: {
             style: `position: absolute; width: ${progressWidth}px; height: ${data.height}px; z-index: 2;`,
           },
@@ -570,7 +565,7 @@ export default class {
           : data.colors.waveOutlineColor;
 
         channelChildren.push(
-          h('canvas', {
+          h("canvas", {
             attributes: {
               width: currentWidth * scale,
               height: data.height * scale,
@@ -582,9 +577,9 @@ export default class {
               this.peaks.bits,
               canvasColor,
               scale,
-              data.height,
+              data.height
             ),
-          }),
+          })
         );
 
         totalWidth -= currentWidth;
@@ -597,19 +592,19 @@ export default class {
         const fadeWidth = secondsToPixels(
           fadeIn.end - fadeIn.start,
           data.resolution,
-          data.sampleRate,
+          data.sampleRate
         );
 
         channelChildren.push(
           h(
-            'div.wp-fade.wp-fadein',
+            "div.wp-fade.wp-fadein",
             {
               attributes: {
                 style: `position: absolute; height: ${data.height}px; width: ${fadeWidth}px; top: 0; left: 0; z-index: 4;`,
               },
             },
             [
-              h('canvas', {
+              h("canvas", {
                 attributes: {
                   width: fadeWidth,
                   height: data.height,
@@ -618,11 +613,11 @@ export default class {
                   fadeIn.type,
                   fadeIn.shape,
                   fadeIn.end - fadeIn.start,
-                  data.resolution,
+                  data.resolution
                 ),
               }),
-            ],
-          ),
+            ]
+          )
         );
       }
 
@@ -631,19 +626,19 @@ export default class {
         const fadeWidth = secondsToPixels(
           fadeOut.end - fadeOut.start,
           data.resolution,
-          data.sampleRate,
+          data.sampleRate
         );
 
         channelChildren.push(
           h(
-            'div.wp-fade.wp-fadeout',
+            "div.wp-fade.wp-fadeout",
             {
               attributes: {
                 style: `position: absolute; height: ${data.height}px; width: ${fadeWidth}px; top: 0; right: 0; z-index: 4;`,
               },
             },
             [
-              h('canvas', {
+              h("canvas", {
                 attributes: {
                   width: fadeWidth,
                   height: data.height,
@@ -652,11 +647,11 @@ export default class {
                   fadeOut.type,
                   fadeOut.shape,
                   fadeOut.end - fadeOut.start,
-                  data.resolution,
+                  data.resolution
                 ),
               }),
-            ],
-          ),
+            ]
+          )
         );
       }
 
@@ -669,7 +664,7 @@ export default class {
             }px; left: ${startX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`,
           },
         },
-        channelChildren,
+        channelChildren
       );
     });
 
@@ -681,33 +676,33 @@ export default class {
       const cStartX = secondsToPixels(
         data.timeSelection.start,
         data.resolution,
-        data.sampleRate,
+        data.sampleRate
       );
       const cEndX = secondsToPixels(
         data.timeSelection.end,
         data.resolution,
-        data.sampleRate,
+        data.sampleRate
       );
-      const cWidth = (cEndX - cStartX) + 1;
-      const cClassName = cWidth > 1 ? '.segment' : '.point';
+      const cWidth = cEndX - cStartX + 1;
+      const cClassName = cWidth > 1 ? ".segment" : ".point";
 
       waveformChildren.push(
         h(`div.selection${cClassName}`, {
           attributes: {
             style: `position: absolute; width: ${cWidth}px; bottom: 0; top: 0; left: ${cStartX}px; z-index: 4;`,
           },
-        }),
+        })
       );
     }
 
     const waveform = h(
-      'div.waveform',
+      "div.waveform",
       {
         attributes: {
           style: `height: ${numChan * data.height}px; position: relative;`,
         },
       },
-      waveformChildren,
+      waveformChildren
     );
 
     const channelChildren = [];
@@ -720,9 +715,9 @@ export default class {
 
     channelChildren.push(waveform);
 
-    const audibleClass = data.shouldPlay ? '' : '.silent';
+    const audibleClass = data.shouldPlay ? "" : ".silent";
     const customClass =
-      this.customClass === undefined ? '' : `.${this.customClass}`;
+      this.customClass === undefined ? "" : `.${this.customClass}`;
 
     return h(
       `div.channel-wrapper${audibleClass}${customClass}`,
@@ -733,7 +728,7 @@ export default class {
           }px;`,
         },
       },
-      channelChildren,
+      channelChildren
     );
   }
 

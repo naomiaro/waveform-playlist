@@ -1,9 +1,9 @@
 /*
-* virtual-dom hook for scrolling to the text annotation.
-*/
+ * virtual-dom hook for scrolling to the text annotation.
+ */
 const Hook = function ScrollTopHook() {};
 Hook.prototype.hook = function hook(node) {
-  const el = node.querySelector('.current');
+  const el = node.querySelector(".current");
   if (el) {
     const box = node.getBoundingClientRect();
     const row = el.getBoundingClientRect();

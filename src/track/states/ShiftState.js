@@ -1,4 +1,4 @@
-import { pixelsToSeconds } from '../../utils/conversions';
+import { pixelsToSeconds } from "../../utils/conversions";
 
 export default class {
   constructor(track) {
@@ -13,9 +13,13 @@ export default class {
 
   emitShift(x) {
     const deltaX = x - this.prevX;
-    const deltaTime = pixelsToSeconds(deltaX, this.samplesPerPixel, this.sampleRate);
+    const deltaTime = pixelsToSeconds(
+      deltaX,
+      this.samplesPerPixel,
+      this.sampleRate
+    );
     this.prevX = x;
-    this.track.ee.emit('shift', deltaTime, this.track);
+    this.track.ee.emit("shift", deltaTime, this.track);
   }
 
   complete(x) {
@@ -53,10 +57,10 @@ export default class {
   }
 
   static getClass() {
-    return '.state-shift';
+    return ".state-shift";
   }
 
   static getEvents() {
-    return ['mousedown', 'mousemove', 'mouseup', 'mouseleave'];
+    return ["mousedown", "mousemove", "mouseup", "mouseleave"];
   }
 }

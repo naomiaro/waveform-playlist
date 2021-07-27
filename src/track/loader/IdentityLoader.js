@@ -1,4 +1,4 @@
-import Loader from './Loader';
+import Loader from "./Loader";
 
 export default class IdentityLoader extends Loader {
   load() {

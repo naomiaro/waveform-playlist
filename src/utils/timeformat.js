@@ -4,9 +4,9 @@ export default function (format) {
     const minutes = parseInt(seconds / 60, 10) % 60;
     const secs = (seconds % 60).toFixed(decimals);
 
-    const sHours = (hours < 10) ? `0${hours}` : hours;
-    const sMinutes = (minutes < 10) ? `0${minutes}` : minutes;
-    const sSeconds = (secs < 10) ? `0${secs}` : secs;
+    const sHours = hours < 10 ? `0${hours}` : hours;
+    const sMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    const sSeconds = secs < 10 ? `0${secs}` : secs;
 
     return `${sHours}:${sMinutes}:${sSeconds}`;
   }
@@ -18,16 +18,16 @@ export default function (format) {
     thousandths(seconds) {
       return seconds.toFixed(3);
     },
-    'hh:mm:ss': function hhmmss(seconds) {
+    "hh:mm:ss": function hhmmss(seconds) {
       return clockFormat(seconds, 0);
     },
-    'hh:mm:ss.u': function hhmmssu(seconds) {
+    "hh:mm:ss.u": function hhmmssu(seconds) {
       return clockFormat(seconds, 1);
     },
-    'hh:mm:ss.uu': function hhmmssuu(seconds) {
+    "hh:mm:ss.uu": function hhmmssuu(seconds) {
       return clockFormat(seconds, 2);
     },
-    'hh:mm:ss.uuu': function hhmmssuuu(seconds) {
+    "hh:mm:ss.uuu": function hhmmssuuu(seconds) {
       return clockFormat(seconds, 3);
     },
   };

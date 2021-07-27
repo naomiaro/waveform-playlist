@@ -1,6 +1,6 @@
-import BlobLoader from './BlobLoader';
-import IdentityLoader from './IdentityLoader';
-import XHRLoader from './XHRLoader';
+import BlobLoader from "./BlobLoader";
+import IdentityLoader from "./IdentityLoader";
+import XHRLoader from "./XHRLoader";
 
 export default class {
   static createLoader(src, audioContext, ee) {
@@ -8,10 +8,10 @@ export default class {
       return new BlobLoader(src, audioContext, ee);
     } else if (src instanceof AudioBuffer) {
       return new IdentityLoader(src, audioContext, ee);
-    } else if (typeof (src) === 'string') {
+    } else if (typeof src === "string") {
       return new XHRLoader(src, audioContext, ee);
     }
 
-    throw new Error('Unsupported src type');
+    throw new Error("Unsupported src type");
   }
 }
