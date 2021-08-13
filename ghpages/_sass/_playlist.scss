@@ -1,60 +1,189 @@
-a {
-  color:#1d70b8;
-  cursor: pointer;
-  text-decoration: underline;
-}
-a:link {
-  color: #1d70b8;
-}
-a:visited {
-  color: #4c2c92;
-}
-a:hover {
-  color: #003078;
-}
-a:active {
-  color: #0b0c0c;
-}
-a:focus {
-  color: #0b0c0c;
-}
+$wp-mute-solo-color: #343a40;
+$wp-mute-solo-hover-color: #fff;
+$wp-mute-solo-focus-color: rgba(52, 58, 64, 0.5);
+$wp-btn-danger-background-hover-color: #c82333;
+$wp-btn-danger-border-hover-color: #bd2130;
+$wp-btn-danger-background-color: #dc3545;
+$wp-btn-danger-border-color: #dc3545;
+$wp-btn-danger-focus-color: rgba(225, 83, 97, 0.5);
+$wp-btn-danger-color: #fff;
+$wp-btn-info-background-hover-color: #138496;
+$wp-btn-info-border-hover-color: #117a8b;
+$wp-btn-info-background-color: #17a2b8;
+$wp-btn-info-border-color: #17a2b8;
+$wp-btn-info-focus-color: rgba(58, 176, 195, 0.5);
+$wp-btn-info-color: #fff;
+$wp-selection-background-color: rgba(0, 0, 0, 0.1);
+$wp-selection-point-color: red;
+$wp-fade-background-color: rgba(0, 0, 0, 0.1);
+$wp-channel-color: grey;
+$wp-channel-progress-color: #fbbc04;
+$wp-cursor-color: black;
+$wp-tracks-container-background-color: #e0eff1;
+$wp-controls-background-color: #fff;
+$wp-controls-border-color: #000;
+$wp-range-slider-label-color: black;
+$wp-range-slider-color: goldenrod;
+$wp-range-slider-focus-color: black;
+$wp-range-slider-background-color: #ddd;
+$wp-range-slider-background-focus-color: #bbb;
+$wp-annotation-box-border-color: grey;
+$wp-annotation-current-background-color: #ebf4f6;
+$wp-annotation-icon-hover-color: orange;
 
-.breadcrumb {
-  background-color: #f4f4f4;
-}
-
-.btn-group-xs > .btn, .btn-xs {
-  padding: .25rem .4rem;
-  font-size: .875rem;
-  line-height: .5;
-  border-radius: .2rem;
+:root {
+  --wp-controls-border-color: #{$wp-controls-border-color};
+  --wp-controls-background-color: #{$wp-controls-background-color};
+  --wp-mute-solo-color: #{$wp-mute-solo-color};
+  --wp-mute-solo-hover-color: #{$wp-mute-solo-hover-color};
+  --wp-mute-solo-focus-color: #{$wp-mute-solo-focus-color};
+  --wp-btn-danger-background-hover-color: #{$wp-btn-danger-background-hover-color};
+  --wp-btn-danger-border-hover-color: #{$wp-btn-danger-border-hover-color};
+  --wp-btn-danger-background-color: #{$wp-btn-danger-background-color};
+  --wp-btn-danger-border-color: #{$wp-btn-danger-border-color};
+  --wp-btn-danger-focus-color: #{$wp-btn-danger-focus-color};
+  --wp-btn-danger-color: #{$wp-btn-danger-color};
+  --wp-btn-info-background-hover-color: #{$wp-btn-info-background-hover-color};
+  --wp-btn-info-border-hover-color: #{$wp-btn-info-border-hover-color};
+  --wp-btn-info-background-color: #{$wp-btn-info-background-color};
+  --wp-btn-info-border-color: #{$wp-btn-info-border-color};
+  --wp-btn-info-focus-color: #{$wp-btn-info-focus-color};
+  --wp-btn-info-color: #{$wp-btn-info-color};
+  --wp-fade-background-color: #{$wp-fade-background-color};
+  --wp-channel-color: #{$wp-channel-color};
+  --wp-channel-progress-color: #{$wp-channel-progress-color};
+  --wp-cursor-color: #{$wp-cursor-color};
+  --wp-selection-background-color: #{$wp-selection-background-color};
+  --wp-selection-point-color: #{$wp-selection-point-color};
+  --wp-tracks-container-background-color: #{$wp-tracks-container-background-color};
+  --wp-range-slider-label-color: #{$wp-range-slider-label-color};
+  --wp-range-slider-color: #{$wp-range-slider-color};
+  --wp-range-slider-focus-color: #{$wp-range-slider-focus-color};
+  --wp-range-slider-background-color: #{$wp-range-slider-background-color};
+  --wp-range-slider-background-focus-color: #{$wp-range-slider-background-focus-color};
+  --wp-annotation-box-border-color: #{$wp-annotation-box-border-color};
+  --wp-annotation-current-background-color: #{$wp-annotation-current-background-color};
+  --wp-annotation-icon-hover-color: #{$wp-annotation-icon-hover-color};
 }
 
 .playlist {
+  *, ::after, ::before {
+    box-sizing: border-box;
+  }
+
   margin: 2em 0;
+
+  .btn:not(:disabled) {
+    cursor: pointer;
+  }
+
+  .btn {
+    display: inline-block;
+    font-weight: 400;
+    text-align: center;
+    vertical-align: middle;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    background-color: transparent;
+    border: 1px solid transparent;
+    transition: color .15s ease-in-out,
+      background-color .15s ease-in-out,
+      border-color .15s ease-in-out,
+      box-shadow .15s ease-in-out;
+  }
+
+  .btn-outline-dark {
+    color: var(--wp-mute-solo-color);
+    border-color: var(--wp-mute-solo-color);
+  }
+
+  .btn-outline-dark:hover {
+    color: var(--wp-mute-solo-hover-color);
+    background-color: var(--wp-mute-solo-color);
+    border-color: var(--wp-mute-solo-color);
+  }
+
+  .btn-outline-dark:active:focus, .btn-outline-dark:focus {
+    box-shadow: 0 0 0 0.2rem var(--wp-mute-solo-focus-color);
+  }
+
+  .btn-danger {
+    color: var(--wp-btn-danger-color);
+    background-color: var(--wp-btn-danger-background-color);
+    border-color: var(--wp-btn-danger-border-color);
+  }
+
+  .btn-danger:hover {
+    color: var(--wp-btn-danger-color);
+    background-color: var(--wp-btn-danger-background-hover-color);
+    border-color: var(--wp-btn-danger-border-hover-color);
+  }
+
+  .btn-danger:active:focus, .btn-danger:focus {
+    box-shadow: 0 0 0 0.2rem var(--wp-btn-danger-focus-color);
+  }
+
+  .btn-info {
+    color: var(--wp-btn-info-color);
+    background-color: var(--wp-btn-info-background-color);
+    border-color: var(--wp-btn-info-border-color);
+  }
+
+  .btn-info:hover {
+    color: var(--wp-btn-info-color);
+    background-color: var(--wp-btn-info-background-hover-color);
+    border-color: var(--wp-btn-info-border-hover-color);
+  }
+
+  .btn-info:active:focus, .btn-info:focus {
+    box-shadow: 0 0 0 0.2rem var(--wp-btn-info-focus-color);
+  }
+
+  .btn-xs {
+    padding: .25rem .4rem;
+    font-size: .875rem;
+    line-height: .5;
+    border-radius: .2rem;
+  }
+
+  .btn-group {
+    margin-bottom: 0.3rem;
+  }
+
+  .btn-group > .btn:not(:first-child) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .btn-group > .btn:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
 
   .playlist-time-scale {
     height: 30px;
   }
 
   .playlist-tracks {
-    background: #e0eff1;
+    background: var(--wp-tracks-container-background-color);
   }
 
   .channel {
-    background: grey;
+    background: var(--wp-channel-color);
   }
 
   .channel-progress {
-    background: orange;
+    background: var(--wp-channel-progress-color);
   }
 
   .cursor {
-    background: black;
+    background: var(--wp-cursor-color);
   }
 
   .wp-fade {
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: var(--wp-fade-background-color);
   }
 
   .state-cursor,
@@ -75,11 +204,11 @@ a:focus {
   }
 
   .selection.point {
-    background: red;
+    background: var(--wp-selection-point-color);
   }
 
   .selection.segment {
-    background: rgba(0, 0, 0, 0.1);
+    background: var(--wp-selection-background-color);
   }
 
   .channel-wrapper.silent .channel {
@@ -87,20 +216,19 @@ a:focus {
   }
 
   .controls {
-    background: white;
+    background: var(--wp-controls-background-color);
     text-align: center;
-    border: 1px solid black;
+    border: 1px solid var(--wp-controls-border-color);
     border-radius: 0.2rem;
 
     .track-header {
       overflow: hidden;
-      color: black;
       height: 26px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 0.2rem;
-      font-size: 0.65rem;
+      font-size: 0.75rem;
 
       button {
         width: 20px;
@@ -126,14 +254,14 @@ a:focus {
     }
 
     label:before {
-      color: black;
+      color: var(--wp-range-slider-label-color);
       font-size: 18px;
       padding-right: 5px;
       -moz-osx-font-smoothing: grayscale;
     }
 
     label:after {
-      color: black;
+      color: var(--wp-range-slider-label-color);
       font-size: 18px;
       padding-left: 5px;
     }
@@ -165,14 +293,14 @@ a:focus {
 
     input[type="range"]::-webkit-slider-runnable-track {
       height: 5px;
-      background: #ddd;
+      background: var(--wp-range-slider-background-color);
       border: none;
       border-radius: 3px;
     }
 
     input[type="range"]::-moz-range-track {
       height: 5px;
-      background: #ddd;
+      background: var(--wp-range-slider-background-color);
       border: none;
       border-radius: 3px;
     }
@@ -186,7 +314,7 @@ a:focus {
       height: 12px;
       width: 12px;
       border-radius: 50%;
-      background: goldenrod;
+      background: var(--wp-range-slider-color);
       margin-top: -5px;
       cursor: ew-resize;
     }
@@ -200,7 +328,7 @@ a:focus {
       height: 12px;
       width: 12px;
       border-radius: 50%;
-      background: goldenrod;
+      background: var(--wp-range-slider-color);
       margin-top: -5px;
       cursor: ew-resize;
     }
@@ -210,19 +338,19 @@ a:focus {
     }
 
     input[type="range"]:focus::-webkit-slider-runnable-track {
-      background: #bbb;
+      background: var(--wp-range-slider-background-focus-color);
     }
 
     input[type="range"]:focus::-moz-range-track {
-      background: #bbb;
+      background: var(--wp-range-slider-background-focus-color);
     }
 
     input[type="range"]:focus::-webkit-slider-thumb {
-      border: 2px solid black;
+      border: 2px solid var(--wp-range-slider-focus-color);
     }
 
     input[type="range"]:focus::-moz-range-thumb {
-      border: 2px solid black;
+      border: 2px solid var(--wp-range-slider-focus-color);
     }
   }
 
@@ -232,11 +360,12 @@ a:focus {
     }
 
     .annotation-box {
-      border: 2px dashed grey;
+      border: 2px dashed var(--wp-annotation-box-border-color);
       padding: 0 10px;
+      line-height: 1.5;
 
       .resize-handle {
-        background: grey;
+        background: var(--wp-annotation-box-border-color);
         opacity: 0.3;
         cursor: ew-resize;
       }
@@ -305,7 +434,7 @@ a:focus {
             }
 
             &:hover {
-              color: orange;
+              color: var(--wp-annotation-icon-hover-color);
               cursor: pointer;
             }
           }
@@ -314,7 +443,7 @@ a:focus {
     }
 
     .current {
-      background-color: #ebf4f6;
+      background-color: var(--wp-annotation-current-background-color);
     }
   }
 }

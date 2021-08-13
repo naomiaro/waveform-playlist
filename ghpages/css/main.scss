@@ -1,15 +1,13 @@
 ---
-# Only the main Sass file needs front matter (the dashes are enough)
+# Styles for waveform-playlist ghpages
 ---
-@charset "utf-8";
 
+@charset 'UTF-8';
+
+@import "base";
 @import "playlist";
 
 .playlist .vocals {
-  header {
-    background-color: green;
-  }
-
   background-color: #c0dce0;
 }
 

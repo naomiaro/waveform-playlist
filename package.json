@@ -32,7 +32,7 @@
     "lodash.forown": "^4.0.0",
     "uuid": "^8.3.2",
     "virtual-dom": "^2.1.1",
-    "webaudio-peaks": "0.0.8"
+    "webaudio-peaks": "^1.0.0"
   },
   "scripts": {
     "clean": "rm -Rf dist && rm -Rf lib && rm -Rf styles",

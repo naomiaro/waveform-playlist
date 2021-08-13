@@ -383,7 +383,7 @@ export default class {
     const widgets = data.controls.widgets;
 
     const removeTrack = h(
-      "button.btn.btn-danger.btn-sm.track-remove",
+      "button.btn.btn-danger.btn-xs.track-remove",
       {
         attributes: {
           type: "button",
@@ -399,7 +399,7 @@ export default class {
     const trackName = h("span", [this.name]);
 
     const collapseTrack = h(
-      "button.btn.btn-info.btn-sm.track-collapse",
+      "button.btn.btn-info.btn-xs.track-collapse",
       {
         attributes: {
           type: "button",
