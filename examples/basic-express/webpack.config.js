@@ -8,4 +8,5 @@ module.exports = {
     path: path.resolve(__dirname, "public/javascripts"),
     filename: "[name].bundle.js",
   },
+  mode: 'production'
 };

@@ -68,10 +68,6 @@ async function main() {
     timescale: true,
     state: "select",
     samplesPerPixel: 1024,
-    controls: {
-      show: true,
-      width: 200,
-    },
     colors: {
       waveOutlineColor: "#E0EFF1",
       timeColor: "grey",
