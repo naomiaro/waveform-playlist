@@ -18,7 +18,7 @@ export default class {
     } else {
       panOrientation = "Right";
     }
-    const percentage = `${Math.abs(this.stereoPan * 100)}% `;
+    const percentage = `${Math.abs(Math.round(this.stereoPan * 100))}% `;
     stereoPanInput.title = `Pan: ${
       this.stereoPan !== 0 ? percentage : ""
     }${panOrientation}`;
