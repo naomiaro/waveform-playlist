@@ -11,4 +11,5 @@ webpack.config.dev.js
 .sass-cache
 .prettierrc.json
 .prettierignore
+/.github
 /ghpages
