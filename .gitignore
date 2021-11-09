@@ -2,6 +2,7 @@ node_modules/
 
 # compiled files
 /lib
+/build
 .sass-cache
 /styles
 
