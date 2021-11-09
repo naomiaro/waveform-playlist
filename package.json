@@ -13,6 +13,7 @@
     "babel-loader": "^8.2.2",
     "gh-pages": "^3.2.3",
     "mkdirp": "^1.0.4",
+    "node-sass": "^6.0.1",
     "parallel-webpack": "^2.6.0",
     "prettier": "2.3.2",
     "webpack": "^5.46.0",
@@ -37,7 +38,7 @@
   },
   "scripts": {
     "clean": "rm -Rf dist && rm -Rf lib && rm -Rf build && rm -Rf styles",
-    "styles": "mkdirp styles && cp ghpages/_sass/_playlist.scss styles/playlist.scss",
+    "styles": "mkdirp styles && cp ghpages/_sass/_playlist.scss styles/playlist.scss && node-sass styles/ -o styles/",
     "compile": "babel src --out-dir lib",
     "jekyll": "jekyll build -s ghpages -d dist/waveform-playlist",
     "jekyll:dev": "jekyll build -s ghpages -d dist/waveform-playlist --watch &",
