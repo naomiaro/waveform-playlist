@@ -24,11 +24,16 @@ Waveform Playlist requires webaudio in the browser to function correctly: [Can I
 
 `npm install waveform-playlist --save`
 
+
+Hate npm? Check Unpkg: https://unpkg.com/browse/waveform-playlist/
+
 - If you want to download and run the already compiled website, navigate to folder `/dist` and run `python -m SimpleHTTPServer 8000`. The website will be available at `localhost:8000/waveform-playlist`.
 
 ## Basic Usage
 
-Starter styles can be found in the npm package download at `waveform-playlist/styles/playlist.scss`
+https://github.com/naomiaro/waveform-playlist/blob/main/examples/basic-html/
+
+https://github.com/naomiaro/waveform-playlist/tree/main/examples/basic-express/
 
 ```javascript
 import WaveformPlaylist from 'waveform-playlist';
