@@ -5,9 +5,10 @@
   <body>
     {% include header.html %}
 
-    <main class="container">
+    <main class="container" title="demo">
       {{ content }}
     </main>
+    <aside class="container mt-5">{% include sponsors.html %}</aside>
 
     {% include footer.html %}
   </body>
