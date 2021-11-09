@@ -398,10 +398,6 @@ Originally created for the [Airtime](https://www.sourcefabric.org/software/airti
 
 The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber, hoping to make easier and more fun the transcription process of TEDx talks.
 
-## Patreon
-
-Wanting to see a particular feature or blog post? [Consider supporting Waveform Playlist!](https://www.patreon.com/naomiaro)
-
 ## License
 
 [MIT License](http://doge.mit-license.org)
