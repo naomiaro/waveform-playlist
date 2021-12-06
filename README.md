@@ -324,7 +324,7 @@ var playlist = WaveformPlaylist(
 var ee = playlist.getEventEmitter();
 ```
 
-An example of using the event emitter to control the playlist can be found in [/dist/js/examples/emitter.js](https://github.com/naomiaro/waveform-playlist/blob/master/dist/js/examples/emitter.js)
+An example of using the event emitter to control the playlist can be found in [/dist/js/examples/emitter.js](https://github.com/naomiaro/waveform-playlist/blob/main/dist/waveform-playlist/js/emitter.js)
 
 #### Events to Invoke
 
