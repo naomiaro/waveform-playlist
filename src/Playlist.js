@@ -154,6 +154,14 @@ export default class {
     this.colors = colors;
   }
 
+  setBarWidth(width) {
+    this.barWidth = width;
+  }
+
+  setBarGap(width) {
+    this.barGap = width;
+  }
+
   setAnnotations(config) {
     const controlWidth = this.controls.show ? this.controls.width : 0;
     this.annotationList = new AnnotationList(
@@ -382,6 +390,8 @@ export default class {
           const peaks = info.peaks || { type: "WebAudio", mono: this.mono };
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
+          const waveBarWidth = info.barWidth || 1;
+          const waveBarGap = info.barGap || 0;
           const stereoPan = info.stereoPan || 0;
 
           // webaudio specific playout for now.
@@ -396,6 +406,8 @@ export default class {
           track.setCues(cueIn, cueOut);
           track.setCustomClass(customClass);
           track.setWaveOutlineColor(waveOutlineColor);
+          track.setBarWidth(waveBarWidth);
+          track.setBarGap(waveBarGap);
 
           if (fadeIn !== undefined) {
             track.setFadeIn(fadeIn.duration, fadeIn.shape);
@@ -921,6 +933,8 @@ export default class {
       playlistLength: this.duration,
       playbackSeconds: this.playbackSeconds,
       colors: this.colors,
+      barWidth: this.barWidth,
+      barGap: this.barGap,
     };
 
     return _defaults({}, data, defaults);
@@ -965,6 +979,8 @@ export default class {
           muted: this.mutedTracks.indexOf(track) > -1,
           collapsed,
           height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
+          barGap: this.barGap,
+          barWidth: this.barWidth,
         })
       );
     });
