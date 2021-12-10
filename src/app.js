@@ -86,6 +86,7 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.linkedEndpoints = config.linkedEndpoints;
 
   // take care of initial virtual dom rendering.
+
   const tree = playlist.render();
   const rootNode = createElement(tree);
 
