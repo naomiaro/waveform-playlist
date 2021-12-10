@@ -24,7 +24,6 @@ Waveform Playlist requires webaudio in the browser to function correctly: [Can I
 
 `npm install waveform-playlist --save`
 
-
 Hate npm? Check Unpkg: https://unpkg.com/browse/waveform-playlist/
 
 - If you want to download and run the already compiled website, navigate to folder `/dist` and run `python -m SimpleHTTPServer 8000`. The website will be available at `localhost:8000/waveform-playlist`.
@@ -36,7 +35,7 @@ https://github.com/naomiaro/waveform-playlist/blob/main/examples/basic-html/
 https://github.com/naomiaro/waveform-playlist/tree/main/examples/basic-express/
 
 ```javascript
-import WaveformPlaylist from 'waveform-playlist';
+import WaveformPlaylist from "waveform-playlist";
 
 var playlist = WaveformPlaylist({
   samplesPerPixel: 3000,
@@ -47,13 +46,13 @@ var playlist = WaveformPlaylist({
   colors: {
     waveOutlineColor: "#E0EFF1",
     timeColor: "grey",
-    fadeColor: "black"
+    fadeColor: "black",
   },
   controls: {
     show: false,
     width: 150,
   },
-  zoomLevels: [500, 1000, 3000, 5000]
+  zoomLevels: [500, 1000, 3000, 5000],
 });
 
 playlist
@@ -61,19 +60,19 @@ playlist
     {
       src: "media/audio/Vocals30.mp3",
       name: "Vocals",
-      gain: 0.5
+      gain: 0.5,
     },
     {
       src: "media/audio/BassDrums30.mp3",
       name: "Drums",
       start: 8.5,
       fadeIn: {
-        duration: 0.5
+        duration: 0.5,
       },
       fadeOut: {
         shape: "logarithmic",
-        duration: 0.5
-      }
+        duration: 0.5,
+      },
     },
     {
       src: "media/audio/Guitar30.mp3",
@@ -81,12 +80,12 @@ playlist
       start: 23.5,
       fadeOut: {
         shape: "linear",
-        duration: 0.5
+        duration: 0.5,
       },
-      cuein: 15
-    }
+      cuein: 15,
+    },
   ])
-  .then(function() {
+  .then(function () {
     // can do stuff with the playlist.
   });
 ```
@@ -129,21 +128,21 @@ var options = {
 
     // width of controls in pixels
     width: 150,
-    
+
     // whether to render the widget or not in the controls panel.
     widgets: {
       // Mute & solo button widget
       muteOrSolo: true,
-      
+
       // Volume slider
       volume: true,
-      
+
       // Stereo pan slider
       stereoPan: true,
-      
+
       // Collapse track button
       collapse: true,
-      
+
       // Remove track button
       remove: true,
     },
@@ -157,7 +156,7 @@ var options = {
     timeColor: "grey",
 
     // color of the fade drawn on canvas
-    fadeColor: "black"
+    fadeColor: "black",
   },
 
   // height in pixels of each canvas element a waveform is on.
@@ -202,8 +201,8 @@ var options = {
           // @param Array annotations - array of annotations in the playlist
           // @param Object opts - configuration options available
           //      - opts.linkEndpoints
-        }
-      }
+        },
+      },
     ],
 
     // If false when clicking an annotation id segment
@@ -212,8 +211,8 @@ var options = {
 
     // If true annotation endpoints will remain linked when dragged
     // if they were the same value before dragging started.
-    linkEndpoints: false
-  }
+    linkEndpoints: false,
+  },
 };
 ```
 
@@ -300,6 +299,12 @@ var options = {
 
   // value from -1 (full left pan) to 1 (full right pan)
   stereoPan: 0
+
+  // width in pixels of waveform bars. Default value 1.
+  barWidth: 1
+
+  // spacing between of waveform bars. Default value 0.
+  barGap: 0
 }
 ```
 
@@ -313,7 +318,7 @@ import WaveformPlaylist from "waveform-playlist";
 
 var playlist = WaveformPlaylist(
   {
-    container: document.getElementById("playlist")
+    container: document.getElementById("playlist"),
   },
 
   // you can pass your own event emitter
@@ -351,7 +356,7 @@ An example of using the event emitter to control the playlist can be found in [/
 | `continuousplay`      | `true`/`false`                                       | Change property `isContinuousPlay`.                                                                                                                                                                  |
 | `linkendpoints`       | `true`/`false`                                       | Change property `linkEndpoints`.                                                                                                                                                                     |
 | `annotationsrequest`  | _none_                                               | Requests to download the annotations to a json file.                                                                                                                                                 |
-| `stereopan` | `panvalue, track` | Set pan value of `track` to `panvalue` (-1-1)|
+| `stereopan`           | `panvalue, track`                                    | Set pan value of `track` to `panvalue` (-1-1)                                                                                                                                                        |
 
 #### Events to Listen to
 
@@ -364,18 +369,18 @@ An example of using the event emitter to control the playlist can be found in [/
 | `shift`                   | `deltaTime, track`  | Sends `deltaTime` in seconds change for Track `track`                                                                                                                                                               |
 | `mute`                    | `track`             | Mute button has been pressed for `track`                                                                                                                                                                            |
 | `solo`                    | `track`             | Solo button has been pressed for `track`                                                                                                                                                                            |
-| `removeTrack`                    | `track`             | Remove button has been pressed for `track`                                                                                                                                                                            |
-| `changeTrackView`                    | `track, opts`             | Collapse button has been pressed for `track`                                                                                                                                                                            |
+| `removeTrack`             | `track`             | Remove button has been pressed for `track`                                                                                                                                                                          |
+| `changeTrackView`         | `track, opts`       | Collapse button has been pressed for `track`                                                                                                                                                                        |
 | `volumechange`            | `volume, track`     | Volume of `track` has changed to `volume` (0-100)                                                                                                                                                                   |
 | `mastervolumechange`      | `volume`            | Master volume of the playlist has changed to `volume` (0-100)                                                                                                                                                       |
 | `audiorequeststatechange` | `state, src`        | Loading audio `src` (`string` or `File`) is now in state [`state`](https://github.com/naomiaro/waveform-playlist/wiki/Track-Loading-States) (Number)                                                                |
 | `loadprogress`            | `percent, src`      | Loading audio `src` has loaded percent `percent` (0-100)                                                                                                                                                            |
 | `audiosourcesloaded`      | _none_              | Audio decoding has finished for all tracks                                                                                                                                                                          |
-| `audiosourcesrendered`    | _none_              | Tracks are rendered to the playlist |
-| `audiosourceserror`    | `err`             | Error thrown while loading tracks |
+| `audiosourcesrendered`    | _none_              | Tracks are rendered to the playlist                                                                                                                                                                                 |
+| `audiosourceserror`       | `err`               | Error thrown while loading tracks                                                                                                                                                                                   |
 | `finished`                | _none_              | Event fired when cursor ( while playing ) reaches the end (maximum duration)                                                                                                                                        |
 | `audiorenderingfinished`  | `type, data`        | Return the result of the rendering in the desired format. `type` can be `buffer` or `wav` and can be used to dertermine the `data` type. When `type` is `wav`, data is a `blob` object that represent the wav file. |
-| `stereopan` | `panvalue, track` | Pan value of `track` has been changed to `panvalue`|
+| `stereopan`               | `panvalue, track`   | Pan value of `track` has been changed to `panvalue`                                                                                                                                                                 |
 
 ## Tests
 

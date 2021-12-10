@@ -576,8 +576,6 @@ export default class {
         const barWidth = this.barWidth ? this.barWidth : 1;
         const barGap = this.barGap ? this.barGap : 0;
 
-        console.log(barWidth, barGap, this.barWidth, this.barGap);
-
         channelChildren.push(
           h("canvas", {
             attributes: {

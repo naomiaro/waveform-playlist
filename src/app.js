@@ -4,7 +4,6 @@ import EventEmitter from "event-emitter";
 import Playlist from "./Playlist";
 
 export function init(options = {}, ee = EventEmitter()) {
-  console.log(options);
   if (options.container === undefined) {
     throw new Error("DOM element container must be given.");
   }
@@ -39,8 +38,6 @@ export function init(options = {}, ee = EventEmitter()) {
       timeColor: "grey",
       fadeColor: "black",
     },
-    barWidth: 1,
-    barGap: 0,
     seekStyle: "line",
     waveHeight: 128,
     collapsedWaveHeight: 30,
@@ -58,8 +55,6 @@ export function init(options = {}, ee = EventEmitter()) {
 
   const config = _defaults({}, options, defaults);
   const zoomIndex = config.zoomLevels.indexOf(config.samplesPerPixel);
-
-  console.log(config);
 
   if (zoomIndex === -1) {
     throw new Error(
@@ -79,8 +74,6 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.setWaveHeight(config.waveHeight);
   playlist.setCollapsedWaveHeight(config.collapsedWaveHeight);
   playlist.setColors(config.colors);
-  playlist.setBarWidth(config.barWidth);
-  playlist.setBarGap(config.barGap);
   playlist.setZoomLevels(config.zoomLevels);
   playlist.setZoomIndex(zoomIndex);
   playlist.setMono(config.mono);
@@ -94,7 +87,6 @@ export function init(options = {}, ee = EventEmitter()) {
 
   // take care of initial virtual dom rendering.
 
-  console.log(playlist);
   const tree = playlist.render();
   const rootNode = createElement(tree);
 
