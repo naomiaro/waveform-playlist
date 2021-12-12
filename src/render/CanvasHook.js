@@ -46,7 +46,7 @@ class CanvasHook {
     const maxValue = 2 ** (this.bits - 1);
     const width = this.barWidth;
     const gap = this.barGap;
-    const plusI = width + gap;
+    const barStart = width + gap;
 
     cc.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -54,10 +54,10 @@ class CanvasHook {
     cc.fillStyle = this.color;
     cc.scale(scale, scale);
 
-    for (let i = 0; i < len; i += plusI) {
-      const minPeak = this.peaks[(i + this.offset) * 2] / maxValue;
-      const maxPeak = this.peaks[(i + this.offset) * 2 + 1] / maxValue;
-      CanvasHook.drawFrame(cc, h2, i, minPeak, maxPeak, width, gap);
+    for (let pixel = 0; pixel < len; pixel += barStart) {
+      const minPeak = this.peaks[(pixel + this.offset) * 2] / maxValue;
+      const maxPeak = this.peaks[(pixel + this.offset) * 2 + 1] / maxValue;
+      CanvasHook.drawFrame(cc, h2, pixel, minPeak, maxPeak, width, gap);
     }
 
     cc.restore();
