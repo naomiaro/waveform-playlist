@@ -22,8 +22,6 @@ export default class {
     this.name = "Untitled";
     this.customClass = undefined;
     this.waveOutlineColor = undefined;
-    this.barWidth = 1;
-    this.barGap = 0;
     this.gain = 1;
     this.fades = {};
     this.peakData = {
@@ -53,14 +51,6 @@ export default class {
 
   setWaveOutlineColor(color) {
     this.waveOutlineColor = color;
-  }
-
-  setBarWidth(width) {
-    this.barWidth = width;
-  }
-
-  setBarGap(gap) {
-    this.barGap = gap;
   }
 
   setCues(cueIn, cueOut) {
@@ -573,8 +563,6 @@ export default class {
         const canvasColor = this.waveOutlineColor
           ? this.waveOutlineColor
           : data.colors.waveOutlineColor;
-        const barWidth = this.barWidth ? this.barWidth : 1;
-        const barGap = this.barGap ? this.barGap : 0;
 
         channelChildren.push(
           h("canvas", {
@@ -590,8 +578,8 @@ export default class {
               canvasColor,
               scale,
               data.height,
-              barWidth,
-              barGap
+              data.barWidth,
+              data.barGap
             ),
           })
         );

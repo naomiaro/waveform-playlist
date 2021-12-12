@@ -41,6 +41,8 @@ export function init(options = {}, ee = EventEmitter()) {
     seekStyle: "line",
     waveHeight: 128,
     collapsedWaveHeight: 30,
+    barWidth: 1,
+    barGap: 0,
     state: "cursor",
     zoomLevels: [512, 1024, 2048, 4096],
     annotationList: {
@@ -81,6 +83,8 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.setShowTimeScale(config.timescale);
   playlist.setSeekStyle(config.seekStyle);
   playlist.setAnnotations(config.annotationList);
+  playlist.setBarGap(config.barGap);
+  playlist.setBarWidth(config.barWidth);
   playlist.isAutomaticScroll = config.isAutomaticScroll;
   playlist.isContinuousPlay = config.isContinuousPlay;
   playlist.linkedEndpoints = config.linkedEndpoints;

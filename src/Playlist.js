@@ -390,8 +390,6 @@ export default class {
           const peaks = info.peaks || { type: "WebAudio", mono: this.mono };
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
-          const waveBarWidth = info.barWidth || 1;
-          const waveBarGap = info.barGap || 0;
           const stereoPan = info.stereoPan || 0;
 
           // webaudio specific playout for now.
@@ -406,8 +404,6 @@ export default class {
           track.setCues(cueIn, cueOut);
           track.setCustomClass(customClass);
           track.setWaveOutlineColor(waveOutlineColor);
-          track.setBarWidth(waveBarWidth);
-          track.setBarGap(waveBarGap);
 
           if (fadeIn !== undefined) {
             track.setFadeIn(fadeIn.duration, fadeIn.shape);

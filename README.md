@@ -162,6 +162,12 @@ var options = {
   // height in pixels of each canvas element a waveform is on.
   waveHeight: 128,
 
+  // width in pixels of waveform bars.
+  barWidth: 1,
+
+  // spacing between of waveform bars.
+  barGap: 0,
+
   // interaction state of the playlist
   // (cursor | select | fadein | fadeout | shift)
   state: "cursor",
@@ -299,12 +305,6 @@ var options = {
 
   // value from -1 (full left pan) to 1 (full right pan)
   stereoPan: 0
-
-  // width in pixels of waveform bars. Default value 1.
-  barWidth: 1
-
-  // spacing between of waveform bars. Default value 0.
-  barGap: 0
 }
 ```
 
