@@ -165,7 +165,7 @@ var options = {
   // width in pixels of waveform bars.
   barWidth: 1,
 
-  // spacing between of waveform bars.
+  // spacing in pixels between waveform bars.
   barGap: 0,
 
   // interaction state of the playlist
