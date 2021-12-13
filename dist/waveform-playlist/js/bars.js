@@ -24,6 +24,7 @@ playlist = WaveformPlaylist.init({
   },
   barWidth: 3,
   barGap: 1,
+  rounded: true,
 });
   
 playlist.load([

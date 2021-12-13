@@ -579,7 +579,8 @@ export default class {
               scale,
               data.height,
               data.barWidth,
-              data.barGap
+              data.barGap,
+              data.rounded
             ),
           })
         );
