@@ -418,6 +418,8 @@ This will build and watch the jekyll site and startup the webpack dev server.
 
 Originally created for the [Airtime](https://www.sourcefabric.org/software/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/)
 
+The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber hoping to make the transcription process of TEDx talks easier and more fun.
+
 ## License
 
 [MIT License](http://doge.mit-license.org)
