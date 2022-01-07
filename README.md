@@ -1,8 +1,18 @@
+[![npm](https://img.shields.io/npm/dm/waveform-playlist.svg)](https://www.npmjs.com/package/waveform-playlist)
+
+## Sponsors
+
+<p align="center">
+  <a href="https://moises.ai/" target="_blank">
+    <img width="222px" src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/ghpages/img/logos/moises-ai.svg">
+  </a>
+</p>
+
+The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber hoping to make the transcription process of TEDx talks easier and more fun.
+
 # Waveform Playlist
 
 Inspired by [Audacity](http://audacity.sourceforge.net/), this project is a multiple track playlist editor written in ES2015 using the [Web Audio API](http://webaudio.github.io/web-audio-api/).
-
-[![npm](https://img.shields.io/npm/dm/waveform-playlist.svg)](https://www.npmjs.com/package/waveform-playlist)
 
 Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out) and track start/end times within the playlist.
 I've written up some demos on github for the different [audio fade types](https://github.com/naomiaro/Web-Audio-Fades) in the project.
@@ -16,9 +26,11 @@ I've written up some demos on github for the different [audio fade types](https:
 ![Screenshot](img/annotations.png?raw=true "Aeneas annotations adjust alignment json export")
 (code for picture shown can be found in ghpages/\_examples/13annotations.html)
 
+
 ## Browser Support
 
 Waveform Playlist requires webaudio in the browser to function correctly: [Can I Use?](http://caniuse.com/#search=webaudio)
+
 
 ## Installation
 
@@ -405,8 +417,6 @@ This will build and watch the jekyll site and startup the webpack dev server.
 ## Credits
 
 Originally created for the [Airtime](https://www.sourcefabric.org/software/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/)
-
-The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber, hoping to make easier and more fun the transcription process of TEDx talks.
 
 ## License
 
