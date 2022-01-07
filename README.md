@@ -8,7 +8,7 @@
   </a>
 </p>
 
-The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber hoping to make the transcription process of TEDx talks easier and more fun.
+[Become a sponsor](https://github.com/sponsors/naomiaro)
 
 # Waveform Playlist
 
