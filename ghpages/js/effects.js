@@ -14,7 +14,10 @@ playlist = WaveformPlaylist.init({
   },
   zoomLevels: [500, 1000, 3000, 5000],
   samplesPerPixel: 1000,
-  waveHeight: 100
+  waveHeight: 100,
+  isAutomaticScroll: true,
+  timescale: true,
+  state: "cursor"
 });
   
 playlist
@@ -32,6 +35,12 @@ playlist
     {
       src: "media/audio/Guitar30.mp3",
       name: "Guitar",
+      effects: function(graphEnd, masterGainNode) {
+        var reverb = new Tone.Reverb(5);
+
+        Tone.connect(graphEnd, reverb);
+        Tone.connect(reverb, masterGainNode);
+       }
     },
     {
       src: "media/audio/PianoSynth30.mp3",
