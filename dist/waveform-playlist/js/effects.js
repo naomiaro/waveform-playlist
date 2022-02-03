@@ -9,16 +9,13 @@ playlist = WaveformPlaylist.init({
       waveOutlineColor: "#E0EFF1",
   },
   controls: {
-    show: true, //whether or not to include the track controls
-    width: 200, //width of controls in pixels
+    show: true,
+    width: 200
   },
   zoomLevels: [500, 1000, 3000, 5000],
   samplesPerPixel: 1000,
   waveHeight: 100
 });
-
-// Set the context used by Tone.js
-// Tone.setContext(playlist.getAudioContext());
   
 playlist
   .load([
@@ -28,7 +25,6 @@ playlist
       effects: function(graphEnd, masterGainNode) {
         var pitchShift = new Tone.PitchShift(12);
 
-         // Use the Tone.connect() helper to connect native AudioNodes with the nodes provided by Tone.js
         Tone.connect(graphEnd, pitchShift);
         Tone.connect(pitchShift, masterGainNode);
        }

@@ -33,7 +33,7 @@
     "lodash.assign": "^4.0.0",
     "lodash.defaultsdeep": "^4.6.1",
     "lodash.forown": "^4.0.0",
-    "standardized-audio-context": "25.1.8",
+    "standardized-audio-context": "^25.3.20",
     "tone": "^14.7.77",
     "uuid": "^8.3.2",
     "virtual-dom": "^2.1.1",
