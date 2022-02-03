@@ -136,6 +136,11 @@ export default class {
 
   setAudioContext(ac) {
     this.ac = ac;
+    this.masterGainNode = ac.createGain();
+  }
+
+  getAudioContext() {
+    return this.ac;
   }
 
   setControlOptions(controlOptions) {
@@ -391,9 +396,14 @@ export default class {
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
           const stereoPan = info.stereoPan || 0;
+          const effects = info.effects || null;
 
           // webaudio specific playout for now.
-          const playout = new Playout(this.ac, audioBuffer);
+          const playout = new Playout(
+            this.ac,
+            audioBuffer,
+            this.masterGainNode
+          );
 
           const track = new Track();
           track.src = info.src;
@@ -428,6 +438,9 @@ export default class {
 
           track.setGainLevel(gain);
           track.setStereoPanValue(stereoPan);
+          if (effects) {
+            track.setEffects(effects);
+          }
 
           if (muted) {
             this.muteTrack(track);

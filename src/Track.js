@@ -238,6 +238,10 @@ export default class {
     this.playout.setStereoPanValue(value);
   }
 
+  setEffects(effectsGraph) {
+    this.playout.setEffects(effectsGraph);
+  }
+
   /*
     startTime, endTime in seconds (float).
     segment is for a highlighted section in the UI.

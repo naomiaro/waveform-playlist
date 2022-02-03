@@ -18,11 +18,11 @@
   />
 
   <title>
-    Full Waveform Editor
+    Effects
   </title>
   <meta
     name="description"
-    content="Waveform Playlist, the multitrack javascript web audio editor and player. Set audio cue in and cue out. Set linear, exponential, logarithmic, and s-curve fades. Shift audio in time. Zoom in and zoom out on the waveform. Play, stop, pause and seek inside the audio tracks."
+    content="Basic web audio single track mono display waveform editor. Play, stop, pause audio. Live seeking enabled."
   />
 
   <link
@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="/waveform-playlist/css/main.css">
   <link
     rel="canonical"
-    href="https://naomiaro.github.io/waveform-playlist/web-audio-editor.html"
+    href="https://naomiaro.github.io/waveform-playlist/effects.html"
   />
   <link rel="alternate" type="application/rss+xml" title="Waveform Playlist"
   href="https://naomiaro.github.io/waveform-playlist/feed.xml">
@@ -98,7 +98,7 @@
 <header class="site-header">
   <ol class="breadcrumb">
     <li><a href="/waveform-playlist/">Waveform Playlist</a></li>
-    <li class="mx-3 active">Full Waveform Editor</li>
+    <li class="mx-3 active">Effects</li>
   </ol>
   <a
     href="https://github.com/naomiaro/waveform-playlist"
@@ -138,8 +138,8 @@
       <div class="wrapper">
   <article class="post">
     <header class="post-header">
-      <h1 class="post-title">Full Waveform Editor</h1>
-      <p class="lead">Every control and state available.</p>
+      <h1 class="post-title">Effects</h1>
+      <p class="lead">Add effects to each track or the master output.</p>
     </header>
     <div class="post-content"><div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
@@ -176,159 +176,9 @@
   </button>
 </div>
 
-    <div class="btn-group">
-  <button
-    type="button"
-    title="Zoom in"
-    class="btn-zoom-in btn btn-outline-dark"
-  >
-    <i class="fas fa-search-plus"></i>
-  </button>
-  <button
-    type="button"
-    title="Zoom out"
-    class="btn-zoom-out btn btn-outline-dark"
-  >
-    <i class="fas fa-search-minus"></i>
-  </button>
-</div>
-
-    <div class="btn-group btn-playlist-state-group">
-  <button
-    type="button"
-    class="btn-cursor btn btn-outline-dark active"
-    title="Select cursor"
-  >
-    <i class="fas fa-headphones"></i>
-  </button>
-  <button
-    type="button"
-    class="btn-select btn btn-outline-dark"
-    title="Select audio region"
-  >
-    <i class="fas fa-italic"></i>
-  </button>
-  <button
-    type="button"
-    class="btn-shift btn btn-outline-dark"
-    title="Shift audio in time"
-  >
-    <i class="fas fa-arrows-alt-h"></i>
-  </button>
-  <button
-    type="button"
-    class="btn-fadein btn btn-outline-dark"
-    title="Set audio fade in"
-  >
-    <i class="fas fa-long-arrow-alt-left"></i>
-  </button>
-  <button
-    type="button"
-    class="btn-fadeout btn btn-outline-dark"
-    title="Set audio fade out"
-  >
-    <i class="fas fa-long-arrow-alt-right"></i>
-  </button>
-</div>
-
-    <div class="btn-group btn-fade-state-group">
-    <button type="button" class="btn btn-sm btn-outline-dark btn-logarithmic active">logarithmic</button>
-    <button type="button" class="btn btn-sm btn-outline-dark btn-linear">linear</button>
-    <button type="button" class="btn btn-sm btn-outline-dark btn-exponential">exponential</button>
-    <button type="button" class="btn btn-sm btn-outline-dark btn-scurve">s-curve</button>
-  </div>
-
-    <div class="btn-group btn-select-state-group">
-  <button
-    type="button"
-    class="btn-loop btn btn-outline-success disabled"
-    title="Loop a selected segment of audio"
-  >
-    <i class="fas fa-redo-alt"></i>
-  </button>
-  <button
-    type="button"
-    title="Keep only the selected audio region for a track"
-    class="btn-trim-audio btn btn-outline-primary disabled"
-  >
-    Trim
-  </button>
-</div>
-<div class="btn-group">
-  <button
-    type="button"
-    title="Print playlist info to console"
-    class="btn btn-outline-info print"
-  >
-    Print
-  </button>
-  <button
-    type="button"
-    title="Clear the playlist's tracks"
-    class="btn btn-clear btn-outline-danger"
-  >
-    Clear
-  </button>
-</div>
-<div class="btn-group">
-  <button
-    type="button"
-    title="Download the current work as Wav file"
-    class="btn btn-download btn-outline-primary"
-  >
-    <i class="fas fa-download"></i>
-  </button>
-</div>
-
   </div>
 </div>
 <div id="playlist"></div>
-<div class="playlist-bottom-bar">
-  <form class="form-inline">
-  <select class="time-format custom-select mr-sm-2" aria-label="Time format selection">
-    <option value="seconds">seconds</option>
-    <option value="thousandths">thousandths</option>
-    <option value="hh:mm:ss">hh:mm:ss</option>
-    <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
-    <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
-    <option value="hh:mm:ss.uuu" selected="selected">hh:mm:ss + milliseconds</option>
-  </select>
-  <label class="sr-only" for="audio_start">Start of audio selection</label>
-  <input type="text" class="audio-start form-control mr-sm-2" id="audio_start">
-  <label class="sr-only" for="audio_end">End of audio selection</label>
-  <input type="text" class="audio-end form-control mr-sm-2" id="audio_end">
-  <span class="audio-pos" aria-label="Audio position">00:00:00.0</span>
-</form>
-
-  <form class="form-inline">
-    <label for="master-gain" class="mr-sm-2">Master Volume</label>
-<input
-  type="range"
-  min="0"
-  max="100"
-  value="100"
-  class="master-gain form-control mr-sm-2"
-  id="master-gain"
-/>
-
-    <div class="form-check form-check-inline">
-  <input class="form-check-input automatic-scroll" type="checkbox" id="automatic_scroll" />
-  <label class="form-check-label" for="automatic_scroll"
-    >Automatic Scroll</label
-  >
-</div>
-
-  </form>
-  <div class="sound-status"></div>
-  <form class="form-inline">
-  <label for="seektime" class="mr-sm-2">Seek to time</label>
-  <input type="number" class="form-control mr-sm-2" value="14" id="seektime" />
-  <button type="button" class="btn btn-outline-primary btn-seektotime">Seek !</button>
-</form>
-
-  <div class="track-drop"></div>
-  <div class="loading-data"></div>
-</div>
 </div>
   </article>
 </div>
@@ -344,7 +194,7 @@
 
     <footer class="px-3">
   
-  <p>Music: <cite>Starlight</cite> by Muse</p>
+  <p>Music: <cite>Sonnet</cite> by LibriVox</p>
   
 
   <p>
@@ -363,7 +213,7 @@
 ></script>
 <script type="text/javascript" src="js/Tone.js"></script>
 <script type="text/javascript" src="js/waveform-playlist.js"></script>
-<script type="text/javascript" src="js/web-audio-editor.js"></script>
+<script type="text/javascript" src="js/effects.js"></script>
 <script type="text/javascript" src="js/emitter.js"></script>
 
 

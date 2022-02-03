@@ -1,12 +1,17 @@
 import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from "fade-maker";
 
+function noEffects(graphEnd, masterGain) {
+  graphEnd.connect(masterGain);
+}
+
 export default class {
-  constructor(ac, buffer) {
+  constructor(ac, buffer, masterGain = ac.createGain()) {
     this.ac = ac;
     this.gain = 1;
+    this.effectsGraph = noEffects;
     this.buffer = buffer;
+    this.masterGain = masterGain;
     this.destination = this.ac.destination;
-    this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
   }
 
   applyFade(type, start, duration, shape = "logarithmic") {
@@ -37,8 +42,14 @@ export default class {
 
   setAudioContext(ac) {
     this.ac = ac;
-    this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
     this.destination = this.ac.destination;
+  }
+
+  createStereoPanner() {
+    if (this.ac.createStereoPanner) {
+      return this.ac.createStereoPanner();
+    }
+    return this.ac.createPanner();
   }
 
   setUpSource() {
@@ -60,7 +71,6 @@ export default class {
         this.volumeGain = undefined;
         this.shouldPlayGain = undefined;
         this.panner = undefined;
-        this.masterGain = undefined;
 
         resolve();
       };
@@ -71,16 +81,15 @@ export default class {
     this.volumeGain = this.ac.createGain();
     // used for solo/mute
     this.shouldPlayGain = this.ac.createGain();
-    this.masterGain = this.ac.createGain();
-
-    this.panner = this.ac.createStereoPanner();
+    this.panner = this.createStereoPanner();
 
     this.source.connect(this.fadeGain);
     this.fadeGain.connect(this.volumeGain);
     this.volumeGain.connect(this.shouldPlayGain);
-    this.shouldPlayGain.connect(this.masterGain);
-    this.masterGain.connect(this.panner);
-    this.panner.connect(this.destination);
+    this.shouldPlayGain.connect(this.panner);
+
+    this.effectsGraph(this.panner, this.masterGain);
+    this.masterGain.connect(this.destination);
 
     return sourcePromise;
   }
@@ -103,9 +112,7 @@ export default class {
     }
   }
 
-  setStereoPanValue(value) {
-    const pan = value === undefined ? 0 : value;
-
+  setStereoPanValue(pan = 0) {
     if (this.panner) {
       if (this.panner.pan !== undefined) {
         this.panner.pan.value = pan;
@@ -114,6 +121,10 @@ export default class {
         this.panner.setPosition(pan, 0, 1 - Math.abs(pan));
       }
     }
+  }
+
+  setEffects(effectsGraph) {
+    this.effectsGraph = effectsGraph;
   }
 
   /*

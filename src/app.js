@@ -1,3 +1,4 @@
+import { AudioContext } from "standardized-audio-context";
 import _defaults from "lodash.defaultsdeep";
 import createElement from "virtual-dom/create-element";
 import EventEmitter from "event-emitter";
@@ -8,15 +9,7 @@ export function init(options = {}, ee = EventEmitter()) {
     throw new Error("DOM element container must be given.");
   }
 
-  window.OfflineAudioContext =
-    window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  window.AudioContext = window.AudioContext || window.webkitAudioContext;
-
-  const audioContext = new window.AudioContext();
-
   const defaults = {
-    ac: audioContext,
-    sampleRate: audioContext.sampleRate,
     samplesPerPixel: 4096,
     mono: true,
     fadeType: "logarithmic",
@@ -65,9 +58,10 @@ export function init(options = {}, ee = EventEmitter()) {
   }
 
   const playlist = new Playlist();
-  playlist.setSampleRate(config.sampleRate);
+  const ctx = config.ac || new AudioContext();
+  playlist.setAudioContext(ctx);
+  playlist.setSampleRate(config.sampleRate || ctx.sampleRate);
   playlist.setSamplesPerPixel(config.samplesPerPixel);
-  playlist.setAudioContext(config.ac);
   playlist.setEventEmitter(ee);
   playlist.setUpEventEmitter();
   playlist.setTimeSelection(0, 0);
