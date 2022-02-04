@@ -180,6 +180,10 @@ export default class {
     );
   }
 
+  setEffects(effectsGraph) {
+    this.effectsGraph = effectsGraph;
+  }
+
   setEventEmitter(ee) {
     this.ee = ee;
   }
@@ -741,6 +745,10 @@ export default class {
     if (this.isPlaying()) {
       return this.restartPlayFrom(start, end);
     }
+
+    // TODO refector this in upcoming modernisation.
+    if (this.effectsGraph)
+      this.tracks && this.tracks[0].playout.setMasterEffects(this.effectsGraph);
 
     this.tracks.forEach((track) => {
       track.setState("cursor");

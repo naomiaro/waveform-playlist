@@ -1,7 +1,7 @@
 import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from "fade-maker";
 
-function noEffects(graphEnd, masterGain) {
-  graphEnd.connect(masterGain);
+function noEffects(node1, node2) {
+  node1.connect(node2);
 }
 
 export default class {
@@ -9,6 +9,7 @@ export default class {
     this.ac = ac;
     this.gain = 1;
     this.effectsGraph = noEffects;
+    this.masterEffectsGraph = noEffects;
     this.buffer = buffer;
     this.masterGain = masterGain;
     this.destination = this.ac.destination;
@@ -89,7 +90,7 @@ export default class {
     this.shouldPlayGain.connect(this.panner);
 
     this.effectsGraph(this.panner, this.masterGain);
-    this.masterGain.connect(this.destination);
+    this.masterEffectsGraph(this.masterGain, this.destination);
 
     return sourcePromise;
   }
@@ -125,6 +126,10 @@ export default class {
 
   setEffects(effectsGraph) {
     this.effectsGraph = effectsGraph;
+  }
+
+  setMasterEffects(effectsGraph) {
+    this.masterEffectsGraph = effectsGraph;
   }
 
   /*

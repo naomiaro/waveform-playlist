@@ -1,4 +1,3 @@
-import { AudioContext } from "standardized-audio-context";
 import _defaults from "lodash.defaultsdeep";
 import createElement from "virtual-dom/create-element";
 import EventEmitter from "event-emitter";
@@ -82,6 +81,10 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.isAutomaticScroll = config.isAutomaticScroll;
   playlist.isContinuousPlay = config.isContinuousPlay;
   playlist.linkedEndpoints = config.linkedEndpoints;
+
+  if (config.effects) {
+    playlist.setEffects(config.effects);
+  }
 
   // take care of initial virtual dom rendering.
 

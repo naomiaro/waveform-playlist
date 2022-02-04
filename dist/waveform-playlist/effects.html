@@ -179,6 +179,34 @@
   </div>
 </div>
 <div id="playlist"></div>
+<form class="form-inline">
+    <label for="master-gain" class="mr-sm-2">Master Volume</label>
+<input
+  type="range"
+  min="0"
+  max="100"
+  value="100"
+  class="master-gain form-control mr-sm-2"
+  id="master-gain"
+/>
+
+  </form>
+  <form class="form-inline">
+  <select class="time-format custom-select mr-sm-2" aria-label="Time format selection">
+    <option value="seconds">seconds</option>
+    <option value="thousandths">thousandths</option>
+    <option value="hh:mm:ss">hh:mm:ss</option>
+    <option value="hh:mm:ss.u">hh:mm:ss + tenths</option>
+    <option value="hh:mm:ss.uu">hh:mm:ss + hundredths</option>
+    <option value="hh:mm:ss.uuu" selected="selected">hh:mm:ss + milliseconds</option>
+  </select>
+  <label class="sr-only" for="audio_start">Start of audio selection</label>
+  <input type="text" class="audio-start form-control mr-sm-2" id="audio_start">
+  <label class="sr-only" for="audio_end">End of audio selection</label>
+  <input type="text" class="audio-end form-control mr-sm-2" id="audio_end">
+  <span class="audio-pos" aria-label="Audio position">00:00:00.0</span>
+</form>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js" integrity="sha512-gwSDP1iEKl4KG0wi3N89RAJU91s78jb/TGC6lsbF5IyR2c19Rn7Jl1icK4K4kUiJNwQUEPI7o98T+GJVWNuvIQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </div>

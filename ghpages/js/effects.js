@@ -17,7 +17,10 @@ playlist = WaveformPlaylist.init({
   waveHeight: 100,
   isAutomaticScroll: true,
   timescale: true,
-  state: "cursor"
+  state: "cursor",
+  effects: function(masterGainNode, destination) {
+    masterGainNode.connect(destination);
+  }
 });
   
 playlist
@@ -30,7 +33,7 @@ playlist
 
         Tone.connect(graphEnd, pitchShift);
         Tone.connect(pitchShift, masterGainNode);
-       }
+      }
     },
     {
       src: "media/audio/Guitar30.mp3",
@@ -40,7 +43,7 @@ playlist
 
         Tone.connect(graphEnd, reverb);
         Tone.connect(reverb, masterGainNode);
-       }
+      }
     },
     {
       src: "media/audio/PianoSynth30.mp3",
