@@ -82,7 +82,9 @@ export default class {
             });
             this.recordingTrack.setCues(0, audioBuffer.duration);
             this.recordingTrack.setBuffer(audioBuffer);
-            this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
+            this.recordingTrack.setPlayout(
+              new Playout(this.ac, audioBuffer, this.masterGainNode)
+            );
             this.adjustDuration();
           })
           .catch(() => {
@@ -136,6 +138,11 @@ export default class {
 
   setAudioContext(ac) {
     this.ac = ac;
+    this.masterGainNode = ac.createGain();
+  }
+
+  getAudioContext() {
+    return this.ac;
   }
 
   setControlOptions(controlOptions) {
@@ -173,6 +180,10 @@ export default class {
       config.isContinuousPlay,
       controlWidth
     );
+  }
+
+  setEffects(effectsGraph) {
+    this.effectsGraph = effectsGraph;
   }
 
   setEventEmitter(ee) {
@@ -391,9 +402,14 @@ export default class {
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
           const stereoPan = info.stereoPan || 0;
+          const effects = info.effects || null;
 
           // webaudio specific playout for now.
-          const playout = new Playout(this.ac, audioBuffer);
+          const playout = new Playout(
+            this.ac,
+            audioBuffer,
+            this.masterGainNode
+          );
 
           const track = new Track();
           track.src = info.src;
@@ -428,6 +444,9 @@ export default class {
 
           track.setGainLevel(gain);
           track.setStereoPanValue(stereoPan);
+          if (effects) {
+            track.setEffects(effects);
+          }
 
           if (muted) {
             this.muteTrack(track);
@@ -728,6 +747,10 @@ export default class {
     if (this.isPlaying()) {
       return this.restartPlayFrom(start, end);
     }
+
+    // TODO refector this in upcoming modernisation.
+    if (this.effectsGraph)
+      this.tracks && this.tracks[0].playout.setMasterEffects(this.effectsGraph);
 
     this.tracks.forEach((track) => {
       track.setState("cursor");

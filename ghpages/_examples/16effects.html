@@ -1,0 +1,25 @@
+---
+layout: page
+title: Tone.js Effects + Custom Webaudio Graphs
+lead: Add effects to each track or analyse the master output. Frequency bar graph code <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Visualizations_with_Web_Audio_API">adapted from MDN</a>.
+excerpt: Basic web audio single track mono display waveform editor. Play, stop, pause audio. Live seeking enabled.
+permalink: effects.html
+javascript: effects.js
+audio_title: Starlight
+audio_artist: Muse
+---
+
+<div id="top-bar" class="playlist-top-bar">
+  <div class="playlist-toolbar">
+    {% include buttons/playback.html %}
+  </div>
+  <div><canvas class="visualizer" width="1000" height="100"></canvas></div>
+</div>
+<div id="playlist"></div>
+<form class="form-inline">
+  {% include sliders/mastergain.html %}
+</form>
+{% include timeformat.html %}
+<div class="track-drop"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js" integrity="sha512-gwSDP1iEKl4KG0wi3N89RAJU91s78jb/TGC6lsbF5IyR2c19Rn7Jl1icK4K4kUiJNwQUEPI7o98T+GJVWNuvIQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>

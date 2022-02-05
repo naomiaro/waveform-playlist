@@ -1,12 +1,18 @@
 import { FADEIN, FADEOUT, createFadeIn, createFadeOut } from "fade-maker";
 
+function noEffects(node1, node2) {
+  node1.connect(node2);
+}
+
 export default class {
-  constructor(ac, buffer) {
+  constructor(ac, buffer, masterGain = ac.createGain()) {
     this.ac = ac;
     this.gain = 1;
+    this.effectsGraph = noEffects;
+    this.masterEffectsGraph = noEffects;
     this.buffer = buffer;
+    this.masterGain = masterGain;
     this.destination = this.ac.destination;
-    this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
   }
 
   applyFade(type, start, duration, shape = "logarithmic") {
@@ -37,13 +43,22 @@ export default class {
 
   setAudioContext(ac) {
     this.ac = ac;
-    this.ac.createStereoPanner = ac.createStereoPanner || ac.createPanner;
     this.destination = this.ac.destination;
+  }
+
+  createStereoPanner() {
+    if (this.ac.createStereoPanner) {
+      return this.ac.createStereoPanner();
+    }
+    return this.ac.createPanner();
   }
 
   setUpSource() {
     this.source = this.ac.createBufferSource();
     this.source.buffer = this.buffer;
+
+    let cleanupEffects;
+    let cleanupMasterEffects;
 
     const sourcePromise = new Promise((resolve) => {
       // keep track of the buffer state.
@@ -55,12 +70,14 @@ export default class {
         this.panner.disconnect();
         this.masterGain.disconnect();
 
+        if (cleanupEffects) cleanupEffects();
+        if (cleanupMasterEffects) cleanupMasterEffects();
+
         this.source = undefined;
         this.fadeGain = undefined;
         this.volumeGain = undefined;
         this.shouldPlayGain = undefined;
         this.panner = undefined;
-        this.masterGain = undefined;
 
         resolve();
       };
@@ -71,16 +88,18 @@ export default class {
     this.volumeGain = this.ac.createGain();
     // used for solo/mute
     this.shouldPlayGain = this.ac.createGain();
-    this.masterGain = this.ac.createGain();
-
-    this.panner = this.ac.createStereoPanner();
+    this.panner = this.createStereoPanner();
 
     this.source.connect(this.fadeGain);
     this.fadeGain.connect(this.volumeGain);
     this.volumeGain.connect(this.shouldPlayGain);
-    this.shouldPlayGain.connect(this.masterGain);
-    this.masterGain.connect(this.panner);
-    this.panner.connect(this.destination);
+    this.shouldPlayGain.connect(this.panner);
+
+    cleanupEffects = this.effectsGraph(this.panner, this.masterGain);
+    cleanupMasterEffects = this.masterEffectsGraph(
+      this.masterGain,
+      this.destination
+    );
 
     return sourcePromise;
   }
@@ -103,9 +122,7 @@ export default class {
     }
   }
 
-  setStereoPanValue(value) {
-    const pan = value === undefined ? 0 : value;
-
+  setStereoPanValue(pan = 0) {
     if (this.panner) {
       if (this.panner.pan !== undefined) {
         this.panner.pan.value = pan;
@@ -114,6 +131,14 @@ export default class {
         this.panner.setPosition(pan, 0, 1 - Math.abs(pan));
       }
     }
+  }
+
+  setEffects(effectsGraph) {
+    this.effectsGraph = effectsGraph;
+  }
+
+  setMasterEffects(effectsGraph) {
+    this.masterEffectsGraph = effectsGraph;
   }
 
   /*
