@@ -26,11 +26,9 @@ I've written up some demos on github for the different [audio fade types](https:
 ![Screenshot](img/annotations.png?raw=true "Aeneas annotations adjust alignment json export")
 (code for picture shown can be found in ghpages/\_examples/13annotations.html)
 
-
 ## Browser Support
 
 Waveform Playlist requires webaudio in the browser to function correctly: [Can I Use?](http://caniuse.com/#search=webaudio)
-
 
 ## Installation
 
@@ -230,6 +228,13 @@ var options = {
     // If true annotation endpoints will remain linked when dragged
     // if they were the same value before dragging started.
     linkEndpoints: false,
+
+    // pass a custom function which will receive the mastergainnode for this playlist and the audio context's destination.
+    // if you pass a function, you must connect these two nodes to hear sound at minimum.
+    effects: function (masterGainNode, destination) {
+      masterGainNode.connect(analyser);
+      masterGainNode.connect(destination);
+    },
   },
 };
 ```
@@ -316,7 +321,16 @@ var options = {
   },
 
   // value from -1 (full left pan) to 1 (full right pan)
-  stereoPan: 0
+  stereoPan: 0,
+
+  // pass a custom function which will receive the last graphnode for this track and the mastergainnode.
+  // if you pass a function, you must connect these two nodes to hear sound at minimum.
+  effects: function(graphEnd, masterGainNode) {
+    var reverb = new Tone.Reverb(1.2);
+
+    Tone.connect(graphEnd, reverb);
+    Tone.connect(reverb, masterGainNode);
+  }
 }
 ```
 
