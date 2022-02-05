@@ -2,6 +2,24 @@ var playlist;
 var audioCtx = Tone.getContext().rawContext;
 var analyser = audioCtx.createAnalyser();
 
+var userMediaStream;
+var constraints = { audio: true };
+
+navigator.getUserMedia = (navigator.getUserMedia ||
+  navigator.webkitGetUserMedia ||
+  navigator.mozGetUserMedia ||
+  navigator.msGetUserMedia);
+
+function gotStream(stream) {
+  userMediaStream = stream;
+  playlist.initRecorder(userMediaStream);
+  $(".btn-record").removeClass("disabled");
+}
+
+function logError(err) {
+  console.error(err);
+}
+
 playlist = WaveformPlaylist.init({
   ac: audioCtx,
   barWidth: 3,
@@ -42,7 +60,7 @@ playlist
       src: "media/audio/Guitar30.mp3",
       name: "Guitar",
       effects: function(graphEnd, masterGainNode) {
-        var reverb = new Tone.Reverb(5);
+        var reverb = new Tone.Reverb(1.2);
 
         Tone.connect(graphEnd, reverb);
         Tone.connect(reverb, masterGainNode);
@@ -59,6 +77,18 @@ playlist
   ])
   .then(function () {
     //can do stuff with the playlist.
+
+    if (navigator.mediaDevices) {
+      navigator.mediaDevices.getUserMedia(constraints)
+      .then(gotStream)
+      .catch(logError);
+    } else if (navigator.getUserMedia && 'MediaRecorder' in window) {
+      navigator.getUserMedia(
+        constraints,
+        gotStream,
+        logError
+      );
+    }
   });
 
   // https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Visualizations_with_Web_Audio_API

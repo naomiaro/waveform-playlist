@@ -82,7 +82,9 @@ export default class {
             });
             this.recordingTrack.setCues(0, audioBuffer.duration);
             this.recordingTrack.setBuffer(audioBuffer);
-            this.recordingTrack.setPlayout(new Playout(this.ac, audioBuffer));
+            this.recordingTrack.setPlayout(
+              new Playout(this.ac, audioBuffer, this.masterGainNode)
+            );
             this.adjustDuration();
           })
           .catch(() => {
