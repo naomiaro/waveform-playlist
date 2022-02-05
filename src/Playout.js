@@ -70,14 +70,14 @@ export default class {
         this.panner.disconnect();
         this.masterGain.disconnect();
 
+        if (cleanupEffects) cleanupEffects();
+        if (cleanupMasterEffects) cleanupMasterEffects();
+
         this.source = undefined;
         this.fadeGain = undefined;
         this.volumeGain = undefined;
         this.shouldPlayGain = undefined;
         this.panner = undefined;
-
-        if (cleanupEffects) cleanupEffects();
-        if (cleanupMasterEffects) cleanupMasterEffects();
 
         resolve();
       };
