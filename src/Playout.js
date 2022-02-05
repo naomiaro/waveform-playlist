@@ -57,6 +57,9 @@ export default class {
     this.source = this.ac.createBufferSource();
     this.source.buffer = this.buffer;
 
+    let cleanupEffects;
+    let cleanupMasterEffects;
+
     const sourcePromise = new Promise((resolve) => {
       // keep track of the buffer state.
       this.source.onended = () => {
@@ -72,6 +75,9 @@ export default class {
         this.volumeGain = undefined;
         this.shouldPlayGain = undefined;
         this.panner = undefined;
+
+        if (cleanupEffects) cleanupEffects();
+        if (cleanupMasterEffects) cleanupMasterEffects();
 
         resolve();
       };
@@ -89,8 +95,11 @@ export default class {
     this.volumeGain.connect(this.shouldPlayGain);
     this.shouldPlayGain.connect(this.panner);
 
-    this.effectsGraph(this.panner, this.masterGain);
-    this.masterEffectsGraph(this.masterGain, this.destination);
+    cleanupEffects = this.effectsGraph(this.panner, this.masterGain);
+    cleanupMasterEffects = this.masterEffectsGraph(
+      this.masterGain,
+      this.destination
+    );
 
     return sourcePromise;
   }

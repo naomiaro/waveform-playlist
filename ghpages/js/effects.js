@@ -54,6 +54,11 @@ playlist
 
         Tone.connect(graphEnd, autoWah);
         Tone.connect(autoWah, masterGainNode);
+
+        return function cleanup() {
+          autoWah.disconnect();
+          autoWah.dispose();
+        }
       }
     },
     {
@@ -64,6 +69,11 @@ playlist
 
         Tone.connect(graphEnd, reverb);
         Tone.connect(reverb, masterGainNode);
+
+        return function cleanup() {
+          reverb.disconnect();
+          reverb.dispose();
+        }
       }
     },
     {
