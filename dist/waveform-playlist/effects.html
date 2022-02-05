@@ -18,7 +18,7 @@
   />
 
   <title>
-    Effects
+    Tone.js Effects + Custom Webaudio Graphs
   </title>
   <meta
     name="description"
@@ -98,7 +98,7 @@
 <header class="site-header">
   <ol class="breadcrumb">
     <li><a href="/waveform-playlist/">Waveform Playlist</a></li>
-    <li class="mx-3 active">Effects</li>
+    <li class="mx-3 active">Tone.js Effects + Custom Webaudio Graphs</li>
   </ol>
   <a
     href="https://github.com/naomiaro/waveform-playlist"
@@ -138,8 +138,8 @@
       <div class="wrapper">
   <article class="post">
     <header class="post-header">
-      <h1 class="post-title">Effects</h1>
-      <p class="lead">Add effects to each track or the master output.</p>
+      <h1 class="post-title">Tone.js Effects + Custom Webaudio Graphs</h1>
+      <p class="lead">Add effects to each track or analyse the master output. Frequency bar graph code <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Visualizations_with_Web_Audio_API">taken from MDN</a>.</p>
     </header>
     <div class="post-content"><div id="top-bar" class="playlist-top-bar">
   <div class="playlist-toolbar">
@@ -177,10 +177,11 @@
 </div>
 
   </div>
+  <div><canvas class="visualizer" width="1000" height="100"></canvas></div>
 </div>
 <div id="playlist"></div>
 <form class="form-inline">
-    <label for="master-gain" class="mr-sm-2">Master Volume</label>
+  <label for="master-gain" class="mr-sm-2">Master Volume</label>
 <input
   type="range"
   min="0"
@@ -190,8 +191,8 @@
   id="master-gain"
 />
 
-  </form>
-  <form class="form-inline">
+</form>
+<form class="form-inline">
   <select class="time-format custom-select mr-sm-2" aria-label="Time format selection">
     <option value="seconds">seconds</option>
     <option value="thousandths">thousandths</option>
