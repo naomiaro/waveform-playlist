@@ -32,10 +32,10 @@ playlist
       src: "media/audio/Vocals30.mp3",
       name: "Vocals",
       effects: function(graphEnd, masterGainNode) {
-        var pitchShift = new Tone.PitchShift(12);
+        var autoWah = new Tone.AutoWah(50, 6, -30);
 
-        Tone.connect(graphEnd, pitchShift);
-        Tone.connect(pitchShift, masterGainNode);
+        Tone.connect(graphEnd, autoWah);
+        Tone.connect(autoWah, masterGainNode);
       }
     },
     {
@@ -98,26 +98,5 @@ playlist
       x += barWidth + 1;
     }
   }
-
-  // function draw() {
-  //   drawVisual = requestAnimationFrame(draw);
-  //   analyser.getByteFrequencyData(dataArray);
-
-  //   canvasCtx.fillStyle = 'rgb(255, 255, 255)';
-  //   canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  //   var barWidth = (WIDTH / scale / bufferLength) * 2.5;
-  //   var barHeight;
-  //   var x = 0;
-
-  //   for(var i = 0; i < bufferLength; i++) {
-  //     barHeight = dataArray[i]/2/scale;
-
-  //     canvasCtx.fillStyle = 'rgb(' + (barHeight+100) + ',50,50)';
-  //     canvasCtx.fillRect(x, HEIGHT/scale-barHeight/2, barWidth, barHeight);
-
-  //     x += barWidth + 1;
-  //   }
-  // }
 
   draw();
