@@ -2,7 +2,7 @@ const createVariants = require("parallel-webpack").createVariants;
 const TerserPlugin = require("terser-webpack-plugin");
 
 function createConfig(options) {
-  return {
+  const config = {
     entry: __dirname + "/src/app.js",
     output: {
       path: __dirname + "/build",
@@ -22,6 +22,13 @@ function createConfig(options) {
     },
     mode: "production",
   };
+
+  if (options.target === "umd") {
+    config.output.umdNamedDefine = true;
+    config.output.globalObject = "this";
+  }
+
+  return config;
 }
 
 module.exports = createVariants(
