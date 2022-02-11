@@ -12,4 +12,5 @@ webpack.config.dev.js
 .prettierrc.json
 .prettierignore
 /.github
+/.vscode
 /ghpages
