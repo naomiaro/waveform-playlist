@@ -1,7 +1,6 @@
 node_modules/
-
+.next/
 # compiled files
-/lib
 /build
 .sass-cache
 /styles
