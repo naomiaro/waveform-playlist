@@ -68,7 +68,7 @@ export default class {
         this.volumeGain.disconnect();
         this.shouldPlayGain.disconnect();
         this.panner.disconnect();
-        this.masterGain.disconnect();
+        // this.masterGain.disconnect();
 
         if (cleanupEffects) cleanupEffects();
         if (cleanupMasterEffects) cleanupMasterEffects();

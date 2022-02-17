@@ -798,6 +798,8 @@ export default class {
       track.setState(this.getState());
     });
 
+    // TODO improve this.
+    this.masterGainNode.disconnect();
     this.drawRequest();
     return Promise.all(this.playoutPromises);
   }
