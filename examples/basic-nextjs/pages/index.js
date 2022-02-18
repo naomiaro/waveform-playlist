@@ -10,7 +10,7 @@ const Waveform = () => {
       const playlist = WaveformPlaylist({
         samplesPerPixel: 100,
         mono: true,
-        waveHeight: 70,
+        waveHeight: 100,
         container: node,
         state: "cursor",
         colors: {
@@ -19,7 +19,7 @@ const Waveform = () => {
           fadeColor: "black",
         },
         controls: {
-          show: false,
+          show: true,
           width: 150,
         },
         zoomLevels: [100, 300, 500],

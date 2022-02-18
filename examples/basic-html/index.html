@@ -20,7 +20,10 @@
         var playlist = WaveformPlaylist.init({
             container: document.getElementById("playlist"),
             samplesPerPixel: 128,
-            zoomLevels: [128, 256, 512]
+            zoomLevels: [128, 256, 512],
+            controls: {
+                show: true
+            }
         });
 
         playlist.load([
