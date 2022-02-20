@@ -1,9 +1,16 @@
 import React, {useCallback, useState} from 'react';
-
+import EventEmitter from 'events';
 import WaveformPlaylist from 'waveform-playlist';
+import { saveAs } from 'file-saver';
 
 const Waveform = () => {
-  const [playlist, setPlaylist] = useState(null);
+  const [ee] = useState(new EventEmitter());
+
+  ee.on('audiorenderingfinished', function (type, data) {
+    if (type === 'wav'){
+      saveAs(data, 'test.wav');
+    }
+  });
 
   const container = useCallback(node => {
     if (node !== null) {
@@ -23,26 +30,25 @@ const Waveform = () => {
           width: 150,
         },
         zoomLevels: [100, 300, 500],
-      });
+      }, ee);
   
       playlist.load([
         {
           src: "hello.mp3",
           name: "Hello",
         }
-      ])
-      .then(function () {
-        // can do stuff with the playlist.
-      });
+      ]);
 
-      setPlaylist(playlist);
+      //initialize the WAV exporter.
+      playlist.initExporter();
     }
   }, []);
 
 
   return (
     <main>
-      <div><button onClick={() => { playlist.getEventEmitter().emit("play") }}>Play</button></div>
+      <div><button onClick={() => { ee.emit("play") }}>Play</button></div>
+      <div><button onClick={() => { ee.emit('startaudiorendering', 'wav') }}>Download</button></div>
       <div ref={container}></div>
     </main>
   );
