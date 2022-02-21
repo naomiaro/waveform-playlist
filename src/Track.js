@@ -532,7 +532,7 @@ export default class {
     );
     let progressWidth = 0;
     const numChan = this.peaks.data.length;
-    const scale = Math.floor(window.devicePixelRatio);
+    const scale = Math.ceil(window.devicePixelRatio);
 
     if (playbackX > 0 && playbackX > startX) {
       if (playbackX < endX) {
