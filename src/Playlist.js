@@ -6,6 +6,7 @@ import patch from "virtual-dom/patch";
 import InlineWorker from "inline-worker";
 
 import { pixelsToSeconds } from "./utils/conversions";
+import { resampleAudioBuffer } from "./utils/audioData";
 import LoaderFactory from "./track/loader/LoaderFactory";
 import ScrollHook from "./render/ScrollHook";
 import TimeScale from "./TimeScale";
@@ -378,7 +379,14 @@ export default class {
         this.ac,
         this.ee
       );
-      return loader.load();
+      return loader.load()
+        .then((audioBuffer) => {
+          if (audioBuffer.sampleRate === this.sampleRate) {
+            return audioBuffer;
+          } else {
+            return resampleAudioBuffer(audioBuffer, this.sampleRate);
+          }
+        });
     });
 
     return Promise.all(loadPromises)
