@@ -446,6 +446,12 @@ Originally created for the [Airtime](https://www.sourcefabric.org/software/airti
 
 The annotation plugin has been sponsored by a fond Italian TED volunteer transcriber hoping to make the transcription process of TEDx talks easier and more fun.
 
+## Books
+
+Currently writing: [Mastering Tone.js](https://leanpub.com/masteringtonejs)
+
+<img src="https://naomiaro.github.io/img/masteringtonejs.png" title="Mastering Tone.js Cover" width="240">
+
 ## License
 
 [MIT License](http://doge.mit-license.org)
