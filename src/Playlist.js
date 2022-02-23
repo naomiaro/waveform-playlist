@@ -513,12 +513,7 @@ export default class {
       44100
     );
 
-    if (window.Tone) {
-      const offlineContext = new window.Tone.OfflineContext(
-        this.offlineAudioContext
-      );
-      window.Tone.setContext(offlineContext);
-    }
+    this.ee.emit("audiorenderingstarting", this.offlineAudioContext);
 
     const currentTime = this.offlineAudioContext.currentTime;
     const mg = this.offlineAudioContext.createGain();

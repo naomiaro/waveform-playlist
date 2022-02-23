@@ -1,5 +1,6 @@
 var playlist;
-var audioCtx = Tone.getContext().rawContext;
+var toneCtx = Tone.getContext();
+var audioCtx = toneCtx.rawContext;
 var analyser = audioCtx.createAnalyser();
 
 var userMediaStream;
@@ -39,6 +40,7 @@ playlist = WaveformPlaylist.init({
   timescale: true,
   state: "cursor",
   effects: function(masterGainNode, destination, isOffline) {
+    // analyser nodes don't work offline.
     if (!isOffline) masterGainNode.connect(analyser);
     masterGainNode.connect(destination);
   }
@@ -46,6 +48,17 @@ playlist = WaveformPlaylist.init({
 
 //initialize the WAV exporter.
 playlist.initExporter();
+
+playlist.ee.on("audiorenderingstarting", function(offlineCtx) {
+  // Set Tone offline to render effects properly.
+  const offlineContext = new Tone.OfflineContext(offlineCtx);
+  Tone.setContext(offlineContext);
+});
+
+playlist.ee.on("audiorenderingfinished", function() {
+  //restore original ctx for further use.
+  Tone.setContext(toneCtx);
+});
   
 playlist
   .load([
