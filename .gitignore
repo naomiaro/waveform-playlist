@@ -4,7 +4,7 @@ node_modules/
 /build
 .sass-cache
 /styles
-
+lib
 .DS_Store
 test/.DS_Store
 ghpages/.jekyll-cache/

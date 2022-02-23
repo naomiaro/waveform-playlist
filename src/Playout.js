@@ -95,10 +95,15 @@ export default class {
     this.volumeGain.connect(this.shouldPlayGain);
     this.shouldPlayGain.connect(this.panner);
 
-    cleanupEffects = this.effectsGraph(this.panner, this.masterGain);
+    cleanupEffects = this.effectsGraph(
+      this.panner,
+      this.masterGain,
+      this.ac instanceof OfflineAudioContext
+    );
     cleanupMasterEffects = this.masterEffectsGraph(
       this.masterGain,
-      this.destination
+      this.destination,
+      this.ac instanceof OfflineAudioContext
     );
 
     return sourcePromise;
@@ -133,11 +138,11 @@ export default class {
     }
   }
 
-  setEffects(effectsGraph) {
+  setEffects(effectsGraph = noEffects) {
     this.effectsGraph = effectsGraph;
   }
 
-  setMasterEffects(effectsGraph) {
+  setMasterEffects(effectsGraph = noEffects) {
     this.masterEffectsGraph = effectsGraph;
   }
 

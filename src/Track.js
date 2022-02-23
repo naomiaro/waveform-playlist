@@ -239,6 +239,7 @@ export default class {
   }
 
   setEffects(effectsGraph) {
+    this.effectsGraph = effectsGraph;
     this.playout.setEffects(effectsGraph);
   }
 
