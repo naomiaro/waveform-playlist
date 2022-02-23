@@ -15,7 +15,6 @@ import AnnotationList from "./annotation/AnnotationList";
 
 import RecorderWorkerFunction from "./utils/recorderWorker";
 import ExportWavWorkerFunction from "./utils/exportWavWorker";
-import Tone from "tonejs";
 
 export default class {
   constructor() {
