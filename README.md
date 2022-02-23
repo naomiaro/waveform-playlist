@@ -232,8 +232,9 @@ var options = {
     // pass a custom function which will receive the mastergainnode for this playlist and the audio context's destination.
     // if you pass a function, you must connect these two nodes to hear sound at minimum.
     // if you need to clean something up when the graph is disposed, return a cleanup function. Waveform Playlist will cleanup the nodes passed as arguments.
-    effects: function (masterGainNode, destination) {
-      masterGainNode.connect(analyser);
+    effects: function (masterGainNode, destination, isOffline) {
+      // analyser nodes don't work offline.
+      if (!isOffline) masterGainNode.connect(analyser);
       masterGainNode.connect(destination);
 
       // return function cleanup() {
@@ -332,7 +333,7 @@ var options = {
   // pass a custom function which will receive the last graphnode for this track and the mastergainnode.
   // if you pass a function, you must connect these two nodes to hear sound at minimum.
   // if you need to clean something up when the graph is disposed, return a cleanup function. Waveform Playlist will cleanup the nodes passed as arguments.
-  effects: function(graphEnd, masterGainNode) {
+  effects: function(graphEnd, masterGainNode, isOffline) {
     var reverb = new Tone.Reverb(1.2);
 
     Tone.connect(graphEnd, reverb);
