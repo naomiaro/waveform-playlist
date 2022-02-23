@@ -1057,12 +1057,15 @@ export default class {
   }
 
   getInfo() {
-    const info = [];
+    const tracks = [];
 
     this.tracks.forEach((track) => {
-      info.push(track.getTrackDetails());
+      tracks.push(track.getTrackDetails());
     });
 
-    return info;
+    return {
+      tracks,
+      effects: this.effectsGraph ? this.effectsGraph.toString() : "",
+    };
   }
 }
