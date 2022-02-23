@@ -38,18 +38,21 @@ playlist = WaveformPlaylist.init({
   isAutomaticScroll: true,
   timescale: true,
   state: "cursor",
-  effects: function(masterGainNode, destination) {
-    masterGainNode.connect(analyser);
+  effects: function(masterGainNode, destination, isOffline) {
+    if (!isOffline) masterGainNode.connect(analyser);
     masterGainNode.connect(destination);
   }
 });
+
+//initialize the WAV exporter.
+playlist.initExporter();
   
 playlist
   .load([
     {
       src: "media/audio/Vocals30.mp3",
       name: "Vocals",
-      effects: function(graphEnd, masterGainNode) {
+      effects: function(graphEnd, masterGainNode, isOffline) {
         var autoWah = new Tone.AutoWah(50, 6, -30);
 
         Tone.connect(graphEnd, autoWah);
@@ -64,7 +67,7 @@ playlist
     {
       src: "media/audio/Guitar30.mp3",
       name: "Guitar",
-      effects: function(graphEnd, masterGainNode) {
+      effects: function(graphEnd, masterGainNode, isOffline) {
         var reverb = new Tone.Reverb(1.2);
 
         Tone.connect(graphEnd, reverb);

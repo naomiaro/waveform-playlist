@@ -15,6 +15,7 @@ import AnnotationList from "./annotation/AnnotationList";
 
 import RecorderWorkerFunction from "./utils/recorderWorker";
 import ExportWavWorkerFunction from "./utils/exportWavWorker";
+import Tone from "tonejs";
 
 export default class {
   constructor() {
@@ -512,12 +513,22 @@ export default class {
       44100
     );
 
+    if (window.Tone) {
+      const offlineContext = new window.Tone.OfflineContext(
+        this.offlineAudioContext
+      );
+      window.Tone.setContext(offlineContext);
+    }
+
     const currentTime = this.offlineAudioContext.currentTime;
+    const mg = this.offlineAudioContext.createGain();
 
     this.tracks.forEach((track) => {
-      track.setOfflinePlayout(
-        new Playout(this.offlineAudioContext, track.buffer)
-      );
+      const playout = new Playout(this.offlineAudioContext, track.buffer, mg);
+      playout.setEffects(track.effectsGraph);
+      playout.setMasterEffects(this.effectsGraph);
+      track.setOfflinePlayout(playout);
+
       track.schedulePlay(currentTime, 0, 0, {
         shouldPlay: this.shouldTrackPlay(track),
         masterGain: 1,

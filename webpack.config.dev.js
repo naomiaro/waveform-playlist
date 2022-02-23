@@ -5,6 +5,9 @@ module.exports = {
   entry: {
     "waveform-playlist": "./app.js",
   },
+  externals: {
+    tonejs: "Tone",
+  },
   output: {
     path: __dirname + "/dist/waveform-playlist/js",
     publicPath: "/waveform-playlist/js/",
