@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useRef } from "react";
 import Script from "next/script";
 import EventEmitter from "events";
 import WaveformPlaylist from "waveform-playlist";
@@ -7,11 +7,11 @@ import { saveAs } from "file-saver";
 export default function Home() {
   const [ee] = useState(new EventEmitter());
   const [toneCtx, setToneCtx] = useState(null);
+  const setUpChain = useRef();
 
   const container = useCallback(
     (node) => {
       if (node !== null && toneCtx !== null) {
-        console.log("init playlist");
         const playlist = WaveformPlaylist(
           {
             ac: toneCtx.rawContext,
@@ -34,15 +34,14 @@ export default function Home() {
           ee
         );
 
-        ee.on("audiorenderingstarting", function (offlineCtx) {
-          console.log("audiorenderingstarted");
+        ee.on("audiorenderingstarting", function (offlineCtx, a) {
           // Set Tone offline to render effects properly.
           const offlineContext = new Tone.OfflineContext(offlineCtx);
           Tone.setContext(offlineContext);
+          setUpChain.current = a;
         });
 
         ee.on("audiorenderingfinished", function (type, data) {
-          console.log("audiorenderingfinished");
           //restore original ctx for further use.
           Tone.setContext(toneCtx);
           if (type === "wav") {
@@ -52,10 +51,14 @@ export default function Home() {
 
         playlist.load([
           {
-            src: "Vocals30.mp3",
-            name: "Vocals",
+            src: "hello.mp3",
+            name: "Hello",
             effects: function (graphEnd, masterGainNode, isOffline) {
               const reverb = new Tone.Reverb(1.2);
+
+              if (isOffline) {
+                setUpChain.current.push(reverb.ready);
+              }
 
               Tone.connect(graphEnd, reverb);
               Tone.connect(reverb, masterGainNode);

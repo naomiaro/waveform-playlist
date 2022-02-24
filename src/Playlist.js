@@ -500,7 +500,7 @@ export default class {
     this.cursor = start;
   }
 
-  startOfflineRender(type) {
+  async startOfflineRender(type) {
     if (this.isRendering) {
       return;
     }
@@ -512,7 +512,13 @@ export default class {
       44100
     );
 
-    this.ee.emit("audiorenderingstarting", this.offlineAudioContext);
+    const setUpChain = [];
+
+    this.ee.emit(
+      "audiorenderingstarting",
+      this.offlineAudioContext,
+      setUpChain
+    );
 
     const currentTime = this.offlineAudioContext.currentTime;
     const mg = this.offlineAudioContext.createGain();
@@ -533,53 +539,43 @@ export default class {
     /*
       TODO cleanup of different audio playouts handling.
     */
-    this.offlineAudioContext
-      .startRendering()
-      .then((audioBuffer) => {
-        if (type === "buffer") {
-          this.ee.emit("audiorenderingfinished", type, audioBuffer);
-          this.isRendering = false;
-          return;
-        }
+    await Promise.all(setUpChain);
+    const audioBuffer = await this.offlineAudioContext.startRendering();
 
-        if (type === "wav") {
-          this.exportWorker.postMessage({
-            command: "init",
-            config: {
-              sampleRate: 44100,
-            },
-          });
-
-          // callback for `exportWAV`
-          this.exportWorker.onmessage = (e) => {
-            this.ee.emit("audiorenderingfinished", type, e.data);
-            this.isRendering = false;
-
-            // clear out the buffer for next renderings.
-            this.exportWorker.postMessage({
-              command: "clear",
-            });
-          };
-
-          // send the channel data from our buffer to the worker
-          this.exportWorker.postMessage({
-            command: "record",
-            buffer: [
-              audioBuffer.getChannelData(0),
-              audioBuffer.getChannelData(1),
-            ],
-          });
-
-          // ask the worker for a WAV
-          this.exportWorker.postMessage({
-            command: "exportWAV",
-            type: "audio/wav",
-          });
-        }
-      })
-      .catch((e) => {
-        throw e;
+    if (type === "buffer") {
+      this.ee.emit("audiorenderingfinished", type, audioBuffer);
+      this.isRendering = false;
+    } else if (type === "wav") {
+      this.exportWorker.postMessage({
+        command: "init",
+        config: {
+          sampleRate: 44100,
+        },
       });
+
+      // callback for `exportWAV`
+      this.exportWorker.onmessage = (e) => {
+        this.ee.emit("audiorenderingfinished", type, e.data);
+        this.isRendering = false;
+
+        // clear out the buffer for next renderings.
+        this.exportWorker.postMessage({
+          command: "clear",
+        });
+      };
+
+      // send the channel data from our buffer to the worker
+      this.exportWorker.postMessage({
+        command: "record",
+        buffer: [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)],
+      });
+
+      // ask the worker for a WAV
+      this.exportWorker.postMessage({
+        command: "exportWAV",
+        type: "audio/wav",
+      });
+    }
   }
 
   getTimeSelection() {
