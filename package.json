@@ -15,7 +15,7 @@
     "babel-loader": "^8.2.3",
     "gh-pages": "^3.2.3",
     "mkdirp": "^1.0.4",
-    "node-sass": "^6.0.1",
+    "node-sass": "^7.0.0",
     "parallel-webpack": "^2.6.0",
     "prettier": "2.3.2",
     "webpack": "^5.68.0",
