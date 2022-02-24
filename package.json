@@ -7,11 +7,10 @@
   "license": "MIT",
   "website": "http://naomiaro.github.io",
   "devDependencies": {
-    "@babel/cli": "^7.16.8",
-    "@babel/core": "^7.16.12",
+    "@babel/cli": "^7.17.6",
+    "@babel/core": "^7.17.5",
     "@babel/preset-env": "^7.16.11",
     "ajv": "^8.9.0",
-    "babel-loader": "^8.2.3",
     "gh-pages": "^3.2.3",
     "mkdirp": "^1.0.4",
     "node-sass": "^6.0.1",

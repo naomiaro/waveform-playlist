@@ -2,6 +2,7 @@ var playlist;
 var toneCtx = Tone.getContext();
 var audioCtx = toneCtx.rawContext;
 var analyser = audioCtx.createAnalyser();
+var offlineSetup = [];
 
 var userMediaStream;
 var constraints = { audio: true };
@@ -49,10 +50,11 @@ playlist = WaveformPlaylist.init({
 //initialize the WAV exporter.
 playlist.initExporter();
 
-playlist.ee.on("audiorenderingstarting", function(offlineCtx) {
+playlist.ee.on("audiorenderingstarting", function(offlineCtx, setup) {
   // Set Tone offline to render effects properly.
   const offlineContext = new Tone.OfflineContext(offlineCtx);
   Tone.setContext(offlineContext);
+  offlineSetup = setup;
 });
 
 playlist.ee.on("audiorenderingfinished", function() {
@@ -83,6 +85,10 @@ playlist
       effects: function(graphEnd, masterGainNode, isOffline) {
         var reverb = new Tone.Reverb(1.2);
 
+        if (isOffline) {
+          offlineSetup.push(reverb.ready);
+        }
+
         Tone.connect(graphEnd, reverb);
         Tone.connect(reverb, masterGainNode);
 
@@ -99,6 +105,21 @@ playlist
     {
       src: "media/audio/BassDrums30.mp3",
       name: "Drums",
+      effects: function(graphEnd, masterGainNode, isOffline) {
+        var reverb = new Tone.Reverb(5);
+
+        if (isOffline) {
+          offlineSetup.push(reverb.ready);
+        }
+
+        Tone.connect(graphEnd, reverb);
+        Tone.connect(reverb, masterGainNode);
+
+        return function cleanup() {
+          reverb.disconnect();
+          reverb.dispose();
+        }
+      }
     },
   ])
   .then(function () {
