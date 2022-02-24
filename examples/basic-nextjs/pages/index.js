@@ -1,61 +1,111 @@
-import React, {useCallback, useState} from 'react';
-import EventEmitter from 'events';
-import WaveformPlaylist from 'waveform-playlist';
-import { saveAs } from 'file-saver';
+import React, { useCallback, useState, useEffect } from "react";
+import Script from "next/script";
+import EventEmitter from "events";
+import WaveformPlaylist from "waveform-playlist";
+import { saveAs } from "file-saver";
 
-const Waveform = () => {
+export default function Home() {
   const [ee] = useState(new EventEmitter());
+  const [toneCtx, setToneCtx] = useState(null);
 
-  ee.on('audiorenderingfinished', function (type, data) {
-    if (type === 'wav'){
-      saveAs(data, 'test.wav');
-    }
-  });
+  const container = useCallback(
+    (node) => {
+      if (node !== null && toneCtx !== null) {
+        console.log("init playlist");
+        const playlist = WaveformPlaylist(
+          {
+            ac: toneCtx.rawContext,
+            samplesPerPixel: 100,
+            mono: true,
+            waveHeight: 100,
+            container: node,
+            state: "cursor",
+            colors: {
+              waveOutlineColor: "#E0EFF1",
+              timeColor: "grey",
+              fadeColor: "black",
+            },
+            controls: {
+              show: true,
+              width: 150,
+            },
+            zoomLevels: [100, 300, 500],
+          },
+          ee
+        );
 
-  const container = useCallback(node => {
-    if (node !== null) {
-      const playlist = WaveformPlaylist({
-        samplesPerPixel: 100,
-        mono: true,
-        waveHeight: 100,
-        container: node,
-        state: "cursor",
-        colors: {
-          waveOutlineColor: "#E0EFF1",
-          timeColor: "grey",
-          fadeColor: "black",
-        },
-        controls: {
-          show: true,
-          width: 150,
-        },
-        zoomLevels: [100, 300, 500],
-      }, ee);
-  
-      playlist.load([
-        {
-          src: "hello.mp3",
-          name: "Hello",
-        }
-      ]);
+        ee.on("audiorenderingstarting", function (offlineCtx) {
+          console.log("audiorenderingstarted");
+          // Set Tone offline to render effects properly.
+          const offlineContext = new Tone.OfflineContext(offlineCtx);
+          Tone.setContext(offlineContext);
+        });
 
-      //initialize the WAV exporter.
-      playlist.initExporter();
-    }
-  }, []);
+        ee.on("audiorenderingfinished", function (type, data) {
+          console.log("audiorenderingfinished");
+          //restore original ctx for further use.
+          Tone.setContext(toneCtx);
+          if (type === "wav") {
+            saveAs(data, "test.wav");
+          }
+        });
 
+        playlist.load([
+          {
+            src: "Vocals30.mp3",
+            name: "Vocals",
+            effects: function (graphEnd, masterGainNode, isOffline) {
+              const reverb = new Tone.Reverb(1.2);
+
+              Tone.connect(graphEnd, reverb);
+              Tone.connect(reverb, masterGainNode);
+
+              return function cleanup() {
+                reverb.disconnect();
+                reverb.dispose();
+              };
+            },
+          },
+        ]);
+
+        //initialize the WAV exporter.
+        playlist.initExporter();
+      }
+    },
+    [ee, toneCtx]
+  );
+
+  function handleLoad() {
+    setToneCtx(Tone.getContext());
+  }
 
   return (
-    <main>
-      <div><button onClick={() => { ee.emit("play") }}>Play</button></div>
-      <div><button onClick={() => { ee.emit('startaudiorendering', 'wav') }}>Download</button></div>
-      <div ref={container}></div>
-    </main>
+    <>
+      <Script
+        src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.37/Tone.js"
+        onLoad={handleLoad}
+      />
+      <main>
+        <div>
+          <button
+            onClick={() => {
+              ee.emit("play");
+            }}
+          >
+            Play
+          </button>
+        </div>
+        <div>
+          <button
+            onClick={() => {
+              ee.emit("startaudiorendering", "wav");
+            }}
+          >
+            Download
+          </button>
+        </div>
+        <div ref={container}></div>
+      </main>
+    </>
   );
-};
-
-const Playlist = () => {
-  return (<Waveform></Waveform>)
-};
-
-export default Playlist;
+}
