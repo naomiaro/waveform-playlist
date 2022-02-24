@@ -61,23 +61,30 @@ playlist.ee.on("audiorenderingfinished", function() {
   //restore original ctx for further use.
   Tone.setContext(toneCtx);
 });
+
+function vocalsEffects(graphEnd, masterGainNode, isOffline) {
+  var autoWah = new Tone.AutoWah(50, 6, -30);
+
+  Tone.connect(graphEnd, autoWah);
+  Tone.connect(autoWah, masterGainNode);
+
+  return function cleanup() {
+    autoWah.disconnect();
+    autoWah.dispose();
+  }
+}
+
+// override for better serialisation when getting playlist info "print"
+vocalsEffects.toString = function() {
+  return ["AutoWah", 50, 6, -30];
+}
   
 playlist
   .load([
     {
       src: "media/audio/Vocals30.mp3",
       name: "Vocals",
-      effects: function(graphEnd, masterGainNode, isOffline) {
-        var autoWah = new Tone.AutoWah(50, 6, -30);
-
-        Tone.connect(graphEnd, autoWah);
-        Tone.connect(autoWah, masterGainNode);
-
-        return function cleanup() {
-          autoWah.disconnect();
-          autoWah.dispose();
-        }
-      }
+      effects: vocalsEffects
     },
     {
       src: "media/audio/Guitar30.mp3",
