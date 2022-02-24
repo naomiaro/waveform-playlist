@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && next export",
     "start": "next start",
     "lint": "next lint"
   },
@@ -14,7 +14,7 @@
     "next": "^12.1.0",
     "react": "17.0.2",
     "react-dom": "17.0.2",
-    "waveform-playlist": "^4.2.2"
+    "waveform-playlist": "^4.3.0"
   },
   "devDependencies": {
     "eslint": "8.8.0",
