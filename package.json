@@ -9,8 +9,10 @@
   "devDependencies": {
     "@babel/cli": "^7.17.6",
     "@babel/core": "^7.17.5",
+    "@babel/plugin-transform-runtime": "^7.17.0",
     "@babel/preset-env": "^7.16.11",
     "ajv": "^8.9.0",
+    "babel-loader": "^8.2.3",
     "gh-pages": "^3.2.3",
     "mkdirp": "^1.0.4",
     "node-sass": "^6.0.1",
@@ -26,6 +28,7 @@
     "css": "styles"
   },
   "dependencies": {
+    "@babel/runtime": "^7.17.2",
     "event-emitter": "^0.3.4",
     "fade-curves": "^1.0.2",
     "fade-maker": "^1.0.3",
