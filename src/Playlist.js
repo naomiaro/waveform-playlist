@@ -379,14 +379,13 @@ export default class {
         this.ac,
         this.ee
       );
-      return loader.load()
-        .then((audioBuffer) => {
-          if (audioBuffer.sampleRate === this.sampleRate) {
-            return audioBuffer;
-          } else {
-            return resampleAudioBuffer(audioBuffer, this.sampleRate);
-          }
-        });
+      return loader.load().then((audioBuffer) => {
+        if (audioBuffer.sampleRate === this.sampleRate) {
+          return audioBuffer;
+        } else {
+          return resampleAudioBuffer(audioBuffer, this.sampleRate);
+        }
+      });
     });
 
     return Promise.all(loadPromises)
@@ -1069,7 +1068,7 @@ export default class {
 
     return {
       tracks,
-      effects: this.effectsGraph ? this.effectsGraph.toString() : "",
+      effects: this.effectsGraph,
     };
   }
 }

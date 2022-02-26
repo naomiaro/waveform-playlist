@@ -750,7 +750,7 @@ export default class {
       cueout: this.cueOut,
       stereoPan: this.stereoPan,
       gain: this.gain,
-      effects: this.effectsGraph ? this.effectsGraph.toString() : "",
+      effects: this.effectsGraph,
     };
 
     if (this.fadeIn) {
