@@ -1,0 +1,29 @@
+@charset 'UTF-8';
+@use 'playlist' with (
+  $wp-channel-color: #FFD500,
+  $wp-tracks-container-background-color: #005BBB
+);
+@import 'base';
+
+.playlist .vocals {
+  background-color: #c0dce0;
+}
+
+.track-drop {
+  border: 2px dashed blue;
+  height: 100px;
+  width: 200px;
+  margin: 1em 0;
+
+  &::before {
+    content: "Drop audio file(s) here!";
+  }
+
+  &.drag-enter {
+    border: 2px solid orange;
+  }
+}
+
+footer {
+  margin-top: 2em;
+}
