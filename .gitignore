@@ -8,3 +8,4 @@ lib
 .DS_Store
 test/.DS_Store
 ghpages/.jekyll-cache/
+dist/waveform-playlist/scss

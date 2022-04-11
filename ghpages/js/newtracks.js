@@ -6,7 +6,7 @@ var playlist = WaveformPlaylist.init({
   timescale: true,
   state: 'cursor',
   colors: {
-    waveOutlineColor: '#E0EFF1',
+    waveOutlineColor: '#005BBB',
     timeColor: 'grey',
     fadeColor: 'black'
   },

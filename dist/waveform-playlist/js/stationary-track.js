@@ -7,9 +7,9 @@ var playlist = WaveformPlaylist.init({
   state: 'shift',
   waveOutlineColor: '#E0EFF1',
   colors: {
-      waveOutlineColor: '#E0EFF1',
-      timeColor: 'grey',
-      fadeColor: 'black'
+    waveOutlineColor: '#005BBB',
+    timeColor: 'grey',
+    fadeColor: 'black'
   },
   controls: {
     show: true, //whether or not to include the track controls

@@ -4,7 +4,7 @@ var playlist = WaveformPlaylist.init({
   container: document.getElementById("playlist"),
   timescale: true,
   colors: {
-      waveOutlineColor: '#E0EFF1'
+    waveOutlineColor: '#005BBB'
   },
   zoomLevels: [128, 256, 512, 1024, 2048, 4096] //zoom levels in samples per pixel
 });

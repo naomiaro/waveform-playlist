@@ -1,11 +1,9 @@
----
-# Styles for waveform-playlist ghpages
----
-
 @charset 'UTF-8';
-
-@import "base";
-@import "playlist";
+@use 'playlist' with (
+  $wp-channel-color: #FFD500,
+  $wp-tracks-container-background-color: #005BBB
+);
+@import 'base';
 
 .playlist .vocals {
   background-color: #c0dce0;

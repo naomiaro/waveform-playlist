@@ -1,0 +1,25 @@
+a {
+  color:#1d70b8;
+  cursor: pointer;
+  text-decoration: underline;
+}
+a:link {
+  color: #1d70b8;
+}
+a:visited {
+  color: #4c2c92;
+}
+a:hover {
+  color: #003078;
+}
+a:active {
+  color: #0b0c0c;
+}
+a:focus {
+  color: #0b0c0c;
+}
+
+.breadcrumb {
+  background-color: #f4f4f4;
+}
+  
