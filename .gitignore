@@ -12,8 +12,6 @@ dist/waveform-playlist/scss
 
 node_modules
 *.log
-_build_dev
-_build_prod
 _localnotes
 .vscode
 .idea
