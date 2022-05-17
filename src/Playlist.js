@@ -328,15 +328,40 @@ export default class {
       ]);
     });
 
+    // TODO: Should be uncommented when cut funtion is ready
+    // ee.on("trim", () => {
+    //   const track = this.getActiveTrack();
+    //   const timeSelection = this.getTimeSelection();
+
+    //   track.trim(timeSelection.start, timeSelection.end);
+    //   track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+
+    //   this.setTimeSelection(0, 0);
+    //   this.drawRequest();
+    // });
+
+    // TODO: Should be rename as cut
     ee.on("trim", () => {
-      const track = this.getActiveTrack();
+      const trackPart1 = this.getActiveTrack();
+      this.load([
+        {
+          src: trackPart1.src,
+          name: trackPart1.name,
+        },
+      ]);
       const timeSelection = this.getTimeSelection();
 
-      track.trim(timeSelection.start, timeSelection.end);
-      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+      trackPart1.trim(trackPart1.startTime, timeSelection.start);
+      trackPart1.calculatePeaks(this.samplesPerPixel, this.sampleRate);
 
-      this.setTimeSelection(0, 0);
-      this.drawRequest();
+      ee.on("audiosourcesrendered", () => {
+        const trackPart2 = this.tracks.at(-1);
+        this.setActiveTrack(trackPart2);
+        trackPart2.trim(timeSelection.start, trackPart2.endTime);
+        trackPart2.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+        this.setTimeSelection(0, 0);
+        this.drawRequest();
+      });
     });
 
     ee.on("zoomin", () => {
