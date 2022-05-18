@@ -217,6 +217,10 @@ $container.on("click", ".btn-trim-audio", function() {
   ee.emit("trim");
 });
 
+$container.on("click", ".btn-split-audio", function() {
+  ee.emit("split");
+});
+
 $container.on("click", ".btn.print", function() {
   console.log(playlist.getInfo());
 });
