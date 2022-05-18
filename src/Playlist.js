@@ -544,7 +544,7 @@ export default class {
     track.setWaveOutlineColor(waveOutlineColor);
 
     if (fadeOut !== undefined) {
-      const fade = trackToSplit?.fades?.[fadeOut];
+      const fade = trackToSplit.fades[fadeOut];
       track.setFadeOut(fade.end - fade.start, fade.shape);
     }
 
