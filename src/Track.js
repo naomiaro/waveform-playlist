@@ -401,7 +401,21 @@ export default class {
       [h("i.fas.fa-times")]
     );
 
-    const trackName = h("span", [this.name]);
+    const trackName = h(
+      "div.single-line",
+      {
+        attributes: {
+          contentEditable: true,
+        },
+        oninput: (e) => {
+          this.ee.emit("renameTrack", {
+            track: this,
+            name: e.target.innerText,
+          });
+        },
+      },
+      [this.name]
+    );
 
     const collapseTrack = h(
       "button.btn.btn-info.btn-xs.track-collapse",

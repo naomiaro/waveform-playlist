@@ -283,6 +283,10 @@ export default class {
       this.drawRequest();
     });
 
+    ee.on("renameTrack", (track) => {
+      this.renameTrack(track);
+    });
+
     ee.on("changeTrackView", (track, opts) => {
       this.collapseTrack(track, opts);
       this.drawRequest();
@@ -323,7 +327,7 @@ export default class {
       this.load([
         {
           src: file,
-          name: file.name,
+          name: `Track ${this.tracks.length + 1}`,
         },
       ]);
     });
@@ -343,13 +347,11 @@ export default class {
       const track = this.getActiveTrack();
       const timeSelection = this.getTimeSelection();
       const timeSelectionStart = timeSelection.start;
-      this.createTrackFromSplit(
-        {
-          trackToSplit: track,
-          name: track.name + "_1",
-          splitTime: timeSelectionStart
-        },
-      );
+      this.createTrackFromSplit({
+        trackToSplit: track,
+        name: track.name + "_1",
+        splitTime: timeSelectionStart,
+      });
       track.trim(track.startTime, timeSelectionStart);
       if (track.fadeOut) {
         track.removeFade(track.fadeOut);
@@ -501,8 +503,7 @@ export default class {
       });
   }
 
-
-  createTrackFromSplit({trackToSplit, name, splitTime}) {
+  createTrackFromSplit({ trackToSplit, name, splitTime }) {
     const enabledStates = trackToSplit.enabledStates;
     const buffer = trackToSplit.buffer;
     const fadeOut = trackToSplit.fadeOut;
@@ -527,11 +528,7 @@ export default class {
     const effects = trackToSplit.effectsGraph || null;
 
     // webaudio specific playout for now.
-    const playout = new Playout(
-      this.ac,
-      buffer,
-      this.masterGainNode
-    );
+    const playout = new Playout(this.ac, buffer, this.masterGainNode);
 
     const track = new Track();
     track.src = trackToSplit.src;
@@ -771,6 +768,10 @@ export default class {
         list.splice(index, 1);
       }
     });
+  }
+
+  renameTrack({ track, name }) {
+    track.name = name;
   }
 
   adjustTrackPlayout() {
