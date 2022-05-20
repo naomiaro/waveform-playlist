@@ -407,10 +407,10 @@ export default class {
         attributes: {
           contentEditable: true,
         },
-        oninput: (e) => {
+        onkeypress: (e) => {
           this.ee.emit("renameTrack", {
             track: this,
-            name: e.target.innerText,
+            event: e,
           });
         },
       },

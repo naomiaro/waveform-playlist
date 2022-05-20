@@ -770,8 +770,12 @@ export default class {
     });
   }
 
-  renameTrack({ track, name }) {
-    track.name = name;
+  renameTrack({ track, event }) {
+    if (event.key === "Enter") {
+      if (event.target.innerText) track.name = event.target.innerText;
+      else event.target.innerText = track.name;
+      event.target.blur();
+    }
   }
 
   adjustTrackPlayout() {
