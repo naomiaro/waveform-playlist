@@ -332,6 +332,17 @@ export default class {
       ]);
     });
 
+    ee.on("cut", () => {
+      const track = this.getActiveTrack();
+      const timeSelection = this.getTimeSelection();
+
+      track.removePart(timeSelection.start, timeSelection.end, this.ac);
+      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+
+      this.setTimeSelection(0, 0);
+      this.drawRequest();
+    });
+
     ee.on("trim", () => {
       const track = this.getActiveTrack();
       const timeSelection = this.getTimeSelection();

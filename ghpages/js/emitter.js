@@ -220,7 +220,9 @@ $container.on("click", ".btn-trim-audio", function() {
 $container.on("click", ".btn-split-audio", function() {
   ee.emit("split");
 });
-
+$container.on("click", ".btn-cut-audio", function() {
+  ee.emit("cut");
+});
 $container.on("click", ".btn.print", function() {
   console.log(playlist.getInfo());
 });

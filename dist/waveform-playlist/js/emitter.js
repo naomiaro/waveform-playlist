@@ -216,6 +216,9 @@ $container.on("click", ".btn-zoom-out", function() {
 $container.on("click", ".btn-trim-audio", function() {
   ee.emit("trim");
 });
+$container.on("click", ".btn-cut-audio", function() {
+  ee.emit("cut");
+});
 
 $container.on("click", ".btn-split-audio", function() {
   ee.emit("split");

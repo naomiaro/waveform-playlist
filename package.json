@@ -1,7 +1,7 @@
 {
-  "name": "waveform-playlist",
+  "name": "afripods-waveform-playlist",
   "description": "Multiple track web audio editor and player with waveform preview",
-  "version": "4.3.3",
+  "version": "1.0.2",
   "main": "build/waveform-playlist.umd.js",
   "author": "Naomi Aro",
   "license": "MIT",
