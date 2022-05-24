@@ -439,7 +439,7 @@ export default class {
           const muted = info.muted || false;
           const soloed = info.soloed || false;
           const selection = info.selected;
-          const peaks = info.peaks || { type: "WebAudio", mono: this.mono };
+          const peaks = info.peaks || {type: "WebAudio", mono: this.mono};
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
           const stereoPan = info.stereoPan || 0;
@@ -514,7 +514,7 @@ export default class {
       });
   }
 
-  createTrackFromSplit({ trackToSplit, name, splitTime }) {
+  createTrackFromSplit({trackToSplit, name, splitTime}) {
     const enabledStates = trackToSplit.enabledStates;
     const buffer = trackToSplit.buffer;
     const fadeOut = trackToSplit.fadeOut;
@@ -663,7 +663,7 @@ export default class {
     if (type === "buffer") {
       this.ee.emit("audiorenderingfinished", type, audioBuffer);
       this.isRendering = false;
-    } else if (type === "wav") {
+    } else if (type === "wav" || type === "wavRaw") {
       this.exportWorker.postMessage({
         command: "init",
         config: {
@@ -692,6 +692,7 @@ export default class {
       this.exportWorker.postMessage({
         command: "exportWAV",
         type: "audio/wav",
+        raw: type === 'wavRaw'
       });
     }
   }
@@ -781,7 +782,7 @@ export default class {
     });
   }
 
-  renameTrack({ track, event }) {
+  renameTrack({track, event}) {
     if (event.key === "Enter") {
       if (event.target.innerText) track.name = event.target.innerText;
       else event.target.innerText = track.name;
