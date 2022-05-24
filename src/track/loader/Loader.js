@@ -1,4 +1,5 @@
 import EventEmitter from "event-emitter";
+import {getAudioBuffer} from "../../FastLoader";
 
 export const STATE_UNINITIALIZED = 0;
 export const STATE_LOADING = 1;
@@ -38,23 +39,10 @@ export default class {
     this.setStateChange(STATE_DECODING);
 
     return new Promise((resolve, reject) => {
-      this.ac.decodeAudioData(
-        audioData,
-        (audioBuffer) => {
-          this.audioBuffer = audioBuffer;
-          this.setStateChange(STATE_FINISHED);
-
-          resolve(audioBuffer);
-        },
-        (err) => {
-          if (err === null) {
-            // Safari issues with null error
-            reject(Error("MediaDecodeAudioDataUnknownContentType"));
-          } else {
-            reject(err);
-          }
-        }
-      );
+      const audioBuffer = getAudioBuffer(audioData, this.ac);
+      this.audioBuffer = audioBuffer;
+      this.setStateChange(STATE_FINISHED);
+      resolve(audioBuffer);
     });
   }
 }
