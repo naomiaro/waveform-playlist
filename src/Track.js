@@ -87,22 +87,35 @@ export default class {
     }
   }
 
-  removePart(start, end, audioContext) {
+  removePart(point1, point2, audioContext) {
     const trackStart = this.getStartTime();
     const trackEnd = this.getEndTime();
 
-    const timeSplitOffset = start - this.getStartTime();
+    let start;
+    let end;
+    if (point1 <= point2) {
+      start = point1;
+      end = point2;
+    } else {
+      start = point2;
+      end = point1;
+    }
+
+    let timeSplitOffset = start - this.getStartTime();
+    if (timeSplitOffset < 0) {
+      // outside interval left
+      timeSplitOffset = 0;
+    }
     const firstPartPercentage = timeSplitOffset / this.duration;
 
     const secondTimeSplitOffset = end - this.getStartTime();
-    const secondPartPercentage = (this.duration - secondTimeSplitOffset) / this.duration;
+    let secondPartPercentage = (this.duration - secondTimeSplitOffset) / this.duration;
+    if (secondPartPercentage < 0) {
+      // outside interval right
+      secondPartPercentage = 0;
+    }
 
-    if (
-      (trackStart <= start && trackEnd >= start) ||
-      (trackStart <= end && trackEnd >= end)
-    ) {
-      const cueIn = this.cueIn;
-
+    if (start <= trackEnd && end >= trackStart) {
       const channels = this.buffer.numberOfChannels;
 
       let newArrayBuffer;
@@ -125,7 +138,7 @@ export default class {
       }
 
       this.buffer = newArrayBuffer;
-      this.setCues(cueIn, this.cueOut);
+      this.setCues(0, newArrayBuffer.duration);
       this.playout.buffer = this.buffer;
     }
   }
