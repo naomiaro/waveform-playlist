@@ -5,7 +5,7 @@ async function main() {
     container: document.getElementById("playlist"),
     timescale: true,
     state: "cursor",
-    samplesPerPixel: 1024,
+    samplesPerPixel: 400000,
     controls: {
       show: true,
       width: 200,

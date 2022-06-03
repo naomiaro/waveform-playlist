@@ -20,6 +20,18 @@ class TimeScale {
     this.colors = colors;
 
     this.timeinfo = {
+      400000: {
+        marker: 300000,
+        bigStep: 100000,
+        smallStep: 50000,
+        secondStep: 100,
+      },
+      100000: {
+        marker: 75000,
+        bigStep: 25000,
+        smallStep: 12000,
+        secondStep: 25,
+      },
       20000: {
         marker: 30000,
         bigStep: 10000,
