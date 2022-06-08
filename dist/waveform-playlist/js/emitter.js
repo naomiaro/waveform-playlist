@@ -337,6 +337,13 @@ ee.on("mastervolumechange", function(volume) {
   displaySoundStatus("Master volume now has volume " + volume + ".");
 });
 
+ee.on("cut", function() {
+  displayLoadingData("A cut operation has started.");
+});
+
+ee.on("cutfinished", function() {
+  displayLoadingData("The cut operation has finished.");
+});
 
 var audioStates = ["uninitialized", "loading", "decoding", "finished"];
 

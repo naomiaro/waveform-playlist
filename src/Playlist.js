@@ -341,6 +341,7 @@ export default class {
 
       this.setTimeSelection(0, 0);
       this.drawRequest();
+      this.ee.emit("cutfinished");
     });
 
     ee.on("trim", () => {
