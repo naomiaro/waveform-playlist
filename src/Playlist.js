@@ -340,6 +340,7 @@ export default class {
       track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
 
       this.setTimeSelection(0, 0);
+      this.adjustDuration();
       this.drawRequest();
       this.ee.emit("cutfinished");
     });
