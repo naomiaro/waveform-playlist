@@ -229,8 +229,12 @@ export default class {
       this.drawRequest();
     });
 
-    ee.on("shift", (deltaTime, track) => {
-      track.setStartTime(track.getStartTime() + deltaTime);
+    ee.on("shift", (deltaTime, track, lastShift) => {
+      let newStartTime = track.getStartTime() + deltaTime;
+      if (lastShift && newStartTime < 0) {
+        newStartTime = 0;
+      }
+      track.setStartTime(newStartTime);
       this.adjustDuration();
       this.drawRequest();
     });
