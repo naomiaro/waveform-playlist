@@ -231,8 +231,14 @@ export default class {
 
     ee.on("shift", (deltaTime, track, lastShift) => {
       let newStartTime = track.getStartTime() + deltaTime;
-      if (lastShift && newStartTime < 0) {
-        newStartTime = 0;
+      if (lastShift) {
+        if (newStartTime < 0) {
+          newStartTime = 0;
+        }
+        if (this.isPlaying()) {
+          this.pause();
+          this.play();
+        }
       }
       track.setStartTime(newStartTime);
       this.adjustDuration();
@@ -887,7 +893,6 @@ export default class {
       this.tracks && this.tracks[0].playout.setMasterEffects(this.effectsGraph);
 
     this.tracks.forEach((track) => {
-      track.setState("cursor");
       playoutPromises.push(
         track.schedulePlay(currentTime, start, end, {
           shouldPlay: this.shouldTrackPlay(track),
