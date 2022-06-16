@@ -196,11 +196,12 @@ export default class {
       this.removeFade(this.fadeIn);
       this.fadeIn = undefined;
     }
-
+    this.ee.emit('createFadeUndoStep')
     this.fadeIn = this.saveFade(FADEIN, fade.shape, fade.start, fade.end);
   }
 
   setFadeOut(duration, shape = "logarithmic") {
+    this.ee.emit('createFadeUndoStep')
     if (duration > this.duration) {
       throw new Error("Invalid Fade Out");
     }
