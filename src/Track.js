@@ -1,13 +1,13 @@
 import _assign from "lodash.assign";
 import _forOwn from "lodash.forown";
 
-import {v4 as uuidv4} from "uuid";
+import { v4 as uuidv4 } from "uuid";
 import h from "virtual-dom/h";
 
 import extractPeaks from "webaudio-peaks";
-import {FADEIN, FADEOUT} from "fade-maker";
+import { FADEIN, FADEOUT } from "fade-maker";
 
-import {secondsToPixels, secondsToSamples} from "./utils/conversions";
+import { secondsToPixels, secondsToSamples } from "./utils/conversions";
 import stateClasses from "./track/states";
 
 import CanvasHook from "./render/CanvasHook";
@@ -109,7 +109,8 @@ export default class {
     const firstPartPercentage = timeSplitOffset / this.duration;
 
     const secondTimeSplitOffset = end - this.getStartTime();
-    let secondPartPercentage = (this.duration - secondTimeSplitOffset) / this.duration;
+    let secondPartPercentage =
+      (this.duration - secondTimeSplitOffset) / this.duration;
     if (secondPartPercentage < 0) {
       // outside interval right
       secondPartPercentage = 0;
@@ -122,19 +123,31 @@ export default class {
       const firstPartNewLength = firstPartPercentage * this.buffer.length;
       const secondPartNewLength = secondPartPercentage * this.buffer.length;
       try {
-        newArrayBuffer = audioContext.createBuffer(channels, firstPartNewLength + secondPartNewLength, this.buffer.sampleRate);
+        newArrayBuffer = audioContext.createBuffer(
+          channels,
+          firstPartNewLength + secondPartNewLength,
+          this.buffer.sampleRate
+        );
         const arrayFirstPart = new Float32Array(firstPartNewLength);
         const arraySecondPart = new Float32Array(secondPartNewLength);
 
         for (let channel = 0; channel < channels; channel++) {
           this.buffer.copyFromChannel(arrayFirstPart, channel, 0);
-          this.buffer.copyFromChannel(arraySecondPart, channel, this.buffer.length - secondPartNewLength);
+          this.buffer.copyFromChannel(
+            arraySecondPart,
+            channel,
+            this.buffer.length - secondPartNewLength
+          );
           newArrayBuffer.copyToChannel(arrayFirstPart, channel, 0);
-          newArrayBuffer.copyToChannel(arraySecondPart, channel, firstPartNewLength);
+          newArrayBuffer.copyToChannel(
+            arraySecondPart,
+            channel,
+            firstPartNewLength
+          );
         }
       } catch (e) {
         // handle error here
-        throw e
+        throw e;
       }
 
       this.buffer = newArrayBuffer;
@@ -452,7 +465,7 @@ export default class {
           title: "Remove track",
         },
         onclick: () => {
-          this.ee.emit("removeTrack", this);
+          this.ee.emit("createUndoStateAndRemoveTrack", this);
         },
       },
       [h("i.fas.fa-times")]
