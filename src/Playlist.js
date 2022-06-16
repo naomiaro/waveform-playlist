@@ -315,12 +315,34 @@ export default class {
     });
 
     ee.on("fadein", (duration, track) => {
-      track.setFadeIn(duration, this.fadeType);
+      this.ee.emit(
+        "createFadeUndoStep",
+        "fadeIn",
+        this.fadeType,
+        duration,
+        track
+      );
+    });
+
+    ee.on("createFadeIn", (fadeObject) => {
+      const track = fadeObject.track;
+      track.setFadeIn(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
 
     ee.on("fadeout", (duration, track) => {
-      track.setFadeOut(duration, this.fadeType);
+      this.ee.emit(
+        "createFadeUndoStep",
+        "fadeOut",
+        this.fadeType,
+        duration,
+        track
+      );
+    });
+
+    ee.on("createFadeOut", (fadeObject) => {
+      const track = fadeObject.track;
+      track.setFadeOut(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
 
@@ -451,7 +473,7 @@ export default class {
           const muted = info.muted || false;
           const soloed = info.soloed || false;
           const selection = info.selected;
-          const peaks = info.peaks || {type: "WebAudio", mono: this.mono};
+          const peaks = info.peaks || { type: "WebAudio", mono: this.mono };
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
           const stereoPan = info.stereoPan || 0;
@@ -465,7 +487,8 @@ export default class {
           );
 
           const track = new Track();
-          track.src = info.src;
+          track.src =
+            info.src instanceof Blob ? URL.createObjectURL(info.src) : info.src;
           track.setBuffer(audioBuffer);
           track.setName(name);
           track.setEventEmitter(this.ee);
@@ -526,7 +549,7 @@ export default class {
       });
   }
 
-  createTrackFromSplit({trackToSplit, name, splitTime}) {
+  createTrackFromSplit({ trackToSplit, name, splitTime }) {
     const enabledStates = trackToSplit.enabledStates;
     const buffer = trackToSplit.buffer;
     const fadeOut = trackToSplit.fadeOut;
@@ -704,7 +727,7 @@ export default class {
       this.exportWorker.postMessage({
         command: "exportWAV",
         type: "audio/wav",
-        raw: type === 'wavRaw'
+        raw: type === "wavRaw",
       });
     }
   }
@@ -794,7 +817,7 @@ export default class {
     });
   }
 
-  renameTrack({track, event}) {
+  renameTrack({ track, event }) {
     if (event.key === "Enter") {
       if (event.target.innerText) track.name = event.target.innerText;
       else event.target.innerText = track.name;
