@@ -465,8 +465,7 @@ export default class {
           title: "Remove track",
         },
         onclick: () => {
-          this.ee.emit("createUndoState");
-          this.ee.emit("removeTrack", this);
+          this.ee.emit("createUndoStateAndRemoveTrack", this);
         },
       },
       [h("i.fas.fa-times")]
