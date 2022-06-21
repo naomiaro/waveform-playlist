@@ -346,13 +346,24 @@ export default class {
       const track = this.getActiveTrack();
       const timeSelection = this.getTimeSelection();
 
-      track.removePart(timeSelection.start, timeSelection.end, this.ac);
+      track.removePart(timeSelection.start, timeSelection.end, this.ac, track);
       track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
 
       this.setTimeSelection(0, 0);
       this.adjustDuration();
       this.drawRequest();
       this.ee.emit("cutfinished");
+    });
+
+    ee.on("loadTrackBuffer", (bufferAndTrackObject) => {
+      const track = bufferAndTrackObject.track;
+      const buffer = bufferAndTrackObject.buffer;
+      track.changeBuffer(buffer);
+      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+      this.setTimeSelection(0, 0);
+      this.adjustDuration();
+      this.drawRequest();
+      this.ee.emit("trackbufferloaded");
     });
 
     ee.on("trim", () => {
@@ -451,7 +462,7 @@ export default class {
           const muted = info.muted || false;
           const soloed = info.soloed || false;
           const selection = info.selected;
-          const peaks = info.peaks || {type: "WebAudio", mono: this.mono};
+          const peaks = info.peaks || { type: "WebAudio", mono: this.mono };
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
           const stereoPan = info.stereoPan || 0;
@@ -526,7 +537,7 @@ export default class {
       });
   }
 
-  createTrackFromSplit({trackToSplit, name, splitTime}) {
+  createTrackFromSplit({ trackToSplit, name, splitTime }) {
     const enabledStates = trackToSplit.enabledStates;
     const buffer = trackToSplit.buffer;
     const fadeOut = trackToSplit.fadeOut;
@@ -704,7 +715,7 @@ export default class {
       this.exportWorker.postMessage({
         command: "exportWAV",
         type: "audio/wav",
-        raw: type === 'wavRaw'
+        raw: type === "wavRaw",
       });
     }
   }
@@ -794,7 +805,7 @@ export default class {
     });
   }
 
-  renameTrack({track, event}) {
+  renameTrack({ track, event }) {
     if (event.key === "Enter") {
       if (event.target.innerText) track.name = event.target.innerText;
       else event.target.innerText = track.name;
