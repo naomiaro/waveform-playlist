@@ -368,13 +368,24 @@ export default class {
       const track = this.getActiveTrack();
       const timeSelection = this.getTimeSelection();
 
-      track.removePart(timeSelection.start, timeSelection.end, this.ac);
+      track.removePart(timeSelection.start, timeSelection.end, this.ac, track);
       track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
 
       this.setTimeSelection(0, 0);
       this.adjustDuration();
       this.drawRequest();
       this.ee.emit("cutfinished");
+    });
+
+    ee.on("loadTrackBuffer", (bufferAndTrackObject) => {
+      const track = bufferAndTrackObject.track;
+      const buffer = bufferAndTrackObject.buffer;
+      track.changeBuffer(buffer);
+      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+      this.setTimeSelection(0, 0);
+      this.adjustDuration();
+      this.drawRequest();
+      this.ee.emit("trackbufferloaded");
     });
 
     ee.on("trim", () => {

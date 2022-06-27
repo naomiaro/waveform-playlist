@@ -87,7 +87,9 @@ export default class {
     }
   }
 
-  removePart(point1, point2, audioContext) {
+  removePart(point1, point2, audioContext, track) {
+    this.ee.emit("saveCutManipulation", this.buffer, track);
+
     const trackStart = this.getStartTime();
     const trackEnd = this.getEndTime();
 
@@ -154,6 +156,12 @@ export default class {
       this.setCues(0, newArrayBuffer.duration);
       this.playout.buffer = this.buffer;
     }
+  }
+
+  changeBuffer(AudioBuffer) {
+    this.buffer = AudioBuffer;
+    this.setCues(0, AudioBuffer.duration);
+    this.playout.buffer = this.buffer;
   }
 
   setStartTime(start) {
