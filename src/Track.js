@@ -193,7 +193,6 @@ export default class {
     if (duration > this.duration) {
       throw new Error("Invalid Fade In");
     }
-
     const fade = {
       shape,
       start: 0,
@@ -204,7 +203,6 @@ export default class {
       this.removeFade(this.fadeIn);
       this.fadeIn = undefined;
     }
-
     this.fadeIn = this.saveFade(FADEIN, fade.shape, fade.start, fade.end);
   }
 
@@ -833,7 +831,7 @@ export default class {
 
   getTrackDetails() {
     const info = {
-      src: this.src,
+      src: this.src instanceof Blob ? URL.createObjectURL(this.src) : this.src,
       start: this.startTime,
       end: this.endTime,
       name: this.name,
