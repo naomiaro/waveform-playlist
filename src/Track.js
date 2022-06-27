@@ -193,6 +193,15 @@ export default class {
     if (duration > this.duration) {
       throw new Error("Invalid Fade In");
     }
+    if (this.fadeOut) {
+      const fadeOut = this.fades[this.fadeOut];
+      let fadeOutDuration = fadeOut.end - fadeOut.start;
+      let totalDuration = fadeOutDuration + duration;
+      if (totalDuration > this.duration) {
+        // fades will intersect
+        duration = this.duration - fadeOutDuration - 0.1; // give fade the available duration (with 0.1s margin) instead
+      }
+    }
     const fade = {
       shape,
       start: 0,
@@ -209,6 +218,16 @@ export default class {
   setFadeOut(duration, shape = "logarithmic") {
     if (duration > this.duration) {
       throw new Error("Invalid Fade Out");
+    }
+
+    if (this.fadeIn) {
+      const fadeIn = this.fades[this.fadeIn];
+      let fadeInDuration = fadeIn.end - fadeIn.start;
+      let totalDuration = fadeInDuration + duration;
+      if (totalDuration > this.duration) {
+        // fades will intersect
+        duration = this.duration - fadeInDuration - 0.1; // give fade the available duration (with 0.1s margin) instead
+      }
     }
 
     const fade = {
