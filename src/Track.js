@@ -193,7 +193,6 @@ export default class {
     if (duration > this.duration) {
       throw new Error("Invalid Fade In");
     }
-
     if (this.fadeOut) {
       const fadeOut = this.fades[this.fadeOut];
       let fadeOutDuration = fadeOut.end - fadeOut.start;
@@ -203,7 +202,6 @@ export default class {
         duration = this.duration - fadeOutDuration - 0.1; // give fade the available duration (with 0.1s margin) instead
       }
     }
-
     const fade = {
       shape,
       start: 0,
@@ -214,7 +212,6 @@ export default class {
       this.removeFade(this.fadeIn);
       this.fadeIn = undefined;
     }
-
     this.fadeIn = this.saveFade(FADEIN, fade.shape, fade.start, fade.end);
   }
 
@@ -853,7 +850,7 @@ export default class {
 
   getTrackDetails() {
     const info = {
-      src: this.src,
+      src: this.src instanceof Blob ? URL.createObjectURL(this.src) : this.src,
       start: this.startTime,
       end: this.endTime,
       name: this.name,

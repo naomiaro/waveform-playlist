@@ -315,12 +315,34 @@ export default class {
     });
 
     ee.on("fadein", (duration, track) => {
-      track.setFadeIn(duration, this.fadeType);
+      this.ee.emit(
+        "createFadeUndoStep",
+        "fadeIn",
+        this.fadeType,
+        duration,
+        track
+      );
+    });
+
+    ee.on("createFadeIn", (fadeObject) => {
+      const track = fadeObject.track;
+      track.setFadeIn(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
 
     ee.on("fadeout", (duration, track) => {
-      track.setFadeOut(duration, this.fadeType);
+      this.ee.emit(
+        "createFadeUndoStep",
+        "fadeOut",
+        this.fadeType,
+        duration,
+        track
+      );
+    });
+
+    ee.on("createFadeOut", (fadeObject) => {
+      const track = fadeObject.track;
+      track.setFadeOut(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
 
@@ -476,7 +498,8 @@ export default class {
           );
 
           const track = new Track();
-          track.src = info.src;
+          track.src =
+            info.src instanceof Blob ? URL.createObjectURL(info.src) : info.src;
           track.setBuffer(audioBuffer);
           track.setName(name);
           track.setEventEmitter(this.ee);
