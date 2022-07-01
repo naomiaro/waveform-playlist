@@ -229,8 +229,18 @@ export default class {
       this.drawRequest();
     });
 
-    ee.on("shift", (deltaTime, track) => {
-      track.setStartTime(track.getStartTime() + deltaTime);
+    ee.on("shift", (deltaTime, track, lastShift) => {
+      let newStartTime = track.getStartTime() + deltaTime;
+      if (lastShift) {
+        if (newStartTime < 0) {
+          newStartTime = 0;
+        }
+        if (this.isPlaying()) {
+          this.pause();
+          this.play();
+        }
+      }
+      track.setStartTime(newStartTime);
       this.adjustDuration();
       this.drawRequest();
     });
@@ -305,12 +315,34 @@ export default class {
     });
 
     ee.on("fadein", (duration, track) => {
-      track.setFadeIn(duration, this.fadeType);
+      this.ee.emit(
+        "createFadeUndoStep",
+        "fadeIn",
+        this.fadeType,
+        duration,
+        track
+      );
+    });
+
+    ee.on("createFadeIn", (fadeObject) => {
+      const track = fadeObject.track;
+      track.setFadeIn(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
 
     ee.on("fadeout", (duration, track) => {
-      track.setFadeOut(duration, this.fadeType);
+      this.ee.emit(
+        "createFadeUndoStep",
+        "fadeOut",
+        this.fadeType,
+        duration,
+        track
+      );
+    });
+
+    ee.on("createFadeOut", (fadeObject) => {
+      const track = fadeObject.track;
+      track.setFadeOut(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
 
@@ -330,6 +362,30 @@ export default class {
           name: `Track ${this.tracks.length + 1}`,
         },
       ]);
+    });
+
+    ee.on("cut", () => {
+      const track = this.getActiveTrack();
+      const timeSelection = this.getTimeSelection();
+
+      track.removePart(timeSelection.start, timeSelection.end, this.ac, track);
+      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+
+      this.setTimeSelection(0, 0);
+      this.adjustDuration();
+      this.drawRequest();
+      this.ee.emit("cutfinished");
+    });
+
+    ee.on("loadTrackBuffer", (bufferAndTrackObject) => {
+      const track = bufferAndTrackObject.track;
+      const buffer = bufferAndTrackObject.buffer;
+      track.changeBuffer(buffer);
+      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+      this.setTimeSelection(0, 0);
+      this.adjustDuration();
+      this.drawRequest();
+      this.ee.emit("trackbufferloaded");
     });
 
     ee.on("trim", () => {
@@ -442,7 +498,8 @@ export default class {
           );
 
           const track = new Track();
-          track.src = info.src;
+          track.src =
+            info.src instanceof Blob ? URL.createObjectURL(info.src) : info.src;
           track.setBuffer(audioBuffer);
           track.setName(name);
           track.setEventEmitter(this.ee);
@@ -652,7 +709,7 @@ export default class {
     if (type === "buffer") {
       this.ee.emit("audiorenderingfinished", type, audioBuffer);
       this.isRendering = false;
-    } else if (type === "wav") {
+    } else if (type === "wav" || type === "wavRaw") {
       this.exportWorker.postMessage({
         command: "init",
         config: {
@@ -681,6 +738,7 @@ export default class {
       this.exportWorker.postMessage({
         command: "exportWAV",
         type: "audio/wav",
+        raw: type === "wavRaw",
       });
     }
   }
@@ -869,7 +927,6 @@ export default class {
       this.tracks && this.tracks[0].playout.setMasterEffects(this.effectsGraph);
 
     this.tracks.forEach((track) => {
-      track.setState("cursor");
       playoutPromises.push(
         track.schedulePlay(currentTime, start, end, {
           shouldPlay: this.shouldTrackPlay(track),

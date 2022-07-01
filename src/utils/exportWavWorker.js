@@ -91,14 +91,17 @@ export default function () {
     return result;
   }
 
-  function exportWAV(type) {
+  function exportWAV(type, raw) {
     const bufferL = mergeBuffers(recBuffersL, recLength);
     const bufferR = mergeBuffers(recBuffersR, recLength);
     const interleaved = interleave(bufferL, bufferR);
     const dataview = encodeWAV(interleaved);
-    const audioBlob = new Blob([dataview], { type });
-
-    postMessage(audioBlob);
+    if (raw) {
+      postMessage(dataview);
+    } else {
+      const audioBlob = new Blob([dataview], {type});
+      postMessage(audioBlob);
+    }
   }
 
   function clear() {
@@ -118,7 +121,7 @@ export default function () {
         break;
       }
       case "exportWAV": {
-        exportWAV(e.data.type);
+        exportWAV(e.data.type, e.data.raw);
         break;
       }
       case "clear": {

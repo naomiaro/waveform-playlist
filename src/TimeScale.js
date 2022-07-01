@@ -1,6 +1,6 @@
 import h from "virtual-dom/h";
 
-import { secondsToPixels } from "./utils/conversions";
+import {secondsToPixels} from "./utils/conversions";
 import TimeScaleHook from "./render/TimeScaleHook";
 
 class TimeScale {
@@ -20,6 +20,18 @@ class TimeScale {
     this.colors = colors;
 
     this.timeinfo = {
+      400000: {
+        marker: 300000,
+        bigStep: 100000,
+        smallStep: 50000,
+        secondStep: 100,
+      },
+      100000: {
+        marker: 75000,
+        bigStep: 25000,
+        smallStep: 12000,
+        secondStep: 25,
+      },
       20000: {
         marker: 30000,
         bigStep: 10000,
@@ -131,7 +143,6 @@ class TimeScale {
               [TimeScale.formatTime(counter)]
             )
           );
-
           canvasInfo[pix] = 10;
         } else if (scaleInfo.bigStep && counter % scaleInfo.bigStep === 0) {
           canvasInfo[pix] = 5;
@@ -151,21 +162,7 @@ class TimeScale {
         },
       },
       [
-        timeMarkers,
-        h("canvas", {
-          attributes: {
-            width: widthX,
-            height: 30,
-            style: "position: absolute; left: 0; right: 0; top: 0; bottom: 0;",
-          },
-          hook: new TimeScaleHook(
-            canvasInfo,
-            this.offset,
-            this.samplesPerPixel,
-            this.duration,
-            this.colors
-          ),
-        }),
+        timeMarkers
       ]
     );
   }

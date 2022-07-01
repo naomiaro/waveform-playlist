@@ -11,7 +11,7 @@ export default class {
     this.sampleRate = sampleRate;
   }
 
-  emitShift(x) {
+  emitShift(x, lastShift) {
     const deltaX = x - this.prevX;
     const deltaTime = pixelsToSeconds(
       deltaX,
@@ -19,11 +19,11 @@ export default class {
       this.sampleRate
     );
     this.prevX = x;
-    this.track.ee.emit("shift", deltaTime, this.track);
+    this.track.ee.emit("shift", deltaTime, this.track, lastShift);
   }
 
   complete(x) {
-    this.emitShift(x);
+    this.emitShift(x, true);
     this.active = false;
   }
 
@@ -38,7 +38,7 @@ export default class {
   mousemove(e) {
     if (this.active) {
       e.preventDefault();
-      this.emitShift(e.offsetX);
+      this.emitShift(e.offsetX, false);
     }
   }
 

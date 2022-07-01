@@ -1,7 +1,7 @@
 {
-  "name": "waveform-playlist",
+  "name": "afripods-waveform-playlist",
   "description": "Multiple track web audio editor and player with waveform preview",
-  "version": "4.3.3",
+  "version": "1.0.20",
   "main": "build/waveform-playlist.umd.js",
   "author": "Naomi Aro",
   "license": "MIT",
@@ -36,6 +36,7 @@
     "lodash.assign": "^4.0.0",
     "lodash.defaultsdeep": "^4.6.1",
     "lodash.forown": "^4.0.0",
+    "mp3-parser": "0.3.0",
     "tone": "^14.7.77",
     "uuid": "^8.3.2",
     "virtual-dom": "^2.1.1",

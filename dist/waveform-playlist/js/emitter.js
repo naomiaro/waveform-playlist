@@ -216,6 +216,9 @@ $container.on("click", ".btn-zoom-out", function() {
 $container.on("click", ".btn-trim-audio", function() {
   ee.emit("trim");
 });
+$container.on("click", ".btn-cut-audio", function() {
+  ee.emit("cut");
+});
 
 $container.on("click", ".btn-split-audio", function() {
   ee.emit("split");
@@ -334,6 +337,13 @@ ee.on("mastervolumechange", function(volume) {
   displaySoundStatus("Master volume now has volume " + volume + ".");
 });
 
+ee.on("cut", function() {
+  displayLoadingData("A cut operation has started.");
+});
+
+ee.on("cutfinished", function() {
+  displayLoadingData("The cut operation has finished.");
+});
 
 var audioStates = ["uninitialized", "loading", "decoding", "finished"];
 

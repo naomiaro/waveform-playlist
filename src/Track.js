@@ -14,6 +14,7 @@ import CanvasHook from "./render/CanvasHook";
 import FadeCanvasHook from "./render/FadeCanvasHook";
 import VolumeSliderHook from "./render/VolumeSliderHook";
 import StereoPanSliderHook from "./render/StereoPanSliderHook";
+import Playout from "./Playout";
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -86,6 +87,83 @@ export default class {
     }
   }
 
+  removePart(point1, point2, audioContext, track) {
+    this.ee.emit("saveCutManipulation", this.buffer, track);
+
+    const trackStart = this.getStartTime();
+    const trackEnd = this.getEndTime();
+
+    let start;
+    let end;
+    if (point1 <= point2) {
+      start = point1;
+      end = point2;
+    } else {
+      start = point2;
+      end = point1;
+    }
+
+    let timeSplitOffset = start - this.getStartTime();
+    if (timeSplitOffset < 0) {
+      // outside interval left
+      timeSplitOffset = 0;
+    }
+    const firstPartPercentage = timeSplitOffset / this.duration;
+
+    const secondTimeSplitOffset = end - this.getStartTime();
+    let secondPartPercentage =
+      (this.duration - secondTimeSplitOffset) / this.duration;
+    if (secondPartPercentage < 0) {
+      // outside interval right
+      secondPartPercentage = 0;
+    }
+
+    if (start <= trackEnd && end >= trackStart) {
+      const channels = this.buffer.numberOfChannels;
+
+      let newArrayBuffer;
+      const firstPartNewLength = firstPartPercentage * this.buffer.length;
+      const secondPartNewLength = secondPartPercentage * this.buffer.length;
+      try {
+        newArrayBuffer = audioContext.createBuffer(
+          channels,
+          firstPartNewLength + secondPartNewLength,
+          this.buffer.sampleRate
+        );
+        const arrayFirstPart = new Float32Array(firstPartNewLength);
+        const arraySecondPart = new Float32Array(secondPartNewLength);
+
+        for (let channel = 0; channel < channels; channel++) {
+          this.buffer.copyFromChannel(arrayFirstPart, channel, 0);
+          this.buffer.copyFromChannel(
+            arraySecondPart,
+            channel,
+            this.buffer.length - secondPartNewLength
+          );
+          newArrayBuffer.copyToChannel(arrayFirstPart, channel, 0);
+          newArrayBuffer.copyToChannel(
+            arraySecondPart,
+            channel,
+            firstPartNewLength
+          );
+        }
+      } catch (e) {
+        // handle error here
+        throw e;
+      }
+
+      this.buffer = newArrayBuffer;
+      this.setCues(0, newArrayBuffer.duration);
+      this.playout.buffer = this.buffer;
+    }
+  }
+
+  changeBuffer(AudioBuffer) {
+    this.buffer = AudioBuffer;
+    this.setCues(0, AudioBuffer.duration);
+    this.playout.buffer = this.buffer;
+  }
+
   setStartTime(start) {
     this.startTime = start;
     this.endTime = start + this.duration;
@@ -115,7 +193,15 @@ export default class {
     if (duration > this.duration) {
       throw new Error("Invalid Fade In");
     }
-
+    if (this.fadeOut) {
+      const fadeOut = this.fades[this.fadeOut];
+      let fadeOutDuration = fadeOut.end - fadeOut.start;
+      let totalDuration = fadeOutDuration + duration;
+      if (totalDuration > this.duration) {
+        // fades will intersect
+        duration = this.duration - fadeOutDuration - 0.1; // give fade the available duration (with 0.1s margin) instead
+      }
+    }
     const fade = {
       shape,
       start: 0,
@@ -126,13 +212,22 @@ export default class {
       this.removeFade(this.fadeIn);
       this.fadeIn = undefined;
     }
-
     this.fadeIn = this.saveFade(FADEIN, fade.shape, fade.start, fade.end);
   }
 
   setFadeOut(duration, shape = "logarithmic") {
     if (duration > this.duration) {
       throw new Error("Invalid Fade Out");
+    }
+
+    if (this.fadeIn) {
+      const fadeIn = this.fades[this.fadeIn];
+      let fadeInDuration = fadeIn.end - fadeIn.start;
+      let totalDuration = fadeInDuration + duration;
+      if (totalDuration > this.duration) {
+        // fades will intersect
+        duration = this.duration - fadeInDuration - 0.1; // give fade the available duration (with 0.1s margin) instead
+      }
     }
 
     const fade = {
@@ -395,7 +490,7 @@ export default class {
           title: "Remove track",
         },
         onclick: () => {
-          this.ee.emit("removeTrack", this);
+          this.ee.emit("createUndoStateAndRemoveTrack", this);
         },
       },
       [h("i.fas.fa-times")]
@@ -755,7 +850,7 @@ export default class {
 
   getTrackDetails() {
     const info = {
-      src: this.src,
+      src: this.src instanceof Blob ? URL.createObjectURL(this.src) : this.src,
       start: this.startTime,
       end: this.endTime,
       name: this.name,

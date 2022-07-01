@@ -48,22 +48,22 @@ function cueFormatters(format) {
 
   var formats = {
     "seconds": function (seconds) {
-        return seconds.toFixed(0);
+      return seconds.toFixed(0);
     },
     "thousandths": function (seconds) {
-        return seconds.toFixed(3);
+      return seconds.toFixed(3);
     },
     "hh:mm:ss": function (seconds) {
-        return clockFormat(seconds, 0);   
+      return clockFormat(seconds, 0);
     },
     "hh:mm:ss.u": function (seconds) {
-        return clockFormat(seconds, 1);   
+      return clockFormat(seconds, 1);
     },
     "hh:mm:ss.uu": function (seconds) {
-        return clockFormat(seconds, 2);   
+      return clockFormat(seconds, 2);
     },
     "hh:mm:ss.uuu": function (seconds) {
-        return clockFormat(seconds, 3);   
+      return clockFormat(seconds, 3);
     }
   };
 
@@ -216,6 +216,9 @@ $container.on("click", ".btn-zoom-out", function() {
 $container.on("click", ".btn-trim-audio", function() {
   ee.emit("trim");
 });
+$container.on("click", ".btn-cut-audio", function() {
+  ee.emit("cut");
+});
 
 $container.on("click", ".btn-split-audio", function() {
   ee.emit("split");
@@ -334,6 +337,13 @@ ee.on("mastervolumechange", function(volume) {
   displaySoundStatus("Master volume now has volume " + volume + ".");
 });
 
+ee.on("cut", function() {
+  displayLoadingData("A cut operation has started.");
+});
+
+ee.on("cutfinished", function() {
+  displayLoadingData("The cut operation has finished.");
+});
 
 var audioStates = ["uninitialized", "loading", "decoding", "finished"];
 
