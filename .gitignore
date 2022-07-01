@@ -9,3 +9,12 @@ lib
 test/.DS_Store
 ghpages/.jekyll-cache/
 dist/waveform-playlist/scss
+
+node_modules
+*.log
+_localnotes
+.vscode
+.idea
+coverage
+_projectNotes
+
