@@ -325,7 +325,7 @@ export default class {
     });
 
     ee.on("createFadeIn", (fadeObject) => {
-      const track = fadeObject.track;
+      const track = this.getTrackByCustomID(fadeObject.track.customID);
       track.setFadeIn(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
@@ -341,7 +341,7 @@ export default class {
     });
 
     ee.on("createFadeOut", (fadeObject) => {
-      const track = fadeObject.track;
+      const track = this.getTrackByCustomID(fadeObject.track.customID);
       track.setFadeOut(fadeObject.duration, fadeObject.fadeType);
       this.drawRequest();
     });
@@ -378,7 +378,9 @@ export default class {
     });
 
     ee.on("loadTrackBuffer", (bufferAndTrackObject) => {
-      const track = bufferAndTrackObject.track;
+      const track = this.getTrackByCustomID(
+        bufferAndTrackObject.track.customID
+      );
       const buffer = bufferAndTrackObject.buffer;
       track.changeBuffer(buffer);
       track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
@@ -479,9 +481,15 @@ export default class {
 
     ee.on("loadFadeStates", (fadeStateObject) => {
       let prevFades = fadeStateObject.fades;
-      const track = fadeStateObject.track;
-      let redoFades = JSON.parse(JSON.stringify(track.fades));
-      this.ee.emit("saveFadeRedo", redoFades);
+      const track = this.getTrackByCustomID(fadeStateObject.track.customID);
+      if (!fadeStateObject.redo) {
+        let redoFades = {
+          fades: JSON.parse(JSON.stringify(track.fades)),
+          track: track,
+          type: "fade",
+        };
+        this.ee.emit("saveFadeRedo", redoFades);
+      }
       if (
         typeof prevFades !== "undefined" &&
         Object.keys(prevFades).length > 0
@@ -491,31 +499,37 @@ export default class {
           let whichFades = [];
           Object.keys(fades).forEach((key) => {
             if (fades[key].type === "FadeIn") {
-              whichFades.push("fadeIn");
+              whichFades.push("FadeIn");
               let duration = fades[key].end - fades[key].start;
               let fadeType = fades[key].shape;
               track.setFadeIn(duration, fadeType);
             } else if (fades[key].type === "FadeOut") {
-              whichFades.push("fadeOut");
+              whichFades.push("FadeOut");
               let duration = fades[key].end - fades[key].start;
               let fadeType = fades[key].shape;
               track.setFadeOut(duration, fadeType);
             }
           });
-          if (!whichFades.includes("fadeIn")) {
+          if (!whichFades.includes("FadeIn")) {
             track.removeFade(track.fadeIn);
             track.fadeIn = undefined;
           }
-          if (!whichFades.includes("fadeOut")) {
+          if (!whichFades.includes("FadeOut")) {
             track.removeFade(track.fadeOut);
             track.fadeOut = undefined;
           }
         }
+      } else {
+        track.removeFade(track.fadeIn);
+        track.fadeIn = undefined;
+        track.removeFade(track.fadeOut);
+        track.fadeOut = undefined;
       }
+      this.drawRequest();
     });
   }
 
-  load(trackList) {
+  load(trackList, event = "none") {
     const loadPromises = trackList.map((trackInfo) => {
       const loader = LoaderFactory.createLoader(
         trackInfo.src,
@@ -548,6 +562,7 @@ export default class {
           const muted = info.muted || false;
           const soloed = info.soloed || false;
           const selection = info.selected;
+          const customID = info.customID || undefined;
           const peaks = info.peaks || { type: "WebAudio", mono: this.mono };
           const customClass = info.customClass || undefined;
           const waveOutlineColor = info.waveOutlineColor || undefined;
@@ -565,6 +580,7 @@ export default class {
           track.src =
             info.src instanceof Blob ? URL.createObjectURL(info.src) : info.src;
           track.setBuffer(audioBuffer);
+          track.setCustomID(customID);
           track.setName(name);
           track.setEventEmitter(this.ee);
           track.setEnabledStates(states);
@@ -609,13 +625,16 @@ export default class {
 
           // extract peaks with AudioContext for now.
           track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
-
+          if (event === "redo") {
+            this.ee.emit("createRedoStep", track);
+          }
           return track;
         });
-
+        
         this.tracks = this.tracks.concat(tracks);
         this.adjustDuration();
         this.draw(this.render());
+        console.log(this.render())
 
         this.ee.emit("audiosourcesrendered");
       })
@@ -701,6 +720,15 @@ export default class {
     this.ee.emit("audiosourcesrendered");
   }
 
+  getTrackByCustomID(customID) {
+    let trackInfo = undefined;
+    this.tracks.forEach((track) => {
+      if (track.customID === customID) {
+        trackInfo = track;
+      }
+    });
+    return trackInfo;
+  }
   /*
     track instance of Track.
   */
@@ -1165,6 +1193,7 @@ export default class {
     window.requestAnimationFrame(() => {
       this.draw(this.render());
     });
+    this.getTrackByCustomID();
   }
 
   draw(newTree) {
@@ -1227,7 +1256,7 @@ export default class {
   }
 
   renderTrackSection() {
-    const trackElements = this.tracks.map((track) => {
+    const trackElements = this.tracks.sort((a,b) => (a.customID > b.customID) ? 1 : ((b.customID > a.customID) ? -1 : 0)).map((track) => {
       const collapsed = this.collapsedTracks.indexOf(track) > -1;
       return track.render(
         this.getTrackRenderData({
