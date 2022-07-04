@@ -151,6 +151,30 @@ export default class {
         // handle error here
         throw e;
       }
+      let fades = track.fades;
+      if (typeof fades !== "undefined" && Object.keys(fades).length > 0) {
+        let fadeInDuration = 0,
+          fadeOutDuration = 0;
+        Object.keys(fades).forEach((key) => {
+          if (fades[key].type === "FadeIn") {
+            fadeInDuration = fades[key].end - fades[key].start;
+          } else if (fades[key].type === "FadeOut") {
+            fadeOutDuration = fades[key].end - fades[key].start;
+          }
+        });
+        let totalFadesDuration = fadeInDuration + fadeOutDuration;
+        if (totalFadesDuration >= newArrayBuffer.duration) {
+          // Only remove fades if they will intersect or be longer than new arrayBuffer after cut
+          if (this.fadeIn) {
+            this.removeFade(this.fadeIn);
+            this.fadeIn = undefined;
+          }
+          if (this.fadeOut) {
+            this.removeFade(this.fadeOut);
+            this.fadeOut = undefined;
+          }
+        }
+      }
 
       this.buffer = newArrayBuffer;
       this.setCues(0, newArrayBuffer.duration);
