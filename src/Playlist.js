@@ -386,6 +386,33 @@ export default class {
       this.adjustDuration();
       this.drawRequest();
       this.ee.emit("trackbufferloaded");
+      if (
+        typeof track.fades !== "undefined" &&
+        Object.keys(track.fades).length > 0
+      ) {
+        let fades = track.fades;
+        let fadeInDuration = 0,
+          fadeOutDuration = 0;
+        Object.keys(fades).forEach((key) => {
+          if (fades[key].type === "FadeIn") {
+            fadeInDuration = fades[key].end - fades[key].start;
+          } else if (fades[key].type === "FadeOut") {
+            fadeOutDuration = fades[key].end - fades[key].start;
+          }
+        });
+        let totalFadesDuration = fadeInDuration + fadeOutDuration;
+        if (totalFadesDuration >= buffer.duration) {
+          // Only remove fades if they will intersect or be longer than new arrayBuffer after cut
+          if (track.fadeIn) {
+            track.removeFade(track.fadeIn);
+            track.fadeIn = undefined;
+          }
+          if (track.fadeOut) {
+            track.removeFade(track.fadeOut);
+            track.fadeOut = undefined;
+          }
+        }
+      }
     });
 
     ee.on("trim", () => {
@@ -448,6 +475,43 @@ export default class {
       this.scrollTimer = setTimeout(() => {
         this.isScrolling = false;
       }, 200);
+    });
+
+    ee.on("loadFadeStates", (fadeStateObject) => {
+      let prevFades = fadeStateObject.fades;
+      const track = fadeStateObject.track;
+      let redoFades = JSON.parse(JSON.stringify(track.fades));
+      this.ee.emit("saveFadeRedo", redoFades);
+      if (
+        typeof prevFades !== "undefined" &&
+        Object.keys(prevFades).length > 0
+      ) {
+        let fades = prevFades;
+        if (fades) {
+          let whichFades = [];
+          Object.keys(fades).forEach((key) => {
+            if (fades[key].type === "FadeIn") {
+              whichFades.push("fadeIn");
+              let duration = fades[key].end - fades[key].start;
+              let fadeType = fades[key].shape;
+              track.setFadeIn(duration, fadeType);
+            } else if (fades[key].type === "FadeOut") {
+              whichFades.push("fadeOut");
+              let duration = fades[key].end - fades[key].start;
+              let fadeType = fades[key].shape;
+              track.setFadeOut(duration, fadeType);
+            }
+          });
+          if (!whichFades.includes("fadeIn")) {
+            track.removeFade(track.fadeIn);
+            track.fadeIn = undefined;
+          }
+          if (!whichFades.includes("fadeOut")) {
+            track.removeFade(track.fadeOut);
+            track.fadeOut = undefined;
+          }
+        }
+      }
     });
   }
 
