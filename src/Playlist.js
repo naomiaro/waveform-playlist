@@ -630,11 +630,10 @@ export default class {
           }
           return track;
         });
-        
+
         this.tracks = this.tracks.concat(tracks);
         this.adjustDuration();
         this.draw(this.render());
-        console.log(this.render())
 
         this.ee.emit("audiosourcesrendered");
       })
@@ -925,6 +924,7 @@ export default class {
       if (event.target.innerText) track.name = event.target.innerText;
       else event.target.innerText = track.name;
       event.target.blur();
+      track.setName(event.target.innerText);
     }
   }
 
@@ -1256,21 +1256,25 @@ export default class {
   }
 
   renderTrackSection() {
-    const trackElements = this.tracks.sort((a,b) => (a.customID > b.customID) ? 1 : ((b.customID > a.customID) ? -1 : 0)).map((track) => {
-      const collapsed = this.collapsedTracks.indexOf(track) > -1;
-      return track.render(
-        this.getTrackRenderData({
-          isActive: this.isActiveTrack(track),
-          shouldPlay: this.shouldTrackPlay(track),
-          soloed: this.soloedTracks.indexOf(track) > -1,
-          muted: this.mutedTracks.indexOf(track) > -1,
-          collapsed,
-          height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
-          barGap: this.barGap,
-          barWidth: this.barWidth,
-        })
-      );
-    });
+    const trackElements = this.tracks
+      .sort((a, b) =>
+        a.customID > b.customID ? 1 : b.customID > a.customID ? -1 : 0
+      )
+      .map((track) => {
+        const collapsed = this.collapsedTracks.indexOf(track) > -1;
+        return track.render(
+          this.getTrackRenderData({
+            isActive: this.isActiveTrack(track),
+            shouldPlay: this.shouldTrackPlay(track),
+            soloed: this.soloedTracks.indexOf(track) > -1,
+            muted: this.mutedTracks.indexOf(track) > -1,
+            collapsed,
+            height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
+            barGap: this.barGap,
+            barWidth: this.barWidth,
+          })
+        );
+      });
 
     return h(
       "div.playlist-tracks",
