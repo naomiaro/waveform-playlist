@@ -21,6 +21,7 @@ const MAX_CANVAS_WIDTH = 1000;
 export default class {
   constructor() {
     this.name = "Untitled";
+    this.customID = "";
     this.customClass = undefined;
     this.waveOutlineColor = undefined;
     this.gain = 1;
@@ -41,7 +42,9 @@ export default class {
   setEventEmitter(ee) {
     this.ee = ee;
   }
-
+  setCustomID(customID) {
+    this.customID = customID;
+  }
   setName(name) {
     this.name = name;
   }
@@ -878,6 +881,7 @@ export default class {
       start: this.startTime,
       end: this.endTime,
       name: this.name,
+      customID: this.customID,
       customClass: this.customClass,
       cuein: this.cueIn,
       cueout: this.cueOut,
