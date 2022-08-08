@@ -53,7 +53,10 @@ export default class {
   complete(x) {
     if (this.isShift()) {
       this.emitShift(x, true);
-      document.querySelector(".is-shifting")?.classList.remove("is-shifting");
+      const shiftingParentElement = document.querySelector(".is-shifting");
+      if (shiftingParentElement) {
+        shiftingParentElement.classList.remove("is-shifting");
+      }
     }
     this.active = false;
   }
@@ -82,8 +85,8 @@ export default class {
     if (this.active) {
       e.preventDefault();
       if (this.isShift()) {
-        const parentElement = e.target?.parentElement;
-        if (!parentElement?.classList.contains("is-shifting")) {
+        const parentElement = e.target ? e.target.parentElement : undefined;
+        if (parentElement && !parentElement.classList.contains("is-shifting")) {
           parentElement.classList.add("is-shifting");
         }
         this.emitShift(e.offsetX, false);
