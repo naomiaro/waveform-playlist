@@ -1,10 +1,17 @@
 import { pixelsToSeconds } from "../../utils/conversions";
 
 export default class {
-
   constructor(track) {
     this.track = track;
     this.active = false;
+  }
+
+  static getClass() {
+    return ".state-cursor";
+  }
+
+  static getEvents() {
+    return ["mousedown", "mousemove", "mouseup", "mouseleave", "click"];
   }
 
   setup(samplesPerPixel, sampleRate) {
@@ -35,7 +42,10 @@ export default class {
       this.samplesPerPixel,
       this.sampleRate
     );
-    this.maxXDifference = Math.max(this.maxXDifference, Math.abs(this.startX - x));
+    this.maxXDifference = Math.max(
+      this.maxXDifference,
+      Math.abs(this.startX - x)
+    );
     this.prevX = x;
     this.track.ee.emit("shift", deltaTime, this.track, lastShift);
   }
@@ -89,17 +99,6 @@ export default class {
   }
 
   mouseleave(e) {
-    if (this.active) {
-      e.preventDefault();
-      this.complete(e.offsetX);
-    }
-  }
-
-  static getClass() {
-    return ".state-cursor";
-  }
-
-  static getEvents() {
-    return ["mousedown", "mousemove", "mouseup", "mouseleave", "click"];
+    this.mouseup(e);
   }
 }
