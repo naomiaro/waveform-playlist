@@ -6,6 +6,14 @@ export default class {
     this.active = false;
   }
 
+  static getClass() {
+    return ".state-select";
+  }
+
+  static getEvents() {
+    return ["mousedown", "mousemove", "mouseup", "mouseleave"];
+  }
+
   setup(samplesPerPixel, sampleRate) {
     this.samplesPerPixel = samplesPerPixel;
     this.sampleRate = sampleRate;
@@ -63,17 +71,6 @@ export default class {
   }
 
   mouseleave(e) {
-    if (this.active) {
-      e.preventDefault();
-      this.complete(e.offsetX);
-    }
-  }
-
-  static getClass() {
-    return ".state-select";
-  }
-
-  static getEvents() {
-    return ["mousedown", "mousemove", "mouseup", "mouseleave"];
+    this.mouseup(e);
   }
 }
