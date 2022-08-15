@@ -8,7 +8,10 @@ export default class {
   }
 
   hook(volumeInput) {
-    volumeInput.value = this.gain * 100;
-    volumeInput.title = `${Math.round(this.gain * 100)}% volume`;
+    const gainPercentAge = this.gain * 100;
+    const gainPercentageStr = Math.round(gainPercentAge).toString();
+    volumeInput.value = gainPercentAge;
+    volumeInput.title = `${gainPercentageStr}% volume`;
+    volumeInput.dataset.currentValue = gainPercentageStr;
   }
 }
