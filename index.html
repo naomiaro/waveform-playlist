@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta
+            property="og:image:height"
+            content="401"
+    />
+    <meta
+            property="og:image:width"
+            content="1039"
+    />
+
+    <title>
+        NightForm
+    </title>
+    <meta
+            name="description"
+            content="Browser-based nightcore editor based on waveform-playlist by @naomiaro"
+    />
+
+    <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
+            integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l"
+            crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="css/main.css">
+
+
+    <script src="https://kit.fontawesome.com/ef69927139.js" crossorigin="anonymous"></script>
+</head>
+
+
+<body>
+
+<main class="container" title="demo">
+    <div class="wrapper">
+        <article class="post">
+            <header class="post-header">
+                <h1 class="post-title">NightForm</h1>
+                <p class="lead">Nightcore audio editor based on <a href="https://github.com/naomiaro/waveform-playlist">waveform-playlist</a>, literally made just for Frank</p>
+            </header>
+            <div class="post-content"><div id="top-bar" class="playlist-top-bar">
+                <div class="playlist-toolbar">
+                    <div class="btn-group">
+                        <button type="button" class="btn-pause btn btn-outline-warning" title="Pause">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button type="button" class="btn-play btn btn-outline-success" title="Play">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button type="button" class="btn-stop btn btn-outline-danger" title="Stop">
+                            <i class="fas fa-stop"></i>
+                        </button>
+                        <button
+                                type="button"
+                                class="btn-rewind btn btn-outline-success"
+                                title="Rewind"
+                        >
+                            <i class="fas fa-fast-backward"></i>
+                        </button>
+                        <button
+                                type="button"
+                                class="btn-fast-forward btn btn-outline-success"
+                                title="Fast forward"
+                        >
+                            <i class="fas fa-fast-forward"></i>
+                        </button>
+
+                        <div class="btn-group">
+                            <button
+                                    type="button"
+                                    title="Download the current work as Wav file"
+                                    class="btn btn-download btn-outline-primary"
+                            >
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <br>
+                    <!--
+                    <form class="form-inline">
+                        <label for="master-gain" class="mr-sm-2">Master Volume</label>
+                        <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value="100"
+                                class="master-gain form-control mr-sm-2"
+                                id="master-gain"
+                        />
+                    </form>
+                    -->
+                </div>
+            </div>
+                <div id="playlist"></div>
+                <div class="playlist-bottom-bar">
+                    <div class="track-drop"></div>
+                    <button
+                            type="button"
+                            title="Clear the playlist's tracks"
+                            class="btn btn-clear btn-outline-danger"
+                    >
+                        Clear
+                    </button>
+                </div>
+                <!--<div class="loading-data"></div>-->
+            </div>
+
+        </article>
+    </div>
+
+</main>
+
+<script
+        src="https://code.jquery.com/jquery-3.6.0.min.js"
+        integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+        crossorigin="anonymous"
+></script>
+<script type="text/javascript" src="js/waveform-playlist.js"></script>
+<script type="text/javascript" src="js/newtracks.js"></script>
+<script type="text/javascript" src="js/emitter.js"></script>
+
+
+</body>
+</html>
