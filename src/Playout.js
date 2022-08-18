@@ -98,12 +98,12 @@ export default class {
     cleanupEffects = this.effectsGraph(
       this.panner,
       this.masterGain,
-      this.ac instanceof OfflineAudioContext
+      this.ac instanceof (window.OfflineAudioContext || window.webkitOfflineAudioContext)
     );
     cleanupMasterEffects = this.masterEffectsGraph(
       this.masterGain,
       this.destination,
-      this.ac instanceof OfflineAudioContext
+      this.ac instanceof (window.OfflineAudioContext || window.webkitOfflineAudioContext)
     );
 
     return sourcePromise;
