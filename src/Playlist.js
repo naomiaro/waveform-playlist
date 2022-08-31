@@ -10,6 +10,7 @@ import LoaderFactory from "./track/loader/LoaderFactory";
 import ScrollHook from "./render/ScrollHook";
 import TimeScale from "./TimeScale";
 import Track from "./Track";
+import Lane from "./Lane";
 import Playout from "./Playout";
 import AnnotationList from "./annotation/AnnotationList";
 
@@ -19,7 +20,7 @@ import ExportWavWorkerFunction from "./utils/exportWavWorker";
 export default class {
   constructor() {
     this.tracks = [];
-    this.lanes = 1;
+    this.lanes = [];
     this.soloedTracks = [];
     this.mutedTracks = [];
     this.collapsedTracks = [];
@@ -532,17 +533,13 @@ export default class {
       this.setNumberLanes(numberLanes);
     });
 
-    ee.on("setTrackLane", (lane) => {
-      const track = this.getActiveTrack();
-      track.setLane(lane);
-      this.adjustDuration();
-      this.drawRequest();
-    });
     ee.on("handleTrackLaneChange", (obj) => {
-      console.log(obj.trackId);
-      console.log(obj.laneId);
       const track = this.getTrackByCustomID(obj.trackId);
-      track.setLane(obj.laneId);
+      const oldLane = this.getLaneByID(track.lane);
+      const newLane = this.getLaneByID(obj.laneId);
+      track.setLane(newLane.id);
+      console.log(oldLane);
+      console.log(newLane);
       this.adjustDuration();
       this.drawRequest();
     });
@@ -653,6 +650,22 @@ export default class {
         });
 
         this.tracks = this.tracks.concat(tracks);
+
+        this.tracks.forEach((track) => {
+          const found = this.lanes.some((lane) => lane.id === track.lane);
+          if (!found) {
+            const lane = new Lane();
+            lane.setName(`Track-${track.lane}`);
+            lane.setId(track.lane);
+            lane.setEventEmitter(this.ee);
+            lane.setDuration(track.duration);
+            lane.setEndTime(track.endTime);
+            lane.addTrack(track);
+            this.lanes.push(lane);
+          } else {
+            this.lanes[track.lane].tracks.push(track);
+          }
+        });
         this.adjustDuration();
         this.draw(this.render());
 
@@ -738,6 +751,16 @@ export default class {
     this.setActiveTrack(track);
 
     this.ee.emit("audiosourcesrendered");
+  }
+
+  getLaneByID(id) {
+    let laneInfo = undefined;
+    this.lanes.forEach((lane) => {
+      if (lane.id === id) {
+        laneInfo = lane;
+      }
+    });
+    return laneInfo;
   }
 
   getTrackByCustomID(customID) {
@@ -1112,6 +1135,7 @@ export default class {
   clear() {
     return this.stop().then(() => {
       this.tracks = [];
+      this.laneElements = [];
       this.soloedTracks = [];
       this.mutedTracks = [];
       this.playoutPromises = [];
@@ -1119,7 +1143,7 @@ export default class {
       this.playbackSeconds = 0;
       this.duration = 0;
       this.scrollLeft = 0;
-      this.lanes = 1;
+      this.lanes = [];
       this.seek(0, 0, undefined);
     });
   }
@@ -1141,7 +1165,18 @@ export default class {
   }
 
   setNumberLanes(numberLanes) {
-    this.lanes = numberLanes;
+    let i = 0;
+    while (i > numberLanes) {
+      const found = this.lanes.some((lane) => lane.id === i);
+      if (!found) {
+        const lane = new Lane();
+        lane.setName(`Track-${i}`);
+        lane.setId(i);
+        lane.setEventEmitter(this.ee);
+        this.lanes.push(lane);
+      }
+      i++;
+    }
   }
 
   startAnimation(startTime) {
@@ -1282,23 +1317,21 @@ export default class {
     return timeScale.render();
   }
 
-  renderLanes() {
-    const laneElements = [];
-    let i = 0;
-    while (i < this.lanes) {
-      laneElements.push(this.renderLane(i));
-      i++;
-    }
-    return h(`div.lanes`, {}, laneElements);
+  renderLanes(lanes) {
+    const lanesObject = [];
+    lanes.forEach((lane) => {
+      lanesObject.push(this.renderLane(lane));
+    });
+    return h(`div.lanes`, {}, lanesObject);
   }
 
-  renderLane(laneNumber) {
-    const laneTracks = this.tracks
+  renderLane(lane) {
+    const laneChildren = this.tracks
       .sort((a, b) =>
         a.customID > b.customID ? 1 : b.customID > a.customID ? -1 : 0
       )
       .map((track) => {
-        if (track.lane === laneNumber) {
+        if (track.lane === lane.id) {
           const collapsed = this.collapsedTracks.indexOf(track) > -1;
           return track.render(
             this.getTrackRenderData({
@@ -1317,15 +1350,15 @@ export default class {
     const laneOverlay = h(`div.lane-overlay`, {
       attributes: {
         style: `height: 100%; width: 100%; position: absolute; top: 0; left: 0; pointer-events: 0;`,
-        laneId: laneNumber,
+        laneId: lane.id,
       },
     });
-    laneTracks.push(laneOverlay);
-    return h(`div.lane.lane-${laneNumber}`, {}, laneTracks);
+    laneChildren.push(laneOverlay);
+    return h(`div.lane.lane-${lane.id}`, {}, laneChildren);
   }
 
   renderTrackSection() {
-    const lanesElement = this.renderLanes();
+    const lanesElement = this.renderLanes(this.lanes);
 
     return h(
       "div.playlist-tracks",
@@ -1358,7 +1391,7 @@ export default class {
           contentEditable: true,
         },
       },
-      `Track-${lane}`
+      lane.name
     );
     const headerChildren = [];
     headerChildren.push(trackName);
@@ -1372,12 +1405,21 @@ export default class {
             attributes: {
               type: "button",
             },
+            onclick: (evt) => {
+              console.log(`Mute clicked`);
+            },
           },
           ["Mute"]
         ),
-        h(`button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`, {}, [
-          "Solo",
-        ]),
+        h(
+          `button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`,
+          {
+            onclick: (evt) => {
+              console.log(`Solo clicked`);
+            },
+          },
+          ["Solo"]
+        ),
       ])
     );
     controls.push(
@@ -1407,11 +1449,9 @@ export default class {
   renderFixed() {
     const fixedChildren = [];
 
-    let i = 0;
-    while (i < this.lanes) {
-      fixedChildren.push(this.renderLaneControls(i));
-      i++;
-    }
+    this.lanes.forEach((lane) => {
+      fixedChildren.push(this.renderLaneControls(lane));
+    });
 
     return h(
       "div.playlist-fixed",
@@ -1485,6 +1525,7 @@ export default class {
 
     return {
       tracks,
+      lanes: this.lanes,
       effects: this.effectsGraph,
     };
   }
