@@ -538,8 +538,8 @@ export default class {
       const oldLane = this.getLaneByID(track.lane);
       const newLane = this.getLaneByID(obj.laneId);
       track.setLane(newLane.id);
-      console.log(oldLane);
-      console.log(newLane);
+      oldLane.removeTrack(track);
+      newLane.addTrack(track);
       this.adjustDuration();
       this.drawRequest();
     });
@@ -662,8 +662,6 @@ export default class {
             lane.setEndTime(track.endTime);
             lane.addTrack(track);
             this.lanes.push(lane);
-          } else {
-            this.lanes[track.lane].tracks.push(track);
           }
         });
         this.adjustDuration();

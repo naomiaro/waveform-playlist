@@ -34,6 +34,13 @@ export default class {
     this.duration = duration;
   }
 
+  removeTrack(track) {
+    const index = this.tracks.indexOf(track);
+    if (index > -1) {
+      this.tracks.splice(index, 1);
+    }
+  }
+
   addTrack(track) {
     this.tracks.push(track);
   }
