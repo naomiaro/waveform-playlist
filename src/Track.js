@@ -22,6 +22,7 @@ export default class {
   constructor() {
     this.name = "Untitled";
     this.customID = "";
+    this.lane = 0;
     this.customClass = undefined;
     this.waveOutlineColor = undefined;
     this.gain = 1;
@@ -41,6 +42,9 @@ export default class {
 
   setEventEmitter(ee) {
     this.ee = ee;
+  }
+  setLane(lane) {
+    this.lane = lane;
   }
   setCustomID(customID) {
     this.customID = customID;
@@ -478,7 +482,7 @@ export default class {
       data.resolution,
       data.sampleRate
     );
-
+    const width = this.peaks.length;
     const config = {
       attributes: {
         style: `position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: ${channelPixels}px; z-index: 9;`,
@@ -486,7 +490,6 @@ export default class {
     };
 
     let overlayClass = "";
-
     if (this.stateObj) {
       this.stateObj.setup(data.resolution, data.sampleRate);
       const StateClass = stateClasses[this.state];
@@ -498,6 +501,7 @@ export default class {
 
       overlayClass = StateClass.getClass();
     }
+
     // use this overlay for track event cursor position calculations.
     return h(`div.playlist-overlay${overlayClass}`, config);
   }
@@ -650,7 +654,7 @@ export default class {
     );
   }
 
-  render(data) {
+  renderChannelWrapper(data) {
     const width = this.peaks.length;
     const playbackX = secondsToPixels(
       data.playbackSeconds,
@@ -712,6 +716,21 @@ export default class {
               height: data.height * scale,
               style: `float: left; position: relative; margin: 0; padding: 0; z-index: 3; width: ${currentWidth}px; height: ${data.height}px;`,
             },
+            onmouseenter: (evt) => {
+              const channelAfter = evt.target.offsetParent.nextElementSibling;
+              const channelBefore =
+                evt.target.offsetParent.previousElementSibling;
+              const overlay = channelAfter.nextElementSibling;
+              if (
+                overlay.classList.contains("state-cursor") ||
+                overlay.classList.contains("state-fadein") ||
+                overlay.classList.contains("state-fadeout")
+              ) {
+                overlay.classList.add("hover");
+                channelAfter.classList.remove("no-pointer-events");
+                channelBefore.classList.remove("no-pointer-events");
+              }
+            },
             hook: new CanvasHook(
               peaks,
               offset,
@@ -728,7 +747,6 @@ export default class {
         totalWidth -= currentWidth;
         offset += MAX_CANVAS_WIDTH;
       }
-
       // if there are fades, display them.
       if (this.fadeIn) {
         const fadeIn = this.fades[this.fadeIn];
@@ -797,21 +815,36 @@ export default class {
           )
         );
       }
-
       return h(
         `div.channel.channel-${channelNum}`,
         {
           attributes: {
             style: `height: ${data.height}px; width: ${width}px; top: ${
               channelNum * data.height
-            }px; left: ${startX}px; position: absolute; margin: 0; padding: 0; z-index: 1;`,
+            }px; left: ${startX}px; position: relative; margin: 0; padding: 0; z-index: 1;`,
+            draggable: true,
+            id: this.customID,
           },
         },
         channelChildren
       );
     });
 
+    const channelBefore = h(`div.channelbefore.no-pointer-events`, {
+      attributes: {
+        style: `height: ${data.height}px; width: ${width}px; top: 0; left: calc(${startX}px - ${width}px); position: absolute; margin: 0; padding: 0; z-index: 11;`,
+      },
+    });
+
+    const channelAfter = h(`div.channelafter.no-pointer-events`, {
+      attributes: {
+        style: `height: ${data.height}px; width: ${width}px; top: 0; left:calc(${startX}px + ${width}px); position: absolute; margin: 0; padding: 0; z-index: 11;`,
+      },
+    });
+
+    waveformChildren.push(channelBefore);
     waveformChildren.push(channels);
+    waveformChildren.push(channelAfter);
     waveformChildren.push(this.renderOverlay(data));
 
     // draw cursor selection on active track.
@@ -866,13 +899,17 @@ export default class {
       `div.channel-wrapper${audibleClass}${customClass}`,
       {
         attributes: {
-          style: `margin-left: ${channelMargin}px; height: ${
-            data.height * numChan
-          }px;`,
+          style: `margin-left: ${channelMargin}px;`,
         },
       },
       channelChildren
     );
+  }
+
+  render(data) {
+    const laneChildren = [];
+    laneChildren.push(this.renderChannelWrapper(data));
+    return laneChildren;
   }
 
   getTrackDetails() {
@@ -881,6 +918,7 @@ export default class {
       start: this.startTime,
       end: this.endTime,
       name: this.name,
+      lane: this.lane,
       customID: this.customID,
       customClass: this.customClass,
       cuein: this.cueIn,

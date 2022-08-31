@@ -4,8 +4,7 @@ import h from "virtual-dom/h";
 import diff from "virtual-dom/diff";
 import patch from "virtual-dom/patch";
 import InlineWorker from "inline-worker";
-
-import { pixelsToSeconds } from "./utils/conversions";
+import { secondsToPixels, pixelsToSeconds } from "./utils/conversions";
 import { resampleAudioBuffer } from "./utils/audioData";
 import LoaderFactory from "./track/loader/LoaderFactory";
 import ScrollHook from "./render/ScrollHook";
@@ -20,6 +19,7 @@ import ExportWavWorkerFunction from "./utils/exportWavWorker";
 export default class {
   constructor() {
     this.tracks = [];
+    this.lanes = 1;
     this.soloedTracks = [];
     this.mutedTracks = [];
     this.collapsedTracks = [];
@@ -527,6 +527,25 @@ export default class {
       }
       this.drawRequest();
     });
+
+    ee.on("setNumberLanes", (numberLanes) => {
+      this.setNumberLanes(numberLanes);
+    });
+
+    ee.on("setTrackLane", (lane) => {
+      const track = this.getActiveTrack();
+      track.setLane(lane);
+      this.adjustDuration();
+      this.drawRequest();
+    });
+    ee.on("handleTrackLaneChange", (obj) => {
+      console.log(obj.trackId);
+      console.log(obj.laneId);
+      const track = this.getTrackByCustomID(obj.trackId);
+      track.setLane(obj.laneId);
+      this.adjustDuration();
+      this.drawRequest();
+    });
   }
 
   load(trackList, event = "none") {
@@ -562,6 +581,7 @@ export default class {
           const muted = info.muted || false;
           const soloed = info.soloed || false;
           const selection = info.selected;
+          const lane = info.lane;
           const customID = info.customID || undefined;
           const peaks = info.peaks || { type: "WebAudio", mono: this.mono };
           const customClass = info.customClass || undefined;
@@ -580,6 +600,7 @@ export default class {
           track.src =
             info.src instanceof Blob ? URL.createObjectURL(info.src) : info.src;
           track.setBuffer(audioBuffer);
+          track.setLane(lane);
           track.setCustomID(customID);
           track.setName(name);
           track.setEventEmitter(this.ee);
@@ -1094,12 +1115,11 @@ export default class {
       this.soloedTracks = [];
       this.mutedTracks = [];
       this.playoutPromises = [];
-
       this.cursor = 0;
       this.playbackSeconds = 0;
       this.duration = 0;
       this.scrollLeft = 0;
-
+      this.lanes = 1;
       this.seek(0, 0, undefined);
     });
   }
@@ -1118,6 +1138,10 @@ export default class {
     });
 
     this.playoutPromises = playoutPromises;
+  }
+
+  setNumberLanes(numberLanes) {
+    this.lanes = numberLanes;
   }
 
   startAnimation(startTime) {
@@ -1168,6 +1192,7 @@ export default class {
       this.playbackSeconds = playbackSeconds;
       this.draw(this.render());
       this.lastDraw = currentTime;
+      this.ee.emit("audiosourcesrendered");
     } else {
       if (
         cursorPos + elapsed >=
@@ -1185,6 +1210,7 @@ export default class {
 
         this.playbackSeconds = 0;
         this.draw(this.render());
+        this.ee.emit("audiosourcesrendered");
       }, 0);
     }
   }
@@ -1192,6 +1218,7 @@ export default class {
   drawRequest() {
     window.requestAnimationFrame(() => {
       this.draw(this.render());
+      this.ee.emit("audiosourcesrendered");
     });
     this.getTrackByCustomID();
   }
@@ -1255,33 +1282,54 @@ export default class {
     return timeScale.render();
   }
 
-  renderTrackSection() {
-    const trackElements = this.tracks
+  renderLanes() {
+    const laneElements = [];
+    let i = 0;
+    while (i < this.lanes) {
+      laneElements.push(this.renderLane(i));
+      i++;
+    }
+    return h(`div.lanes`, {}, laneElements);
+  }
+
+  renderLane(laneNumber) {
+    const laneTracks = this.tracks
       .sort((a, b) =>
         a.customID > b.customID ? 1 : b.customID > a.customID ? -1 : 0
       )
       .map((track) => {
-        const collapsed = this.collapsedTracks.indexOf(track) > -1;
-        return track.render(
-          this.getTrackRenderData({
-            isActive: this.isActiveTrack(track),
-            shouldPlay: this.shouldTrackPlay(track),
-            soloed: this.soloedTracks.indexOf(track) > -1,
-            muted: this.mutedTracks.indexOf(track) > -1,
-            collapsed,
-            height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
-            barGap: this.barGap,
-            barWidth: this.barWidth,
-          })
-        );
+        if (track.lane === laneNumber) {
+          const collapsed = this.collapsedTracks.indexOf(track) > -1;
+          return track.render(
+            this.getTrackRenderData({
+              isActive: this.isActiveTrack(track),
+              shouldPlay: this.shouldTrackPlay(track),
+              soloed: this.soloedTracks.indexOf(track) > -1,
+              muted: this.mutedTracks.indexOf(track) > -1,
+              collapsed,
+              height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
+              barGap: this.barGap,
+              barWidth: this.barWidth,
+            })
+          );
+        }
       });
+    const laneOverlay = h(`div.lane-overlay`, {
+      attributes: {
+        style: `height: 100%; width: 100%; position: absolute; top: 0; left: 0; pointer-events: 0;`,
+        laneId: laneNumber,
+      },
+    });
+    laneTracks.push(laneOverlay);
+    return h(`div.lane.lane-${laneNumber}`, {}, laneTracks);
+  }
+
+  renderTrackSection() {
+    const lanesElement = this.renderLanes();
 
     return h(
       "div.playlist-tracks",
       {
-        attributes: {
-          style: "overflow: auto;",
-        },
         onscroll: (e) => {
           this.scrollLeft = pixelsToSeconds(
             e.target.scrollLeft,
@@ -1293,22 +1341,129 @@ export default class {
         },
         hook: new ScrollHook(this),
       },
-      trackElements
+      lanesElement
+    );
+  }
+
+  renderLaneControls(lane) {
+    let muted = false;
+    let soloed = false;
+    const muteClass = muted ? ".active" : "";
+    const soloClass = soloed ? ".active" : "";
+
+    const trackName = h(
+      "div.single-line",
+      {
+        attributes: {
+          contentEditable: true,
+        },
+      },
+      `Track-${lane}`
+    );
+    const headerChildren = [];
+    headerChildren.push(trackName);
+    const controls = [h("div.track-header", headerChildren)];
+
+    controls.push(
+      h("div.btn-group", [
+        h(
+          `button.btn.btn-outline-dark.btn-xs.btn-mute${muteClass}`,
+          {
+            attributes: {
+              type: "button",
+            },
+          },
+          ["Mute"]
+        ),
+        h(`button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`, {}, [
+          "Solo",
+        ]),
+      ])
+    );
+    controls.push(
+      h("label.volume", [
+        h("input.volume-slider", {
+          attributes: {
+            "aria-label": "Track volume control",
+            type: "range",
+            min: 0,
+            max: 100,
+            value: 100,
+          },
+        }),
+      ])
+    );
+    return h(
+      "div.controls",
+      {
+        attributes: {
+          style: `height: ${125}px; width: ${125}px;z-index: 10;`,
+        },
+      },
+      controls
+    );
+  }
+
+  renderFixed() {
+    const fixedChildren = [];
+
+    let i = 0;
+    while (i < this.lanes) {
+      fixedChildren.push(this.renderLaneControls(i));
+      i++;
+    }
+
+    return h(
+      "div.playlist-fixed",
+      {
+        attributes: {
+          style: "overflow: hidden; position: relative;",
+        },
+      },
+      fixedChildren
+    );
+  }
+
+  renderScrollable() {
+    const scrollableChildren = [];
+    const playbackX = secondsToPixels(
+      this.playbackSeconds,
+      this.samplesPerPixel,
+      this.sampleRate
+    );
+
+    const cursor = h("div.playback-indicator", {
+      attributes: {
+        style: `position: absolute; width: 2px; height: calc(100% - 27px); margin: 0; padding: 0; top: 27px; left: calc(20px + ${playbackX}px); bottom: 0; z-index: 14; background: #f2765d; cursor: grab;`,
+      },
+    });
+
+    if (this.showTimescale) {
+      scrollableChildren.push(this.renderTimeScale());
+    }
+    scrollableChildren.push(cursor);
+
+    scrollableChildren.push(this.renderTrackSection());
+
+    if (this.annotationList.length) {
+      scrollableChildren.push(this.renderAnnotations());
+    }
+    return h(
+      "div.playlist-scrollable",
+      {
+        attributes: {
+          style: "position: relative;",
+        },
+      },
+      scrollableChildren
     );
   }
 
   render() {
     const containerChildren = [];
 
-    if (this.showTimescale) {
-      containerChildren.push(this.renderTimeScale());
-    }
-
-    containerChildren.push(this.renderTrackSection());
-
-    if (this.annotationList.length) {
-      containerChildren.push(this.renderAnnotations());
-    }
+    containerChildren.push(this.renderFixed());
+    containerChildren.push(this.renderScrollable());
 
     return h(
       "div.playlist",
