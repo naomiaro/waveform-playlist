@@ -62,12 +62,14 @@ export default class {
   }
 
   mousedown(e) {
-    e.preventDefault();
+    //e.preventDefault();
     this.startTime = new Date().getTime();
     this.active = true;
     this.el = e.target;
     this.prevX = e.offsetX;
     this.startX = e.offsetX;
+    this.prevY = e.offsetY;
+    this.startY = e.offsetY;
     this.maxXDifference = 0;
   }
 
@@ -99,8 +101,16 @@ export default class {
       e.preventDefault();
       this.complete(e.offsetX);
     }
+    if (e.target.classList.contains("hover")) {
+      const channelAfter = e.target.previousElementSibling;
+      const channelBefore =
+        e.target.previousElementSibling.previousElementSibling
+          .previousElementSibling;
+      channelAfter.classList.add("no-pointer-events");
+      channelBefore.classList.add("no-pointer-events");
+      e.target.classList.remove("hover");
+    }
   }
-
   mouseleave(e) {
     this.mouseup(e);
   }
