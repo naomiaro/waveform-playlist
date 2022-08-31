@@ -482,7 +482,7 @@ export default class {
       data.resolution,
       data.sampleRate
     );
-    const width = this.peaks.length;
+
     const config = {
       attributes: {
         style: `position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: ${channelPixels}px; z-index: 9;`,
