@@ -8,7 +8,9 @@ export default class {
     this.id = "";
     this.customClass = undefined;
     this.gain = 1;
+    this.volume = 1;
     this.muted = false;
+    this.soloed = false;
     this.duration = 0;
     this.endTime = 0;
     this.tracks = [];
@@ -26,6 +28,10 @@ export default class {
     this.name = name;
   }
 
+  setMuted(bool) {
+    this.muted = bool;
+  }
+
   setEndTime(endTime) {
     this.endTime = endTime;
   }
@@ -39,10 +45,20 @@ export default class {
     if (index > -1) {
       this.tracks.splice(index, 1);
     }
+    const endTime =
+      this.tracks.length > 0
+        ? Math.max(...this.tracks.map((track) => track.endTime))
+        : 0;
+    this.setEndTime(endTime);
   }
 
   addTrack(track) {
     this.tracks.push(track);
+    const endTime =
+      this.tracks.length > 0
+        ? Math.max(...this.tracks.map((track) => track.endTime))
+        : 0;
+    this.setEndTime(endTime);
   }
 
   getEndTime() {
