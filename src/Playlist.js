@@ -8,6 +8,7 @@ import { secondsToPixels, pixelsToSeconds } from "./utils/conversions";
 import { resampleAudioBuffer } from "./utils/audioData";
 import LoaderFactory from "./track/loader/LoaderFactory";
 import ScrollHook from "./render/ScrollHook";
+import VolumeSliderHook from "./render/VolumeSliderHook";
 import TimeScale from "./TimeScale";
 import Track from "./Track";
 import Lane from "./Lane";
@@ -242,6 +243,13 @@ export default class {
         }
       }
       track.setStartTime(newStartTime);
+      this.lanes.forEach((lane) => {
+        const endTime =
+          lane.tracks.length > 0
+            ? Math.max(...lane.tracks.map((track) => track.endTime))
+            : 0;
+        lane.setEndTime(endTime);
+      });
       this.adjustDuration();
       this.drawRequest();
     });
@@ -970,6 +978,15 @@ export default class {
     }
   }
 
+  renameLane({ lane, event }) {
+    if (event.key === "Enter") {
+      if (event.target.innerText) lane.name = event.target.innerText;
+      else event.target.innerText = lane.name;
+      event.target.blur();
+      lane.setName(event.target.innerText);
+    }
+  }
+
   adjustTrackPlayout() {
     this.tracks.forEach((track) => {
       track.setShouldPlay(this.shouldTrackPlay(track));
@@ -1163,17 +1180,15 @@ export default class {
   }
 
   setNumberLanes(numberLanes) {
-    let i = 0;
-    while (i > numberLanes) {
-      const found = this.lanes.some((lane) => lane.id === i);
-      if (!found) {
-        const lane = new Lane();
-        lane.setName(`Track-${i}`);
-        lane.setId(i);
-        lane.setEventEmitter(this.ee);
-        this.lanes.push(lane);
-      }
-      i++;
+    const found = this.lanes.some((lane) => lane.id === numberLanes);
+    if (!found) {
+      const lane = new Lane();
+      lane.setName(`Track-${numberLanes}`);
+      lane.setId(numberLanes);
+      lane.setEventEmitter(this.ee);
+      this.lanes.push(lane);
+      this.adjustDuration();
+      this.drawRequest();
     }
   }
 
@@ -1355,6 +1370,26 @@ export default class {
     return h(`div.lane.lane-${lane.id}`, {}, laneChildren);
   }
 
+  removeLane(lane) {
+    if (lane.tracks.length > 0) {
+      lane.tracks.forEach((track) => {
+        this.removeTrack(track);
+      });
+    }
+    const index = this.lanes.indexOf(lane);
+    if (index > -1) {
+      this.lanes.splice(index, 1);
+    }
+    if (this.lanes.length === 0) {
+      this.tracks.forEach((track) => {
+        this.removeTrack(track);
+      });
+    }
+    this.adjustDuration();
+    this.adjustTrackPlayout();
+    this.drawRequest();
+  }
+
   renderTrackSection() {
     const lanesElement = this.renderLanes(this.lanes);
 
@@ -1377,10 +1412,8 @@ export default class {
   }
 
   renderLaneControls(lane) {
-    let muted = false;
-    let soloed = false;
-    const muteClass = muted ? ".active" : "";
-    const soloClass = soloed ? ".active" : "";
+    const muteClass = lane.muted ? ".active" : "";
+    const soloClass = lane.soloed ? ".active" : "";
 
     const trackName = h(
       "div.single-line",
@@ -1388,10 +1421,27 @@ export default class {
         attributes: {
           contentEditable: true,
         },
+        onkeypress: (e) => {
+          this.renameLane({ lane: lane, event: e });
+        },
       },
-      lane.name
+      [lane.name]
+    );
+    const removeTrack = h(
+      "button.btn.btn-danger.btn-xs.track-remove",
+      {
+        attributes: {
+          type: "button",
+          title: "Remove track",
+        },
+        onclick: () => {
+          this.removeLane(lane);
+        },
+      },
+      [h("i.fas.fa-times")]
     );
     const headerChildren = [];
+    headerChildren.push(removeTrack);
     headerChildren.push(trackName);
     const controls = [h("div.track-header", headerChildren)];
 
@@ -1403,8 +1453,9 @@ export default class {
             attributes: {
               type: "button",
             },
-            onclick: (evt) => {
-              console.log(`Mute clicked`);
+            onclick: () => {
+              lane.muted ? lane.setMuted(false) : lane.setMuted(true);
+              this.drawRequest();
             },
           },
           ["Mute"]
@@ -1412,9 +1463,7 @@ export default class {
         h(
           `button.btn.btn-outline-dark.btn-xs.btn-solo${soloClass}`,
           {
-            onclick: (evt) => {
-              console.log(`Solo clicked`);
-            },
+            onclick: (evt) => {},
           },
           ["Solo"]
         ),
@@ -1429,6 +1478,11 @@ export default class {
             min: 0,
             max: 100,
             value: 100,
+          },
+          hook: new VolumeSliderHook(lane.gain),
+          oninput: (e) => {
+            lane.setGainLevel(e.target.value / 100);
+            this.drawRequest();
           },
         }),
       ])
