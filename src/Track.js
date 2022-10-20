@@ -86,6 +86,179 @@ export default class {
     }
   }
 
+  createArrayBuffer(point1, point2, audioContext) {
+    let newArrayBuffer;
+    const trackStart = this.getStartTime();
+    const trackEnd = this.getEndTime();
+
+    let start = point1;
+    let end = point2;
+
+    let timeSplitOffset = start - this.getStartTime();
+    if (timeSplitOffset < 0) {
+      // outside interval left
+      timeSplitOffset = 0;
+    }
+    const firstPartPercentage = timeSplitOffset / this.duration;
+
+    const secondTimeSplitOffset = end - this.getStartTime();
+    let secondPartPercentage =
+      (this.duration - secondTimeSplitOffset) / this.duration;
+    if (secondPartPercentage < 0) {
+      // outside interval right
+      secondPartPercentage = 0;
+    }
+
+    if (start <= trackEnd && end >= trackStart) {
+      const channels = this.buffer.numberOfChannels;
+      const firstPartNewLength = firstPartPercentage * this.buffer.length;
+      const secondPartNewLength = secondPartPercentage * this.buffer.length;
+      try {
+        newArrayBuffer = audioContext.createBuffer(
+          channels,
+          firstPartNewLength + secondPartNewLength,
+          this.buffer.sampleRate
+        );
+        const arrayFirstPart = new Float32Array(firstPartNewLength);
+        const arraySecondPart = new Float32Array(secondPartNewLength);
+
+        for (let channel = 0; channel < channels; channel++) {
+          this.buffer.copyFromChannel(arrayFirstPart, channel, 0);
+          this.buffer.copyFromChannel(
+            arraySecondPart,
+            channel,
+            this.buffer.length - secondPartNewLength
+          );
+          newArrayBuffer.copyToChannel(arrayFirstPart, channel, 0);
+          newArrayBuffer.copyToChannel(
+            arraySecondPart,
+            channel,
+            firstPartNewLength
+          );
+        }
+      } catch (e) {
+        // handle error here
+        throw e;
+      }
+    }
+    return newArrayBuffer;
+  }
+
+  razorCut(point, audioContext, track) {
+    const newArrayBuffer1 = this.createArrayBuffer(
+      point,
+      track.endTime,
+      audioContext
+    );
+    const newArrayBuffer2 = this.createArrayBuffer(
+      track.startTime,
+      point,
+      audioContext
+    );
+    let razorCutObject = {
+      Track: track,
+      Point: point,
+      buffer1: newArrayBuffer1,
+      buffer2: newArrayBuffer2,
+    };
+    return this.ee.emit("razorCutFinished", razorCutObject);
+  }
+
+  removePart(point1, point2, audioContext, track) {
+    this.ee.emit("saveCutManipulation", this.buffer, track);
+
+    const trackStart = this.getStartTime();
+    const trackEnd = this.getEndTime();
+
+    let start;
+    let end;
+    if (point1 <= point2) {
+      start = point1;
+      end = point2;
+    } else {
+      start = point2;
+      end = point1;
+    }
+
+    let timeSplitOffset = start - this.getStartTime();
+    if (timeSplitOffset < 0) {
+      // outside interval left
+      timeSplitOffset = 0;
+    }
+    const firstPartPercentage = timeSplitOffset / this.duration;
+
+    const secondTimeSplitOffset = end - this.getStartTime();
+    let secondPartPercentage =
+      (this.duration - secondTimeSplitOffset) / this.duration;
+    if (secondPartPercentage < 0) {
+      // outside interval right
+      secondPartPercentage = 0;
+    }
+
+    if (start <= trackEnd && end >= trackStart) {
+      const channels = this.buffer.numberOfChannels;
+
+      let newArrayBuffer;
+      const firstPartNewLength = firstPartPercentage * this.buffer.length;
+      const secondPartNewLength = secondPartPercentage * this.buffer.length;
+      try {
+        newArrayBuffer = audioContext.createBuffer(
+          channels,
+          firstPartNewLength + secondPartNewLength,
+          this.buffer.sampleRate
+        );
+        const arrayFirstPart = new Float32Array(firstPartNewLength);
+        const arraySecondPart = new Float32Array(secondPartNewLength);
+
+        for (let channel = 0; channel < channels; channel++) {
+          this.buffer.copyFromChannel(arrayFirstPart, channel, 0);
+          this.buffer.copyFromChannel(
+            arraySecondPart,
+            channel,
+            this.buffer.length - secondPartNewLength
+          );
+          newArrayBuffer.copyToChannel(arrayFirstPart, channel, 0);
+          newArrayBuffer.copyToChannel(
+            arraySecondPart,
+            channel,
+            firstPartNewLength
+          );
+        }
+      } catch (e) {
+        // handle error here
+        throw e;
+      }
+      let fades = track.fades;
+      if (typeof fades !== "undefined" && Object.keys(fades).length > 0) {
+        let fadeInDuration = 0,
+          fadeOutDuration = 0;
+        Object.keys(fades).forEach((key) => {
+          if (fades[key].type === "FadeIn") {
+            fadeInDuration = fades[key].end - fades[key].start;
+          } else if (fades[key].type === "FadeOut") {
+            fadeOutDuration = fades[key].end - fades[key].start;
+          }
+        });
+        let totalFadesDuration = fadeInDuration + fadeOutDuration;
+        if (totalFadesDuration >= newArrayBuffer.duration) {
+          // Only remove fades if they will intersect or be longer than new arrayBuffer after cut
+          if (this.fadeIn) {
+            this.removeFade(this.fadeIn);
+            this.fadeIn = undefined;
+          }
+          if (this.fadeOut) {
+            this.removeFade(this.fadeOut);
+            this.fadeOut = undefined;
+          }
+        }
+      }
+
+      this.buffer = newArrayBuffer;
+      this.setCues(0, newArrayBuffer.duration);
+      this.playout.buffer = this.buffer;
+    }
+  }
+
   setStartTime(start) {
     this.startTime = start;
     this.endTime = start + this.duration;
