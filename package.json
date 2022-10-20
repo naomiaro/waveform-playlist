@@ -1,5 +1,5 @@
 {
-  "name": "waveform-playlist",
+  "name": "colmena-waveform-playlist",
   "description": "Multiple track web audio editor and player with waveform preview",
   "version": "4.3.3",
   "main": "build/waveform-playlist.umd.js",

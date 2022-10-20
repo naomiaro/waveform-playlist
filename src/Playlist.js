@@ -328,6 +328,25 @@ export default class {
       ]);
     });
 
+    ee.on("cut", () => {
+      const track = this.getActiveTrack();
+      const timeSelection = this.getTimeSelection();
+
+      track.removePart(timeSelection.start, timeSelection.end, this.ac, track);
+      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+
+      this.setTimeSelection(0, 0);
+      this.adjustDuration();
+      this.drawRequest();
+      this.ee.emit("cutfinished");
+    });
+
+    ee.on("razorCut", () => {
+      const Track = this.getActiveTrack();
+      const timeSelection = this.getTimeSelection();
+      Track.razorCut(timeSelection.start, this.ac, Track);
+    });
+
     ee.on("trim", () => {
       const track = this.getActiveTrack();
       const timeSelection = this.getTimeSelection();
