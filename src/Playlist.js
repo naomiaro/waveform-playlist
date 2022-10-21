@@ -358,6 +358,25 @@ export default class {
       this.drawRequest();
     });
 
+    ee.on("split", () => {
+      const track = this.getActiveTrack();
+      const timeSelection = this.getTimeSelection();
+      const timeSelectionStart = timeSelection.start;
+      this.createTrackFromSplit({
+        trackToSplit: track,
+        name: track.name + "_1",
+        splitTime: timeSelectionStart,
+      });
+      track.trim(track.startTime, timeSelectionStart);
+      if (track.fadeOut) {
+        track.removeFade(track.fadeOut);
+        track.fadeOut = undefined;
+      }
+
+      track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+      this.drawRequest();
+    });
+
     ee.on("zoomin", () => {
       const zoomIndex = Math.max(0, this.zoomIndex - 1);
       const zoom = this.zoomLevels[zoomIndex];
@@ -497,6 +516,83 @@ export default class {
       .catch((e) => {
         this.ee.emit("audiosourceserror", e);
       });
+  }
+
+  createTrackFromSplit({ trackToSplit, name, splitTime }) {
+    const enabledStates = trackToSplit.enabledStates;
+    const buffer = trackToSplit.buffer;
+    const fadeOut = trackToSplit.fadeOut;
+    const cueIn = trackToSplit.cueIn;
+    const cueOut = trackToSplit.cueOut;
+    const gain = trackToSplit.gain || 1;
+
+    let muted = false;
+    if (this.mutedTracks.indexOf(trackToSplit) !== -1) {
+      muted = true;
+    }
+
+    let soloed = false;
+    if (this.soloedTracks.indexOf(trackToSplit) !== -1) {
+      soloed = true;
+    }
+
+    const peaks = trackToSplit.peakData;
+    const customClass = trackToSplit.customClass;
+    const waveOutlineColor = trackToSplit.waveOutlineColor;
+    const stereoPan = trackToSplit.stereoPan || 0;
+    const effects = trackToSplit.effectsGraph || null;
+
+    // webaudio specific playout for now.
+    const playout = new Playout(this.ac, buffer, this.masterGainNode);
+
+    const track = new Track();
+    track.src = trackToSplit.src;
+    track.setBuffer(buffer);
+    track.setName(name);
+    track.setEventEmitter(this.ee);
+    track.setEnabledStates(enabledStates);
+    track.setCues(cueIn, cueOut);
+    track.setCustomClass(customClass);
+    track.setWaveOutlineColor(waveOutlineColor);
+
+    if (fadeOut !== undefined) {
+      const fade = trackToSplit.fades[fadeOut];
+      track.setFadeOut(fade.end - fade.start, fade.shape);
+    }
+
+    if (peaks !== undefined) {
+      track.setPeakData(peaks);
+    }
+
+    track.setState(this.getState());
+    track.setPlayout(playout);
+
+    track.setGainLevel(gain);
+    track.setStereoPanValue(stereoPan);
+    if (effects) {
+      track.setEffects(effects);
+    }
+
+    if (muted) {
+      this.muteTrack(track);
+    }
+
+    if (soloed) {
+      this.soloTrack(track);
+    }
+
+    track.setStartTime(trackToSplit.startTime);
+    track.trim(splitTime, track.endTime);
+
+    // extract peaks with AudioContext for now.
+    track.calculatePeaks(this.samplesPerPixel, this.sampleRate);
+
+    this.tracks = this.tracks.concat([track]);
+    this.adjustDuration();
+    this.draw(this.render());
+    this.setActiveTrack(track);
+
+    this.ee.emit("audiosourcesrendered");
   }
 
   /*

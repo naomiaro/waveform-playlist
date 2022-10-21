@@ -338,6 +338,10 @@ ee.on("cut", function() {
   displayLoadingData("A cut operation has started.");
 });
 
+$container.on("click", ".btn-split-audio", function() {
+  ee.emit("split");
+});
+
 ee.on("cutfinished", function() {
   displayLoadingData("The cut operation has finished.");
 });
