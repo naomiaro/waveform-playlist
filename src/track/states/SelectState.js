@@ -1,4 +1,5 @@
 import { pixelsToSeconds } from "../../utils/conversions";
+import { getXOffsetOnTouchEvent } from "../../utils/mobiles";
 
 export default class {
   constructor(track) {
@@ -47,10 +48,31 @@ export default class {
     this.track.ee.emit("select", startTime, startTime, this.track);
   }
 
+  touchstart(e) {
+    e.preventDefault();
+    this.active = true;
+
+    this.startX = getXOffsetOnTouchEvent(e);
+    const startTime = pixelsToSeconds(
+      this.startX,
+      this.samplesPerPixel,
+      this.sampleRate
+    );
+
+    this.track.ee.emit("select", startTime, startTime, this.track);
+  }
+
   mousemove(e) {
     if (this.active) {
       e.preventDefault();
       this.emitSelection(e.offsetX);
+    }
+  }
+
+  touchmove(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.emitSelection(getXOffsetOnTouchEvent(e));
     }
   }
 
@@ -68,11 +90,26 @@ export default class {
     }
   }
 
+  touchend(e) {
+    if (this.active) {
+      e.preventDefault();
+      this.complete(getXOffsetOnTouchEvent(e));
+    }
+  }
+
   static getClass() {
     return ".state-select";
   }
 
   static getEvents() {
-    return ["mousedown", "mousemove", "mouseup", "mouseleave"];
+    return [
+      "mousedown",
+      "mousemove",
+      "mouseup",
+      "mouseleave",
+      "touchstart",
+      "touchmove",
+      "touchend",
+    ];
   }
 }

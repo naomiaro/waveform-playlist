@@ -1,4 +1,5 @@
 import { pixelsToSeconds } from "../../utils/conversions";
+import { getXOffsetOnTouchEvent } from "../../utils/mobiles";
 
 export default class {
   constructor(track) {
@@ -9,11 +10,6 @@ export default class {
   setup(samplesPerPixel, sampleRate) {
     this.samplesPerPixel = samplesPerPixel;
     this.sampleRate = sampleRate;
-  }
-
-  getXOffsetOnTouchEvent(e) {
-    const bcr = e.target.getBoundingClientRect();
-    return e.targetTouches[0].clientX - bcr.x;
   }
 
   emitShift(x) {
@@ -45,7 +41,7 @@ export default class {
 
     this.active = true;
     this.el = e.target;
-    this.prevX = this.getXOffsetOnTouchEvent(e);
+    this.prevX = getXOffsetOnTouchEvent(e);
   }
 
   mousemove(e) {
@@ -58,7 +54,7 @@ export default class {
   touchmove(e) {
     if (this.active) {
       e.preventDefault();
-      this.emitShift(this.getXOffsetOnTouchEvent(e));
+      this.emitShift(getXOffsetOnTouchEvent(e));
     }
   }
 
@@ -79,7 +75,7 @@ export default class {
   touchend(e) {
     if (this.active) {
       e.preventDefault();
-      this.complete(this.getXOffsetOnTouchEvent(e));
+      this.complete(getXOffsetOnTouchEvent(e));
     }
   }
 
