@@ -747,7 +747,7 @@ export default class {
     const selected = this.getTimeSelection();
     const playoutPromises = [];
 
-    const start = startTime || this.pausedAt || this.cursor;
+    const start = (startTime === 0) ? 0 : (startTime || this.pausedAt || this.cursor);
     let end = endTime;
 
     if (!end && selected.end !== selected.start && selected.end > start) {
