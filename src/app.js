@@ -35,6 +35,7 @@ export function init(options = {}, ee = EventEmitter()) {
     collapsedWaveHeight: 30,
     barWidth: 1,
     barGap: 0,
+    rounded: false,
     state: "cursor",
     zoomLevels: [512, 1024, 2048, 4096],
     annotationList: {
@@ -78,6 +79,7 @@ export function init(options = {}, ee = EventEmitter()) {
   playlist.setAnnotations(config.annotationList);
   playlist.setBarGap(config.barGap);
   playlist.setBarWidth(config.barWidth);
+  playlist.setRounded(config.rounded);
   playlist.isAutomaticScroll = config.isAutomaticScroll;
   playlist.isContinuousPlay = config.isContinuousPlay;
   playlist.linkedEndpoints = config.linkedEndpoints;

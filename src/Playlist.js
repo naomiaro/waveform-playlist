@@ -170,6 +170,10 @@ export default class {
     this.barGap = width;
   }
 
+  setRounded(rounded) {
+    this.rounded = rounded;
+  }
+
   setAnnotations(config) {
     const controlWidth = this.controls.show ? this.controls.width : 0;
     this.annotationList = new AnnotationList(
@@ -966,6 +970,7 @@ export default class {
       colors: this.colors,
       barWidth: this.barWidth,
       barGap: this.barGap,
+      rounded: this.rounded,
     };
 
     return _defaults({}, data, defaults);
@@ -1012,6 +1017,7 @@ export default class {
           height: collapsed ? this.collapsedWaveHeight : this.waveHeight,
           barGap: this.barGap,
           barWidth: this.barWidth,
+          rounded: this.rounded,
         })
       );
     });
