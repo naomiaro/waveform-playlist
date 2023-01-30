@@ -8,7 +8,7 @@ export default class extends Loader {
     return new Promise((resolve, reject) => {
       fetch(this.src)
         .then((data) => data.arrayBuffer())
-        .then((arrayBuffer) => super.ac.decodeAudioData(arrayBuffer))
+        .then((arrayBuffer) => super.fetchLoad(arrayBuffer))
         .then((decodedAudio) => resolve(decodedAudio))
         .catch((err) => {
           reject(Error(`Track ${this.src} failed to load with error: ${err}`));

@@ -59,4 +59,28 @@ export default class {
       );
     });
   }
+
+  fetchLoad(arrayBuffer) {
+    this.setStateChange(STATE_DECODING);
+
+    return new Promise((resolve, reject) => {
+      this.ac.decodeAudioData(
+        arrayBuffer,
+        (audioBuffer) => {
+          this.audioBuffer = audioBuffer;
+          this.setStateChange(STATE_FINISHED);
+
+          resolve(audioBuffer);
+        },
+        (err) => {
+          if (err === null) {
+            // Safari issues with null error
+            reject(Error("MediaDecodeAudioDataUnknownContentType"));
+          } else {
+            reject(err);
+          }
+        }
+      );
+    });
+  }
 }
