@@ -52,10 +52,12 @@ export default class {
     this.mediaRecorder = new MediaRecorder(stream);
 
     this.mediaRecorder.onstart = () => {
+      const start = this.cursor;
       const track = new Track();
       track.setName("Recording");
       track.setEnabledStates();
       track.setEventEmitter(this.ee);
+      track.setStartTime(start);
 
       this.recordingTrack = track;
       this.tracks.push(track);
@@ -851,12 +853,13 @@ export default class {
 
   record() {
     const playoutPromises = [];
+    const start = this.cursor;
     this.mediaRecorder.start(300);
 
     this.tracks.forEach((track) => {
       track.setState("none");
       playoutPromises.push(
-        track.schedulePlay(this.ac.currentTime, 0, undefined, {
+        track.schedulePlay(this.ac.currentTime, start, undefined, {
           shouldPlay: this.shouldTrackPlay(track),
         })
       );
