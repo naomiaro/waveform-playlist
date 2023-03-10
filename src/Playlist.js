@@ -56,6 +56,7 @@ export default class {
       track.setName("Recording");
       track.setEnabledStates();
       track.setEventEmitter(this.ee);
+      track.setStartTime(this.cursor);
 
       this.recordingTrack = track;
       this.tracks.push(track);
