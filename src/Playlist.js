@@ -48,18 +48,23 @@ export default class {
   }
 
   // TODO extract into a plugin
-  initRecorder(stream) {
+  initRecorder(stream, track, name = "Recording") {
     this.mediaRecorder = new MediaRecorder(stream);
 
     this.mediaRecorder.onstart = () => {
-      const track = new Track();
-      track.setName("Recording");
-      track.setEnabledStates();
-      track.setEventEmitter(this.ee);
+      if (this.recordingTrack === undefined) {
+        const track = new Track();
+        track.setName(name);
+        track.setEnabledStates();
+        track.setEventEmitter(this.ee);
 
-      this.recordingTrack = track;
-      this.tracks.push(track);
+        this.recordingTrack = track;
+        this.tracks.push(track);
+      }
 
+      const start = this.cursor;
+      this.recordingTrack.setStartTime(start);
+    
       this.chunks = [];
       this.working = false;
     };
@@ -851,12 +856,13 @@ export default class {
 
   record() {
     const playoutPromises = [];
+    const start = this.cursor;
     this.mediaRecorder.start(300);
 
     this.tracks.forEach((track) => {
       track.setState("none");
       playoutPromises.push(
-        track.schedulePlay(this.ac.currentTime, 0, undefined, {
+        track.schedulePlay(this.ac.currentTime, start, undefined, {
           shouldPlay: (track !== this.recordingTrack) && this.shouldTrackPlay(track),
         })
       );
