@@ -49,10 +49,12 @@ export default class {
 
   // TODO extract into a plugin
   initRecorder(stream, track, name = "Recording") {
+    this.fixedRecordingTrack = (track !== undefined);
+    this.recordingTrack = track;
     this.mediaRecorder = new MediaRecorder(stream);
 
     this.mediaRecorder.onstart = () => {
-      if (this.recordingTrack === undefined) {
+      if (!this.fixedRecordingTrack) {
         const track = new Track();
         track.setName(name);
         track.setEnabledStates();
