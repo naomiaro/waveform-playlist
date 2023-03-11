@@ -857,7 +857,7 @@ export default class {
       track.setState("none");
       playoutPromises.push(
         track.schedulePlay(this.ac.currentTime, 0, undefined, {
-          shouldPlay: this.shouldTrackPlay(track),
+          shouldPlay: (track !== this.recordingTrack) && this.shouldTrackPlay(track),
         })
       );
     });
