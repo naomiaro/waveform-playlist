@@ -1,6 +1,6 @@
 var userMediaStream;
 var playlist;
-var constraints = { audio: true };
+var constraints = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
 
 navigator.getUserMedia = (navigator.getUserMedia ||
   navigator.webkitGetUserMedia ||
@@ -39,8 +39,8 @@ playlist.initExporter();
 
 if (navigator.mediaDevices) {
   navigator.mediaDevices.getUserMedia(constraints)
-  .then(gotStream)
-  .catch(logError);
+    .then(gotStream)
+    .catch(logError);
 } else if (navigator.getUserMedia && 'MediaRecorder' in window) {
   navigator.getUserMedia(
     constraints,
