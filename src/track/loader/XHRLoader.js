@@ -4,7 +4,7 @@ export default class extends Loader {
   /**
    * Loads an audio file via XHR.
    */
-  load() {
+  load(handleProgress = () => {}) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
 
@@ -21,6 +21,7 @@ export default class extends Loader {
 
         decoderPromise
           .then((audioBuffer) => {
+            handleProgress();
             resolve(audioBuffer);
           })
           .catch(reject);

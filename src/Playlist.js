@@ -373,14 +373,14 @@ export default class {
     });
   }
 
-  load(trackList) {
+  load(trackList, handleProgress = () => {}, handleIsRendered = () => {}) {
     const loadPromises = trackList.map((trackInfo) => {
       const loader = LoaderFactory.createLoader(
         trackInfo.src,
         this.ac,
         this.ee
       );
-      return loader.load().then((audioBuffer) => {
+      return loader.load(handleProgress).then((audioBuffer) => {
         if (audioBuffer.sampleRate === this.sampleRate) {
           return audioBuffer;
         } else {
@@ -473,6 +473,8 @@ export default class {
         this.tracks = this.tracks.concat(tracks);
         this.adjustDuration();
         this.draw(this.render());
+
+        handleIsRendered();
 
         this.ee.emit("audiosourcesrendered");
       })
