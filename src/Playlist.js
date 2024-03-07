@@ -1022,7 +1022,7 @@ export default class {
       "div.playlist-tracks",
       {
         attributes: {
-          style: "overflow: auto; padding-top: 55px;",
+          style: "padding-top: 55px;",
         },
         onscroll: (e) => {
           this.scrollLeft = pixelsToSeconds(
@@ -1056,7 +1056,7 @@ export default class {
       "div.playlist",
       {
         attributes: {
-          style: "overflow: hidden; position: relative;",
+          style: "position: relative;",
         },
       },
       containerChildren

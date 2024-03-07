@@ -147,7 +147,7 @@ class TimeScale {
       "div.playlist-time-scale",
       {
         attributes: {
-          style: `position: sticky; margin-left: ${this.marginLeft}px; z-index: 999; height: 31px;`,
+          style: `position: sticky; margin-left: ${this.marginLeft}px; z-index: 999; height: 31px; top: 0;`,
         },
       },
       [
