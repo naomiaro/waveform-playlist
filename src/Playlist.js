@@ -1022,7 +1022,7 @@ export default class {
       "div.playlist-tracks",
       {
         attributes: {
-          style: "padding-top: 55px;",
+          style: "",
         },
         onscroll: (e) => {
           this.scrollLeft = pixelsToSeconds(
