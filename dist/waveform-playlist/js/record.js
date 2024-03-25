@@ -39,8 +39,8 @@ playlist.initExporter();
 
 if (navigator.mediaDevices) {
   navigator.mediaDevices.getUserMedia(constraints)
-    .then(gotStream)
-    .catch(logError);
+  .then(gotStream)
+  .catch(logError);
 } else if (navigator.getUserMedia && 'MediaRecorder' in window) {
   navigator.getUserMedia(
     constraints,
