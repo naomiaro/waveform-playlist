@@ -1,6 +1,6 @@
 var userMediaStream;
 var playlist;
-var constraints = { audio: true };
+var constraints = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
 
 navigator.getUserMedia = (navigator.getUserMedia ||
   navigator.webkitGetUserMedia ||
