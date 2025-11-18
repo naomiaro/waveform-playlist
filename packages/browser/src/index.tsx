@@ -296,9 +296,6 @@ class WaveformPlaylistClass {
                 this.setTrackGain(trackId, newGain);
               }}
             />
-            <div style={{ fontSize: '11px', marginTop: '4px', color: '#666' }}>
-              {Math.round(gain * 100)}%
-            </div>
           </VolumeSliderWrapper>
         </Controls>
       );
@@ -309,16 +306,16 @@ class WaveformPlaylistClass {
         <PlaylistInfoContext.Provider value={playlistInfo}>
           <ThemeProvider theme={theme}>
             <div style={{ fontFamily: 'Arial, sans-serif' }}>
-              {showTimescale && (
-                <StyledTimeScale
-                  duration={maxDuration * 1000}
-                  marker={10000}
-                  bigStep={5000}
-                  secondStep={1000}
-                />
-              )}
               <Playlist theme={theme}>
                 <>
+                  {showTimescale && (
+                    <StyledTimeScale
+                      duration={maxDuration * 1000}
+                      marker={10000}
+                      bigStep={5000}
+                      secondStep={1000}
+                    />
+                  )}
                   {this.tracks.map((track) => {
                     const peaksData = this.peaksData.get(track.id);
                     if (!peaksData) return null;

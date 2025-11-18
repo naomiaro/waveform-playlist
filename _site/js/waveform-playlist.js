@@ -102100,19 +102100,19 @@ class WaveformPlaylistClass {
                                 }, style: {
                                     backgroundColor: soloed ? '#51cf66' : '#f0f0f0',
                                     fontWeight: soloed ? 'bold' : 'normal',
-                                }, children: soloed ? 'S' : 'S' })] }), (0, jsx_runtime_1.jsxs)(ui_components_1.VolumeSliderWrapper, { children: [(0, jsx_runtime_1.jsx)(ui_components_1.VolumeSlider, { min: 0, max: 200, value: gain * 100, onChange: (e) => {
-                                    const newGain = parseInt(e.currentTarget.value) / 100;
-                                    setGain(newGain);
-                                    this.setTrackGain(trackId, newGain);
-                                } }), (0, jsx_runtime_1.jsxs)("div", { style: { fontSize: '11px', marginTop: '4px', color: '#666' }, children: [Math.round(gain * 100), "%"] })] })] }));
+                                }, children: soloed ? 'S' : 'S' })] }), (0, jsx_runtime_1.jsx)(ui_components_1.VolumeSliderWrapper, { children: (0, jsx_runtime_1.jsx)(ui_components_1.VolumeSlider, { min: 0, max: 200, value: gain * 100, onChange: (e) => {
+                                const newGain = parseInt(e.currentTarget.value) / 100;
+                                setGain(newGain);
+                                this.setTrackGain(trackId, newGain);
+                            } }) })] }));
         };
-        this.root.render((0, jsx_runtime_1.jsx)(ui_components_1.DevicePixelRatioProvider, { children: (0, jsx_runtime_1.jsx)(ui_components_1.PlaylistInfoContext.Provider, { value: playlistInfo, children: (0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { fontFamily: 'Arial, sans-serif' }, children: [showTimescale && ((0, jsx_runtime_1.jsx)(ui_components_1.StyledTimeScale, { duration: maxDuration * 1000, marker: 10000, bigStep: 5000, secondStep: 1000 })), (0, jsx_runtime_1.jsx)(ui_components_1.Playlist, { theme: theme, children: (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: this.tracks.map((track) => {
-                                        const peaksData = this.peaksData.get(track.id);
-                                        if (!peaksData)
-                                            return null;
-                                        const trackControls = showControls ? ((0, jsx_runtime_1.jsx)(TrackControls, { trackId: track.id, track: track })) : (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, {});
-                                        return ((0, jsx_runtime_1.jsx)(ui_components_1.TrackControlsContext.Provider, { value: trackControls, children: (0, jsx_runtime_1.jsx)(ui_components_1.Track, { numChannels: peaksData.data.length, children: (0, jsx_runtime_1.jsx)(WaveformDisplay, { trackId: track.id }) }) }, track.id));
-                                    }) }) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }) }) }));
+        this.root.render((0, jsx_runtime_1.jsx)(ui_components_1.DevicePixelRatioProvider, { children: (0, jsx_runtime_1.jsx)(ui_components_1.PlaylistInfoContext.Provider, { value: playlistInfo, children: (0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { fontFamily: 'Arial, sans-serif' }, children: [(0, jsx_runtime_1.jsx)(ui_components_1.Playlist, { theme: theme, children: (0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [showTimescale && ((0, jsx_runtime_1.jsx)(ui_components_1.StyledTimeScale, { duration: maxDuration * 1000, marker: 10000, bigStep: 5000, secondStep: 1000 })), this.tracks.map((track) => {
+                                            const peaksData = this.peaksData.get(track.id);
+                                            if (!peaksData)
+                                                return null;
+                                            const trackControls = showControls ? ((0, jsx_runtime_1.jsx)(TrackControls, { trackId: track.id, track: track })) : (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, {});
+                                            return ((0, jsx_runtime_1.jsx)(ui_components_1.TrackControlsContext.Provider, { value: trackControls, children: (0, jsx_runtime_1.jsx)(ui_components_1.Track, { numChannels: peaksData.data.length, children: (0, jsx_runtime_1.jsx)(WaveformDisplay, { trackId: track.id }) }) }, track.id));
+                                        })] }) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }) }) }));
     }
     play(startTime) {
         return __awaiter(this, void 0, void 0, function* () {
