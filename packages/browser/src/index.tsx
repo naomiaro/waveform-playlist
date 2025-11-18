@@ -92,6 +92,9 @@ class WaveformPlaylistClass {
   private setProgressFn: ((progress: number) => void) | null = null;
   private isAutomaticScroll: boolean = false;
   private scrollContainer: HTMLElement | null = null;
+  private selectionStart: number = 0;
+  private selectionEnd: number = 0;
+  private timeFormat: string = 'hh:mm:ss.uuu';
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
@@ -687,6 +690,9 @@ class WaveformPlaylistClass {
       this.setProgressFn(newTime);
     }
 
+    // Update selection to the clicked time
+    this.setSelection(newTime, newTime);
+
     // Emit timeupdate event so UI elements like time inputs update
     if (this.eventEmitter) {
       this.eventEmitter.emit('timeupdate', newTime);
@@ -736,6 +742,52 @@ class WaveformPlaylistClass {
   setTrackSolo(trackId: string, soloed: boolean): void {
     if (this.playout) {
       this.playout.setSolo(trackId, soloed);
+    }
+  }
+
+  private formatTime(seconds: number): string {
+    const clockFormat = (secs: number, decimals: number): string => {
+      const hours = Math.floor(secs / 3600) % 24;
+      const minutes = Math.floor(secs / 60) % 60;
+      const s = (secs % 60).toFixed(decimals);
+
+      return String(hours).padStart(2, '0') + ':' +
+             String(minutes).padStart(2, '0') + ':' +
+             s.padStart(decimals + 3, '0');
+    };
+
+    const formats: Record<string, (s: number) => string> = {
+      'seconds': (s) => s.toFixed(0),
+      'thousandths': (s) => s.toFixed(3),
+      'hh:mm:ss': (s) => clockFormat(s, 0),
+      'hh:mm:ss.u': (s) => clockFormat(s, 1),
+      'hh:mm:ss.uu': (s) => clockFormat(s, 2),
+      'hh:mm:ss.uuu': (s) => clockFormat(s, 3),
+    };
+
+    const formatter = formats[this.timeFormat] || formats['hh:mm:ss.uuu'];
+    return formatter(seconds);
+  }
+
+  private updateSelectionInputs(): void {
+    const audioStart = document.getElementById('audio_start') as HTMLInputElement;
+    const audioEnd = document.getElementById('audio_end') as HTMLInputElement;
+
+    if (audioStart) {
+      audioStart.value = this.formatTime(this.selectionStart);
+    }
+    if (audioEnd) {
+      audioEnd.value = this.formatTime(this.selectionEnd);
+    }
+  }
+
+  setSelection(start: number, end: number): void {
+    this.selectionStart = start;
+    this.selectionEnd = end;
+    this.updateSelectionInputs();
+
+    if (this.eventEmitter) {
+      this.eventEmitter.emit('select', start, end);
     }
   }
 
@@ -857,6 +909,13 @@ class WaveformPlaylistClass {
               self.addTrack(args[0]).catch((error) => {
                 console.error('Failed to add new track:', error);
               });
+            }
+            break;
+          case 'durationformat':
+            // Update time format and refresh selection inputs
+            if (args[0]) {
+              self.timeFormat = args[0];
+              self.updateSelectionInputs();
             }
             break;
         }
