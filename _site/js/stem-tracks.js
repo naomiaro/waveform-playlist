@@ -2,16 +2,11 @@ var playlist = WaveformPlaylist.init({
   samplesPerPixel: 1000,
   waveHeight: 100,
   container: document.getElementById("playlist"),
-  timescale: true,
-  state: "cursor",
   colors: {
     waveOutlineColor: "#005BBB",
+    waveFillColor: "#f0f0f0",
+    waveProgressColor: "#ff0000",
   },
-  controls: {
-    show: true, //whether or not to include the track controls
-    width: 200, //width of controls in pixels
-  },
-  zoomLevels: [500, 1000, 3000, 5000],
 });
 
 playlist
@@ -34,5 +29,31 @@ playlist
     },
   ])
   .then(function () {
-    //can do stuff with the playlist.
+    console.log("Stem tracks loaded with new React architecture!");
+    console.log("Using Tone.js 15.1.22 for multitrack playback");
+
+    // Wire up playback controls
+    var ee = playlist.getEventEmitter();
+
+    document.querySelector(".btn-play").addEventListener("click", function () {
+      ee.emit("play");
+    });
+
+    document.querySelector(".btn-pause").addEventListener("click", function () {
+      ee.emit("pause");
+    });
+
+    document.querySelector(".btn-stop").addEventListener("click", function () {
+      ee.emit("stop");
+    });
+
+    // Wire up master gain slider if it exists
+    var masterGainSlider = document.getElementById("master-gain");
+    if (masterGainSlider) {
+      masterGainSlider.addEventListener("input", function (e) {
+        var gain = parseFloat(e.target.value) / 100;
+        // TODO: Implement master gain control
+        console.log("Master gain:", gain);
+      });
+    }
   });
