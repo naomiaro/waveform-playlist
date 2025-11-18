@@ -2,6 +2,7 @@ import { useDevicePixelRatio, DevicePixelRatioProvider } from './DevicePixelRati
 import { usePlaylistInfo, PlaylistInfoContext } from './PlaylistInfo';
 import { useTheme } from './Theme';
 import { useTrackControls, TrackControlsContext } from './TrackControls';
+import { PlayoutProvider, usePlayoutStatus, usePlayoutStatusUpdate } from './Playout';
 
 export {
   useDevicePixelRatio,
@@ -11,4 +12,7 @@ export {
   useTrackControls,
   PlaylistInfoContext,
   TrackControlsContext,
+  PlayoutProvider,
+  usePlayoutStatus,
+  usePlayoutStatusUpdate,
 };

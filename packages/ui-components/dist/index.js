@@ -41,6 +41,7 @@ __export(index_exports, {
   Playhead: () => Playhead,
   Playlist: () => Playlist,
   PlaylistInfoContext: () => PlaylistInfoContext,
+  PlayoutProvider: () => PlayoutProvider,
   Slider: () => Slider,
   SliderWrapper: () => SliderWrapper,
   SmartChannel: () => SmartChannel,
@@ -55,6 +56,8 @@ __export(index_exports, {
   VolumeUpIcon: () => VolumeUpIcon,
   useDevicePixelRatio: () => useDevicePixelRatio,
   usePlaylistInfo: () => usePlaylistInfo,
+  usePlayoutStatus: () => usePlayoutStatus,
+  usePlayoutStatusUpdate: () => usePlayoutStatusUpdate,
   useTheme: () => useTheme,
   useTrackControls: () => useTrackControls,
   useWaveformData: () => useWaveformData
@@ -289,13 +292,37 @@ var import_jsx_runtime6 = require("react/jsx-runtime");
 var TrackControlsContext = (0, import_react6.createContext)(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_react6.Fragment, {}));
 var useTrackControls = () => (0, import_react6.useContext)(TrackControlsContext);
 
-// src/components/SmartChannel.tsx
+// src/contexts/Playout.tsx
+var import_react7 = require("react");
 var import_jsx_runtime7 = require("react/jsx-runtime");
+var defaultProgress = 0;
+var defaultIsPlaying = false;
+var defaultPlayout = {
+  progress: defaultProgress,
+  isPlaying: defaultIsPlaying
+};
+var PlayoutStatusContext = (0, import_react7.createContext)(defaultPlayout);
+var PlayoutStatusUpdateContext = (0, import_react7.createContext)({
+  setIsPlaying: () => {
+  },
+  setProgress: () => {
+  }
+});
+var PlayoutProvider = ({ children }) => {
+  const [isPlaying, setIsPlaying] = (0, import_react7.useState)(defaultIsPlaying);
+  const [progress, setProgress] = (0, import_react7.useState)(defaultProgress);
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(PlayoutStatusUpdateContext.Provider, { value: { setIsPlaying, setProgress }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(PlayoutStatusContext.Provider, { value: { isPlaying, progress }, children }) });
+};
+var usePlayoutStatus = () => (0, import_react7.useContext)(PlayoutStatusContext);
+var usePlayoutStatusUpdate = () => (0, import_react7.useContext)(PlayoutStatusUpdateContext);
+
+// src/components/SmartChannel.tsx
+var import_jsx_runtime8 = require("react/jsx-runtime");
 var SmartChannel = (props) => {
   const theme = useTheme();
   const { waveHeight } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
     Channel,
     {
       ...props,
@@ -307,10 +334,10 @@ var SmartChannel = (props) => {
 };
 
 // src/components/SmartScale.tsx
-var import_react8 = require("react");
+var import_react9 = require("react");
 
 // src/components/TimeScale.tsx
-var import_react7 = require("react");
+var import_react8 = require("react");
 var import_styled_components5 = __toESM(require("styled-components"));
 
 // src/utils/conversions.ts
@@ -319,7 +346,7 @@ function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
 }
 
 // src/components/TimeScale.tsx
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function formatTime(milliseconds) {
   const seconds = Math.floor(milliseconds / 1e3);
   const s = seconds % 60;
@@ -354,15 +381,15 @@ var TimeScale = (props) => {
   } = props;
   const canvasInfo = /* @__PURE__ */ new Map();
   const timeMarkers = [];
-  const canvasRef = (0, import_react7.useRef)(null);
+  const canvasRef = (0, import_react8.useRef)(null);
   const {
     sampleRate,
     samplesPerPixel,
     timeScaleHeight,
     controls: { show: showControls, width: controlWidth }
-  } = (0, import_react7.useContext)(PlaylistInfoContext);
+  } = (0, import_react8.useContext)(PlaylistInfoContext);
   const devicePixelRatio = useDevicePixelRatio();
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     if (canvasRef.current !== null) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
@@ -395,7 +422,7 @@ var TimeScale = (props) => {
     if (counter % marker === 0) {
       const timestamp = formatTime(counter);
       timeMarkers.push(
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(TimeStamp, { $left: pix, children: timestamp }, timestamp)
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(TimeStamp, { $left: pix, children: timestamp }, timestamp)
       );
       canvasInfo.set(pix, timeScaleHeight);
     } else if (counter % bigStep === 0) {
@@ -405,7 +432,7 @@ var TimeScale = (props) => {
     }
     counter += secondStep;
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
     PlaylistTimeScaleScroll,
     {
       $cssWidth: widthX,
@@ -413,7 +440,7 @@ var TimeScale = (props) => {
       $timeScaleHeight: timeScaleHeight,
       children: [
         timeMarkers,
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           TimeTicks,
           {
             $cssWidth: widthX,
@@ -430,7 +457,7 @@ var TimeScale = (props) => {
 var StyledTimeScale = (0, import_styled_components5.withTheme)(TimeScale);
 
 // src/components/SmartScale.tsx
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_jsx_runtime10 = require("react/jsx-runtime");
 var timeinfo = /* @__PURE__ */ new Map([
   [
     700,
@@ -504,9 +531,9 @@ function getScaleInfo(samplesPerPixel) {
   return config;
 }
 var SmartScale = () => {
-  const { samplesPerPixel, duration } = (0, import_react8.useContext)(PlaylistInfoContext);
+  const { samplesPerPixel, duration } = (0, import_react9.useContext)(PlaylistInfoContext);
   let config = getScaleInfo(samplesPerPixel);
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
     StyledTimeScale,
     {
       marker: config.marker,
@@ -518,11 +545,11 @@ var SmartScale = () => {
 };
 
 // src/components/SmartTrack.tsx
-var import_react9 = require("react");
+var import_react10 = require("react");
 
 // src/components/Track.tsx
 var import_styled_components6 = __toESM(require("styled-components"));
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 var Container = import_styled_components6.default.div`
   height: ${(props) => props.$waveHeight * props.$numChannels}px;
   margin-left: ${(props) => props.$controlWidth}px;
@@ -547,7 +574,7 @@ var Track = ({
     controls: { show, width }
   } = usePlaylistInfo();
   const controls = useTrackControls();
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
     Container,
     {
       $numChannels: numChannels,
@@ -555,15 +582,15 @@ var Track = ({
       $waveHeight: waveHeight,
       $controlWidth: show ? width : 0,
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ControlsWrapper, { $controlWidth: show ? width : 0, children: controls }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ChannelContainer, { children })
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ControlsWrapper, { $controlWidth: show ? width : 0, children: controls }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ChannelContainer, { children })
       ]
     }
   );
 };
 
 // src/components/SmartTrack.tsx
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 function parseData(waveform, channel) {
   const peakLength = waveform.length;
   let data;
@@ -583,8 +610,8 @@ var WaveformDataTrack = ({
 }) => {
   const { samplesPerPixel } = usePlaylistInfo();
   const waveform = waveformData.resample({ scale: samplesPerPixel });
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
+    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       SmartChannel,
       {
         data: parseData(waveform, i),
@@ -601,9 +628,9 @@ var SmartTrack = ({
   type
 }) => {
   const { data: waveformData } = useWaveformData(dataUri, type);
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_react9.Fragment, { children: [
-    !waveformData && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Track, { numChannels: 0 }),
-    waveformData && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(WaveformDataTrack, { waveformData })
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_react10.Fragment, { children: [
+    !waveformData && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Track, { numChannels: 0 }),
+    waveformData && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(WaveformDataTrack, { waveformData })
   ] });
 };
 
@@ -749,9 +776,9 @@ var SliderWrapper = import_styled_components14.default.label`
 `;
 
 // src/components/TrackControls/Knob.tsx
-var import_react10 = __toESM(require("react"));
+var import_react11 = __toESM(require("react"));
 var import_styled_components15 = __toESM(require("styled-components"));
-var import_jsx_runtime12 = require("react/jsx-runtime");
+var import_jsx_runtime13 = require("react/jsx-runtime");
 var KnobContainer = import_styled_components15.default.div`
   display: flex;
   flex-direction: column;
@@ -776,18 +803,18 @@ var Knob = ({
   label,
   size = 40
 }) => {
-  const [isDragging, setIsDragging] = (0, import_react10.useState)(false);
-  const startYRef = (0, import_react10.useRef)(0);
-  const startValueRef = (0, import_react10.useRef)(0);
+  const [isDragging, setIsDragging] = (0, import_react11.useState)(false);
+  const startYRef = (0, import_react11.useRef)(0);
+  const startValueRef = (0, import_react11.useRef)(0);
   const normalizedValue = (value - min) / (max - min);
   const angle = -135 + normalizedValue * 270;
-  const handleMouseDown = (0, import_react10.useCallback)((e) => {
+  const handleMouseDown = (0, import_react11.useCallback)((e) => {
     setIsDragging(true);
     startYRef.current = e.clientY;
     startValueRef.current = value;
     e.preventDefault();
   }, [value]);
-  const handleMouseMove = (0, import_react10.useCallback)((e) => {
+  const handleMouseMove = (0, import_react11.useCallback)((e) => {
     if (!isDragging) return;
     const deltaY = startYRef.current - e.clientY;
     const range = max - min;
@@ -796,10 +823,10 @@ var Knob = ({
     const newValue = Math.max(min, Math.min(max, startValueRef.current + delta));
     onChange(newValue);
   }, [isDragging, min, max, onChange]);
-  const handleMouseUp = (0, import_react10.useCallback)(() => {
+  const handleMouseUp = (0, import_react11.useCallback)(() => {
     setIsDragging(false);
   }, []);
-  import_react10.default.useEffect(() => {
+  import_react11.default.useEffect(() => {
     if (isDragging) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
@@ -816,15 +843,15 @@ var Knob = ({
   const indicatorAngle = angle * Math.PI / 180;
   const indicatorX = centerX + Math.cos(indicatorAngle) * (radius - 6);
   const indicatorY = centerY + Math.sin(indicatorAngle) * (radius - 6);
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(KnobContainer, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(KnobContainer, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
       KnobSvg,
       {
         width: size,
         height: size,
         onMouseDown: handleMouseDown,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
             "circle",
             {
               cx: centerX,
@@ -835,7 +862,7 @@ var Knob = ({
               strokeWidth: "2"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
             "path",
             {
               d: `M ${centerX + Math.cos(-2.356) * radius} ${centerY + Math.sin(-2.356) * radius}
@@ -848,7 +875,7 @@ var Knob = ({
               strokeLinecap: "round"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
             "circle",
             {
               cx: indicatorX,
@@ -860,7 +887,7 @@ var Knob = ({
         ]
       }
     ),
-    label && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(KnobLabel, { children: label })
+    label && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(KnobLabel, { children: label })
   ] });
 };
 // Annotate the CommonJS export names for ESM import in node:
@@ -876,6 +903,7 @@ var Knob = ({
   Playhead,
   Playlist,
   PlaylistInfoContext,
+  PlayoutProvider,
   Slider,
   SliderWrapper,
   SmartChannel,
@@ -890,6 +918,8 @@ var Knob = ({
   VolumeUpIcon,
   useDevicePixelRatio,
   usePlaylistInfo,
+  usePlayoutStatus,
+  usePlayoutStatusUpdate,
   useTheme,
   useTrackControls,
   useWaveformData

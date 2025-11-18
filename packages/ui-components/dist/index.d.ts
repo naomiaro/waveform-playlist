@@ -1,7 +1,7 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
 import WaveformData from 'waveform-data';
 import * as react from 'react';
-import react__default, { FunctionComponent, ReactNode } from 'react';
+import react__default, { FunctionComponent, ReactNode, Dispatch, SetStateAction } from 'react';
 import { Peaks, Bits } from '@waveform-playlist/webaudio-peaks';
 import * as styled_components_dist_utils_hoist from 'styled-components/dist/utils/hoist';
 import * as styled_components from 'styled-components';
@@ -17,7 +17,7 @@ type RenderProps = {
     loading: boolean;
     error?: Error;
 };
-type Props$1 = {
+type Props$2 = {
     location: Location;
     type: Type;
     children: (args: RenderProps) => JSX.Element;
@@ -44,7 +44,7 @@ declare function useWaveformData(location: Location, type: Type): {
  *  }}
  * </BBCWaveformData>
  */
-declare const BBCWaveformData: ({ location, type, children }: Props$1) => react_jsx_runtime.JSX.Element;
+declare const BBCWaveformData: ({ location, type, children }: Props$2) => react_jsx_runtime.JSX.Element;
 
 interface ChannelProps {
     className?: string;
@@ -152,10 +152,10 @@ interface KnobProps {
 }
 declare const Knob: react__default.FC<KnobProps>;
 
-type Props = {
+type Props$1 = {
     children: ReactNode;
 };
-declare const DevicePixelRatioProvider: ({ children }: Props) => react_jsx_runtime.JSX.Element;
+declare const DevicePixelRatioProvider: ({ children }: Props$1) => react_jsx_runtime.JSX.Element;
 declare const useDevicePixelRatio: () => number;
 
 type Controls = {
@@ -179,4 +179,18 @@ declare const useTheme: () => styled_components.DefaultTheme | undefined;
 declare const TrackControlsContext: react__default.Context<react_jsx_runtime.JSX.Element>;
 declare const useTrackControls: () => react_jsx_runtime.JSX.Element;
 
-export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Knob, Playhead, type PlayheadProps, Playlist, PlaylistInfoContext, type PlaylistProps, type Props$1 as Props, Slider, SliderWrapper, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };
+type PlayoutStatusUpdate = {
+    setIsPlaying: Dispatch<SetStateAction<boolean>>;
+    setProgress: Dispatch<SetStateAction<number>>;
+};
+type Props = {
+    children: ReactNode;
+};
+declare const PlayoutProvider: ({ children }: Props) => react_jsx_runtime.JSX.Element;
+declare const usePlayoutStatus: () => {
+    progress: number;
+    isPlaying: boolean;
+};
+declare const usePlayoutStatusUpdate: () => PlayoutStatusUpdate;
+
+export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Knob, Playhead, type PlayheadProps, Playlist, PlaylistInfoContext, type PlaylistProps, PlayoutProvider, type Props$2 as Props, Slider, SliderWrapper, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, usePlayoutStatus, usePlayoutStatusUpdate, useTheme, useTrackControls, useWaveformData };

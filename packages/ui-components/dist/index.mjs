@@ -226,13 +226,41 @@ import { jsx as jsx6 } from "react/jsx-runtime";
 var TrackControlsContext = createContext3(/* @__PURE__ */ jsx6(Fragment2, {}));
 var useTrackControls = () => useContext4(TrackControlsContext);
 
-// src/components/SmartChannel.tsx
+// src/contexts/Playout.tsx
+import {
+  useState as useState2,
+  createContext as createContext4,
+  useContext as useContext5
+} from "react";
 import { jsx as jsx7 } from "react/jsx-runtime";
+var defaultProgress = 0;
+var defaultIsPlaying = false;
+var defaultPlayout = {
+  progress: defaultProgress,
+  isPlaying: defaultIsPlaying
+};
+var PlayoutStatusContext = createContext4(defaultPlayout);
+var PlayoutStatusUpdateContext = createContext4({
+  setIsPlaying: () => {
+  },
+  setProgress: () => {
+  }
+});
+var PlayoutProvider = ({ children }) => {
+  const [isPlaying, setIsPlaying] = useState2(defaultIsPlaying);
+  const [progress, setProgress] = useState2(defaultProgress);
+  return /* @__PURE__ */ jsx7(PlayoutStatusUpdateContext.Provider, { value: { setIsPlaying, setProgress }, children: /* @__PURE__ */ jsx7(PlayoutStatusContext.Provider, { value: { isPlaying, progress }, children }) });
+};
+var usePlayoutStatus = () => useContext5(PlayoutStatusContext);
+var usePlayoutStatusUpdate = () => useContext5(PlayoutStatusUpdateContext);
+
+// src/components/SmartChannel.tsx
+import { jsx as jsx8 } from "react/jsx-runtime";
 var SmartChannel = (props) => {
   const theme = useTheme();
   const { waveHeight } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
-  return /* @__PURE__ */ jsx7(
+  return /* @__PURE__ */ jsx8(
     Channel,
     {
       ...props,
@@ -244,10 +272,10 @@ var SmartChannel = (props) => {
 };
 
 // src/components/SmartScale.tsx
-import { useContext as useContext6 } from "react";
+import { useContext as useContext7 } from "react";
 
 // src/components/TimeScale.tsx
-import { useRef, useEffect as useEffect2, useContext as useContext5 } from "react";
+import { useRef, useEffect as useEffect2, useContext as useContext6 } from "react";
 import styled4, { withTheme as withTheme2 } from "styled-components";
 
 // src/utils/conversions.ts
@@ -256,7 +284,7 @@ function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
 }
 
 // src/components/TimeScale.tsx
-import { jsx as jsx8, jsxs as jsxs2 } from "react/jsx-runtime";
+import { jsx as jsx9, jsxs as jsxs2 } from "react/jsx-runtime";
 function formatTime(milliseconds) {
   const seconds = Math.floor(milliseconds / 1e3);
   const s = seconds % 60;
@@ -297,7 +325,7 @@ var TimeScale = (props) => {
     samplesPerPixel,
     timeScaleHeight,
     controls: { show: showControls, width: controlWidth }
-  } = useContext5(PlaylistInfoContext);
+  } = useContext6(PlaylistInfoContext);
   const devicePixelRatio = useDevicePixelRatio();
   useEffect2(() => {
     if (canvasRef.current !== null) {
@@ -332,7 +360,7 @@ var TimeScale = (props) => {
     if (counter % marker === 0) {
       const timestamp = formatTime(counter);
       timeMarkers.push(
-        /* @__PURE__ */ jsx8(TimeStamp, { $left: pix, children: timestamp }, timestamp)
+        /* @__PURE__ */ jsx9(TimeStamp, { $left: pix, children: timestamp }, timestamp)
       );
       canvasInfo.set(pix, timeScaleHeight);
     } else if (counter % bigStep === 0) {
@@ -350,7 +378,7 @@ var TimeScale = (props) => {
       $timeScaleHeight: timeScaleHeight,
       children: [
         timeMarkers,
-        /* @__PURE__ */ jsx8(
+        /* @__PURE__ */ jsx9(
           TimeTicks,
           {
             $cssWidth: widthX,
@@ -367,7 +395,7 @@ var TimeScale = (props) => {
 var StyledTimeScale = withTheme2(TimeScale);
 
 // src/components/SmartScale.tsx
-import { jsx as jsx9 } from "react/jsx-runtime";
+import { jsx as jsx10 } from "react/jsx-runtime";
 var timeinfo = /* @__PURE__ */ new Map([
   [
     700,
@@ -441,9 +469,9 @@ function getScaleInfo(samplesPerPixel) {
   return config;
 }
 var SmartScale = () => {
-  const { samplesPerPixel, duration } = useContext6(PlaylistInfoContext);
+  const { samplesPerPixel, duration } = useContext7(PlaylistInfoContext);
   let config = getScaleInfo(samplesPerPixel);
-  return /* @__PURE__ */ jsx9(
+  return /* @__PURE__ */ jsx10(
     StyledTimeScale,
     {
       marker: config.marker,
@@ -459,7 +487,7 @@ import { Fragment as Fragment3 } from "react";
 
 // src/components/Track.tsx
 import styled5 from "styled-components";
-import { jsx as jsx10, jsxs as jsxs3 } from "react/jsx-runtime";
+import { jsx as jsx11, jsxs as jsxs3 } from "react/jsx-runtime";
 var Container = styled5.div`
   height: ${(props) => props.$waveHeight * props.$numChannels}px;
   margin-left: ${(props) => props.$controlWidth}px;
@@ -492,15 +520,15 @@ var Track = ({
       $waveHeight: waveHeight,
       $controlWidth: show ? width : 0,
       children: [
-        /* @__PURE__ */ jsx10(ControlsWrapper, { $controlWidth: show ? width : 0, children: controls }),
-        /* @__PURE__ */ jsx10(ChannelContainer, { children })
+        /* @__PURE__ */ jsx11(ControlsWrapper, { $controlWidth: show ? width : 0, children: controls }),
+        /* @__PURE__ */ jsx11(ChannelContainer, { children })
       ]
     }
   );
 };
 
 // src/components/SmartTrack.tsx
-import { jsx as jsx11, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx12, jsxs as jsxs4 } from "react/jsx-runtime";
 function parseData(waveform, channel) {
   const peakLength = waveform.length;
   let data;
@@ -520,8 +548,8 @@ var WaveformDataTrack = ({
 }) => {
   const { samplesPerPixel } = usePlaylistInfo();
   const waveform = waveformData.resample({ scale: samplesPerPixel });
-  return /* @__PURE__ */ jsx11(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
-    return /* @__PURE__ */ jsx11(
+  return /* @__PURE__ */ jsx12(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
+    return /* @__PURE__ */ jsx12(
       SmartChannel,
       {
         data: parseData(waveform, i),
@@ -539,8 +567,8 @@ var SmartTrack = ({
 }) => {
   const { data: waveformData } = useWaveformData(dataUri, type);
   return /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    !waveformData && /* @__PURE__ */ jsx11(Track, { numChannels: 0 }),
-    waveformData && /* @__PURE__ */ jsx11(WaveformDataTrack, { waveformData })
+    !waveformData && /* @__PURE__ */ jsx12(Track, { numChannels: 0 }),
+    waveformData && /* @__PURE__ */ jsx12(WaveformDataTrack, { waveformData })
   ] });
 };
 
@@ -686,9 +714,9 @@ var SliderWrapper = styled13.label`
 `;
 
 // src/components/TrackControls/Knob.tsx
-import React8, { useRef as useRef2, useState as useState2, useCallback as useCallback2 } from "react";
+import React9, { useRef as useRef2, useState as useState3, useCallback as useCallback2 } from "react";
 import styled14 from "styled-components";
-import { jsx as jsx12, jsxs as jsxs5 } from "react/jsx-runtime";
+import { jsx as jsx13, jsxs as jsxs5 } from "react/jsx-runtime";
 var KnobContainer = styled14.div`
   display: flex;
   flex-direction: column;
@@ -713,7 +741,7 @@ var Knob = ({
   label,
   size = 40
 }) => {
-  const [isDragging, setIsDragging] = useState2(false);
+  const [isDragging, setIsDragging] = useState3(false);
   const startYRef = useRef2(0);
   const startValueRef = useRef2(0);
   const normalizedValue = (value - min) / (max - min);
@@ -736,7 +764,7 @@ var Knob = ({
   const handleMouseUp = useCallback2(() => {
     setIsDragging(false);
   }, []);
-  React8.useEffect(() => {
+  React9.useEffect(() => {
     if (isDragging) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
@@ -761,7 +789,7 @@ var Knob = ({
         height: size,
         onMouseDown: handleMouseDown,
         children: [
-          /* @__PURE__ */ jsx12(
+          /* @__PURE__ */ jsx13(
             "circle",
             {
               cx: centerX,
@@ -772,7 +800,7 @@ var Knob = ({
               strokeWidth: "2"
             }
           ),
-          /* @__PURE__ */ jsx12(
+          /* @__PURE__ */ jsx13(
             "path",
             {
               d: `M ${centerX + Math.cos(-2.356) * radius} ${centerY + Math.sin(-2.356) * radius}
@@ -785,7 +813,7 @@ var Knob = ({
               strokeLinecap: "round"
             }
           ),
-          /* @__PURE__ */ jsx12(
+          /* @__PURE__ */ jsx13(
             "circle",
             {
               cx: indicatorX,
@@ -797,7 +825,7 @@ var Knob = ({
         ]
       }
     ),
-    label && /* @__PURE__ */ jsx12(KnobLabel, { children: label })
+    label && /* @__PURE__ */ jsx13(KnobLabel, { children: label })
   ] });
 };
 export {
@@ -812,6 +840,7 @@ export {
   Playhead,
   Playlist,
   PlaylistInfoContext,
+  PlayoutProvider,
   Slider,
   SliderWrapper,
   SmartChannel,
@@ -826,6 +855,8 @@ export {
   VolumeUpIcon,
   useDevicePixelRatio,
   usePlaylistInfo,
+  usePlayoutStatus,
+  usePlayoutStatusUpdate,
   useTheme,
   useTrackControls,
   useWaveformData

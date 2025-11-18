@@ -23,6 +23,9 @@ import {
   PlaylistInfoContext,
   DevicePixelRatioProvider,
   TrackControlsContext,
+  PlayoutProvider,
+  usePlayoutStatus,
+  usePlayoutStatusUpdate,
 } from '@waveform-playlist/ui-components';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
@@ -183,6 +186,31 @@ class WaveformPlaylistClass {
     const samplesPerPixel = this.config.samplesPerPixel || 4096;
     const timeScaleHeight = 30;
 
+    // Move the playlist content into a separate component
+    const PlaylistContent: React.FC = () => {
+      const { progress: currentTime } = usePlayoutStatus();
+      const { setProgress } = usePlayoutStatusUpdate();
+      const animationRef = React.useRef<number | null>(null);
+
+      // Set up animation loop to update progress
+      React.useEffect(() => {
+        const updateProgress = () => {
+          if (this.playout) {
+            const currentTime = this.playout.getCurrentTime();
+            setProgress(currentTime);
+          }
+          animationRef.current = requestAnimationFrame(updateProgress);
+        };
+
+        animationRef.current = requestAnimationFrame(updateProgress);
+
+        return () => {
+          if (animationRef.current !== null) {
+            cancelAnimationFrame(animationRef.current);
+          }
+        };
+      }, [setProgress]);
+
     // Check if controls should be shown (default: true)
     const showControls = this.config.controls?.show !== false;
     const controlsWidth = this.config.controls?.width || 250;
@@ -216,8 +244,9 @@ class WaveformPlaylistClass {
       },
     };
 
-    // Waveform component using Channel from ui-components
-    const WaveformDisplay: React.FC<{ trackId: string }> = ({ trackId }) => {
+    // Waveform component using Channel from ui-components - memoize to prevent recreation
+    const WaveformDisplay = React.useMemo(() => {
+      return React.memo<{ trackId: string; currentTime: number }>(({ trackId, currentTime }) => {
       const peaksData = this.peaksData.get(trackId);
       if (!peaksData || !this.playout) return null;
 
@@ -232,8 +261,8 @@ class WaveformPlaylistClass {
       const trackDuration = track.buffer.duration;
 
       let progressPx = 0;
-      if (this.currentTime >= trackStartTime) {
-        const relativeTime = this.currentTime - trackStartTime;
+      if (currentTime >= trackStartTime) {
+        const relativeTime = currentTime - trackStartTime;
         if (relativeTime <= trackDuration) {
           // Convert time to pixels: relativeTime * sampleRate / samplesPerPixel
           const sampleRate = this.playout.sampleRate || 44100;
@@ -262,9 +291,11 @@ class WaveformPlaylistClass {
           ))}
         </>
       );
-    };
+      });
+    }, [theme, waveHeight, samplesPerPixel]);
 
-    const TrackControls: React.FC<{ trackId: string; track: Track }> = ({ trackId, track }) => {
+    const TrackControls = React.useMemo(() => {
+      return ({ trackId, track }: { trackId: string; track: Track }) => {
       const [muted, setMuted] = React.useState(track.muted);
       const [soloed, setSoloed] = React.useState(track.soloed);
       const [gain, setGain] = React.useState(track.gain);
@@ -339,9 +370,10 @@ class WaveformPlaylistClass {
           </div>
         </Controls>
       );
-    };
+      };
+    }, []);
 
-    this.root.render(
+    return (
       <DevicePixelRatioProvider>
         <PlaylistInfoContext.Provider value={playlistInfo}>
           <ThemeProvider theme={theme}>
@@ -367,13 +399,13 @@ class WaveformPlaylistClass {
                     return (
                       <TrackControlsContext.Provider key={track.id} value={trackControls}>
                         <TrackComponent numChannels={peaksData.data.length}>
-                          <WaveformDisplay trackId={track.id} />
+                          <WaveformDisplay trackId={track.id} currentTime={currentTime} />
                         </TrackComponent>
                       </TrackControlsContext.Provider>
                     );
                   })}
                   <Playhead
-                    position={((this.currentTime * (this.playout?.sampleRate || 44100)) / samplesPerPixel) + (showControls ? controlsWidth : 0)}
+                    position={((currentTime * (this.playout?.sampleRate || 44100)) / samplesPerPixel) + (showControls ? controlsWidth : 0)}
                     color={theme.waveProgressColor || '#f00'}
                   />
                 </>
@@ -385,6 +417,14 @@ class WaveformPlaylistClass {
           </ThemeProvider>
         </PlaylistInfoContext.Provider>
       </DevicePixelRatioProvider>
+      );
+    };
+
+    // Render with PlayoutProvider wrapping everything
+    this.root.render(
+      <PlayoutProvider>
+        <PlaylistContent />
+      </PlayoutProvider>
     );
   }
 
@@ -432,7 +472,8 @@ class WaveformPlaylistClass {
     const updateProgress = () => {
       if (this.playbackState === 'playing' && this.playout) {
         this.currentTime = this.playout.getCurrentTime();
-        this.render();
+        // Don't call render() here - it causes flickering
+        // The React components will read currentTime when needed
         this.animationFrameId = requestAnimationFrame(updateProgress);
       }
     };
