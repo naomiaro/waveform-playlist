@@ -439,21 +439,32 @@ class WaveformPlaylistClass {
       };
     }, []);
 
+    // Calculate timeline width for the timescale
+    const timelineWidth = this.playout
+      ? secondsToPixels(maxDuration, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)
+      : 0;
+
     return (
       <DevicePixelRatioProvider>
         <PlaylistInfoContext.Provider value={playlistInfo}>
           <ThemeProvider theme={theme}>
             <div style={{ fontFamily: 'Arial, sans-serif' }}>
-              <Playlist theme={theme}>
-                <>
-                  {showTimescale && (
+              <Playlist
+                theme={theme}
+                backgroundColor={theme.waveOutlineColor || '#00f'}
+                timescaleWidth={timelineWidth}
+                timescale={
+                  showTimescale ? (
                     <StyledTimeScale
                       duration={maxDuration * 1000}
                       marker={10000}
                       bigStep={5000}
                       secondStep={1000}
                     />
-                  )}
+                  ) : undefined
+                }
+              >
+                <>
                   {this.tracks.map((track) => {
                     const peaksData = this.peaksData.get(track.id);
                     if (!peaksData) return null;
@@ -464,7 +475,10 @@ class WaveformPlaylistClass {
 
                     return (
                       <TrackControlsContext.Provider key={track.id} value={trackControls}>
-                        <TrackComponent numChannels={peaksData.data.length}>
+                        <TrackComponent
+                          numChannels={peaksData.data.length}
+                          backgroundColor={theme.waveOutlineColor || '#00f'}
+                        >
                           <WaveformDisplay trackId={track.id} currentTime={currentTime} />
                         </TrackComponent>
                       </TrackControlsContext.Provider>

@@ -19,6 +19,7 @@ const Container = styled.div.attrs<ContainerProps>((props) => ({
 
 interface ChannelContainerProps {
   readonly $controlWidth: number;
+  readonly $backgroundColor?: string;
 }
 const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   style: {
@@ -26,6 +27,7 @@ const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   },
 }))<ChannelContainerProps>`
   position: relative;
+  background: ${(props) => props.$backgroundColor || 'transparent'};
 `;
 
 export interface ControlsWrapperProps {
@@ -47,12 +49,14 @@ export interface TrackProps {
   className?: string;
   children?: ReactNode;
   numChannels: number;
+  backgroundColor?: string;
 }
 
 export const Track: FunctionComponent<TrackProps> = ({
   numChannels,
   children,
   className,
+  backgroundColor,
 }) => {
   const {
     waveHeight,
@@ -69,7 +73,12 @@ export const Track: FunctionComponent<TrackProps> = ({
       <ControlsWrapper $controlWidth={show ? width : 0}>
         {controls}
       </ControlsWrapper>
-      <ChannelContainer $controlWidth={show ? width : 0}>{children}</ChannelContainer>
+      <ChannelContainer
+        $controlWidth={show ? width : 0}
+        $backgroundColor={backgroundColor}
+      >
+        {children}
+      </ChannelContainer>
     </Container>
   );
 };
