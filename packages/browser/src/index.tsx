@@ -493,11 +493,17 @@ class WaveformPlaylistClass {
                       <TrackControls trackId={track.id} track={track} />
                     ) : <></>;
 
+                    // Calculate track offset in pixels based on startTime
+                    const trackOffsetPx = this.playout
+                      ? secondsToPixels(track.startTime, samplesPerPixel, this.playout.sampleRate)
+                      : 0;
+
                     return (
                       <TrackControlsContext.Provider key={track.id} value={trackControls}>
                         <TrackComponent
                           numChannels={peaksData.data.length}
                           backgroundColor={theme.waveOutlineColor || '#00f'}
+                          offset={trackOffsetPx}
                         >
                           <WaveformDisplay trackId={track.id} currentTime={currentTime} />
                         </TrackComponent>

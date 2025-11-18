@@ -20,10 +20,11 @@ const Container = styled.div.attrs<ContainerProps>((props) => ({
 interface ChannelContainerProps {
   readonly $controlWidth: number;
   readonly $backgroundColor?: string;
+  readonly $offset?: number;
 }
 const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   style: {
-    marginLeft: `${props.$controlWidth}px`,
+    marginLeft: `${props.$controlWidth + (props.$offset || 0)}px`,
   },
 }))<ChannelContainerProps>`
   position: relative;
@@ -50,6 +51,7 @@ export interface TrackProps {
   children?: ReactNode;
   numChannels: number;
   backgroundColor?: string;
+  offset?: number; // Offset in pixels to shift the waveform right
 }
 
 export const Track: FunctionComponent<TrackProps> = ({
@@ -57,6 +59,7 @@ export const Track: FunctionComponent<TrackProps> = ({
   children,
   className,
   backgroundColor,
+  offset = 0,
 }) => {
   const {
     waveHeight,
@@ -76,6 +79,7 @@ export const Track: FunctionComponent<TrackProps> = ({
       <ChannelContainer
         $controlWidth={show ? width : 0}
         $backgroundColor={backgroundColor}
+        $offset={offset}
       >
         {children}
       </ChannelContainer>

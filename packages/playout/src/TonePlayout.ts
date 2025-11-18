@@ -65,9 +65,21 @@ export class TonePlayout {
       return;
     }
 
-    // Play all tracks - mute state will control volume
-    this.tracks.forEach(track => {
-      track.play(when, offset);
+    const playbackPosition = offset ?? 0;
+
+    // Play tracks based on their individual start times
+    this.tracks.forEach((toneTrack) => {
+      const trackStartTime = toneTrack.startTime;
+
+      if (playbackPosition >= trackStartTime) {
+        // Track should be playing - calculate buffer offset and start immediately
+        const bufferOffset = playbackPosition - trackStartTime;
+        toneTrack.play(when, bufferOffset);
+      } else {
+        // Track should start later - schedule it to start when playback reaches its start time
+        const delay = trackStartTime - playbackPosition;
+        toneTrack.play(when + delay, 0);
+      }
     });
 
     // Start transport

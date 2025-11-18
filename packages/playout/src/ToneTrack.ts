@@ -102,14 +102,14 @@ export class ToneTrack {
     // Record when we started playing
     this.playStartTime = Tone.now();
 
-    // Calculate the actual start position
-    const startTime = this.track.startTime + this.pausedPosition + offset;
-    const playDuration = duration ?? (this.track.endTime ? this.track.endTime - startTime : undefined);
+    // Calculate the buffer position (not including track.startTime - that's handled by the playout scheduling)
+    const bufferPosition = this.pausedPosition + offset;
+    const playDuration = duration ?? (this.track.endTime ? this.track.endTime - bufferPosition : undefined);
 
     if (playDuration !== undefined) {
-      this.player.start(when, startTime, playDuration);
+      this.player.start(when, bufferPosition, playDuration);
     } else {
-      this.player.start(when, startTime);
+      this.player.start(when, bufferPosition);
     }
   }
 
@@ -154,5 +154,9 @@ export class ToneTrack {
 
   get muted(): boolean {
     return this.track.muted;
+  }
+
+  get startTime(): number {
+    return this.track.startTime;
   }
 }

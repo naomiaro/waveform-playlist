@@ -69,12 +69,12 @@ var ToneTrack = class {
   play(when = Tone.now(), offset = 0, duration) {
     if (this.isPlaying) return;
     this.playStartTime = Tone.now();
-    const startTime = this.track.startTime + this.pausedPosition + offset;
-    const playDuration = duration ?? (this.track.endTime ? this.track.endTime - startTime : void 0);
+    const bufferPosition = this.pausedPosition + offset;
+    const playDuration = duration ?? (this.track.endTime ? this.track.endTime - bufferPosition : void 0);
     if (playDuration !== void 0) {
-      this.player.start(when, startTime, playDuration);
+      this.player.start(when, bufferPosition, playDuration);
     } else {
-      this.player.start(when, startTime);
+      this.player.start(when, bufferPosition);
     }
   }
   pause() {
@@ -108,6 +108,9 @@ var ToneTrack = class {
   }
   get muted() {
     return this.track.muted;
+  }
+  get startTime() {
+    return this.track.startTime;
   }
 };
 
@@ -158,8 +161,16 @@ var TonePlayout = class {
       console.warn("TonePlayout not initialized. Call init() first.");
       return;
     }
-    this.tracks.forEach((track) => {
-      track.play(when, offset);
+    const playbackPosition = offset ?? 0;
+    this.tracks.forEach((toneTrack) => {
+      const trackStartTime = toneTrack.startTime;
+      if (playbackPosition >= trackStartTime) {
+        const bufferOffset = playbackPosition - trackStartTime;
+        toneTrack.play(when, bufferOffset);
+      } else {
+        const delay = trackStartTime - playbackPosition;
+        toneTrack.play(when + delay, 0);
+      }
     });
     if (offset !== void 0) {
       Tone2.getTransport().start(when, offset);

@@ -32,6 +32,7 @@ declare class ToneTrack {
     get buffer(): AudioBuffer;
     get isPlaying(): boolean;
     get muted(): boolean;
+    get startTime(): number;
 }
 
 interface TonePlayoutOptions {
