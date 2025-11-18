@@ -87,6 +87,7 @@ class WaveformPlaylistClass {
   private eventEmitter: any = null;
   private playbackState: 'stopped' | 'paused' | 'playing' = 'stopped';
   private currentTime: number = 0;
+  private hasSeeked: boolean = false; // Track if user has manually seeked (clicked timeline)
   private animationFrameId: number | null = null;
   private setProgressFn: ((progress: number) => void) | null = null;
   private isAutomaticScroll: boolean = false;
@@ -453,6 +454,8 @@ class WaveformPlaylistClass {
                 theme={theme}
                 backgroundColor={theme.waveOutlineColor || '#00f'}
                 timescaleWidth={timelineWidth}
+                onTracksClick={this.handleTracksClick}
+                scrollContainerRef={(el) => { this.scrollContainer = el; }}
                 timescale={
                   showTimescale ? (
                     <StyledTimeScale
@@ -515,13 +518,17 @@ class WaveformPlaylistClass {
       // Initialize playout on first play (requires user gesture)
       await this.playout.init();
 
-      // If resuming from pause, don't pass offset (to resume from current position)
-      // If stopped or explicit startTime provided, use that offset
-      if (this.playbackState === 'paused' && startTime === undefined) {
-        this.playout.play(undefined, undefined);
-      } else {
-        this.playout.play(undefined, startTime ?? 0);
-      }
+      console.log('Playing from:', { startTime, playbackState: this.playbackState, currentTime: this.currentTime, hasSeeked: this.hasSeeked });
+
+      // Always stop first to reset pausedPosition, then use explicit offset
+      // This ensures we always start from the correct absolute position
+      const playFrom = startTime !== undefined ? startTime : this.currentTime;
+      console.log('Playing from position:', playFrom);
+
+      this.playout.stop(); // Reset pausedPosition to 0
+      this.currentTime = playFrom;
+      this.hasSeeked = false; // Reset seek flag
+      this.playout.play(undefined, playFrom);
 
       this.playbackState = 'playing';
       this.startAnimation();
@@ -640,6 +647,63 @@ class WaveformPlaylistClass {
   setAutomaticScroll(enabled: boolean): void {
     this.isAutomaticScroll = enabled;
   }
+
+  private handleTracksClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+    console.log('Track clicked!', e);
+
+    if (!this.playout || !this.scrollContainer) {
+      console.log('No playout or scrollContainer:', { playout: this.playout, scrollContainer: this.scrollContainer });
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scrollLeft = this.scrollContainer.scrollLeft;
+    const controlsWidth = this.config.controls?.show !== false ? (this.config.controls?.width || 250) : 0;
+
+    // Calculate click position relative to timeline start
+    const clickX = e.clientX - rect.left + scrollLeft - controlsWidth;
+
+    // Convert pixels to seconds
+    const samplesPerPixel = this.config.samplesPerPixel || 4096;
+    const pixelsPerSecond = this.playout.sampleRate / samplesPerPixel;
+    const clickTime = clickX / pixelsPerSecond;
+
+    // Seek to the clicked time
+    const duration = this.getDuration();
+    const newTime = Math.max(0, Math.min(clickTime, duration));
+
+    console.log('Seeking to:', {
+      clickX,
+      pixelsPerSecond,
+      clickTime,
+      duration,
+      newTime,
+      currentTime: this.currentTime,
+      setProgressFn: !!this.setProgressFn
+    });
+
+    this.currentTime = newTime;
+    if (this.setProgressFn) {
+      this.setProgressFn(newTime);
+    }
+
+    // Emit timeupdate event so UI elements like time inputs update
+    if (this.eventEmitter) {
+      this.eventEmitter.emit('timeupdate', newTime);
+    }
+
+    // Seek to the new position
+    if (this.playbackState === 'playing') {
+      // If playing, restart from new position
+      console.log('Click during playback - restarting from', newTime);
+      this.play(newTime);
+    } else {
+      // If paused or stopped, seek without playing
+      console.log('Click while not playing - seeking to', newTime);
+      this.playout.stop(); // Reset pausedPosition to 0
+      this.hasSeeked = true; // Mark that we've seeked so play() knows to use currentTime
+    }
+  };
 
   private stopAnimation(): void {
     if (this.animationFrameId !== null) {
