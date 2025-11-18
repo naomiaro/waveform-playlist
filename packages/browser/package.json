@@ -29,9 +29,11 @@
     "@waveform-playlist/state": "workspace:*",
     "@waveform-playlist/ui-components": "workspace:*",
     "@waveform-playlist/annotations": "workspace:*",
+    "@waveform-playlist/webaudio-peaks": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "styled-components": "^6.1.8",
-    "tone": "15.1.22"
+    "tone": "15.1.22",
+    "waveform-data": "^4.4.0"
   }
 }

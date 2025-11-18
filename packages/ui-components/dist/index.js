@@ -81,22 +81,22 @@ var import_jsx_runtime2 = require("react/jsx-runtime");
 var MAX_CANVAS_WIDTH = 1e3;
 var Progress = import_styled_components.default.div`
   position: absolute;
-  background: ${(props) => props.waveProgressColor};
-  width: ${(props) => props.progress}px;
-  height: ${(props) => props.waveHeight}px;
+  background: ${(props) => props.$waveProgressColor};
+  width: ${(props) => props.$progress}px;
+  height: ${(props) => props.$waveHeight}px;
 `;
 var Waveform = import_styled_components.default.canvas`
   float: left;
   position: relative;
-  width: ${(props) => props.cssWidth}px;
-  height: ${(props) => props.waveHeight}px;
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$waveHeight}px;
 `;
 var Wrapper = import_styled_components.default.div`
   position: absolute;
-  top: ${(props) => props.waveHeight * props.index}px;
-  background: ${(props) => props.waveFillColor};
-  width: ${(props) => props.cssWidth}px;
-  height: ${(props) => props.waveHeight}px;
+  top: ${(props) => props.$waveHeight * props.$index}px;
+  background: ${(props) => props.$waveFillColor};
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$waveHeight}px;
 `;
 var Channel = (props) => {
   const {
@@ -163,10 +163,10 @@ var Channel = (props) => {
     const waveform = /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       Waveform,
       {
-        cssWidth: currentWidth,
+        $cssWidth: currentWidth,
         width: currentWidth * devicePixelRatio,
         height: waveHeight * devicePixelRatio,
-        waveHeight,
+        $waveHeight: waveHeight,
         "data-index": waveformCount,
         ref: canvasRef
       },
@@ -179,18 +179,18 @@ var Channel = (props) => {
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
     Wrapper,
     {
-      index,
-      cssWidth: length,
+      $index: index,
+      $cssWidth: length,
       className,
-      waveHeight,
-      waveFillColor,
+      $waveHeight: waveHeight,
+      $waveFillColor: waveFillColor,
       children: [
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           Progress,
           {
-            progress,
-            waveHeight,
-            waveProgressColor
+            $progress: progress,
+            $waveHeight: waveHeight,
+            $waveProgressColor: waveProgressColor
           }
         ),
         waveforms

@@ -40,11 +40,11 @@
     "@waveform-playlist/state": "workspace:*",
     "@waveform-playlist/playout": "workspace:*",
     "@waveform-playlist/loaders": "workspace:*",
+    "@waveform-playlist/webaudio-peaks": "workspace:*",
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
     "react-async-hook": "^4.0.0",
-    "waveform-data": "^4.4.0",
-    "webaudio-peaks": "^1.0.0"
+    "waveform-data": "^4.4.0"
   }
 }

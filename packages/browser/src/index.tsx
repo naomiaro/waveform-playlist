@@ -5,6 +5,9 @@ import { TonePlayout } from '@waveform-playlist/playout';
 import { LoaderFactory } from '@waveform-playlist/loaders';
 import { Track } from '@waveform-playlist/core';
 import { getContext } from 'tone';
+import { Channel } from '@waveform-playlist/ui-components';
+import { generatePeaks } from './peaksUtil';
+import type { PeakData } from '@waveform-playlist/webaudio-peaks';
 
 // Simple theme
 const defaultTheme = {
@@ -58,6 +61,7 @@ class WaveformPlaylistClass {
   private playout: TonePlayout | null = null;
   private config: PlaylistConfig;
   private tracks: Track[] = [];
+  private peaksData: Map<string, PeakData> = new Map();
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
@@ -111,6 +115,11 @@ class WaveformPlaylistClass {
 
         loadedTracks.push(track);
 
+        // Generate peaks for waveform visualization
+        const samplesPerPixel = this.config.samplesPerPixel || 4096;
+        const peaks = generatePeaks(audioBuffer, samplesPerPixel);
+        this.peaksData.set(track.id, peaks);
+
         // Add to playout engine
         if (this.playout) {
           this.playout.addTrack({
@@ -141,68 +150,38 @@ class WaveformPlaylistClass {
       ...this.config.colors,
     };
 
-    // Simple waveform visualization component
-    const WaveformCanvas: React.FC<{ trackId: string }> = ({ trackId }) => {
-      const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const waveHeight = this.config.waveHeight || 128;
+    const samplesPerPixel = this.config.samplesPerPixel || 4096;
 
-      React.useEffect(() => {
-        if (!canvasRef.current || !this.playout) return;
+    // Waveform component using Channel from ui-components
+    const WaveformDisplay: React.FC<{ trackId: string }> = ({ trackId }) => {
+      const peaksData = this.peaksData.get(trackId);
+      if (!peaksData || !this.playout) return null;
 
-        const track = this.playout.getTrack(trackId);
-        if (!track) return;
+      const track = this.playout.getTrack(trackId);
+      if (!track) return null;
 
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // Get the audio buffer from the track
-        const buffer = track.buffer;
-        if (!buffer) return;
-
-        // Set canvas size
-        const width = canvas.width;
-        const height = canvas.height;
-        const data = buffer.getChannelData(0); // Get first channel
-        const step = Math.ceil(data.length / width);
-        const amp = height / 2;
-
-        // Draw waveform
-        ctx.fillStyle = theme.waveFillColor || '#e0e0e0';
-        ctx.fillRect(0, 0, width, height);
-
-        ctx.strokeStyle = theme.waveOutlineColor || '#00f';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-
-        for (let i = 0; i < width; i++) {
-          let min = 1.0;
-          let max = -1.0;
-
-          for (let j = 0; j < step; j++) {
-            const datum = data[i * step + j];
-            if (datum < min) min = datum;
-            if (datum > max) max = datum;
-          }
-
-          ctx.moveTo(i, (1 + min) * amp);
-          ctx.lineTo(i, (1 + max) * amp);
-        }
-
-        ctx.stroke();
-      }, [trackId]);
+      const buffer = track.buffer;
+      const width = peaksData.length;
+      const totalHeight = waveHeight * peaksData.data.length;
 
       return (
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={128}
-          style={{
-            width: '100%',
-            height: '128px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-          }}
-        />
+        <div style={{ position: 'relative', width: `${width}px`, height: `${totalHeight}px`, background: '#f0f0f0' }}>
+          {peaksData.data.map((channelData, index) => (
+            <Channel
+              key={index}
+              index={index}
+              data={channelData}
+              bits={peaksData.bits}
+              length={width}
+              waveHeight={waveHeight}
+              waveOutlineColor={theme.waveOutlineColor || '#00f'}
+              waveFillColor={theme.waveFillColor || '#f0f0f0'}
+              waveProgressColor={theme.waveProgressColor || '#f00'}
+              progress={0}
+            />
+          ))}
+        </div>
       );
     };
 
@@ -221,7 +200,7 @@ class WaveformPlaylistClass {
                 <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
                   {track.name}
                 </div>
-                <WaveformCanvas trackId={track.id} />
+                <WaveformDisplay trackId={track.id} />
                 <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
                   Start: {track.startTime.toFixed(2)}s |
                   Gain: {(track.gain * 100).toFixed(0)}% |

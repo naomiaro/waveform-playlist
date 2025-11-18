@@ -1205,6 +1205,336 @@ function createFadeOut(gain, shape, start, duration) {
 
 /***/ }),
 
+/***/ "../../node_modules/.pnpm/react-async-hook@4.0.0_react@18.3.1/node_modules/react-async-hook/dist/react-async-hook.esm.js":
+/*!*******************************************************************************************************************************!*\
+  !*** ../../node_modules/.pnpm/react-async-hook@4.0.0_react@18.3.1/node_modules/react-async-hook/dist/react-async-hook.esm.js ***!
+  \*******************************************************************************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   useAsync: () => (/* binding */ useAsync),
+/* harmony export */   useAsyncAbortable: () => (/* binding */ useAsyncAbortable),
+/* harmony export */   useAsyncCallback: () => (/* binding */ useAsyncCallback)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+
+
+function _extends() {
+  _extends = Object.assign || function (target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var source = arguments[i];
+
+      for (var key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          target[key] = source[key];
+        }
+      }
+    }
+
+    return target;
+  };
+
+  return _extends.apply(this, arguments);
+}
+
+// A type of promise-like that resolves synchronously and supports only one observer
+
+const _iteratorSymbol = /*#__PURE__*/ typeof Symbol !== "undefined" ? (Symbol.iterator || (Symbol.iterator = Symbol("Symbol.iterator"))) : "@@iterator";
+
+const _asyncIteratorSymbol = /*#__PURE__*/ typeof Symbol !== "undefined" ? (Symbol.asyncIterator || (Symbol.asyncIterator = Symbol("Symbol.asyncIterator"))) : "@@asyncIterator";
+
+// Asynchronously await a promise and pass the result to a finally continuation
+function _finallyRethrows(body, finalizer) {
+	try {
+		var result = body();
+	} catch (e) {
+		return finalizer(true, e);
+	}
+	if (result && result.then) {
+		return result.then(finalizer.bind(null, false), finalizer.bind(null, true));
+	}
+	return finalizer(false, value);
+}
+
+var useIsomorphicLayoutEffect = typeof window !== 'undefined' && typeof window.document !== 'undefined' && typeof window.document.createElement !== 'undefined' ? react__WEBPACK_IMPORTED_MODULE_0__.useLayoutEffect : react__WEBPACK_IMPORTED_MODULE_0__.useEffect; // Assign current value to a ref and returns a stable getter to get the latest value.
+// This way we are sure to always get latest value provided to hook and
+// avoid weird issues due to closures capturing stale values...
+// See https://github.com/facebook/react/issues/16956
+// See https://overreacted.io/making-setinterval-declarative-with-react-hooks/
+
+var useGetter = function useGetter(t) {
+  var ref = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(t);
+  useIsomorphicLayoutEffect(function () {
+    ref.current = t;
+  });
+  return (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function () {
+    return ref.current;
+  }, [ref]);
+};
+
+var InitialAsyncState = {
+  status: 'not-requested',
+  loading: false,
+  result: undefined,
+  error: undefined
+};
+var InitialAsyncLoadingState = {
+  status: 'loading',
+  loading: true,
+  result: undefined,
+  error: undefined
+};
+
+var defaultSetLoading = function defaultSetLoading(_asyncState) {
+  return InitialAsyncLoadingState;
+};
+
+var defaultSetResult = function defaultSetResult(result, _asyncState) {
+  return {
+    status: 'success',
+    loading: false,
+    result: result,
+    error: undefined
+  };
+};
+
+var defaultSetError = function defaultSetError(error, _asyncState) {
+  return {
+    status: 'error',
+    loading: false,
+    result: undefined,
+    error: error
+  };
+};
+
+var noop = function noop() {};
+
+var DefaultOptions = {
+  initialState: function initialState(options) {
+    return options && options.executeOnMount ? InitialAsyncLoadingState : InitialAsyncState;
+  },
+  executeOnMount: true,
+  executeOnUpdate: true,
+  setLoading: defaultSetLoading,
+  setResult: defaultSetResult,
+  setError: defaultSetError,
+  onSuccess: noop,
+  onError: noop
+};
+
+var normalizeOptions = function normalizeOptions(options) {
+  return _extends({}, DefaultOptions, {}, options);
+};
+
+var useAsyncState = function useAsyncState(options) {
+  var _useState = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(function () {
+    return options.initialState(options);
+  }),
+      value = _useState[0],
+      setValue = _useState[1];
+
+  var reset = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function () {
+    return setValue(options.initialState(options));
+  }, [setValue, options]);
+  var setLoading = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function () {
+    return setValue(options.setLoading(value));
+  }, [value, setValue]);
+  var setResult = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (result) {
+    return setValue(options.setResult(result, value));
+  }, [value, setValue]);
+  var setError = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (error) {
+    return setValue(options.setError(error, value));
+  }, [value, setValue]);
+  var merge = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (state) {
+    return setValue(_extends({}, value, {}, state));
+  }, [value, setValue]);
+  return {
+    value: value,
+    set: setValue,
+    merge: merge,
+    reset: reset,
+    setLoading: setLoading,
+    setResult: setResult,
+    setError: setError
+  };
+};
+
+var useIsMounted = function useIsMounted() {
+  var ref = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(false);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    ref.current = true;
+    return function () {
+      ref.current = false;
+    };
+  }, []);
+  return function () {
+    return ref.current;
+  };
+};
+
+var useCurrentPromise = function useCurrentPromise() {
+  var ref = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  return {
+    set: function set(promise) {
+      return ref.current = promise;
+    },
+    get: function get() {
+      return ref.current;
+    },
+    is: function is(promise) {
+      return ref.current === promise;
+    }
+  };
+}; // Relaxed interface which accept both async and sync functions
+// Accepting sync function is convenient for useAsyncCallback
+
+
+var useAsyncInternal = function useAsyncInternal(asyncFunction, params, options) {
+  // Fallback missing params, only for JS users forgetting the deps array, to prevent infinite loops
+  // https://github.com/slorber/react-async-hook/issues/27
+  // @ts-ignore
+  !params && (params = []);
+  var normalizedOptions = normalizeOptions(options);
+
+  var _useState2 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null),
+      currentParams = _useState2[0],
+      setCurrentParams = _useState2[1];
+
+  var AsyncState = useAsyncState(normalizedOptions);
+  var isMounted = useIsMounted();
+  var CurrentPromise = useCurrentPromise(); // We only want to handle the promise result/error
+  // if it is the last operation and the comp is still mounted
+
+  var shouldHandlePromise = function shouldHandlePromise(p) {
+    return isMounted() && CurrentPromise.is(p);
+  };
+
+  var executeAsyncOperation = function executeAsyncOperation() {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    // async ensures errors thrown synchronously are caught (ie, bug when formatting api payloads)
+    // async ensures promise-like and synchronous functions are handled correctly too
+    // see https://github.com/slorber/react-async-hook/issues/24
+    var promise = function () {
+      try {
+        return Promise.resolve(asyncFunction.apply(void 0, args));
+      } catch (e) {
+        return Promise.reject(e);
+      }
+    }();
+
+    setCurrentParams(args);
+    CurrentPromise.set(promise);
+    AsyncState.setLoading();
+    promise.then(function (result) {
+      if (shouldHandlePromise(promise)) {
+        AsyncState.setResult(result);
+      }
+
+      normalizedOptions.onSuccess(result, {
+        isCurrent: function isCurrent() {
+          return CurrentPromise.is(promise);
+        }
+      });
+    }, function (error) {
+      if (shouldHandlePromise(promise)) {
+        AsyncState.setError(error);
+      }
+
+      normalizedOptions.onError(error, {
+        isCurrent: function isCurrent() {
+          return CurrentPromise.is(promise);
+        }
+      });
+    });
+    return promise;
+  };
+
+  var getLatestExecuteAsyncOperation = useGetter(executeAsyncOperation);
+  var executeAsyncOperationMemo = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function () {
+    return getLatestExecuteAsyncOperation().apply(void 0, arguments);
+  }, [getLatestExecuteAsyncOperation]); // Keep this outside useEffect, because inside isMounted()
+  // will be true as the component is already mounted when it's run
+
+  var isMounting = !isMounted();
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    var execute = function execute() {
+      return getLatestExecuteAsyncOperation().apply(void 0, params);
+    };
+
+    isMounting && normalizedOptions.executeOnMount && execute();
+    !isMounting && normalizedOptions.executeOnUpdate && execute();
+  }, params);
+  return _extends({}, AsyncState.value, {
+    set: AsyncState.set,
+    merge: AsyncState.merge,
+    reset: AsyncState.reset,
+    execute: executeAsyncOperationMemo,
+    currentPromise: CurrentPromise.get(),
+    currentParams: currentParams
+  });
+};
+
+function useAsync(asyncFunction, params, options) {
+  return useAsyncInternal(asyncFunction, params, options);
+}
+var useAsyncAbortable = function useAsyncAbortable(asyncFunction, params, options) {
+  var abortControllerRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(); // Wrap the original async function and enhance it with abortion login
+
+  var asyncFunctionWrapper = function asyncFunctionWrapper() {
+    for (var _len2 = arguments.length, p = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+      p[_key2] = arguments[_key2];
+    }
+
+    try {
+      // Cancel previous async call
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      } // Create/store new abort controller for next async call
+
+
+      var abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      return Promise.resolve(_finallyRethrows(function () {
+        // @ts-ignore // TODO how to type this?
+        return Promise.resolve(asyncFunction.apply(void 0, [abortController.signal].concat(p)));
+      }, function (_wasThrown, _result) {
+        // Unset abortController ref if response is already there,
+        // as it's not needed anymore to try to abort it (would it be no-op?)
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = undefined;
+        }
+
+        if (_wasThrown) throw _result;
+        return _result;
+      }));
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  };
+
+  return useAsync(asyncFunctionWrapper, params, options);
+};
+var useAsyncCallback = function useAsyncCallback(asyncFunction, options) {
+  return useAsyncInternal(asyncFunction, // Hacky but in such case we don't need the params,
+  // because async function is only executed manually
+  [], _extends({}, options, {
+    executeOnMount: false,
+    executeOnUpdate: false
+  }));
+};
+
+
+//# sourceMappingURL=react-async-hook.esm.js.map
+
+
+/***/ }),
+
 /***/ "../../node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js":
 /*!******************************************************************************************************************!*\
   !*** ../../node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js ***!
@@ -83210,6 +83540,816 @@ function __rewriteRelativeImportExtension(path, preserveJsx) {
 
 /***/ }),
 
+/***/ "../../node_modules/.pnpm/waveform-data@4.5.2/node_modules/waveform-data/dist/waveform-data.esm.js":
+/*!*********************************************************************************************************!*\
+  !*** ../../node_modules/.pnpm/waveform-data@4.5.2/node_modules/waveform-data/dist/waveform-data.esm.js ***!
+  \*********************************************************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ WaveformData)
+/* harmony export */ });
+/**
+ * Provides access to the waveform data for a single audio channel.
+ */
+
+function WaveformDataChannel(waveformData, channelIndex) {
+  this._waveformData = waveformData;
+  this._channelIndex = channelIndex;
+}
+
+/**
+ * Returns the waveform minimum at the given index position.
+ */
+
+WaveformDataChannel.prototype.min_sample = function (index) {
+  var offset = (index * this._waveformData.channels + this._channelIndex) * 2;
+  return this._waveformData._at(offset);
+};
+
+/**
+ * Returns the waveform maximum at the given index position.
+ */
+
+WaveformDataChannel.prototype.max_sample = function (index) {
+  var offset = (index * this._waveformData.channels + this._channelIndex) * 2 + 1;
+  return this._waveformData._at(offset);
+};
+
+/**
+ * Sets the waveform minimum at the given index position.
+ */
+
+WaveformDataChannel.prototype.set_min_sample = function (index, sample) {
+  var offset = (index * this._waveformData.channels + this._channelIndex) * 2;
+  return this._waveformData._set_at(offset, sample);
+};
+
+/**
+ * Sets the waveform maximum at the given index position.
+ */
+
+WaveformDataChannel.prototype.set_max_sample = function (index, sample) {
+  var offset = (index * this._waveformData.channels + this._channelIndex) * 2 + 1;
+  return this._waveformData._set_at(offset, sample);
+};
+
+/**
+ * Returns all the waveform minimum values as an array.
+ */
+
+WaveformDataChannel.prototype.min_array = function () {
+  var length = this._waveformData.length;
+  var values = [];
+  for (var i = 0; i < length; i++) {
+    values.push(this.min_sample(i));
+  }
+  return values;
+};
+
+/**
+ * Returns all the waveform maximum values as an array.
+ */
+
+WaveformDataChannel.prototype.max_array = function () {
+  var length = this._waveformData.length;
+  var values = [];
+  for (var i = 0; i < length; i++) {
+    values.push(this.max_sample(i));
+  }
+  return values;
+};
+
+/**
+ * AudioBuffer-based WaveformData generator
+ *
+ * Adapted from BlockFile::CalcSummary in Audacity, with permission.
+ * See https://github.com/audacity/audacity/blob/
+ *   1108c1376c09166162335fab4743008cba57c4ee/src/BlockFile.cpp#L198
+ */
+
+var INT8_MAX = 127;
+var INT8_MIN = -128;
+var INT16_MAX = 32767;
+var INT16_MIN = -32768;
+function calculateWaveformDataLength(audio_sample_count, scale) {
+  var data_length = Math.floor(audio_sample_count / scale);
+  var samples_remaining = audio_sample_count - data_length * scale;
+  if (samples_remaining > 0) {
+    data_length++;
+  }
+  return data_length;
+}
+function generateWaveformData(options) {
+  var scale = options.scale;
+  var amplitude_scale = options.amplitude_scale;
+  var split_channels = options.split_channels;
+  var length = options.length;
+  var sample_rate = options.sample_rate;
+  var channels = options.channels.map(function (channel) {
+    return new Float32Array(channel);
+  });
+  var output_channels = split_channels ? channels.length : 1;
+  var header_size = 24;
+  var data_length = calculateWaveformDataLength(length, scale);
+  var bytes_per_sample = options.bits === 8 ? 1 : 2;
+  var total_size = header_size + data_length * 2 * bytes_per_sample * output_channels;
+  var buffer = new ArrayBuffer(total_size);
+  var data_view = new DataView(buffer);
+  var scale_counter = 0;
+  var offset = header_size;
+  var min_value = new Array(output_channels);
+  var max_value = new Array(output_channels);
+  for (var channel = 0; channel < output_channels; channel++) {
+    min_value[channel] = Infinity;
+    max_value[channel] = -Infinity;
+  }
+  var range_min = options.bits === 8 ? INT8_MIN : INT16_MIN;
+  var range_max = options.bits === 8 ? INT8_MAX : INT16_MAX;
+  data_view.setInt32(0, 2, true); // Version
+  data_view.setUint32(4, options.bits === 8, true); // Is 8 bit?
+  data_view.setInt32(8, sample_rate, true); // Sample rate
+  data_view.setInt32(12, scale, true); // Scale
+  data_view.setInt32(16, data_length, true); // Length
+  data_view.setInt32(20, output_channels, true);
+  for (var i = 0; i < length; i++) {
+    var sample = 0;
+    if (output_channels === 1) {
+      for (var _channel = 0; _channel < channels.length; ++_channel) {
+        sample += channels[_channel][i];
+      }
+      sample = Math.floor(range_max * sample * amplitude_scale / channels.length);
+      if (sample < min_value[0]) {
+        min_value[0] = sample;
+        if (min_value[0] < range_min) {
+          min_value[0] = range_min;
+        }
+      }
+      if (sample > max_value[0]) {
+        max_value[0] = sample;
+        if (max_value[0] > range_max) {
+          max_value[0] = range_max;
+        }
+      }
+    } else {
+      for (var _channel2 = 0; _channel2 < output_channels; ++_channel2) {
+        sample = Math.floor(range_max * channels[_channel2][i] * amplitude_scale);
+        if (sample < min_value[_channel2]) {
+          min_value[_channel2] = sample;
+          if (min_value[_channel2] < range_min) {
+            min_value[_channel2] = range_min;
+          }
+        }
+        if (sample > max_value[_channel2]) {
+          max_value[_channel2] = sample;
+          if (max_value[_channel2] > range_max) {
+            max_value[_channel2] = range_max;
+          }
+        }
+      }
+    }
+    if (++scale_counter === scale) {
+      for (var _channel3 = 0; _channel3 < output_channels; _channel3++) {
+        if (options.bits === 8) {
+          data_view.setInt8(offset++, min_value[_channel3]);
+          data_view.setInt8(offset++, max_value[_channel3]);
+        } else {
+          data_view.setInt16(offset, min_value[_channel3], true);
+          data_view.setInt16(offset + 2, max_value[_channel3], true);
+          offset += 4;
+        }
+        min_value[_channel3] = Infinity;
+        max_value[_channel3] = -Infinity;
+      }
+      scale_counter = 0;
+    }
+  }
+  if (scale_counter > 0) {
+    for (var _channel4 = 0; _channel4 < output_channels; _channel4++) {
+      if (options.bits === 8) {
+        data_view.setInt8(offset++, min_value[_channel4]);
+        data_view.setInt8(offset++, max_value[_channel4]);
+      } else {
+        data_view.setInt16(offset, min_value[_channel4], true);
+        data_view.setInt16(offset + 2, max_value[_channel4], true);
+      }
+    }
+  }
+  return buffer;
+}
+
+function _typeof(o) {
+  "@babel/helpers - typeof";
+
+  return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) {
+    return typeof o;
+  } : function (o) {
+    return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o;
+  }, _typeof(o);
+}
+
+function isJsonWaveformData(data) {
+  return data && _typeof(data) === 'object' && 'sample_rate' in data && 'samples_per_pixel' in data && 'bits' in data && 'length' in data && 'data' in data;
+}
+function isBinaryWaveformData(data) {
+  var isCompatible = data && _typeof(data) === 'object' && 'byteLength' in data;
+  if (isCompatible) {
+    var view = new DataView(data);
+    var version = view.getInt32(0, true);
+    if (version !== 1 && version !== 2) {
+      throw new TypeError('WaveformData.create(): This waveform data version not supported');
+    }
+  }
+  return isCompatible;
+}
+function convertJsonToBinary(data) {
+  var waveformData = data.data;
+  var channels = data.channels || 1;
+  var header_size = 24; // version 2
+  var bytes_per_sample = data.bits === 8 ? 1 : 2;
+  var expected_length = data.length * 2 * channels;
+  if (waveformData.length !== expected_length) {
+    throw new Error('WaveformData.create(): Length mismatch in JSON waveform data');
+  }
+  var total_size = header_size + waveformData.length * bytes_per_sample;
+  var array_buffer = new ArrayBuffer(total_size);
+  var data_object = new DataView(array_buffer);
+  data_object.setInt32(0, 2, true); // Version
+  data_object.setUint32(4, data.bits === 8, true);
+  data_object.setInt32(8, data.sample_rate, true);
+  data_object.setInt32(12, data.samples_per_pixel, true);
+  data_object.setInt32(16, data.length, true);
+  data_object.setInt32(20, channels, true);
+  var index = header_size;
+  if (data.bits === 8) {
+    for (var i = 0; i < waveformData.length; i++) {
+      data_object.setInt8(index++, waveformData[i], true);
+    }
+  } else {
+    for (var _i = 0; _i < waveformData.length; _i++) {
+      data_object.setInt16(index, waveformData[_i], true);
+      index += 2;
+    }
+  }
+  return array_buffer;
+}
+
+function isNullOrUndefined(value) {
+  return value === undefined || value === null;
+}
+
+function decodeBase64(base64, enableUnicode) {
+    var binaryString = atob(base64);
+    if (enableUnicode) {
+        var binaryView = new Uint8Array(binaryString.length);
+        for (var i = 0, n = binaryString.length; i < n; ++i) {
+            binaryView[i] = binaryString.charCodeAt(i);
+        }
+        return String.fromCharCode.apply(null, new Uint16Array(binaryView.buffer));
+    }
+    return binaryString;
+}
+
+function createURL(base64, sourcemapArg, enableUnicodeArg) {
+    var sourcemap = sourcemapArg === undefined ? null : sourcemapArg;
+    var enableUnicode = enableUnicodeArg === undefined ? false : enableUnicodeArg;
+    var source = decodeBase64(base64, enableUnicode);
+    var start = source.indexOf('\n', 10) + 1;
+    var body = source.substring(start) + (sourcemap ? '\/\/# sourceMappingURL=' + sourcemap : '');
+    var blob = new Blob([body], { type: 'application/javascript' });
+    return URL.createObjectURL(blob);
+}
+
+function createBase64WorkerFactory(base64, sourcemapArg, enableUnicodeArg) {
+    var url;
+    return function WorkerFactory(options) {
+        url = url || createURL(base64, sourcemapArg, enableUnicodeArg);
+        return new Worker(url, options);
+    };
+}
+
+var WorkerFactory = /*#__PURE__*/createBase64WorkerFactory('Lyogcm9sbHVwLXBsdWdpbi13ZWItd29ya2VyLWxvYWRlciAqLwooZnVuY3Rpb24gKCkgewogICd1c2Ugc3RyaWN0JzsKCiAgLyoqCiAgICogQXVkaW9CdWZmZXItYmFzZWQgV2F2ZWZvcm1EYXRhIGdlbmVyYXRvcgogICAqCiAgICogQWRhcHRlZCBmcm9tIEJsb2NrRmlsZTo6Q2FsY1N1bW1hcnkgaW4gQXVkYWNpdHksIHdpdGggcGVybWlzc2lvbi4KICAgKiBTZWUgaHR0cHM6Ly9naXRodWIuY29tL2F1ZGFjaXR5L2F1ZGFjaXR5L2Jsb2IvCiAgICogICAxMTA4YzEzNzZjMDkxNjYxNjIzMzVmYWI0NzQzMDA4Y2JhNTdjNGVlL3NyYy9CbG9ja0ZpbGUuY3BwI0wxOTgKICAgKi8KCiAgdmFyIElOVDhfTUFYID0gMTI3OwogIHZhciBJTlQ4X01JTiA9IC0xMjg7CiAgdmFyIElOVDE2X01BWCA9IDMyNzY3OwogIHZhciBJTlQxNl9NSU4gPSAtMzI3Njg7CiAgZnVuY3Rpb24gY2FsY3VsYXRlV2F2ZWZvcm1EYXRhTGVuZ3RoKGF1ZGlvX3NhbXBsZV9jb3VudCwgc2NhbGUpIHsKICAgIHZhciBkYXRhX2xlbmd0aCA9IE1hdGguZmxvb3IoYXVkaW9fc2FtcGxlX2NvdW50IC8gc2NhbGUpOwogICAgdmFyIHNhbXBsZXNfcmVtYWluaW5nID0gYXVkaW9fc2FtcGxlX2NvdW50IC0gZGF0YV9sZW5ndGggKiBzY2FsZTsKICAgIGlmIChzYW1wbGVzX3JlbWFpbmluZyA+IDApIHsKICAgICAgZGF0YV9sZW5ndGgrKzsKICAgIH0KICAgIHJldHVybiBkYXRhX2xlbmd0aDsKICB9CiAgZnVuY3Rpb24gZ2VuZXJhdGVXYXZlZm9ybURhdGEob3B0aW9ucykgewogICAgdmFyIHNjYWxlID0gb3B0aW9ucy5zY2FsZTsKICAgIHZhciBhbXBsaXR1ZGVfc2NhbGUgPSBvcHRpb25zLmFtcGxpdHVkZV9zY2FsZTsKICAgIHZhciBzcGxpdF9jaGFubmVscyA9IG9wdGlvbnMuc3BsaXRfY2hhbm5lbHM7CiAgICB2YXIgbGVuZ3RoID0gb3B0aW9ucy5sZW5ndGg7CiAgICB2YXIgc2FtcGxlX3JhdGUgPSBvcHRpb25zLnNhbXBsZV9yYXRlOwogICAgdmFyIGNoYW5uZWxzID0gb3B0aW9ucy5jaGFubmVscy5tYXAoZnVuY3Rpb24gKGNoYW5uZWwpIHsKICAgICAgcmV0dXJuIG5ldyBGbG9hdDMyQXJyYXkoY2hhbm5lbCk7CiAgICB9KTsKICAgIHZhciBvdXRwdXRfY2hhbm5lbHMgPSBzcGxpdF9jaGFubmVscyA/IGNoYW5uZWxzLmxlbmd0aCA6IDE7CiAgICB2YXIgaGVhZGVyX3NpemUgPSAyNDsKICAgIHZhciBkYXRhX2xlbmd0aCA9IGNhbGN1bGF0ZVdhdmVmb3JtRGF0YUxlbmd0aChsZW5ndGgsIHNjYWxlKTsKICAgIHZhciBieXRlc19wZXJfc2FtcGxlID0gb3B0aW9ucy5iaXRzID09PSA4ID8gMSA6IDI7CiAgICB2YXIgdG90YWxfc2l6ZSA9IGhlYWRlcl9zaXplICsgZGF0YV9sZW5ndGggKiAyICogYnl0ZXNfcGVyX3NhbXBsZSAqIG91dHB1dF9jaGFubmVsczsKICAgIHZhciBidWZmZXIgPSBuZXcgQXJyYXlCdWZmZXIodG90YWxfc2l6ZSk7CiAgICB2YXIgZGF0YV92aWV3ID0gbmV3IERhdGFWaWV3KGJ1ZmZlcik7CiAgICB2YXIgc2NhbGVfY291bnRlciA9IDA7CiAgICB2YXIgb2Zmc2V0ID0gaGVhZGVyX3NpemU7CiAgICB2YXIgbWluX3ZhbHVlID0gbmV3IEFycmF5KG91dHB1dF9jaGFubmVscyk7CiAgICB2YXIgbWF4X3ZhbHVlID0gbmV3IEFycmF5KG91dHB1dF9jaGFubmVscyk7CiAgICBmb3IgKHZhciBjaGFubmVsID0gMDsgY2hhbm5lbCA8IG91dHB1dF9jaGFubmVsczsgY2hhbm5lbCsrKSB7CiAgICAgIG1pbl92YWx1ZVtjaGFubmVsXSA9IEluZmluaXR5OwogICAgICBtYXhfdmFsdWVbY2hhbm5lbF0gPSAtSW5maW5pdHk7CiAgICB9CiAgICB2YXIgcmFuZ2VfbWluID0gb3B0aW9ucy5iaXRzID09PSA4ID8gSU5UOF9NSU4gOiBJTlQxNl9NSU47CiAgICB2YXIgcmFuZ2VfbWF4ID0gb3B0aW9ucy5iaXRzID09PSA4ID8gSU5UOF9NQVggOiBJTlQxNl9NQVg7CiAgICBkYXRhX3ZpZXcuc2V0SW50MzIoMCwgMiwgdHJ1ZSk7IC8vIFZlcnNpb24KICAgIGRhdGFfdmlldy5zZXRVaW50MzIoNCwgb3B0aW9ucy5iaXRzID09PSA4LCB0cnVlKTsgLy8gSXMgOCBiaXQ/CiAgICBkYXRhX3ZpZXcuc2V0SW50MzIoOCwgc2FtcGxlX3JhdGUsIHRydWUpOyAvLyBTYW1wbGUgcmF0ZQogICAgZGF0YV92aWV3LnNldEludDMyKDEyLCBzY2FsZSwgdHJ1ZSk7IC8vIFNjYWxlCiAgICBkYXRhX3ZpZXcuc2V0SW50MzIoMTYsIGRhdGFfbGVuZ3RoLCB0cnVlKTsgLy8gTGVuZ3RoCiAgICBkYXRhX3ZpZXcuc2V0SW50MzIoMjAsIG91dHB1dF9jaGFubmVscywgdHJ1ZSk7CiAgICBmb3IgKHZhciBpID0gMDsgaSA8IGxlbmd0aDsgaSsrKSB7CiAgICAgIHZhciBzYW1wbGUgPSAwOwogICAgICBpZiAob3V0cHV0X2NoYW5uZWxzID09PSAxKSB7CiAgICAgICAgZm9yICh2YXIgX2NoYW5uZWwgPSAwOyBfY2hhbm5lbCA8IGNoYW5uZWxzLmxlbmd0aDsgKytfY2hhbm5lbCkgewogICAgICAgICAgc2FtcGxlICs9IGNoYW5uZWxzW19jaGFubmVsXVtpXTsKICAgICAgICB9CiAgICAgICAgc2FtcGxlID0gTWF0aC5mbG9vcihyYW5nZV9tYXggKiBzYW1wbGUgKiBhbXBsaXR1ZGVfc2NhbGUgLyBjaGFubmVscy5sZW5ndGgpOwogICAgICAgIGlmIChzYW1wbGUgPCBtaW5fdmFsdWVbMF0pIHsKICAgICAgICAgIG1pbl92YWx1ZVswXSA9IHNhbXBsZTsKICAgICAgICAgIGlmIChtaW5fdmFsdWVbMF0gPCByYW5nZV9taW4pIHsKICAgICAgICAgICAgbWluX3ZhbHVlWzBdID0gcmFuZ2VfbWluOwogICAgICAgICAgfQogICAgICAgIH0KICAgICAgICBpZiAoc2FtcGxlID4gbWF4X3ZhbHVlWzBdKSB7CiAgICAgICAgICBtYXhfdmFsdWVbMF0gPSBzYW1wbGU7CiAgICAgICAgICBpZiAobWF4X3ZhbHVlWzBdID4gcmFuZ2VfbWF4KSB7CiAgICAgICAgICAgIG1heF92YWx1ZVswXSA9IHJhbmdlX21heDsKICAgICAgICAgIH0KICAgICAgICB9CiAgICAgIH0gZWxzZSB7CiAgICAgICAgZm9yICh2YXIgX2NoYW5uZWwyID0gMDsgX2NoYW5uZWwyIDwgb3V0cHV0X2NoYW5uZWxzOyArK19jaGFubmVsMikgewogICAgICAgICAgc2FtcGxlID0gTWF0aC5mbG9vcihyYW5nZV9tYXggKiBjaGFubmVsc1tfY2hhbm5lbDJdW2ldICogYW1wbGl0dWRlX3NjYWxlKTsKICAgICAgICAgIGlmIChzYW1wbGUgPCBtaW5fdmFsdWVbX2NoYW5uZWwyXSkgewogICAgICAgICAgICBtaW5fdmFsdWVbX2NoYW5uZWwyXSA9IHNhbXBsZTsKICAgICAgICAgICAgaWYgKG1pbl92YWx1ZVtfY2hhbm5lbDJdIDwgcmFuZ2VfbWluKSB7CiAgICAgICAgICAgICAgbWluX3ZhbHVlW19jaGFubmVsMl0gPSByYW5nZV9taW47CiAgICAgICAgICAgIH0KICAgICAgICAgIH0KICAgICAgICAgIGlmIChzYW1wbGUgPiBtYXhfdmFsdWVbX2NoYW5uZWwyXSkgewogICAgICAgICAgICBtYXhfdmFsdWVbX2NoYW5uZWwyXSA9IHNhbXBsZTsKICAgICAgICAgICAgaWYgKG1heF92YWx1ZVtfY2hhbm5lbDJdID4gcmFuZ2VfbWF4KSB7CiAgICAgICAgICAgICAgbWF4X3ZhbHVlW19jaGFubmVsMl0gPSByYW5nZV9tYXg7CiAgICAgICAgICAgIH0KICAgICAgICAgIH0KICAgICAgICB9CiAgICAgIH0KICAgICAgaWYgKCsrc2NhbGVfY291bnRlciA9PT0gc2NhbGUpIHsKICAgICAgICBmb3IgKHZhciBfY2hhbm5lbDMgPSAwOyBfY2hhbm5lbDMgPCBvdXRwdXRfY2hhbm5lbHM7IF9jaGFubmVsMysrKSB7CiAgICAgICAgICBpZiAob3B0aW9ucy5iaXRzID09PSA4KSB7CiAgICAgICAgICAgIGRhdGFfdmlldy5zZXRJbnQ4KG9mZnNldCsrLCBtaW5fdmFsdWVbX2NoYW5uZWwzXSk7CiAgICAgICAgICAgIGRhdGFfdmlldy5zZXRJbnQ4KG9mZnNldCsrLCBtYXhfdmFsdWVbX2NoYW5uZWwzXSk7CiAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICBkYXRhX3ZpZXcuc2V0SW50MTYob2Zmc2V0LCBtaW5fdmFsdWVbX2NoYW5uZWwzXSwgdHJ1ZSk7CiAgICAgICAgICAgIGRhdGFfdmlldy5zZXRJbnQxNihvZmZzZXQgKyAyLCBtYXhfdmFsdWVbX2NoYW5uZWwzXSwgdHJ1ZSk7CiAgICAgICAgICAgIG9mZnNldCArPSA0OwogICAgICAgICAgfQogICAgICAgICAgbWluX3ZhbHVlW19jaGFubmVsM10gPSBJbmZpbml0eTsKICAgICAgICAgIG1heF92YWx1ZVtfY2hhbm5lbDNdID0gLUluZmluaXR5OwogICAgICAgIH0KICAgICAgICBzY2FsZV9jb3VudGVyID0gMDsKICAgICAgfQogICAgfQogICAgaWYgKHNjYWxlX2NvdW50ZXIgPiAwKSB7CiAgICAgIGZvciAodmFyIF9jaGFubmVsNCA9IDA7IF9jaGFubmVsNCA8IG91dHB1dF9jaGFubmVsczsgX2NoYW5uZWw0KyspIHsKICAgICAgICBpZiAob3B0aW9ucy5iaXRzID09PSA4KSB7CiAgICAgICAgICBkYXRhX3ZpZXcuc2V0SW50OChvZmZzZXQrKywgbWluX3ZhbHVlW19jaGFubmVsNF0pOwogICAgICAgICAgZGF0YV92aWV3LnNldEludDgob2Zmc2V0KyssIG1heF92YWx1ZVtfY2hhbm5lbDRdKTsKICAgICAgICB9IGVsc2UgewogICAgICAgICAgZGF0YV92aWV3LnNldEludDE2KG9mZnNldCwgbWluX3ZhbHVlW19jaGFubmVsNF0sIHRydWUpOwogICAgICAgICAgZGF0YV92aWV3LnNldEludDE2KG9mZnNldCArIDIsIG1heF92YWx1ZVtfY2hhbm5lbDRdLCB0cnVlKTsKICAgICAgICB9CiAgICAgIH0KICAgIH0KICAgIHJldHVybiBidWZmZXI7CiAgfQoKICBvbm1lc3NhZ2UgPSBmdW5jdGlvbiBvbm1lc3NhZ2UoZXZ0KSB7CiAgICB2YXIgYnVmZmVyID0gZ2VuZXJhdGVXYXZlZm9ybURhdGEoZXZ0LmRhdGEpOwoKICAgIC8vIFRyYW5zZmVyIGJ1ZmZlciB0byB0aGUgY2FsbGluZyB0aHJlYWQKICAgIHRoaXMucG9zdE1lc3NhZ2UoYnVmZmVyLCBbYnVmZmVyXSk7CiAgICB0aGlzLmNsb3NlKCk7CiAgfTsKCn0pKCk7Ci8vIyBzb3VyY2VNYXBwaW5nVVJMPXdhdmVmb3JtLWRhdGEtd29ya2VyLmpzLm1hcAoK', null, false);
+/* eslint-enable */
+
+/**
+ * Provides access to waveform data.
+ */
+
+function WaveformData(data) {
+  if (isJsonWaveformData(data)) {
+    data = convertJsonToBinary(data);
+  }
+  if (isBinaryWaveformData(data)) {
+    this._data = new DataView(data);
+    this._offset = this._version() === 2 ? 24 : 20;
+    this._channels = [];
+    for (var channel = 0; channel < this.channels; channel++) {
+      this._channels[channel] = new WaveformDataChannel(this, channel);
+    }
+  } else {
+    throw new TypeError('WaveformData.create(): Unknown data format');
+  }
+}
+var defaultOptions = {
+  scale: 512,
+  bits: 8,
+  amplitude_scale: 1.0,
+  split_channels: false,
+  disable_worker: false
+};
+function getOptions(options) {
+  var opts = {
+    scale: options.scale || defaultOptions.scale,
+    bits: options.bits || defaultOptions.bits,
+    amplitude_scale: options.amplitude_scale || defaultOptions.amplitude_scale,
+    split_channels: options.split_channels || defaultOptions.split_channels,
+    disable_worker: options.disable_worker || defaultOptions.disable_worker
+  };
+  return opts;
+}
+function getChannelData(audio_buffer) {
+  var channels = [];
+  for (var i = 0; i < audio_buffer.numberOfChannels; ++i) {
+    channels.push(audio_buffer.getChannelData(i).buffer);
+  }
+  return channels;
+}
+function createFromAudioBuffer(audio_buffer, options, callback) {
+  var channels = getChannelData(audio_buffer);
+  if (options.disable_worker) {
+    var buffer = generateWaveformData({
+      scale: options.scale,
+      bits: options.bits,
+      amplitude_scale: options.amplitude_scale,
+      split_channels: options.split_channels,
+      length: audio_buffer.length,
+      sample_rate: audio_buffer.sampleRate,
+      channels: channels
+    });
+    callback(undefined, new WaveformData(buffer), audio_buffer);
+  } else {
+    var worker = new WorkerFactory();
+    worker.onmessage = function (evt) {
+      callback(undefined, new WaveformData(evt.data), audio_buffer);
+    };
+    worker.postMessage({
+      scale: options.scale,
+      bits: options.bits,
+      amplitude_scale: options.amplitude_scale,
+      split_channels: options.split_channels,
+      length: audio_buffer.length,
+      sample_rate: audio_buffer.sampleRate,
+      channels: channels
+    }, channels);
+  }
+}
+function createFromArrayBuffer(audioContext, audioData, options, callback) {
+  // The following function is a workaround for a Webkit bug where decodeAudioData
+  // invokes the errorCallback with null instead of a DOMException.
+  // See https://webaudio.github.io/web-audio-api/#dom-baseaudiocontext-decodeaudiodata
+  // and http://stackoverflow.com/q/10365335/103396
+
+  function errorCallback(error) {
+    if (!error) {
+      error = new DOMException('EncodingError');
+    }
+    callback(error);
+    // prevent double-calling the callback on errors:
+    callback = function callback() {};
+  }
+  var promise = audioContext.decodeAudioData(audioData, function (audio_buffer) {
+    createFromAudioBuffer(audio_buffer, options, callback);
+  }, errorCallback);
+  if (promise) {
+    promise.catch(errorCallback);
+  }
+}
+
+/**
+ * Creates and returns a WaveformData instance from the given waveform data.
+ */
+
+WaveformData.create = function create(data) {
+  return new WaveformData(data);
+};
+
+/**
+ * Creates a WaveformData instance from audio.
+ */
+
+WaveformData.createFromAudio = function (options, callback) {
+  var opts = getOptions(options);
+  if (options.audio_context && options.array_buffer) {
+    return createFromArrayBuffer(options.audio_context, options.array_buffer, opts, callback);
+  } else if (options.audio_buffer) {
+    return createFromAudioBuffer(options.audio_buffer, opts, callback);
+  } else {
+    throw new TypeError(
+    // eslint-disable-next-line
+    'WaveformData.createFromAudio(): Pass either an AudioContext and ArrayBuffer, or an AudioBuffer object');
+  }
+};
+function WaveformResampler(options) {
+  this._inputData = options.waveformData;
+
+  // Scale we want to reach
+  this._output_samples_per_pixel = options.scale;
+  this._scale = this._inputData.scale; // scale we are coming from
+
+  // The amount of data we want to resample i.e. final zoom want to resample
+  // all data but for intermediate zoom we want to resample subset
+  this._input_buffer_size = this._inputData.length;
+  var input_buffer_length_samples = this._input_buffer_size * this._inputData.scale;
+  var output_buffer_length_samples = Math.ceil(input_buffer_length_samples / this._output_samples_per_pixel);
+  var output_header_size = 24; // version 2
+  var bytes_per_sample = this._inputData.bits === 8 ? 1 : 2;
+  var total_size = output_header_size + output_buffer_length_samples * 2 * this._inputData.channels * bytes_per_sample;
+  this._output_data = new ArrayBuffer(total_size);
+  this.output_dataview = new DataView(this._output_data);
+  this.output_dataview.setInt32(0, 2, true); // Version
+  this.output_dataview.setUint32(4, this._inputData.bits === 8, true); // Is 8 bit?
+  this.output_dataview.setInt32(8, this._inputData.sample_rate, true);
+  this.output_dataview.setInt32(12, this._output_samples_per_pixel, true);
+  this.output_dataview.setInt32(16, output_buffer_length_samples, true);
+  this.output_dataview.setInt32(20, this._inputData.channels, true);
+  this._outputWaveformData = new WaveformData(this._output_data);
+  this._input_index = 0;
+  this._output_index = 0;
+  var channels = this._inputData.channels;
+  this._min = new Array(channels);
+  this._max = new Array(channels);
+  for (var channel = 0; channel < channels; ++channel) {
+    if (this._input_buffer_size > 0) {
+      this._min[channel] = this._inputData.channel(channel).min_sample(this._input_index);
+      this._max[channel] = this._inputData.channel(channel).max_sample(this._input_index);
+    } else {
+      this._min[channel] = 0;
+      this._max[channel] = 0;
+    }
+  }
+  this._min_value = this._inputData.bits === 8 ? -128 : -32768;
+  this._max_value = this._inputData.bits === 8 ? 127 : 32767;
+  this._where = 0;
+  this._prev_where = 0;
+  this._stop = 0;
+  this._last_input_index = 0;
+}
+WaveformResampler.prototype.sample_at_pixel = function (x) {
+  return Math.floor(x * this._output_samples_per_pixel);
+};
+WaveformResampler.prototype.next = function () {
+  var count = 0;
+  var total = 1000;
+  var channels = this._inputData.channels;
+  var channel;
+  while (this._input_index < this._input_buffer_size && count < total) {
+    while (Math.floor(this.sample_at_pixel(this._output_index) / this._scale) === this._input_index) {
+      if (this._output_index > 0) {
+        for (var i = 0; i < channels; ++i) {
+          channel = this._outputWaveformData.channel(i);
+          channel.set_min_sample(this._output_index - 1, this._min[i]);
+          channel.set_max_sample(this._output_index - 1, this._max[i]);
+        }
+      }
+      this._last_input_index = this._input_index;
+      this._output_index++;
+      this._where = this.sample_at_pixel(this._output_index);
+      this._prev_where = this.sample_at_pixel(this._output_index - 1);
+      if (this._where !== this._prev_where) {
+        for (var _i = 0; _i < channels; ++_i) {
+          this._min[_i] = this._max_value;
+          this._max[_i] = this._min_value;
+        }
+      }
+    }
+    this._where = this.sample_at_pixel(this._output_index);
+    this._stop = Math.floor(this._where / this._scale);
+    if (this._stop > this._input_buffer_size) {
+      this._stop = this._input_buffer_size;
+    }
+    while (this._input_index < this._stop) {
+      for (var _i2 = 0; _i2 < channels; ++_i2) {
+        channel = this._inputData.channel(_i2);
+        var value = channel.min_sample(this._input_index);
+        if (value < this._min[_i2]) {
+          this._min[_i2] = value;
+        }
+        value = channel.max_sample(this._input_index);
+        if (value > this._max[_i2]) {
+          this._max[_i2] = value;
+        }
+      }
+      this._input_index++;
+    }
+    count++;
+  }
+  if (this._input_index < this._input_buffer_size) {
+    // More to do
+    return false;
+  } else {
+    // Done
+    if (this._input_index !== this._last_input_index) {
+      for (var _i3 = 0; _i3 < channels; ++_i3) {
+        channel = this._outputWaveformData.channel(_i3);
+        channel.set_min_sample(this._output_index - 1, this._min[_i3]);
+        channel.set_max_sample(this._output_index - 1, this._max[_i3]);
+      }
+    }
+    return true;
+  }
+};
+WaveformResampler.prototype.getOutputData = function () {
+  return this._output_data;
+};
+WaveformData.prototype = {
+  _getResampleOptions: function _getResampleOptions(options) {
+    var opts = {};
+    opts.scale = options.scale;
+    opts.width = options.width;
+    if (!isNullOrUndefined(opts.width) && (typeof opts.width !== 'number' || opts.width <= 0)) {
+      throw new RangeError('WaveformData.resample(): width should be a positive integer value');
+    }
+    if (!isNullOrUndefined(opts.scale) && (typeof opts.scale !== 'number' || opts.scale <= 0)) {
+      throw new RangeError('WaveformData.resample(): scale should be a positive integer value');
+    }
+    if (!opts.scale && !opts.width) {
+      throw new Error('WaveformData.resample(): Missing scale or width option');
+    }
+    if (opts.width) {
+      // Calculate the target scale for the resampled waveform
+      opts.scale = Math.floor(this.duration * this.sample_rate / opts.width);
+    }
+    if (opts.scale < this.scale) {
+      throw new Error('WaveformData.resample(): Zoom level ' + opts.scale + ' too low, minimum: ' + this.scale);
+    }
+    opts.abortSignal = options.abortSignal;
+    return opts;
+  },
+  resample: function resample(options) {
+    options = this._getResampleOptions(options);
+    options.waveformData = this;
+    var resampler = new WaveformResampler(options);
+    while (!resampler.next()) {
+      // nothing
+    }
+    return new WaveformData(resampler.getOutputData());
+  },
+  /**
+   * Concatenates with one or more other waveforms, returning a new WaveformData object.
+   */
+
+  concat: function concat() {
+    var self = this;
+    var otherWaveforms = Array.prototype.slice.call(arguments);
+
+    // Check that all the supplied waveforms are compatible
+    otherWaveforms.forEach(function (otherWaveform) {
+      if (self.channels !== otherWaveform.channels || self.sample_rate !== otherWaveform.sample_rate || self.bits !== otherWaveform.bits || self.scale !== otherWaveform.scale) {
+        throw new Error('WaveformData.concat(): Waveforms are incompatible');
+      }
+    });
+    var combinedBuffer = this._concatBuffers.apply(this, otherWaveforms);
+    return WaveformData.create(combinedBuffer);
+  },
+  /**
+   * Returns a new ArrayBuffer with the concatenated waveform.
+   * All waveforms must have identical metadata (version, channels, etc)
+   */
+
+  _concatBuffers: function _concatBuffers() {
+    var otherWaveforms = Array.prototype.slice.call(arguments);
+    var headerSize = this._offset;
+    var totalSize = headerSize;
+    var totalDataLength = 0;
+    var bufferCollection = [this].concat(otherWaveforms).map(function (w) {
+      return w._data.buffer;
+    });
+    for (var i = 0; i < bufferCollection.length; i++) {
+      var buffer = bufferCollection[i];
+      var dataSize = new DataView(buffer).getInt32(16, true);
+      totalSize += buffer.byteLength - headerSize;
+      totalDataLength += dataSize;
+    }
+    var totalBuffer = new ArrayBuffer(totalSize);
+    var sourceHeader = new DataView(bufferCollection[0]);
+    var totalBufferView = new DataView(totalBuffer);
+
+    // Copy the header from the first chunk
+    for (var _i4 = 0; _i4 < headerSize; _i4++) {
+      totalBufferView.setUint8(_i4, sourceHeader.getUint8(_i4));
+    }
+
+    // Rewrite the data-length header item to reflect all of the samples concatenated together
+    totalBufferView.setInt32(16, totalDataLength, true);
+    var offset = 0;
+    var dataOfTotalBuffer = new Uint8Array(totalBuffer, headerSize);
+    for (var _i5 = 0; _i5 < bufferCollection.length; _i5++) {
+      var _buffer = bufferCollection[_i5];
+      dataOfTotalBuffer.set(new Uint8Array(_buffer, headerSize), offset);
+      offset += _buffer.byteLength - headerSize;
+    }
+    return totalBuffer;
+  },
+  slice: function slice(options) {
+    var startIndex = 0;
+    var endIndex = 0;
+    if (!isNullOrUndefined(options.startIndex) && !isNullOrUndefined(options.endIndex)) {
+      startIndex = options.startIndex;
+      endIndex = options.endIndex;
+    } else if (!isNullOrUndefined(options.startTime) && !isNullOrUndefined(options.endTime)) {
+      startIndex = this.at_time(options.startTime);
+      endIndex = this.at_time(options.endTime);
+    }
+    if (startIndex < 0) {
+      throw new RangeError('startIndex or startTime must not be negative');
+    }
+    if (endIndex < 0) {
+      throw new RangeError('endIndex or endTime must not be negative');
+    }
+    if (startIndex > this.length) {
+      startIndex = this.length;
+    }
+    if (endIndex > this.length) {
+      endIndex = this.length;
+    }
+    if (startIndex > endIndex) {
+      startIndex = endIndex;
+    }
+    var length = endIndex - startIndex;
+    var header_size = 24; // Version 2
+    var bytes_per_sample = this.bits === 8 ? 1 : 2;
+    var total_size = header_size + length * 2 * this.channels * bytes_per_sample;
+    var output_data = new ArrayBuffer(total_size);
+    var output_dataview = new DataView(output_data);
+    output_dataview.setInt32(0, 2, true); // Version
+    output_dataview.setUint32(4, this.bits === 8, true); // Is 8 bit?
+    output_dataview.setInt32(8, this.sample_rate, true);
+    output_dataview.setInt32(12, this.scale, true);
+    output_dataview.setInt32(16, length, true);
+    output_dataview.setInt32(20, this.channels, true);
+    for (var i = 0; i < length * this.channels * 2; i++) {
+      var sample = this._at(startIndex * this.channels * 2 + i);
+      if (this.bits === 8) {
+        output_dataview.setInt8(header_size + i, sample);
+      } else {
+        output_dataview.setInt16(header_size + i * 2, sample, true);
+      }
+    }
+    return new WaveformData(output_data);
+  },
+  /**
+   * Returns the data format version number.
+   */
+
+  _version: function _version() {
+    return this._data.getInt32(0, true);
+  },
+  /**
+   * Returns the length of the waveform, in pixels.
+   */
+
+  get length() {
+    return this._data.getUint32(16, true);
+  },
+  /**
+   * Returns the number of bits per sample, either 8 or 16.
+   */
+
+  get bits() {
+    var bits = Boolean(this._data.getUint32(4, true));
+    return bits ? 8 : 16;
+  },
+  /**
+   * Returns the (approximate) duration of the audio file, in seconds.
+   */
+
+  get duration() {
+    return this.length * this.scale / this.sample_rate;
+  },
+  /**
+   * Returns the number of pixels per second.
+   */
+
+  get pixels_per_second() {
+    return this.sample_rate / this.scale;
+  },
+  /**
+   * Returns the amount of time represented by a single pixel, in seconds.
+   */
+
+  get seconds_per_pixel() {
+    return this.scale / this.sample_rate;
+  },
+  /**
+   * Returns the number of waveform channels.
+   */
+
+  get channels() {
+    if (this._version() === 2) {
+      return this._data.getInt32(20, true);
+    } else {
+      return 1;
+    }
+  },
+  /**
+   * Returns a waveform channel.
+   */
+
+  channel: function channel(index) {
+    if (index >= 0 && index < this._channels.length) {
+      return this._channels[index];
+    } else {
+      throw new RangeError('Invalid channel: ' + index);
+    }
+  },
+  /**
+   * Returns the number of audio samples per second.
+   */
+
+  get sample_rate() {
+    return this._data.getInt32(8, true);
+  },
+  /**
+   * Returns the number of audio samples per pixel.
+   */
+
+  get scale() {
+    return this._data.getInt32(12, true);
+  },
+  /**
+   * Returns a waveform data value at a specific offset.
+   */
+
+  _at: function at_sample(index) {
+    if (this.bits === 8) {
+      return this._data.getInt8(this._offset + index);
+    } else {
+      return this._data.getInt16(this._offset + index * 2, true);
+    }
+  },
+  /**
+   * Sets a waveform data value at a specific offset.
+   */
+
+  _set_at: function set_at(index, sample) {
+    if (this.bits === 8) {
+      return this._data.setInt8(this._offset + index, sample);
+    } else {
+      return this._data.setInt16(this._offset + index * 2, sample, true);
+    }
+  },
+  /**
+   * Returns the waveform data index position for a given time.
+   */
+
+  at_time: function at_time(time) {
+    return Math.floor(time * this.sample_rate / this.scale);
+  },
+  /**
+   * Returns the time in seconds for a given index.
+   */
+
+  time: function time(index) {
+    return index * this.scale / this.sample_rate;
+  },
+  /**
+   * Returns an object containing the waveform data.
+   */
+
+  toJSON: function toJSON() {
+    var waveform = {
+      version: 2,
+      channels: this.channels,
+      sample_rate: this.sample_rate,
+      samples_per_pixel: this.scale,
+      bits: this.bits,
+      length: this.length,
+      data: []
+    };
+    for (var i = 0; i < this.length; i++) {
+      for (var channel = 0; channel < this.channels; channel++) {
+        waveform.data.push(this.channel(channel).min_sample(i));
+        waveform.data.push(this.channel(channel).max_sample(i));
+      }
+    }
+    return waveform;
+  },
+  /**
+   * Returns the waveform data in binary format as an ArrayBuffer.
+   */
+
+  toArrayBuffer: function toArrayBuffer() {
+    return this._data.buffer;
+  }
+};
+
+
+
+
+/***/ }),
+
 /***/ "../loaders/dist/index.js":
 /*!********************************!*\
   !*** ../loaders/dist/index.js ***!
@@ -83664,6 +84804,714 @@ var TonePlayout = class {
 
 /***/ }),
 
+/***/ "../ui-components/dist/index.js":
+/*!**************************************!*\
+  !*** ../ui-components/dist/index.js ***!
+  \**************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/index.tsx
+var index_exports = {};
+__export(index_exports, {
+  BBCWaveformData: () => BBCWaveformData,
+  Channel: () => Channel,
+  Playlist: () => Playlist,
+  PlaylistInfoContext: () => PlaylistInfoContext,
+  SmartChannel: () => SmartChannel,
+  SmartScale: () => SmartScale,
+  SmartTrack: () => SmartTrack,
+  StyledPlaylist: () => StyledPlaylist,
+  StyledTimeScale: () => StyledTimeScale,
+  TimeScale: () => TimeScale,
+  Track: () => Track,
+  TrackControlsContext: () => TrackControlsContext,
+  useDevicePixelRatio: () => useDevicePixelRatio,
+  usePlaylistInfo: () => usePlaylistInfo,
+  useTheme: () => useTheme,
+  useTrackControls: () => useTrackControls,
+  useWaveformData: () => useWaveformData
+});
+module.exports = __toCommonJS(index_exports);
+
+// src/components/BBCExtractPeaks.tsx
+var import_react = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+var import_react_async_hook = __webpack_require__(/*! react-async-hook */ "../../node_modules/.pnpm/react-async-hook@4.0.0_react@18.3.1/node_modules/react-async-hook/dist/react-async-hook.esm.js");
+var import_waveform_data = __toESM(__webpack_require__(/*! waveform-data */ "../../node_modules/.pnpm/waveform-data@4.5.2/node_modules/waveform-data/dist/waveform-data.esm.js"));
+var import_jsx_runtime = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+var fetchPeaks = async (dataUri, type) => {
+  const parsePeaksMethod = type === "dat" ? "arrayBuffer" : "json";
+  const peaksResponse = await fetch(dataUri);
+  const decodedPeaks = await peaksResponse[parsePeaksMethod]();
+  return import_waveform_data.default.create(decodedPeaks);
+};
+function useWaveformData(location, type) {
+  const asyncPeaks = (0, import_react_async_hook.useAsync)(fetchPeaks, [location, type]);
+  return {
+    loading: asyncPeaks.loading,
+    error: asyncPeaks.error,
+    data: asyncPeaks.result
+  };
+}
+var BBCWaveformData = ({ location, type, children }) => {
+  const asyncPeaks = useWaveformData(location, type);
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_react.Fragment, { children: children(asyncPeaks) });
+};
+
+// src/components/Channel.tsx
+var import_react2 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+var import_styled_components = __toESM(__webpack_require__(/*! styled-components */ "../../node_modules/.pnpm/styled-components@6.1.19_react-dom@18.3.1_react@18.3.1/node_modules/styled-components/dist/styled-components.browser.esm.js"));
+var import_jsx_runtime2 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+var MAX_CANVAS_WIDTH = 1e3;
+var Progress = import_styled_components.default.div`
+  position: absolute;
+  background: ${(props) => props.$waveProgressColor};
+  width: ${(props) => props.$progress}px;
+  height: ${(props) => props.$waveHeight}px;
+`;
+var Waveform = import_styled_components.default.canvas`
+  float: left;
+  position: relative;
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$waveHeight}px;
+`;
+var Wrapper = import_styled_components.default.div`
+  position: absolute;
+  top: ${(props) => props.$waveHeight * props.$index}px;
+  background: ${(props) => props.$waveFillColor};
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$waveHeight}px;
+`;
+var Channel = (props) => {
+  const {
+    data,
+    bits,
+    length,
+    index,
+    className,
+    progress = 0,
+    devicePixelRatio = 1,
+    waveHeight = 80,
+    waveProgressColor = "orange",
+    waveOutlineColor = "#E0EFF1",
+    waveFillColor = "grey"
+  } = props;
+  const canvases = [];
+  const canvasRef = (0, import_react2.useCallback)(
+    (canvas) => {
+      if (canvas !== null) {
+        const index2 = parseInt(canvas.dataset.index, 10);
+        canvases[index2] = canvas;
+      }
+    },
+    [canvases]
+  );
+  (0, import_react2.useEffect)(() => {
+    let offset = 0;
+    for (let i = 0; i < canvases.length; i++) {
+      const canvas = canvases[i];
+      const ctx = canvas.getContext("2d");
+      const h2 = waveHeight / 2;
+      const maxValue = 2 ** (bits - 1);
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.resetTransform();
+        ctx.fillStyle = waveOutlineColor;
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        const peakSegmentLength = canvas.width / devicePixelRatio;
+        for (let i2 = 0; i2 < peakSegmentLength; i2 += 1) {
+          const minPeak = data[(i2 + offset) * 2] / maxValue;
+          const maxPeak = data[(i2 + offset) * 2 + 1] / maxValue;
+          const min = Math.abs(minPeak * h2);
+          const max = Math.abs(maxPeak * h2);
+          ctx.fillRect(i2, 0, 1, h2 - max);
+          ctx.fillRect(i2, h2 + min, 1, h2 - min);
+        }
+      }
+      offset += MAX_CANVAS_WIDTH;
+    }
+  }, [
+    data,
+    bits,
+    waveHeight,
+    waveOutlineColor,
+    devicePixelRatio,
+    length,
+    canvases
+  ]);
+  let totalWidth = length;
+  let waveformCount = 0;
+  const waveforms = [];
+  while (totalWidth > 0) {
+    const currentWidth = Math.min(totalWidth, MAX_CANVAS_WIDTH);
+    const waveform = /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+      Waveform,
+      {
+        $cssWidth: currentWidth,
+        width: currentWidth * devicePixelRatio,
+        height: waveHeight * devicePixelRatio,
+        $waveHeight: waveHeight,
+        "data-index": waveformCount,
+        ref: canvasRef
+      },
+      `${length}-${waveformCount}`
+    );
+    waveforms.push(waveform);
+    totalWidth -= currentWidth;
+    waveformCount += 1;
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+    Wrapper,
+    {
+      $index: index,
+      $cssWidth: length,
+      className,
+      $waveHeight: waveHeight,
+      $waveFillColor: waveFillColor,
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+          Progress,
+          {
+            $progress: progress,
+            $waveHeight: waveHeight,
+            $waveProgressColor: waveProgressColor
+          }
+        ),
+        waveforms
+      ]
+    }
+  );
+};
+
+// src/components/Playlist.tsx
+var import_styled_components2 = __toESM(__webpack_require__(/*! styled-components */ "../../node_modules/.pnpm/styled-components@6.1.19_react-dom@18.3.1_react@18.3.1/node_modules/styled-components/dist/styled-components.browser.esm.js"));
+var import_jsx_runtime3 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+var Wrapper2 = import_styled_components2.default.div`
+  overflow: hidden;
+  position: relative;
+`;
+var ScrollContainer = import_styled_components2.default.div`
+  overflow: auto;
+`;
+var Playlist = ({ children }) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Wrapper2, { children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ScrollContainer, { children }) });
+};
+var StyledPlaylist = (0, import_styled_components2.withTheme)(Playlist);
+
+// src/contexts/DevicePixelRatio.tsx
+var import_react3 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+var import_jsx_runtime4 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+function getScale() {
+  return window.devicePixelRatio;
+}
+var DevicePixelRatioContext = (0, import_react3.createContext)(getScale());
+var useDevicePixelRatio = () => (0, import_react3.useContext)(DevicePixelRatioContext);
+
+// src/contexts/PlaylistInfo.tsx
+var import_react4 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+var PlaylistInfoContext = (0, import_react4.createContext)({
+  sampleRate: 48e3,
+  samplesPerPixel: 1e3,
+  zoomLevels: [1e3, 1500, 2e3, 2500],
+  waveHeight: 80,
+  timeScaleHeight: 15,
+  controls: {
+    show: false,
+    width: 150
+  },
+  duration: 3e4
+});
+var usePlaylistInfo = () => (0, import_react4.useContext)(PlaylistInfoContext);
+
+// src/contexts/Theme.tsx
+var import_react5 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+var import_styled_components3 = __webpack_require__(/*! styled-components */ "../../node_modules/.pnpm/styled-components@6.1.19_react-dom@18.3.1_react@18.3.1/node_modules/styled-components/dist/styled-components.browser.esm.js");
+var useTheme = () => (0, import_react5.useContext)(import_styled_components3.ThemeContext);
+
+// src/contexts/TrackControls.tsx
+var import_react6 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+var import_jsx_runtime5 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+var TrackControlsContext = (0, import_react6.createContext)(/* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_react6.Fragment, {}));
+var useTrackControls = () => (0, import_react6.useContext)(TrackControlsContext);
+
+// src/components/SmartChannel.tsx
+var import_jsx_runtime6 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+var SmartChannel = (props) => {
+  const theme = useTheme();
+  const { waveHeight } = usePlaylistInfo();
+  const devicePixelRatio = useDevicePixelRatio();
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    Channel,
+    {
+      ...props,
+      ...theme,
+      waveHeight,
+      devicePixelRatio
+    }
+  );
+};
+
+// src/components/SmartScale.tsx
+var import_react8 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+
+// src/components/TimeScale.tsx
+var import_react7 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+var import_styled_components4 = __toESM(__webpack_require__(/*! styled-components */ "../../node_modules/.pnpm/styled-components@6.1.19_react-dom@18.3.1_react@18.3.1/node_modules/styled-components/dist/styled-components.browser.esm.js"));
+
+// src/utils/conversions.ts
+function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
+  return Math.ceil(seconds * sampleRate / samplesPerPixel);
+}
+
+// src/components/TimeScale.tsx
+var import_jsx_runtime7 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+function formatTime(milliseconds) {
+  const seconds = Math.floor(milliseconds / 1e3);
+  const s = seconds % 60;
+  const m = (seconds - s) / 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+var PlaylistTimeScaleScroll = import_styled_components4.default.div`
+  position: relative;
+  width: ${(props) => props.cssWidth}px;
+  margin-left: ${(props) => props.controlWidth}px;
+  height: ${(props) => props.timeScaleHeight * 2}px;
+`;
+var TimeTicks = import_styled_components4.default.canvas`
+  position: absolute;
+  width: ${(props) => props.cssWidth}px;
+  height: ${(props) => props.timeScaleHeight}px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+`;
+var TimeStamp = import_styled_components4.default.div`
+  left: ${(props) => props.left}px;
+  position: absolute;
+`;
+var TimeScale = (props) => {
+  const {
+    theme: { timeColor },
+    duration,
+    marker,
+    bigStep,
+    secondStep
+  } = props;
+  const canvasInfo = /* @__PURE__ */ new Map();
+  const timeMarkers = [];
+  const canvasRef = (0, import_react7.useRef)(null);
+  const {
+    sampleRate,
+    samplesPerPixel,
+    timeScaleHeight,
+    controls: { show: showControls, width: controlWidth }
+  } = (0, import_react7.useContext)(PlaylistInfoContext);
+  const devicePixelRatio = useDevicePixelRatio();
+  (0, import_react7.useEffect)(() => {
+    if (canvasRef.current !== null) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.resetTransform();
+        ctx.fillStyle = timeColor;
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        for (const [pixLeft, scaleHeight] of canvasInfo.entries()) {
+          const scaleY = timeScaleHeight - scaleHeight;
+          ctx.fillRect(pixLeft, scaleY, 1, scaleHeight);
+        }
+      }
+    }
+  }, [
+    duration,
+    devicePixelRatio,
+    timeColor,
+    timeScaleHeight,
+    bigStep,
+    secondStep,
+    marker,
+    canvasInfo
+  ]);
+  const widthX = secondsToPixels(duration / 1e3, samplesPerPixel, sampleRate);
+  const pixPerSec = sampleRate / samplesPerPixel;
+  let counter = 0;
+  for (let i = 0; i < widthX; i += pixPerSec * secondStep / 1e3) {
+    const pix = Math.floor(i);
+    if (counter % marker === 0) {
+      const timestamp = formatTime(counter);
+      timeMarkers.push(
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TimeStamp, { left: pix, children: timestamp }, timestamp)
+      );
+      canvasInfo.set(pix, timeScaleHeight);
+    } else if (counter % bigStep === 0) {
+      canvasInfo.set(pix, Math.floor(timeScaleHeight / 2));
+    } else if (counter % secondStep === 0) {
+      canvasInfo.set(pix, Math.floor(timeScaleHeight / 5));
+    }
+    counter += secondStep;
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    PlaylistTimeScaleScroll,
+    {
+      cssWidth: widthX,
+      controlWidth: showControls ? controlWidth : 0,
+      timeScaleHeight,
+      children: [
+        timeMarkers,
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          TimeTicks,
+          {
+            cssWidth: widthX,
+            timeScaleHeight,
+            width: widthX * devicePixelRatio,
+            height: timeScaleHeight * devicePixelRatio,
+            ref: canvasRef
+          }
+        )
+      ]
+    }
+  );
+};
+var StyledTimeScale = (0, import_styled_components4.withTheme)(TimeScale);
+
+// src/components/SmartScale.tsx
+var import_jsx_runtime8 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+var timeinfo = /* @__PURE__ */ new Map([
+  [
+    700,
+    {
+      marker: 1e3,
+      bigStep: 500,
+      smallStep: 100
+    }
+  ],
+  [
+    1500,
+    {
+      marker: 2e3,
+      bigStep: 1e3,
+      smallStep: 200
+    }
+  ],
+  [
+    2500,
+    {
+      marker: 2e3,
+      bigStep: 1e3,
+      smallStep: 500
+    }
+  ],
+  [
+    5e3,
+    {
+      marker: 5e3,
+      bigStep: 1e3,
+      smallStep: 500
+    }
+  ],
+  [
+    1e4,
+    {
+      marker: 1e4,
+      bigStep: 5e3,
+      smallStep: 1e3
+    }
+  ],
+  [
+    12e3,
+    {
+      marker: 15e3,
+      bigStep: 5e3,
+      smallStep: 1e3
+    }
+  ],
+  [
+    Infinity,
+    {
+      marker: 3e4,
+      bigStep: 1e4,
+      smallStep: 5e3
+    }
+  ]
+]);
+function getScaleInfo(samplesPerPixel) {
+  const keys = timeinfo.keys();
+  let config;
+  for (const resolution of keys) {
+    if (samplesPerPixel < resolution) {
+      config = timeinfo.get(resolution);
+      break;
+    }
+  }
+  if (config === void 0) {
+    config = { marker: 3e4, bigStep: 1e4, smallStep: 5e3 };
+  }
+  return config;
+}
+var SmartScale = () => {
+  const { samplesPerPixel, duration } = (0, import_react8.useContext)(PlaylistInfoContext);
+  let config = getScaleInfo(samplesPerPixel);
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    StyledTimeScale,
+    {
+      marker: config.marker,
+      bigStep: config.bigStep,
+      secondStep: config.smallStep,
+      duration
+    }
+  );
+};
+
+// src/components/SmartTrack.tsx
+var import_react9 = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js");
+
+// src/components/Track.tsx
+var import_styled_components5 = __toESM(__webpack_require__(/*! styled-components */ "../../node_modules/.pnpm/styled-components@6.1.19_react-dom@18.3.1_react@18.3.1/node_modules/styled-components/dist/styled-components.browser.esm.js"));
+var import_jsx_runtime9 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+var Container = import_styled_components5.default.div`
+  height: ${(props) => props.waveHeight * props.numChannels}px;
+  margin-left: ${(props) => props.controlWidth}px;
+`;
+var ChannelContainer = import_styled_components5.default.div`
+  position: relative;
+`;
+var ControlsWrapper = import_styled_components5.default.div`
+  width: ${(props) => props.controlWidth}px;
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  height: 100%;
+`;
+var Track = ({
+  numChannels,
+  children,
+  className
+}) => {
+  const {
+    waveHeight,
+    controls: { show, width }
+  } = usePlaylistInfo();
+  const controls = useTrackControls();
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+    Container,
+    {
+      numChannels,
+      className,
+      waveHeight,
+      controlWidth: show ? width : 0,
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ControlsWrapper, { controlWidth: show ? width : 0, children: controls }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ChannelContainer, { children })
+      ]
+    }
+  );
+};
+
+// src/components/SmartTrack.tsx
+var import_jsx_runtime10 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+function parseData(waveform, channel) {
+  const peakLength = waveform.length;
+  let data;
+  if (waveform.bits === 8) {
+    data = new Int8Array(peakLength * 2);
+  } else {
+    data = new Int16Array(peakLength * 2);
+  }
+  for (let i = 0; i < peakLength; i++) {
+    data[i * 2] = waveform.channel(channel).min_sample(i);
+    data[i * 2 + 1] = waveform.channel(channel).max_sample(i);
+  }
+  return data;
+}
+var WaveformDataTrack = ({
+  waveformData
+}) => {
+  const { samplesPerPixel } = usePlaylistInfo();
+  const waveform = waveformData.resample({ scale: samplesPerPixel });
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+      SmartChannel,
+      {
+        data: parseData(waveform, i),
+        bits: waveform.bits,
+        length: waveform.length,
+        index: i
+      },
+      i
+    );
+  }) });
+};
+var SmartTrack = ({
+  dataUri,
+  type
+}) => {
+  const { data: waveformData } = useWaveformData(dataUri, type);
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_react9.Fragment, { children: [
+    !waveformData && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Track, { numChannels: 0 }),
+    waveformData && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(WaveformDataTrack, { waveformData })
+  ] });
+};
+// Annotate the CommonJS export names for ESM import in node:
+0 && (0);
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ "../webaudio-peaks/dist/index.js":
+/*!***************************************!*\
+  !*** ../webaudio-peaks/dist/index.js ***!
+  \***************************************/
+/***/ ((module) => {
+
+"use strict";
+
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/index.ts
+var index_exports = {};
+__export(index_exports, {
+  default: () => extractPeaksFromBuffer
+});
+module.exports = __toCommonJS(index_exports);
+function findMinMax(array) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < array.length; i++) {
+    const curr = array[i];
+    if (min > curr) {
+      min = curr;
+    }
+    if (max < curr) {
+      max = curr;
+    }
+  }
+  return { min, max };
+}
+function convert(n, bits) {
+  const maxValue = Math.pow(2, bits - 1);
+  const v = n < 0 ? n * maxValue : n * (maxValue - 1);
+  return Math.max(-maxValue, Math.min(maxValue - 1, v));
+}
+function makeTypedArray(bits, length) {
+  switch (bits) {
+    case 8:
+      return new Int8Array(length);
+    case 16:
+      return new Int16Array(length);
+    case 32:
+      return new Int32Array(length);
+  }
+}
+function extractPeaks(channel, samplesPerPixel, bits) {
+  const chanLength = channel.length;
+  const numPeaks = Math.ceil(chanLength / samplesPerPixel);
+  const peaks = makeTypedArray(bits, numPeaks * 2);
+  for (let i = 0; i < numPeaks; i++) {
+    const start = i * samplesPerPixel;
+    const end = Math.min((i + 1) * samplesPerPixel, chanLength);
+    const segment = channel.subarray(start, end);
+    const extrema = findMinMax(segment);
+    const min = convert(extrema.min, bits);
+    const max = convert(extrema.max, bits);
+    peaks[i * 2] = min;
+    peaks[i * 2 + 1] = max;
+  }
+  return peaks;
+}
+function makeMono(channelPeaks, bits) {
+  const numChan = channelPeaks.length;
+  const weight = 1 / numChan;
+  const numPeaks = channelPeaks[0].length / 2;
+  const peaks = makeTypedArray(bits, numPeaks * 2);
+  for (let i = 0; i < numPeaks; i++) {
+    let min = 0;
+    let max = 0;
+    for (let c = 0; c < numChan; c++) {
+      min += weight * channelPeaks[c][i * 2];
+      max += weight * channelPeaks[c][i * 2 + 1];
+    }
+    peaks[i * 2] = min;
+    peaks[i * 2 + 1] = max;
+  }
+  return [peaks];
+}
+function extractPeaksFromBuffer(source, samplesPerPixel = 1e3, isMono = true, cueIn = 0, cueOut, bits = 16) {
+  if (bits !== 8 && bits !== 16 && bits !== 32) {
+    throw new Error("Invalid number of bits specified for peaks.");
+  }
+  let peaks = [];
+  if ("getChannelData" in source) {
+    const numChan = source.numberOfChannels;
+    const actualCueOut = cueOut ?? source.length;
+    for (let c = 0; c < numChan; c++) {
+      const channel = source.getChannelData(c);
+      const slice = channel.subarray(cueIn, actualCueOut);
+      peaks.push(extractPeaks(slice, samplesPerPixel, bits));
+    }
+  } else {
+    const actualCueOut = cueOut ?? source.length;
+    const slice = source.subarray(cueIn, actualCueOut);
+    peaks.push(extractPeaks(slice, samplesPerPixel, bits));
+  }
+  if (isMono && peaks.length > 1) {
+    peaks = makeMono(peaks, bits);
+  }
+  const numPeaks = peaks[0].length / 2;
+  return {
+    length: numPeaks,
+    data: peaks,
+    bits
+  };
+}
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
 /***/ "./src/index.tsx":
 /*!***********************!*\
   !*** ./src/index.tsx ***!
@@ -83681,18 +85529,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.init = void 0;
 const jsx_runtime_1 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
-const react_1 = __importDefault(__webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js"));
 const client_1 = __webpack_require__(/*! react-dom/client */ "../../node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/client.js");
 const styled_components_1 = __webpack_require__(/*! styled-components */ "../../node_modules/.pnpm/styled-components@6.1.19_react-dom@18.3.1_react@18.3.1/node_modules/styled-components/dist/styled-components.browser.esm.js");
 const playout_1 = __webpack_require__(/*! @waveform-playlist/playout */ "../playout/dist/index.js");
 const loaders_1 = __webpack_require__(/*! @waveform-playlist/loaders */ "../loaders/dist/index.js");
 const tone_1 = __webpack_require__(/*! tone */ "../../node_modules/.pnpm/tone@15.1.22/node_modules/tone/build/esm/index.js");
+const ui_components_1 = __webpack_require__(/*! @waveform-playlist/ui-components */ "../ui-components/dist/index.js");
+const peaksUtil_1 = __webpack_require__(/*! ./peaksUtil */ "./src/peaksUtil.ts");
 // Simple theme
 const defaultTheme = {
     waveOutlineColor: '#00f',
@@ -83705,6 +85551,7 @@ class WaveformPlaylistClass {
         this.root = null;
         this.playout = null;
         this.tracks = [];
+        this.peaksData = new Map();
         this.container = config.container;
         this.config = config;
         // Clear container
@@ -83749,6 +85596,10 @@ class WaveformPlaylistClass {
                         } : undefined,
                     };
                     loadedTracks.push(track);
+                    // Generate peaks for waveform visualization
+                    const samplesPerPixel = this.config.samplesPerPixel || 4096;
+                    const peaks = (0, peaksUtil_1.generatePeaks)(audioBuffer, samplesPerPixel);
+                    this.peaksData.set(track.id, peaks);
                     // Add to playout engine
                     if (this.playout) {
                         this.playout.addTrack({
@@ -83773,60 +85624,24 @@ class WaveformPlaylistClass {
         if (!this.root)
             return;
         const theme = Object.assign(Object.assign({}, defaultTheme), this.config.colors);
-        // Simple waveform visualization component
-        const WaveformCanvas = ({ trackId }) => {
-            const canvasRef = react_1.default.useRef(null);
-            react_1.default.useEffect(() => {
-                if (!canvasRef.current || !this.playout)
-                    return;
-                const track = this.playout.getTrack(trackId);
-                if (!track)
-                    return;
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                if (!ctx)
-                    return;
-                // Get the audio buffer from the track
-                const buffer = track.buffer;
-                if (!buffer)
-                    return;
-                // Set canvas size
-                const width = canvas.width;
-                const height = canvas.height;
-                const data = buffer.getChannelData(0); // Get first channel
-                const step = Math.ceil(data.length / width);
-                const amp = height / 2;
-                // Draw waveform
-                ctx.fillStyle = theme.waveFillColor || '#e0e0e0';
-                ctx.fillRect(0, 0, width, height);
-                ctx.strokeStyle = theme.waveOutlineColor || '#00f';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                for (let i = 0; i < width; i++) {
-                    let min = 1.0;
-                    let max = -1.0;
-                    for (let j = 0; j < step; j++) {
-                        const datum = data[i * step + j];
-                        if (datum < min)
-                            min = datum;
-                        if (datum > max)
-                            max = datum;
-                    }
-                    ctx.moveTo(i, (1 + min) * amp);
-                    ctx.lineTo(i, (1 + max) * amp);
-                }
-                ctx.stroke();
-            }, [trackId]);
-            return ((0, jsx_runtime_1.jsx)("canvas", { ref: canvasRef, width: 800, height: 128, style: {
-                    width: '100%',
-                    height: '128px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                } }));
+        const waveHeight = this.config.waveHeight || 128;
+        const samplesPerPixel = this.config.samplesPerPixel || 4096;
+        // Waveform component using Channel from ui-components
+        const WaveformDisplay = ({ trackId }) => {
+            const peaksData = this.peaksData.get(trackId);
+            if (!peaksData || !this.playout)
+                return null;
+            const track = this.playout.getTrack(trackId);
+            if (!track)
+                return null;
+            const buffer = track.buffer;
+            const width = peaksData.length;
+            const totalHeight = waveHeight * peaksData.data.length;
+            return ((0, jsx_runtime_1.jsx)("div", { style: { position: 'relative', width: `${width}px`, height: `${totalHeight}px`, background: '#f0f0f0' }, children: peaksData.data.map((channelData, index) => ((0, jsx_runtime_1.jsx)(ui_components_1.Channel, { index: index, data: channelData, bits: peaksData.bits, length: width, waveHeight: waveHeight, waveOutlineColor: theme.waveOutlineColor || '#00f', waveFillColor: theme.waveFillColor || '#f0f0f0', waveProgressColor: theme.waveProgressColor || '#f00', progress: 0 }, index))) }));
         };
         this.root.render((0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { padding: '20px', fontFamily: 'Arial, sans-serif' }, children: [(0, jsx_runtime_1.jsx)("h3", { children: "Waveform Playlist" }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px' }, children: this.tracks.map((track) => ((0, jsx_runtime_1.jsxs)("div", { style: {
                                 marginBottom: '20px',
-                            }, children: [(0, jsx_runtime_1.jsx)("div", { style: { marginBottom: '8px', fontWeight: 'bold' }, children: track.name }), (0, jsx_runtime_1.jsx)(WaveformCanvas, { trackId: track.id }), (0, jsx_runtime_1.jsxs)("div", { style: { fontSize: '12px', color: '#666', marginTop: '8px' }, children: ["Start: ", track.startTime.toFixed(2), "s | Gain: ", (track.gain * 100).toFixed(0), "% | Pan: ", track.stereoPan.toFixed(2)] })] }, track.id))) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }));
+                            }, children: [(0, jsx_runtime_1.jsx)("div", { style: { marginBottom: '8px', fontWeight: 'bold' }, children: track.name }), (0, jsx_runtime_1.jsx)(WaveformDisplay, { trackId: track.id }), (0, jsx_runtime_1.jsxs)("div", { style: { fontSize: '12px', color: '#666', marginTop: '8px' }, children: ["Start: ", track.startTime.toFixed(2), "s | Gain: ", (track.gain * 100).toFixed(0), "% | Pan: ", track.stereoPan.toFixed(2)] })] }, track.id))) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }));
     }
     play(startTime) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -83890,6 +85705,31 @@ const WaveformPlaylistAPI = {
 exports.init = WaveformPlaylistAPI.init;
 // Default export for UMD
 exports["default"] = WaveformPlaylistAPI;
+
+
+/***/ }),
+
+/***/ "./src/peaksUtil.ts":
+/*!**************************!*\
+  !*** ./src/peaksUtil.ts ***!
+  \**************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.generatePeaks = generatePeaks;
+const webaudio_peaks_1 = __importDefault(__webpack_require__(/*! @waveform-playlist/webaudio-peaks */ "../webaudio-peaks/dist/index.js"));
+/**
+ * Generate peaks from an AudioBuffer for waveform visualization
+ * This is a thin wrapper around the webaudio-peaks package
+ */
+function generatePeaks(audioBuffer, samplesPerPixel = 1000, bits = 8) {
+    return (0, webaudio_peaks_1.default)(audioBuffer, samplesPerPixel, true, undefined, undefined, bits);
+}
 
 
 /***/ })

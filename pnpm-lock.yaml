@@ -51,6 +51,9 @@ importers:
       '@waveform-playlist/ui-components':
         specifier: workspace:*
         version: link:../ui-components
+      '@waveform-playlist/webaudio-peaks':
+        specifier: workspace:*
+        version: link:../webaudio-peaks
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -63,6 +66,9 @@ importers:
       tone:
         specifier: 15.1.22
         version: 15.1.22
+      waveform-data:
+        specifier: ^4.4.0
+        version: 4.5.2
     devDependencies:
       '@types/node':
         specifier: ^20.10.6
@@ -178,15 +184,15 @@ importers:
       '@waveform-playlist/state':
         specifier: workspace:*
         version: link:../state
+      '@waveform-playlist/webaudio-peaks':
+        specifier: workspace:*
+        version: link:../webaudio-peaks
       react-async-hook:
         specifier: ^4.0.0
         version: 4.0.0(react@18.3.1)
       waveform-data:
         specifier: ^4.4.0
         version: 4.5.2
-      webaudio-peaks:
-        specifier: ^1.0.0
-        version: 1.0.0
     devDependencies:
       '@types/react':
         specifier: ^18.2.45
@@ -206,6 +212,15 @@ importers:
       styled-components:
         specifier: ^6.1.8
         version: 6.1.19(react-dom@18.3.1)(react@18.3.1)
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.1(typescript@5.9.3)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  packages/webaudio-peaks:
+    devDependencies:
       tsup:
         specifier: ^8.0.1
         version: 8.5.1(typescript@5.9.3)
@@ -2324,10 +2339,6 @@ packages:
 
   /waveform-data@4.5.2:
     resolution: {integrity: sha512-1wDQ2LmaCM76xXXkOamWui1dp7uS2UHVeNccuHDS/qnoOrczrXR6g7Q9m/UjlibHfukxBrceoRIVTKKY1tDLdA==}
-    dev: false
-
-  /webaudio-peaks@1.0.0:
-    resolution: {integrity: sha512-N7ck946hz2LNZxVveeMA3nWawFwYxfd0LYVXBwLJJvOrOx/8QBTFMuqqz+qUZecjDPpMxgNWsRSU/pTy5B7CSw==}
     dev: false
 
   /webpack-cli@5.1.4(webpack@5.102.1):

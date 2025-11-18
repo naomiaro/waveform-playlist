@@ -2,7 +2,7 @@ import * as react_jsx_runtime from 'react/jsx-runtime';
 import WaveformData from 'waveform-data';
 import * as React from 'react';
 import React__default, { FunctionComponent, ReactNode } from 'react';
-import { Peaks, Bits } from 'webaudio-peaks';
+import { Peaks, Bits } from '@waveform-playlist/webaudio-peaks';
 import * as styled_components_dist_utils_hoist from 'styled-components/dist/utils/hoist';
 import * as styled_components from 'styled-components';
 import { DefaultTheme } from 'styled-components';

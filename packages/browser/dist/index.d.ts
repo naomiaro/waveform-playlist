@@ -40,6 +40,7 @@ declare class WaveformPlaylistClass {
     private playout;
     private config;
     private tracks;
+    private peaksData;
     constructor(config: PlaylistConfig);
     load(trackConfigs: TrackConfig[]): Promise<void>;
     private render;

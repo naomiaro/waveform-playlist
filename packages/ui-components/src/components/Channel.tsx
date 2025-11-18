@@ -1,46 +1,46 @@
 import React, { FunctionComponent, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { Peaks, Bits } from 'webaudio-peaks';
+import { Peaks, Bits } from '@waveform-playlist/webaudio-peaks';
 
 const MAX_CANVAS_WIDTH = 1000;
 
 interface ProgressProps {
-  readonly progress: number;
-  readonly waveHeight: number;
-  readonly waveProgressColor: string;
+  readonly $progress: number;
+  readonly $waveHeight: number;
+  readonly $waveProgressColor: string;
 }
 const Progress = styled.div<ProgressProps>`
   position: absolute;
-  background: ${(props) => props.waveProgressColor};
-  width: ${(props) => props.progress}px;
-  height: ${(props) => props.waveHeight}px;
+  background: ${(props) => props.$waveProgressColor};
+  width: ${(props) => props.$progress}px;
+  height: ${(props) => props.$waveHeight}px;
 `;
 
 interface WaveformProps {
-  readonly cssWidth: number;
-  readonly waveHeight: number;
+  readonly $cssWidth: number;
+  readonly $waveHeight: number;
 }
 
 const Waveform = styled.canvas<WaveformProps>`
   float: left;
   position: relative;
-  width: ${(props) => props.cssWidth}px;
-  height: ${(props) => props.waveHeight}px;
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$waveHeight}px;
 `;
 
 interface WrapperProps {
-  readonly index: number;
-  readonly cssWidth: number;
-  readonly waveHeight: number;
-  readonly waveFillColor: string;
+  readonly $index: number;
+  readonly $cssWidth: number;
+  readonly $waveHeight: number;
+  readonly $waveFillColor: string;
 }
 
 const Wrapper = styled.div<WrapperProps>`
   position: absolute;
-  top: ${(props) => props.waveHeight * props.index}px;
-  background: ${(props) => props.waveFillColor};
-  width: ${(props) => props.cssWidth}px;
-  height: ${(props) => props.waveHeight}px;
+  top: ${(props) => props.$waveHeight * props.$index}px;
+  background: ${(props) => props.$waveFillColor};
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$waveHeight}px;
 `;
 
 export interface ChannelProps {
@@ -132,10 +132,10 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     const waveform = (
       <Waveform
         key={`${length}-${waveformCount}`}
-        cssWidth={currentWidth}
+        $cssWidth={currentWidth}
         width={currentWidth * devicePixelRatio}
         height={waveHeight * devicePixelRatio}
-        waveHeight={waveHeight}
+        $waveHeight={waveHeight}
         data-index={waveformCount}
         ref={canvasRef}
       />
@@ -148,16 +148,16 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
 
   return (
     <Wrapper
-      index={index}
-      cssWidth={length}
+      $index={index}
+      $cssWidth={length}
       className={className}
-      waveHeight={waveHeight}
-      waveFillColor={waveFillColor}
+      $waveHeight={waveHeight}
+      $waveFillColor={waveFillColor}
     >
       <Progress
-        progress={progress}
-        waveHeight={waveHeight}
-        waveProgressColor={waveProgressColor}
+        $progress={progress}
+        $waveHeight={waveHeight}
+        $waveProgressColor={waveProgressColor}
       />
       {waveforms}
     </Wrapper>
