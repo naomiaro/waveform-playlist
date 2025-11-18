@@ -7,5 +7,15 @@ node_modules/
 lib
 .DS_Store
 test/.DS_Store
+
+# Jekyll
 ghpages/.jekyll-cache/
-dist/waveform-playlist/scss
+_site/
+
+# Build outputs
+dist/
+ghpages/js/waveform-playlist.js
+ghpages/js/waveform-playlist.js.map
+
+# Source maps
+*.js.map
