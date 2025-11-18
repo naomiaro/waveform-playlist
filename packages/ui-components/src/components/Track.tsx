@@ -12,11 +12,19 @@ interface ContainerProps {
 const Container = styled.div.attrs<ContainerProps>((props) => ({
   style: {
     height: `${props.$waveHeight * props.$numChannels}px`,
+  },
+}))<ContainerProps>`
+  position: relative;
+`;
+
+interface ChannelContainerProps {
+  readonly $controlWidth: number;
+}
+const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
+  style: {
     marginLeft: `${props.$controlWidth}px`,
   },
-}))<ContainerProps>``;
-
-const ChannelContainer = styled.div`
+}))<ChannelContainerProps>`
   position: relative;
 `;
 
@@ -28,10 +36,11 @@ const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
     width: `${props.$controlWidth}px`,
   },
 }))<ControlsWrapperProps>`
-  position: absolute;
+  position: sticky;
   z-index: 1;
   left: 0;
   height: 100%;
+  float: left;
 `;
 
 export interface TrackProps {
@@ -60,7 +69,7 @@ export const Track: FunctionComponent<TrackProps> = ({
       <ControlsWrapper $controlWidth={show ? width : 0}>
         {controls}
       </ControlsWrapper>
-      <ChannelContainer>{children}</ChannelContainer>
+      <ChannelContainer $controlWidth={show ? width : 0}>{children}</ChannelContainer>
     </Container>
   );
 };
