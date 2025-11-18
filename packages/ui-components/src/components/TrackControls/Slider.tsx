@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 
-export const VolumeSlider = styled.input.attrs({
+export const Slider = styled.input.attrs({
   type: 'range',
 })`
   -webkit-appearance: none;

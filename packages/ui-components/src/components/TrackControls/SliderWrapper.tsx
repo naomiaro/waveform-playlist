@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 
-export const VolumeSliderWrapper = styled.label`
+export const SliderWrapper = styled.label`
   margin: 1em auto;
   width: 100%;
   display: flex;

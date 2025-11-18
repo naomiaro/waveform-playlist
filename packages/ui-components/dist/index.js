@@ -37,8 +37,11 @@ __export(index_exports, {
   Controls: () => Controls,
   DevicePixelRatioProvider: () => DevicePixelRatioProvider,
   Header: () => Header,
+  Knob: () => Knob,
   Playlist: () => Playlist,
   PlaylistInfoContext: () => PlaylistInfoContext,
+  Slider: () => Slider,
+  SliderWrapper: () => SliderWrapper,
   SmartChannel: () => SmartChannel,
   SmartScale: () => SmartScale,
   SmartTrack: () => SmartTrack,
@@ -48,8 +51,6 @@ __export(index_exports, {
   Track: () => Track,
   TrackControlsContext: () => TrackControlsContext,
   VolumeDownIcon: () => VolumeDownIcon,
-  VolumeSlider: () => VolumeSlider,
-  VolumeSliderWrapper: () => VolumeSliderWrapper,
   VolumeUpIcon: () => VolumeUpIcon,
   useDevicePixelRatio: () => useDevicePixelRatio,
   usePlaylistInfo: () => usePlaylistInfo,
@@ -615,9 +616,15 @@ var ButtonGroup = import_styled_components7.default.div`
 var import_styled_components8 = __toESM(require("styled-components"));
 var Controls = import_styled_components8.default.div`
   background: white;
-  text-align: center;
-  height: 100%;
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
 `;
 
 // src/components/TrackControls/Header.tsx
@@ -650,9 +657,9 @@ var VolumeUpIcon = (0, import_styled_components11.default)(import_react_fontawes
   icon: "volume-up"
 })``;
 
-// src/components/TrackControls/VolumeSlider.tsx
+// src/components/TrackControls/Slider.tsx
 var import_styled_components12 = __toESM(require("styled-components"));
-var VolumeSlider = import_styled_components12.default.input.attrs({
+var Slider = import_styled_components12.default.input.attrs({
   type: "range"
 })`
   -webkit-appearance: none;
@@ -712,9 +719,9 @@ var VolumeSlider = import_styled_components12.default.input.attrs({
   }
 `;
 
-// src/components/TrackControls/VolumeSliderWrapper.tsx
+// src/components/TrackControls/SliderWrapper.tsx
 var import_styled_components13 = __toESM(require("styled-components"));
-var VolumeSliderWrapper = import_styled_components13.default.label`
+var SliderWrapper = import_styled_components13.default.label`
   margin: 1em auto;
   width: 100%;
   display: flex;
@@ -722,6 +729,122 @@ var VolumeSliderWrapper = import_styled_components13.default.label`
   align-items: center;
   justify-content: center;
 `;
+
+// src/components/TrackControls/Knob.tsx
+var import_react10 = __toESM(require("react"));
+var import_styled_components14 = __toESM(require("styled-components"));
+var import_jsx_runtime11 = require("react/jsx-runtime");
+var KnobContainer = import_styled_components14.default.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+`;
+var KnobSvg = import_styled_components14.default.svg`
+  cursor: pointer;
+  user-select: none;
+`;
+var KnobLabel = import_styled_components14.default.span`
+  font-size: 9px;
+  color: #666;
+  font-weight: bold;
+  text-transform: uppercase;
+`;
+var Knob = ({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+  size = 40
+}) => {
+  const [isDragging, setIsDragging] = (0, import_react10.useState)(false);
+  const startYRef = (0, import_react10.useRef)(0);
+  const startValueRef = (0, import_react10.useRef)(0);
+  const normalizedValue = (value - min) / (max - min);
+  const angle = -135 + normalizedValue * 270;
+  const handleMouseDown = (0, import_react10.useCallback)((e) => {
+    setIsDragging(true);
+    startYRef.current = e.clientY;
+    startValueRef.current = value;
+    e.preventDefault();
+  }, [value]);
+  const handleMouseMove = (0, import_react10.useCallback)((e) => {
+    if (!isDragging) return;
+    const deltaY = startYRef.current - e.clientY;
+    const range = max - min;
+    const sensitivity = 0.5;
+    const delta = deltaY / 100 * range * sensitivity;
+    const newValue = Math.max(min, Math.min(max, startValueRef.current + delta));
+    onChange(newValue);
+  }, [isDragging, min, max, onChange]);
+  const handleMouseUp = (0, import_react10.useCallback)(() => {
+    setIsDragging(false);
+  }, []);
+  import_react10.default.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+    return void 0;
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+  const radius = size / 2 - 4;
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const indicatorAngle = angle * Math.PI / 180;
+  const indicatorX = centerX + Math.cos(indicatorAngle) * (radius - 6);
+  const indicatorY = centerY + Math.sin(indicatorAngle) * (radius - 6);
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(KnobContainer, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+      KnobSvg,
+      {
+        width: size,
+        height: size,
+        onMouseDown: handleMouseDown,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+            "circle",
+            {
+              cx: centerX,
+              cy: centerY,
+              r: radius,
+              fill: "#f5f5f5",
+              stroke: "#999",
+              strokeWidth: "2"
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+            "path",
+            {
+              d: `M ${centerX + Math.cos(-2.356) * radius} ${centerY + Math.sin(-2.356) * radius}
+              A ${radius} ${radius} 0 ${normalizedValue > 0.5 ? 1 : 0} 1
+              ${centerX + Math.cos(-2.356 + normalizedValue * 4.712) * radius}
+              ${centerY + Math.sin(-2.356 + normalizedValue * 4.712) * radius}`,
+              fill: "none",
+              stroke: isDragging ? "#3b82f6" : "#666",
+              strokeWidth: "3",
+              strokeLinecap: "round"
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+            "circle",
+            {
+              cx: indicatorX,
+              cy: indicatorY,
+              r: "3",
+              fill: isDragging ? "#3b82f6" : "#333"
+            }
+          )
+        ]
+      }
+    ),
+    label && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(KnobLabel, { children: label })
+  ] });
+};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BBCWaveformData,
@@ -731,8 +854,11 @@ var VolumeSliderWrapper = import_styled_components13.default.label`
   Controls,
   DevicePixelRatioProvider,
   Header,
+  Knob,
   Playlist,
   PlaylistInfoContext,
+  Slider,
+  SliderWrapper,
   SmartChannel,
   SmartScale,
   SmartTrack,
@@ -742,8 +868,6 @@ var VolumeSliderWrapper = import_styled_components13.default.label`
   Track,
   TrackControlsContext,
   VolumeDownIcon,
-  VolumeSlider,
-  VolumeSliderWrapper,
   VolumeUpIcon,
   useDevicePixelRatio,
   usePlaylistInfo,

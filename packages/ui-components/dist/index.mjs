@@ -554,9 +554,15 @@ var ButtonGroup = styled6.div`
 import styled7 from "styled-components";
 var Controls = styled7.div`
   background: white;
-  text-align: center;
-  height: 100%;
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
 `;
 
 // src/components/TrackControls/Header.tsx
@@ -589,9 +595,9 @@ var VolumeUpIcon = styled10(FontAwesomeIcon2).attrs({
   icon: "volume-up"
 })``;
 
-// src/components/TrackControls/VolumeSlider.tsx
+// src/components/TrackControls/Slider.tsx
 import styled11 from "styled-components";
-var VolumeSlider = styled11.input.attrs({
+var Slider = styled11.input.attrs({
   type: "range"
 })`
   -webkit-appearance: none;
@@ -651,9 +657,9 @@ var VolumeSlider = styled11.input.attrs({
   }
 `;
 
-// src/components/TrackControls/VolumeSliderWrapper.tsx
+// src/components/TrackControls/SliderWrapper.tsx
 import styled12 from "styled-components";
-var VolumeSliderWrapper = styled12.label`
+var SliderWrapper = styled12.label`
   margin: 1em auto;
   width: 100%;
   display: flex;
@@ -661,6 +667,122 @@ var VolumeSliderWrapper = styled12.label`
   align-items: center;
   justify-content: center;
 `;
+
+// src/components/TrackControls/Knob.tsx
+import React8, { useRef as useRef2, useState as useState2, useCallback as useCallback2 } from "react";
+import styled13 from "styled-components";
+import { jsx as jsx11, jsxs as jsxs5 } from "react/jsx-runtime";
+var KnobContainer = styled13.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+`;
+var KnobSvg = styled13.svg`
+  cursor: pointer;
+  user-select: none;
+`;
+var KnobLabel = styled13.span`
+  font-size: 9px;
+  color: #666;
+  font-weight: bold;
+  text-transform: uppercase;
+`;
+var Knob = ({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+  size = 40
+}) => {
+  const [isDragging, setIsDragging] = useState2(false);
+  const startYRef = useRef2(0);
+  const startValueRef = useRef2(0);
+  const normalizedValue = (value - min) / (max - min);
+  const angle = -135 + normalizedValue * 270;
+  const handleMouseDown = useCallback2((e) => {
+    setIsDragging(true);
+    startYRef.current = e.clientY;
+    startValueRef.current = value;
+    e.preventDefault();
+  }, [value]);
+  const handleMouseMove = useCallback2((e) => {
+    if (!isDragging) return;
+    const deltaY = startYRef.current - e.clientY;
+    const range = max - min;
+    const sensitivity = 0.5;
+    const delta = deltaY / 100 * range * sensitivity;
+    const newValue = Math.max(min, Math.min(max, startValueRef.current + delta));
+    onChange(newValue);
+  }, [isDragging, min, max, onChange]);
+  const handleMouseUp = useCallback2(() => {
+    setIsDragging(false);
+  }, []);
+  React8.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+    return void 0;
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+  const radius = size / 2 - 4;
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const indicatorAngle = angle * Math.PI / 180;
+  const indicatorX = centerX + Math.cos(indicatorAngle) * (radius - 6);
+  const indicatorY = centerY + Math.sin(indicatorAngle) * (radius - 6);
+  return /* @__PURE__ */ jsxs5(KnobContainer, { children: [
+    /* @__PURE__ */ jsxs5(
+      KnobSvg,
+      {
+        width: size,
+        height: size,
+        onMouseDown: handleMouseDown,
+        children: [
+          /* @__PURE__ */ jsx11(
+            "circle",
+            {
+              cx: centerX,
+              cy: centerY,
+              r: radius,
+              fill: "#f5f5f5",
+              stroke: "#999",
+              strokeWidth: "2"
+            }
+          ),
+          /* @__PURE__ */ jsx11(
+            "path",
+            {
+              d: `M ${centerX + Math.cos(-2.356) * radius} ${centerY + Math.sin(-2.356) * radius}
+              A ${radius} ${radius} 0 ${normalizedValue > 0.5 ? 1 : 0} 1
+              ${centerX + Math.cos(-2.356 + normalizedValue * 4.712) * radius}
+              ${centerY + Math.sin(-2.356 + normalizedValue * 4.712) * radius}`,
+              fill: "none",
+              stroke: isDragging ? "#3b82f6" : "#666",
+              strokeWidth: "3",
+              strokeLinecap: "round"
+            }
+          ),
+          /* @__PURE__ */ jsx11(
+            "circle",
+            {
+              cx: indicatorX,
+              cy: indicatorY,
+              r: "3",
+              fill: isDragging ? "#3b82f6" : "#333"
+            }
+          )
+        ]
+      }
+    ),
+    label && /* @__PURE__ */ jsx11(KnobLabel, { children: label })
+  ] });
+};
 export {
   BBCWaveformData,
   Button,
@@ -669,8 +791,11 @@ export {
   Controls,
   DevicePixelRatioProvider,
   Header,
+  Knob,
   Playlist,
   PlaylistInfoContext,
+  Slider,
+  SliderWrapper,
   SmartChannel,
   SmartScale,
   SmartTrack,
@@ -680,8 +805,6 @@ export {
   Track,
   TrackControlsContext,
   VolumeDownIcon,
-  VolumeSlider,
-  VolumeSliderWrapper,
   VolumeUpIcon,
   useDevicePixelRatio,
   usePlaylistInfo,

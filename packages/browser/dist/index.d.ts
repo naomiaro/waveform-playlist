@@ -54,6 +54,7 @@ declare class WaveformPlaylistClass {
     setTrackGain(trackId: string, gain: number): void;
     setTrackMute(trackId: string, muted: boolean): void;
     setTrackSolo(trackId: string, soloed: boolean): void;
+    setTrackPan(trackId: string, pan: number): void;
     getCurrentTime(): number;
     getTracks(): Track[];
     private createEventEmitter;

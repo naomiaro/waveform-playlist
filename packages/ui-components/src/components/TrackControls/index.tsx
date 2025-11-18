@@ -4,8 +4,9 @@ import { Controls } from './Controls';
 import { Header } from './Header';
 import { VolumeDownIcon } from './VolumeDownIcon';
 import { VolumeUpIcon } from './VolumeUpIcon';
-import { VolumeSlider } from './VolumeSlider';
-import { VolumeSliderWrapper } from './VolumeSliderWrapper';
+import { Slider } from './Slider';
+import { SliderWrapper } from './SliderWrapper';
+import { Knob } from './Knob';
 
 export {
   Button,
@@ -14,6 +15,7 @@ export {
   Header,
   VolumeDownIcon,
   VolumeUpIcon,
-  VolumeSlider,
-  VolumeSliderWrapper,
+  Slider,
+  SliderWrapper,
+  Knob,
 };

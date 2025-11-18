@@ -13,8 +13,9 @@ import {
   Header,
   VolumeDownIcon,
   VolumeUpIcon,
-  VolumeSlider,
-  VolumeSliderWrapper,
+  Slider,
+  SliderWrapper,
+  Knob,
   StyledTimeScale,
   Playlist,
   Track as TrackComponent,
@@ -181,7 +182,7 @@ class WaveformPlaylistClass {
 
     // Check if controls should be shown (default: true)
     const showControls = this.config.controls?.show !== false;
-    const controlsWidth = this.config.controls?.width || 200;
+    const controlsWidth = this.config.controls?.width || 250;
 
     // Check if timescale should be shown (default: true)
     const showTimescale = this.config.timescale !== false;
@@ -251,11 +252,14 @@ class WaveformPlaylistClass {
       const [muted, setMuted] = React.useState(track.muted);
       const [soloed, setSoloed] = React.useState(track.soloed);
       const [gain, setGain] = React.useState(track.gain);
+      const [stereoPan, setStereoPan] = React.useState(track.stereoPan || 0);
 
       return (
         <Controls>
-          <Header>{track.name}</Header>
-          <ButtonGroup>
+          <div style={{ fontSize: '9px', fontWeight: 'bold', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+            {track.name}
+          </div>
+          <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
             <Button
               onClick={() => {
                 const newMuted = !muted;
@@ -263,8 +267,8 @@ class WaveformPlaylistClass {
                 this.setTrackMute(trackId, newMuted);
               }}
               style={{
-                padding: '2px 8px',
-                fontSize: '12px',
+                padding: '2px 5px',
+                fontSize: '9px',
                 backgroundColor: muted ? '#ef4444' : undefined,
                 color: muted ? '#fff' : undefined,
               }}
@@ -278,18 +282,18 @@ class WaveformPlaylistClass {
                 this.setTrackSolo(trackId, newSoloed);
               }}
               style={{
-                padding: '2px 8px',
-                fontSize: '12px',
+                padding: '2px 5px',
+                fontSize: '9px',
                 backgroundColor: soloed ? '#3b82f6' : undefined,
                 color: soloed ? '#fff' : undefined,
               }}
             >
               Solo
             </Button>
-          </ButtonGroup>
-          <VolumeSliderWrapper>
-            <VolumeDownIcon />
-            <VolumeSlider
+          </div>
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px' }}>
+            <VolumeDownIcon style={{ fontSize: '10px', flexShrink: 0 }} />
+            <Slider
               min={0}
               max={200}
               value={gain * 100}
@@ -298,9 +302,25 @@ class WaveformPlaylistClass {
                 setGain(newGain);
                 this.setTrackGain(trackId, newGain);
               }}
+              style={{ flex: 1 }}
             />
-            <VolumeUpIcon />
-          </VolumeSliderWrapper>
+            <VolumeUpIcon style={{ fontSize: '10px', flexShrink: 0 }} />
+          </div>
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px' }}>
+            <span style={{ fontSize: '8px', color: '#666', fontWeight: 'bold', flexShrink: 0 }}>L</span>
+            <Slider
+              min={-100}
+              max={100}
+              value={stereoPan * 100}
+              onChange={(e) => {
+                const newPan = parseInt(e.currentTarget.value) / 100;
+                setStereoPan(newPan);
+                this.setTrackPan(trackId, newPan);
+              }}
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontSize: '8px', color: '#666', fontWeight: 'bold', flexShrink: 0 }}>R</span>
+          </div>
         </Controls>
       );
     };
@@ -403,6 +423,15 @@ class WaveformPlaylistClass {
   setTrackSolo(trackId: string, soloed: boolean): void {
     if (this.playout) {
       this.playout.setSolo(trackId, soloed);
+    }
+  }
+
+  setTrackPan(trackId: string, pan: number): void {
+    if (this.playout) {
+      const track = this.playout.getTrack(trackId);
+      if (track) {
+        track.setPan(pan);
+      }
     }
   }
 

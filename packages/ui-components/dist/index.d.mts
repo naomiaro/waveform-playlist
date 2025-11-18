@@ -130,11 +130,21 @@ declare const VolumeUpIcon: styled_components_dist_types.IStyledComponentBase<"w
     ref?: ((instance: SVGSVGElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<SVGSVGElement> | null | undefined;
 }>, never>, never>> & string & Omit<typeof FontAwesomeIcon, keyof react.Component<any, {}, any>>;
 
-declare const VolumeSlider: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<styled_components.FastOmit<styled_components_dist_types.Substitute<react.DetailedHTMLProps<react.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>, Omit<react.DetailedHTMLProps<react.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>, "ref"> & {
+declare const Slider: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<styled_components.FastOmit<styled_components_dist_types.Substitute<react.DetailedHTMLProps<react.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>, Omit<react.DetailedHTMLProps<react.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>, "ref"> & {
     ref?: ((instance: HTMLInputElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<HTMLInputElement> | null | undefined;
 }>, never>, never>> & string;
 
-declare const VolumeSliderWrapper: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<react.DetailedHTMLProps<react.LabelHTMLAttributes<HTMLLabelElement>, HTMLLabelElement>, never>> & string;
+declare const SliderWrapper: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<react.DetailedHTMLProps<react.LabelHTMLAttributes<HTMLLabelElement>, HTMLLabelElement>, never>> & string;
+
+interface KnobProps {
+    value: number;
+    min: number;
+    max: number;
+    onChange: (value: number) => void;
+    label?: string;
+    size?: number;
+}
+declare const Knob: react__default.FC<KnobProps>;
 
 type Props = {
     children: ReactNode;
@@ -163,4 +173,4 @@ declare const useTheme: () => styled_components.DefaultTheme | undefined;
 declare const TrackControlsContext: react__default.Context<react_jsx_runtime.JSX.Element>;
 declare const useTrackControls: () => react_jsx_runtime.JSX.Element;
 
-export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Playlist, PlaylistInfoContext, type PlaylistProps, type Props$1 as Props, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeSlider, VolumeSliderWrapper, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };
+export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Knob, Playlist, PlaylistInfoContext, type PlaylistProps, type Props$1 as Props, Slider, SliderWrapper, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };
