@@ -265,6 +265,8 @@ class WaveformPlaylistClass {
               style={{
                 padding: '2px 8px',
                 fontSize: '12px',
+                backgroundColor: muted ? '#ef4444' : undefined,
+                color: muted ? '#fff' : undefined,
               }}
             >
               Mute
@@ -278,6 +280,8 @@ class WaveformPlaylistClass {
               style={{
                 padding: '2px 8px',
                 fontSize: '12px',
+                backgroundColor: soloed ? '#3b82f6' : undefined,
+                color: soloed ? '#fff' : undefined,
               }}
             >
               Solo
