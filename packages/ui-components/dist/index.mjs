@@ -169,6 +169,17 @@ function getScale() {
   return window.devicePixelRatio;
 }
 var DevicePixelRatioContext = createContext(getScale());
+var DevicePixelRatioProvider = ({ children }) => {
+  const [scale, setScale] = useState(getScale());
+  matchMedia(`(resolution: ${getScale()}dppx)`).addEventListener(
+    "change",
+    () => {
+      setScale(getScale());
+    },
+    { once: true }
+  );
+  return /* @__PURE__ */ jsx4(DevicePixelRatioContext.Provider, { value: Math.ceil(scale), children });
+};
 var useDevicePixelRatio = () => useContext(DevicePixelRatioContext);
 
 // src/contexts/PlaylistInfo.tsx
@@ -656,6 +667,7 @@ export {
   ButtonGroup,
   Channel,
   Controls,
+  DevicePixelRatioProvider,
   Header,
   Playlist,
   PlaylistInfoContext,

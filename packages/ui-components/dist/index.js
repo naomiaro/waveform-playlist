@@ -35,6 +35,7 @@ __export(index_exports, {
   ButtonGroup: () => ButtonGroup,
   Channel: () => Channel,
   Controls: () => Controls,
+  DevicePixelRatioProvider: () => DevicePixelRatioProvider,
   Header: () => Header,
   Playlist: () => Playlist,
   PlaylistInfoContext: () => PlaylistInfoContext,
@@ -229,6 +230,17 @@ function getScale() {
   return window.devicePixelRatio;
 }
 var DevicePixelRatioContext = (0, import_react3.createContext)(getScale());
+var DevicePixelRatioProvider = ({ children }) => {
+  const [scale, setScale] = (0, import_react3.useState)(getScale());
+  matchMedia(`(resolution: ${getScale()}dppx)`).addEventListener(
+    "change",
+    () => {
+      setScale(getScale());
+    },
+    { once: true }
+  );
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(DevicePixelRatioContext.Provider, { value: Math.ceil(scale), children });
+};
 var useDevicePixelRatio = () => (0, import_react3.useContext)(DevicePixelRatioContext);
 
 // src/contexts/PlaylistInfo.tsx
@@ -717,6 +729,7 @@ var VolumeSliderWrapper = import_styled_components13.default.label`
   ButtonGroup,
   Channel,
   Controls,
+  DevicePixelRatioProvider,
   Header,
   Playlist,
   PlaylistInfoContext,

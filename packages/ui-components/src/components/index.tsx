@@ -7,3 +7,4 @@ export * from './SmartTrack';
 export * from './TimeScale';
 export * from './Track';
 export * from './TrackControls';
+export { StyledTimeScale } from './TimeScale';

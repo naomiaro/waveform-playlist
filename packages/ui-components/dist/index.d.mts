@@ -17,7 +17,7 @@ type RenderProps = {
     loading: boolean;
     error?: Error;
 };
-type Props = {
+type Props$1 = {
     location: Location;
     type: Type;
     children: (args: RenderProps) => JSX.Element;
@@ -44,7 +44,7 @@ declare function useWaveformData(location: Location, type: Type): {
  *  }}
  * </BBCWaveformData>
  */
-declare const BBCWaveformData: ({ location, type, children }: Props) => react_jsx_runtime.JSX.Element;
+declare const BBCWaveformData: ({ location, type, children }: Props$1) => react_jsx_runtime.JSX.Element;
 
 interface ChannelProps {
     className?: string;
@@ -136,6 +136,10 @@ declare const VolumeSlider: styled_components_dist_types.IStyledComponentBase<"w
 
 declare const VolumeSliderWrapper: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<react.DetailedHTMLProps<react.LabelHTMLAttributes<HTMLLabelElement>, HTMLLabelElement>, never>> & string;
 
+type Props = {
+    children: ReactNode;
+};
+declare const DevicePixelRatioProvider: ({ children }: Props) => react_jsx_runtime.JSX.Element;
 declare const useDevicePixelRatio: () => number;
 
 type Controls = {
@@ -159,4 +163,4 @@ declare const useTheme: () => styled_components.DefaultTheme | undefined;
 declare const TrackControlsContext: react__default.Context<react_jsx_runtime.JSX.Element>;
 declare const useTrackControls: () => react_jsx_runtime.JSX.Element;
 
-export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, Header, Playlist, PlaylistInfoContext, type PlaylistProps, type Props, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeSlider, VolumeSliderWrapper, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };
+export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Playlist, PlaylistInfoContext, type PlaylistProps, type Props$1 as Props, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeSlider, VolumeSliderWrapper, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };

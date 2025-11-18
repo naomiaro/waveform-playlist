@@ -101092,6 +101092,7 @@ __export(index_exports, {
   ButtonGroup: () => ButtonGroup,
   Channel: () => Channel,
   Controls: () => Controls,
+  DevicePixelRatioProvider: () => DevicePixelRatioProvider,
   Header: () => Header,
   Playlist: () => Playlist,
   PlaylistInfoContext: () => PlaylistInfoContext,
@@ -101286,6 +101287,17 @@ function getScale() {
   return window.devicePixelRatio;
 }
 var DevicePixelRatioContext = (0, import_react3.createContext)(getScale());
+var DevicePixelRatioProvider = ({ children }) => {
+  const [scale, setScale] = (0, import_react3.useState)(getScale());
+  matchMedia(`(resolution: ${getScale()}dppx)`).addEventListener(
+    "change",
+    () => {
+      setScale(getScale());
+    },
+    { once: true }
+  );
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(DevicePixelRatioContext.Provider, { value: Math.ceil(scale), children });
+};
 var useDevicePixelRatio = () => (0, import_react3.useContext)(DevicePixelRatioContext);
 
 // src/contexts/PlaylistInfo.tsx
@@ -102015,21 +102027,50 @@ class WaveformPlaylistClass {
         });
     }
     render() {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g;
         if (!this.root)
             return;
         const theme = Object.assign(Object.assign({}, defaultTheme), this.config.colors);
         const waveHeight = this.config.waveHeight || 128;
         const samplesPerPixel = this.config.samplesPerPixel || 4096;
+        const timeScaleHeight = 30;
         // Check if controls should be shown (support both old and new config formats)
         const showControls = ((_a = this.config.controls) === null || _a === void 0 ? void 0 : _a.show) !== false &&
             ((_c = (_b = this.config.options) === null || _b === void 0 ? void 0 : _b.controls) === null || _c === void 0 ? void 0 : _c.show) !== false;
         const controlsWidth = ((_d = this.config.controls) === null || _d === void 0 ? void 0 : _d.width) ||
             ((_f = (_e = this.config.options) === null || _e === void 0 ? void 0 : _e.controls) === null || _f === void 0 ? void 0 : _f.width) ||
             150;
+        // Check if timescale should be shown (default: true)
+        const showTimescale = this.config.timescale !== false;
+        // Calculate total duration from all tracks
+        let maxDuration = 0;
+        if (this.playout) {
+            this.tracks.forEach((track) => {
+                var _a;
+                const toneTrack = (_a = this.playout) === null || _a === void 0 ? void 0 : _a.getTrack(track.id);
+                if (toneTrack) {
+                    const trackDuration = toneTrack.buffer.duration + track.startTime;
+                    maxDuration = Math.max(maxDuration, trackDuration);
+                }
+            });
+        }
+        // Playlist info context values
+        const playlistInfo = {
+            sampleRate: ((_g = this.playout) === null || _g === void 0 ? void 0 : _g.sampleRate) || 44100,
+            samplesPerPixel,
+            zoomLevels: this.config.zoomLevels || [512, 1024, 2048, 4096],
+            waveHeight,
+            timeScaleHeight,
+            duration: maxDuration,
+            controls: {
+                show: showControls,
+                width: controlsWidth,
+            },
+        };
         console.log('Config:', this.config);
         console.log('Controls config:', this.config.controls);
         console.log('Show controls:', showControls);
+        console.log('Playlist info:', playlistInfo);
         // Waveform component using Channel from ui-components
         const WaveformDisplay = ({ trackId }) => {
             const peaksData = this.peaksData.get(trackId);
@@ -102038,10 +102079,8 @@ class WaveformPlaylistClass {
             const track = this.playout.getTrack(trackId);
             if (!track)
                 return null;
-            const buffer = track.buffer;
             const width = peaksData.length;
-            const totalHeight = waveHeight * peaksData.data.length;
-            return ((0, jsx_runtime_1.jsx)("div", { style: { position: 'relative', width: `${width}px`, height: `${totalHeight}px`, background: '#f0f0f0' }, children: peaksData.data.map((channelData, index) => ((0, jsx_runtime_1.jsx)(ui_components_1.Channel, { index: index, data: channelData, bits: peaksData.bits, length: width, waveHeight: waveHeight, waveOutlineColor: theme.waveOutlineColor || '#00f', waveFillColor: theme.waveFillColor || '#f0f0f0', waveProgressColor: theme.waveProgressColor || '#f00', progress: 0 }, index))) }));
+            return ((0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: peaksData.data.map((channelData, index) => ((0, jsx_runtime_1.jsx)(ui_components_1.Channel, { index: index, data: channelData, bits: peaksData.bits, length: width, waveHeight: waveHeight, waveOutlineColor: theme.waveOutlineColor || '#00f', waveFillColor: theme.waveFillColor || '#f0f0f0', waveProgressColor: theme.waveProgressColor || '#f00', progress: 0 }, index))) }));
         };
         const TrackControls = ({ trackId, track }) => {
             const [muted, setMuted] = react_1.default.useState(track.muted);
@@ -102067,12 +102106,13 @@ class WaveformPlaylistClass {
                                     this.setTrackGain(trackId, newGain);
                                 } }), (0, jsx_runtime_1.jsxs)("div", { style: { fontSize: '11px', marginTop: '4px', color: '#666' }, children: [Math.round(gain * 100), "%"] })] })] }));
         };
-        this.root.render((0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { fontFamily: 'Arial, sans-serif' }, children: [(0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px' }, children: this.tracks.map((track) => ((0, jsx_runtime_1.jsxs)("div", { style: {
-                                marginBottom: '20px',
-                                display: 'flex',
-                                gap: '10px',
-                                alignItems: 'stretch',
-                            }, children: [showControls && ((0, jsx_runtime_1.jsx)("div", { style: { width: `${controlsWidth}px`, flexShrink: 0 }, children: (0, jsx_runtime_1.jsx)(TrackControls, { trackId: track.id, track: track }) })), (0, jsx_runtime_1.jsx)("div", { style: { flex: 1, overflow: 'auto' }, children: (0, jsx_runtime_1.jsx)(WaveformDisplay, { trackId: track.id }) })] }, track.id))) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }));
+        this.root.render((0, jsx_runtime_1.jsx)(ui_components_1.DevicePixelRatioProvider, { children: (0, jsx_runtime_1.jsx)(ui_components_1.PlaylistInfoContext.Provider, { value: playlistInfo, children: (0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { fontFamily: 'Arial, sans-serif' }, children: [showTimescale && ((0, jsx_runtime_1.jsx)(ui_components_1.StyledTimeScale, { duration: maxDuration * 1000, marker: 10000, bigStep: 5000, secondStep: 1000 })), (0, jsx_runtime_1.jsx)(ui_components_1.Playlist, { theme: theme, children: (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, { children: this.tracks.map((track) => {
+                                        const peaksData = this.peaksData.get(track.id);
+                                        if (!peaksData)
+                                            return null;
+                                        const trackControls = showControls ? ((0, jsx_runtime_1.jsx)(TrackControls, { trackId: track.id, track: track })) : (0, jsx_runtime_1.jsx)(jsx_runtime_1.Fragment, {});
+                                        return ((0, jsx_runtime_1.jsx)(ui_components_1.TrackControlsContext.Provider, { value: trackControls, children: (0, jsx_runtime_1.jsx)(ui_components_1.Track, { numChannels: peaksData.data.length, children: (0, jsx_runtime_1.jsx)(WaveformDisplay, { trackId: track.id }) }) }, track.id));
+                                    }) }) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }) }) }));
     }
     play(startTime) {
         return __awaiter(this, void 0, void 0, function* () {

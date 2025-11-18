@@ -12,7 +12,13 @@ import {
   Controls,
   Header,
   VolumeSlider,
-  VolumeSliderWrapper
+  VolumeSliderWrapper,
+  StyledTimeScale,
+  Playlist,
+  Track as TrackComponent,
+  PlaylistInfoContext,
+  DevicePixelRatioProvider,
+  TrackControlsContext,
 } from '@waveform-playlist/ui-components';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
@@ -170,6 +176,7 @@ class WaveformPlaylistClass {
 
     const waveHeight = this.config.waveHeight || 128;
     const samplesPerPixel = this.config.samplesPerPixel || 4096;
+    const timeScaleHeight = 30;
 
     // Check if controls should be shown (support both old and new config formats)
     const showControls = this.config.controls?.show !== false &&
@@ -178,9 +185,39 @@ class WaveformPlaylistClass {
                          this.config.options?.controls?.width ||
                          150;
 
+    // Check if timescale should be shown (default: true)
+    const showTimescale = this.config.timescale !== false;
+
+    // Calculate total duration from all tracks
+    let maxDuration = 0;
+    if (this.playout) {
+      this.tracks.forEach((track) => {
+        const toneTrack = this.playout?.getTrack(track.id);
+        if (toneTrack) {
+          const trackDuration = toneTrack.buffer.duration + track.startTime;
+          maxDuration = Math.max(maxDuration, trackDuration);
+        }
+      });
+    }
+
+    // Playlist info context values
+    const playlistInfo = {
+      sampleRate: this.playout?.sampleRate || 44100,
+      samplesPerPixel,
+      zoomLevels: this.config.zoomLevels || [512, 1024, 2048, 4096],
+      waveHeight,
+      timeScaleHeight,
+      duration: maxDuration,
+      controls: {
+        show: showControls,
+        width: controlsWidth,
+      },
+    };
+
     console.log('Config:', this.config);
     console.log('Controls config:', this.config.controls);
     console.log('Show controls:', showControls);
+    console.log('Playlist info:', playlistInfo);
 
     // Waveform component using Channel from ui-components
     const WaveformDisplay: React.FC<{ trackId: string }> = ({ trackId }) => {
@@ -190,12 +227,10 @@ class WaveformPlaylistClass {
       const track = this.playout.getTrack(trackId);
       if (!track) return null;
 
-      const buffer = track.buffer;
       const width = peaksData.length;
-      const totalHeight = waveHeight * peaksData.data.length;
 
       return (
-        <div style={{ position: 'relative', width: `${width}px`, height: `${totalHeight}px`, background: '#f0f0f0' }}>
+        <>
           {peaksData.data.map((channelData: Peaks, index: number) => (
             <Channel
               key={index}
@@ -210,7 +245,7 @@ class WaveformPlaylistClass {
               progress={0}
             />
           ))}
-        </div>
+        </>
       );
     };
 
@@ -270,35 +305,45 @@ class WaveformPlaylistClass {
     };
 
     this.root.render(
-      <ThemeProvider theme={theme}>
-        <div style={{ fontFamily: 'Arial, sans-serif' }}>
-          <div style={{ marginTop: '20px' }}>
-            {this.tracks.map((track) => (
-              <div
-                key={track.id}
-                style={{
-                  marginBottom: '20px',
-                  display: 'flex',
-                  gap: '10px',
-                  alignItems: 'stretch',
-                }}
-              >
-                {showControls && (
-                  <div style={{ width: `${controlsWidth}px`, flexShrink: 0 }}>
-                    <TrackControls trackId={track.id} track={track} />
-                  </div>
-                )}
-                <div style={{ flex: 1, overflow: 'auto' }}>
-                  <WaveformDisplay trackId={track.id} />
-                </div>
+      <DevicePixelRatioProvider>
+        <PlaylistInfoContext.Provider value={playlistInfo}>
+          <ThemeProvider theme={theme}>
+            <div style={{ fontFamily: 'Arial, sans-serif' }}>
+              {showTimescale && (
+                <StyledTimeScale
+                  duration={maxDuration * 1000}
+                  marker={10000}
+                  bigStep={5000}
+                  secondStep={1000}
+                />
+              )}
+              <Playlist theme={theme}>
+                <>
+                  {this.tracks.map((track) => {
+                    const peaksData = this.peaksData.get(track.id);
+                    if (!peaksData) return null;
+
+                    const trackControls = showControls ? (
+                      <TrackControls trackId={track.id} track={track} />
+                    ) : <></>;
+
+                    return (
+                      <TrackControlsContext.Provider key={track.id} value={trackControls}>
+                        <TrackComponent numChannels={peaksData.data.length}>
+                          <WaveformDisplay trackId={track.id} />
+                        </TrackComponent>
+                      </TrackControlsContext.Provider>
+                    );
+                  })}
+                </>
+              </Playlist>
+              <div style={{ marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }}>
+                ✨ Powered by Tone.js 15.1.22 and React 18
               </div>
-            ))}
-          </div>
-          <div style={{ marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }}>
-            ✨ Powered by Tone.js 15.1.22 and React 18
-          </div>
-        </div>
-      </ThemeProvider>
+            </div>
+          </ThemeProvider>
+        </PlaylistInfoContext.Provider>
+      </DevicePixelRatioProvider>
     );
   }
 
