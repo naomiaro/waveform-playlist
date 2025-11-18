@@ -193,4 +193,11 @@ declare const usePlayoutStatus: () => {
 };
 declare const usePlayoutStatusUpdate: () => PlayoutStatusUpdate;
 
-export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Knob, Playhead, type PlayheadProps, Playlist, PlaylistInfoContext, type PlaylistProps, PlayoutProvider, type Props$2 as Props, Slider, SliderWrapper, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, usePlayoutStatus, usePlayoutStatusUpdate, useTheme, useTrackControls, useWaveformData };
+declare function samplesToSeconds(samples: number, sampleRate: number): number;
+declare function secondsToSamples(seconds: number, sampleRate: number): number;
+declare function samplesToPixels(samples: number, samplesPerPixel: number): number;
+declare function pixelsToSamples(pixels: number, samplesPerPixel: number): number;
+declare function pixelsToSeconds(pixels: number, samplesPerPixel: number, sampleRate: number): number;
+declare function secondsToPixels(seconds: number, samplesPerPixel: number, sampleRate: number): number;
+
+export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Knob, Playhead, type PlayheadProps, Playlist, PlaylistInfoContext, type PlaylistProps, PlayoutProvider, type Props$2 as Props, Slider, SliderWrapper, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeUpIcon, pixelsToSamples, pixelsToSeconds, samplesToPixels, samplesToSeconds, secondsToPixels, secondsToSamples, useDevicePixelRatio, usePlaylistInfo, usePlayoutStatus, usePlayoutStatusUpdate, useTheme, useTrackControls, useWaveformData };

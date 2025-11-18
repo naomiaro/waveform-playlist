@@ -8,6 +8,7 @@ const Wrapper = styled.div`
 
 const ScrollContainer = styled.div`
   overflow: auto;
+  position: relative;
 `;
 
 export interface PlaylistProps {
@@ -17,7 +18,7 @@ export interface PlaylistProps {
 export const Playlist: FunctionComponent<PlaylistProps> = ({ children }) => {
   return (
     <Wrapper>
-      <ScrollContainer>{children}</ScrollContainer>
+      <ScrollContainer data-scroll-container="true">{children}</ScrollContainer>
     </Wrapper>
   );
 };

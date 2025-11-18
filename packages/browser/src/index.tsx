@@ -26,6 +26,7 @@ import {
   PlayoutProvider,
   usePlayoutStatus,
   usePlayoutStatusUpdate,
+  secondsToPixels,
 } from '@waveform-playlist/ui-components';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
@@ -88,10 +89,13 @@ class WaveformPlaylistClass {
   private currentTime: number = 0;
   private animationFrameId: number | null = null;
   private setProgressFn: ((progress: number) => void) | null = null;
+  private isAutomaticScroll: boolean = false;
+  private scrollContainer: HTMLElement | null = null;
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
     this.config = config;
+    this.isAutomaticScroll = config.isAutomaticScroll ?? false;
 
     // Clear container
     this.container.innerHTML = '';
@@ -250,17 +254,18 @@ class WaveformPlaylistClass {
       const trackStartTime = trackData?.startTime || 0;
       const trackDuration = track.buffer.duration;
 
+      // Calculate progress based on how long this track has been playing
       let progressPx = 0;
       if (currentTime >= trackStartTime) {
         const relativeTime = currentTime - trackStartTime;
         if (relativeTime <= trackDuration) {
-          // Convert time to pixels: relativeTime * sampleRate / samplesPerPixel
-          const sampleRate = this.playout.sampleRate || 44100;
-          progressPx = (relativeTime * sampleRate) / samplesPerPixel;
-          progressPx = Math.min(progressPx, width); // Clamp to width
+          // Track is currently playing - show progress based on relativeTime
+          progressPx = secondsToPixels(relativeTime, samplesPerPixel, this.playout.sampleRate);
         } else {
-          progressPx = width; // Track has finished
+          // Track has finished - show full width
+          progressPx = secondsToPixels(trackDuration, samplesPerPixel, this.playout.sampleRate);
         }
+        progressPx = Math.min(progressPx, width); // Clamp to width
       }
 
       return (
@@ -395,7 +400,7 @@ class WaveformPlaylistClass {
                     );
                   })}
                   <Playhead
-                    position={((currentTime * (this.playout?.sampleRate || 44100)) / samplesPerPixel) + (showControls ? controlsWidth : 0)}
+                    position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
                     color={theme.waveProgressColor || '#f00'}
                   />
                 </>
@@ -480,6 +485,12 @@ class WaveformPlaylistClass {
       if (this.eventEmitter) {
         this.eventEmitter.emit('timeupdate', this.currentTime);
       }
+
+      // Handle automatic scroll
+      if (this.isAutomaticScroll) {
+        this.scrollToCurrentTime();
+      }
+
       this.animationFrameId = requestAnimationFrame(updateProgress);
     };
 
@@ -487,6 +498,48 @@ class WaveformPlaylistClass {
     if (this.playbackState === 'playing') {
       this.animationFrameId = requestAnimationFrame(updateProgress);
     }
+  }
+
+  private scrollToCurrentTime(): void {
+    if (!this.scrollContainer) {
+      // Try to find the scroll container using data attribute
+      this.scrollContainer = this.container.querySelector('[data-scroll-container="true"]') as HTMLElement;
+      if (!this.scrollContainer) {
+        return;
+      }
+    }
+
+    if (!this.playout) return;
+
+    // Convert current time to pixels using shared util
+    const samplesPerPixel = this.config.samplesPerPixel || 4096;
+    const currentPixel = secondsToPixels(this.currentTime, samplesPerPixel, this.playout.sampleRate);
+
+    const viewportWidth = this.scrollContainer.clientWidth;
+    const currentScrollLeft = this.scrollContainer.scrollLeft;
+    const currentScrollRight = currentScrollLeft + viewportWidth;
+
+    // Define playhead position in viewport (20% from left edge)
+    const playheadOffset = viewportWidth * 0.2;
+
+    // Check if playhead is outside the visible area
+    const isOutsideLeft = currentPixel < currentScrollLeft;
+    const isOutsideRight = currentPixel > currentScrollRight;
+
+    if (isOutsideLeft || isOutsideRight) {
+      // Position playhead at the left edge (with small offset)
+      this.scrollContainer.scrollLeft = Math.max(0, currentPixel - playheadOffset);
+    } else {
+      // Scroll to keep playhead at consistent position (20% from left)
+      const targetScrollLeft = currentPixel - playheadOffset;
+      if (targetScrollLeft > currentScrollLeft) {
+        this.scrollContainer.scrollLeft = Math.max(0, targetScrollLeft);
+      }
+    }
+  }
+
+  setAutomaticScroll(enabled: boolean): void {
+    this.isAutomaticScroll = enabled;
   }
 
   private stopAnimation(): void {
@@ -631,6 +684,9 @@ class WaveformPlaylistClass {
             break;
           case 'fastforward':
             self.fastForward();
+            break;
+          case 'automaticscroll':
+            self.setAutomaticScroll(args[0]);
             break;
         }
       },

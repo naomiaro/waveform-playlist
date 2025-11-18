@@ -54,6 +54,12 @@ __export(index_exports, {
   TrackControlsContext: () => TrackControlsContext,
   VolumeDownIcon: () => VolumeDownIcon,
   VolumeUpIcon: () => VolumeUpIcon,
+  pixelsToSamples: () => pixelsToSamples,
+  pixelsToSeconds: () => pixelsToSeconds,
+  samplesToPixels: () => samplesToPixels,
+  samplesToSeconds: () => samplesToSeconds,
+  secondsToPixels: () => secondsToPixels,
+  secondsToSamples: () => secondsToSamples,
   useDevicePixelRatio: () => useDevicePixelRatio,
   usePlaylistInfo: () => usePlaylistInfo,
   usePlayoutStatus: () => usePlayoutStatus,
@@ -251,9 +257,10 @@ var Wrapper2 = import_styled_components3.default.div`
 `;
 var ScrollContainer = import_styled_components3.default.div`
   overflow: auto;
+  position: relative;
 `;
 var Playlist = ({ children }) => {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Wrapper2, { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ScrollContainer, { children }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Wrapper2, { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ScrollContainer, { "data-scroll-container": "true", children }) });
 };
 var StyledPlaylist = (0, import_styled_components3.withTheme)(Playlist);
 
@@ -353,6 +360,21 @@ var import_react8 = require("react");
 var import_styled_components5 = __toESM(require("styled-components"));
 
 // src/utils/conversions.ts
+function samplesToSeconds(samples, sampleRate) {
+  return samples / sampleRate;
+}
+function secondsToSamples(seconds, sampleRate) {
+  return Math.ceil(seconds * sampleRate);
+}
+function samplesToPixels(samples, samplesPerPixel) {
+  return Math.floor(samples / samplesPerPixel);
+}
+function pixelsToSamples(pixels, samplesPerPixel) {
+  return Math.floor(pixels * samplesPerPixel);
+}
+function pixelsToSeconds(pixels, samplesPerPixel, sampleRate) {
+  return pixels * samplesPerPixel / sampleRate;
+}
 function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
   return Math.ceil(seconds * sampleRate / samplesPerPixel);
 }
@@ -942,6 +964,12 @@ var Knob = ({
   TrackControlsContext,
   VolumeDownIcon,
   VolumeUpIcon,
+  pixelsToSamples,
+  pixelsToSeconds,
+  samplesToPixels,
+  samplesToSeconds,
+  secondsToPixels,
+  secondsToSamples,
   useDevicePixelRatio,
   usePlaylistInfo,
   usePlayoutStatus,

@@ -47,6 +47,8 @@ declare class WaveformPlaylistClass {
     private currentTime;
     private animationFrameId;
     private setProgressFn;
+    private isAutomaticScroll;
+    private scrollContainer;
     constructor(config: PlaylistConfig);
     load(trackConfigs: TrackConfig[]): Promise<void>;
     private render;
@@ -54,6 +56,8 @@ declare class WaveformPlaylistClass {
     pause(): void;
     stop(): void;
     private startAnimation;
+    private scrollToCurrentTime;
+    setAutomaticScroll(enabled: boolean): void;
     private stopAnimation;
     setMasterGain(gain: number): void;
     setTrackGain(trackId: string, gain: number): void;

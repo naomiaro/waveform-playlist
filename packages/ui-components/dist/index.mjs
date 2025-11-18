@@ -185,9 +185,10 @@ var Wrapper2 = styled3.div`
 `;
 var ScrollContainer = styled3.div`
   overflow: auto;
+  position: relative;
 `;
 var Playlist = ({ children }) => {
-  return /* @__PURE__ */ jsx4(Wrapper2, { children: /* @__PURE__ */ jsx4(ScrollContainer, { children }) });
+  return /* @__PURE__ */ jsx4(Wrapper2, { children: /* @__PURE__ */ jsx4(ScrollContainer, { "data-scroll-container": "true", children }) });
 };
 var StyledPlaylist = withTheme(Playlist);
 
@@ -291,6 +292,21 @@ import { useRef, useEffect as useEffect2, useContext as useContext6 } from "reac
 import styled4, { withTheme as withTheme2 } from "styled-components";
 
 // src/utils/conversions.ts
+function samplesToSeconds(samples, sampleRate) {
+  return samples / sampleRate;
+}
+function secondsToSamples(seconds, sampleRate) {
+  return Math.ceil(seconds * sampleRate);
+}
+function samplesToPixels(samples, samplesPerPixel) {
+  return Math.floor(samples / samplesPerPixel);
+}
+function pixelsToSamples(pixels, samplesPerPixel) {
+  return Math.floor(pixels * samplesPerPixel);
+}
+function pixelsToSeconds(pixels, samplesPerPixel, sampleRate) {
+  return pixels * samplesPerPixel / sampleRate;
+}
 function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
   return Math.ceil(seconds * sampleRate / samplesPerPixel);
 }
@@ -879,6 +895,12 @@ export {
   TrackControlsContext,
   VolumeDownIcon,
   VolumeUpIcon,
+  pixelsToSamples,
+  pixelsToSeconds,
+  samplesToPixels,
+  samplesToSeconds,
+  secondsToPixels,
+  secondsToSamples,
   useDevicePixelRatio,
   usePlaylistInfo,
   usePlayoutStatus,
