@@ -2,6 +2,7 @@ export * from './BBCExtractPeaks';
 export * from './Channel';
 export * from './Playhead';
 export * from './Playlist';
+export * from './Selection';
 export * from './SmartChannel';
 export * from './SmartScale';
 export * from './SmartTrack';

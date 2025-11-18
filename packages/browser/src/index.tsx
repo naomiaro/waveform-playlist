@@ -19,6 +19,7 @@ import {
   StyledTimeScale,
   Playlist,
   Playhead,
+  Selection,
   Track as TrackComponent,
   PlaylistInfoContext,
   DevicePixelRatioProvider,
@@ -75,6 +76,10 @@ interface TrackConfig {
   muted?: boolean;
   soloed?: boolean;
   stereoPan?: number;
+  selected?: {
+    start: number;
+    end: number;
+  };
 }
 
 class WaveformPlaylistClass {
@@ -132,7 +137,7 @@ class WaveformPlaylistClass {
         const track: Track = {
           id: `track-${i}`,
           name: config.name || `Track ${i + 1}`,
-          src: config.src,
+          src: typeof config.src === 'string' ? config.src : undefined,
           gain: config.gain ?? 1,
           muted: config.muted ?? false,
           soloed: config.soloed ?? false,
@@ -181,6 +186,15 @@ class WaveformPlaylistClass {
     // Render the playlist (for now, just a simple div with track info)
     this.render();
     console.log('Render complete');
+
+    // Handle pre-selection if any track has a selected region
+    for (let i = 0; i < trackConfigs.length; i++) {
+      const config = trackConfigs[i];
+      if (config.selected) {
+        this.setSelection(config.selected.start, config.selected.end);
+        break; // Only use the first track's selection
+      }
+    }
   }
 
   async addTrack(src: string | File, config?: Partial<TrackConfig>): Promise<void> {
@@ -210,7 +224,7 @@ class WaveformPlaylistClass {
       const track: Track = {
         id: `track-${trackIndex}`,
         name: trackConfig.name || (src instanceof File ? src.name : `Track ${trackIndex + 1}`),
-        src: trackConfig.src,
+        src: typeof trackConfig.src === 'string' ? trackConfig.src : undefined,
         gain: trackConfig.gain ?? 1,
         muted: trackConfig.muted ?? false,
         soloed: trackConfig.soloed ?? false,
@@ -490,11 +504,20 @@ class WaveformPlaylistClass {
                       </TrackControlsContext.Provider>
                     );
                   })}
-                  {this.tracks.length > 0 && (
-                    <Playhead
-                      position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
-                      color={theme.waveProgressColor || '#f00'}
-                    />
+                  {this.tracks.length > 0 && this.playout && (
+                    <>
+                      {this.selectionStart !== this.selectionEnd && (
+                        <Selection
+                          startPosition={secondsToPixels(this.selectionStart, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
+                          endPosition={secondsToPixels(this.selectionEnd, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
+                          color="#00ff00"
+                        />
+                      )}
+                      <Playhead
+                        position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
+                        color={theme.waveProgressColor || '#f00'}
+                      />
+                    </>
                   )}
                 </>
               </Playlist>
@@ -523,9 +546,16 @@ class WaveformPlaylistClass {
 
       console.log('Playing from:', { startTime, playbackState: this.playbackState, currentTime: this.currentTime, hasSeeked: this.hasSeeked });
 
-      // Always stop first to reset pausedPosition, then use explicit offset
-      // This ensures we always start from the correct absolute position
-      const playFrom = startTime !== undefined ? startTime : this.currentTime;
+      // Determine where to start playing
+      let playFrom: number;
+      if (startTime !== undefined) {
+        playFrom = startTime;
+      } else if (this.selectionStart !== this.selectionEnd && this.currentTime < this.selectionStart) {
+        // If there's a selection and we're before it, start from selection start
+        playFrom = this.selectionStart;
+      } else {
+        playFrom = this.currentTime;
+      }
       console.log('Playing from position:', playFrom);
 
       this.playout.stop(); // Reset pausedPosition to 0
@@ -579,6 +609,12 @@ class WaveformPlaylistClass {
       }
 
       this.currentTime = this.playout.getCurrentTime();
+
+      // Check if playback has reached the selection end
+      if (this.selectionStart !== this.selectionEnd && this.currentTime >= this.selectionEnd) {
+        this.stop();
+        return;
+      }
 
       // Check if playback has reached the end
       const duration = this.getDuration();
