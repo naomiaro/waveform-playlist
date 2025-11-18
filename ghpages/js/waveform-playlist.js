@@ -84601,6 +84601,8 @@ var Tone = __toESM(__webpack_require__(/*! tone */ "../../node_modules/.pnpm/ton
 var import_fade_maker = __webpack_require__(/*! fade-maker */ "../../node_modules/.pnpm/fade-maker@1.0.3/node_modules/fade-maker/index.js");
 var ToneTrack = class {
   constructor(options) {
+    this.pausedPosition = 0;
+    this.playStartTime = 0;
     this.track = options.track;
     this.audioBuffer = options.buffer;
     this.player = new Tone.Player({
@@ -84660,7 +84662,9 @@ var ToneTrack = class {
     this.track.soloed = soloed;
   }
   play(when = Tone.now(), offset = 0, duration) {
-    const startTime = this.track.startTime + offset;
+    if (this.isPlaying) return;
+    this.playStartTime = Tone.now();
+    const startTime = this.track.startTime + this.pausedPosition + offset;
     const playDuration = duration ?? (this.track.endTime ? this.track.endTime - startTime : void 0);
     if (playDuration !== void 0) {
       this.player.start(when, startTime, playDuration);
@@ -84668,8 +84672,15 @@ var ToneTrack = class {
       this.player.start(when, startTime);
     }
   }
+  pause() {
+    if (!this.isPlaying) return;
+    const elapsed = (Tone.now() - this.playStartTime) * this.player.playbackRate;
+    this.pausedPosition = this.pausedPosition + elapsed;
+    this.player.stop();
+  }
   stop(when = Tone.now()) {
     this.player.stop(when);
+    this.pausedPosition = 0;
   }
   dispose() {
     this.player.dispose();
@@ -84749,7 +84760,7 @@ var TonePlayout = class {
   pause() {
     Tone2.getTransport().pause();
     this.tracks.forEach((track) => {
-      track.stop();
+      track.pause();
     });
   }
   stop() {

@@ -13,6 +13,8 @@ declare class ToneTrack {
     private muteGain;
     private track;
     private audioBuffer;
+    private pausedPosition;
+    private playStartTime;
     constructor(options: ToneTrackOptions);
     private gainToDb;
     applyFadeIn(start: number, duration: number, shape?: FadeType): void;
@@ -22,6 +24,7 @@ declare class ToneTrack {
     setMute(muted: boolean): void;
     setSolo(soloed: boolean): void;
     play(when?: number, offset?: number, duration?: number): void;
+    pause(): void;
     stop(when?: number): void;
     dispose(): void;
     get id(): string;

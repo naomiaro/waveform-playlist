@@ -79,7 +79,7 @@ export class TonePlayout {
   pause(): void {
     Tone.getTransport().pause();
     this.tracks.forEach(track => {
-      track.stop();
+      track.pause();
     });
   }
 

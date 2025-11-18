@@ -15,6 +15,8 @@ export class ToneTrack {
   private muteGain: Tone.Gain;
   private track: Track;
   private audioBuffer: AudioBuffer;
+  private pausedPosition: number = 0;
+  private playStartTime: number = 0;
 
   constructor(options: ToneTrackOptions) {
     this.track = options.track;
@@ -94,7 +96,14 @@ export class ToneTrack {
   }
 
   play(when: number = Tone.now(), offset: number = 0, duration?: number): void {
-    const startTime = this.track.startTime + offset;
+    // Don't start if already playing
+    if (this.isPlaying) return;
+
+    // Record when we started playing
+    this.playStartTime = Tone.now();
+
+    // Calculate the actual start position
+    const startTime = this.track.startTime + this.pausedPosition + offset;
     const playDuration = duration ?? (this.track.endTime ? this.track.endTime - startTime : undefined);
 
     if (playDuration !== undefined) {
@@ -104,8 +113,19 @@ export class ToneTrack {
     }
   }
 
+  pause(): void {
+    if (!this.isPlaying) return;
+
+    // Calculate current position based on elapsed time
+    const elapsed = (Tone.now() - this.playStartTime) * this.player.playbackRate;
+    this.pausedPosition = this.pausedPosition + elapsed;
+
+    this.player.stop();
+  }
+
   stop(when: number = Tone.now()): void {
     this.player.stop(when);
+    this.pausedPosition = 0;
   }
 
   dispose(): void {
