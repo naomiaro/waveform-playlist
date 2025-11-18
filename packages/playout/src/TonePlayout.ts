@@ -11,6 +11,7 @@ export class TonePlayout {
   private masterVolume: Tone.Volume;
   private isInitialized = false;
   private soloedTracks: Set<string> = new Set();
+  private manualMuteState: Map<string, boolean> = new Map();
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Tone.Volume(this.gainToDb(options.masterGain ?? 1));
@@ -19,6 +20,8 @@ export class TonePlayout {
     if (options.tracks) {
       options.tracks.forEach(track => {
         this.tracks.set(track.id, track);
+        // Initialize manual mute state for constructor-provided tracks
+        this.manualMuteState.set(track.id, track.muted);
       });
     }
   }
@@ -37,6 +40,8 @@ export class TonePlayout {
   addTrack(trackOptions: ToneTrackOptions): ToneTrack {
     const toneTrack = new ToneTrack(trackOptions);
     this.tracks.set(toneTrack.id, toneTrack);
+    // Initialize manual mute state from track options
+    this.manualMuteState.set(toneTrack.id, trackOptions.track.muted ?? false);
     return toneTrack;
   }
 
@@ -45,6 +50,8 @@ export class TonePlayout {
     if (track) {
       track.dispose();
       this.tracks.delete(trackId);
+      this.manualMuteState.delete(trackId);
+      this.soloedTracks.delete(trackId);
     }
   }
 
@@ -58,19 +65,9 @@ export class TonePlayout {
       return;
     }
 
-    // Handle solo logic
-    const hassoloedTracks = this.soloedTracks.size > 0;
-
+    // Play all tracks - mute state will control volume
     this.tracks.forEach(track => {
-      if (hassoloedTracks) {
-        // Only play soloed tracks
-        if (this.soloedTracks.has(track.id)) {
-          track.play(when, offset);
-        }
-      } else {
-        // Play all non-muted tracks
-        track.play(when, offset);
-      }
+      track.play(when, offset);
     });
 
     Tone.getTransport().start(when, offset);
@@ -97,6 +94,9 @@ export class TonePlayout {
   setSolo(trackId: string, soloed: boolean): void {
     const track = this.tracks.get(trackId);
     if (track) {
+      console.log(`setSolo(${trackId}, ${soloed})`);
+      console.log('Manual mute state before:', Array.from(this.manualMuteState.entries()));
+
       track.setSolo(soloed);
       if (soloed) {
         this.soloedTracks.add(trackId);
@@ -104,28 +104,36 @@ export class TonePlayout {
         this.soloedTracks.delete(trackId);
       }
 
+      console.log('Soloed tracks:', Array.from(this.soloedTracks));
+
       // Update mute state of all tracks based on solo logic
       this.updateSoloMuting();
+
+      console.log('Manual mute state after:', Array.from(this.manualMuteState.entries()));
     }
   }
 
   private updateSoloMuting(): void {
     const hasSoloedTracks = this.soloedTracks.size > 0;
+    console.log('updateSoloMuting - hasSoloedTracks:', hasSoloedTracks);
 
     this.tracks.forEach((track, id) => {
       if (hasSoloedTracks) {
         // If there are soloed tracks, mute all non-soloed tracks
         if (!this.soloedTracks.has(id)) {
+          console.log(`  ${id}: muting (not soloed)`);
           track.setMute(true);
         } else {
-          // Unmute soloed tracks (unless they were manually muted)
-          // For now, just unmute - we'll need to track manual mutes separately later
-          track.setMute(false);
+          // Restore manual mute state for soloed tracks
+          const manuallyMuted = this.manualMuteState.get(id) ?? false;
+          console.log(`  ${id}: restoring manual mute state (${manuallyMuted}) for soloed track`);
+          track.setMute(manuallyMuted);
         }
       } else {
-        // No soloed tracks, unmute all tracks
-        // TODO: Restore original mute state (need to track manual mutes)
-        track.setMute(false);
+        // No soloed tracks, restore original manual mute state for all tracks
+        const manuallyMuted = this.manualMuteState.get(id) ?? false;
+        console.log(`  ${id}: restoring manual mute state (${manuallyMuted})`);
+        track.setMute(manuallyMuted);
       }
     });
   }
@@ -133,6 +141,8 @@ export class TonePlayout {
   setMute(trackId: string, muted: boolean): void {
     const track = this.tracks.get(trackId);
     if (track) {
+      // Store the manual mute state
+      this.manualMuteState.set(trackId, muted);
       track.setMute(muted);
     }
   }

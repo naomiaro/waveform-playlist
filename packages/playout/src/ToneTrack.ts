@@ -151,4 +151,8 @@ export class ToneTrack {
   get isPlaying(): boolean {
     return this.player.state === 'started';
   }
+
+  get muted(): boolean {
+    return this.track.muted;
+  }
 }

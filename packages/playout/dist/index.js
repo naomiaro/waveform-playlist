@@ -143,6 +143,9 @@ var ToneTrack = class {
   get isPlaying() {
     return this.player.state === "started";
   }
+  get muted() {
+    return this.track.muted;
+  }
 };
 
 // src/TonePlayout.ts
@@ -151,11 +154,13 @@ var TonePlayout = class {
     this.tracks = /* @__PURE__ */ new Map();
     this.isInitialized = false;
     this.soloedTracks = /* @__PURE__ */ new Set();
+    this.manualMuteState = /* @__PURE__ */ new Map();
     this.masterVolume = new Tone2.Volume(this.gainToDb(options.masterGain ?? 1));
     this.masterVolume.toDestination();
     if (options.tracks) {
       options.tracks.forEach((track) => {
         this.tracks.set(track.id, track);
+        this.manualMuteState.set(track.id, track.muted);
       });
     }
   }
@@ -170,6 +175,7 @@ var TonePlayout = class {
   addTrack(trackOptions) {
     const toneTrack = new ToneTrack(trackOptions);
     this.tracks.set(toneTrack.id, toneTrack);
+    this.manualMuteState.set(toneTrack.id, trackOptions.track.muted ?? false);
     return toneTrack;
   }
   removeTrack(trackId) {
@@ -177,6 +183,8 @@ var TonePlayout = class {
     if (track) {
       track.dispose();
       this.tracks.delete(trackId);
+      this.manualMuteState.delete(trackId);
+      this.soloedTracks.delete(trackId);
     }
   }
   getTrack(trackId) {
@@ -187,15 +195,8 @@ var TonePlayout = class {
       console.warn("TonePlayout not initialized. Call init() first.");
       return;
     }
-    const hassoloedTracks = this.soloedTracks.size > 0;
     this.tracks.forEach((track) => {
-      if (hassoloedTracks) {
-        if (this.soloedTracks.has(track.id)) {
-          track.play(when, offset);
-        }
-      } else {
-        track.play(when, offset);
-      }
+      track.play(when, offset);
     });
     Tone2.getTransport().start(when, offset);
   }
@@ -217,32 +218,43 @@ var TonePlayout = class {
   setSolo(trackId, soloed) {
     const track = this.tracks.get(trackId);
     if (track) {
+      console.log(`setSolo(${trackId}, ${soloed})`);
+      console.log("Manual mute state before:", Array.from(this.manualMuteState.entries()));
       track.setSolo(soloed);
       if (soloed) {
         this.soloedTracks.add(trackId);
       } else {
         this.soloedTracks.delete(trackId);
       }
+      console.log("Soloed tracks:", Array.from(this.soloedTracks));
       this.updateSoloMuting();
+      console.log("Manual mute state after:", Array.from(this.manualMuteState.entries()));
     }
   }
   updateSoloMuting() {
     const hasSoloedTracks = this.soloedTracks.size > 0;
+    console.log("updateSoloMuting - hasSoloedTracks:", hasSoloedTracks);
     this.tracks.forEach((track, id) => {
       if (hasSoloedTracks) {
         if (!this.soloedTracks.has(id)) {
+          console.log(`  ${id}: muting (not soloed)`);
           track.setMute(true);
         } else {
-          track.setMute(false);
+          const manuallyMuted = this.manualMuteState.get(id) ?? false;
+          console.log(`  ${id}: restoring manual mute state (${manuallyMuted}) for soloed track`);
+          track.setMute(manuallyMuted);
         }
       } else {
-        track.setMute(false);
+        const manuallyMuted = this.manualMuteState.get(id) ?? false;
+        console.log(`  ${id}: restoring manual mute state (${manuallyMuted})`);
+        track.setMute(manuallyMuted);
       }
     });
   }
   setMute(trackId, muted) {
     const track = this.tracks.get(trackId);
     if (track) {
+      this.manualMuteState.set(trackId, muted);
       track.setMute(muted);
     }
   }

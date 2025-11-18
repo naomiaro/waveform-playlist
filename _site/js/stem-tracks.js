@@ -33,20 +33,7 @@ playlist
     console.log("Using Tone.js 15.1.22 for multitrack playback");
     console.log("Loaded tracks:", playlist.getTracks());
 
-    // Wire up playback controls
-    var ee = playlist.getEventEmitter();
-
-    document.querySelector(".btn-play").addEventListener("click", function () {
-      ee.emit("play");
-    });
-
-    document.querySelector(".btn-pause").addEventListener("click", function () {
-      ee.emit("pause");
-    });
-
-    document.querySelector(".btn-stop").addEventListener("click", function () {
-      ee.emit("stop");
-    });
+    // Note: Playback controls are handled by emitter.js
 
     // Wire up master gain slider
     var masterGainSlider = document.getElementById("master-gain");

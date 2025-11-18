@@ -31,6 +31,7 @@ declare class ToneTrack {
     get duration(): number;
     get buffer(): AudioBuffer;
     get isPlaying(): boolean;
+    get muted(): boolean;
 }
 
 interface TonePlayoutOptions {
@@ -42,6 +43,7 @@ declare class TonePlayout {
     private masterVolume;
     private isInitialized;
     private soloedTracks;
+    private manualMuteState;
     constructor(options?: TonePlayoutOptions);
     private gainToDb;
     init(): Promise<void>;
