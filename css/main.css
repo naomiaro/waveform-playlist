@@ -33,11 +33,11 @@
   --wp-annotation-icon-hover-color: orange;
 }
 
-.playlist {
-  margin: 2em 0;
-}
 .playlist *, .playlist ::after, .playlist ::before {
   box-sizing: border-box;
+}
+.playlist {
+  margin: 2em 0;
 }
 .playlist .btn:not(:disabled) {
   cursor: pointer;
