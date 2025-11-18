@@ -84,6 +84,8 @@ class WaveformPlaylistClass {
   private config: PlaylistConfig;
   private tracks: Track[] = [];
   private peaksData: Map<string, PeakData> = new Map();
+  private eventEmitter: any = null;
+  private playbackState: 'stopped' | 'paused' | 'playing' = 'stopped';
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
@@ -97,6 +99,9 @@ class WaveformPlaylistClass {
 
     // Initialize playout
     this.playout = new TonePlayout();
+
+    // Initialize event emitter
+    this.eventEmitter = this.createEventEmitter();
   }
 
   async load(trackConfigs: TrackConfig[]): Promise<void> {
@@ -266,6 +271,10 @@ class WaveformPlaylistClass {
                 setMuted(newMuted);
                 this.setTrackMute(trackId, newMuted);
               }}
+              style={{
+                padding: '2px 8px',
+                fontSize: '12px',
+              }}
             >
               Mute
             </Button>
@@ -274,6 +283,10 @@ class WaveformPlaylistClass {
                 const newSoloed = !soloed;
                 setSoloed(newSoloed);
                 this.setTrackSolo(trackId, newSoloed);
+              }}
+              style={{
+                padding: '2px 8px',
+                fontSize: '12px',
               }}
             >
               Solo
@@ -344,19 +357,30 @@ class WaveformPlaylistClass {
     if (this.playout) {
       // Initialize playout on first play (requires user gesture)
       await this.playout.init();
-      this.playout.play(undefined, startTime ?? 0);
+
+      // If resuming from pause, don't pass offset (to resume from current position)
+      // If stopped or explicit startTime provided, use that offset
+      if (this.playbackState === 'paused' && startTime === undefined) {
+        this.playout.play(undefined, undefined);
+      } else {
+        this.playout.play(undefined, startTime ?? 0);
+      }
+
+      this.playbackState = 'playing';
     }
   }
 
   pause(): void {
     if (this.playout) {
       this.playout.pause();
+      this.playbackState = 'paused';
     }
   }
 
   stop(): void {
     if (this.playout) {
       this.playout.stop();
+      this.playbackState = 'stopped';
     }
   }
 
@@ -398,30 +422,47 @@ class WaveformPlaylistClass {
     return this.tracks;
   }
 
-  getEventEmitter(): any {
+  private createEventEmitter(): any {
     // Return a minimal event emitter for compatibility
     // TODO: Integrate with Zustand store for proper event handling
+    const listeners: Map<string, Function[]> = new Map();
+
+    const self = this;
+
     return {
-      on: (event: string) => {
+      on: (event: string, callback: Function) => {
         console.log(`Event listener registered: ${event}`);
+        if (!listeners.has(event)) {
+          listeners.set(event, []);
+        }
+        listeners.get(event)!.push(callback);
       },
       emit: (event: string, ...args: any[]) => {
         console.log(`Event emitted: ${event}`, args);
 
+        // Call registered listeners
+        if (listeners.has(event)) {
+          listeners.get(event)!.forEach(callback => callback(...args));
+        }
+
         // Handle basic events
         switch(event) {
           case 'play':
-            this.play();
+            self.play();
             break;
           case 'pause':
-            this.pause();
+            self.pause();
             break;
           case 'stop':
-            this.stop();
+            self.stop();
             break;
         }
       },
     };
+  }
+
+  getEventEmitter(): any {
+    return this.eventEmitter;
   }
 
   destroy(): void {

@@ -100962,15 +100962,22 @@ var TonePlayout = class {
   getTrack(trackId) {
     return this.tracks.get(trackId);
   }
-  play(when = Tone2.now(), offset = 0) {
+  play(when = Tone2.now(), offset) {
     if (!this.isInitialized) {
       console.warn("TonePlayout not initialized. Call init() first.");
       return;
     }
-    this.tracks.forEach((track) => {
-      track.play(when, offset);
-    });
-    Tone2.getTransport().start(when, offset);
+    if (offset !== void 0) {
+      this.tracks.forEach((track) => {
+        track.play(when, offset);
+      });
+      Tone2.getTransport().start(when, offset);
+    } else {
+      this.tracks.forEach((track) => {
+        track.play(when, 0);
+      });
+      Tone2.getTransport().start(when);
+    }
   }
   pause() {
     Tone2.getTransport().pause();
@@ -101955,6 +101962,8 @@ class WaveformPlaylistClass {
         this.playout = null;
         this.tracks = [];
         this.peaksData = new Map();
+        this.eventEmitter = null;
+        this.playbackState = 'stopped';
         this.container = config.container;
         this.config = config;
         // Clear container
@@ -101963,6 +101972,8 @@ class WaveformPlaylistClass {
         this.root = (0, client_1.createRoot)(this.container);
         // Initialize playout
         this.playout = new playout_1.TonePlayout();
+        // Initialize event emitter
+        this.eventEmitter = this.createEventEmitter();
     }
     load(trackConfigs) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -102090,10 +102101,16 @@ class WaveformPlaylistClass {
                                     const newMuted = !muted;
                                     setMuted(newMuted);
                                     this.setTrackMute(trackId, newMuted);
+                                }, style: {
+                                    padding: '2px 8px',
+                                    fontSize: '12px',
                                 }, children: "Mute" }), (0, jsx_runtime_1.jsx)(ui_components_1.Button, { onClick: () => {
                                     const newSoloed = !soloed;
                                     setSoloed(newSoloed);
                                     this.setTrackSolo(trackId, newSoloed);
+                                }, style: {
+                                    padding: '2px 8px',
+                                    fontSize: '12px',
                                 }, children: "Solo" })] }), (0, jsx_runtime_1.jsxs)(ui_components_1.VolumeSliderWrapper, { children: [(0, jsx_runtime_1.jsx)(ui_components_1.VolumeDownIcon, {}), (0, jsx_runtime_1.jsx)(ui_components_1.VolumeSlider, { min: 0, max: 200, value: gain * 100, onChange: (e) => {
                                     const newGain = parseInt(e.currentTarget.value) / 100;
                                     setGain(newGain);
@@ -102113,18 +102130,28 @@ class WaveformPlaylistClass {
             if (this.playout) {
                 // Initialize playout on first play (requires user gesture)
                 yield this.playout.init();
-                this.playout.play(undefined, startTime !== null && startTime !== void 0 ? startTime : 0);
+                // If resuming from pause, don't pass offset (to resume from current position)
+                // If stopped or explicit startTime provided, use that offset
+                if (this.playbackState === 'paused' && startTime === undefined) {
+                    this.playout.play(undefined, undefined);
+                }
+                else {
+                    this.playout.play(undefined, startTime !== null && startTime !== void 0 ? startTime : 0);
+                }
+                this.playbackState = 'playing';
             }
         });
     }
     pause() {
         if (this.playout) {
             this.playout.pause();
+            this.playbackState = 'paused';
         }
     }
     stop() {
         if (this.playout) {
             this.playout.stop();
+            this.playbackState = 'stopped';
         }
     }
     setMasterGain(gain) {
@@ -102159,29 +102186,42 @@ class WaveformPlaylistClass {
     getTracks() {
         return this.tracks;
     }
-    getEventEmitter() {
+    createEventEmitter() {
         // Return a minimal event emitter for compatibility
         // TODO: Integrate with Zustand store for proper event handling
+        const listeners = new Map();
+        const self = this;
         return {
-            on: (event) => {
+            on: (event, callback) => {
                 console.log(`Event listener registered: ${event}`);
+                if (!listeners.has(event)) {
+                    listeners.set(event, []);
+                }
+                listeners.get(event).push(callback);
             },
             emit: (event, ...args) => {
                 console.log(`Event emitted: ${event}`, args);
+                // Call registered listeners
+                if (listeners.has(event)) {
+                    listeners.get(event).forEach(callback => callback(...args));
+                }
                 // Handle basic events
                 switch (event) {
                     case 'play':
-                        this.play();
+                        self.play();
                         break;
                     case 'pause':
-                        this.pause();
+                        self.pause();
                         break;
                     case 'stop':
-                        this.stop();
+                        self.stop();
                         break;
                 }
             },
         };
+    }
+    getEventEmitter() {
+        return this.eventEmitter;
     }
     destroy() {
         if (this.playout) {

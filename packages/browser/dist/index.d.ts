@@ -48,6 +48,8 @@ declare class WaveformPlaylistClass {
     private config;
     private tracks;
     private peaksData;
+    private eventEmitter;
+    private playbackState;
     constructor(config: PlaylistConfig);
     load(trackConfigs: TrackConfig[]): Promise<void>;
     private render;
@@ -60,6 +62,7 @@ declare class WaveformPlaylistClass {
     setTrackSolo(trackId: string, soloed: boolean): void;
     getCurrentTime(): number;
     getTracks(): Track[];
+    private createEventEmitter;
     getEventEmitter(): any;
     destroy(): void;
 }

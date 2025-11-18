@@ -153,15 +153,22 @@ var TonePlayout = class {
   getTrack(trackId) {
     return this.tracks.get(trackId);
   }
-  play(when = Tone2.now(), offset = 0) {
+  play(when = Tone2.now(), offset) {
     if (!this.isInitialized) {
       console.warn("TonePlayout not initialized. Call init() first.");
       return;
     }
-    this.tracks.forEach((track) => {
-      track.play(when, offset);
-    });
-    Tone2.getTransport().start(when, offset);
+    if (offset !== void 0) {
+      this.tracks.forEach((track) => {
+        track.play(when, offset);
+      });
+      Tone2.getTransport().start(when, offset);
+    } else {
+      this.tracks.forEach((track) => {
+        track.play(when, 0);
+      });
+      Tone2.getTransport().start(when);
+    }
   }
   pause() {
     Tone2.getTransport().pause();

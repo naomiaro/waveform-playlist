@@ -49,11 +49,61 @@ playlist
     }
 
     // Display current time during playback
-    var timeDisplay = document.getElementById("time-display");
+    var timeDisplay = document.querySelector(".audio-pos");
+    var timeUpdateInterval = null;
+    var isPlaying = false;
+
     if (timeDisplay) {
-      setInterval(function () {
+      // Helper function to format time as hh:mm:ss.uuu
+      function formatTime(seconds) {
+        var hours = Math.floor(seconds / 3600) % 24;
+        var minutes = Math.floor(seconds / 60) % 60;
+        var secs = (seconds % 60).toFixed(3);
+
+        return (hours < 10 ? "0" + hours : hours) + ":" +
+               (minutes < 10 ? "0" + minutes : minutes) + ":" +
+               (secs < 10 ? "0" + secs : secs);
+      }
+
+      function updateTimeDisplay() {
         var currentTime = playlist.getCurrentTime();
-        timeDisplay.textContent = currentTime.toFixed(2) + "s";
-      }, 100);
+        timeDisplay.textContent = formatTime(currentTime);
+      }
+
+      function startTimeUpdates() {
+        if (!timeUpdateInterval) {
+          timeUpdateInterval = setInterval(updateTimeDisplay, 100);
+        }
+      }
+
+      function stopTimeUpdates() {
+        if (timeUpdateInterval) {
+          clearInterval(timeUpdateInterval);
+          timeUpdateInterval = null;
+        }
+      }
+
+      // Listen to play/pause/stop events via the event emitter
+      var ee = playlist.getEventEmitter();
+
+      ee.on("play", function() {
+        isPlaying = true;
+        startTimeUpdates();
+      });
+
+      ee.on("pause", function() {
+        isPlaying = false;
+        stopTimeUpdates();
+        updateTimeDisplay(); // Update once more to show final position
+      });
+
+      ee.on("stop", function() {
+        isPlaying = false;
+        stopTimeUpdates();
+        updateTimeDisplay(); // Update once more to show final position
+      });
+
+      // Initialize with current time
+      updateTimeDisplay();
     }
   });
