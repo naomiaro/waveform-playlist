@@ -1,3 +1,4 @@
+// Initialize the playlist with the new React-based API
 var playlist = WaveformPlaylist.init({
   container: document.getElementById("playlist"),
   colors: {
@@ -5,10 +6,14 @@ var playlist = WaveformPlaylist.init({
   },
 });
 
+// Load tracks
 playlist.load([
   {
     "src": "media/audio/BassDrums30.mp3"
   }
 ]).then(function() {
-  //can do stuff with the playlist.
+  console.log('Playlist loaded with new React architecture!');
+  console.log('Using Tone.js 15.1.22 for playback');
+}).catch(function(error) {
+  console.error('Failed to load playlist:', error);
 });

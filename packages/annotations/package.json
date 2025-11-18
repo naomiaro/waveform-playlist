@@ -1,0 +1,30 @@
+{
+  "name": "@waveform-playlist/annotations",
+  "version": "5.0.0-alpha.0",
+  "description": "Annotation support for waveform-playlist",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["waveform", "audio", "annotations"],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@waveform-playlist/core": "workspace:*"
+  }
+}
