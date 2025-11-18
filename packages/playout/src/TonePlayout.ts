@@ -65,21 +65,17 @@ export class TonePlayout {
       return;
     }
 
-    // If offset is undefined, resume from pause (tracks use their stored pausedPosition)
-    // If offset is provided, seek to that position
+    // Play all tracks - mute state will control volume
+    this.tracks.forEach(track => {
+      track.play(when, offset);
+    });
+
+    // Start transport
     if (offset !== undefined) {
       // Explicit offset provided - seek to that position
-      this.tracks.forEach(track => {
-        track.play(when, offset);
-      });
       Tone.getTransport().start(when, offset);
     } else {
-      // No offset - resume from pause
-      // Tracks maintain their own pausedPosition, so pass 0
-      this.tracks.forEach(track => {
-        track.play(when, 0);
-      });
-      // Don't pass offset to Transport.start() - let it resume from current position
+      // No offset - resume from pause (Transport resumes from current position)
       Tone.getTransport().start(when);
     }
   }

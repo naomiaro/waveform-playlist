@@ -100967,15 +100967,12 @@ var TonePlayout = class {
       console.warn("TonePlayout not initialized. Call init() first.");
       return;
     }
+    this.tracks.forEach((track) => {
+      track.play(when, offset);
+    });
     if (offset !== void 0) {
-      this.tracks.forEach((track) => {
-        track.play(when, offset);
-      });
       Tone2.getTransport().start(when, offset);
     } else {
-      this.tracks.forEach((track) => {
-        track.play(when, 0);
-      });
       Tone2.getTransport().start(when);
     }
   }
