@@ -49,9 +49,10 @@ declare class WaveformPlaylistClass {
     getEventEmitter(): any;
     destroy(): void;
 }
-export declare function init(config: PlaylistConfig): WaveformPlaylistClass;
-declare const _default: {
-    init: typeof init;
+declare const WaveformPlaylistAPI: {
+    init: (config: PlaylistConfig) => WaveformPlaylistClass;
 };
-export default _default;
+export declare const init: (config: PlaylistConfig) => WaveformPlaylistClass;
+export type { PlaylistConfig, TrackConfig };
+export default WaveformPlaylistAPI;
 //# sourceMappingURL=index.d.ts.map

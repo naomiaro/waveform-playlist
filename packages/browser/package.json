@@ -31,6 +31,7 @@
     "@waveform-playlist/annotations": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "styled-components": "^6.1.8"
+    "styled-components": "^6.1.8",
+    "tone": "15.1.22"
   }
 }

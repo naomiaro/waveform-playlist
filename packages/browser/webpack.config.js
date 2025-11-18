@@ -5,8 +5,11 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, '../../ghpages/js'),
     filename: 'waveform-playlist.js',
-    library: 'WaveformPlaylist',
-    libraryTarget: 'umd',
+    library: {
+      name: 'WaveformPlaylist',
+      type: 'umd',
+      export: 'default',
+    },
     globalObject: 'this',
   },
   resolve: {

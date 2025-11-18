@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Waveform Playlist Bundle</title>
+</head>
+<body>
+    <h1>Test Page</h1>
+    <div id="playlist"></div>
+
+    <script src="ghpages/js/waveform-playlist.js"></script>
+    <script>
+        console.log('WaveformPlaylist object:', WaveformPlaylist);
+        console.log('WaveformPlaylist.init:', WaveformPlaylist.init);
+
+        try {
+            var playlist = WaveformPlaylist.init({
+                container: document.getElementById("playlist"),
+                colors: {
+                    waveOutlineColor: '#005BBB'
+                },
+            });
+
+            console.log('Playlist created:', playlist);
+
+            playlist.load([{
+                "src": "ghpages/media/audio/BassDrums30.mp3"
+            }]).then(function() {
+                console.log('SUCCESS: Playlist loaded!');
+            }).catch(function(error) {
+                console.error('ERROR loading playlist:', error);
+            });
+        } catch (error) {
+            console.error('ERROR creating playlist:', error);
+        }
+    </script>
+</body>
+</html>

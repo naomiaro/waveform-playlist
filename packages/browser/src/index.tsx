@@ -4,6 +4,7 @@ import { ThemeProvider } from 'styled-components';
 import { TonePlayout } from '@waveform-playlist/playout';
 import { LoaderFactory } from '@waveform-playlist/loaders';
 import { Track } from '@waveform-playlist/core';
+import { getContext } from 'tone';
 
 // Simple theme
 const defaultTheme = {
@@ -73,7 +74,8 @@ class WaveformPlaylistClass {
   }
 
   async load(trackConfigs: TrackConfig[]): Promise<void> {
-    const audioContext = new AudioContext();
+    // Use Tone's context (it will be in suspended state until user gesture)
+    const audioContext = getContext().rawContext as AudioContext;
     const loadedTracks: Track[] = [];
 
     // Load all tracks
@@ -124,10 +126,8 @@ class WaveformPlaylistClass {
 
     this.tracks = loadedTracks;
 
-    // Initialize playout
-    if (this.playout) {
-      await this.playout.init();
-    }
+    // Don't initialize playout here - it will be initialized on first play()
+    // to comply with browser autoplay policies
 
     // Render the playlist (for now, just a simple div with track info)
     this.render();
@@ -177,6 +177,8 @@ class WaveformPlaylistClass {
 
   async play(startTime?: number): Promise<void> {
     if (this.playout) {
+      // Initialize playout on first play (requires user gesture)
+      await this.playout.init();
       this.playout.play(undefined, startTime ?? 0);
     }
   }
@@ -229,12 +231,16 @@ class WaveformPlaylistClass {
   }
 }
 
-// Export the main API
-export function init(config: PlaylistConfig): WaveformPlaylistClass {
-  return new WaveformPlaylistClass(config);
-}
-
-// Export for UMD bundle
-export default {
-  init,
+// Create the API object
+const WaveformPlaylistAPI = {
+  init: (config: PlaylistConfig): WaveformPlaylistClass => {
+    return new WaveformPlaylistClass(config);
+  }
 };
+
+// Export for ES modules
+export const init = WaveformPlaylistAPI.init;
+export type { PlaylistConfig, TrackConfig };
+
+// Default export for UMD
+export default WaveformPlaylistAPI;

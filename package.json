@@ -13,7 +13,9 @@
     "install:all": "pnpm install",
     "test": "echo \"Tests coming soon\"",
     "format": "prettier --write \"packages/**/src/**/*.{ts,tsx}\"",
-    "lint": "eslint \"packages/**/src/**/*.{ts,tsx}\""
+    "lint": "eslint \"packages/**/src/**/*.{ts,tsx}\"",
+    "jekyll:serve": "jekyll serve -s ghpages --livereload",
+    "jekyll:build": "jekyll build -s ghpages -d dist/waveform-playlist"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
