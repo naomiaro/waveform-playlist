@@ -60,7 +60,7 @@ interface PlaylistConfig {
 }
 
 interface TrackConfig {
-  src: string;
+  src: string | File;
   name?: string;
   start?: number;
   fadeIn?: {
@@ -177,6 +177,77 @@ class WaveformPlaylistClass {
     // Render the playlist (for now, just a simple div with track info)
     this.render();
     console.log('Render complete');
+  }
+
+  async addTrack(src: string | File, config?: Partial<TrackConfig>): Promise<void> {
+    // Use Tone's context
+    const audioContext = getContext().rawContext as AudioContext;
+
+    try {
+      // Create track config
+      const trackConfig: TrackConfig = {
+        src,
+        name: config?.name,
+        start: config?.start,
+        fadeIn: config?.fadeIn,
+        fadeOut: config?.fadeOut,
+        gain: config?.gain,
+        muted: config?.muted,
+        soloed: config?.soloed,
+        stereoPan: config?.stereoPan,
+      };
+
+      // Load audio file
+      const loader = LoaderFactory.createLoader(trackConfig.src, audioContext);
+      const audioBuffer = await loader.load();
+
+      // Create track object with new ID based on current tracks length
+      const trackIndex = this.tracks.length;
+      const track: Track = {
+        id: `track-${trackIndex}`,
+        name: trackConfig.name || (src instanceof File ? src.name : `Track ${trackIndex + 1}`),
+        src: trackConfig.src,
+        gain: trackConfig.gain ?? 1,
+        muted: trackConfig.muted ?? false,
+        soloed: trackConfig.soloed ?? false,
+        stereoPan: trackConfig.stereoPan ?? 0,
+        startTime: trackConfig.start ?? 0,
+        fadeIn: trackConfig.fadeIn ? {
+          start: trackConfig.start ?? 0,
+          end: (trackConfig.start ?? 0) + trackConfig.fadeIn.duration,
+          type: trackConfig.fadeIn.shape ?? 'logarithmic',
+        } : undefined,
+        fadeOut: trackConfig.fadeOut ? {
+          start: audioBuffer.duration - trackConfig.fadeOut.duration,
+          end: audioBuffer.duration,
+          type: trackConfig.fadeOut.shape ?? 'logarithmic',
+        } : undefined,
+      };
+
+      // Generate peaks for waveform visualization
+      const samplesPerPixel = this.config.samplesPerPixel || 4096;
+      const peaks = generatePeaks(audioBuffer, samplesPerPixel);
+      this.peaksData.set(track.id, peaks);
+
+      // Add to playout engine
+      if (this.playout) {
+        this.playout.addTrack({
+          buffer: audioBuffer,
+          track,
+        });
+      }
+
+      // Add to tracks array
+      this.tracks.push(track);
+
+      // Re-render to show the new track
+      this.render();
+
+      console.log('Added new track:', track);
+    } catch (error) {
+      console.error(`Failed to load track:`, error);
+      throw error;
+    }
   }
 
   private render(): void {
@@ -399,10 +470,12 @@ class WaveformPlaylistClass {
                       </TrackControlsContext.Provider>
                     );
                   })}
-                  <Playhead
-                    position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
-                    color={theme.waveProgressColor || '#f00'}
-                  />
+                  {this.tracks.length > 0 && (
+                    <Playhead
+                      position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
+                      color={theme.waveProgressColor || '#f00'}
+                    />
+                  )}
                 </>
               </Playlist>
               <div style={{ marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }}>
@@ -699,6 +772,14 @@ class WaveformPlaylistClass {
             break;
           case 'automaticscroll':
             self.setAutomaticScroll(args[0]);
+            break;
+          case 'newtrack':
+            // Handle adding a new track from a File object
+            if (args[0]) {
+              self.addTrack(args[0]).catch((error) => {
+                console.error('Failed to add new track:', error);
+              });
+            }
             break;
         }
       },

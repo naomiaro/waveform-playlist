@@ -12,9 +12,9 @@ var playlist = WaveformPlaylist.init({
   },
   controls: {
     show: true, //whether or not to include the track controls
-    width: 200 //width of controls in pixels
+    width: 250 //width of controls in pixels
   }
 });
 
-//initialize the WAV exporter.
-playlist.initExporter();
+// Load empty playlist - ready for users to add tracks
+playlist.load([]);
