@@ -124,6 +124,10 @@ export class ToneTrack {
     return this.audioBuffer.duration;
   }
 
+  get buffer(): AudioBuffer {
+    return this.audioBuffer;
+  }
+
   get isPlaying(): boolean {
     return this.player.state === 'started';
   }

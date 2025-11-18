@@ -26,6 +26,7 @@ declare class ToneTrack {
     dispose(): void;
     get id(): string;
     get duration(): number;
+    get buffer(): AudioBuffer;
     get isPlaying(): boolean;
 }
 

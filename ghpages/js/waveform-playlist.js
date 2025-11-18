@@ -83544,6 +83544,9 @@ var ToneTrack = class {
   get duration() {
     return this.audioBuffer.duration;
   }
+  get buffer() {
+    return this.audioBuffer;
+  }
   get isPlaying() {
     return this.player.state === "started";
   }
@@ -83678,9 +83681,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.init = void 0;
 const jsx_runtime_1 = __webpack_require__(/*! react/jsx-runtime */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js");
+const react_1 = __importDefault(__webpack_require__(/*! react */ "../../node_modules/.pnpm/react@18.3.1/node_modules/react/index.js"));
 const client_1 = __webpack_require__(/*! react-dom/client */ "../../node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/client.js");
 const styled_components_1 = __webpack_require__(/*! styled-components */ "../../node_modules/.pnpm/styled-components@6.1.19_react-dom@18.3.1_react@18.3.1/node_modules/styled-components/dist/styled-components.browser.esm.js");
 const playout_1 = __webpack_require__(/*! @waveform-playlist/playout */ "../playout/dist/index.js");
@@ -83766,14 +83773,60 @@ class WaveformPlaylistClass {
         if (!this.root)
             return;
         const theme = Object.assign(Object.assign({}, defaultTheme), this.config.colors);
-        // For now, render a simple track list
-        // TODO: Integrate actual UI components from @waveform-playlist/ui-components
-        this.root.render((0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { padding: '20px', fontFamily: 'Arial, sans-serif' }, children: [(0, jsx_runtime_1.jsx)("h3", { children: "Waveform Playlist (React)" }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px' }, children: this.tracks.map((track) => ((0, jsx_runtime_1.jsxs)("div", { style: {
-                                padding: '10px',
-                                marginBottom: '10px',
-                                border: '1px solid #ccc',
-                                borderRadius: '4px',
-                            }, children: [(0, jsx_runtime_1.jsx)("strong", { children: track.name }), (0, jsx_runtime_1.jsxs)("div", { style: { fontSize: '12px', color: '#666', marginTop: '5px' }, children: ["Start: ", track.startTime.toFixed(2), "s | Gain: ", (track.gain * 100).toFixed(0), "% | Pan: ", track.stereoPan.toFixed(2)] })] }, track.id))) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }));
+        // Simple waveform visualization component
+        const WaveformCanvas = ({ trackId }) => {
+            const canvasRef = react_1.default.useRef(null);
+            react_1.default.useEffect(() => {
+                if (!canvasRef.current || !this.playout)
+                    return;
+                const track = this.playout.getTrack(trackId);
+                if (!track)
+                    return;
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                if (!ctx)
+                    return;
+                // Get the audio buffer from the track
+                const buffer = track.buffer;
+                if (!buffer)
+                    return;
+                // Set canvas size
+                const width = canvas.width;
+                const height = canvas.height;
+                const data = buffer.getChannelData(0); // Get first channel
+                const step = Math.ceil(data.length / width);
+                const amp = height / 2;
+                // Draw waveform
+                ctx.fillStyle = theme.waveFillColor || '#e0e0e0';
+                ctx.fillRect(0, 0, width, height);
+                ctx.strokeStyle = theme.waveOutlineColor || '#00f';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let i = 0; i < width; i++) {
+                    let min = 1.0;
+                    let max = -1.0;
+                    for (let j = 0; j < step; j++) {
+                        const datum = data[i * step + j];
+                        if (datum < min)
+                            min = datum;
+                        if (datum > max)
+                            max = datum;
+                    }
+                    ctx.moveTo(i, (1 + min) * amp);
+                    ctx.lineTo(i, (1 + max) * amp);
+                }
+                ctx.stroke();
+            }, [trackId]);
+            return ((0, jsx_runtime_1.jsx)("canvas", { ref: canvasRef, width: 800, height: 128, style: {
+                    width: '100%',
+                    height: '128px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                } }));
+        };
+        this.root.render((0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { padding: '20px', fontFamily: 'Arial, sans-serif' }, children: [(0, jsx_runtime_1.jsx)("h3", { children: "Waveform Playlist" }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px' }, children: this.tracks.map((track) => ((0, jsx_runtime_1.jsxs)("div", { style: {
+                                marginBottom: '20px',
+                            }, children: [(0, jsx_runtime_1.jsx)("div", { style: { marginBottom: '8px', fontWeight: 'bold' }, children: track.name }), (0, jsx_runtime_1.jsx)(WaveformCanvas, { trackId: track.id }), (0, jsx_runtime_1.jsxs)("div", { style: { fontSize: '12px', color: '#666', marginTop: '8px' }, children: ["Start: ", track.startTime.toFixed(2), "s | Gain: ", (track.gain * 100).toFixed(0), "% | Pan: ", track.stereoPan.toFixed(2)] })] }, track.id))) }), (0, jsx_runtime_1.jsx)("div", { style: { marginTop: '20px', color: '#666', fontSize: '12px' }, children: "\u2728 Powered by Tone.js 15.1.22 and React 18" })] }) }));
     }
     play(startTime) {
         return __awaiter(this, void 0, void 0, function* () {

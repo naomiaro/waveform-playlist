@@ -141,25 +141,88 @@ class WaveformPlaylistClass {
       ...this.config.colors,
     };
 
-    // For now, render a simple track list
-    // TODO: Integrate actual UI components from @waveform-playlist/ui-components
+    // Simple waveform visualization component
+    const WaveformCanvas: React.FC<{ trackId: string }> = ({ trackId }) => {
+      const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+      React.useEffect(() => {
+        if (!canvasRef.current || !this.playout) return;
+
+        const track = this.playout.getTrack(trackId);
+        if (!track) return;
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Get the audio buffer from the track
+        const buffer = track.buffer;
+        if (!buffer) return;
+
+        // Set canvas size
+        const width = canvas.width;
+        const height = canvas.height;
+        const data = buffer.getChannelData(0); // Get first channel
+        const step = Math.ceil(data.length / width);
+        const amp = height / 2;
+
+        // Draw waveform
+        ctx.fillStyle = theme.waveFillColor || '#e0e0e0';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.strokeStyle = theme.waveOutlineColor || '#00f';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+
+        for (let i = 0; i < width; i++) {
+          let min = 1.0;
+          let max = -1.0;
+
+          for (let j = 0; j < step; j++) {
+            const datum = data[i * step + j];
+            if (datum < min) min = datum;
+            if (datum > max) max = datum;
+          }
+
+          ctx.moveTo(i, (1 + min) * amp);
+          ctx.lineTo(i, (1 + max) * amp);
+        }
+
+        ctx.stroke();
+      }, [trackId]);
+
+      return (
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={128}
+          style={{
+            width: '100%',
+            height: '128px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+          }}
+        />
+      );
+    };
+
     this.root.render(
       <ThemeProvider theme={theme}>
         <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-          <h3>Waveform Playlist (React)</h3>
+          <h3>Waveform Playlist</h3>
           <div style={{ marginTop: '20px' }}>
             {this.tracks.map((track) => (
               <div
                 key={track.id}
                 style={{
-                  padding: '10px',
-                  marginBottom: '10px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
+                  marginBottom: '20px',
                 }}
               >
-                <strong>{track.name}</strong>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+                <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                  {track.name}
+                </div>
+                <WaveformCanvas trackId={track.id} />
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
                   Start: {track.startTime.toFixed(2)}s |
                   Gain: {(track.gain * 100).toFixed(0)}% |
                   Pan: {track.stereoPan.toFixed(2)}

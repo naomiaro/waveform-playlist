@@ -126,6 +126,9 @@ var ToneTrack = class {
   get duration() {
     return this.audioBuffer.duration;
   }
+  get buffer() {
+    return this.audioBuffer;
+  }
   get isPlaying() {
     return this.player.state === "started";
   }
