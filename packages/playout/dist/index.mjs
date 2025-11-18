@@ -186,7 +186,22 @@ var TonePlayout = class {
       } else {
         this.soloedTracks.delete(trackId);
       }
+      this.updateSoloMuting();
     }
+  }
+  updateSoloMuting() {
+    const hasSoloedTracks = this.soloedTracks.size > 0;
+    this.tracks.forEach((track, id) => {
+      if (hasSoloedTracks) {
+        if (!this.soloedTracks.has(id)) {
+          track.setMute(true);
+        } else {
+          track.setMute(false);
+        }
+      } else {
+        track.setMute(false);
+      }
+    });
   }
   setMute(trackId, muted) {
     const track = this.tracks.get(trackId);

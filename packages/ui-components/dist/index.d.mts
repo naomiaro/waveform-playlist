@@ -1,11 +1,14 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
 import WaveformData from 'waveform-data';
-import * as React from 'react';
-import React__default, { FunctionComponent, ReactNode } from 'react';
+import * as react from 'react';
+import react__default, { FunctionComponent, ReactNode } from 'react';
 import { Peaks, Bits } from '@waveform-playlist/webaudio-peaks';
 import * as styled_components_dist_utils_hoist from 'styled-components/dist/utils/hoist';
 import * as styled_components from 'styled-components';
 import { DefaultTheme } from 'styled-components';
+import * as styled_components_dist_types from 'styled-components/dist/types';
+import * as _fortawesome_react_fontawesome from '@fortawesome/react-fontawesome';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 type Location = string;
 type Type = 'json' | 'dat';
@@ -63,7 +66,7 @@ interface PlaylistProps {
     readonly children?: JSX.Element | JSX.Element[];
 }
 declare const Playlist: FunctionComponent<PlaylistProps>;
-declare const StyledPlaylist: React__default.ForwardRefExoticComponent<styled_components.ExecutionProps & React__default.RefAttributes<React__default.FunctionComponent<PlaylistProps>>> & styled_components_dist_utils_hoist.NonReactStatics<React__default.FunctionComponent<PlaylistProps>>;
+declare const StyledPlaylist: react__default.ForwardRefExoticComponent<styled_components.ExecutionProps & react__default.RefAttributes<react__default.FunctionComponent<PlaylistProps>>> & styled_components_dist_utils_hoist.NonReactStatics<react__default.FunctionComponent<PlaylistProps>>;
 
 interface SmartChannelProps {
     className?: string;
@@ -105,6 +108,34 @@ interface TrackProps {
 }
 declare const Track: FunctionComponent<TrackProps>;
 
+declare const Button: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<styled_components.FastOmit<styled_components_dist_types.Substitute<react.DetailedHTMLProps<react.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>, Omit<react.DetailedHTMLProps<react.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>, "ref"> & {
+    ref?: ((instance: HTMLButtonElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<HTMLButtonElement> | null | undefined;
+}>, never>, never>> & string;
+
+declare const ButtonGroup: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<react.DetailedHTMLProps<react.HTMLAttributes<HTMLDivElement>, HTMLDivElement>, never>> & string;
+
+declare const Controls$1: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<react.DetailedHTMLProps<react.HTMLAttributes<HTMLDivElement>, HTMLDivElement>, never>> & string;
+
+declare const Header: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<react.DetailedHTMLProps<react.HTMLAttributes<HTMLElement>, HTMLElement>, never>> & string;
+
+declare const VolumeDownIcon: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<styled_components.FastOmit<styled_components_dist_types.Substitute<Omit<_fortawesome_react_fontawesome.FontAwesomeIconProps, "ref"> & {
+    ref?: ((instance: SVGSVGElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<SVGSVGElement> | null | undefined;
+}, Omit<_fortawesome_react_fontawesome.FontAwesomeIconProps, "ref"> & {
+    ref?: ((instance: SVGSVGElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<SVGSVGElement> | null | undefined;
+}>, never>, never>> & string & Omit<typeof FontAwesomeIcon, keyof react.Component<any, {}, any>>;
+
+declare const VolumeUpIcon: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<styled_components.FastOmit<styled_components_dist_types.Substitute<Omit<_fortawesome_react_fontawesome.FontAwesomeIconProps, "ref"> & {
+    ref?: ((instance: SVGSVGElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<SVGSVGElement> | null | undefined;
+}, Omit<_fortawesome_react_fontawesome.FontAwesomeIconProps, "ref"> & {
+    ref?: ((instance: SVGSVGElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<SVGSVGElement> | null | undefined;
+}>, never>, never>> & string & Omit<typeof FontAwesomeIcon, keyof react.Component<any, {}, any>>;
+
+declare const VolumeSlider: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<styled_components.FastOmit<styled_components_dist_types.Substitute<react.DetailedHTMLProps<react.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>, Omit<react.DetailedHTMLProps<react.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>, "ref"> & {
+    ref?: ((instance: HTMLInputElement | null) => void | react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES[keyof react.DO_NOT_USE_OR_YOU_WILL_BE_FIRED_CALLBACK_REF_RETURN_VALUES]) | react.RefObject<HTMLInputElement> | null | undefined;
+}>, never>, never>> & string;
+
+declare const VolumeSliderWrapper: styled_components_dist_types.IStyledComponentBase<"web", styled_components.FastOmit<react.DetailedHTMLProps<react.LabelHTMLAttributes<HTMLLabelElement>, HTMLLabelElement>, never>> & string;
+
 declare const useDevicePixelRatio: () => number;
 
 type Controls = {
@@ -120,12 +151,12 @@ type PlaylistInfo = {
     duration: number;
     controls: Controls;
 };
-declare const PlaylistInfoContext: React.Context<PlaylistInfo>;
+declare const PlaylistInfoContext: react.Context<PlaylistInfo>;
 declare const usePlaylistInfo: () => PlaylistInfo;
 
 declare const useTheme: () => styled_components.DefaultTheme | undefined;
 
-declare const TrackControlsContext: React__default.Context<react_jsx_runtime.JSX.Element>;
+declare const TrackControlsContext: react__default.Context<react_jsx_runtime.JSX.Element>;
 declare const useTrackControls: () => react_jsx_runtime.JSX.Element;
 
-export { BBCWaveformData, Channel, type ChannelProps, type ControlsWrapperProps, Playlist, PlaylistInfoContext, type PlaylistProps, type Props, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };
+export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, Header, Playlist, PlaylistInfoContext, type PlaylistProps, type Props, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeSlider, VolumeSliderWrapper, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };

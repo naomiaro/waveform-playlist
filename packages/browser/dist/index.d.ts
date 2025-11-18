@@ -1,3 +1,4 @@
+import { Track } from '@waveform-playlist/core';
 interface PlaylistConfig {
     container: HTMLElement;
     samplesPerPixel?: number;
@@ -11,6 +12,12 @@ interface PlaylistConfig {
     controls?: {
         show?: boolean;
         width?: number;
+    };
+    options?: {
+        controls?: {
+            show?: boolean;
+            width?: number;
+        };
     };
     zoomLevels?: number[];
     state?: string;
@@ -47,6 +54,12 @@ declare class WaveformPlaylistClass {
     play(startTime?: number): Promise<void>;
     pause(): void;
     stop(): void;
+    setMasterGain(gain: number): void;
+    setTrackGain(trackId: string, gain: number): void;
+    setTrackMute(trackId: string, muted: boolean): void;
+    setTrackSolo(trackId: string, soloed: boolean): void;
+    getCurrentTime(): number;
+    getTracks(): Track[];
     getEventEmitter(): any;
     destroy(): void;
 }

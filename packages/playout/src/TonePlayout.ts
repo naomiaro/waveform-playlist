@@ -103,7 +103,31 @@ export class TonePlayout {
       } else {
         this.soloedTracks.delete(trackId);
       }
+
+      // Update mute state of all tracks based on solo logic
+      this.updateSoloMuting();
     }
+  }
+
+  private updateSoloMuting(): void {
+    const hasSoloedTracks = this.soloedTracks.size > 0;
+
+    this.tracks.forEach((track, id) => {
+      if (hasSoloedTracks) {
+        // If there are soloed tracks, mute all non-soloed tracks
+        if (!this.soloedTracks.has(id)) {
+          track.setMute(true);
+        } else {
+          // Unmute soloed tracks (unless they were manually muted)
+          // For now, just unmute - we'll need to track manual mutes separately later
+          track.setMute(false);
+        }
+      } else {
+        // No soloed tracks, unmute all tracks
+        // TODO: Restore original mute state (need to track manual mutes)
+        track.setMute(false);
+      }
+    });
   }
 
   setMute(trackId: string, muted: boolean): void {

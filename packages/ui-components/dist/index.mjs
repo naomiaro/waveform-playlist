@@ -515,9 +515,148 @@ var SmartTrack = ({
     waveformData && /* @__PURE__ */ jsx10(WaveformDataTrack, { waveformData })
   ] });
 };
+
+// src/components/TrackControls/Button.tsx
+import styled5 from "styled-components";
+var Button = styled5.button.attrs({
+  type: "button"
+})`
+  border: 1px solid black;
+  padding: 5px;
+`;
+
+// src/components/TrackControls/ButtonGroup.tsx
+import styled6 from "styled-components";
+var ButtonGroup = styled6.div`
+  button:first-child {
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+  }
+
+  button:last-child {
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+  }
+`;
+
+// src/components/TrackControls/Controls.tsx
+import styled7 from "styled-components";
+var Controls = styled7.div`
+  background: white;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+`;
+
+// src/components/TrackControls/Header.tsx
+import styled8 from "styled-components";
+var Header = styled8.header`
+  overflow: hidden;
+  color: white;
+  background-color: blueviolet;
+  margin-bottom: 1em;
+  height: 20px;
+`;
+
+// src/components/TrackControls/VolumeDownIcon.tsx
+import styled9 from "styled-components";
+import { library } from "@fortawesome/fontawesome-svg-core";
+import { faVolumeDown } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+library.add(faVolumeDown);
+var VolumeDownIcon = styled9(FontAwesomeIcon).attrs({
+  icon: "volume-down"
+})``;
+
+// src/components/TrackControls/VolumeUpIcon.tsx
+import styled10 from "styled-components";
+import { library as library2 } from "@fortawesome/fontawesome-svg-core";
+import { faVolumeUp } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon as FontAwesomeIcon2 } from "@fortawesome/react-fontawesome";
+library2.add(faVolumeUp);
+var VolumeUpIcon = styled10(FontAwesomeIcon2).attrs({
+  icon: "volume-up"
+})``;
+
+// src/components/TrackControls/VolumeSlider.tsx
+import styled11 from "styled-components";
+var VolumeSlider = styled11.input.attrs({
+  type: "range"
+})`
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  &::-webkit-slider-runnable-track {
+    height: 8px;
+    background: #ddd;
+    border: none;
+    border-radius: 3px;
+    padding: 1px;
+  }
+
+  &::-moz-range-track {
+    height: 8px;
+    background: #ddd;
+    border: none;
+    border-radius: 3px;
+    padding: 1px;
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+
+    border: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: goldenrod;
+    margin-top: -5px;
+    cursor: ew-resize;
+  }
+
+  &::-moz-range-thumb {
+    border: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: goldenrod;
+    margin-top: -5px;
+    cursor: ew-resize;
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus::-webkit-slider-runnable-track {
+    background: #bbb;
+  }
+
+  &:focus::-moz-range-track {
+    background: #bbb;
+  }
+`;
+
+// src/components/TrackControls/VolumeSliderWrapper.tsx
+import styled12 from "styled-components";
+var VolumeSliderWrapper = styled12.label`
+  margin: 1em auto;
+  width: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+`;
 export {
   BBCWaveformData,
+  Button,
+  ButtonGroup,
   Channel,
+  Controls,
+  Header,
   Playlist,
   PlaylistInfoContext,
   SmartChannel,
@@ -528,6 +667,10 @@ export {
   TimeScale,
   Track,
   TrackControlsContext,
+  VolumeDownIcon,
+  VolumeSlider,
+  VolumeSliderWrapper,
+  VolumeUpIcon,
   useDevicePixelRatio,
   usePlaylistInfo,
   useTheme,

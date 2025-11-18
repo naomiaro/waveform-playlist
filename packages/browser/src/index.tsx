@@ -5,9 +5,17 @@ import { TonePlayout } from '@waveform-playlist/playout';
 import { LoaderFactory } from '@waveform-playlist/loaders';
 import { Track } from '@waveform-playlist/core';
 import { getContext } from 'tone';
-import { Channel } from '@waveform-playlist/ui-components';
+import {
+  Channel,
+  Button,
+  ButtonGroup,
+  Controls,
+  Header,
+  VolumeSlider,
+  VolumeSliderWrapper
+} from '@waveform-playlist/ui-components';
 import { generatePeaks } from './peaksUtil';
-import type { PeakData } from '@waveform-playlist/webaudio-peaks';
+import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
 
 // Simple theme
 const defaultTheme = {
@@ -30,6 +38,12 @@ interface PlaylistConfig {
   controls?: {
     show?: boolean;
     width?: number;
+  };
+  options?: {
+    controls?: {
+      show?: boolean;
+      width?: number;
+    };
   };
   zoomLevels?: number[];
   state?: string;
@@ -135,11 +149,15 @@ class WaveformPlaylistClass {
 
     this.tracks = loadedTracks;
 
+    console.log('Loaded tracks:', loadedTracks);
+    console.log('Peaks data:', Array.from(this.peaksData.entries()));
+
     // Don't initialize playout here - it will be initialized on first play()
     // to comply with browser autoplay policies
 
     // Render the playlist (for now, just a simple div with track info)
     this.render();
+    console.log('Render complete');
   }
 
   private render(): void {
@@ -152,6 +170,17 @@ class WaveformPlaylistClass {
 
     const waveHeight = this.config.waveHeight || 128;
     const samplesPerPixel = this.config.samplesPerPixel || 4096;
+
+    // Check if controls should be shown (support both old and new config formats)
+    const showControls = this.config.controls?.show !== false &&
+                        this.config.options?.controls?.show !== false;
+    const controlsWidth = this.config.controls?.width ||
+                         this.config.options?.controls?.width ||
+                         150;
+
+    console.log('Config:', this.config);
+    console.log('Controls config:', this.config.controls);
+    console.log('Show controls:', showControls);
 
     // Waveform component using Channel from ui-components
     const WaveformDisplay: React.FC<{ trackId: string }> = ({ trackId }) => {
@@ -167,7 +196,7 @@ class WaveformPlaylistClass {
 
       return (
         <div style={{ position: 'relative', width: `${width}px`, height: `${totalHeight}px`, background: '#f0f0f0' }}>
-          {peaksData.data.map((channelData, index) => (
+          {peaksData.data.map((channelData: Peaks, index: number) => (
             <Channel
               key={index}
               index={index}
@@ -185,31 +214,87 @@ class WaveformPlaylistClass {
       );
     };
 
+    const TrackControls: React.FC<{ trackId: string; track: Track }> = ({ trackId, track }) => {
+      const [muted, setMuted] = React.useState(track.muted);
+      const [soloed, setSoloed] = React.useState(track.soloed);
+      const [gain, setGain] = React.useState(track.gain);
+
+      return (
+        <Controls>
+          <Header>{track.name}</Header>
+          <ButtonGroup>
+            <Button
+              onClick={() => {
+                const newMuted = !muted;
+                setMuted(newMuted);
+                this.setTrackMute(trackId, newMuted);
+              }}
+              style={{
+                backgroundColor: muted ? '#ff6b6b' : '#f0f0f0',
+                fontWeight: muted ? 'bold' : 'normal',
+              }}
+            >
+              {muted ? 'M' : 'M'}
+            </Button>
+            <Button
+              onClick={() => {
+                const newSoloed = !soloed;
+                setSoloed(newSoloed);
+                this.setTrackSolo(trackId, newSoloed);
+              }}
+              style={{
+                backgroundColor: soloed ? '#51cf66' : '#f0f0f0',
+                fontWeight: soloed ? 'bold' : 'normal',
+              }}
+            >
+              {soloed ? 'S' : 'S'}
+            </Button>
+          </ButtonGroup>
+          <VolumeSliderWrapper>
+            <VolumeSlider
+              min={0}
+              max={200}
+              value={gain * 100}
+              onChange={(e) => {
+                const newGain = parseInt(e.currentTarget.value) / 100;
+                setGain(newGain);
+                this.setTrackGain(trackId, newGain);
+              }}
+            />
+            <div style={{ fontSize: '11px', marginTop: '4px', color: '#666' }}>
+              {Math.round(gain * 100)}%
+            </div>
+          </VolumeSliderWrapper>
+        </Controls>
+      );
+    };
+
     this.root.render(
       <ThemeProvider theme={theme}>
-        <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-          <h3>Waveform Playlist</h3>
+        <div style={{ fontFamily: 'Arial, sans-serif' }}>
           <div style={{ marginTop: '20px' }}>
             {this.tracks.map((track) => (
               <div
                 key={track.id}
                 style={{
                   marginBottom: '20px',
+                  display: 'flex',
+                  gap: '10px',
+                  alignItems: 'stretch',
                 }}
               >
-                <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
-                  {track.name}
-                </div>
-                <WaveformDisplay trackId={track.id} />
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-                  Start: {track.startTime.toFixed(2)}s |
-                  Gain: {(track.gain * 100).toFixed(0)}% |
-                  Pan: {track.stereoPan.toFixed(2)}
+                {showControls && (
+                  <div style={{ width: `${controlsWidth}px`, flexShrink: 0 }}>
+                    <TrackControls trackId={track.id} track={track} />
+                  </div>
+                )}
+                <div style={{ flex: 1, overflow: 'auto' }}>
+                  <WaveformDisplay trackId={track.id} />
                 </div>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: '20px', color: '#666', fontSize: '12px' }}>
+          <div style={{ marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }}>
             ✨ Powered by Tone.js 15.1.22 and React 18
           </div>
         </div>
@@ -235,6 +320,44 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.stop();
     }
+  }
+
+  setMasterGain(gain: number): void {
+    if (this.playout) {
+      this.playout.setMasterGain(gain);
+    }
+  }
+
+  setTrackGain(trackId: string, gain: number): void {
+    if (this.playout) {
+      const track = this.playout.getTrack(trackId);
+      if (track) {
+        track.setVolume(gain);
+      }
+    }
+  }
+
+  setTrackMute(trackId: string, muted: boolean): void {
+    if (this.playout) {
+      this.playout.setMute(trackId, muted);
+    }
+  }
+
+  setTrackSolo(trackId: string, soloed: boolean): void {
+    if (this.playout) {
+      this.playout.setSolo(trackId, soloed);
+    }
+  }
+
+  getCurrentTime(): number {
+    if (this.playout) {
+      return this.playout.getCurrentTime();
+    }
+    return 0;
+  }
+
+  getTracks(): Track[] {
+    return this.tracks;
   }
 
   getEventEmitter(): any {

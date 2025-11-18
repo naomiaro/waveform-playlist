@@ -4,6 +4,9 @@ var playlist = WaveformPlaylist.init({
   colors: {
     waveOutlineColor: '#005BBB'
   },
+  controls: {
+    show: false
+  },
 });
 
 // Load tracks

@@ -31,7 +31,11 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   BBCWaveformData: () => BBCWaveformData,
+  Button: () => Button,
+  ButtonGroup: () => ButtonGroup,
   Channel: () => Channel,
+  Controls: () => Controls,
+  Header: () => Header,
   Playlist: () => Playlist,
   PlaylistInfoContext: () => PlaylistInfoContext,
   SmartChannel: () => SmartChannel,
@@ -42,6 +46,10 @@ __export(index_exports, {
   TimeScale: () => TimeScale,
   Track: () => Track,
   TrackControlsContext: () => TrackControlsContext,
+  VolumeDownIcon: () => VolumeDownIcon,
+  VolumeSlider: () => VolumeSlider,
+  VolumeSliderWrapper: () => VolumeSliderWrapper,
+  VolumeUpIcon: () => VolumeUpIcon,
   useDevicePixelRatio: () => useDevicePixelRatio,
   usePlaylistInfo: () => usePlaylistInfo,
   useTheme: () => useTheme,
@@ -567,10 +575,149 @@ var SmartTrack = ({
     waveformData && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(WaveformDataTrack, { waveformData })
   ] });
 };
+
+// src/components/TrackControls/Button.tsx
+var import_styled_components6 = __toESM(require("styled-components"));
+var Button = import_styled_components6.default.button.attrs({
+  type: "button"
+})`
+  border: 1px solid black;
+  padding: 5px;
+`;
+
+// src/components/TrackControls/ButtonGroup.tsx
+var import_styled_components7 = __toESM(require("styled-components"));
+var ButtonGroup = import_styled_components7.default.div`
+  button:first-child {
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+  }
+
+  button:last-child {
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+  }
+`;
+
+// src/components/TrackControls/Controls.tsx
+var import_styled_components8 = __toESM(require("styled-components"));
+var Controls = import_styled_components8.default.div`
+  background: white;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+`;
+
+// src/components/TrackControls/Header.tsx
+var import_styled_components9 = __toESM(require("styled-components"));
+var Header = import_styled_components9.default.header`
+  overflow: hidden;
+  color: white;
+  background-color: blueviolet;
+  margin-bottom: 1em;
+  height: 20px;
+`;
+
+// src/components/TrackControls/VolumeDownIcon.tsx
+var import_styled_components10 = __toESM(require("styled-components"));
+var import_fontawesome_svg_core = require("@fortawesome/fontawesome-svg-core");
+var import_free_solid_svg_icons = require("@fortawesome/free-solid-svg-icons");
+var import_react_fontawesome = require("@fortawesome/react-fontawesome");
+import_fontawesome_svg_core.library.add(import_free_solid_svg_icons.faVolumeDown);
+var VolumeDownIcon = (0, import_styled_components10.default)(import_react_fontawesome.FontAwesomeIcon).attrs({
+  icon: "volume-down"
+})``;
+
+// src/components/TrackControls/VolumeUpIcon.tsx
+var import_styled_components11 = __toESM(require("styled-components"));
+var import_fontawesome_svg_core2 = require("@fortawesome/fontawesome-svg-core");
+var import_free_solid_svg_icons2 = require("@fortawesome/free-solid-svg-icons");
+var import_react_fontawesome2 = require("@fortawesome/react-fontawesome");
+import_fontawesome_svg_core2.library.add(import_free_solid_svg_icons2.faVolumeUp);
+var VolumeUpIcon = (0, import_styled_components11.default)(import_react_fontawesome2.FontAwesomeIcon).attrs({
+  icon: "volume-up"
+})``;
+
+// src/components/TrackControls/VolumeSlider.tsx
+var import_styled_components12 = __toESM(require("styled-components"));
+var VolumeSlider = import_styled_components12.default.input.attrs({
+  type: "range"
+})`
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  &::-webkit-slider-runnable-track {
+    height: 8px;
+    background: #ddd;
+    border: none;
+    border-radius: 3px;
+    padding: 1px;
+  }
+
+  &::-moz-range-track {
+    height: 8px;
+    background: #ddd;
+    border: none;
+    border-radius: 3px;
+    padding: 1px;
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+
+    border: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: goldenrod;
+    margin-top: -5px;
+    cursor: ew-resize;
+  }
+
+  &::-moz-range-thumb {
+    border: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: goldenrod;
+    margin-top: -5px;
+    cursor: ew-resize;
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus::-webkit-slider-runnable-track {
+    background: #bbb;
+  }
+
+  &:focus::-moz-range-track {
+    background: #bbb;
+  }
+`;
+
+// src/components/TrackControls/VolumeSliderWrapper.tsx
+var import_styled_components13 = __toESM(require("styled-components"));
+var VolumeSliderWrapper = import_styled_components13.default.label`
+  margin: 1em auto;
+  width: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+`;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BBCWaveformData,
+  Button,
+  ButtonGroup,
   Channel,
+  Controls,
+  Header,
   Playlist,
   PlaylistInfoContext,
   SmartChannel,
@@ -581,6 +728,10 @@ var SmartTrack = ({
   TimeScale,
   Track,
   TrackControlsContext,
+  VolumeDownIcon,
+  VolumeSlider,
+  VolumeSliderWrapper,
+  VolumeUpIcon,
   useDevicePixelRatio,
   usePlaylistInfo,
   useTheme,

@@ -6,3 +6,4 @@ export * from './SmartScale';
 export * from './SmartTrack';
 export * from './TimeScale';
 export * from './Track';
+export * from './TrackControls';

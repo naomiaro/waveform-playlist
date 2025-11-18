@@ -53,6 +53,7 @@ declare class TonePlayout {
     stop(): void;
     setMasterGain(gain: number): void;
     setSolo(trackId: string, soloed: boolean): void;
+    private updateSoloMuting;
     setMute(trackId: string, muted: boolean): void;
     getCurrentTime(): number;
     seekTo(time: number): void;
