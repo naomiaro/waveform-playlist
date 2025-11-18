@@ -46,6 +46,7 @@ declare class WaveformPlaylistClass {
     private playbackState;
     private currentTime;
     private animationFrameId;
+    private setProgressFn;
     constructor(config: PlaylistConfig);
     load(trackConfigs: TrackConfig[]): Promise<void>;
     private render;
@@ -59,6 +60,9 @@ declare class WaveformPlaylistClass {
     setTrackMute(trackId: string, muted: boolean): void;
     setTrackSolo(trackId: string, soloed: boolean): void;
     setTrackPan(trackId: string, pan: number): void;
+    private getDuration;
+    rewind(): void;
+    fastForward(): void;
     getCurrentTime(): number;
     getTracks(): Track[];
     private createEventEmitter;

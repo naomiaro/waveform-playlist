@@ -9,10 +9,12 @@ interface ContainerProps {
   readonly $controlWidth: number;
 }
 
-const Container = styled.div<ContainerProps>`
-  height: ${(props) => props.$waveHeight * props.$numChannels}px;
-  margin-left: ${(props) => props.$controlWidth}px;
-`;
+const Container = styled.div.attrs<ContainerProps>((props) => ({
+  style: {
+    height: `${props.$waveHeight * props.$numChannels}px`,
+    marginLeft: `${props.$controlWidth}px`,
+  },
+}))<ContainerProps>``;
 
 const ChannelContainer = styled.div`
   position: relative;
@@ -21,8 +23,11 @@ const ChannelContainer = styled.div`
 export interface ControlsWrapperProps {
   readonly $controlWidth: number;
 }
-const ControlsWrapper = styled.div<ControlsWrapperProps>`
-  width: ${(props) => props.$controlWidth}px;
+const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
+  style: {
+    width: `${props.$controlWidth}px`,
+  },
+}))<ControlsWrapperProps>`
   position: absolute;
   z-index: 1;
   left: 0;

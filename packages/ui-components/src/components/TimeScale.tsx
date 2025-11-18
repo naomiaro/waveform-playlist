@@ -17,21 +17,27 @@ interface PlaylistTimeScaleScroll {
   readonly $controlWidth: number;
   readonly $timeScaleHeight: number;
 }
-const PlaylistTimeScaleScroll = styled.div<PlaylistTimeScaleScroll>`
+const PlaylistTimeScaleScroll = styled.div.attrs<PlaylistTimeScaleScroll>((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    marginLeft: `${props.$controlWidth}px`,
+    height: `${props.$timeScaleHeight * 2}px`,
+  },
+}))<PlaylistTimeScaleScroll>`
   position: relative;
-  width: ${(props) => props.$cssWidth}px;
-  margin-left: ${(props) => props.$controlWidth}px;
-  height: ${(props) => props.$timeScaleHeight * 2}px;
 `;
 
 interface TimeTicks {
   readonly $cssWidth: number;
   readonly $timeScaleHeight: number;
 }
-const TimeTicks = styled.canvas<TimeTicks>`
+const TimeTicks = styled.canvas.attrs<TimeTicks>((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    height: `${props.$timeScaleHeight}px`,
+  },
+}))<TimeTicks>`
   position: absolute;
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$timeScaleHeight}px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -40,8 +46,11 @@ const TimeTicks = styled.canvas<TimeTicks>`
 interface TimeStamp {
   readonly $left: number;
 }
-const TimeStamp = styled.div<TimeStamp>`
-  left: ${(props) => props.$left}px;
+const TimeStamp = styled.div.attrs<TimeStamp>((props) => ({
+  style: {
+    left: `${props.$left}px`,
+  },
+}))<TimeStamp>`
   position: absolute;
 `;
 

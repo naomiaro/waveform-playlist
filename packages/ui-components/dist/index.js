@@ -93,24 +93,33 @@ var import_react2 = require("react");
 var import_styled_components = __toESM(require("styled-components"));
 var import_jsx_runtime2 = require("react/jsx-runtime");
 var MAX_CANVAS_WIDTH = 1e3;
-var Progress = import_styled_components.default.div`
+var Progress = import_styled_components.default.div.attrs((props) => ({
+  style: {
+    width: `${props.$progress}px`,
+    height: `${props.$waveHeight}px`
+  }
+}))`
   position: absolute;
   background: ${(props) => props.$waveProgressColor};
-  width: ${(props) => props.$progress}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
-var Waveform = import_styled_components.default.canvas`
+var Waveform = import_styled_components.default.canvas.attrs((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    height: `${props.$waveHeight}px`
+  }
+}))`
   float: left;
   position: relative;
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
-var Wrapper = import_styled_components.default.div`
+var Wrapper = import_styled_components.default.div.attrs((props) => ({
+  style: {
+    top: `${props.$waveHeight * props.$index}px`,
+    width: `${props.$cssWidth}px`,
+    height: `${props.$waveHeight}px`
+  }
+}))`
   position: absolute;
-  top: ${(props) => props.$waveHeight * props.$index}px;
   background: ${(props) => props.$waveFillColor};
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
 var Channel = (props) => {
   const {
@@ -216,9 +225,12 @@ var Channel = (props) => {
 // src/components/Playhead.tsx
 var import_styled_components2 = __toESM(require("styled-components"));
 var import_jsx_runtime3 = require("react/jsx-runtime");
-var PlayheadLine = import_styled_components2.default.div`
+var PlayheadLine = import_styled_components2.default.div.attrs((props) => ({
+  style: {
+    left: `${props.$position}px`
+  }
+}))`
   position: absolute;
-  left: ${(props) => props.$position}px;
   top: 0;
   width: 2px;
   background: ${(props) => props.$color};
@@ -353,22 +365,31 @@ function formatTime(milliseconds) {
   const m = (seconds - s) / 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-var PlaylistTimeScaleScroll = import_styled_components5.default.div`
+var PlaylistTimeScaleScroll = import_styled_components5.default.div.attrs((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    marginLeft: `${props.$controlWidth}px`,
+    height: `${props.$timeScaleHeight * 2}px`
+  }
+}))`
   position: relative;
-  width: ${(props) => props.$cssWidth}px;
-  margin-left: ${(props) => props.$controlWidth}px;
-  height: ${(props) => props.$timeScaleHeight * 2}px;
 `;
-var TimeTicks = import_styled_components5.default.canvas`
+var TimeTicks = import_styled_components5.default.canvas.attrs((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    height: `${props.$timeScaleHeight}px`
+  }
+}))`
   position: absolute;
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$timeScaleHeight}px;
   left: 0;
   right: 0;
   bottom: 0;
 `;
-var TimeStamp = import_styled_components5.default.div`
-  left: ${(props) => props.$left}px;
+var TimeStamp = import_styled_components5.default.div.attrs((props) => ({
+  style: {
+    left: `${props.$left}px`
+  }
+}))`
   position: absolute;
 `;
 var TimeScale = (props) => {
@@ -550,15 +571,20 @@ var import_react10 = require("react");
 // src/components/Track.tsx
 var import_styled_components6 = __toESM(require("styled-components"));
 var import_jsx_runtime11 = require("react/jsx-runtime");
-var Container = import_styled_components6.default.div`
-  height: ${(props) => props.$waveHeight * props.$numChannels}px;
-  margin-left: ${(props) => props.$controlWidth}px;
-`;
+var Container = import_styled_components6.default.div.attrs((props) => ({
+  style: {
+    height: `${props.$waveHeight * props.$numChannels}px`,
+    marginLeft: `${props.$controlWidth}px`
+  }
+}))``;
 var ChannelContainer = import_styled_components6.default.div`
   position: relative;
 `;
-var ControlsWrapper = import_styled_components6.default.div`
-  width: ${(props) => props.$controlWidth}px;
+var ControlsWrapper = import_styled_components6.default.div.attrs((props) => ({
+  style: {
+    width: `${props.$controlWidth}px`
+  }
+}))`
   position: absolute;
   z-index: 1;
   left: 0;

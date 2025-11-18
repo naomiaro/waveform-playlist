@@ -27,24 +27,33 @@ import { useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { jsx as jsx2, jsxs } from "react/jsx-runtime";
 var MAX_CANVAS_WIDTH = 1e3;
-var Progress = styled.div`
+var Progress = styled.div.attrs((props) => ({
+  style: {
+    width: `${props.$progress}px`,
+    height: `${props.$waveHeight}px`
+  }
+}))`
   position: absolute;
   background: ${(props) => props.$waveProgressColor};
-  width: ${(props) => props.$progress}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
-var Waveform = styled.canvas`
+var Waveform = styled.canvas.attrs((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    height: `${props.$waveHeight}px`
+  }
+}))`
   float: left;
   position: relative;
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
-var Wrapper = styled.div`
+var Wrapper = styled.div.attrs((props) => ({
+  style: {
+    top: `${props.$waveHeight * props.$index}px`,
+    width: `${props.$cssWidth}px`,
+    height: `${props.$waveHeight}px`
+  }
+}))`
   position: absolute;
-  top: ${(props) => props.$waveHeight * props.$index}px;
   background: ${(props) => props.$waveFillColor};
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
 var Channel = (props) => {
   const {
@@ -150,9 +159,12 @@ var Channel = (props) => {
 // src/components/Playhead.tsx
 import styled2 from "styled-components";
 import { jsx as jsx3 } from "react/jsx-runtime";
-var PlayheadLine = styled2.div`
+var PlayheadLine = styled2.div.attrs((props) => ({
+  style: {
+    left: `${props.$position}px`
+  }
+}))`
   position: absolute;
-  left: ${(props) => props.$position}px;
   top: 0;
   width: 2px;
   background: ${(props) => props.$color};
@@ -291,22 +303,31 @@ function formatTime(milliseconds) {
   const m = (seconds - s) / 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-var PlaylistTimeScaleScroll = styled4.div`
+var PlaylistTimeScaleScroll = styled4.div.attrs((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    marginLeft: `${props.$controlWidth}px`,
+    height: `${props.$timeScaleHeight * 2}px`
+  }
+}))`
   position: relative;
-  width: ${(props) => props.$cssWidth}px;
-  margin-left: ${(props) => props.$controlWidth}px;
-  height: ${(props) => props.$timeScaleHeight * 2}px;
 `;
-var TimeTicks = styled4.canvas`
+var TimeTicks = styled4.canvas.attrs((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    height: `${props.$timeScaleHeight}px`
+  }
+}))`
   position: absolute;
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$timeScaleHeight}px;
   left: 0;
   right: 0;
   bottom: 0;
 `;
-var TimeStamp = styled4.div`
-  left: ${(props) => props.$left}px;
+var TimeStamp = styled4.div.attrs((props) => ({
+  style: {
+    left: `${props.$left}px`
+  }
+}))`
   position: absolute;
 `;
 var TimeScale = (props) => {
@@ -488,15 +509,20 @@ import { Fragment as Fragment3 } from "react";
 // src/components/Track.tsx
 import styled5 from "styled-components";
 import { jsx as jsx11, jsxs as jsxs3 } from "react/jsx-runtime";
-var Container = styled5.div`
-  height: ${(props) => props.$waveHeight * props.$numChannels}px;
-  margin-left: ${(props) => props.$controlWidth}px;
-`;
+var Container = styled5.div.attrs((props) => ({
+  style: {
+    height: `${props.$waveHeight * props.$numChannels}px`,
+    marginLeft: `${props.$controlWidth}px`
+  }
+}))``;
 var ChannelContainer = styled5.div`
   position: relative;
 `;
-var ControlsWrapper = styled5.div`
-  width: ${(props) => props.$controlWidth}px;
+var ControlsWrapper = styled5.div.attrs((props) => ({
+  style: {
+    width: `${props.$controlWidth}px`
+  }
+}))`
   position: absolute;
   z-index: 1;
   left: 0;

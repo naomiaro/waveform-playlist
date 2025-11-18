@@ -9,11 +9,14 @@ interface ProgressProps {
   readonly $waveHeight: number;
   readonly $waveProgressColor: string;
 }
-const Progress = styled.div<ProgressProps>`
+const Progress = styled.div.attrs<ProgressProps>((props) => ({
+  style: {
+    width: `${props.$progress}px`,
+    height: `${props.$waveHeight}px`,
+  },
+}))<ProgressProps>`
   position: absolute;
   background: ${(props) => props.$waveProgressColor};
-  width: ${(props) => props.$progress}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
 
 interface WaveformProps {
@@ -21,11 +24,14 @@ interface WaveformProps {
   readonly $waveHeight: number;
 }
 
-const Waveform = styled.canvas<WaveformProps>`
+const Waveform = styled.canvas.attrs<WaveformProps>((props) => ({
+  style: {
+    width: `${props.$cssWidth}px`,
+    height: `${props.$waveHeight}px`,
+  },
+}))<WaveformProps>`
   float: left;
   position: relative;
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
 
 interface WrapperProps {
@@ -35,12 +41,15 @@ interface WrapperProps {
   readonly $waveFillColor: string;
 }
 
-const Wrapper = styled.div<WrapperProps>`
+const Wrapper = styled.div.attrs<WrapperProps>((props) => ({
+  style: {
+    top: `${props.$waveHeight * props.$index}px`,
+    width: `${props.$cssWidth}px`,
+    height: `${props.$waveHeight}px`,
+  },
+}))<WrapperProps>`
   position: absolute;
-  top: ${(props) => props.$waveHeight * props.$index}px;
   background: ${(props) => props.$waveFillColor};
-  width: ${(props) => props.$cssWidth}px;
-  height: ${(props) => props.$waveHeight}px;
 `;
 
 export interface ChannelProps {

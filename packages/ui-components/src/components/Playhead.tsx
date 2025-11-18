@@ -6,9 +6,12 @@ interface PlayheadLineProps {
   readonly $color: string;
 }
 
-const PlayheadLine = styled.div<PlayheadLineProps>`
+const PlayheadLine = styled.div.attrs<PlayheadLineProps>((props) => ({
+  style: {
+    left: `${props.$position}px`,
+  },
+}))<PlayheadLineProps>`
   position: absolute;
-  left: ${(props) => props.$position}px;
   top: 0;
   width: 2px;
   background: ${(props) => props.$color};

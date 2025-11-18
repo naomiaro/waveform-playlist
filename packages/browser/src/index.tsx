@@ -87,6 +87,7 @@ class WaveformPlaylistClass {
   private playbackState: 'stopped' | 'paused' | 'playing' = 'stopped';
   private currentTime: number = 0;
   private animationFrameId: number | null = null;
+  private setProgressFn: ((progress: number) => void) | null = null;
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
@@ -192,22 +193,11 @@ class WaveformPlaylistClass {
       const { setProgress } = usePlayoutStatusUpdate();
       const animationRef = React.useRef<number | null>(null);
 
-      // Set up animation loop to update progress
+      // Store setProgress reference for use in animation and seeking
       React.useEffect(() => {
-        const updateProgress = () => {
-          if (this.playout) {
-            const currentTime = this.playout.getCurrentTime();
-            setProgress(currentTime);
-          }
-          animationRef.current = requestAnimationFrame(updateProgress);
-        };
-
-        animationRef.current = requestAnimationFrame(updateProgress);
-
+        this.setProgressFn = setProgress;
         return () => {
-          if (animationRef.current !== null) {
-            cancelAnimationFrame(animationRef.current);
-          }
+          this.setProgressFn = null;
         };
       }, [setProgress]);
 
@@ -460,7 +450,13 @@ class WaveformPlaylistClass {
       this.playbackState = 'stopped';
       this.stopAnimation();
       this.currentTime = 0;
-      this.render();
+      if (this.setProgressFn) {
+        this.setProgressFn(0);
+      }
+      // Emit timeupdate event for external listeners
+      if (this.eventEmitter) {
+        this.eventEmitter.emit('timeupdate', 0);
+      }
     }
   }
 
@@ -470,15 +466,27 @@ class WaveformPlaylistClass {
     }
 
     const updateProgress = () => {
-      if (this.playbackState === 'playing' && this.playout) {
-        this.currentTime = this.playout.getCurrentTime();
-        // Don't call render() here - it causes flickering
-        // The React components will read currentTime when needed
-        this.animationFrameId = requestAnimationFrame(updateProgress);
+      // Only continue loop if still playing
+      if (this.playbackState !== 'playing' || !this.playout) {
+        this.animationFrameId = null;
+        return;
       }
+
+      this.currentTime = this.playout.getCurrentTime();
+      if (this.setProgressFn) {
+        this.setProgressFn(this.currentTime);
+      }
+      // Emit timeupdate event for external listeners
+      if (this.eventEmitter) {
+        this.eventEmitter.emit('timeupdate', this.currentTime);
+      }
+      this.animationFrameId = requestAnimationFrame(updateProgress);
     };
 
-    this.animationFrameId = requestAnimationFrame(updateProgress);
+    // Only start if actually playing
+    if (this.playbackState === 'playing') {
+      this.animationFrameId = requestAnimationFrame(updateProgress);
+    }
   }
 
   private stopAnimation(): void {
@@ -520,6 +528,55 @@ class WaveformPlaylistClass {
       const track = this.playout.getTrack(trackId);
       if (track) {
         track.setPan(pan);
+      }
+    }
+  }
+
+  private getDuration(): number {
+    let maxDuration = 0;
+    if (this.playout) {
+      this.tracks.forEach((track) => {
+        const toneTrack = this.playout?.getTrack(track.id);
+        if (toneTrack) {
+          const trackDuration = toneTrack.buffer.duration + track.startTime;
+          maxDuration = Math.max(maxDuration, trackDuration);
+        }
+      });
+    }
+    return maxDuration;
+  }
+
+  rewind(): void {
+    const wasPlaying = this.playbackState === 'playing';
+    if (wasPlaying) {
+      this.stop();
+      this.play(0);
+    } else {
+      this.currentTime = 0;
+      if (this.setProgressFn) {
+        this.setProgressFn(0);
+      }
+      // Emit timeupdate event for external listeners
+      if (this.eventEmitter) {
+        this.eventEmitter.emit('timeupdate', 0);
+      }
+    }
+  }
+
+  fastForward(): void {
+    const wasPlaying = this.playbackState === 'playing';
+    const duration = this.getDuration();
+    if (wasPlaying) {
+      this.stop();
+      this.play(duration);
+    } else {
+      this.currentTime = duration;
+      if (this.setProgressFn) {
+        this.setProgressFn(duration);
+      }
+      // Emit timeupdate event for external listeners
+      if (this.eventEmitter) {
+        this.eventEmitter.emit('timeupdate', duration);
       }
     }
   }
@@ -568,6 +625,12 @@ class WaveformPlaylistClass {
             break;
           case 'stop':
             self.stop();
+            break;
+          case 'rewind':
+            self.rewind();
+            break;
+          case 'fastforward':
+            self.fastForward();
             break;
         }
       },
