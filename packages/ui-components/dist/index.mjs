@@ -147,24 +147,41 @@ var Channel = (props) => {
   );
 };
 
-// src/components/Playlist.tsx
-import styled2, { withTheme } from "styled-components";
+// src/components/Playhead.tsx
+import styled2 from "styled-components";
 import { jsx as jsx3 } from "react/jsx-runtime";
-var Wrapper2 = styled2.div`
+var PlayheadLine = styled2.div`
+  position: absolute;
+  left: ${(props) => props.$position}px;
+  top: 0;
+  width: 2px;
+  background: ${(props) => props.$color};
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+`;
+var Playhead = ({ position, color = "#ff0000" }) => {
+  return /* @__PURE__ */ jsx3(PlayheadLine, { $position: position, $color: color });
+};
+
+// src/components/Playlist.tsx
+import styled3, { withTheme } from "styled-components";
+import { jsx as jsx4 } from "react/jsx-runtime";
+var Wrapper2 = styled3.div`
   overflow: hidden;
   position: relative;
 `;
-var ScrollContainer = styled2.div`
+var ScrollContainer = styled3.div`
   overflow: auto;
 `;
 var Playlist = ({ children }) => {
-  return /* @__PURE__ */ jsx3(Wrapper2, { children: /* @__PURE__ */ jsx3(ScrollContainer, { children }) });
+  return /* @__PURE__ */ jsx4(Wrapper2, { children: /* @__PURE__ */ jsx4(ScrollContainer, { children }) });
 };
 var StyledPlaylist = withTheme(Playlist);
 
 // src/contexts/DevicePixelRatio.tsx
 import { useState, createContext, useContext } from "react";
-import { jsx as jsx4 } from "react/jsx-runtime";
+import { jsx as jsx5 } from "react/jsx-runtime";
 function getScale() {
   return window.devicePixelRatio;
 }
@@ -178,7 +195,7 @@ var DevicePixelRatioProvider = ({ children }) => {
     },
     { once: true }
   );
-  return /* @__PURE__ */ jsx4(DevicePixelRatioContext.Provider, { value: Math.ceil(scale), children });
+  return /* @__PURE__ */ jsx5(DevicePixelRatioContext.Provider, { value: Math.ceil(scale), children });
 };
 var useDevicePixelRatio = () => useContext(DevicePixelRatioContext);
 
@@ -205,17 +222,17 @@ var useTheme = () => useContext3(ThemeContext);
 
 // src/contexts/TrackControls.tsx
 import { createContext as createContext3, useContext as useContext4, Fragment as Fragment2 } from "react";
-import { jsx as jsx5 } from "react/jsx-runtime";
-var TrackControlsContext = createContext3(/* @__PURE__ */ jsx5(Fragment2, {}));
+import { jsx as jsx6 } from "react/jsx-runtime";
+var TrackControlsContext = createContext3(/* @__PURE__ */ jsx6(Fragment2, {}));
 var useTrackControls = () => useContext4(TrackControlsContext);
 
 // src/components/SmartChannel.tsx
-import { jsx as jsx6 } from "react/jsx-runtime";
+import { jsx as jsx7 } from "react/jsx-runtime";
 var SmartChannel = (props) => {
   const theme = useTheme();
   const { waveHeight } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
-  return /* @__PURE__ */ jsx6(
+  return /* @__PURE__ */ jsx7(
     Channel,
     {
       ...props,
@@ -231,7 +248,7 @@ import { useContext as useContext6 } from "react";
 
 // src/components/TimeScale.tsx
 import { useRef, useEffect as useEffect2, useContext as useContext5 } from "react";
-import styled3, { withTheme as withTheme2 } from "styled-components";
+import styled4, { withTheme as withTheme2 } from "styled-components";
 
 // src/utils/conversions.ts
 function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
@@ -239,20 +256,20 @@ function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
 }
 
 // src/components/TimeScale.tsx
-import { jsx as jsx7, jsxs as jsxs2 } from "react/jsx-runtime";
+import { jsx as jsx8, jsxs as jsxs2 } from "react/jsx-runtime";
 function formatTime(milliseconds) {
   const seconds = Math.floor(milliseconds / 1e3);
   const s = seconds % 60;
   const m = (seconds - s) / 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-var PlaylistTimeScaleScroll = styled3.div`
+var PlaylistTimeScaleScroll = styled4.div`
   position: relative;
   width: ${(props) => props.cssWidth}px;
   margin-left: ${(props) => props.controlWidth}px;
   height: ${(props) => props.timeScaleHeight * 2}px;
 `;
-var TimeTicks = styled3.canvas`
+var TimeTicks = styled4.canvas`
   position: absolute;
   width: ${(props) => props.cssWidth}px;
   height: ${(props) => props.timeScaleHeight}px;
@@ -260,7 +277,7 @@ var TimeTicks = styled3.canvas`
   right: 0;
   bottom: 0;
 `;
-var TimeStamp = styled3.div`
+var TimeStamp = styled4.div`
   left: ${(props) => props.left}px;
   position: absolute;
 `;
@@ -315,7 +332,7 @@ var TimeScale = (props) => {
     if (counter % marker === 0) {
       const timestamp = formatTime(counter);
       timeMarkers.push(
-        /* @__PURE__ */ jsx7(TimeStamp, { left: pix, children: timestamp }, timestamp)
+        /* @__PURE__ */ jsx8(TimeStamp, { left: pix, children: timestamp }, timestamp)
       );
       canvasInfo.set(pix, timeScaleHeight);
     } else if (counter % bigStep === 0) {
@@ -333,7 +350,7 @@ var TimeScale = (props) => {
       timeScaleHeight,
       children: [
         timeMarkers,
-        /* @__PURE__ */ jsx7(
+        /* @__PURE__ */ jsx8(
           TimeTicks,
           {
             cssWidth: widthX,
@@ -350,7 +367,7 @@ var TimeScale = (props) => {
 var StyledTimeScale = withTheme2(TimeScale);
 
 // src/components/SmartScale.tsx
-import { jsx as jsx8 } from "react/jsx-runtime";
+import { jsx as jsx9 } from "react/jsx-runtime";
 var timeinfo = /* @__PURE__ */ new Map([
   [
     700,
@@ -426,7 +443,7 @@ function getScaleInfo(samplesPerPixel) {
 var SmartScale = () => {
   const { samplesPerPixel, duration } = useContext6(PlaylistInfoContext);
   let config = getScaleInfo(samplesPerPixel);
-  return /* @__PURE__ */ jsx8(
+  return /* @__PURE__ */ jsx9(
     StyledTimeScale,
     {
       marker: config.marker,
@@ -441,16 +458,16 @@ var SmartScale = () => {
 import { Fragment as Fragment3 } from "react";
 
 // src/components/Track.tsx
-import styled4 from "styled-components";
-import { jsx as jsx9, jsxs as jsxs3 } from "react/jsx-runtime";
-var Container = styled4.div`
+import styled5 from "styled-components";
+import { jsx as jsx10, jsxs as jsxs3 } from "react/jsx-runtime";
+var Container = styled5.div`
   height: ${(props) => props.waveHeight * props.numChannels}px;
   margin-left: ${(props) => props.controlWidth}px;
 `;
-var ChannelContainer = styled4.div`
+var ChannelContainer = styled5.div`
   position: relative;
 `;
-var ControlsWrapper = styled4.div`
+var ControlsWrapper = styled5.div`
   width: ${(props) => props.controlWidth}px;
   position: absolute;
   z-index: 1;
@@ -475,15 +492,15 @@ var Track = ({
       waveHeight,
       controlWidth: show ? width : 0,
       children: [
-        /* @__PURE__ */ jsx9(ControlsWrapper, { controlWidth: show ? width : 0, children: controls }),
-        /* @__PURE__ */ jsx9(ChannelContainer, { children })
+        /* @__PURE__ */ jsx10(ControlsWrapper, { controlWidth: show ? width : 0, children: controls }),
+        /* @__PURE__ */ jsx10(ChannelContainer, { children })
       ]
     }
   );
 };
 
 // src/components/SmartTrack.tsx
-import { jsx as jsx10, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx11, jsxs as jsxs4 } from "react/jsx-runtime";
 function parseData(waveform, channel) {
   const peakLength = waveform.length;
   let data;
@@ -503,8 +520,8 @@ var WaveformDataTrack = ({
 }) => {
   const { samplesPerPixel } = usePlaylistInfo();
   const waveform = waveformData.resample({ scale: samplesPerPixel });
-  return /* @__PURE__ */ jsx10(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
-    return /* @__PURE__ */ jsx10(
+  return /* @__PURE__ */ jsx11(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
+    return /* @__PURE__ */ jsx11(
       SmartChannel,
       {
         data: parseData(waveform, i),
@@ -522,14 +539,14 @@ var SmartTrack = ({
 }) => {
   const { data: waveformData } = useWaveformData(dataUri, type);
   return /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    !waveformData && /* @__PURE__ */ jsx10(Track, { numChannels: 0 }),
-    waveformData && /* @__PURE__ */ jsx10(WaveformDataTrack, { waveformData })
+    !waveformData && /* @__PURE__ */ jsx11(Track, { numChannels: 0 }),
+    waveformData && /* @__PURE__ */ jsx11(WaveformDataTrack, { waveformData })
   ] });
 };
 
 // src/components/TrackControls/Button.tsx
-import styled5 from "styled-components";
-var Button = styled5.button.attrs({
+import styled6 from "styled-components";
+var Button = styled6.button.attrs({
   type: "button"
 })`
   border: 1px solid black;
@@ -537,8 +554,8 @@ var Button = styled5.button.attrs({
 `;
 
 // src/components/TrackControls/ButtonGroup.tsx
-import styled6 from "styled-components";
-var ButtonGroup = styled6.div`
+import styled7 from "styled-components";
+var ButtonGroup = styled7.div`
   button:first-child {
     border-top-left-radius: 5px;
     border-bottom-left-radius: 5px;
@@ -551,8 +568,8 @@ var ButtonGroup = styled6.div`
 `;
 
 // src/components/TrackControls/Controls.tsx
-import styled7 from "styled-components";
-var Controls = styled7.div`
+import styled8 from "styled-components";
+var Controls = styled8.div`
   background: white;
   width: 100%;
   height: 100%;
@@ -566,8 +583,8 @@ var Controls = styled7.div`
 `;
 
 // src/components/TrackControls/Header.tsx
-import styled8 from "styled-components";
-var Header = styled8.header`
+import styled9 from "styled-components";
+var Header = styled9.header`
   overflow: hidden;
   color: white;
   background-color: blueviolet;
@@ -576,28 +593,28 @@ var Header = styled8.header`
 `;
 
 // src/components/TrackControls/VolumeDownIcon.tsx
-import styled9 from "styled-components";
+import styled10 from "styled-components";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { faVolumeDown } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 library.add(faVolumeDown);
-var VolumeDownIcon = styled9(FontAwesomeIcon).attrs({
+var VolumeDownIcon = styled10(FontAwesomeIcon).attrs({
   icon: "volume-down"
 })``;
 
 // src/components/TrackControls/VolumeUpIcon.tsx
-import styled10 from "styled-components";
+import styled11 from "styled-components";
 import { library as library2 } from "@fortawesome/fontawesome-svg-core";
 import { faVolumeUp } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon as FontAwesomeIcon2 } from "@fortawesome/react-fontawesome";
 library2.add(faVolumeUp);
-var VolumeUpIcon = styled10(FontAwesomeIcon2).attrs({
+var VolumeUpIcon = styled11(FontAwesomeIcon2).attrs({
   icon: "volume-up"
 })``;
 
 // src/components/TrackControls/Slider.tsx
-import styled11 from "styled-components";
-var Slider = styled11.input.attrs({
+import styled12 from "styled-components";
+var Slider = styled12.input.attrs({
   type: "range"
 })`
   -webkit-appearance: none;
@@ -658,8 +675,8 @@ var Slider = styled11.input.attrs({
 `;
 
 // src/components/TrackControls/SliderWrapper.tsx
-import styled12 from "styled-components";
-var SliderWrapper = styled12.label`
+import styled13 from "styled-components";
+var SliderWrapper = styled13.label`
   margin: 1em auto;
   width: 100%;
   display: flex;
@@ -670,19 +687,19 @@ var SliderWrapper = styled12.label`
 
 // src/components/TrackControls/Knob.tsx
 import React8, { useRef as useRef2, useState as useState2, useCallback as useCallback2 } from "react";
-import styled13 from "styled-components";
-import { jsx as jsx11, jsxs as jsxs5 } from "react/jsx-runtime";
-var KnobContainer = styled13.div`
+import styled14 from "styled-components";
+import { jsx as jsx12, jsxs as jsxs5 } from "react/jsx-runtime";
+var KnobContainer = styled14.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
 `;
-var KnobSvg = styled13.svg`
+var KnobSvg = styled14.svg`
   cursor: pointer;
   user-select: none;
 `;
-var KnobLabel = styled13.span`
+var KnobLabel = styled14.span`
   font-size: 9px;
   color: #666;
   font-weight: bold;
@@ -744,7 +761,7 @@ var Knob = ({
         height: size,
         onMouseDown: handleMouseDown,
         children: [
-          /* @__PURE__ */ jsx11(
+          /* @__PURE__ */ jsx12(
             "circle",
             {
               cx: centerX,
@@ -755,7 +772,7 @@ var Knob = ({
               strokeWidth: "2"
             }
           ),
-          /* @__PURE__ */ jsx11(
+          /* @__PURE__ */ jsx12(
             "path",
             {
               d: `M ${centerX + Math.cos(-2.356) * radius} ${centerY + Math.sin(-2.356) * radius}
@@ -768,7 +785,7 @@ var Knob = ({
               strokeLinecap: "round"
             }
           ),
-          /* @__PURE__ */ jsx11(
+          /* @__PURE__ */ jsx12(
             "circle",
             {
               cx: indicatorX,
@@ -780,7 +797,7 @@ var Knob = ({
         ]
       }
     ),
-    label && /* @__PURE__ */ jsx11(KnobLabel, { children: label })
+    label && /* @__PURE__ */ jsx12(KnobLabel, { children: label })
   ] });
 };
 export {
@@ -792,6 +809,7 @@ export {
   DevicePixelRatioProvider,
   Header,
   Knob,
+  Playhead,
   Playlist,
   PlaylistInfoContext,
   Slider,

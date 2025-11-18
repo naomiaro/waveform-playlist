@@ -1,5 +1,6 @@
 export * from './BBCExtractPeaks';
 export * from './Channel';
+export * from './Playhead';
 export * from './Playlist';
 export * from './SmartChannel';
 export * from './SmartScale';

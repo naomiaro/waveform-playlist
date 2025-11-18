@@ -18,6 +18,7 @@ import {
   Knob,
   StyledTimeScale,
   Playlist,
+  Playhead,
   Track as TrackComponent,
   PlaylistInfoContext,
   DevicePixelRatioProvider,
@@ -81,6 +82,8 @@ class WaveformPlaylistClass {
   private peaksData: Map<string, PeakData> = new Map();
   private eventEmitter: any = null;
   private playbackState: 'stopped' | 'paused' | 'playing' = 'stopped';
+  private currentTime: number = 0;
+  private animationFrameId: number | null = null;
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
@@ -228,6 +231,24 @@ class WaveformPlaylistClass {
 
       const width = peaksData.length;
 
+      // Calculate progress in pixels for this track
+      const trackData = this.tracks.find(t => t.id === trackId);
+      const trackStartTime = trackData?.startTime || 0;
+      const trackDuration = track.buffer.duration;
+
+      let progressPx = 0;
+      if (this.currentTime >= trackStartTime) {
+        const relativeTime = this.currentTime - trackStartTime;
+        if (relativeTime <= trackDuration) {
+          // Convert time to pixels: relativeTime * sampleRate / samplesPerPixel
+          const sampleRate = this.playout.sampleRate || 44100;
+          progressPx = (relativeTime * sampleRate) / samplesPerPixel;
+          progressPx = Math.min(progressPx, width); // Clamp to width
+        } else {
+          progressPx = width; // Track has finished
+        }
+      }
+
       return (
         <>
           {peaksData.data.map((channelData: Peaks, index: number) => (
@@ -241,7 +262,7 @@ class WaveformPlaylistClass {
               waveOutlineColor={theme.waveOutlineColor || '#00f'}
               waveFillColor={theme.waveFillColor || '#f0f0f0'}
               waveProgressColor={theme.waveProgressColor || '#f00'}
-              progress={0}
+              progress={progressPx}
             />
           ))}
         </>
@@ -356,6 +377,10 @@ class WaveformPlaylistClass {
                       </TrackControlsContext.Provider>
                     );
                   })}
+                  <Playhead
+                    position={((this.currentTime * (this.playout?.sampleRate || 44100)) / samplesPerPixel) + (showControls ? controlsWidth : 0)}
+                    color={theme.waveProgressColor || '#f00'}
+                  />
                 </>
               </Playlist>
               <div style={{ marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }}>
@@ -382,6 +407,7 @@ class WaveformPlaylistClass {
       }
 
       this.playbackState = 'playing';
+      this.startAnimation();
     }
   }
 
@@ -389,6 +415,7 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.pause();
       this.playbackState = 'paused';
+      this.stopAnimation();
     }
   }
 
@@ -396,6 +423,32 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.stop();
       this.playbackState = 'stopped';
+      this.stopAnimation();
+      this.currentTime = 0;
+      this.render();
+    }
+  }
+
+  private startAnimation(): void {
+    if (this.animationFrameId !== null) {
+      return; // Already running
+    }
+
+    const updateProgress = () => {
+      if (this.playbackState === 'playing' && this.playout) {
+        this.currentTime = this.playout.getCurrentTime();
+        this.render();
+        this.animationFrameId = requestAnimationFrame(updateProgress);
+      }
+    };
+
+    this.animationFrameId = requestAnimationFrame(updateProgress);
+  }
+
+  private stopAnimation(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
   }
 

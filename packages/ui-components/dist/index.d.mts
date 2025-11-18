@@ -61,6 +61,12 @@ interface ChannelProps {
 }
 declare const Channel: FunctionComponent<ChannelProps>;
 
+interface PlayheadProps {
+    position: number;
+    color?: string;
+}
+declare const Playhead: react__default.FC<PlayheadProps>;
+
 interface PlaylistProps {
     readonly theme: DefaultTheme;
     readonly children?: JSX.Element | JSX.Element[];
@@ -173,4 +179,4 @@ declare const useTheme: () => styled_components.DefaultTheme | undefined;
 declare const TrackControlsContext: react__default.Context<react_jsx_runtime.JSX.Element>;
 declare const useTrackControls: () => react_jsx_runtime.JSX.Element;
 
-export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Knob, Playlist, PlaylistInfoContext, type PlaylistProps, type Props$1 as Props, Slider, SliderWrapper, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };
+export { BBCWaveformData, Button, ButtonGroup, Channel, type ChannelProps, Controls$1 as Controls, type ControlsWrapperProps, DevicePixelRatioProvider, Header, Knob, Playhead, type PlayheadProps, Playlist, PlaylistInfoContext, type PlaylistProps, type Props$1 as Props, Slider, SliderWrapper, SmartChannel, type SmartChannelProps, SmartScale, SmartTrack, type SmartTrackProps, StyledPlaylist, StyledTimeScale, TimeScale, type TimeScaleProps, Track, TrackControlsContext, type TrackProps, VolumeDownIcon, VolumeUpIcon, useDevicePixelRatio, usePlaylistInfo, useTheme, useTrackControls, useWaveformData };

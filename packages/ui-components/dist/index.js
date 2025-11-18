@@ -38,6 +38,7 @@ __export(index_exports, {
   DevicePixelRatioProvider: () => DevicePixelRatioProvider,
   Header: () => Header,
   Knob: () => Knob,
+  Playhead: () => Playhead,
   Playlist: () => Playlist,
   PlaylistInfoContext: () => PlaylistInfoContext,
   Slider: () => Slider,
@@ -209,24 +210,41 @@ var Channel = (props) => {
   );
 };
 
-// src/components/Playlist.tsx
+// src/components/Playhead.tsx
 var import_styled_components2 = __toESM(require("styled-components"));
 var import_jsx_runtime3 = require("react/jsx-runtime");
-var Wrapper2 = import_styled_components2.default.div`
+var PlayheadLine = import_styled_components2.default.div`
+  position: absolute;
+  left: ${(props) => props.$position}px;
+  top: 0;
+  width: 2px;
+  background: ${(props) => props.$color};
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+`;
+var Playhead = ({ position, color = "#ff0000" }) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(PlayheadLine, { $position: position, $color: color });
+};
+
+// src/components/Playlist.tsx
+var import_styled_components3 = __toESM(require("styled-components"));
+var import_jsx_runtime4 = require("react/jsx-runtime");
+var Wrapper2 = import_styled_components3.default.div`
   overflow: hidden;
   position: relative;
 `;
-var ScrollContainer = import_styled_components2.default.div`
+var ScrollContainer = import_styled_components3.default.div`
   overflow: auto;
 `;
 var Playlist = ({ children }) => {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Wrapper2, { children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ScrollContainer, { children }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Wrapper2, { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ScrollContainer, { children }) });
 };
-var StyledPlaylist = (0, import_styled_components2.withTheme)(Playlist);
+var StyledPlaylist = (0, import_styled_components3.withTheme)(Playlist);
 
 // src/contexts/DevicePixelRatio.tsx
 var import_react3 = require("react");
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 function getScale() {
   return window.devicePixelRatio;
 }
@@ -240,7 +258,7 @@ var DevicePixelRatioProvider = ({ children }) => {
     },
     { once: true }
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(DevicePixelRatioContext.Provider, { value: Math.ceil(scale), children });
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(DevicePixelRatioContext.Provider, { value: Math.ceil(scale), children });
 };
 var useDevicePixelRatio = () => (0, import_react3.useContext)(DevicePixelRatioContext);
 
@@ -262,22 +280,22 @@ var usePlaylistInfo = () => (0, import_react4.useContext)(PlaylistInfoContext);
 
 // src/contexts/Theme.tsx
 var import_react5 = require("react");
-var import_styled_components3 = require("styled-components");
-var useTheme = () => (0, import_react5.useContext)(import_styled_components3.ThemeContext);
+var import_styled_components4 = require("styled-components");
+var useTheme = () => (0, import_react5.useContext)(import_styled_components4.ThemeContext);
 
 // src/contexts/TrackControls.tsx
 var import_react6 = require("react");
-var import_jsx_runtime5 = require("react/jsx-runtime");
-var TrackControlsContext = (0, import_react6.createContext)(/* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_react6.Fragment, {}));
+var import_jsx_runtime6 = require("react/jsx-runtime");
+var TrackControlsContext = (0, import_react6.createContext)(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_react6.Fragment, {}));
 var useTrackControls = () => (0, import_react6.useContext)(TrackControlsContext);
 
 // src/components/SmartChannel.tsx
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 var SmartChannel = (props) => {
   const theme = useTheme();
   const { waveHeight } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
     Channel,
     {
       ...props,
@@ -293,7 +311,7 @@ var import_react8 = require("react");
 
 // src/components/TimeScale.tsx
 var import_react7 = require("react");
-var import_styled_components4 = __toESM(require("styled-components"));
+var import_styled_components5 = __toESM(require("styled-components"));
 
 // src/utils/conversions.ts
 function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
@@ -301,20 +319,20 @@ function secondsToPixels(seconds, samplesPerPixel, sampleRate) {
 }
 
 // src/components/TimeScale.tsx
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function formatTime(milliseconds) {
   const seconds = Math.floor(milliseconds / 1e3);
   const s = seconds % 60;
   const m = (seconds - s) / 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-var PlaylistTimeScaleScroll = import_styled_components4.default.div`
+var PlaylistTimeScaleScroll = import_styled_components5.default.div`
   position: relative;
   width: ${(props) => props.cssWidth}px;
   margin-left: ${(props) => props.controlWidth}px;
   height: ${(props) => props.timeScaleHeight * 2}px;
 `;
-var TimeTicks = import_styled_components4.default.canvas`
+var TimeTicks = import_styled_components5.default.canvas`
   position: absolute;
   width: ${(props) => props.cssWidth}px;
   height: ${(props) => props.timeScaleHeight}px;
@@ -322,7 +340,7 @@ var TimeTicks = import_styled_components4.default.canvas`
   right: 0;
   bottom: 0;
 `;
-var TimeStamp = import_styled_components4.default.div`
+var TimeStamp = import_styled_components5.default.div`
   left: ${(props) => props.left}px;
   position: absolute;
 `;
@@ -377,7 +395,7 @@ var TimeScale = (props) => {
     if (counter % marker === 0) {
       const timestamp = formatTime(counter);
       timeMarkers.push(
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TimeStamp, { left: pix, children: timestamp }, timestamp)
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(TimeStamp, { left: pix, children: timestamp }, timestamp)
       );
       canvasInfo.set(pix, timeScaleHeight);
     } else if (counter % bigStep === 0) {
@@ -387,7 +405,7 @@ var TimeScale = (props) => {
     }
     counter += secondStep;
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
     PlaylistTimeScaleScroll,
     {
       cssWidth: widthX,
@@ -395,7 +413,7 @@ var TimeScale = (props) => {
       timeScaleHeight,
       children: [
         timeMarkers,
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           TimeTicks,
           {
             cssWidth: widthX,
@@ -409,10 +427,10 @@ var TimeScale = (props) => {
     }
   );
 };
-var StyledTimeScale = (0, import_styled_components4.withTheme)(TimeScale);
+var StyledTimeScale = (0, import_styled_components5.withTheme)(TimeScale);
 
 // src/components/SmartScale.tsx
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 var timeinfo = /* @__PURE__ */ new Map([
   [
     700,
@@ -488,7 +506,7 @@ function getScaleInfo(samplesPerPixel) {
 var SmartScale = () => {
   const { samplesPerPixel, duration } = (0, import_react8.useContext)(PlaylistInfoContext);
   let config = getScaleInfo(samplesPerPixel);
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
     StyledTimeScale,
     {
       marker: config.marker,
@@ -503,16 +521,16 @@ var SmartScale = () => {
 var import_react9 = require("react");
 
 // src/components/Track.tsx
-var import_styled_components5 = __toESM(require("styled-components"));
-var import_jsx_runtime9 = require("react/jsx-runtime");
-var Container = import_styled_components5.default.div`
+var import_styled_components6 = __toESM(require("styled-components"));
+var import_jsx_runtime10 = require("react/jsx-runtime");
+var Container = import_styled_components6.default.div`
   height: ${(props) => props.waveHeight * props.numChannels}px;
   margin-left: ${(props) => props.controlWidth}px;
 `;
-var ChannelContainer = import_styled_components5.default.div`
+var ChannelContainer = import_styled_components6.default.div`
   position: relative;
 `;
-var ControlsWrapper = import_styled_components5.default.div`
+var ControlsWrapper = import_styled_components6.default.div`
   width: ${(props) => props.controlWidth}px;
   position: absolute;
   z-index: 1;
@@ -529,7 +547,7 @@ var Track = ({
     controls: { show, width }
   } = usePlaylistInfo();
   const controls = useTrackControls();
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
     Container,
     {
       numChannels,
@@ -537,15 +555,15 @@ var Track = ({
       waveHeight,
       controlWidth: show ? width : 0,
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ControlsWrapper, { controlWidth: show ? width : 0, children: controls }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ChannelContainer, { children })
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ControlsWrapper, { controlWidth: show ? width : 0, children: controls }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ChannelContainer, { children })
       ]
     }
   );
 };
 
 // src/components/SmartTrack.tsx
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function parseData(waveform, channel) {
   const peakLength = waveform.length;
   let data;
@@ -565,8 +583,8 @@ var WaveformDataTrack = ({
 }) => {
   const { samplesPerPixel } = usePlaylistInfo();
   const waveform = waveformData.resample({ scale: samplesPerPixel });
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Track, { numChannels: waveform.channels, children: Array(waveform.channels).fill(0).map((_, i) => {
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       SmartChannel,
       {
         data: parseData(waveform, i),
@@ -583,15 +601,15 @@ var SmartTrack = ({
   type
 }) => {
   const { data: waveformData } = useWaveformData(dataUri, type);
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_react9.Fragment, { children: [
-    !waveformData && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Track, { numChannels: 0 }),
-    waveformData && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(WaveformDataTrack, { waveformData })
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_react9.Fragment, { children: [
+    !waveformData && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Track, { numChannels: 0 }),
+    waveformData && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(WaveformDataTrack, { waveformData })
   ] });
 };
 
 // src/components/TrackControls/Button.tsx
-var import_styled_components6 = __toESM(require("styled-components"));
-var Button = import_styled_components6.default.button.attrs({
+var import_styled_components7 = __toESM(require("styled-components"));
+var Button = import_styled_components7.default.button.attrs({
   type: "button"
 })`
   border: 1px solid black;
@@ -599,8 +617,8 @@ var Button = import_styled_components6.default.button.attrs({
 `;
 
 // src/components/TrackControls/ButtonGroup.tsx
-var import_styled_components7 = __toESM(require("styled-components"));
-var ButtonGroup = import_styled_components7.default.div`
+var import_styled_components8 = __toESM(require("styled-components"));
+var ButtonGroup = import_styled_components8.default.div`
   button:first-child {
     border-top-left-radius: 5px;
     border-bottom-left-radius: 5px;
@@ -613,8 +631,8 @@ var ButtonGroup = import_styled_components7.default.div`
 `;
 
 // src/components/TrackControls/Controls.tsx
-var import_styled_components8 = __toESM(require("styled-components"));
-var Controls = import_styled_components8.default.div`
+var import_styled_components9 = __toESM(require("styled-components"));
+var Controls = import_styled_components9.default.div`
   background: white;
   width: 100%;
   height: 100%;
@@ -628,8 +646,8 @@ var Controls = import_styled_components8.default.div`
 `;
 
 // src/components/TrackControls/Header.tsx
-var import_styled_components9 = __toESM(require("styled-components"));
-var Header = import_styled_components9.default.header`
+var import_styled_components10 = __toESM(require("styled-components"));
+var Header = import_styled_components10.default.header`
   overflow: hidden;
   color: white;
   background-color: blueviolet;
@@ -638,28 +656,28 @@ var Header = import_styled_components9.default.header`
 `;
 
 // src/components/TrackControls/VolumeDownIcon.tsx
-var import_styled_components10 = __toESM(require("styled-components"));
+var import_styled_components11 = __toESM(require("styled-components"));
 var import_fontawesome_svg_core = require("@fortawesome/fontawesome-svg-core");
 var import_free_solid_svg_icons = require("@fortawesome/free-solid-svg-icons");
 var import_react_fontawesome = require("@fortawesome/react-fontawesome");
 import_fontawesome_svg_core.library.add(import_free_solid_svg_icons.faVolumeDown);
-var VolumeDownIcon = (0, import_styled_components10.default)(import_react_fontawesome.FontAwesomeIcon).attrs({
+var VolumeDownIcon = (0, import_styled_components11.default)(import_react_fontawesome.FontAwesomeIcon).attrs({
   icon: "volume-down"
 })``;
 
 // src/components/TrackControls/VolumeUpIcon.tsx
-var import_styled_components11 = __toESM(require("styled-components"));
+var import_styled_components12 = __toESM(require("styled-components"));
 var import_fontawesome_svg_core2 = require("@fortawesome/fontawesome-svg-core");
 var import_free_solid_svg_icons2 = require("@fortawesome/free-solid-svg-icons");
 var import_react_fontawesome2 = require("@fortawesome/react-fontawesome");
 import_fontawesome_svg_core2.library.add(import_free_solid_svg_icons2.faVolumeUp);
-var VolumeUpIcon = (0, import_styled_components11.default)(import_react_fontawesome2.FontAwesomeIcon).attrs({
+var VolumeUpIcon = (0, import_styled_components12.default)(import_react_fontawesome2.FontAwesomeIcon).attrs({
   icon: "volume-up"
 })``;
 
 // src/components/TrackControls/Slider.tsx
-var import_styled_components12 = __toESM(require("styled-components"));
-var Slider = import_styled_components12.default.input.attrs({
+var import_styled_components13 = __toESM(require("styled-components"));
+var Slider = import_styled_components13.default.input.attrs({
   type: "range"
 })`
   -webkit-appearance: none;
@@ -720,8 +738,8 @@ var Slider = import_styled_components12.default.input.attrs({
 `;
 
 // src/components/TrackControls/SliderWrapper.tsx
-var import_styled_components13 = __toESM(require("styled-components"));
-var SliderWrapper = import_styled_components13.default.label`
+var import_styled_components14 = __toESM(require("styled-components"));
+var SliderWrapper = import_styled_components14.default.label`
   margin: 1em auto;
   width: 100%;
   display: flex;
@@ -732,19 +750,19 @@ var SliderWrapper = import_styled_components13.default.label`
 
 // src/components/TrackControls/Knob.tsx
 var import_react10 = __toESM(require("react"));
-var import_styled_components14 = __toESM(require("styled-components"));
-var import_jsx_runtime11 = require("react/jsx-runtime");
-var KnobContainer = import_styled_components14.default.div`
+var import_styled_components15 = __toESM(require("styled-components"));
+var import_jsx_runtime12 = require("react/jsx-runtime");
+var KnobContainer = import_styled_components15.default.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
 `;
-var KnobSvg = import_styled_components14.default.svg`
+var KnobSvg = import_styled_components15.default.svg`
   cursor: pointer;
   user-select: none;
 `;
-var KnobLabel = import_styled_components14.default.span`
+var KnobLabel = import_styled_components15.default.span`
   font-size: 9px;
   color: #666;
   font-weight: bold;
@@ -798,15 +816,15 @@ var Knob = ({
   const indicatorAngle = angle * Math.PI / 180;
   const indicatorX = centerX + Math.cos(indicatorAngle) * (radius - 6);
   const indicatorY = centerY + Math.sin(indicatorAngle) * (radius - 6);
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(KnobContainer, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(KnobContainer, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
       KnobSvg,
       {
         width: size,
         height: size,
         onMouseDown: handleMouseDown,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "circle",
             {
               cx: centerX,
@@ -817,7 +835,7 @@ var Knob = ({
               strokeWidth: "2"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "path",
             {
               d: `M ${centerX + Math.cos(-2.356) * radius} ${centerY + Math.sin(-2.356) * radius}
@@ -830,7 +848,7 @@ var Knob = ({
               strokeLinecap: "round"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "circle",
             {
               cx: indicatorX,
@@ -842,7 +860,7 @@ var Knob = ({
         ]
       }
     ),
-    label && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(KnobLabel, { children: label })
+    label && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(KnobLabel, { children: label })
   ] });
 };
 // Annotate the CommonJS export names for ESM import in node:
@@ -855,6 +873,7 @@ var Knob = ({
   DevicePixelRatioProvider,
   Header,
   Knob,
+  Playhead,
   Playlist,
   PlaylistInfoContext,
   Slider,

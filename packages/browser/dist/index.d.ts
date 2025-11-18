@@ -44,12 +44,16 @@ declare class WaveformPlaylistClass {
     private peaksData;
     private eventEmitter;
     private playbackState;
+    private currentTime;
+    private animationFrameId;
     constructor(config: PlaylistConfig);
     load(trackConfigs: TrackConfig[]): Promise<void>;
     private render;
     play(startTime?: number): Promise<void>;
     pause(): void;
     stop(): void;
+    private startAnimation;
+    private stopAnimation;
     setMasterGain(gain: number): void;
     setTrackGain(trackId: string, gain: number): void;
     setTrackMute(trackId: string, muted: boolean): void;
