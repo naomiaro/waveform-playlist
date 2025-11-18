@@ -94,9 +94,6 @@ export class TonePlayout {
   setSolo(trackId: string, soloed: boolean): void {
     const track = this.tracks.get(trackId);
     if (track) {
-      console.log(`setSolo(${trackId}, ${soloed})`);
-      console.log('Manual mute state before:', Array.from(this.manualMuteState.entries()));
-
       track.setSolo(soloed);
       if (soloed) {
         this.soloedTracks.add(trackId);
@@ -104,35 +101,27 @@ export class TonePlayout {
         this.soloedTracks.delete(trackId);
       }
 
-      console.log('Soloed tracks:', Array.from(this.soloedTracks));
-
       // Update mute state of all tracks based on solo logic
       this.updateSoloMuting();
-
-      console.log('Manual mute state after:', Array.from(this.manualMuteState.entries()));
     }
   }
 
   private updateSoloMuting(): void {
     const hasSoloedTracks = this.soloedTracks.size > 0;
-    console.log('updateSoloMuting - hasSoloedTracks:', hasSoloedTracks);
 
     this.tracks.forEach((track, id) => {
       if (hasSoloedTracks) {
         // If there are soloed tracks, mute all non-soloed tracks
         if (!this.soloedTracks.has(id)) {
-          console.log(`  ${id}: muting (not soloed)`);
           track.setMute(true);
         } else {
           // Restore manual mute state for soloed tracks
           const manuallyMuted = this.manualMuteState.get(id) ?? false;
-          console.log(`  ${id}: restoring manual mute state (${manuallyMuted}) for soloed track`);
           track.setMute(manuallyMuted);
         }
       } else {
         // No soloed tracks, restore original manual mute state for all tracks
         const manuallyMuted = this.manualMuteState.get(id) ?? false;
-        console.log(`  ${id}: restoring manual mute state (${manuallyMuted})`);
         track.setMute(manuallyMuted);
       }
     });
