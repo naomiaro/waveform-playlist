@@ -105,7 +105,7 @@ declare const TimeScale: FunctionComponent<TimeScalePropsWithTheme>;
 declare const StyledTimeScale: FunctionComponent<TimeScaleProps>;
 
 interface ControlsWrapperProps {
-    readonly controlWidth: number;
+    readonly $controlWidth: number;
 }
 interface TrackProps {
     className?: string;

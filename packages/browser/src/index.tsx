@@ -216,11 +216,6 @@ class WaveformPlaylistClass {
       },
     };
 
-    console.log('Config:', this.config);
-    console.log('Controls config:', this.config.controls);
-    console.log('Show controls:', showControls);
-    console.log('Playlist info:', playlistInfo);
-
     // Waveform component using Channel from ui-components
     const WaveformDisplay: React.FC<{ trackId: string }> = ({ trackId }) => {
       const peaksData = this.peaksData.get(trackId);

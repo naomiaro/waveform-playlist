@@ -4,14 +4,14 @@ import { usePlaylistInfo } from '../contexts/PlaylistInfo';
 import { useTrackControls } from '../contexts/TrackControls';
 
 interface ContainerProps {
-  readonly numChannels: number;
-  readonly waveHeight: number;
-  readonly controlWidth: number;
+  readonly $numChannels: number;
+  readonly $waveHeight: number;
+  readonly $controlWidth: number;
 }
 
 const Container = styled.div<ContainerProps>`
-  height: ${(props) => props.waveHeight * props.numChannels}px;
-  margin-left: ${(props) => props.controlWidth}px;
+  height: ${(props) => props.$waveHeight * props.$numChannels}px;
+  margin-left: ${(props) => props.$controlWidth}px;
 `;
 
 const ChannelContainer = styled.div`
@@ -19,10 +19,10 @@ const ChannelContainer = styled.div`
 `;
 
 export interface ControlsWrapperProps {
-  readonly controlWidth: number;
+  readonly $controlWidth: number;
 }
 const ControlsWrapper = styled.div<ControlsWrapperProps>`
-  width: ${(props) => props.controlWidth}px;
+  width: ${(props) => props.$controlWidth}px;
   position: absolute;
   z-index: 1;
   left: 0;
@@ -47,12 +47,12 @@ export const Track: FunctionComponent<TrackProps> = ({
   const controls = useTrackControls();
   return (
     <Container
-      numChannels={numChannels}
+      $numChannels={numChannels}
       className={className}
-      waveHeight={waveHeight}
-      controlWidth={show ? width : 0}
+      $waveHeight={waveHeight}
+      $controlWidth={show ? width : 0}
     >
-      <ControlsWrapper controlWidth={show ? width : 0}>
+      <ControlsWrapper $controlWidth={show ? width : 0}>
         {controls}
       </ControlsWrapper>
       <ChannelContainer>{children}</ChannelContainer>

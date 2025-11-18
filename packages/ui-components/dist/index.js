@@ -328,20 +328,20 @@ function formatTime(milliseconds) {
 }
 var PlaylistTimeScaleScroll = import_styled_components5.default.div`
   position: relative;
-  width: ${(props) => props.cssWidth}px;
-  margin-left: ${(props) => props.controlWidth}px;
-  height: ${(props) => props.timeScaleHeight * 2}px;
+  width: ${(props) => props.$cssWidth}px;
+  margin-left: ${(props) => props.$controlWidth}px;
+  height: ${(props) => props.$timeScaleHeight * 2}px;
 `;
 var TimeTicks = import_styled_components5.default.canvas`
   position: absolute;
-  width: ${(props) => props.cssWidth}px;
-  height: ${(props) => props.timeScaleHeight}px;
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$timeScaleHeight}px;
   left: 0;
   right: 0;
   bottom: 0;
 `;
 var TimeStamp = import_styled_components5.default.div`
-  left: ${(props) => props.left}px;
+  left: ${(props) => props.$left}px;
   position: absolute;
 `;
 var TimeScale = (props) => {
@@ -395,7 +395,7 @@ var TimeScale = (props) => {
     if (counter % marker === 0) {
       const timestamp = formatTime(counter);
       timeMarkers.push(
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(TimeStamp, { left: pix, children: timestamp }, timestamp)
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(TimeStamp, { $left: pix, children: timestamp }, timestamp)
       );
       canvasInfo.set(pix, timeScaleHeight);
     } else if (counter % bigStep === 0) {
@@ -408,16 +408,16 @@ var TimeScale = (props) => {
   return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
     PlaylistTimeScaleScroll,
     {
-      cssWidth: widthX,
-      controlWidth: showControls ? controlWidth : 0,
-      timeScaleHeight,
+      $cssWidth: widthX,
+      $controlWidth: showControls ? controlWidth : 0,
+      $timeScaleHeight: timeScaleHeight,
       children: [
         timeMarkers,
         /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           TimeTicks,
           {
-            cssWidth: widthX,
-            timeScaleHeight,
+            $cssWidth: widthX,
+            $timeScaleHeight: timeScaleHeight,
             width: widthX * devicePixelRatio,
             height: timeScaleHeight * devicePixelRatio,
             ref: canvasRef
@@ -524,14 +524,14 @@ var import_react9 = require("react");
 var import_styled_components6 = __toESM(require("styled-components"));
 var import_jsx_runtime10 = require("react/jsx-runtime");
 var Container = import_styled_components6.default.div`
-  height: ${(props) => props.waveHeight * props.numChannels}px;
-  margin-left: ${(props) => props.controlWidth}px;
+  height: ${(props) => props.$waveHeight * props.$numChannels}px;
+  margin-left: ${(props) => props.$controlWidth}px;
 `;
 var ChannelContainer = import_styled_components6.default.div`
   position: relative;
 `;
 var ControlsWrapper = import_styled_components6.default.div`
-  width: ${(props) => props.controlWidth}px;
+  width: ${(props) => props.$controlWidth}px;
   position: absolute;
   z-index: 1;
   left: 0;
@@ -550,12 +550,12 @@ var Track = ({
   return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
     Container,
     {
-      numChannels,
+      $numChannels: numChannels,
       className,
-      waveHeight,
-      controlWidth: show ? width : 0,
+      $waveHeight: waveHeight,
+      $controlWidth: show ? width : 0,
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ControlsWrapper, { controlWidth: show ? width : 0, children: controls }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ControlsWrapper, { $controlWidth: show ? width : 0, children: controls }),
         /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ChannelContainer, { children })
       ]
     }

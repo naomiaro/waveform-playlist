@@ -13,35 +13,35 @@ function formatTime(milliseconds: number) {
 }
 
 interface PlaylistTimeScaleScroll {
-  readonly cssWidth: number;
-  readonly controlWidth: number;
-  readonly timeScaleHeight: number;
+  readonly $cssWidth: number;
+  readonly $controlWidth: number;
+  readonly $timeScaleHeight: number;
 }
 const PlaylistTimeScaleScroll = styled.div<PlaylistTimeScaleScroll>`
   position: relative;
-  width: ${(props) => props.cssWidth}px;
-  margin-left: ${(props) => props.controlWidth}px;
-  height: ${(props) => props.timeScaleHeight * 2}px;
+  width: ${(props) => props.$cssWidth}px;
+  margin-left: ${(props) => props.$controlWidth}px;
+  height: ${(props) => props.$timeScaleHeight * 2}px;
 `;
 
 interface TimeTicks {
-  readonly cssWidth: number;
-  readonly timeScaleHeight: number;
+  readonly $cssWidth: number;
+  readonly $timeScaleHeight: number;
 }
 const TimeTicks = styled.canvas<TimeTicks>`
   position: absolute;
-  width: ${(props) => props.cssWidth}px;
-  height: ${(props) => props.timeScaleHeight}px;
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$timeScaleHeight}px;
   left: 0;
   right: 0;
   bottom: 0;
 `;
 
 interface TimeStamp {
-  readonly left: number;
+  readonly $left: number;
 }
 const TimeStamp = styled.div<TimeStamp>`
-  left: ${(props) => props.left}px;
+  left: ${(props) => props.$left}px;
   position: absolute;
 `;
 
@@ -115,7 +115,7 @@ export const TimeScale: FunctionComponent<TimeScalePropsWithTheme> = (props) => 
     if (counter % marker === 0) {
       const timestamp = formatTime(counter);
       timeMarkers.push(
-        <TimeStamp key={timestamp} left={pix}>
+        <TimeStamp key={timestamp} $left={pix}>
           {timestamp}
         </TimeStamp>
       );
@@ -131,14 +131,14 @@ export const TimeScale: FunctionComponent<TimeScalePropsWithTheme> = (props) => 
 
   return (
     <PlaylistTimeScaleScroll
-      cssWidth={widthX}
-      controlWidth={showControls ? controlWidth : 0}
-      timeScaleHeight={timeScaleHeight}
+      $cssWidth={widthX}
+      $controlWidth={showControls ? controlWidth : 0}
+      $timeScaleHeight={timeScaleHeight}
     >
       {timeMarkers}
       <TimeTicks
-        cssWidth={widthX}
-        timeScaleHeight={timeScaleHeight}
+        $cssWidth={widthX}
+        $timeScaleHeight={timeScaleHeight}
         width={widthX * devicePixelRatio}
         height={timeScaleHeight * devicePixelRatio}
         ref={canvasRef}

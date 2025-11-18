@@ -265,20 +265,20 @@ function formatTime(milliseconds) {
 }
 var PlaylistTimeScaleScroll = styled4.div`
   position: relative;
-  width: ${(props) => props.cssWidth}px;
-  margin-left: ${(props) => props.controlWidth}px;
-  height: ${(props) => props.timeScaleHeight * 2}px;
+  width: ${(props) => props.$cssWidth}px;
+  margin-left: ${(props) => props.$controlWidth}px;
+  height: ${(props) => props.$timeScaleHeight * 2}px;
 `;
 var TimeTicks = styled4.canvas`
   position: absolute;
-  width: ${(props) => props.cssWidth}px;
-  height: ${(props) => props.timeScaleHeight}px;
+  width: ${(props) => props.$cssWidth}px;
+  height: ${(props) => props.$timeScaleHeight}px;
   left: 0;
   right: 0;
   bottom: 0;
 `;
 var TimeStamp = styled4.div`
-  left: ${(props) => props.left}px;
+  left: ${(props) => props.$left}px;
   position: absolute;
 `;
 var TimeScale = (props) => {
@@ -332,7 +332,7 @@ var TimeScale = (props) => {
     if (counter % marker === 0) {
       const timestamp = formatTime(counter);
       timeMarkers.push(
-        /* @__PURE__ */ jsx8(TimeStamp, { left: pix, children: timestamp }, timestamp)
+        /* @__PURE__ */ jsx8(TimeStamp, { $left: pix, children: timestamp }, timestamp)
       );
       canvasInfo.set(pix, timeScaleHeight);
     } else if (counter % bigStep === 0) {
@@ -345,16 +345,16 @@ var TimeScale = (props) => {
   return /* @__PURE__ */ jsxs2(
     PlaylistTimeScaleScroll,
     {
-      cssWidth: widthX,
-      controlWidth: showControls ? controlWidth : 0,
-      timeScaleHeight,
+      $cssWidth: widthX,
+      $controlWidth: showControls ? controlWidth : 0,
+      $timeScaleHeight: timeScaleHeight,
       children: [
         timeMarkers,
         /* @__PURE__ */ jsx8(
           TimeTicks,
           {
-            cssWidth: widthX,
-            timeScaleHeight,
+            $cssWidth: widthX,
+            $timeScaleHeight: timeScaleHeight,
             width: widthX * devicePixelRatio,
             height: timeScaleHeight * devicePixelRatio,
             ref: canvasRef
@@ -461,14 +461,14 @@ import { Fragment as Fragment3 } from "react";
 import styled5 from "styled-components";
 import { jsx as jsx10, jsxs as jsxs3 } from "react/jsx-runtime";
 var Container = styled5.div`
-  height: ${(props) => props.waveHeight * props.numChannels}px;
-  margin-left: ${(props) => props.controlWidth}px;
+  height: ${(props) => props.$waveHeight * props.$numChannels}px;
+  margin-left: ${(props) => props.$controlWidth}px;
 `;
 var ChannelContainer = styled5.div`
   position: relative;
 `;
 var ControlsWrapper = styled5.div`
-  width: ${(props) => props.controlWidth}px;
+  width: ${(props) => props.$controlWidth}px;
   position: absolute;
   z-index: 1;
   left: 0;
@@ -487,12 +487,12 @@ var Track = ({
   return /* @__PURE__ */ jsxs3(
     Container,
     {
-      numChannels,
+      $numChannels: numChannels,
       className,
-      waveHeight,
-      controlWidth: show ? width : 0,
+      $waveHeight: waveHeight,
+      $controlWidth: show ? width : 0,
       children: [
-        /* @__PURE__ */ jsx10(ControlsWrapper, { controlWidth: show ? width : 0, children: controls }),
+        /* @__PURE__ */ jsx10(ControlsWrapper, { $controlWidth: show ? width : 0, children: controls }),
         /* @__PURE__ */ jsx10(ChannelContainer, { children })
       ]
     }
