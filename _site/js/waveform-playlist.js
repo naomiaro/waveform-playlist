@@ -102039,7 +102039,7 @@ class WaveformPlaylistClass {
             ((_c = (_b = this.config.options) === null || _b === void 0 ? void 0 : _b.controls) === null || _c === void 0 ? void 0 : _c.show) !== false;
         const controlsWidth = ((_d = this.config.controls) === null || _d === void 0 ? void 0 : _d.width) ||
             ((_f = (_e = this.config.options) === null || _e === void 0 ? void 0 : _e.controls) === null || _f === void 0 ? void 0 : _f.width) ||
-            150;
+            200;
         // Check if timescale should be shown (default: true)
         const showTimescale = this.config.timescale !== false;
         // Calculate total duration from all tracks
@@ -102090,21 +102090,15 @@ class WaveformPlaylistClass {
                                     const newMuted = !muted;
                                     setMuted(newMuted);
                                     this.setTrackMute(trackId, newMuted);
-                                }, style: {
-                                    backgroundColor: muted ? '#ff6b6b' : '#f0f0f0',
-                                    fontWeight: muted ? 'bold' : 'normal',
-                                }, children: muted ? 'M' : 'M' }), (0, jsx_runtime_1.jsx)(ui_components_1.Button, { onClick: () => {
+                                }, children: "Mute" }), (0, jsx_runtime_1.jsx)(ui_components_1.Button, { onClick: () => {
                                     const newSoloed = !soloed;
                                     setSoloed(newSoloed);
                                     this.setTrackSolo(trackId, newSoloed);
-                                }, style: {
-                                    backgroundColor: soloed ? '#51cf66' : '#f0f0f0',
-                                    fontWeight: soloed ? 'bold' : 'normal',
-                                }, children: soloed ? 'S' : 'S' })] }), (0, jsx_runtime_1.jsx)(ui_components_1.VolumeSliderWrapper, { children: (0, jsx_runtime_1.jsx)(ui_components_1.VolumeSlider, { min: 0, max: 200, value: gain * 100, onChange: (e) => {
-                                const newGain = parseInt(e.currentTarget.value) / 100;
-                                setGain(newGain);
-                                this.setTrackGain(trackId, newGain);
-                            } }) })] }));
+                                }, children: "Solo" })] }), (0, jsx_runtime_1.jsxs)(ui_components_1.VolumeSliderWrapper, { children: [(0, jsx_runtime_1.jsx)(ui_components_1.VolumeDownIcon, {}), (0, jsx_runtime_1.jsx)(ui_components_1.VolumeSlider, { min: 0, max: 200, value: gain * 100, onChange: (e) => {
+                                    const newGain = parseInt(e.currentTarget.value) / 100;
+                                    setGain(newGain);
+                                    this.setTrackGain(trackId, newGain);
+                                } }), (0, jsx_runtime_1.jsx)(ui_components_1.VolumeUpIcon, {})] })] }));
         };
         this.root.render((0, jsx_runtime_1.jsx)(ui_components_1.DevicePixelRatioProvider, { children: (0, jsx_runtime_1.jsx)(ui_components_1.PlaylistInfoContext.Provider, { value: playlistInfo, children: (0, jsx_runtime_1.jsx)(styled_components_1.ThemeProvider, { theme: theme, children: (0, jsx_runtime_1.jsxs)("div", { style: { fontFamily: 'Arial, sans-serif' }, children: [(0, jsx_runtime_1.jsx)(ui_components_1.Playlist, { theme: theme, children: (0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [showTimescale && ((0, jsx_runtime_1.jsx)(ui_components_1.StyledTimeScale, { duration: maxDuration * 1000, marker: 10000, bigStep: 5000, secondStep: 1000 })), this.tracks.map((track) => {
                                             const peaksData = this.peaksData.get(track.id);

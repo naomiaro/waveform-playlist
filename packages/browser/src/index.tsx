@@ -11,6 +11,8 @@ import {
   ButtonGroup,
   Controls,
   Header,
+  VolumeDownIcon,
+  VolumeUpIcon,
   VolumeSlider,
   VolumeSliderWrapper,
   StyledTimeScale,
@@ -183,7 +185,7 @@ class WaveformPlaylistClass {
                         this.config.options?.controls?.show !== false;
     const controlsWidth = this.config.controls?.width ||
                          this.config.options?.controls?.width ||
-                         150;
+                         200;
 
     // Check if timescale should be shown (default: true)
     const showTimescale = this.config.timescale !== false;
@@ -264,12 +266,8 @@ class WaveformPlaylistClass {
                 setMuted(newMuted);
                 this.setTrackMute(trackId, newMuted);
               }}
-              style={{
-                backgroundColor: muted ? '#ff6b6b' : '#f0f0f0',
-                fontWeight: muted ? 'bold' : 'normal',
-              }}
             >
-              {muted ? 'M' : 'M'}
+              Mute
             </Button>
             <Button
               onClick={() => {
@@ -277,15 +275,12 @@ class WaveformPlaylistClass {
                 setSoloed(newSoloed);
                 this.setTrackSolo(trackId, newSoloed);
               }}
-              style={{
-                backgroundColor: soloed ? '#51cf66' : '#f0f0f0',
-                fontWeight: soloed ? 'bold' : 'normal',
-              }}
             >
-              {soloed ? 'S' : 'S'}
+              Solo
             </Button>
           </ButtonGroup>
           <VolumeSliderWrapper>
+            <VolumeDownIcon />
             <VolumeSlider
               min={0}
               max={200}
@@ -296,6 +291,7 @@ class WaveformPlaylistClass {
                 this.setTrackGain(trackId, newGain);
               }}
             />
+            <VolumeUpIcon />
           </VolumeSliderWrapper>
         </Controls>
       );
