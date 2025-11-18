@@ -31,19 +31,13 @@ function toggleActive(node) {
 function cueFormatters(format) {
 
   function clockFormat(seconds, decimals) {
-    var hours,
-        minutes,
-        secs,
-        result;
+    const hours = Math.floor(seconds / 3600) % 24;
+    const minutes = Math.floor(seconds / 60) % 60;
+    const secs = (seconds % 60).toFixed(decimals);
 
-    hours = parseInt(seconds / 3600, 10) % 24;
-    minutes = parseInt(seconds / 60, 10) % 60;
-    secs = seconds % 60;
-    secs = secs.toFixed(decimals);
-
-    result = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (secs < 10 ? "0" + secs : secs);
-
-    return result;
+    return String(hours).padStart(2, '0') + ':' +
+           String(minutes).padStart(2, '0') + ':' +
+           secs.padStart(decimals + 3, '0');
   }
 
   var formats = {

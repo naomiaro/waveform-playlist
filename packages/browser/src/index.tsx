@@ -462,6 +462,10 @@ class WaveformPlaylistClass {
       if (this.eventEmitter) {
         this.eventEmitter.emit('timeupdate', 0);
       }
+      // Scroll back to the beginning
+      if (this.scrollContainer) {
+        this.scrollContainer.scrollLeft = 0;
+      }
     }
   }
 
@@ -478,6 +482,14 @@ class WaveformPlaylistClass {
       }
 
       this.currentTime = this.playout.getCurrentTime();
+
+      // Check if playback has reached the end
+      const duration = this.getDuration();
+      if (this.currentTime >= duration) {
+        this.stop();
+        return;
+      }
+
       if (this.setProgressFn) {
         this.setProgressFn(this.currentTime);
       }
