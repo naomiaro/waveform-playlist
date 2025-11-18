@@ -47,12 +47,6 @@ interface PlaylistConfig {
     show?: boolean;
     width?: number;
   };
-  options?: {
-    controls?: {
-      show?: boolean;
-      width?: number;
-    };
-  };
   zoomLevels?: number[];
   state?: string;
   timescale?: boolean;
@@ -185,12 +179,9 @@ class WaveformPlaylistClass {
     const samplesPerPixel = this.config.samplesPerPixel || 4096;
     const timeScaleHeight = 30;
 
-    // Check if controls should be shown (support both old and new config formats)
-    const showControls = this.config.controls?.show !== false &&
-                        this.config.options?.controls?.show !== false;
-    const controlsWidth = this.config.controls?.width ||
-                         this.config.options?.controls?.width ||
-                         200;
+    // Check if controls should be shown (default: true)
+    const showControls = this.config.controls?.show !== false;
+    const controlsWidth = this.config.controls?.width || 200;
 
     // Check if timescale should be shown (default: true)
     const showTimescale = this.config.timescale !== false;

@@ -102035,19 +102035,16 @@ class WaveformPlaylistClass {
         });
     }
     render() {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c;
         if (!this.root)
             return;
         const theme = Object.assign(Object.assign({}, defaultTheme), this.config.colors);
         const waveHeight = this.config.waveHeight || 128;
         const samplesPerPixel = this.config.samplesPerPixel || 4096;
         const timeScaleHeight = 30;
-        // Check if controls should be shown (support both old and new config formats)
-        const showControls = ((_a = this.config.controls) === null || _a === void 0 ? void 0 : _a.show) !== false &&
-            ((_c = (_b = this.config.options) === null || _b === void 0 ? void 0 : _b.controls) === null || _c === void 0 ? void 0 : _c.show) !== false;
-        const controlsWidth = ((_d = this.config.controls) === null || _d === void 0 ? void 0 : _d.width) ||
-            ((_f = (_e = this.config.options) === null || _e === void 0 ? void 0 : _e.controls) === null || _f === void 0 ? void 0 : _f.width) ||
-            200;
+        // Check if controls should be shown (default: true)
+        const showControls = ((_a = this.config.controls) === null || _a === void 0 ? void 0 : _a.show) !== false;
+        const controlsWidth = ((_b = this.config.controls) === null || _b === void 0 ? void 0 : _b.width) || 200;
         // Check if timescale should be shown (default: true)
         const showTimescale = this.config.timescale !== false;
         // Calculate total duration from all tracks
@@ -102064,7 +102061,7 @@ class WaveformPlaylistClass {
         }
         // Playlist info context values
         const playlistInfo = {
-            sampleRate: ((_g = this.playout) === null || _g === void 0 ? void 0 : _g.sampleRate) || 44100,
+            sampleRate: ((_c = this.playout) === null || _c === void 0 ? void 0 : _c.sampleRate) || 44100,
             samplesPerPixel,
             zoomLevels: this.config.zoomLevels || [512, 1024, 2048, 4096],
             waveHeight,

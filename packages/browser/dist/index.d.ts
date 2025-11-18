@@ -13,12 +13,6 @@ interface PlaylistConfig {
         show?: boolean;
         width?: number;
     };
-    options?: {
-        controls?: {
-            show?: boolean;
-            width?: number;
-        };
-    };
     zoomLevels?: number[];
     state?: string;
     timescale?: boolean;
