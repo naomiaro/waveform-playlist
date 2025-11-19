@@ -828,8 +828,12 @@ class WaveformPlaylistClass {
         this.hasSeeked = true;
       }
     } else {
-      // It was a drag - just update the selection
+      // It was a drag - update the selection and reset currentTime to selection start
       this.setSelection(start, end);
+      this.currentTime = start;
+      if (this.setProgressFn) {
+        this.setProgressFn(start);
+      }
     }
   };
 
