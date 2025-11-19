@@ -6,6 +6,8 @@ export const Slider = styled.input.attrs({
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  box-sizing: border-box;
+  width: 100%;
 
   &::-webkit-slider-runnable-track {
     height: 8px;

@@ -448,8 +448,8 @@ class WaveformPlaylistClass {
               Solo
             </Button>
           </div>
-          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px' }}>
-            <VolumeDownIcon style={{ fontSize: '10px', flexShrink: 0 }} />
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', boxSizing: 'border-box' }}>
+            <VolumeDownIcon style={{ fontSize: '10px', width: '12px', flexShrink: 0, textAlign: 'center' }} />
             <Slider
               min={0}
               max={200}
@@ -459,12 +459,12 @@ class WaveformPlaylistClass {
                 setGain(newGain);
                 this.setTrackGain(trackId, newGain);
               }}
-              style={{ flex: 1 }}
+              style={{ flex: 1, minWidth: 0 }}
             />
-            <VolumeUpIcon style={{ fontSize: '10px', flexShrink: 0 }} />
+            <VolumeUpIcon style={{ fontSize: '10px', width: '12px', flexShrink: 0, textAlign: 'center' }} />
           </div>
-          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px' }}>
-            <span style={{ fontSize: '8px', color: '#666', fontWeight: 'bold', flexShrink: 0 }}>L</span>
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', boxSizing: 'border-box' }}>
+            <span style={{ fontSize: '8px', color: '#666', fontWeight: 'bold', width: '12px', flexShrink: 0, textAlign: 'center' }}>L</span>
             <Slider
               min={-100}
               max={100}
@@ -474,9 +474,9 @@ class WaveformPlaylistClass {
                 setStereoPan(newPan);
                 this.setTrackPan(trackId, newPan);
               }}
-              style={{ flex: 1 }}
+              style={{ flex: 1, minWidth: 0 }}
             />
-            <span style={{ fontSize: '8px', color: '#666', fontWeight: 'bold', flexShrink: 0 }}>R</span>
+            <span style={{ fontSize: '8px', color: '#666', fontWeight: 'bold', width: '12px', flexShrink: 0, textAlign: 'center' }}>R</span>
           </div>
         </Controls>
       );
