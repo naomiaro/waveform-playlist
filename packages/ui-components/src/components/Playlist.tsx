@@ -3,7 +3,7 @@ import React, { FunctionComponent } from 'react';
 
 const Wrapper = styled.div`
   overflow-y: hidden;
-  overflow-x: visible;
+  overflow-x: auto;
   position: relative;
 `;
 
@@ -15,7 +15,6 @@ interface ScrollContainerProps {
 const ScrollContainer = styled.div<ScrollContainerProps>`
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
-  overflow-x: auto;
   ${(props) => props.$width !== undefined && `max-width: ${props.$width}px;`}
 `;
 
