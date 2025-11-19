@@ -300,12 +300,10 @@ class WaveformPlaylistClass {
 
       // Store setProgress, setSelection, and setIsPlaying references
       React.useEffect(() => {
-        console.log('Setting progress functions', { setProgress, setSelection, setIsPlaying });
         this.setProgressFn = setProgress;
         this.setSelectionFn = setSelection;
         this.setIsPlayingFn = setIsPlaying;
         return () => {
-          console.log('Clearing progress functions');
           this.setProgressFn = null;
           this.setSelectionFn = null;
           this.setIsPlayingFn = null;
@@ -676,10 +674,7 @@ class WaveformPlaylistClass {
       }
 
       if (this.setProgressFn) {
-        console.log('Updating progress:', this.currentTime);
         this.setProgressFn(this.currentTime);
-      } else {
-        console.warn('setProgressFn is null!');
       }
       // Emit timeupdate event for external listeners
       if (this.eventEmitter) {
@@ -748,11 +743,10 @@ class WaveformPlaylistClass {
     }
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const controlsWidth = this.config.controls?.show !== false ? (this.config.controls?.width || 200) : 0;
 
     // Calculate position relative to timeline start
-    // rect.left already accounts for scroll since ClickOverlay is inside ScrollContainer
-    const clickX = e.clientX - rect.left - controlsWidth;
+    // rect.left already accounts for the ClickOverlay's left offset (which includes controlsWidth)
+    const clickX = e.clientX - rect.left;
 
     // Convert pixels to seconds
     const samplesPerPixel = this.config.samplesPerPixel || 4096;
