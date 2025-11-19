@@ -149,6 +149,15 @@ playlist
     // Start visualization now that analyser is ready
     draw();
 
+    // Hook up master volume slider
+    var masterGainSlider = document.getElementById('master-gain');
+    if (masterGainSlider) {
+      masterGainSlider.addEventListener('input', function(e) {
+        var value = parseFloat(e.target.value) / 100; // Convert 0-100 to 0-1
+        playlist.setMasterGain(value);
+      });
+    }
+
     //can do stuff with the playlist.
 
     if (navigator.mediaDevices) {
