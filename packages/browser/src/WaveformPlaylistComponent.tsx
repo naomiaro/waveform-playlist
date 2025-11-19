@@ -81,6 +81,13 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
+  const [draggingAnnotation, setDraggingAnnotation] = useState<{
+    id: string;
+    edge: 'start' | 'end';
+    originalStart: number;
+    originalEnd: number;
+    startX: number;
+  } | null>(null);
 
   const playoutRef = useRef<TonePlayout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -318,6 +325,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   };
 
   const handleAnnotationClick = async (annotation: AnnotationData) => {
+    console.log('WaveformPlaylist: Annotation clicked, starting playback');
     setActiveAnnotationId(annotation.id);
     setShouldScrollToActive(true);
     const playDuration = !isContinuousPlay ? annotation.end - annotation.start : undefined;
@@ -339,7 +347,99 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     setSelectionEnd(clickTime);
   };
 
+  const handleAnnotationDragStart = (annotationId: string, edge: 'start' | 'end', e: React.DragEvent) => {
+    const annotation = annotations.find(a => a.id === annotationId);
+    if (!annotation) return;
+
+    setDraggingAnnotation({
+      id: annotationId,
+      edge,
+      originalStart: annotation.start,
+      originalEnd: annotation.end,
+      startX: e.clientX,
+    });
+  };
+
+  const handleAnnotationDrag = (e: React.DragEvent) => {
+    if (!draggingAnnotation || e.clientX === 0) return; // clientX is 0 on dragend
+
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = e.clientX - rect.left;
+    const newTime = (x * samplesPerPixel) / sampleRate;
+
+    const updatedAnnotations = [...annotations];
+    const annotationIndex = updatedAnnotations.findIndex(a => a.id === draggingAnnotation.id);
+
+    if (annotationIndex !== -1) {
+      const annotation = updatedAnnotations[annotationIndex];
+
+      if (draggingAnnotation.edge === 'start') {
+        // Dragging start edge
+        const constrainedStart = Math.max(0, Math.min(newTime, annotation.end - 0.1));
+        updatedAnnotations[annotationIndex] = {
+          ...annotation,
+          start: constrainedStart,
+        };
+
+        // Check collision with previous annotation (dragging left)
+        if (annotationIndex > 0 && constrainedStart < updatedAnnotations[annotationIndex - 1].end) {
+          // Push previous annotation's end back
+          updatedAnnotations[annotationIndex - 1] = {
+            ...updatedAnnotations[annotationIndex - 1],
+            end: constrainedStart,
+          };
+        }
+      } else {
+        // Dragging end edge
+        const constrainedEnd = Math.max(annotation.start + 0.1, Math.min(newTime, duration));
+        updatedAnnotations[annotationIndex] = {
+          ...annotation,
+          end: constrainedEnd,
+        };
+
+        // Check collision with next annotation (dragging right)
+        if (annotationIndex < updatedAnnotations.length - 1 && constrainedEnd > updatedAnnotations[annotationIndex + 1].start) {
+          // Push next annotation's start forward, keeping end time fixed (duration gets smaller)
+          const nextAnnotation = updatedAnnotations[annotationIndex + 1];
+
+          updatedAnnotations[annotationIndex + 1] = {
+            ...nextAnnotation,
+            start: constrainedEnd,
+            // Keep end unchanged - duration gets smaller
+          };
+
+          // Cascade: check if this pushed annotation now overlaps with the one after it
+          let currentIndex = annotationIndex + 1;
+          while (currentIndex < updatedAnnotations.length - 1) {
+            const current = updatedAnnotations[currentIndex];
+            const next = updatedAnnotations[currentIndex + 1];
+
+            if (current.end > next.start) {
+              updatedAnnotations[currentIndex + 1] = {
+                ...next,
+                start: current.end,
+                // Keep end unchanged - duration gets smaller
+              };
+              currentIndex++;
+            } else {
+              break; // No more collisions
+            }
+          }
+        }
+      }
+
+      setAnnotations(updatedAnnotations);
+    }
+  };
+
+  const handleAnnotationDragEnd = () => {
+    setDraggingAnnotation(null);
+  };
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Handle selection dragging
     if (!isSelectingRef.current) return;
 
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
@@ -354,6 +454,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Finish selection dragging
     if (!isSelectingRef.current) return;
 
     isSelectingRef.current = false;
@@ -679,6 +780,9 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                             color="#ff9800"
                             isActive={annotation.id === activeAnnotationId}
                             onClick={() => handleAnnotationClick(annotation)}
+                            onDragStart={(edge, e) => handleAnnotationDragStart(annotation.id, edge, e)}
+                            onDrag={handleAnnotationDrag}
+                            onDragEnd={handleAnnotationDragEnd}
                           />
                         );
                       })}

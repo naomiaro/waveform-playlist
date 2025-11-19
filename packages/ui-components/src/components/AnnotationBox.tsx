@@ -46,6 +46,42 @@ const Label = styled.span`
   text-overflow: ellipsis;
   padding: 0 6px;
   letter-spacing: 0.3px;
+  user-select: none;
+`;
+
+const ResizeHandle = styled.div<{ $position: 'left' | 'right' }>`
+  position: absolute;
+  top: 0;
+  ${(props) => props.$position}: -15px;
+  width: 30px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 70%;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 3px;
+    opacity: 0.7;
+    transition: opacity 0.2s, background 0.2s;
+  }
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.15);
+  }
+
+  &:hover::before {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.8);
+  }
 `;
 
 export interface AnnotationBoxComponentProps {
@@ -55,6 +91,9 @@ export interface AnnotationBoxComponentProps {
   color?: string;
   isActive?: boolean;
   onClick?: () => void;
+  onDragStart?: (edge: 'start' | 'end', e: React.DragEvent) => void;
+  onDrag?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
 }
 
 export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
@@ -64,12 +103,43 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
   color = '#ff9800',
   isActive = false,
   onClick,
+  onDragStart,
+  onDrag,
+  onDragEnd,
 }) => {
   const width = Math.max(0, endPosition - startPosition);
 
   if (width <= 0) {
     return null;
   }
+
+  const handleDragStart = (edge: 'start' | 'end') => (e: React.DragEvent) => {
+    // Create a transparent div element to use as drag image
+    const dragImage = document.createElement('div');
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-9999px';
+    dragImage.style.width = '1px';
+    dragImage.style.height = '1px';
+    dragImage.style.opacity = '0';
+    document.body.appendChild(dragImage);
+
+    e.dataTransfer.setDragImage(dragImage, 0, 0);
+    e.dataTransfer.effectAllowed = 'move';
+
+    // Clean up the drag image element after a short delay
+    setTimeout(() => {
+      document.body.removeChild(dragImage);
+    }, 0);
+
+    if (onDragStart) {
+      onDragStart(edge, e);
+    }
+  };
+
+  const handleHandleClick = (e: React.MouseEvent) => {
+    // Prevent clicks on resize handles from bubbling to annotation box
+    e.stopPropagation();
+  };
 
   return (
     <Box
@@ -79,7 +149,23 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
       $isActive={isActive}
       onClick={onClick}
     >
+      <ResizeHandle
+        $position="left"
+        draggable="true"
+        onDragStart={handleDragStart('start')}
+        onDrag={onDrag}
+        onDragEnd={onDragEnd}
+        onClick={handleHandleClick}
+      />
       {label && <Label>{label}</Label>}
+      <ResizeHandle
+        $position="right"
+        draggable="true"
+        onDragStart={handleDragStart('end')}
+        onDrag={onDrag}
+        onDragEnd={onDragEnd}
+        onClick={handleHandleClick}
+      />
     </Box>
   );
 };
