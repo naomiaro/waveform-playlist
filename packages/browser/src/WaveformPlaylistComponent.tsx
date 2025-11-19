@@ -13,6 +13,7 @@ import {
   PlaylistInfoContext,
   DevicePixelRatioProvider,
   StyledTimeScale,
+  secondsToPixels,
   type AnnotationData,
 } from '@waveform-playlist/ui-components';
 import { TonePlayout } from '@waveform-playlist/playout';
@@ -78,9 +79,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
+  const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
 
   const playoutRef = useRef<TonePlayout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isPlayingTimedSegmentRef = useRef(false);
   const currentTimeRef = useRef<number>(0);
@@ -174,6 +177,40 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     setAnnotations(parsed);
   }, [annotationList?.annotations]);
 
+  // Automatic scroll to keep playhead in view
+  const scrollToCurrentTime = () => {
+    if (!scrollContainerRef.current) {
+      // Try to find the scroll container using data attribute
+      const scrollContainer = containerRef.current?.querySelector('[data-scroll-container="true"]') as HTMLElement;
+      if (scrollContainer) {
+        scrollContainerRef.current = scrollContainer;
+      } else {
+        return;
+      }
+    }
+
+    if (!audioBuffer) return;
+
+    // Convert current time to pixels
+    const currentPixel = secondsToPixels(currentTimeRef.current, samplesPerPixel, sampleRate);
+
+    const viewportWidth = scrollContainerRef.current.clientWidth;
+    const currentScrollLeft = scrollContainerRef.current.scrollLeft;
+    const currentScrollRight = currentScrollLeft + viewportWidth;
+
+    // Define playhead position in viewport (20% from left edge)
+    const playheadOffset = viewportWidth * 0.2;
+
+    // Check if playhead is outside the visible area
+    const isOutsideLeft = currentPixel < currentScrollLeft;
+    const isOutsideRight = currentPixel > currentScrollRight;
+
+    if (isOutsideLeft || isOutsideRight) {
+      // Position playhead at 20% from the left edge
+      scrollContainerRef.current.scrollLeft = Math.max(0, currentPixel - playheadOffset);
+    }
+  };
+
   // Animation loop
   const startAnimationLoop = () => {
     const updateTime = () => {
@@ -191,6 +228,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
             setActiveAnnotationId(currentAnnotation.id);
             setShouldScrollToActive(true);
           }
+        }
+
+        // Handle automatic scroll
+        if (isAutomaticScroll) {
+          scrollToCurrentTime();
         }
       }
       animationFrameRef.current = requestAnimationFrame(updateTime);
@@ -259,6 +301,10 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const clickTime = (x * samplesPerPixel) / (audioBuffer?.sampleRate || 44100);
 
     isSelectingRef.current = true;
+    // Update currentTime immediately so playhead appears at click position
+    currentTimeRef.current = clickTime;
+    setCurrentTime(clickTime);
+    // Clear any existing selection
     setSelectionStart(clickTime);
     setSelectionEnd(clickTime);
   };
@@ -270,7 +316,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const x = e.clientX - rect.left;
     const moveTime = (x * samplesPerPixel) / (audioBuffer?.sampleRate || 44100);
 
-    setSelectionEnd(moveTime);
+    // Update selection during drag
+    const start = Math.min(selectionStart, moveTime);
+    const end = Math.max(selectionStart, moveTime);
+    setSelectionStart(start);
+    setSelectionEnd(end);
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -282,20 +332,28 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const x = e.clientX - rect.left;
     const endTime = (x * samplesPerPixel) / (audioBuffer?.sampleRate || 44100);
 
-    // If it's just a click (not a drag), seek to that position
-    if (Math.abs(endTime - selectionStart) < 0.1) {
-      currentTimeRef.current = selectionStart;
-      setCurrentTime(selectionStart);
+    const start = Math.min(selectionStart, endTime);
+    const end = Math.max(selectionStart, endTime);
+
+    // If it's just a click (not a drag), seek to that position and clear selection
+    if (Math.abs(end - start) < 0.1) {
+      currentTimeRef.current = start;
+      setCurrentTime(start);
       setSelectionStart(0);
       setSelectionEnd(0);
 
       if (isPlaying && playoutRef.current) {
         playoutRef.current.stop();
-        playoutRef.current.play(Tone.now(), selectionStart);
+        playoutRef.current.play(Tone.now(), start);
+      } else if (playoutRef.current) {
+        playoutRef.current.stop();
       }
     } else {
-      // It's a selection
-      setSelectionEnd(endTime);
+      // It was a drag - finalize the selection and set currentTime to selection start
+      setSelectionStart(start);
+      setSelectionEnd(end);
+      currentTimeRef.current = start;
+      setCurrentTime(start);
     }
   };
 
@@ -387,10 +445,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     };
   }, [audioBuffer, duration, isPlaying]);
 
-  // Checkbox listeners for continuous play and link endpoints
+  // Checkbox listeners for continuous play, link endpoints, and automatic scroll
   useEffect(() => {
     const continuousPlayCheckbox = document.querySelector('.continuous-play') as HTMLInputElement;
     const linkEndpointsCheckbox = document.querySelector('.link-endpoints') as HTMLInputElement;
+    const automaticScrollCheckbox = document.querySelector('.automatic-scroll') as HTMLInputElement;
 
     const handleContinuousPlayChange = (e: Event) => {
       const checked = (e.target as HTMLInputElement).checked;
@@ -400,6 +459,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const handleLinkEndpointsChange = (e: Event) => {
       const checked = (e.target as HTMLInputElement).checked;
       setLinkEndpoints(checked);
+    };
+
+    const handleAutomaticScrollChange = (e: Event) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      setIsAutomaticScroll(checked);
     };
 
     if (continuousPlayCheckbox) {
@@ -412,9 +476,15 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       linkEndpointsCheckbox.addEventListener('change', handleLinkEndpointsChange);
     }
 
+    if (automaticScrollCheckbox) {
+      automaticScrollCheckbox.checked = isAutomaticScroll;
+      automaticScrollCheckbox.addEventListener('change', handleAutomaticScrollChange);
+    }
+
     return () => {
       continuousPlayCheckbox?.removeEventListener('change', handleContinuousPlayChange);
       linkEndpointsCheckbox?.removeEventListener('change', handleLinkEndpointsChange);
+      automaticScrollCheckbox?.removeEventListener('change', handleAutomaticScrollChange);
     };
   }, []);
 
@@ -524,10 +594,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                       color="rgba(0, 255, 0, 0.3)"
                     />
                   )}
-                  <Playhead
-                    position={(currentTime * sampleRate) / samplesPerPixel}
-                    color="#f00"
-                  />
+                  {(isPlaying || selectionStart === selectionEnd) && (
+                    <Playhead
+                      position={(currentTime * sampleRate) / samplesPerPixel}
+                      color="#f00"
+                    />
+                  )}
                 </>
               </Playlist>
             ) : (
