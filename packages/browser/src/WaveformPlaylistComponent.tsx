@@ -21,6 +21,7 @@ import { type Track } from '@waveform-playlist/core';
 import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
+import { SelectionTimeInputsManager } from './SelectionTimeInputsManager';
 
 // Default theme
 const defaultTheme = {
@@ -89,6 +90,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const currentTimeRef = useRef<number>(0);
   const isSelectingRef = useRef(false);
   const isAutomaticScrollRef = useRef(false);
+  const selectionInputsManagerRef = useRef<SelectionTimeInputsManager | null>(null);
 
   const theme = { ...defaultTheme, ...userTheme };
 
@@ -362,12 +364,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const start = Math.min(selectionStart, endTime);
     const end = Math.max(selectionStart, endTime);
 
-    // If it's just a click (not a drag), seek to that position and clear selection
+    // If it's just a click (not a drag), seek to that position but keep existing selection
     if (Math.abs(end - start) < 0.1) {
+      console.log('WaveformPlaylist: Click detected, seeking to position');
       currentTimeRef.current = start;
       setCurrentTime(start);
-      setSelectionStart(0);
-      setSelectionEnd(0);
+      // Don't clear the selection - keep it as is
 
       if (isPlaying && playoutRef.current) {
         playoutRef.current.stop();
@@ -377,6 +379,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       }
     } else {
       // It was a drag - finalize the selection and set currentTime to selection start
+      console.log('WaveformPlaylist: Selection created', { start, end });
       setSelectionStart(start);
       setSelectionEnd(end);
       currentTimeRef.current = start;
@@ -400,7 +403,20 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       try {
         await playoutRef.current.init();
         playoutRef.current.stop();
-        playoutRef.current.play(Tone.now(), currentTimeRef.current);
+
+        // Check if there's a selection
+        if (selectionStart !== selectionEnd && selectionEnd > selectionStart) {
+          // Play only the selected region
+          const duration = selectionEnd - selectionStart;
+          playoutRef.current.setOnPlaybackComplete(() => {
+            handlePause(false);
+          });
+          playoutRef.current.play(Tone.now(), selectionStart, duration);
+        } else {
+          // Play from current position to the end
+          playoutRef.current.play(Tone.now(), currentTimeRef.current);
+        }
+
         setIsPlaying(true);
         startAnimationLoop();
       } catch (error) {
@@ -461,7 +477,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       rewindButton?.removeEventListener('click', handleRewindClick);
       fastForwardButton?.removeEventListener('click', handleFastForwardClick);
     };
-  }, [audioBuffer, duration, isPlaying]);
+  }, [audioBuffer, duration, isPlaying, selectionStart, selectionEnd]);
 
   // Checkbox listeners for continuous play, link endpoints, and automatic scroll
   useEffect(() => {
@@ -507,6 +523,49 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       automaticScrollCheckbox?.removeEventListener('change', handleAutomaticScrollChange);
     };
   }, []);
+
+  // Initialize selection time inputs manager
+  useEffect(() => {
+    // Find the form that contains the time inputs
+    const timeFormatForm = Array.from(document.querySelectorAll('form.form-inline')).find(
+      form => form.querySelector('.time-format')
+    );
+
+    if (!timeFormatForm) {
+      console.warn('SelectionTimeInputs: time format form not found');
+      return;
+    }
+
+    // Create the manager with the actual form element
+    selectionInputsManagerRef.current = new SelectionTimeInputsManager({
+      container: timeFormatForm as HTMLElement,
+      onSelectionChange: (start, end) => {
+        setSelectionStart(start);
+        setSelectionEnd(end);
+        currentTimeRef.current = start;
+        setCurrentTime(start);
+
+        // If playing, seek to the new position
+        if (isPlaying && playoutRef.current) {
+          playoutRef.current.stop();
+          playoutRef.current.play(Tone.now(), start);
+        }
+      },
+    });
+
+    return () => {
+      selectionInputsManagerRef.current?.dispose();
+      selectionInputsManagerRef.current = null;
+    };
+  }, []);
+
+  // Update selection inputs when selection changes
+  useEffect(() => {
+    console.log('WaveformPlaylist: Selection changed', { selectionStart, selectionEnd, hasManager: !!selectionInputsManagerRef.current });
+    if (selectionInputsManagerRef.current) {
+      selectionInputsManagerRef.current.updateSelection(selectionStart, selectionEnd);
+    }
+  }, [selectionStart, selectionEnd]);
 
   // Calculate dimensions
   const sampleRate = audioBuffer?.sampleRate || 44100;

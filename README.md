@@ -361,7 +361,7 @@ var playlist = WaveformPlaylist(
   },
 
   // you can pass your own event emitter
-  EventEmitter()
+  EventEmitter(),
 );
 
 // retrieves the event emitter the playlist is using.
@@ -457,3 +457,5 @@ Currently writing: [Mastering Tone.js](https://leanpub.com/masteringtonejs). 25%
 ## License
 
 [MIT License](http://doge.mit-license.org)
+
+`/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --remote-allow-origins='*' --user-data-dir=/tmp/chrome-debug-profile`
