@@ -481,6 +481,8 @@ class WaveformPlaylistClass {
       : 0;
     // Don't add controlsWidth - controls are sticky on the left and don't add to scrollable width
     const timelineWidth = playlistDuration;
+    // Tracks need to include controls width since they take up space in flex layout
+    const tracksFullWidth = timelineWidth + (showControls ? controlsWidth : 0);
 
     return (
       <DevicePixelRatioProvider>
@@ -492,7 +494,7 @@ class WaveformPlaylistClass {
                 backgroundColor={theme.waveOutlineColor || '#00f'}
                 scrollContainerWidth={timelineWidth}
                 timescaleWidth={timelineWidth}
-                tracksWidth={timelineWidth}
+                tracksWidth={tracksFullWidth}
                 onTracksMouseDown={this.handleMouseDown}
                 onTracksMouseMove={this.handleMouseMove}
                 onTracksMouseUp={this.handleMouseUp}
@@ -528,6 +530,7 @@ class WaveformPlaylistClass {
                           numChannels={peaksData.data.length}
                           backgroundColor={theme.waveOutlineColor || '#00f'}
                           offset={trackOffsetPx}
+                          width={tracksFullWidth}
                         >
                           <WaveformDisplay
                             trackId={track.id}

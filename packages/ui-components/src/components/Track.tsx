@@ -7,6 +7,7 @@ interface ContainerProps {
   readonly $numChannels: number;
   readonly $waveHeight: number;
   readonly $controlWidth: number;
+  readonly $width?: number;
 }
 
 const Container = styled.div.attrs<ContainerProps>((props) => ({
@@ -16,6 +17,7 @@ const Container = styled.div.attrs<ContainerProps>((props) => ({
 }))<ContainerProps>`
   position: relative;
   display: flex;
+  ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
 `;
 
 interface ChannelContainerProps {
@@ -54,6 +56,7 @@ export interface TrackProps {
   numChannels: number;
   backgroundColor?: string;
   offset?: number; // Offset in pixels to shift the waveform right
+  width?: number; // Total width of the track (for consistent backgrounds across tracks)
 }
 
 export const Track: FunctionComponent<TrackProps> = ({
@@ -62,10 +65,11 @@ export const Track: FunctionComponent<TrackProps> = ({
   className,
   backgroundColor,
   offset = 0,
+  width,
 }) => {
   const {
     waveHeight,
-    controls: { show, width },
+    controls: { show, width: controlWidth },
   } = usePlaylistInfo();
   const controls = useTrackControls();
   return (
@@ -73,13 +77,14 @@ export const Track: FunctionComponent<TrackProps> = ({
       $numChannels={numChannels}
       className={className}
       $waveHeight={waveHeight}
-      $controlWidth={show ? width : 0}
+      $controlWidth={show ? controlWidth : 0}
+      $width={width}
     >
-      <ControlsWrapper $controlWidth={show ? width : 0}>
+      <ControlsWrapper $controlWidth={show ? controlWidth : 0}>
         {controls}
       </ControlsWrapper>
       <ChannelContainer
-        $controlWidth={show ? width : 0}
+        $controlWidth={show ? controlWidth : 0}
         $backgroundColor={backgroundColor}
         $offset={offset}
       >
