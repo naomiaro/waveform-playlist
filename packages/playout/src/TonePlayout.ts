@@ -1,9 +1,12 @@
 import * as Tone from 'tone';
 import { ToneTrack, ToneTrackOptions } from './ToneTrack';
 
+export type EffectsFunction = (masterGainNode: Tone.Volume, destination: Tone.ToneAudioNode, isOffline: boolean, ToneLib: typeof Tone) => void | (() => void);
+
 export interface TonePlayoutOptions {
   tracks?: ToneTrack[];
   masterGain?: number;
+  effects?: EffectsFunction;
 }
 
 export class TonePlayout {
@@ -12,10 +15,20 @@ export class TonePlayout {
   private isInitialized = false;
   private soloedTracks: Set<string> = new Set();
   private manualMuteState: Map<string, boolean> = new Map();
+  private effectsCleanup?: () => void;
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Tone.Volume(this.gainToDb(options.masterGain ?? 1));
-    this.masterVolume.toDestination();
+
+    // Setup effects chain if provided, otherwise connect directly to destination
+    if (options.effects) {
+      const cleanup = options.effects(this.masterVolume, Tone.getDestination(), false, Tone);
+      if (cleanup) {
+        this.effectsCleanup = cleanup;
+      }
+    } else {
+      this.masterVolume.toDestination();
+    }
 
     if (options.tracks) {
       options.tracks.forEach(track => {
@@ -38,7 +51,12 @@ export class TonePlayout {
   }
 
   addTrack(trackOptions: ToneTrackOptions): ToneTrack {
-    const toneTrack = new ToneTrack(trackOptions);
+    // Ensure tracks connect to master volume instead of destination
+    const optionsWithDestination = {
+      ...trackOptions,
+      destination: this.masterVolume,
+    };
+    const toneTrack = new ToneTrack(optionsWithDestination);
     this.tracks.set(toneTrack.id, toneTrack);
     // Initialize manual mute state from track options
     this.manualMuteState.set(toneTrack.id, trackOptions.track.muted ?? false);
@@ -168,6 +186,12 @@ export class TonePlayout {
       track.dispose();
     });
     this.tracks.clear();
+
+    // Clean up effects if cleanup function was provided
+    if (this.effectsCleanup) {
+      this.effectsCleanup();
+    }
+
     this.masterVolume.dispose();
   }
 

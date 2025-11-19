@@ -2,9 +2,13 @@ import * as Tone from 'tone';
 import { Track, FadeType } from '@waveform-playlist/core';
 import { createFadeIn, createFadeOut } from 'fade-maker';
 
+export type TrackEffectsFunction = (graphEnd: Tone.Gain, masterGainNode: Tone.ToneAudioNode, isOffline: boolean, ToneLib: typeof Tone) => void | (() => void);
+
 export interface ToneTrackOptions {
   buffer: AudioBuffer;
   track: Track;
+  effects?: TrackEffectsFunction;
+  destination?: Tone.ToneAudioNode;
 }
 
 export class ToneTrack {
@@ -17,6 +21,7 @@ export class ToneTrack {
   private audioBuffer: AudioBuffer;
   private pausedPosition: number = 0;
   private playStartTime: number = 0;
+  private effectsCleanup?: () => void;
 
   constructor(options: ToneTrackOptions) {
     this.track = options.track;
@@ -33,14 +38,24 @@ export class ToneTrack {
     this.panNode = new Tone.Panner(options.track.stereoPan);
     this.muteGain = new Tone.Gain(options.track.muted ? 0 : 1);
 
-    // Chain: Player -> FadeGain -> Volume -> Pan -> MuteGain -> Destination
+    // Build base chain: Player -> FadeGain -> Volume -> Pan -> MuteGain
     this.player.chain(
       this.fadeGain,
       this.volumeNode,
       this.panNode,
-      this.muteGain,
-      Tone.getDestination()
+      this.muteGain
     );
+
+    // Connect to destination or apply effects chain
+    const destination = options.destination || Tone.getDestination();
+    if (options.effects) {
+      const cleanup = options.effects(this.muteGain, destination, false, Tone);
+      if (cleanup) {
+        this.effectsCleanup = cleanup;
+      }
+    } else {
+      this.muteGain.connect(destination);
+    }
 
     // Apply fades if they exist
     if (options.track.fadeIn) {
@@ -129,6 +144,11 @@ export class ToneTrack {
   }
 
   dispose(): void {
+    // Clean up effects if cleanup function was provided
+    if (this.effectsCleanup) {
+      this.effectsCleanup();
+    }
+
     this.player.dispose();
     this.volumeNode.dispose();
     this.panNode.dispose();

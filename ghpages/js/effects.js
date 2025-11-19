@@ -1,7 +1,5 @@
 var playlist;
-var toneCtx = Tone.getContext();
-var audioCtx = toneCtx.rawContext;
-var analyser = audioCtx.createAnalyser();
+var analyser;
 var offlineSetup = [];
 
 var userMediaStream;
@@ -14,8 +12,9 @@ navigator.getUserMedia = (navigator.getUserMedia ||
 
 function gotStream(stream) {
   userMediaStream = stream;
-  playlist.initRecorder(userMediaStream);
-  $(".btn-record").removeClass("disabled");
+  // TODO: Recording not yet implemented in new version
+  // playlist.initRecorder(userMediaStream);
+  // $(".btn-record").removeClass("disabled");
 }
 
 function logError(err) {
@@ -23,9 +22,9 @@ function logError(err) {
 }
 
 playlist = WaveformPlaylist.init({
-  ac: audioCtx,
-  barWidth: 3,
-  barGap: 1,
+  // ac: audioCtx,  // Remove this - let Tone.js manage its own context
+  // barWidth: 3,  // TODO: Bar rendering not supported in new version
+  // barGap: 1,
   container: document.getElementById("playlist"),
   colors: {
     waveOutlineColor: '#005BBB',
@@ -40,40 +39,55 @@ playlist = WaveformPlaylist.init({
   waveHeight: 100,
   isAutomaticScroll: true,
   timescale: true,
-  state: "cursor",
-  effects: function(masterGainNode, destination, isOffline) {
-    // analyser nodes don't work offline.
-    if (!isOffline) masterGainNode.connect(analyser);
+  // state: "cursor",  // TODO: State parameter not yet implemented
+  // Master effects to set up the analyser
+  effects: function(masterGainNode, destination, isOffline, ToneLib) {
+    // Create analyser and connect it in parallel to monitor the output
+    analyser = new ToneLib.Analyser('fft', 256);
+    masterGainNode.connect(analyser);
+
+    // Connect master to destination as normal
     masterGainNode.connect(destination);
+
+    return function cleanup() {
+      // Cleanup when playlist is destroyed
+      analyser.dispose();
+    };
   }
 });
 
-//initialize the WAV exporter.
-playlist.initExporter();
+// TODO: WAV exporter not yet implemented in new version
+// playlist.initExporter();
 
-playlist.ee.on("audiorenderingstarting", function(offlineCtx, setup) {
-  // Set Tone offline to render effects properly.
-  const offlineContext = new Tone.OfflineContext(offlineCtx);
-  Tone.setContext(offlineContext);
-  offlineSetup = setup;
-});
+// TODO: Event emitter not yet implemented in new version
+// playlist.ee.on("audiorenderingstarting", function(offlineCtx, setup) {
+//   // Set Tone offline to render effects properly.
+//   const offlineContext = new Tone.OfflineContext(offlineCtx);
+//   Tone.setContext(offlineContext);
+//   offlineSetup = setup;
+// });
 
-playlist.ee.on("audiorenderingfinished", function() {
-  //restore original ctx for further use.
-  Tone.setContext(toneCtx);
-});
+// playlist.ee.on("audiorenderingfinished", function() {
+//   //restore original ctx for further use.
+//   Tone.setContext(toneCtx);
+// });
   
 playlist
   .load([
     {
       src: "media/audio/Vocals30.mp3",
       name: "Vocals",
-      effects: function vocalsEffects(graphEnd, masterGainNode, isOffline) {
-        var autoWah = new Tone.AutoWah(50, 6, -30);
-      
-        Tone.connect(graphEnd, autoWah);
-        Tone.connect(autoWah, masterGainNode);
-      
+      effects: function vocalsEffects(graphEnd, masterGainNode, isOffline, ToneLib) {
+        var autoWah = new ToneLib.AutoWah({
+          context: graphEnd.context,
+          baseFrequency: 50,
+          octaves: 6,
+          sensitivity: -30
+        });
+
+        graphEnd.connect(autoWah);
+        autoWah.connect(masterGainNode);
+
         return function cleanup() {
           autoWah.disconnect();
           autoWah.dispose();
@@ -83,15 +97,18 @@ playlist
     {
       src: "media/audio/Guitar30.mp3",
       name: "Guitar",
-      effects: function(graphEnd, masterGainNode, isOffline) {
-        var reverb = new Tone.Reverb(1.2);
+      effects: function(graphEnd, masterGainNode, isOffline, ToneLib) {
+        var reverb = new ToneLib.Reverb({
+          context: graphEnd.context,
+          decay: 1.2
+        });
 
         if (isOffline) {
           offlineSetup.push(reverb.ready);
         }
 
-        Tone.connect(graphEnd, reverb);
-        Tone.connect(reverb, masterGainNode);
+        graphEnd.connect(reverb);
+        reverb.connect(masterGainNode);
 
         return function cleanup() {
           reverb.disconnect();
@@ -106,15 +123,18 @@ playlist
     {
       src: "media/audio/BassDrums30.mp3",
       name: "Drums",
-      effects: function(graphEnd, masterGainNode, isOffline) {
-        var reverb = new Tone.Reverb(5);
+      effects: function(graphEnd, masterGainNode, isOffline, ToneLib) {
+        var reverb = new ToneLib.Reverb({
+          context: graphEnd.context,
+          decay: 5
+        });
 
         if (isOffline) {
           offlineSetup.push(reverb.ready);
         }
 
-        Tone.connect(graphEnd, reverb);
-        Tone.connect(reverb, masterGainNode);
+        graphEnd.connect(reverb);
+        reverb.connect(masterGainNode);
 
         return function cleanup() {
           reverb.disconnect();
@@ -124,6 +144,11 @@ playlist
     },
   ])
   .then(function () {
+    console.log('Analyser connected');
+
+    // Start visualization now that analyser is ready
+    draw();
+
     //can do stuff with the playlist.
 
     if (navigator.mediaDevices) {
@@ -140,11 +165,8 @@ playlist
   });
 
   // https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Visualizations_with_Web_Audio_API
-  // The following code is from Mozilla Developer Network:
+  // The following code is adapted from Mozilla Developer Network:
   // This draws the frequency data to the canvas.
-  analyser.fftSize = 256;
-  var bufferLength = analyser.frequencyBinCount;
-  var dataArray = new Uint8Array(bufferLength);
   var drawVisual;
   var canvas = document.querySelector('.visualizer');
   var canvasCtx = canvas.getContext("2d");
@@ -158,7 +180,12 @@ playlist
 
   function draw() {
     drawVisual = requestAnimationFrame(draw);
-    analyser.getByteFrequencyData(dataArray);
+
+    // Skip if analyser not ready yet
+    if (!analyser) return;
+
+    var dataArray = analyser.getValue(); // Returns Float32Array with dB values
+    var bufferLength = dataArray.length;
 
     canvasCtx.fillStyle = 'rgb(255, 255, 255)';
     canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -168,7 +195,11 @@ playlist
     var x = 0;
 
     for(var i = 0; i < bufferLength; i++) {
-      barHeight = dataArray[i]/2/scale;
+      // Tone.Analyser FFT mode returns dB values (typically -100 to 0)
+      // Normalize to 0-255 range
+      var dbValue = dataArray[i];
+      var normalized = Math.max(0, Math.min(255, (dbValue + 100) * 2.55));
+      barHeight = normalized / 2 / scale;
 
       canvasCtx.fillStyle = 'rgb('+(barHeight+100)+',50,50)';
       canvasCtx.fillRect(x,HEIGHT/scale-barHeight/2,barWidth,barHeight);
@@ -177,4 +208,4 @@ playlist
     }
   }
 
-  draw();
+  // draw() is now called after analyser is created in the .then() callback

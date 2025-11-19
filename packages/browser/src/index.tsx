@@ -1,10 +1,11 @@
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { ThemeProvider } from 'styled-components';
-import { TonePlayout } from '@waveform-playlist/playout';
+import { TonePlayout, type EffectsFunction } from '@waveform-playlist/playout';
 import { LoaderFactory } from '@waveform-playlist/loaders';
 import { Track } from '@waveform-playlist/core';
-import { getContext } from 'tone';
+import * as Tone from 'tone';
+import type { ToneAudioNode } from 'tone';
 import {
   SmartChannel,
   Button,
@@ -58,7 +59,10 @@ interface PlaylistConfig {
   state?: string;
   timescale?: boolean;
   isAutomaticScroll?: boolean;
+  effects?: EffectsFunction;
 }
+
+export type TrackEffectsFunction = (graphEnd: ToneAudioNode, masterGainNode: ToneAudioNode, isOffline: boolean) => void | (() => void);
 
 interface TrackConfig {
   src: string | File;
@@ -80,6 +84,7 @@ interface TrackConfig {
     start: number;
     end: number;
   };
+  effects?: TrackEffectsFunction;
 }
 
 class WaveformPlaylistClass {
@@ -116,8 +121,10 @@ class WaveformPlaylistClass {
     // Create React root
     this.root = createRoot(this.container);
 
-    // Initialize playout
-    this.playout = new TonePlayout();
+    // Initialize playout with optional effects
+    this.playout = new TonePlayout({
+      effects: this.config.effects,
+    });
 
     // Initialize event emitter
     this.eventEmitter = this.createEventEmitter();
@@ -125,7 +132,7 @@ class WaveformPlaylistClass {
 
   async load(trackConfigs: TrackConfig[]): Promise<void> {
     // Use Tone's context (it will be in suspended state until user gesture)
-    const audioContext = getContext().rawContext as AudioContext;
+    const audioContext = Tone.getContext().rawContext as AudioContext;
     const loadedTracks: Track[] = [];
 
     // Load all tracks
@@ -171,6 +178,7 @@ class WaveformPlaylistClass {
           this.playout.addTrack({
             buffer: audioBuffer,
             track,
+            effects: config.effects,
           });
         }
       } catch (error) {
@@ -211,7 +219,7 @@ class WaveformPlaylistClass {
 
   async addTrack(src: string | File, config?: Partial<TrackConfig>): Promise<void> {
     // Use Tone's context
-    const audioContext = getContext().rawContext as AudioContext;
+    const audioContext = Tone.getContext().rawContext as AudioContext;
 
     try {
       // Create track config
@@ -264,6 +272,7 @@ class WaveformPlaylistClass {
         this.playout.addTrack({
           buffer: audioBuffer,
           track,
+          effects: trackConfig.effects,
         });
       }
 
@@ -1097,12 +1106,14 @@ class WaveformPlaylistClass {
 const WaveformPlaylistAPI = {
   init: (config: PlaylistConfig): WaveformPlaylistClass => {
     return new WaveformPlaylistClass(config);
-  }
+  },
+  Tone: Tone,
 };
 
 // Export for ES modules
 export const init = WaveformPlaylistAPI.init;
 export type { PlaylistConfig, TrackConfig };
+export { Tone };
 
 // Default export for UMD
 export default WaveformPlaylistAPI;
