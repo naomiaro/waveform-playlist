@@ -17,31 +17,35 @@ const Box = styled.div.attrs<AnnotationBoxProps>((props) => ({
   position: absolute;
   top: 0;
   height: 100%;
-  background: ${(props) => props.$color};
-  border: 2px solid ${(props) => props.$color};
+  background: ${(props) => props.$isActive ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.85)'};
+  border: 2px solid ${(props) => props.$isActive ? '#d67600' : props.$color};
   border-radius: 4px;
-  opacity: ${(props) => (props.$isActive ? 0.5 : 0.3)};
   cursor: pointer;
   pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 
   &:hover {
-    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.98);
+    border-color: #d67600;
+    border-width: 3px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   }
 `;
 
 const Label = styled.span`
-  font-size: 10px;
-  font-weight: bold;
-  color: #333;
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 600;
+  color: #2a2a2a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 0 4px;
+  padding: 0 6px;
+  letter-spacing: 0.3px;
 `;
 
 export interface AnnotationBoxComponentProps {

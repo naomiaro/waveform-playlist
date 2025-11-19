@@ -90,6 +90,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const currentTimeRef = useRef<number>(0);
   const isSelectingRef = useRef(false);
   const isAutomaticScrollRef = useRef(false);
+  const isPlayingRef = useRef(false);
   const selectionInputsManagerRef = useRef<SelectionTimeInputsManager | null>(null);
 
   const theme = { ...defaultTheme, ...userTheme };
@@ -479,6 +480,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     };
   }, [audioBuffer, duration, isPlaying, selectionStart, selectionEnd]);
 
+  // Keep isPlayingRef in sync with isPlaying state
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
   // Checkbox listeners for continuous play, link endpoints, and automatic scroll
   useEffect(() => {
     const continuousPlayCheckbox = document.querySelector('.continuous-play') as HTMLInputElement;
@@ -488,6 +494,13 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const handleContinuousPlayChange = (e: Event) => {
       const checked = (e.target as HTMLInputElement).checked;
       setIsContinuousPlay(checked);
+
+      // If turning off continuous play while playing, stop playback
+      if (!checked && isPlayingRef.current && playoutRef.current) {
+        playoutRef.current.stop();
+        setIsPlaying(false);
+        stopAnimationLoop();
+      }
     };
 
     const handleLinkEndpointsChange = (e: Event) => {
@@ -678,7 +691,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                       color="rgba(0, 255, 0, 0.3)"
                     />
                   )}
-                  {(isPlaying || selectionStart === selectionEnd) && (
+                  {(isPlaying || (selectionStart === selectionEnd && !activeAnnotationId)) && (
                     <Playhead
                       position={(currentTime * sampleRate) / samplesPerPixel}
                       color="#f00"

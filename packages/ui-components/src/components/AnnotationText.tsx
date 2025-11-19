@@ -11,53 +11,71 @@ const Container = styled.div`
 `;
 
 const AnnotationItem = styled.div<{ $isActive?: boolean }>`
-  padding: 8px;
-  margin-bottom: 4px;
+  padding: 12px;
+  margin-bottom: 6px;
   border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : '#ccc')};
   background: ${(props) => (props.$isActive ? '#fff3e0' : '#f9f9f9')};
+  border-radius: 4px;
   transition: all 0.2s;
+  cursor: pointer;
+  box-shadow: ${(props) => (props.$isActive ? '0 2px 4px rgba(255, 152, 0, 0.2)' : 'none')};
+
+  &:hover {
+    background: ${(props) => (props.$isActive ? '#ffe9cc' : '#f0f0f0')};
+    border-left-color: #ff9800;
+  }
 `;
 
 const AnnotationHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 `;
 
 const TimeRange = styled.span`
-  font-size: 11px;
-  color: #666;
-  font-family: monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  letter-spacing: 0.5px;
 `;
 
 const AnnotationControls = styled.div`
   display: flex;
-  gap: 4px;
+  gap: 6px;
 `;
 
 const ControlButton = styled.button`
   background: transparent;
   border: 1px solid #ccc;
-  padding: 2px 6px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 14px;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
 
   &:hover {
-    background: #e0e0e0;
+    background: #e8e8e8;
     border-color: #999;
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
   }
 `;
 
 const AnnotationTextContent = styled.div<{ $isEditable?: boolean }>`
-  font-size: 13px;
-  line-height: 1.4;
-  color: #333;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #2a2a2a;
   white-space: pre-wrap;
   word-break: break-word;
-  outline: ${(props) => (props.$isEditable ? '1px dashed #ccc' : 'none')};
-  padding: ${(props) => (props.$isEditable ? '4px' : '0')};
+  outline: ${(props) => (props.$isEditable ? '1px dashed #ddd' : 'none')};
+  padding: ${(props) => (props.$isEditable ? '6px' : '0')};
+  border-radius: 3px;
+  min-height: 20px;
 
   &[contenteditable='true']:focus {
     outline: 2px solid #ff9800;

@@ -459,3 +459,27 @@ Currently writing: [Mastering Tone.js](https://leanpub.com/masteringtonejs). 25%
 [MIT License](http://doge.mit-license.org)
 
 `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --remote-allow-origins='*' --user-data-dir=/tmp/chrome-debug-profile`
+
+## How to Use Them
+
+```bash
+  waveform-playlist/
+  ├── CLAUDE.md              # AI context & decisions
+  ├── PROJECT_STRUCTURE.md   # Architecture & how it works
+  └── TODO.md                # Roadmap & tasks
+```
+
+### Starting a session:
+
+"Read CLAUDE.md and PROJECT_STRUCTURE.md"
+
+### When stuck:
+
+- "How does X work?" → Check PROJECT_STRUCTURE.md
+- "What pattern should I use?" → Check CLAUDE.md
+- "What was decided about Y?" → Check CLAUDE.md
+
+### After making changes:
+
+- Update CLAUDE.md with WHY
+- Update PROJECT_STRUCTURE.md with WHAT
