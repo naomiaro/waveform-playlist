@@ -197,13 +197,16 @@ class WaveformPlaylistClass {
     }, 0);
 
     // Handle pre-selection if any track has a selected region
-    for (let i = 0; i < trackConfigs.length; i++) {
-      const config = trackConfigs[i];
-      if (config.selected) {
-        this.setSelection(config.selected.start, config.selected.end);
-        break; // Only use the first track's selection
+    // Use setTimeout to ensure React component has mounted and setSelectionFn is available
+    setTimeout(() => {
+      for (let i = 0; i < trackConfigs.length; i++) {
+        const config = trackConfigs[i];
+        if (config.selected) {
+          this.setSelection(config.selected.start, config.selected.end);
+          break; // Only use the first track's selection
+        }
       }
-    }
+    }, 100);
   }
 
   async addTrack(src: string | File, config?: Partial<TrackConfig>): Promise<void> {
@@ -309,7 +312,7 @@ class WaveformPlaylistClass {
 
     // Check if controls should be shown (default: true)
     const showControls = this.config.controls?.show !== false;
-    const controlsWidth = this.config.controls?.width || 250;
+    const controlsWidth = this.config.controls?.width || 200;
 
     // Check if timescale should be shown (default: true)
     const showTimescale = this.config.timescale !== false;
@@ -488,8 +491,8 @@ class WaveformPlaylistClass {
               <Playlist
                 theme={theme}
                 backgroundColor={theme.waveOutlineColor || '#00f'}
-                scrollContainerWidth={timelineWidth}
-                timescaleWidth={timelineWidth}
+                scrollContainerWidth={tracksFullWidth}
+                timescaleWidth={tracksFullWidth}
                 tracksWidth={tracksFullWidth}
                 onTracksMouseDown={this.handleMouseDown}
                 onTracksMouseMove={this.handleMouseMove}
@@ -739,7 +742,7 @@ class WaveformPlaylistClass {
     }
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const controlsWidth = this.config.controls?.show !== false ? (this.config.controls?.width || 250) : 0;
+    const controlsWidth = this.config.controls?.show !== false ? (this.config.controls?.width || 200) : 0;
 
     // Calculate position relative to timeline start
     // rect.left already accounts for scroll since ClickOverlay is inside ScrollContainer
