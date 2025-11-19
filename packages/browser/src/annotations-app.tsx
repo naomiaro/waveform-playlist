@@ -108,15 +108,11 @@ const theme = {
 interface AnnotationsAppProps {
   audioSrc: string;
   annotations: any[];
-  isContinuousPlay?: boolean;
-  linkEndpoints?: boolean;
 }
 
 const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
   audioSrc,
   annotations: initialAnnotations,
-  isContinuousPlay = false,
-  linkEndpoints = true,
 }) => {
   const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
@@ -126,6 +122,8 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
   const [duration, setDuration] = useState(0);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [peaksData, setPeaksData] = useState<PeakData | null>(null);
+  const [isContinuousPlay, setIsContinuousPlay] = useState(false);
+  const [linkEndpoints, setLinkEndpoints] = useState(true);
 
   const playoutRef = useRef<TonePlayout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -291,6 +289,40 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
     const playDuration = !isContinuousPlay ? annotation.end - annotation.start : undefined;
     await handlePlay(annotation.start, playDuration);
   };
+
+  // Set up checkbox event listeners
+  useEffect(() => {
+    const continuousPlayCheckbox = document.querySelector('.continuous-play') as HTMLInputElement;
+    const linkEndpointsCheckbox = document.querySelector('.link-endpoints') as HTMLInputElement;
+
+    const handleContinuousPlayChange = (e: Event) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      console.log('Continuous play changed:', checked);
+      setIsContinuousPlay(checked);
+    };
+
+    const handleLinkEndpointsChange = (e: Event) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      console.log('Link endpoints changed:', checked);
+      setLinkEndpoints(checked);
+    };
+
+    // Set initial checkbox states
+    if (continuousPlayCheckbox) {
+      continuousPlayCheckbox.checked = isContinuousPlay;
+      continuousPlayCheckbox.addEventListener('change', handleContinuousPlayChange);
+    }
+
+    if (linkEndpointsCheckbox) {
+      linkEndpointsCheckbox.checked = linkEndpoints;
+      linkEndpointsCheckbox.addEventListener('change', handleLinkEndpointsChange);
+    }
+
+    return () => {
+      continuousPlayCheckbox?.removeEventListener('change', handleContinuousPlayChange);
+      linkEndpointsCheckbox?.removeEventListener('change', handleLinkEndpointsChange);
+    };
+  }, []); // Only run once on mount
 
   // Set up button event listeners
   useEffect(() => {
@@ -503,8 +535,6 @@ export function initAnnotationsApp() {
     <AnnotationsApp
       audioSrc="media/audio/sonnet.mp3"
       annotations={notes}
-      isContinuousPlay={false}
-      linkEndpoints={true}
     />
   );
 }
