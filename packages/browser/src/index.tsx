@@ -96,6 +96,7 @@ class WaveformPlaylistClass {
   private animationFrameId: number | null = null;
   private setProgressFn: ((progress: number) => void) | null = null;
   private setSelectionFn: ((start: number, end: number) => void) | null = null;
+  private setIsPlayingFn: ((isPlaying: boolean) => void) | null = null;
   private isAutomaticScroll: boolean = false;
   private scrollContainer: HTMLElement | null = null;
   private selectionStart: number = 0;
@@ -285,19 +286,21 @@ class WaveformPlaylistClass {
 
     // Move the playlist content into a separate component
     const PlaylistContent: React.FC = () => {
-      const { progress: currentTime, selectionStart, selectionEnd } = usePlayoutStatus();
-      const { setProgress, setSelection } = usePlayoutStatusUpdate();
+      const { progress: currentTime, selectionStart, selectionEnd, isPlaying } = usePlayoutStatus();
+      const { setProgress, setSelection, setIsPlaying } = usePlayoutStatusUpdate();
       const animationRef = React.useRef<number | null>(null);
 
-      // Store setProgress and setSelection references for use in animation and seeking
+      // Store setProgress, setSelection, and setIsPlaying references
       React.useEffect(() => {
         this.setProgressFn = setProgress;
         this.setSelectionFn = setSelection;
+        this.setIsPlayingFn = setIsPlaying;
         return () => {
           this.setProgressFn = null;
           this.setSelectionFn = null;
+          this.setIsPlayingFn = null;
         };
-      }, [setProgress, setSelection]);
+      }, [setProgress, setSelection, setIsPlaying]);
 
     // Check if controls should be shown (default: true)
     const showControls = this.config.controls?.show !== false;
@@ -334,7 +337,8 @@ class WaveformPlaylistClass {
 
     // Waveform component using Channel from ui-components - memoize to prevent recreation
     const WaveformDisplay = React.useMemo(() => {
-      return React.memo<{ trackId: string; currentTime: number }>(({ trackId, currentTime }) => {
+      return React.memo<{ trackId: string; currentTime: number; selectionStart: number; selectionEnd: number; isPlaying: boolean }>(
+        ({ trackId, currentTime, selectionStart, selectionEnd, isPlaying }) => {
       const peaksData = this.peaksData.get(trackId);
       if (!peaksData || !this.playout) return null;
 
@@ -348,9 +352,13 @@ class WaveformPlaylistClass {
       const trackStartTime = trackData?.startTime || 0;
       const trackDuration = track.buffer.duration;
 
+      // Don't show progress if there's an active selection AND not playing
+      const hasSelection = selectionStart !== selectionEnd;
+      const shouldShowProgress = isPlaying || !hasSelection;
+
       // Calculate progress based on how long this track has been playing
       let progressPx = 0;
-      if (currentTime >= trackStartTime) {
+      if (shouldShowProgress && currentTime >= trackStartTime) {
         const relativeTime = currentTime - trackStartTime;
         if (relativeTime <= trackDuration) {
           // Track is currently playing - show progress based on relativeTime
@@ -512,7 +520,13 @@ class WaveformPlaylistClass {
                           backgroundColor={theme.waveOutlineColor || '#00f'}
                           offset={trackOffsetPx}
                         >
-                          <WaveformDisplay trackId={track.id} currentTime={currentTime} />
+                          <WaveformDisplay
+                            trackId={track.id}
+                            currentTime={currentTime}
+                            selectionStart={selectionStart}
+                            selectionEnd={selectionEnd}
+                            isPlaying={isPlaying}
+                          />
                         </TrackComponent>
                       </TrackControlsContext.Provider>
                     );
@@ -526,10 +540,12 @@ class WaveformPlaylistClass {
                           color="#00ff00"
                         />
                       )}
-                      <Playhead
-                        position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
-                        color={theme.waveProgressColor || '#f00'}
-                      />
+                      {(isPlaying || selectionStart === selectionEnd) && (
+                        <Playhead
+                          position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
+                          color={theme.waveProgressColor || '#f00'}
+                        />
+                      )}
                     </>
                   )}
                 </>
@@ -577,6 +593,9 @@ class WaveformPlaylistClass {
       this.playout.play(undefined, playFrom);
 
       this.playbackState = 'playing';
+      if (this.setIsPlayingFn) {
+        this.setIsPlayingFn(true);
+      }
       this.startAnimation();
     }
   }
@@ -585,6 +604,9 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.pause();
       this.playbackState = 'paused';
+      if (this.setIsPlayingFn) {
+        this.setIsPlayingFn(false);
+      }
       this.stopAnimation();
     }
   }
@@ -593,6 +615,9 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.stop();
       this.playbackState = 'stopped';
+      if (this.setIsPlayingFn) {
+        this.setIsPlayingFn(false);
+      }
       this.stopAnimation();
       this.currentTime = 0;
       if (this.setProgressFn) {
