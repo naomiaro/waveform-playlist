@@ -153,7 +153,7 @@ var notes = [
 
 var actions = [
   {
-    class: 'fas.fa-minus',
+    class: 'bi.bi-dash',
     title: 'Reduce annotation end by 0.010s',
     action: (annotation, i, annotations, opts) => {
       var next;
@@ -162,12 +162,22 @@ var actions = [
 
       if (opts.linkEndpoints) {
         next = annotations[i + 1];
-        next && (next.start -= delta);
+        if (next) {
+          next.start -= delta;
+          // Update begin if it exists (for compatibility)
+          if (next.begin !== undefined) {
+            next.begin = next.start.toString();
+          }
+        }
+      }
+      // Update begin if it exists (for compatibility)
+      if (annotation.begin !== undefined) {
+        annotation.begin = annotation.end.toString();
       }
     }
   },
   {
-    class: 'fas.fa-plus',
+    class: 'bi.bi-plus',
     title: 'Increase annotation end by 0.010s',
     action: (annotation, i, annotations, opts) => {
       var next;
@@ -176,29 +186,44 @@ var actions = [
 
       if (opts.linkEndpoints) {
         next = annotations[i + 1];
-        next && (next.start += delta);
+        if (next) {
+          next.start += delta;
+          // Update begin if it exists (for compatibility)
+          if (next.begin !== undefined) {
+            next.begin = next.start.toString();
+          }
+        }
+      }
+      // Update begin if it exists (for compatibility)
+      if (annotation.begin !== undefined) {
+        annotation.begin = annotation.end.toString();
       }
     }
   },
   {
-    class: 'fas.fa-cut',
+    class: 'bi.bi-scissors',
     title: 'Split annotation in half',
     action: (annotation, i, annotations) => {
       const halfDuration = (annotation.end - annotation.start) / 2;
 
       annotations.splice(i + 1, 0, {
-        id: 'test',
+        id: 'annotation_' + Date.now(),
         start: annotation.end - halfDuration,
         end: annotation.end,
+        begin: (annotation.end - halfDuration).toString(),
         lines: ['----'],
-        lang: 'en',
+        language: 'en',
       });
 
       annotation.end = annotation.start + halfDuration;
+      // Update begin if it exists (for compatibility)
+      if (annotation.begin !== undefined) {
+        annotation.begin = annotation.end.toString();
+      }
     }
   },
   {
-    class: 'fas.fa-trash',
+    class: 'bi.bi-trash',
     title: 'Delete annotation',
     action: (annotation, i, annotations) => {
       annotations.splice(i, 1);

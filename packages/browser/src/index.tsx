@@ -21,6 +21,11 @@ import {
   Playlist,
   Playhead,
   Selection,
+  Annotation as AnnotationComponent,
+  AnnotationBox,
+  AnnotationBoxesWrapper,
+  AnnotationText,
+  AnnotationsTrack,
   Track as TrackComponent,
   PlaylistInfoContext,
   DevicePixelRatioProvider,
@@ -61,9 +66,35 @@ interface PlaylistConfig {
   timescale?: boolean;
   isAutomaticScroll?: boolean;
   effects?: EffectsFunction;
+  annotationList?: AnnotationListConfig;
 }
 
 export type TrackEffectsFunction = (graphEnd: ToneAudioNode, masterGainNode: ToneAudioNode, isOffline: boolean) => void | (() => void);
+
+export interface Annotation {
+  id: string;
+  start: number;
+  end: number;
+  lines: string[];
+  language?: string;
+  // Support for Aeneas JSON format
+  begin?: string | number;
+  children?: any[];
+}
+
+export interface AnnotationAction {
+  class: string;
+  title: string;
+  action: (annotation: Annotation, index: number, annotations: Annotation[], opts: AnnotationListConfig) => void;
+}
+
+export interface AnnotationListConfig {
+  annotations: Annotation[];
+  controls?: AnnotationAction[];
+  editable?: boolean;
+  isContinuousPlay?: boolean;
+  linkEndpoints?: boolean;
+}
 
 interface TrackConfig {
   src: string | File;
@@ -110,11 +141,31 @@ class WaveformPlaylistClass {
   private timeFormat: string = 'hh:mm:ss.uuu';
   private isDragging: boolean = false;
   private dragStartTime: number = 0;
+  private annotations: Annotation[] = [];
+  private activeAnnotationId: string | null = null;
+  private setAnnotationsFn: ((annotations: Annotation[]) => void) | null = null;
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
     this.config = config;
     this.isAutomaticScroll = config.isAutomaticScroll ?? false;
+
+    // Initialize annotations from config
+    if (config.annotationList?.annotations) {
+      this.annotations = config.annotationList.annotations.map(note => {
+        // Handle both Aeneas format (begin/end as strings) and standard format (start/end as numbers)
+        const start = note.begin !== undefined ? parseFloat(note.begin as any) : note.start;
+        const end = note.end !== undefined ? (typeof note.end === 'string' ? parseFloat(note.end) : note.end) : note.end;
+
+        return {
+          id: note.id,
+          start: start,
+          end: end,
+          lines: note.lines,
+          language: note.language,
+        };
+      });
+    }
 
     // Clear container
     this.container.innerHTML = '';
@@ -555,6 +606,45 @@ class WaveformPlaylistClass {
                       </TrackControlsContext.Provider>
                     );
                   })}
+                  {/* Render annotation boxes if annotations are configured */}
+                  {this.annotations.length > 0 && this.playout && (
+                    <AnnotationBoxesWrapper
+                      height={30}
+                      width={tracksFullWidth}
+                    >
+                      {this.annotations.map((annotation) => {
+                        const startPx = secondsToPixels(annotation.start, samplesPerPixel, this.playout!.sampleRate);
+                        const endPx = secondsToPixels(annotation.end, samplesPerPixel, this.playout!.sampleRate);
+
+                        return (
+                          <AnnotationBox
+                            key={annotation.id}
+                            startPosition={startPx}
+                            endPosition={endPx}
+                            color="#ff9800"
+                            isActive={annotation.id === this.activeAnnotationId}
+                            onClick={() => {
+                              this.activeAnnotationId = annotation.id;
+                              if (this.config.annotationList?.isContinuousPlay === false) {
+                                // Play only this annotation
+                                this.seek(annotation.start);
+                                this.play();
+                                setTimeout(() => {
+                                  if (this.currentTime >= annotation.end) {
+                                    this.pause();
+                                  }
+                                }, (annotation.end - annotation.start) * 1000);
+                              } else {
+                                // Seek to annotation start
+                                this.seek(annotation.start);
+                              }
+                              this.render();
+                            }}
+                          />
+                        );
+                      })}
+                    </AnnotationBoxesWrapper>
+                  )}
                   {this.tracks.length > 0 && this.playout && (
                     <>
                       {selectionStart !== selectionEnd && (
@@ -574,6 +664,37 @@ class WaveformPlaylistClass {
                   )}
                 </>
               </Playlist>
+              {/* Render annotation text panel if annotations are configured */}
+              {this.annotations.length > 0 && (
+                <AnnotationText
+                  annotations={this.annotations}
+                  activeAnnotationId={this.activeAnnotationId || undefined}
+                  editable={this.config.annotationList?.editable}
+                  controls={this.config.annotationList?.controls}
+                  annotationListConfig={this.config.annotationList}
+                  onAnnotationClick={(annotation) => {
+                    this.activeAnnotationId = annotation.id;
+                    if (this.config.annotationList?.isContinuousPlay === false) {
+                      // Play only this annotation
+                      this.seek(annotation.start);
+                      this.play();
+                      setTimeout(() => {
+                        if (this.currentTime >= annotation.end) {
+                          this.pause();
+                        }
+                      }, (annotation.end - annotation.start) * 1000);
+                    } else {
+                      // Seek to annotation start
+                      this.seek(annotation.start);
+                    }
+                    this.render();
+                  }}
+                  onAnnotationUpdate={(updatedAnnotations) => {
+                    this.annotations = updatedAnnotations;
+                    this.render();
+                  }}
+                />
+              )}
               <div style={{ marginTop: '20px', color: '#666', fontSize: '12px', textAlign: 'center' }}>
                 ✨ Powered by Tone.js 15.1.22 and React 18
               </div>
