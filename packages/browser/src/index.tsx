@@ -191,6 +191,11 @@ class WaveformPlaylistClass {
     this.render();
     console.log('Render complete');
 
+    // Setup input listeners after DOM is ready
+    setTimeout(() => {
+      this.setupSelectionInputListeners();
+    }, 0);
+
     // Handle pre-selection if any track has a selected region
     for (let i = 0; i < trackConfigs.length; i++) {
       const config = trackConfigs[i];
@@ -847,6 +852,25 @@ class WaveformPlaylistClass {
     }
   }
 
+  private parseTime(timeString: string): number {
+    // Try to parse as clock format (hh:mm:ss.uuu)
+    const clockMatch = timeString.match(/^(\d+):(\d+):(\d+(?:\.\d+)?)$/);
+    if (clockMatch) {
+      const hours = parseInt(clockMatch[1], 10);
+      const minutes = parseInt(clockMatch[2], 10);
+      const seconds = parseFloat(clockMatch[3]);
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    // Try to parse as plain seconds
+    const seconds = parseFloat(timeString);
+    if (!isNaN(seconds)) {
+      return seconds;
+    }
+
+    return 0;
+  }
+
   private formatTime(seconds: number): string {
     const clockFormat = (secs: number, decimals: number): string => {
       const hours = Math.floor(secs / 3600) % 24;
@@ -880,6 +904,25 @@ class WaveformPlaylistClass {
     }
     if (audioEnd) {
       audioEnd.value = this.formatTime(this.selectionEnd);
+    }
+  }
+
+  private setupSelectionInputListeners(): void {
+    const audioStart = document.getElementById('audio_start') as HTMLInputElement;
+    const audioEnd = document.getElementById('audio_end') as HTMLInputElement;
+
+    if (audioStart) {
+      audioStart.addEventListener('change', () => {
+        const newStart = this.parseTime(audioStart.value);
+        this.setSelection(newStart, this.selectionEnd);
+      });
+    }
+
+    if (audioEnd) {
+      audioEnd.addEventListener('change', () => {
+        const newEnd = this.parseTime(audioEnd.value);
+        this.setSelection(this.selectionStart, newEnd);
+      });
     }
   }
 
