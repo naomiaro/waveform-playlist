@@ -226,6 +226,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
         currentTimeRef.current = time;
         setCurrentTime(time);
 
+        // Check if playback has reached the end
+        if (time >= duration) {
+          handleStop();
+          return;
+        }
+
         // Update active annotation based on playback time
         if (!isPlayingTimedSegmentRef.current || isContinuousPlay) {
           const currentAnnotation = annotations.find(
@@ -293,6 +299,19 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     } else {
       setShouldScrollToActive(false);
     }
+  };
+
+  const handleStop = () => {
+    if (!playoutRef.current) return;
+
+    playoutRef.current.stop();
+    setIsPlaying(false);
+    stopAnimationLoop();
+
+    currentTimeRef.current = 0;
+    setCurrentTime(0);
+    setActiveAnnotationId(null);
+    setShouldScrollToActive(false);
   };
 
   const handleAnnotationClick = async (annotation: AnnotationData) => {
@@ -402,16 +421,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     };
 
     const handleStopClick = () => {
-      if (!playoutRef.current) return;
-
-      playoutRef.current.stop();
-      setIsPlaying(false);
-      stopAnimationLoop();
-
-      currentTimeRef.current = 0;
-      setCurrentTime(0);
-      setActiveAnnotationId(null);
-      setShouldScrollToActive(false);
+      handleStop();
     };
 
     const handleRewindClick = () => {
