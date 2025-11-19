@@ -144,6 +144,7 @@ class WaveformPlaylistClass {
   private annotations: Annotation[] = [];
   private activeAnnotationId: string | null = null;
   private setAnnotationsFn: ((annotations: Annotation[]) => void) | null = null;
+  private lastScrolledAnnotationId: string | null = null;
   private isPlayingTimedSegment: boolean = false;
 
   constructor(config: PlaylistConfig) {
@@ -627,6 +628,7 @@ class WaveformPlaylistClass {
                             isActive={annotation.id === this.activeAnnotationId}
                             onClick={async () => {
                               this.activeAnnotationId = annotation.id;
+                              this.lastScrolledAnnotationId = annotation.id; // Mark that we're scrolling to this annotation
                               // Calculate duration if continuous play is disabled
                               const duration = this.config.annotationList?.isContinuousPlay === false
                                 ? annotation.end - annotation.start
@@ -661,8 +663,10 @@ class WaveformPlaylistClass {
               {/* Render annotation text panel if annotations are configured */}
               {this.annotations.length > 0 && (
                 <AnnotationText
+                  key="annotation-text-panel"
                   annotations={this.annotations}
                   activeAnnotationId={this.activeAnnotationId || undefined}
+                  shouldScrollToActive={this.activeAnnotationId === this.lastScrolledAnnotationId}
                   editable={this.config.annotationList?.editable}
                   controls={this.config.annotationList?.controls}
                   annotationListConfig={this.config.annotationList}
@@ -745,13 +749,19 @@ class WaveformPlaylistClass {
   }
 
   pause(clearActiveAnnotation: boolean = true): void {
+    console.log('[Playlist] pause called - clearActiveAnnotation:', clearActiveAnnotation, 'activeAnnotationId:', this.activeAnnotationId);
     if (this.playout) {
       this.playout.pause();
       this.playbackState = 'paused';
       this.isPlayingTimedSegment = false;
       if (clearActiveAnnotation) {
         this.activeAnnotationId = null;
+        this.lastScrolledAnnotationId = null;
+      } else {
+        // Reset scroll tracking so we don't scroll on remount
+        this.lastScrolledAnnotationId = null;
       }
+      console.log('[Playlist] after pause - activeAnnotationId:', this.activeAnnotationId);
       this.currentTime = 0;
       if (this.setIsPlayingFn) {
         this.setIsPlayingFn(false);
@@ -1194,8 +1204,6 @@ class WaveformPlaylistClass {
         listeners.get(event)!.push(callback);
       },
       emit: (event: string, ...args: any[]) => {
-        console.log(`Event emitted: ${event}`, args);
-
         // Call registered listeners
         if (listeners.has(event)) {
           listeners.get(event)!.forEach(callback => callback(...args));

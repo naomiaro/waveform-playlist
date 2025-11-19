@@ -68,6 +68,7 @@ const AnnotationTextContent = styled.div<{ $isEditable?: boolean }>`
 export interface AnnotationTextProps {
   annotations: AnnotationData[];
   activeAnnotationId?: string;
+  shouldScrollToActive?: boolean;
   editable?: boolean;
   controls?: AnnotationAction[];
   annotationListConfig?: any;
@@ -75,9 +76,10 @@ export interface AnnotationTextProps {
   onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;
 }
 
-export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
+const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   annotations,
   activeAnnotationId,
+  shouldScrollToActive = false,
   editable = false,
   controls = [],
   annotationListConfig,
@@ -85,16 +87,42 @@ export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
   onAnnotationUpdate,
 }) => {
   const activeAnnotationRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const prevActiveIdRef = useRef<string | undefined>(undefined);
 
-  // Auto-scroll to active annotation
+  // Track component renders and scroll position
   useEffect(() => {
-    if (activeAnnotationId && activeAnnotationRef.current) {
+    console.log('[AnnotationText] Render - activeAnnotationId:', activeAnnotationId, 'prev:', prevActiveIdRef.current, 'scrollTop:', containerRef.current?.scrollTop);
+  });
+
+  // Track scroll changes
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      console.log('[AnnotationText] Scroll event - scrollTop:', container.scrollTop);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll to active annotation when it changes
+  useEffect(() => {
+    console.log('[AnnotationText] useEffect triggered - activeAnnotationId:', activeAnnotationId, 'shouldScrollToActive:', shouldScrollToActive, 'will scroll:', !!(activeAnnotationId && activeAnnotationRef.current && shouldScrollToActive));
+
+    // Only scroll if parent says we should (prevents scrolling on remount after pause)
+    if (activeAnnotationId && activeAnnotationRef.current && shouldScrollToActive) {
+      console.log('[AnnotationText] Calling scrollIntoView for:', activeAnnotationId);
       activeAnnotationRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
       });
     }
-  }, [activeAnnotationId]);
+
+    prevActiveIdRef.current = activeAnnotationId;
+  }, [activeAnnotationId, shouldScrollToActive]);
 
   const formatTime = (seconds: number): string => {
     if (isNaN(seconds) || !isFinite(seconds)) {
@@ -129,7 +157,7 @@ export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
   };
 
   return (
-    <Container>
+    <Container ref={containerRef}>
       {annotations.map((annotation, index) => {
         const isActive = annotation.id === activeAnnotationId;
         return (
@@ -170,3 +198,6 @@ export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
     </Container>
   );
 };
+
+// Memoize to prevent unnecessary remounting when parent re-renders
+export const AnnotationText = React.memo(AnnotationTextComponent);
