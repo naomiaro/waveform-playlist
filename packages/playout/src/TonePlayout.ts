@@ -16,6 +16,8 @@ export class TonePlayout {
   private soloedTracks: Set<string> = new Set();
   private manualMuteState: Map<string, boolean> = new Map();
   private effectsCleanup?: () => void;
+  private onPlaybackCompleteCallback?: () => void;
+  private activeTracks: Set<string> = new Set();
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Tone.Volume(this.gainToDb(options.masterGain ?? 1));
@@ -77,13 +79,16 @@ export class TonePlayout {
     return this.tracks.get(trackId);
   }
 
-  play(when: number = Tone.now(), offset?: number): void {
+  play(when: number = Tone.now(), offset?: number, duration?: number): void {
     if (!this.isInitialized) {
       console.warn('TonePlayout not initialized. Call init() first.');
       return;
     }
 
     const playbackPosition = offset ?? 0;
+
+    // Clear active tracks and set up stop callbacks if duration is specified
+    this.activeTracks.clear();
 
     // Play tracks based on their individual start times
     this.tracks.forEach((toneTrack) => {
@@ -92,11 +97,33 @@ export class TonePlayout {
       if (playbackPosition >= trackStartTime) {
         // Track should be playing - calculate buffer offset and start immediately
         const bufferOffset = playbackPosition - trackStartTime;
-        toneTrack.play(when, bufferOffset);
+
+        if (duration !== undefined) {
+          this.activeTracks.add(toneTrack.id);
+          toneTrack.setOnStopCallback(() => {
+            this.activeTracks.delete(toneTrack.id);
+            if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
+              this.onPlaybackCompleteCallback();
+            }
+          });
+        }
+
+        toneTrack.play(when, bufferOffset, duration);
       } else {
         // Track should start later - schedule it to start when playback reaches its start time
         const delay = trackStartTime - playbackPosition;
-        toneTrack.play(when + delay, 0);
+
+        if (duration !== undefined) {
+          this.activeTracks.add(toneTrack.id);
+          toneTrack.setOnStopCallback(() => {
+            this.activeTracks.delete(toneTrack.id);
+            if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
+              this.onPlaybackCompleteCallback();
+            }
+          });
+        }
+
+        toneTrack.play(when + delay, 0, duration);
       }
     });
 
@@ -201,5 +228,9 @@ export class TonePlayout {
 
   get sampleRate(): number {
     return Tone.getContext().sampleRate;
+  }
+
+  setOnPlaybackComplete(callback: () => void): void {
+    this.onPlaybackCompleteCallback = callback;
   }
 }

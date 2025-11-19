@@ -143,8 +143,8 @@ class WaveformPlaylistClass {
   private dragStartTime: number = 0;
   private annotations: Annotation[] = [];
   private activeAnnotationId: string | null = null;
-  private playingAnnotationId: string | null = null; // Track which annotation is being played
   private setAnnotationsFn: ((annotations: Annotation[]) => void) | null = null;
+  private isPlayingTimedSegment: boolean = false;
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
@@ -627,8 +627,11 @@ class WaveformPlaylistClass {
                             isActive={annotation.id === this.activeAnnotationId}
                             onClick={async () => {
                               this.activeAnnotationId = annotation.id;
-                              this.playingAnnotationId = annotation.id;
-                              await this.play(annotation.start);
+                              // Calculate duration if continuous play is disabled
+                              const duration = this.config.annotationList?.isContinuousPlay === false
+                                ? annotation.end - annotation.start
+                                : undefined;
+                              await this.play(annotation.start, duration);
                               this.render();
                             }}
                           />
@@ -693,12 +696,12 @@ class WaveformPlaylistClass {
     );
   }
 
-  async play(startTime?: number): Promise<void> {
+  async play(startTime?: number, duration?: number): Promise<void> {
     if (this.playout) {
       // Initialize playout on first play (requires user gesture)
       await this.playout.init();
 
-      console.log('Playing from:', { startTime, playbackState: this.playbackState, currentTime: this.currentTime, hasSeeked: this.hasSeeked });
+      console.log('Playing from:', { startTime, duration, playbackState: this.playbackState, currentTime: this.currentTime, hasSeeked: this.hasSeeked });
 
       // Determine where to start playing
       let playFrom: number;
@@ -710,12 +713,28 @@ class WaveformPlaylistClass {
       } else {
         playFrom = this.currentTime;
       }
-      console.log('Playing from position:', playFrom);
+      console.log('Playing from position:', playFrom, 'for duration:', duration);
 
-      this.playout.stop(); // Reset pausedPosition to 0
+      this.playout.stop();
       this.currentTime = playFrom;
-      this.hasSeeked = false; // Reset seek flag
-      this.playout.play(undefined, playFrom);
+      this.hasSeeked = false;
+
+      // Set up callback for when playback completes (if playing with duration)
+      if (duration !== undefined) {
+        this.isPlayingTimedSegment = true;
+        this.playout.setOnPlaybackComplete(() => {
+          // Only pause if still playing, but keep the active annotation highlighted
+          if (this.playbackState === 'playing') {
+            this.isPlayingTimedSegment = false;
+            this.pause(false);
+          }
+        });
+      } else {
+        this.isPlayingTimedSegment = false;
+      }
+
+      // Play with duration if specified
+      this.playout.play(Tone.now(), playFrom, duration);
 
       this.playbackState = 'playing';
       if (this.setIsPlayingFn) {
@@ -725,14 +744,20 @@ class WaveformPlaylistClass {
     }
   }
 
-  pause(): void {
+  pause(clearActiveAnnotation: boolean = true): void {
     if (this.playout) {
       this.playout.pause();
       this.playbackState = 'paused';
-      this.activeAnnotationId = null;
-      this.playingAnnotationId = null;
+      this.isPlayingTimedSegment = false;
+      if (clearActiveAnnotation) {
+        this.activeAnnotationId = null;
+      }
+      this.currentTime = 0;
       if (this.setIsPlayingFn) {
         this.setIsPlayingFn(false);
+      }
+      if (this.setProgressFn) {
+        this.setProgressFn(0);
       }
       this.stopAnimation();
       this.render();
@@ -743,8 +768,8 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.stop();
       this.playbackState = 'stopped';
+      this.isPlayingTimedSegment = false;
       this.activeAnnotationId = null;
-      this.playingAnnotationId = null;
       if (this.setIsPlayingFn) {
         this.setIsPlayingFn(false);
       }
@@ -780,7 +805,8 @@ class WaveformPlaylistClass {
       this.currentTime = this.playout.getCurrentTime();
 
       // Update active annotation based on current playback time (only while playing)
-      if (this.annotations.length > 0 && this.playbackState === 'playing') {
+      // Skip this when playing a timed segment to avoid brief highlighting of next annotation
+      if (this.annotations.length > 0 && this.playbackState === 'playing' && !this.isPlayingTimedSegment) {
         const currentAnnotation = this.annotations.find(
           ann => this.currentTime >= ann.start && this.currentTime < ann.end
         );
@@ -789,17 +815,6 @@ class WaveformPlaylistClass {
           this.activeAnnotationId = newActiveId;
           // Re-render to update highlighted annotation
           this.render();
-        }
-
-        // If playing a specific annotation and continuous play is disabled, stop at annotation end
-        if (this.playingAnnotationId && this.config.annotationList?.isContinuousPlay === false) {
-          const playingAnnotation = this.annotations.find(ann => ann.id === this.playingAnnotationId);
-          if (playingAnnotation && this.currentTime >= playingAnnotation.end) {
-            this.playingAnnotationId = null;
-            this.activeAnnotationId = null;
-            this.pause();
-            return;
-          }
         }
       }
 

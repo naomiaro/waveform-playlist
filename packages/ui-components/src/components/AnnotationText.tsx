@@ -1,4 +1,4 @@
-import React, { FunctionComponent } from 'react';
+import React, { FunctionComponent, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import type { AnnotationData, AnnotationAction } from './Annotation';
 
@@ -84,6 +84,18 @@ export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
   onAnnotationClick,
   onAnnotationUpdate,
 }) => {
+  const activeAnnotationRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to active annotation
+  useEffect(() => {
+    if (activeAnnotationId && activeAnnotationRef.current) {
+      activeAnnotationRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [activeAnnotationId]);
+
   const formatTime = (seconds: number): string => {
     if (isNaN(seconds) || !isFinite(seconds)) {
       return '0:00.000';
@@ -118,10 +130,13 @@ export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
 
   return (
     <Container>
-      {annotations.map((annotation, index) => (
+      {annotations.map((annotation, index) => {
+        const isActive = annotation.id === activeAnnotationId;
+        return (
         <AnnotationItem
           key={annotation.id}
-          $isActive={annotation.id === activeAnnotationId}
+          ref={isActive ? activeAnnotationRef : null}
+          $isActive={isActive}
         >
           <AnnotationHeader>
             <TimeRange>
@@ -150,7 +165,8 @@ export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
             {annotation.lines.join('\n')}
           </AnnotationTextContent>
         </AnnotationItem>
-      ))}
+        );
+      })}
     </Container>
   );
 };

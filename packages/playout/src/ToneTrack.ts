@@ -22,6 +22,7 @@ export class ToneTrack {
   private pausedPosition: number = 0;
   private playStartTime: number = 0;
   private effectsCleanup?: () => void;
+  private onStopCallback?: () => void;
 
   constructor(options: ToneTrackOptions) {
     this.track = options.track;
@@ -31,6 +32,11 @@ export class ToneTrack {
     this.player = new Tone.Player({
       url: options.buffer,
       loop: false,
+      onstop: () => {
+        if (this.onStopCallback) {
+          this.onStopCallback();
+        }
+      },
     });
 
     this.fadeGain = new Tone.Gain(1);
@@ -178,5 +184,9 @@ export class ToneTrack {
 
   get startTime(): number {
     return this.track.startTime;
+  }
+
+  setOnStopCallback(callback: () => void): void {
+    this.onStopCallback = callback;
   }
 }
