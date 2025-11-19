@@ -6,7 +6,7 @@ import { LoaderFactory } from '@waveform-playlist/loaders';
 import { Track } from '@waveform-playlist/core';
 import { getContext } from 'tone';
 import {
-  Channel,
+  SmartChannel,
   Button,
   ButtonGroup,
   Controls,
@@ -378,16 +378,12 @@ class WaveformPlaylistClass {
       return (
         <>
           {peaksData.data.map((channelData: Peaks, index: number) => (
-            <Channel
+            <SmartChannel
               key={index}
               index={index}
               data={channelData}
               bits={peaksData.bits}
               length={width}
-              waveHeight={waveHeight}
-              waveOutlineColor={theme.waveOutlineColor || '#00f'}
-              waveFillColor={theme.waveFillColor || '#f0f0f0'}
-              waveProgressColor={theme.waveProgressColor || '#f00'}
               progress={progressPx}
             />
           ))}

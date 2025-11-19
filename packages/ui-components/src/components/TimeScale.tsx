@@ -91,8 +91,9 @@ export const TimeScale: FunctionComponent<TimeScalePropsWithTheme> = (props) => 
       const ctx = canvas.getContext('2d');
 
       if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.resetTransform();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = timeColor;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 

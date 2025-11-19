@@ -97,12 +97,13 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     for (let i = 0; i < canvases.length; i++) {
       const canvas = canvases[i];
       const ctx = canvas.getContext('2d');
-      const h2 = waveHeight / 2;
+      const h2 = Math.floor(waveHeight / 2);
       const maxValue = 2 ** (bits - 1);
 
       if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.resetTransform();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = waveOutlineColor;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
