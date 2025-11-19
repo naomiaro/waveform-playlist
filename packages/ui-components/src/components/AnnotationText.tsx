@@ -15,12 +15,7 @@ const AnnotationItem = styled.div<{ $isActive?: boolean }>`
   margin-bottom: 4px;
   border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : '#ccc')};
   background: ${(props) => (props.$isActive ? '#fff3e0' : '#f9f9f9')};
-  cursor: pointer;
   transition: all 0.2s;
-
-  &:hover {
-    background: ${(props) => (props.$isActive ? '#ffe0b2' : '#f0f0f0')};
-  }
 `;
 
 const AnnotationHeader = styled.div`
@@ -127,7 +122,6 @@ export const AnnotationText: FunctionComponent<AnnotationTextProps> = ({
         <AnnotationItem
           key={annotation.id}
           $isActive={annotation.id === activeAnnotationId}
-          onClick={() => onAnnotationClick && onAnnotationClick(annotation)}
         >
           <AnnotationHeader>
             <TimeRange>

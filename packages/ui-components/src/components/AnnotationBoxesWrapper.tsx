@@ -19,6 +19,7 @@ const Container = styled.div.attrs<ContainerProps>((props) => ({
   background: #f5f5f5;
   border-top: 2px solid #ddd;
   border-bottom: 1px solid #ddd;
+  z-index: 110;
 `;
 
 const ControlsPlaceholder = styled.div<{ $controlWidth: number }>`

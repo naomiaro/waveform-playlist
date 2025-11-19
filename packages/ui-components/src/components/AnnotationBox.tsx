@@ -23,15 +23,31 @@ const Box = styled.div.attrs<AnnotationBoxProps>((props) => ({
   opacity: ${(props) => (props.$isActive ? 0.5 : 0.3)};
   cursor: pointer;
   pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 
   &:hover {
     opacity: 0.6;
   }
 `;
 
+const Label = styled.span`
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+`;
+
 export interface AnnotationBoxComponentProps {
   startPosition: number;
   endPosition: number;
+  label?: string;
   color?: string;
   isActive?: boolean;
   onClick?: () => void;
@@ -40,6 +56,7 @@ export interface AnnotationBoxComponentProps {
 export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
   startPosition,
   endPosition,
+  label,
   color = '#ff9800',
   isActive = false,
   onClick,
@@ -57,6 +74,8 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
       $color={color}
       $isActive={isActive}
       onClick={onClick}
-    />
+    >
+      {label && <Label>{label}</Label>}
+    </Box>
   );
 };

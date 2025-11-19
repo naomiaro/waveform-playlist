@@ -143,6 +143,7 @@ class WaveformPlaylistClass {
   private dragStartTime: number = 0;
   private annotations: Annotation[] = [];
   private activeAnnotationId: string | null = null;
+  private playingAnnotationId: string | null = null; // Track which annotation is being played
   private setAnnotationsFn: ((annotations: Annotation[]) => void) | null = null;
 
   constructor(config: PlaylistConfig) {
@@ -621,23 +622,13 @@ class WaveformPlaylistClass {
                             key={annotation.id}
                             startPosition={startPx}
                             endPosition={endPx}
+                            label={annotation.id}
                             color="#ff9800"
                             isActive={annotation.id === this.activeAnnotationId}
-                            onClick={() => {
+                            onClick={async () => {
                               this.activeAnnotationId = annotation.id;
-                              if (this.config.annotationList?.isContinuousPlay === false) {
-                                // Play only this annotation
-                                this.seek(annotation.start);
-                                this.play();
-                                setTimeout(() => {
-                                  if (this.currentTime >= annotation.end) {
-                                    this.pause();
-                                  }
-                                }, (annotation.end - annotation.start) * 1000);
-                              } else {
-                                // Seek to annotation start
-                                this.seek(annotation.start);
-                              }
+                              this.playingAnnotationId = annotation.id;
+                              await this.play(annotation.start);
                               this.render();
                             }}
                           />
@@ -654,7 +645,7 @@ class WaveformPlaylistClass {
                           color="#00ff00"
                         />
                       )}
-                      {(isPlaying || selectionStart === selectionEnd) && (
+                      {isPlaying && (
                         <Playhead
                           position={secondsToPixels(currentTime, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
                           color={theme.waveProgressColor || '#f00'}
@@ -673,20 +664,9 @@ class WaveformPlaylistClass {
                   controls={this.config.annotationList?.controls}
                   annotationListConfig={this.config.annotationList}
                   onAnnotationClick={(annotation) => {
+                    // Just select and seek, don't auto-play
                     this.activeAnnotationId = annotation.id;
-                    if (this.config.annotationList?.isContinuousPlay === false) {
-                      // Play only this annotation
-                      this.seek(annotation.start);
-                      this.play();
-                      setTimeout(() => {
-                        if (this.currentTime >= annotation.end) {
-                          this.pause();
-                        }
-                      }, (annotation.end - annotation.start) * 1000);
-                    } else {
-                      // Seek to annotation start
-                      this.seek(annotation.start);
-                    }
+                    this.seek(annotation.start);
                     this.render();
                   }}
                   onAnnotationUpdate={(updatedAnnotations) => {
@@ -749,10 +729,13 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.pause();
       this.playbackState = 'paused';
+      this.activeAnnotationId = null;
+      this.playingAnnotationId = null;
       if (this.setIsPlayingFn) {
         this.setIsPlayingFn(false);
       }
       this.stopAnimation();
+      this.render();
     }
   }
 
@@ -760,6 +743,8 @@ class WaveformPlaylistClass {
     if (this.playout) {
       this.playout.stop();
       this.playbackState = 'stopped';
+      this.activeAnnotationId = null;
+      this.playingAnnotationId = null;
       if (this.setIsPlayingFn) {
         this.setIsPlayingFn(false);
       }
@@ -772,6 +757,7 @@ class WaveformPlaylistClass {
       if (this.eventEmitter) {
         this.eventEmitter.emit('timeupdate', 0);
       }
+      this.render();
       // Scroll back to the beginning
       if (this.scrollContainer) {
         this.scrollContainer.scrollLeft = 0;
@@ -792,6 +778,30 @@ class WaveformPlaylistClass {
       }
 
       this.currentTime = this.playout.getCurrentTime();
+
+      // Update active annotation based on current playback time (only while playing)
+      if (this.annotations.length > 0 && this.playbackState === 'playing') {
+        const currentAnnotation = this.annotations.find(
+          ann => this.currentTime >= ann.start && this.currentTime < ann.end
+        );
+        const newActiveId = currentAnnotation ? currentAnnotation.id : null;
+        if (newActiveId !== this.activeAnnotationId) {
+          this.activeAnnotationId = newActiveId;
+          // Re-render to update highlighted annotation
+          this.render();
+        }
+
+        // If playing a specific annotation and continuous play is disabled, stop at annotation end
+        if (this.playingAnnotationId && this.config.annotationList?.isContinuousPlay === false) {
+          const playingAnnotation = this.annotations.find(ann => ann.id === this.playingAnnotationId);
+          if (playingAnnotation && this.currentTime >= playingAnnotation.end) {
+            this.playingAnnotationId = null;
+            this.activeAnnotationId = null;
+            this.pause();
+            return;
+          }
+        }
+      }
 
       // Check if playback has reached the selection end
       if (this.selectionStart !== this.selectionEnd && this.currentTime >= this.selectionEnd) {
