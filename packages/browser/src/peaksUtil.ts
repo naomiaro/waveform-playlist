@@ -7,8 +7,8 @@ import extractPeaks, { type PeakData } from '@waveform-playlist/webaudio-peaks';
 export function generatePeaks(
   audioBuffer: AudioBuffer,
   samplesPerPixel: number = 1000,
+  isMono: boolean = true,
   bits: 8 | 16 | 32 = 8
 ): PeakData {
-  // Pass false for isMono to keep channels separate (show stereo)
-  return extractPeaks(audioBuffer, samplesPerPixel, false, undefined, undefined, bits);
+  return extractPeaks(audioBuffer, samplesPerPixel, isMono, undefined, undefined, bits);
 }

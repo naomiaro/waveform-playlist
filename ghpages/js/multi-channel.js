@@ -1,6 +1,7 @@
 var playlist = WaveformPlaylist.init({
   container: document.getElementById("playlist"),
   waveHeight: 80,
+  mono: false, // Show all channels separately (stereo display)
   timescale: true,
   // state: 'cursor',  // TODO: State parameter not yet fully implemented
   colors: {

@@ -45,6 +45,7 @@ interface PlaylistConfig {
   container: HTMLElement;
   samplesPerPixel?: number;
   waveHeight?: number;
+  mono?: boolean; // Whether to merge channels to mono (default: true)
   colors?: {
     waveOutlineColor?: string;
     waveFillColor?: string;
@@ -170,7 +171,8 @@ class WaveformPlaylistClass {
 
         // Generate peaks for waveform visualization
         const samplesPerPixel = this.config.samplesPerPixel || 4096;
-        const peaks = generatePeaks(audioBuffer, samplesPerPixel);
+        const isMono = this.config.mono ?? true; // Default to mono
+        const peaks = generatePeaks(audioBuffer, samplesPerPixel, isMono);
         this.peaksData.set(track.id, peaks);
 
         // Add to playout engine
@@ -264,7 +266,8 @@ class WaveformPlaylistClass {
 
       // Generate peaks for waveform visualization
       const samplesPerPixel = this.config.samplesPerPixel || 4096;
-      const peaks = generatePeaks(audioBuffer, samplesPerPixel);
+      const isMono = this.config.mono ?? true; // Default to mono
+      const peaks = generatePeaks(audioBuffer, samplesPerPixel, isMono);
       this.peaksData.set(track.id, peaks);
 
       // Add to playout engine
