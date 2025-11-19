@@ -9,5 +9,6 @@ export function generatePeaks(
   samplesPerPixel: number = 1000,
   bits: 8 | 16 | 32 = 8
 ): PeakData {
-  return extractPeaks(audioBuffer, samplesPerPixel, true, undefined, undefined, bits);
+  // Pass false for isMono to keep channels separate (show stereo)
+  return extractPeaks(audioBuffer, samplesPerPixel, false, undefined, undefined, bits);
 }

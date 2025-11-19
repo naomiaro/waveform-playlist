@@ -1,9 +1,8 @@
 var playlist = WaveformPlaylist.init({
   container: document.getElementById("playlist"),
   waveHeight: 80,
-  mono: false,
   timescale: true,
-  state: 'cursor',
+  // state: 'cursor',  // TODO: State parameter not yet fully implemented
   colors: {
     waveOutlineColor: '#005BBB',
     waveFillColor: '#FFD500'
