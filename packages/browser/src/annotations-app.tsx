@@ -131,46 +131,58 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isPlayingTimedSegmentRef = useRef(false);
+  const currentTimeRef = useRef<number>(0);
 
   // Load audio and initialize
   useEffect(() => {
+    console.log('Load audio effect triggered');
     const loadAudio = async () => {
-      const response = await fetch(audioSrc);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioContext = Tone.getContext().rawContext as AudioContext;
-      const buffer = await audioContext.decodeAudioData(arrayBuffer);
+      try {
+        console.log('Fetching audio from:', audioSrc);
+        const response = await fetch(audioSrc);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioContext = Tone.getContext().rawContext as AudioContext;
+        const buffer = await audioContext.decodeAudioData(arrayBuffer);
+        console.log('Audio decoded, duration:', buffer.duration);
 
-      setAudioBuffer(buffer);
-      setDuration(buffer.duration);
+        setAudioBuffer(buffer);
+        setDuration(buffer.duration);
 
-      // Generate peaks using the proper utility
-      const samplesPerPixel = 1024;
-      const isMono = false; // Keep stereo channels
-      const bits = 16;
-      const peaks = generatePeaks(buffer, samplesPerPixel, isMono, bits);
-      setPeaksData(peaks);
-      console.log('Peaks generated:', peaks.data.length, 'channels, bits:', peaks.bits, 'length:', peaks.length);
+        // Generate peaks using the proper utility
+        const samplesPerPixel = 1024;
+        const isMono = true; // Mono display
+        const bits = 16;
+        const peaks = generatePeaks(buffer, samplesPerPixel, isMono, bits);
+        setPeaksData(peaks);
+        console.log('Peaks generated:', peaks.data.length, 'channels, bits:', peaks.bits, 'length:', peaks.length);
 
-      // Initialize playout
-      const playout = new TonePlayout();
-      await playout.init();
+        // Initialize playout (don't call init() yet - needs user gesture)
+        console.log('Creating TonePlayout...');
+        const playout = new TonePlayout();
+        console.log('TonePlayout created');
 
-      // Create and add track
-      const track = new Track();
-      track.id = 'track-0';
-      track.name = 'Audio Track';
-      track.gain = 1;
-      track.muted = false;
-      track.soloed = false;
-      track.stereoPan = 0;
-      track.startTime = 0;
+        // Create and add track
+        const track: Track = {
+          id: 'track-0',
+          name: 'Audio Track',
+          gain: 1,
+          muted: false,
+          soloed: false,
+          stereoPan: 0,
+          startTime: 0,
+        };
 
-      playout.addTrack({
-        buffer,
-        track,
-      });
+        playout.addTrack({
+          buffer,
+          track,
+        });
+        console.log('Track added to playout');
 
-      playoutRef.current = playout;
+        playoutRef.current = playout;
+        console.log('Playout ref set:', playoutRef.current);
+      } catch (error) {
+        console.error('Error loading audio:', error);
+      }
     };
 
     loadAudio();
@@ -208,7 +220,8 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
     const updateTime = () => {
       if (playoutRef.current) {
         const time = playoutRef.current.getCurrentTime();
-        setCurrentTime(time);
+        currentTimeRef.current = time; // Update ref
+        setCurrentTime(time); // Update state for rendering
 
         // Update active annotation during continuous play
         if (!isPlayingTimedSegmentRef.current && isContinuousPlay) {
@@ -278,6 +291,80 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
     const playDuration = !isContinuousPlay ? annotation.end - annotation.start : undefined;
     await handlePlay(annotation.start, playDuration);
   };
+
+  // Set up button event listeners
+  useEffect(() => {
+    if (!audioBuffer) return;
+
+    const playButton = document.querySelector('.btn-play');
+    const pauseButton = document.querySelector('.btn-pause');
+    const stopButton = document.querySelector('.btn-stop');
+
+    console.log('Setting up button listeners', { playButton, pauseButton, stopButton });
+
+    const handlePlayClick = async () => {
+      console.log('Play button clicked', 'currentTimeRef:', currentTimeRef.current);
+      if (!playoutRef.current) {
+        console.log('No playout ref');
+        return;
+      }
+
+      try {
+        await playoutRef.current.init();
+        // Stop any previous playback before starting new one
+        playoutRef.current.stop();
+        // Use the currentTimeRef which is always up to date
+        console.log('Playing from:', currentTimeRef.current);
+        playoutRef.current.play(Tone.now(), currentTimeRef.current);
+        setIsPlaying(true);
+        startAnimationLoop();
+      } catch (error) {
+        console.error('Play error:', error);
+      }
+    };
+
+    const handlePauseClick = () => {
+      console.log('Pause button clicked');
+      if (!playoutRef.current) return;
+
+      // Capture the current time before pausing
+      const pauseTime = playoutRef.current.getCurrentTime();
+      console.log('Pausing at:', pauseTime);
+
+      playoutRef.current.pause();
+      setIsPlaying(false);
+      stopAnimationLoop();
+
+      // Update both ref and state with the exact pause time
+      currentTimeRef.current = pauseTime;
+      setCurrentTime(pauseTime);
+    };
+
+    const handleStopClick = () => {
+      console.log('Stop button clicked');
+      if (!playoutRef.current) return;
+
+      playoutRef.current.stop();
+      setIsPlaying(false);
+      stopAnimationLoop();
+
+      // Reset both ref and state to 0
+      currentTimeRef.current = 0;
+      setCurrentTime(0);
+      setActiveAnnotationId(null);
+      setShouldScrollToActive(false);
+    };
+
+    playButton?.addEventListener('click', handlePlayClick);
+    pauseButton?.addEventListener('click', handlePauseClick);
+    stopButton?.addEventListener('click', handleStopClick);
+
+    return () => {
+      playButton?.removeEventListener('click', handlePlayClick);
+      pauseButton?.removeEventListener('click', handlePauseClick);
+      stopButton?.removeEventListener('click', handleStopClick);
+    };
+  }, [audioBuffer]);
 
   // Calculate widths
   const samplesPerPixel = 1024;
@@ -352,12 +439,11 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
                 >
                   <WaveformDisplay />
                 </TrackComponent>
-                {isPlaying && (
-                  <Playhead
-                    position={(currentTime * sampleRate) / samplesPerPixel}
-                    color="#f00"
-                  />
-                )}
+                {/* Show playhead whenever audio is loaded */}
+                <Playhead
+                  position={(currentTime * sampleRate) / samplesPerPixel}
+                  color="#f00"
+                />
               </>
             </Playlist>
           ) : (
