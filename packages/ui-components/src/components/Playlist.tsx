@@ -30,8 +30,13 @@ const TimescaleWrapper = styled.div<TimescaleWrapperProps>`
   overflow: visible;
 `;
 
-const TracksContainer = styled.div`
+interface TracksContainerProps {
+  readonly $width?: number;
+}
+
+const TracksContainer = styled.div<TracksContainerProps>`
   position: relative;
+  ${(props) => props.$width !== undefined && `min-width: ${props.$width}px;`}
 `;
 
 const ClickOverlay = styled.div`
@@ -50,6 +55,7 @@ export interface PlaylistProps {
   readonly backgroundColor?: string;
   readonly timescale?: JSX.Element;
   readonly timescaleWidth?: number;
+  readonly tracksWidth?: number;
   readonly scrollContainerWidth?: number;
   readonly onTracksClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   readonly onTracksMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -62,6 +68,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
   backgroundColor,
   timescale,
   timescaleWidth,
+  tracksWidth,
   scrollContainerWidth,
   onTracksClick,
   onTracksMouseDown,
@@ -78,7 +85,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
         ref={scrollContainerRef}
       >
         {timescale && <TimescaleWrapper $width={timescaleWidth}>{timescale}</TimescaleWrapper>}
-        <TracksContainer>
+        <TracksContainer $width={tracksWidth}>
           {children}
           {(onTracksClick || onTracksMouseDown) && (
             <ClickOverlay

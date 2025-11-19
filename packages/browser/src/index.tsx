@@ -490,6 +490,7 @@ class WaveformPlaylistClass {
                 theme={theme}
                 backgroundColor={theme.waveOutlineColor || '#00f'}
                 timescaleWidth={timelineWidth}
+                tracksWidth={timelineWidth}
                 onTracksMouseDown={this.handleMouseDown}
                 onTracksMouseMove={this.handleMouseMove}
                 onTracksMouseUp={this.handleMouseUp}
@@ -737,11 +738,11 @@ class WaveformPlaylistClass {
     }
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const scrollLeft = this.scrollContainer.scrollLeft;
     const controlsWidth = this.config.controls?.show !== false ? (this.config.controls?.width || 250) : 0;
 
     // Calculate position relative to timeline start
-    const clickX = e.clientX - rect.left + scrollLeft - controlsWidth;
+    // rect.left already accounts for scroll since ClickOverlay is inside ScrollContainer
+    const clickX = e.clientX - rect.left - controlsWidth;
 
     // Convert pixels to seconds
     const samplesPerPixel = this.config.samplesPerPixel || 4096;
