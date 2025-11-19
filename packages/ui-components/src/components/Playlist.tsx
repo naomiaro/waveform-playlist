@@ -2,18 +2,22 @@ import styled, { DefaultTheme, withTheme } from 'styled-components';
 import React, { FunctionComponent } from 'react';
 
 const Wrapper = styled.div`
-  overflow: hidden;
+  overflow-y: hidden;
+  overflow-x: visible;
   position: relative;
 `;
 
 interface ScrollContainerProps {
   readonly $backgroundColor?: string;
+  readonly $width?: number;
 }
 
 const ScrollContainer = styled.div<ScrollContainerProps>`
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: auto;
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
+  ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
 `;
 
 interface TimescaleWrapperProps {
@@ -23,6 +27,7 @@ interface TimescaleWrapperProps {
 const TimescaleWrapper = styled.div<TimescaleWrapperProps>`
   background: white;
   ${(props) => props.$width && `min-width: ${props.$width}px;`}
+  overflow: visible;
 `;
 
 const TracksContainer = styled.div`
@@ -45,6 +50,7 @@ export interface PlaylistProps {
   readonly backgroundColor?: string;
   readonly timescale?: JSX.Element;
   readonly timescaleWidth?: number;
+  readonly scrollContainerWidth?: number;
   readonly onTracksClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   readonly onTracksMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
   readonly onTracksMouseMove?: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -56,6 +62,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
   backgroundColor,
   timescale,
   timescaleWidth,
+  scrollContainerWidth,
   onTracksClick,
   onTracksMouseDown,
   onTracksMouseMove,
@@ -67,6 +74,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
       <ScrollContainer
         data-scroll-container="true"
         $backgroundColor={backgroundColor}
+        $width={scrollContainerWidth}
         ref={scrollContainerRef}
       >
         {timescale && <TimescaleWrapper $width={timescaleWidth}>{timescale}</TimescaleWrapper>}

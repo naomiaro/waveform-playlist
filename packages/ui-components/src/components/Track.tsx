@@ -15,6 +15,7 @@ const Container = styled.div.attrs<ContainerProps>((props) => ({
   },
 }))<ContainerProps>`
   position: relative;
+  display: flex;
 `;
 
 interface ChannelContainerProps {
@@ -24,11 +25,12 @@ interface ChannelContainerProps {
 }
 const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   style: {
-    marginLeft: `${props.$controlWidth + (props.$offset || 0)}px`,
+    paddingLeft: `${props.$offset || 0}px`,
   },
 }))<ChannelContainerProps>`
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
+  flex: 1;
 `;
 
 export interface ControlsWrapperProps {
@@ -43,7 +45,7 @@ const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
   z-index: 1;
   left: 0;
   height: 100%;
-  float: left;
+  flex-shrink: 0;
 `;
 
 export interface TrackProps {

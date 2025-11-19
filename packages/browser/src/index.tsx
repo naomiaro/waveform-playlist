@@ -476,9 +476,10 @@ class WaveformPlaylistClass {
     }, []);
 
     // Calculate timeline width for the timescale
-    const timelineWidth = this.playout
-      ? secondsToPixels(maxDuration, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)
+    const playlistDuration = this.playout
+      ? secondsToPixels(maxDuration, samplesPerPixel, this.playout.sampleRate)
       : 0;
+    const timelineWidth = playlistDuration + (showControls ? controlsWidth : 0);
 
     return (
       <DevicePixelRatioProvider>
