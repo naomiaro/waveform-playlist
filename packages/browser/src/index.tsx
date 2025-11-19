@@ -95,11 +95,14 @@ class WaveformPlaylistClass {
   private hasSeeked: boolean = false; // Track if user has manually seeked (clicked timeline)
   private animationFrameId: number | null = null;
   private setProgressFn: ((progress: number) => void) | null = null;
+  private setSelectionFn: ((start: number, end: number) => void) | null = null;
   private isAutomaticScroll: boolean = false;
   private scrollContainer: HTMLElement | null = null;
   private selectionStart: number = 0;
   private selectionEnd: number = 0;
   private timeFormat: string = 'hh:mm:ss.uuu';
+  private isDragging: boolean = false;
+  private dragStartTime: number = 0;
 
   constructor(config: PlaylistConfig) {
     this.container = config.container;
@@ -282,17 +285,19 @@ class WaveformPlaylistClass {
 
     // Move the playlist content into a separate component
     const PlaylistContent: React.FC = () => {
-      const { progress: currentTime } = usePlayoutStatus();
-      const { setProgress } = usePlayoutStatusUpdate();
+      const { progress: currentTime, selectionStart, selectionEnd } = usePlayoutStatus();
+      const { setProgress, setSelection } = usePlayoutStatusUpdate();
       const animationRef = React.useRef<number | null>(null);
 
-      // Store setProgress reference for use in animation and seeking
+      // Store setProgress and setSelection references for use in animation and seeking
       React.useEffect(() => {
         this.setProgressFn = setProgress;
+        this.setSelectionFn = setSelection;
         return () => {
           this.setProgressFn = null;
+          this.setSelectionFn = null;
         };
-      }, [setProgress]);
+      }, [setProgress, setSelection]);
 
     // Check if controls should be shown (default: true)
     const showControls = this.config.controls?.show !== false;
@@ -471,7 +476,9 @@ class WaveformPlaylistClass {
                 theme={theme}
                 backgroundColor={theme.waveOutlineColor || '#00f'}
                 timescaleWidth={timelineWidth}
-                onTracksClick={this.handleTracksClick}
+                onTracksMouseDown={this.handleMouseDown}
+                onTracksMouseMove={this.handleMouseMove}
+                onTracksMouseUp={this.handleMouseUp}
                 scrollContainerRef={(el) => { this.scrollContainer = el; }}
                 timescale={
                   showTimescale ? (
@@ -512,10 +519,10 @@ class WaveformPlaylistClass {
                   })}
                   {this.tracks.length > 0 && this.playout && (
                     <>
-                      {this.selectionStart !== this.selectionEnd && (
+                      {selectionStart !== selectionEnd && (
                         <Selection
-                          startPosition={secondsToPixels(this.selectionStart, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
-                          endPosition={secondsToPixels(this.selectionEnd, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
+                          startPosition={secondsToPixels(selectionStart, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
+                          endPosition={secondsToPixels(selectionEnd, samplesPerPixel, this.playout.sampleRate) + (showControls ? controlsWidth : 0)}
                           color="#00ff00"
                         />
                       )}
@@ -693,19 +700,16 @@ class WaveformPlaylistClass {
     this.isAutomaticScroll = enabled;
   }
 
-  private handleTracksClick = (e: React.MouseEvent<HTMLDivElement>): void => {
-    console.log('Track clicked!', e);
-
+  private getTimeFromMouseEvent = (e: React.MouseEvent<HTMLDivElement>): number | null => {
     if (!this.playout || !this.scrollContainer) {
-      console.log('No playout or scrollContainer:', { playout: this.playout, scrollContainer: this.scrollContainer });
-      return;
+      return null;
     }
 
     const rect = e.currentTarget.getBoundingClientRect();
     const scrollLeft = this.scrollContainer.scrollLeft;
     const controlsWidth = this.config.controls?.show !== false ? (this.config.controls?.width || 250) : 0;
 
-    // Calculate click position relative to timeline start
+    // Calculate position relative to timeline start
     const clickX = e.clientX - rect.left + scrollLeft - controlsWidth;
 
     // Convert pixels to seconds
@@ -713,43 +717,74 @@ class WaveformPlaylistClass {
     const pixelsPerSecond = this.playout.sampleRate / samplesPerPixel;
     const clickTime = clickX / pixelsPerSecond;
 
-    // Seek to the clicked time
     const duration = this.getDuration();
-    const newTime = Math.max(0, Math.min(clickTime, duration));
+    return Math.max(0, Math.min(clickTime, duration));
+  };
 
-    console.log('Seeking to:', {
-      clickX,
-      pixelsPerSecond,
-      clickTime,
-      duration,
-      newTime,
-      currentTime: this.currentTime,
-      setProgressFn: !!this.setProgressFn
-    });
+  private handleMouseDown = (e: React.MouseEvent<HTMLDivElement>): void => {
+    const clickTime = this.getTimeFromMouseEvent(e);
+    if (clickTime === null) return;
 
-    this.currentTime = newTime;
+    this.isDragging = true;
+    this.dragStartTime = clickTime;
+
+    // Start selection at click position
+    this.setSelection(clickTime, clickTime);
+  };
+
+  private handleMouseMove = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if (!this.isDragging) return;
+
+    const currentTime = this.getTimeFromMouseEvent(e);
+    if (currentTime === null) return;
+
+    // Update selection end to current mouse position
+    const start = Math.min(this.dragStartTime, currentTime);
+    const end = Math.max(this.dragStartTime, currentTime);
+    this.setSelection(start, end);
+
+    // Force re-render to show updated selection
     if (this.setProgressFn) {
-      this.setProgressFn(newTime);
+      this.setProgressFn(this.currentTime);
     }
+  };
 
-    // Update selection to the clicked time
-    this.setSelection(newTime, newTime);
+  private handleMouseUp = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if (!this.isDragging) return;
 
-    // Emit timeupdate event so UI elements like time inputs update
-    if (this.eventEmitter) {
-      this.eventEmitter.emit('timeupdate', newTime);
-    }
+    const endTime = this.getTimeFromMouseEvent(e);
+    if (endTime === null) return;
 
-    // Seek to the new position
-    if (this.playbackState === 'playing') {
-      // If playing, restart from new position
-      console.log('Click during playback - restarting from', newTime);
-      this.play(newTime);
+    this.isDragging = false;
+
+    // Finalize selection
+    const start = Math.min(this.dragStartTime, endTime);
+    const end = Math.max(this.dragStartTime, endTime);
+
+    // If it was just a click (no drag), seek to that position
+    if (Math.abs(end - start) < 0.1) {
+      this.currentTime = start;
+      if (this.setProgressFn) {
+        this.setProgressFn(start);
+      }
+
+      // Emit timeupdate event
+      if (this.eventEmitter) {
+        this.eventEmitter.emit('timeupdate', start);
+      }
+
+      // Seek to the new position
+      if (this.playbackState === 'playing') {
+        this.play(start);
+      } else {
+        if (this.playout) {
+          this.playout.stop();
+        }
+        this.hasSeeked = true;
+      }
     } else {
-      // If paused or stopped, seek without playing
-      console.log('Click while not playing - seeking to', newTime);
-      this.playout.stop(); // Reset pausedPosition to 0
-      this.hasSeeked = true; // Mark that we've seeked so play() knows to use currentTime
+      // It was a drag - just update the selection
+      this.setSelection(start, end);
     }
   };
 
@@ -827,6 +862,11 @@ class WaveformPlaylistClass {
     this.selectionStart = start;
     this.selectionEnd = end;
     this.updateSelectionInputs();
+
+    // Update React state for immediate UI feedback
+    if (this.setSelectionFn) {
+      this.setSelectionFn(start, end);
+    }
 
     if (this.eventEmitter) {
       this.eventEmitter.emit('select', start, end);

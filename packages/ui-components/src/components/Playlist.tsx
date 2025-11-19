@@ -35,7 +35,7 @@ const ClickOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  cursor: pointer;
+  cursor: crosshair;
   z-index: 100;
 `;
 
@@ -46,6 +46,9 @@ export interface PlaylistProps {
   readonly timescale?: JSX.Element;
   readonly timescaleWidth?: number;
   readonly onTracksClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  readonly onTracksMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  readonly onTracksMouseMove?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  readonly onTracksMouseUp?: (e: React.MouseEvent<HTMLDivElement>) => void;
   readonly scrollContainerRef?: (el: HTMLDivElement | null) => void;
 }
 export const Playlist: FunctionComponent<PlaylistProps> = ({
@@ -54,6 +57,9 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
   timescale,
   timescaleWidth,
   onTracksClick,
+  onTracksMouseDown,
+  onTracksMouseMove,
+  onTracksMouseUp,
   scrollContainerRef
 }) => {
   return (
@@ -66,7 +72,14 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
         {timescale && <TimescaleWrapper $width={timescaleWidth}>{timescale}</TimescaleWrapper>}
         <TracksContainer>
           {children}
-          {onTracksClick && <ClickOverlay onClick={onTracksClick} />}
+          {(onTracksClick || onTracksMouseDown) && (
+            <ClickOverlay
+              onClick={onTracksClick}
+              onMouseDown={onTracksMouseDown}
+              onMouseMove={onTracksMouseMove}
+              onMouseUp={onTracksMouseUp}
+            />
+          )}
         </TracksContainer>
       </ScrollContainer>
     </Wrapper>
