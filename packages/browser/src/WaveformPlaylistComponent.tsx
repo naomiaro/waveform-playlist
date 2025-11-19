@@ -374,18 +374,29 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
     if (annotationIndex !== -1) {
       const annotation = updatedAnnotations[annotationIndex];
+      const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
 
       if (draggingAnnotation.edge === 'start') {
         // Dragging start edge
         const constrainedStart = Math.max(0, Math.min(newTime, annotation.end - 0.1));
+        const delta = constrainedStart - annotation.start;
+
         updatedAnnotations[annotationIndex] = {
           ...annotation,
           start: constrainedStart,
         };
 
-        // Check collision with previous annotation (dragging left)
-        if (annotationIndex > 0 && constrainedStart < updatedAnnotations[annotationIndex - 1].end) {
-          // Push previous annotation's end back
+        if (linkEndpoints && annotationIndex > 0) {
+          // Link Endpoints: if previous annotation's end is touching this start, move it together
+          const prevAnnotation = updatedAnnotations[annotationIndex - 1];
+          if (Math.abs(prevAnnotation.end - annotation.start) < LINK_THRESHOLD) {
+            updatedAnnotations[annotationIndex - 1] = {
+              ...prevAnnotation,
+              end: Math.max(prevAnnotation.start + 0.1, prevAnnotation.end + delta),
+            };
+          }
+        } else if (!linkEndpoints && annotationIndex > 0 && constrainedStart < updatedAnnotations[annotationIndex - 1].end) {
+          // Collision detection: push previous annotation's end back
           updatedAnnotations[annotationIndex - 1] = {
             ...updatedAnnotations[annotationIndex - 1],
             end: constrainedStart,
@@ -394,23 +405,51 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       } else {
         // Dragging end edge
         const constrainedEnd = Math.max(annotation.start + 0.1, Math.min(newTime, duration));
+        const delta = constrainedEnd - annotation.end;
+
         updatedAnnotations[annotationIndex] = {
           ...annotation,
           end: constrainedEnd,
         };
 
-        // Check collision with next annotation (dragging right)
-        if (annotationIndex < updatedAnnotations.length - 1 && constrainedEnd > updatedAnnotations[annotationIndex + 1].start) {
-          // Push next annotation's start forward, keeping end time fixed (duration gets smaller)
+        if (linkEndpoints && annotationIndex < updatedAnnotations.length - 1) {
+          // Link Endpoints: if next annotation's start is touching this end, move it together
+          const nextAnnotation = updatedAnnotations[annotationIndex + 1];
+          if (Math.abs(nextAnnotation.start - annotation.end) < LINK_THRESHOLD) {
+            const newStart = nextAnnotation.start + delta;
+            updatedAnnotations[annotationIndex + 1] = {
+              ...nextAnnotation,
+              start: Math.min(nextAnnotation.end - 0.1, newStart),
+            };
+
+            // Cascade linked endpoints
+            let currentIndex = annotationIndex + 1;
+            while (currentIndex < updatedAnnotations.length - 1) {
+              const current = updatedAnnotations[currentIndex];
+              const next = updatedAnnotations[currentIndex + 1];
+
+              if (Math.abs(next.start - current.end) < LINK_THRESHOLD) {
+                const nextDelta = current.end - annotations[currentIndex].end;
+                updatedAnnotations[currentIndex + 1] = {
+                  ...next,
+                  start: Math.min(next.end - 0.1, next.start + nextDelta),
+                };
+                currentIndex++;
+              } else {
+                break; // No more linked endpoints
+              }
+            }
+          }
+        } else if (!linkEndpoints && annotationIndex < updatedAnnotations.length - 1 && constrainedEnd > updatedAnnotations[annotationIndex + 1].start) {
+          // Collision detection: push next annotation's start forward
           const nextAnnotation = updatedAnnotations[annotationIndex + 1];
 
           updatedAnnotations[annotationIndex + 1] = {
             ...nextAnnotation,
             start: constrainedEnd,
-            // Keep end unchanged - duration gets smaller
           };
 
-          // Cascade: check if this pushed annotation now overlaps with the one after it
+          // Cascade collisions
           let currentIndex = annotationIndex + 1;
           while (currentIndex < updatedAnnotations.length - 1) {
             const current = updatedAnnotations[currentIndex];
@@ -420,11 +459,10 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
               updatedAnnotations[currentIndex + 1] = {
                 ...next,
                 start: current.end,
-                // Keep end unchanged - duration gets smaller
               };
               currentIndex++;
             } else {
-              break; // No more collisions
+              break;
             }
           }
         }
