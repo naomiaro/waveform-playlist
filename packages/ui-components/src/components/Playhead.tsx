@@ -16,7 +16,7 @@ const PlayheadLine = styled.div.attrs<PlayheadLineProps>((props) => ({
   width: 2px;
   background: ${(props) => props.$color};
   height: 100%;
-  z-index: 10;
+  z-index: 150;
   pointer-events: none;
 `;
 
