@@ -13,8 +13,6 @@ interface ScrollContainerProps {
 }
 
 const ScrollContainer = styled.div<ScrollContainerProps>`
-  overflow-y: auto;
-  overflow-x: auto;
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
   ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
@@ -26,7 +24,7 @@ interface TimescaleWrapperProps {
 
 const TimescaleWrapper = styled.div<TimescaleWrapperProps>`
   background: white;
-  ${(props) => props.$width && `min-width: ${props.$width}px;`}
+  ${(props) => props.$width && `width: ${props.$width}px;`}
   overflow: visible;
 `;
 

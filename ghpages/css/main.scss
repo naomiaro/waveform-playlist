@@ -4,13 +4,12 @@
 
 @charset 'UTF-8';
 
-// Override playlist variables
-$wp-channel-color: #FFD500;
-$wp-tracks-container-background-color: #005BBB;
-
-// Import partials from _sass directory
-@import 'playlist';
-@import 'base';
+// Import partials from _sass directory with overridden variables
+@use 'playlist' as * with (
+  $wp-channel-color: #FFD500,
+  $wp-tracks-container-background-color: #005BBB
+);
+@use 'base' as *;
 
 .playlist .vocals {
   background-color: #c0dce0;

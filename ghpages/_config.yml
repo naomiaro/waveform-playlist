@@ -22,3 +22,21 @@ collections:
     output: true
     output_ext: html
 
+# Exclude files from processing
+exclude:
+  - node_modules
+  - package.json
+  - package-lock.json
+  - pnpm-lock.yaml
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - .git
+  - .gitignore
+  - README.md
+
+# Keep these directories that are built externally
+keep_files:
+  - js
+  - css
+

@@ -479,7 +479,8 @@ class WaveformPlaylistClass {
     const playlistDuration = this.playout
       ? secondsToPixels(maxDuration, samplesPerPixel, this.playout.sampleRate)
       : 0;
-    const timelineWidth = playlistDuration + (showControls ? controlsWidth : 0);
+    // Don't add controlsWidth - controls are sticky on the left and don't add to scrollable width
+    const timelineWidth = playlistDuration;
 
     return (
       <DevicePixelRatioProvider>
@@ -489,6 +490,7 @@ class WaveformPlaylistClass {
               <Playlist
                 theme={theme}
                 backgroundColor={theme.waveOutlineColor || '#00f'}
+                scrollContainerWidth={timelineWidth}
                 timescaleWidth={timelineWidth}
                 tracksWidth={timelineWidth}
                 onTracksMouseDown={this.handleMouseDown}
