@@ -676,6 +676,37 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     };
   }, []);
 
+  // Download JSON button
+  useEffect(() => {
+    const downloadButton = document.querySelector('.btn-annotations-download');
+
+    const handleDownloadClick = () => {
+      // Create JSON from annotations
+      const jsonData = JSON.stringify(annotations, null, 2);
+
+      // Create blob and download link
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'annotations.json';
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+
+    downloadButton?.addEventListener('click', handleDownloadClick);
+
+    return () => {
+      downloadButton?.removeEventListener('click', handleDownloadClick);
+    };
+  }, [annotations]);
+
   // Initialize selection time inputs manager
   useEffect(() => {
     // Find the form that contains the time inputs
