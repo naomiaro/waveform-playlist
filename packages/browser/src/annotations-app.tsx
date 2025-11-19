@@ -290,6 +290,27 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
     await handlePlay(annotation.start, playDuration);
   };
 
+  // Mouse handlers for click-to-seek on waveform
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const samplesPerPixel = 1024;
+    const sampleRate = audioBuffer?.sampleRate || 44100;
+    const clickTime = (x * samplesPerPixel) / sampleRate;
+
+    console.log('Waveform clicked at pixel:', x, 'time:', clickTime);
+
+    // Update time
+    currentTimeRef.current = clickTime;
+    setCurrentTime(clickTime);
+
+    // If playing, restart from new position
+    if (isPlaying && playoutRef.current) {
+      playoutRef.current.stop();
+      playoutRef.current.play(Tone.now(), clickTime);
+    }
+  };
+
   // Set up checkbox event listeners
   useEffect(() => {
     const continuousPlayCheckbox = document.querySelector('.continuous-play') as HTMLInputElement;
@@ -453,6 +474,7 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
               timescaleWidth={tracksFullWidth}
               tracksWidth={tracksFullWidth}
               controlsWidth={0}
+              onTracksMouseDown={handleMouseDown}
               timescale={
                 <StyledTimeScale
                   duration={duration * 1000}
