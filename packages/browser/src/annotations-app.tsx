@@ -439,6 +439,27 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
                 >
                   <WaveformDisplay />
                 </TrackComponent>
+                {/* Annotation boxes - inside Playlist to scroll with tracks */}
+                {annotations.length > 0 && (
+                  <AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
+                    {annotations.map((annotation) => {
+                      const startPx = (annotation.start * sampleRate) / samplesPerPixel;
+                      const endPx = (annotation.end * sampleRate) / samplesPerPixel;
+
+                      return (
+                        <AnnotationBox
+                          key={annotation.id}
+                          startPosition={startPx}
+                          endPosition={endPx}
+                          label={annotation.id}
+                          color="#ff9800"
+                          isActive={annotation.id === activeAnnotationId}
+                          onClick={() => handleAnnotationClick(annotation)}
+                        />
+                      );
+                    })}
+                  </AnnotationBoxesWrapper>
+                )}
                 {/* Show playhead whenever audio is loaded */}
                 <Playhead
                   position={(currentTime * sampleRate) / samplesPerPixel}
@@ -448,30 +469,6 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
             </Playlist>
           ) : (
             <div>Loading waveform...</div>
-          )}
-
-          {/* Annotation boxes */}
-          {annotations.length > 0 && audioBuffer && (
-            <AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
-              {annotations.map((annotation) => {
-                const sampleRate = audioBuffer.sampleRate;
-                const samplesPerPixel = 1024;
-                const startPx = (annotation.start * sampleRate) / samplesPerPixel;
-                const endPx = (annotation.end * sampleRate) / samplesPerPixel;
-
-                return (
-                  <AnnotationBox
-                    key={annotation.id}
-                    startPosition={startPx}
-                    endPosition={endPx}
-                    label={annotation.id}
-                    color="#ff9800"
-                    isActive={annotation.id === activeAnnotationId}
-                    onClick={() => handleAnnotationClick(annotation)}
-                  />
-                );
-              })}
-            </AnnotationBoxesWrapper>
           )}
 
           {/* Annotation text panel */}
