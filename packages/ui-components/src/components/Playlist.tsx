@@ -75,12 +75,10 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
   scrollContainerRef
 }) => {
   return (
-    <Wrapper>
+    <Wrapper data-scroll-container="true" ref={scrollContainerRef}>
       <ScrollContainer
-        data-scroll-container="true"
         $backgroundColor={backgroundColor}
         $width={scrollContainerWidth}
-        ref={scrollContainerRef}
       >
         {timescale && <TimescaleWrapper $width={timescaleWidth}>{timescale}</TimescaleWrapper>}
         <TracksContainer $width={tracksWidth}>

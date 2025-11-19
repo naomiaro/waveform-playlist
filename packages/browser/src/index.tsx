@@ -300,10 +300,12 @@ class WaveformPlaylistClass {
 
       // Store setProgress, setSelection, and setIsPlaying references
       React.useEffect(() => {
+        console.log('Setting progress functions', { setProgress, setSelection, setIsPlaying });
         this.setProgressFn = setProgress;
         this.setSelectionFn = setSelection;
         this.setIsPlayingFn = setIsPlaying;
         return () => {
+          console.log('Clearing progress functions');
           this.setProgressFn = null;
           this.setSelectionFn = null;
           this.setIsPlayingFn = null;
@@ -639,8 +641,8 @@ class WaveformPlaylistClass {
         this.eventEmitter.emit('timeupdate', 0);
       }
       // Scroll back to the beginning
-      if (this.scrollContainer && this.scrollContainer.parentElement) {
-        this.scrollContainer.parentElement.scrollLeft = 0;
+      if (this.scrollContainer) {
+        this.scrollContainer.scrollLeft = 0;
       }
     }
   }
@@ -673,7 +675,10 @@ class WaveformPlaylistClass {
       }
 
       if (this.setProgressFn) {
+        console.log('Updating progress:', this.currentTime);
         this.setProgressFn(this.currentTime);
+      } else {
+        console.warn('setProgressFn is null!');
       }
       // Emit timeupdate event for external listeners
       if (this.eventEmitter) {
@@ -703,20 +708,14 @@ class WaveformPlaylistClass {
       }
     }
 
-    // The actual scrolling element is the parent wrapper, not the scroll container
-    const scrollElement = this.scrollContainer.parentElement;
-    if (!scrollElement) {
-      return;
-    }
-
     if (!this.playout) return;
 
     // Convert current time to pixels using shared util
     const samplesPerPixel = this.config.samplesPerPixel || 4096;
     const currentPixel = secondsToPixels(this.currentTime, samplesPerPixel, this.playout.sampleRate);
 
-    const viewportWidth = scrollElement.clientWidth;
-    const currentScrollLeft = scrollElement.scrollLeft;
+    const viewportWidth = this.scrollContainer.clientWidth;
+    const currentScrollLeft = this.scrollContainer.scrollLeft;
     const currentScrollRight = currentScrollLeft + viewportWidth;
 
     // Define playhead position in viewport (20% from left edge)
@@ -728,12 +727,12 @@ class WaveformPlaylistClass {
 
     if (isOutsideLeft || isOutsideRight) {
       // Position playhead at the left edge (with small offset)
-      scrollElement.scrollLeft = Math.max(0, currentPixel - playheadOffset);
+      this.scrollContainer.scrollLeft = Math.max(0, currentPixel - playheadOffset);
     } else {
       // Scroll to keep playhead at consistent position (20% from left)
       const targetScrollLeft = currentPixel - playheadOffset;
       if (targetScrollLeft > currentScrollLeft) {
-        scrollElement.scrollLeft = Math.max(0, targetScrollLeft);
+        this.scrollContainer.scrollLeft = Math.max(0, targetScrollLeft);
       }
     }
   }
