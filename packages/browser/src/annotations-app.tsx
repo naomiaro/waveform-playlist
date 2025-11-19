@@ -221,8 +221,9 @@ const AnnotationsApp: React.FC<AnnotationsAppProps> = ({
         currentTimeRef.current = time; // Update ref
         setCurrentTime(time); // Update state for rendering
 
-        // Update active annotation during continuous play
-        if (!isPlayingTimedSegmentRef.current && isContinuousPlay) {
+        // Always update active annotation based on current playback time
+        // (unless we're playing a timed segment and don't want it to switch)
+        if (!isPlayingTimedSegmentRef.current || isContinuousPlay) {
           const currentAnnotation = annotations.find(
             (ann) => time >= ann.start && time < ann.end
           );
