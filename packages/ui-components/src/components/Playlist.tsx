@@ -37,10 +37,14 @@ const TracksContainer = styled.div<TracksContainerProps>`
   ${(props) => props.$width !== undefined && `min-width: ${props.$width}px;`}
 `;
 
-const ClickOverlay = styled.div`
+interface ClickOverlayProps {
+  readonly $controlsWidth?: number;
+}
+
+const ClickOverlay = styled.div<ClickOverlayProps>`
   position: absolute;
   top: 0;
-  left: 0;
+  left: ${(props) => props.$controlsWidth || 0}px;
   right: 0;
   bottom: 0;
   cursor: crosshair;
@@ -55,6 +59,7 @@ export interface PlaylistProps {
   readonly timescaleWidth?: number;
   readonly tracksWidth?: number;
   readonly scrollContainerWidth?: number;
+  readonly controlsWidth?: number;
   readonly onTracksClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   readonly onTracksMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
   readonly onTracksMouseMove?: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -68,6 +73,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
   timescaleWidth,
   tracksWidth,
   scrollContainerWidth,
+  controlsWidth,
   onTracksClick,
   onTracksMouseDown,
   onTracksMouseMove,
@@ -85,6 +91,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
           {children}
           {(onTracksClick || onTracksMouseDown) && (
             <ClickOverlay
+              $controlsWidth={controlsWidth}
               onClick={onTracksClick}
               onMouseDown={onTracksMouseDown}
               onMouseMove={onTracksMouseMove}

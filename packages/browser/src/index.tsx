@@ -496,6 +496,7 @@ class WaveformPlaylistClass {
                 scrollContainerWidth={tracksFullWidth}
                 timescaleWidth={tracksFullWidth}
                 tracksWidth={tracksFullWidth}
+                controlsWidth={showControls ? controlsWidth : 0}
                 onTracksMouseDown={this.handleMouseDown}
                 onTracksMouseMove={this.handleMouseMove}
                 onTracksMouseUp={this.handleMouseUp}
