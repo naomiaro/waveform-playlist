@@ -5,7 +5,8 @@ var playlist = WaveformPlaylist.init({
     width: 200, // width of controls in pixels
   },
   colors: {
-    waveOutlineColor: '#005BBB'
+    waveOutlineColor: '#005BBB',
+    waveFillColor: '#FFD500'
   },
 });
 

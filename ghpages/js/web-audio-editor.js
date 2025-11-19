@@ -24,6 +24,7 @@ playlist = WaveformPlaylist.init({
   state: 'cursor',
   colors: {
     waveOutlineColor: '#005BBB',
+    waveFillColor: '#FFD500',
     timeColor: 'grey',
     fadeColor: 'black'
   },

@@ -213,6 +213,7 @@ var playlist = WaveformPlaylist.init({
   samplesPerPixel: 1024,
   colors: {
     waveOutlineColor: '#005BBB',
+    waveFillColor: '#FFD500',
     timeColor: 'grey',
     fadeColor: 'black'
   },

@@ -5,9 +5,9 @@ var playlist = WaveformPlaylist.init({
   waveHeight: 100,
   container: document.getElementById("playlist"),
   state: 'shift',
-  waveOutlineColor: '#E0EFF1',
   colors: {
     waveOutlineColor: '#005BBB',
+    waveFillColor: '#FFD500',
     timeColor: 'grey',
     fadeColor: 'black'
   },

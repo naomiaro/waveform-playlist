@@ -4,7 +4,7 @@ var playlist = WaveformPlaylist.init({
   container: document.getElementById("playlist"),
   colors: {
     waveOutlineColor: "#005BBB",
-    waveFillColor: "#f0f0f0",
+    waveFillColor: "#FFD500",
     waveProgressColor: "#ff0000",
   },
 });
