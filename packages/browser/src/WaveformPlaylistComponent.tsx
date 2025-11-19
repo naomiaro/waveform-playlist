@@ -88,6 +88,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const isPlayingTimedSegmentRef = useRef(false);
   const currentTimeRef = useRef<number>(0);
   const isSelectingRef = useRef(false);
+  const isAutomaticScrollRef = useRef(false);
 
   const theme = { ...defaultTheme, ...userTheme };
 
@@ -179,17 +180,13 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
   // Automatic scroll to keep playhead in view
   const scrollToCurrentTime = () => {
-    if (!scrollContainerRef.current) {
-      // Try to find the scroll container using data attribute
-      const scrollContainer = containerRef.current?.querySelector('[data-scroll-container="true"]') as HTMLElement;
-      if (scrollContainer) {
-        scrollContainerRef.current = scrollContainer;
-      } else {
-        return;
-      }
+    if (!scrollContainerRef.current || !audioBuffer) {
+      console.log('scrollToCurrentTime: missing ref or buffer', {
+        hasRef: !!scrollContainerRef.current,
+        hasBuffer: !!audioBuffer
+      });
+      return;
     }
-
-    if (!audioBuffer) return;
 
     // Convert current time to pixels
     const currentPixel = secondsToPixels(currentTimeRef.current, samplesPerPixel, sampleRate);
@@ -205,9 +202,19 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const isOutsideLeft = currentPixel < currentScrollLeft;
     const isOutsideRight = currentPixel > currentScrollRight;
 
+    console.log('scrollToCurrentTime:', {
+      currentPixel,
+      viewportWidth,
+      currentScrollLeft,
+      currentScrollRight,
+      isOutsideLeft,
+      isOutsideRight
+    });
+
     if (isOutsideLeft || isOutsideRight) {
-      // Position playhead at 20% from the left edge
-      scrollContainerRef.current.scrollLeft = Math.max(0, currentPixel - playheadOffset);
+      const newScrollLeft = Math.max(0, currentPixel - playheadOffset);
+      console.log('Scrolling to:', newScrollLeft);
+      scrollContainerRef.current.scrollLeft = newScrollLeft;
     }
   };
 
@@ -231,7 +238,8 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
         }
 
         // Handle automatic scroll
-        if (isAutomaticScroll) {
+        if (isAutomaticScrollRef.current) {
+          console.log('Calling scrollToCurrentTime, isAutomaticScroll:', isAutomaticScrollRef.current);
           scrollToCurrentTime();
         }
       }
@@ -463,6 +471,8 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
     const handleAutomaticScrollChange = (e: Event) => {
       const checked = (e.target as HTMLInputElement).checked;
+      console.log('Automatic scroll checkbox changed:', checked);
+      isAutomaticScrollRef.current = checked;
       setIsAutomaticScroll(checked);
     };
 
@@ -547,6 +557,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                 onTracksMouseDown={handleMouseDown}
                 onTracksMouseMove={handleMouseMove}
                 onTracksMouseUp={handleMouseUp}
+                scrollContainerRef={(el) => {
+                  if (el) {
+                    scrollContainerRef.current = el;
+                  }
+                }}
                 timescale={
                   timescale ? (
                     <StyledTimeScale
