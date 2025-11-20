@@ -1,25 +1,6 @@
 import React from 'react';
-import styled from 'styled-components';
+import { ControlButton } from '@waveform-playlist/ui-components';
 import { useWaveformPlaylist } from '../WaveformPlaylistContext';
-
-const Button = styled.button`
-  padding: 0.5rem 1rem;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-size: 1rem;
-
-  &:hover:not(:disabled) {
-    background: #0056b3;
-  }
-
-  &:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-  }
-`;
 
 export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
   const { play, isPlaying, selectionStart, selectionEnd, currentTimeRef } = useWaveformPlaylist();
@@ -37,9 +18,9 @@ export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
   };
 
   return (
-    <Button onClick={handleClick} disabled={isPlaying} className={className}>
+    <ControlButton onClick={handleClick} disabled={isPlaying} className={className}>
       Play
-    </Button>
+    </ControlButton>
   );
 };
 
@@ -47,9 +28,9 @@ export const PauseButton: React.FC<{ className?: string }> = ({ className }) => 
   const { pause, isPlaying } = useWaveformPlaylist();
 
   return (
-    <Button onClick={pause} disabled={!isPlaying} className={className}>
+    <ControlButton onClick={pause} disabled={!isPlaying} className={className}>
       Pause
-    </Button>
+    </ControlButton>
   );
 };
 
@@ -57,9 +38,9 @@ export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
   const { stop, isPlaying } = useWaveformPlaylist();
 
   return (
-    <Button onClick={stop} disabled={!isPlaying} className={className}>
+    <ControlButton onClick={stop} disabled={!isPlaying} className={className}>
       Stop
-    </Button>
+    </ControlButton>
   );
 };
 
@@ -76,9 +57,9 @@ export const RewindButton: React.FC<{ className?: string }> = ({ className }) =>
   };
 
   return (
-    <Button onClick={handleClick} className={className}>
+    <ControlButton onClick={handleClick} className={className}>
       Rewind
-    </Button>
+    </ControlButton>
   );
 };
 
@@ -95,9 +76,9 @@ export const FastForwardButton: React.FC<{ className?: string }> = ({ className 
   };
 
   return (
-    <Button onClick={handleClick} className={className}>
+    <ControlButton onClick={handleClick} className={className}>
       Fast Forward
-    </Button>
+    </ControlButton>
   );
 };
 
@@ -118,9 +99,9 @@ export const SkipBackwardButton: React.FC<{ skipAmount?: number; className?: str
   };
 
   return (
-    <Button onClick={handleClick} className={className}>
+    <ControlButton onClick={handleClick} className={className}>
       Skip Backward
-    </Button>
+    </ControlButton>
   );
 };
 
@@ -141,8 +122,8 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
   };
 
   return (
-    <Button onClick={handleClick} className={className}>
+    <ControlButton onClick={handleClick} className={className}>
       Skip Forward
-    </Button>
+    </ControlButton>
   );
 };

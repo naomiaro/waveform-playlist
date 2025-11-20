@@ -47,6 +47,45 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - Clicking (without dragging) seeks but preserves selection
 - Playing with a selection stops at the selection end
 
+### Shared Styled Components (2025-01-19)
+
+**Pattern:** Extract commonly duplicated styled components into shared definitions in `ui-components/styled/`
+
+**Implemented:**
+
+1. **CheckboxStyles** (`packages/ui-components/src/styled/CheckboxStyles.tsx`)
+   - `CheckboxWrapper` - Flex container for checkbox + label
+   - `StyledCheckbox` - Base checkbox input styling
+   - `CheckboxLabel` - Label styling with proper cursor and user-select
+   - Used by: `AutomaticScrollCheckbox`, `EditableCheckbox`, `LinkEndpointsCheckbox`, `ContinuousPlayCheckbox`
+
+2. **ButtonStyles** (`packages/ui-components/src/styled/ButtonStyles.tsx`)
+   - `ControlButton` - Large control button with color variants
+   - Variants: `primary` (blue), `success` (green), `info` (cyan)
+   - Features: Consistent padding, hover states, disabled styling
+   - Used by: `PlaybackControls`, `ZoomControls`, `DownloadAnnotationsButton`
+   - Note: Separate from `TrackControls/Button` which is for compact track UI
+
+**Benefits:**
+- Reduces code duplication (~60% reduction in affected components)
+- Ensures consistent styling across all components
+- Easier to maintain and update styles in one place
+- Clearer separation between presentation and logic
+
+**Usage Pattern:**
+```typescript
+// In ui-components package (relative import)
+import { ControlButton } from '../styled/ButtonStyles';
+
+// In other packages (package import)
+import { ControlButton } from '@waveform-playlist/ui-components';
+
+// Use with variant
+<ControlButton variant="success" onClick={handleClick}>
+  Zoom In
+</ControlButton>
+```
+
 ## Code Conventions
 
 ### React/TypeScript

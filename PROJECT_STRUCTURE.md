@@ -73,8 +73,20 @@ waveform-playlist/
   │   └── TrackControls/
   ├── contexts/          # React contexts (theme, playlist info, playout)
   ├── utils/             # Utilities (time formatting, conversions)
+  ├── styled/            # Shared styled components
+  │   ├── CheckboxStyles.tsx  # Checkbox, label, wrapper
+  │   └── ButtonStyles.tsx    # ControlButton with variants
   └── index.tsx          # Public API
   ```
+- **Shared Styled Components:**
+  - **Pattern:** Extract commonly duplicated styled components into `styled/` directory
+  - **CheckboxStyles:** Shared checkbox components used across all checkbox controls
+    - `CheckboxWrapper`, `StyledCheckbox`, `CheckboxLabel`
+    - ~60% code reduction in checkbox components
+  - **ButtonStyles:** Shared button component with color variants
+    - `ControlButton` - Large control button (primary/success/info variants)
+    - Separate from `TrackControls/Button` (compact UI button)
+  - **Benefits:** DRY principle, consistent styling, easier maintenance
 - **Key components:**
   - `Playlist` - Main container component
   - `Track` - Individual waveform track
@@ -616,4 +628,9 @@ See `CLAUDE.md` for architectural decisions and next steps:
 
 ---
 
-**Last Updated:** 2025-01-19 (Refactored annotations into optional package `@waveform-playlist/annotations` with `useAnnotationControls` hook, React components, and ~50KB bundle size reduction for users who don't need annotations. Created OPTIONAL_PACKAGES.md documentation)
+**Last Updated:** 2025-01-19
+- Refactored annotations into optional package `@waveform-playlist/annotations` with `useAnnotationControls` hook, React components, and ~50KB bundle size reduction for users who don't need annotations
+- Created OPTIONAL_PACKAGES.md documentation
+- Extracted duplicated styled components (checkboxes and buttons) into shared definitions in `ui-components/styled/`
+- Created `CheckboxStyles.tsx` with shared checkbox components (~60% code reduction)
+- Created `ButtonStyles.tsx` with `ControlButton` component supporting primary/success/info variants

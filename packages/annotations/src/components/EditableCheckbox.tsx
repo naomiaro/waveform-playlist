@@ -1,21 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
-
-const CheckboxWrapper = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const Checkbox = styled.input`
-  cursor: pointer;
-`;
-
-const Label = styled.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
+import { CheckboxWrapper, StyledCheckbox, CheckboxLabel } from '@waveform-playlist/ui-components';
 
 export interface EditableCheckboxProps {
   checked: boolean;
@@ -30,13 +14,13 @@ export const EditableCheckbox: React.FC<EditableCheckboxProps> = ({
 }) => {
   return (
     <CheckboxWrapper className={className}>
-      <Checkbox
+      <StyledCheckbox
         type="checkbox"
         id="editable-annotations"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <Label htmlFor="editable-annotations">Editable Annotations</Label>
+      <CheckboxLabel htmlFor="editable-annotations">Editable Annotations</CheckboxLabel>
     </CheckboxWrapper>
   );
 };

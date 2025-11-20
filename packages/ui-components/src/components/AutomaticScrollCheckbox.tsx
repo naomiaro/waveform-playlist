@@ -1,21 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
-
-const CheckboxWrapper = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const Checkbox = styled.input`
-  cursor: pointer;
-`;
-
-const Label = styled.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
+import { CheckboxWrapper, StyledCheckbox, CheckboxLabel } from '../styled/CheckboxStyles';
 
 export interface AutomaticScrollCheckboxProps {
   checked: boolean;
@@ -39,7 +23,7 @@ export const AutomaticScrollCheckbox: React.FC<AutomaticScrollCheckboxProps> = (
 
   return (
     <CheckboxWrapper className={className}>
-      <Checkbox
+      <StyledCheckbox
         type="checkbox"
         id="automatic-scroll"
         className="automatic-scroll"
@@ -47,7 +31,7 @@ export const AutomaticScrollCheckbox: React.FC<AutomaticScrollCheckboxProps> = (
         onChange={handleChange}
         disabled={disabled}
       />
-      <Label htmlFor="automatic-scroll">Automatic Scroll</Label>
+      <CheckboxLabel htmlFor="automatic-scroll">Automatic Scroll</CheckboxLabel>
     </CheckboxWrapper>
   );
 };

@@ -656,21 +656,8 @@ var AnnotationTextComponent = ({
 var AnnotationText2 = React2.memo(AnnotationTextComponent);
 
 // src/components/ContinuousPlayCheckbox.tsx
-import styled6 from "styled-components";
+import { CheckboxWrapper, StyledCheckbox, CheckboxLabel } from "@waveform-playlist/ui-components";
 import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
-var CheckboxWrapper = styled6.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-var Checkbox = styled6.input`
-  cursor: pointer;
-`;
-var Label2 = styled6.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
 var ContinuousPlayCheckbox = ({
   checked,
   onChange,
@@ -682,7 +669,7 @@ var ContinuousPlayCheckbox = ({
   };
   return /* @__PURE__ */ jsxs6(CheckboxWrapper, { className, children: [
     /* @__PURE__ */ jsx6(
-      Checkbox,
+      StyledCheckbox,
       {
         type: "checkbox",
         id: "continuous-play",
@@ -692,26 +679,13 @@ var ContinuousPlayCheckbox = ({
         disabled
       }
     ),
-    /* @__PURE__ */ jsx6(Label2, { htmlFor: "continuous-play", children: "Continuous Play" })
+    /* @__PURE__ */ jsx6(CheckboxLabel, { htmlFor: "continuous-play", children: "Continuous Play" })
   ] });
 };
 
 // src/components/LinkEndpointsCheckbox.tsx
-import styled7 from "styled-components";
+import { CheckboxWrapper as CheckboxWrapper2, StyledCheckbox as StyledCheckbox2, CheckboxLabel as CheckboxLabel2 } from "@waveform-playlist/ui-components";
 import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
-var CheckboxWrapper2 = styled7.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-var Checkbox2 = styled7.input`
-  cursor: pointer;
-`;
-var Label3 = styled7.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
 var LinkEndpointsCheckbox = ({
   checked,
   onChange,
@@ -723,7 +697,7 @@ var LinkEndpointsCheckbox = ({
   };
   return /* @__PURE__ */ jsxs7(CheckboxWrapper2, { className, children: [
     /* @__PURE__ */ jsx7(
-      Checkbox2,
+      StyledCheckbox2,
       {
         type: "checkbox",
         id: "link-endpoints",
@@ -733,26 +707,13 @@ var LinkEndpointsCheckbox = ({
         disabled
       }
     ),
-    /* @__PURE__ */ jsx7(Label3, { htmlFor: "link-endpoints", children: "Link Endpoints" })
+    /* @__PURE__ */ jsx7(CheckboxLabel2, { htmlFor: "link-endpoints", children: "Link Endpoints" })
   ] });
 };
 
 // src/components/EditableCheckbox.tsx
-import styled8 from "styled-components";
+import { CheckboxWrapper as CheckboxWrapper3, StyledCheckbox as StyledCheckbox3, CheckboxLabel as CheckboxLabel3 } from "@waveform-playlist/ui-components";
 import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
-var CheckboxWrapper3 = styled8.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-var Checkbox3 = styled8.input`
-  cursor: pointer;
-`;
-var Label4 = styled8.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
 var EditableCheckbox = ({
   checked,
   onChange,
@@ -760,7 +721,7 @@ var EditableCheckbox = ({
 }) => {
   return /* @__PURE__ */ jsxs8(CheckboxWrapper3, { className, children: [
     /* @__PURE__ */ jsx8(
-      Checkbox3,
+      StyledCheckbox3,
       {
         type: "checkbox",
         id: "editable-annotations",
@@ -768,33 +729,13 @@ var EditableCheckbox = ({
         onChange: (e) => onChange(e.target.checked)
       }
     ),
-    /* @__PURE__ */ jsx8(Label4, { htmlFor: "editable-annotations", children: "Editable Annotations" })
+    /* @__PURE__ */ jsx8(CheckboxLabel3, { htmlFor: "editable-annotations", children: "Editable Annotations" })
   ] });
 };
 
 // src/components/DownloadAnnotationsButton.tsx
-import styled9 from "styled-components";
+import { ControlButton as ControlButton3 } from "@waveform-playlist/ui-components";
 import { jsx as jsx9 } from "react/jsx-runtime";
-var Button = styled9.button`
-  padding: 0.5rem 1rem;
-  background: #17a2b8;
-  color: white;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-
-  &:hover:not(:disabled) {
-    background: #138496;
-  }
-
-  &:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-`;
 var DownloadAnnotationsButton = ({
   annotations,
   filename = "annotations.json",
@@ -819,8 +760,9 @@ var DownloadAnnotationsButton = ({
     URL.revokeObjectURL(url);
   };
   return /* @__PURE__ */ jsx9(
-    Button,
+    ControlButton3,
     {
+      variant: "info",
       onClick: handleDownload,
       disabled: disabled || annotations.length === 0,
       className,

@@ -1,21 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
-
-const CheckboxWrapper = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const Checkbox = styled.input`
-  cursor: pointer;
-`;
-
-const Label = styled.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
+import { CheckboxWrapper, StyledCheckbox, CheckboxLabel } from '@waveform-playlist/ui-components';
 
 export interface LinkEndpointsCheckboxProps {
   checked: boolean;
@@ -40,7 +24,7 @@ export const LinkEndpointsCheckbox: React.FC<LinkEndpointsCheckboxProps> = ({
 
   return (
     <CheckboxWrapper className={className}>
-      <Checkbox
+      <StyledCheckbox
         type="checkbox"
         id="link-endpoints"
         className="link-endpoints"
@@ -48,7 +32,7 @@ export const LinkEndpointsCheckbox: React.FC<LinkEndpointsCheckboxProps> = ({
         onChange={handleChange}
         disabled={disabled}
       />
-      <Label htmlFor="link-endpoints">Link Endpoints</Label>
+      <CheckboxLabel htmlFor="link-endpoints">Link Endpoints</CheckboxLabel>
     </CheckboxWrapper>
   );
 };

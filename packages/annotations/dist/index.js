@@ -703,21 +703,8 @@ var AnnotationTextComponent = ({
 var AnnotationText2 = import_react2.default.memo(AnnotationTextComponent);
 
 // src/components/ContinuousPlayCheckbox.tsx
-var import_styled_components6 = __toESM(require("styled-components"));
+var import_ui_components3 = require("@waveform-playlist/ui-components");
 var import_jsx_runtime6 = require("react/jsx-runtime");
-var CheckboxWrapper = import_styled_components6.default.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-var Checkbox = import_styled_components6.default.input`
-  cursor: pointer;
-`;
-var Label2 = import_styled_components6.default.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
 var ContinuousPlayCheckbox = ({
   checked,
   onChange,
@@ -727,9 +714,9 @@ var ContinuousPlayCheckbox = ({
   const handleChange = (e) => {
     onChange(e.target.checked);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(CheckboxWrapper, { className, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_ui_components3.CheckboxWrapper, { className, children: [
     /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-      Checkbox,
+      import_ui_components3.StyledCheckbox,
       {
         type: "checkbox",
         id: "continuous-play",
@@ -739,26 +726,13 @@ var ContinuousPlayCheckbox = ({
         disabled
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Label2, { htmlFor: "continuous-play", children: "Continuous Play" })
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_ui_components3.CheckboxLabel, { htmlFor: "continuous-play", children: "Continuous Play" })
   ] });
 };
 
 // src/components/LinkEndpointsCheckbox.tsx
-var import_styled_components7 = __toESM(require("styled-components"));
+var import_ui_components4 = require("@waveform-playlist/ui-components");
 var import_jsx_runtime7 = require("react/jsx-runtime");
-var CheckboxWrapper2 = import_styled_components7.default.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-var Checkbox2 = import_styled_components7.default.input`
-  cursor: pointer;
-`;
-var Label3 = import_styled_components7.default.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
 var LinkEndpointsCheckbox = ({
   checked,
   onChange,
@@ -768,9 +742,9 @@ var LinkEndpointsCheckbox = ({
   const handleChange = (e) => {
     onChange(e.target.checked);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(CheckboxWrapper2, { className, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_ui_components4.CheckboxWrapper, { className, children: [
     /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-      Checkbox2,
+      import_ui_components4.StyledCheckbox,
       {
         type: "checkbox",
         id: "link-endpoints",
@@ -780,34 +754,21 @@ var LinkEndpointsCheckbox = ({
         disabled
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Label3, { htmlFor: "link-endpoints", children: "Link Endpoints" })
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_ui_components4.CheckboxLabel, { htmlFor: "link-endpoints", children: "Link Endpoints" })
   ] });
 };
 
 // src/components/EditableCheckbox.tsx
-var import_styled_components8 = __toESM(require("styled-components"));
+var import_ui_components5 = require("@waveform-playlist/ui-components");
 var import_jsx_runtime8 = require("react/jsx-runtime");
-var CheckboxWrapper3 = import_styled_components8.default.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-var Checkbox3 = import_styled_components8.default.input`
-  cursor: pointer;
-`;
-var Label4 = import_styled_components8.default.label`
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-`;
 var EditableCheckbox = ({
   checked,
   onChange,
   className
 }) => {
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(CheckboxWrapper3, { className, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_ui_components5.CheckboxWrapper, { className, children: [
     /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-      Checkbox3,
+      import_ui_components5.StyledCheckbox,
       {
         type: "checkbox",
         id: "editable-annotations",
@@ -815,33 +776,13 @@ var EditableCheckbox = ({
         onChange: (e) => onChange(e.target.checked)
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(Label4, { htmlFor: "editable-annotations", children: "Editable Annotations" })
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_ui_components5.CheckboxLabel, { htmlFor: "editable-annotations", children: "Editable Annotations" })
   ] });
 };
 
 // src/components/DownloadAnnotationsButton.tsx
-var import_styled_components9 = __toESM(require("styled-components"));
+var import_ui_components6 = require("@waveform-playlist/ui-components");
 var import_jsx_runtime9 = require("react/jsx-runtime");
-var Button = import_styled_components9.default.button`
-  padding: 0.5rem 1rem;
-  background: #17a2b8;
-  color: white;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-
-  &:hover:not(:disabled) {
-    background: #138496;
-  }
-
-  &:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-`;
 var DownloadAnnotationsButton = ({
   annotations,
   filename = "annotations.json",
@@ -866,8 +807,9 @@ var DownloadAnnotationsButton = ({
     URL.revokeObjectURL(url);
   };
   return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-    Button,
+    import_ui_components6.ControlButton,
     {
+      variant: "info",
       onClick: handleDownload,
       disabled: disabled || annotations.length === 0,
       className,
