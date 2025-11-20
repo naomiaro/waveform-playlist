@@ -161,7 +161,7 @@ export const Waveform: React.FC<WaveformProps> = ({
           <Playlist
             theme={theme}
             backgroundColor={theme.waveOutlineColor}
-            scrollContainerWidth={tracksFullWidth}
+            scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0)}
             timescaleWidth={tracksFullWidth}
             tracksWidth={tracksFullWidth}
             controlsWidth={controls.show ? controls.width : 0}

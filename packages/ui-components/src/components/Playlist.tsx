@@ -24,17 +24,21 @@ interface TimescaleWrapperProps {
 
 const TimescaleWrapper = styled.div<TimescaleWrapperProps>`
   background: white;
-  ${(props) => props.$width && `width: ${props.$width}px;`}
+  ${(props) => props.$width && `min-width: ${props.$width}px;`}
+  width: 100%;
   overflow: visible;
 `;
 
 interface TracksContainerProps {
   readonly $width?: number;
+  readonly $backgroundColor?: string;
 }
 
 const TracksContainer = styled.div<TracksContainerProps>`
   position: relative;
+  background: ${(props) => props.$backgroundColor || 'transparent'};
   ${(props) => props.$width !== undefined && `min-width: ${props.$width}px;`}
+  width: 100%;
 `;
 
 interface ClickOverlayProps {
@@ -87,7 +91,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
         $width={scrollContainerWidth}
       >
         {timescale && <TimescaleWrapper $width={timescaleWidth}>{timescale}</TimescaleWrapper>}
-        <TracksContainer $width={tracksWidth}>
+        <TracksContainer $width={tracksWidth} $backgroundColor={backgroundColor}>
           {children}
           {(onTracksClick || onTracksMouseDown) && (
             <ClickOverlay

@@ -335,11 +335,14 @@
   ${e=>void 0!==e.$width&&`width: ${e.$width}px;`}
 `,Fe=Ee.default.div`
   background: white;
-  ${e=>e.$width&&`width: ${e.$width}px;`}
+  ${e=>e.$width&&`min-width: ${e.$width}px;`}
+  width: 100%;
   overflow: visible;
 `,Be=Ee.default.div`
   position: relative;
+  background: ${e=>e.$backgroundColor||"transparent"};
   ${e=>void 0!==e.$width&&`min-width: ${e.$width}px;`}
+  width: 100%;
 `,Ve=Ee.default.div`
   position: absolute;
   top: 0;
@@ -348,7 +351,7 @@
   bottom: 0;
   cursor: crosshair;
   z-index: 100;
-`,qe=({children:e,backgroundColor:t,timescale:c,timescaleWidth:n,tracksWidth:s,scrollContainerWidth:a,controlsWidth:i,onTracksClick:l,onTracksMouseDown:r,onTracksMouseMove:o,onTracksMouseUp:u,scrollContainerRef:f})=>(0,Re.jsx)(Oe,{"data-scroll-container":"true",ref:f,children:(0,Re.jsxs)(Ie,{$backgroundColor:t,$width:a,children:[c&&(0,Re.jsx)(Fe,{$width:n,children:c}),(0,Re.jsxs)(Be,{$width:s,children:[e,(l||r)&&(0,Re.jsx)(Ve,{$controlsWidth:i,onClick:l,onMouseDown:r,onMouseMove:o,onMouseUp:u})]})]})}),je=(0,Ee.withTheme)(qe),We=f(c(991)),He=c(723),Ue=We.default.div.attrs(e=>({style:{left:`${e.$left}px`,width:`${e.$width}px`}}))`
+`,qe=({children:e,backgroundColor:t,timescale:c,timescaleWidth:n,tracksWidth:s,scrollContainerWidth:a,controlsWidth:i,onTracksClick:l,onTracksMouseDown:r,onTracksMouseMove:o,onTracksMouseUp:u,scrollContainerRef:f})=>(0,Re.jsx)(Oe,{"data-scroll-container":"true",ref:f,children:(0,Re.jsxs)(Ie,{$backgroundColor:t,$width:a,children:[c&&(0,Re.jsx)(Fe,{$width:n,children:c}),(0,Re.jsxs)(Be,{$width:s,$backgroundColor:t,children:[e,(l||r)&&(0,Re.jsx)(Ve,{$controlsWidth:i,onClick:l,onMouseDown:r,onMouseMove:o,onMouseUp:u})]})]})}),je=(0,Ee.withTheme)(qe),We=f(c(991)),He=c(723),Ue=We.default.div.attrs(e=>({style:{left:`${e.$left}px`,width:`${e.$width}px`}}))`
   position: absolute;
   top: 0;
   background: ${e=>e.$color};
