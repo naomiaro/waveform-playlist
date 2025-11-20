@@ -1,13 +1,15 @@
 import styled from 'styled-components';
 
 export const ButtonGroup = styled.div`
-  button:first-child {
-    border-top-left-radius: 5px;
-    border-bottom-left-radius: 5px;
+  margin-bottom: 0.3rem;
+
+  button:not(:first-child) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
   }
 
-  button:last-child {
-    border-top-right-radius: 5px;
-    border-bottom-right-radius: 5px;
+  button:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
   }
 `;

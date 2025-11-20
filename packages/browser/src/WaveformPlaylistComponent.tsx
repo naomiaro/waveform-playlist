@@ -11,10 +11,19 @@ import {
   Playhead,
   Selection,
   PlaylistInfoContext,
+  TrackControlsContext,
   DevicePixelRatioProvider,
   StyledTimeScale,
   secondsToPixels,
   type AnnotationData,
+  Controls,
+  Header,
+  Button,
+  ButtonGroup,
+  Slider,
+  SliderWrapper,
+  VolumeDownIcon,
+  VolumeUpIcon,
 } from '@waveform-playlist/ui-components';
 import { TonePlayout } from '@waveform-playlist/playout';
 import { type Track } from '@waveform-playlist/core';
@@ -46,6 +55,10 @@ export interface WaveformPlaylistProps {
     waveProgressColor?: string;
     timeColor?: string;
   };
+  controls?: {
+    show: boolean;
+    width: number;
+  };
   annotationList?: {
     annotations?: any[];
     editable?: boolean;
@@ -64,6 +77,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   waveHeight = 80,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   theme: userTheme,
+  controls = { show: false, width: 0 },
   annotationList,
   onReady,
   onAnnotationUpdate,
@@ -77,8 +91,14 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  const [peaksData, setPeaksData] = useState<PeakData | null>(null);
+  const [audioBuffers, setAudioBuffers] = useState<AudioBuffer[]>([]);
+  const [peaksDataArray, setPeaksDataArray] = useState<PeakData[]>([]);
+  const [trackStates, setTrackStates] = useState<Array<{
+    muted: boolean;
+    soloed: boolean;
+    volume: number;
+    pan: number;
+  }>>([]);
   const [samplesPerPixel, setSamplesPerPixel] = useState(initialSamplesPerPixel);
   const [zoomIndex, setZoomIndex] = useState(() => ZOOM_LEVELS.indexOf(initialSamplesPerPixel) !== -1 ? ZOOM_LEVELS.indexOf(initialSamplesPerPixel) : 2);
   const [isContinuousPlay, setIsContinuousPlay] = useState(annotationList?.isContinuousPlay ?? false);
@@ -113,47 +133,72 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
     const loadAudio = async () => {
       try {
-        const track = tracks[0]; // Load first track for now
-        console.log('Fetching audio from:', track.src);
-        const response = await fetch(track.src);
-        const arrayBuffer = await response.arrayBuffer();
+        console.log('Loading', tracks.length, 'track(s)...');
         const audioContext = Tone.getContext().rawContext as AudioContext;
-        const buffer = await audioContext.decodeAudioData(arrayBuffer);
-        console.log('Audio decoded, duration:', buffer.duration);
 
-        setAudioBuffer(buffer);
-        setDuration(buffer.duration);
+        // Load all tracks in parallel
+        const loadPromises = tracks.map(async (track, index) => {
+          console.log(`Fetching audio from: ${track.src}`);
+          const response = await fetch(track.src);
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = await audioContext.decodeAudioData(arrayBuffer);
+          console.log(`Track ${index} decoded, duration: ${buffer.duration}`);
 
-        // Generate peaks
-        const bits = 16;
-        const peaks = generatePeaks(buffer, samplesPerPixel, mono, bits);
-        setPeaksData(peaks);
-        console.log('Peaks generated:', peaks.data.length, 'channels, bits:', peaks.bits, 'length:', peaks.length);
+          // Generate peaks for this track
+          const bits = 16;
+          const peaks = generatePeaks(buffer, samplesPerPixel, mono, bits);
+          console.log(`Peaks generated for track ${index}:`, peaks.data.length, 'channels');
+
+          return { buffer, peaks, track, index };
+        });
+
+        const loadedTracks = await Promise.all(loadPromises);
+
+        // Extract buffers and peaks
+        const buffers = loadedTracks.map(t => t.buffer);
+        const peaks = loadedTracks.map(t => t.peaks);
+
+        // Find max duration across all tracks
+        const maxDuration = Math.max(...buffers.map(b => b.duration));
+
+        setAudioBuffers(buffers);
+        setPeaksDataArray(peaks);
+        setDuration(maxDuration);
+
+        // Initialize track states
+        setTrackStates(tracks.map(() => ({
+          muted: false,
+          soloed: false,
+          volume: 1.0,
+          pan: 0,
+        })));
 
         // Initialize playout (don't call init() yet - needs user gesture)
         console.log('Creating TonePlayout...');
         const playout = new TonePlayout();
         console.log('TonePlayout created');
 
-        // Create and add track
-        const trackObj: Track = {
-          id: 'track-0',
-          name: track.name || 'Audio Track',
-          gain: 1,
-          muted: false,
-          soloed: false,
-          stereoPan: 0,
-          startTime: 0,
-        };
+        // Add all tracks to playout
+        loadedTracks.forEach(({ buffer, track }, index) => {
+          const trackObj: Track = {
+            id: `track-${index}`,
+            name: track.name || `Audio Track ${index + 1}`,
+            gain: 1,
+            muted: false,
+            soloed: false,
+            stereoPan: 0,
+            startTime: 0,
+          };
 
-        playout.addTrack({
-          buffer,
-          track: trackObj,
+          playout.addTrack({
+            buffer,
+            track: trackObj,
+          });
+          console.log(`Track ${index} added to playout`);
         });
-        console.log('Track added to playout');
 
         playoutRef.current = playout;
-        console.log('Playout ref set:', playoutRef.current);
+        console.log('Playout ref set with', loadedTracks.length, 'track(s)');
 
         onReady?.();
       } catch (error) {
@@ -195,10 +240,10 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
   // Automatic scroll to keep playhead in view
   const scrollToCurrentTime = () => {
-    if (!scrollContainerRef.current || !audioBuffer) {
+    if (!scrollContainerRef.current || audioBuffers.length === 0) {
       console.log('scrollToCurrentTime: missing ref or buffer', {
         hasRef: !!scrollContainerRef.current,
-        hasBuffer: !!audioBuffer
+        hasBuffer: audioBuffers.length > 0
       });
       return;
     }
@@ -278,7 +323,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
   // Play/pause handlers
   const handlePlay = async (startTime?: number, playDuration?: number) => {
-    if (!playoutRef.current || !audioBuffer) return;
+    if (!playoutRef.current || audioBuffers.length === 0) return;
 
     await playoutRef.current.init();
 
@@ -340,8 +385,10 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   // Mouse handlers for selection and click-to-seek
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const clickTime = (x * samplesPerPixel) / (audioBuffer?.sampleRate || 44100);
+    const controlWidth = controls.show ? controls.width : 0;
+    const x = e.clientX - rect.left - controlWidth;
+    const sampleRate = audioBuffers[0]?.sampleRate || 44100;
+    const clickTime = (x * samplesPerPixel) / sampleRate;
 
     isSelectingRef.current = true;
     // Update currentTime immediately so playhead appears at click position
@@ -487,8 +534,10 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     if (!isSelectingRef.current) return;
 
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const moveTime = (x * samplesPerPixel) / (audioBuffer?.sampleRate || 44100);
+    const controlWidth = controls.show ? controls.width : 0;
+    const x = e.clientX - rect.left - controlWidth;
+    const sampleRate = audioBuffers[0]?.sampleRate || 44100;
+    const moveTime = (x * samplesPerPixel) / sampleRate;
 
     // Update selection during drag
     const start = Math.min(selectionStart, moveTime);
@@ -504,8 +553,10 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     isSelectingRef.current = false;
 
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const endTime = (x * samplesPerPixel) / (audioBuffer?.sampleRate || 44100);
+    const controlWidth = controls.show ? controls.width : 0;
+    const x = e.clientX - rect.left - controlWidth;
+    const sampleRate = audioBuffers[0]?.sampleRate || 44100;
+    const endTime = (x * samplesPerPixel) / sampleRate;
 
     const start = Math.min(selectionStart, endTime);
     const end = Math.max(selectionStart, endTime);
@@ -535,7 +586,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
   // Expose play/pause/stop/rewind/ff methods for external buttons
   useEffect(() => {
-    if (!audioBuffer) return;
+    if (audioBuffers.length === 0) return;
 
     const playButton = document.querySelector('.btn-play');
     const pauseButton = document.querySelector('.btn-pause');
@@ -623,7 +674,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       rewindButton?.removeEventListener('click', handleRewindClick);
       fastForwardButton?.removeEventListener('click', handleFastForwardClick);
     };
-  }, [audioBuffer, duration, isPlaying, selectionStart, selectionEnd]);
+  }, [audioBuffers, duration, isPlaying, selectionStart, selectionEnd]);
 
   // Keep isPlayingRef in sync with isPlaying state
   useEffect(() => {
@@ -787,31 +838,9 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   }, [selectionStart, selectionEnd]);
 
   // Calculate dimensions
-  const sampleRate = audioBuffer?.sampleRate || 44100;
+  const sampleRate = audioBuffers[0]?.sampleRate || 44100;
   const timeScaleHeight = timescale ? 30 : 0;
-  const tracksFullWidth = audioBuffer ? Math.floor((duration * sampleRate) / samplesPerPixel) : 0;
-
-  // Waveform display
-  const WaveformDisplay = () => {
-    if (!peaksData) return null;
-
-    const width = peaksData.length;
-
-    return (
-      <>
-        {peaksData.data.map((channelPeaks: Peaks, index: number) => (
-          <SmartChannel
-            key={index}
-            index={index}
-            data={channelPeaks}
-            bits={peaksData.bits}
-            length={width}
-            progress={0}
-          />
-        ))}
-      </>
-    );
-  };
+  const tracksFullWidth = audioBuffers.length > 0 ? Math.floor((duration * sampleRate) / samplesPerPixel) : 0;
 
   const handleAnnotationUpdate = (updated: AnnotationData[]) => {
     setAnnotations(updated);
@@ -828,20 +857,17 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
           waveHeight,
           timeScaleHeight,
           duration,
-          controls: {
-            show: false,
-            width: 0,
-          },
+          controls: controls,
         }}>
           <div ref={containerRef} style={{ width: '100%' }}>
-            {audioBuffer && peaksData ? (
+            {audioBuffers.length > 0 && peaksDataArray.length > 0 ? (
               <Playlist
                 theme={theme}
                 backgroundColor={theme.waveOutlineColor}
                 scrollContainerWidth={tracksFullWidth}
                 timescaleWidth={tracksFullWidth}
                 tracksWidth={tracksFullWidth}
-                controlsWidth={0}
+                controlsWidth={controls.show ? controls.width : 0}
                 onTracksMouseDown={handleMouseDown}
                 onTracksMouseMove={handleMouseMove}
                 onTracksMouseUp={handleMouseUp}
@@ -862,14 +888,105 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                 }
               >
                 <>
-                  <TrackComponent
-                    numChannels={peaksData.data.length}
-                    backgroundColor={theme.waveOutlineColor}
-                    offset={0}
-                    width={tracksFullWidth}
-                  >
-                    <WaveformDisplay />
-                  </TrackComponent>
+                  {peaksDataArray.map((peaksData, trackIndex) => {
+                    const width = peaksData.length;
+                    const trackName = tracks[trackIndex]?.name || `Track ${trackIndex + 1}`;
+                    const trackState = trackStates[trackIndex] || { muted: false, soloed: false, volume: 1.0, pan: 0 };
+
+                    const handleMute = () => {
+                      const newStates = [...trackStates];
+                      newStates[trackIndex] = { ...trackState, muted: !trackState.muted };
+                      setTrackStates(newStates);
+                      // TODO: Update Tone.js track mute state
+                    };
+
+                    const handleSolo = () => {
+                      const newStates = [...trackStates];
+                      newStates[trackIndex] = { ...trackState, soloed: !trackState.soloed };
+                      setTrackStates(newStates);
+                      // TODO: Update Tone.js track solo state
+                    };
+
+                    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const volume = parseFloat(e.target.value);
+                      const newStates = [...trackStates];
+                      newStates[trackIndex] = { ...trackState, volume };
+                      setTrackStates(newStates);
+                      // TODO: Update Tone.js track volume
+                    };
+
+                    const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const pan = parseFloat(e.target.value);
+                      const newStates = [...trackStates];
+                      newStates[trackIndex] = { ...trackState, pan };
+                      setTrackStates(newStates);
+                      // TODO: Update Tone.js track pan
+                    };
+
+                    const trackControls = (
+                      <Controls>
+                        <Header style={{ justifyContent: 'center' }}>{trackName}</Header>
+                        <ButtonGroup>
+                          <Button
+                            $variant={trackState.muted ? 'danger' : 'outline'}
+                            onClick={handleMute}
+                          >
+                            Mute
+                          </Button>
+                          <Button
+                            $variant={trackState.soloed ? 'info' : 'outline'}
+                            onClick={handleSolo}
+                          >
+                            Solo
+                          </Button>
+                        </ButtonGroup>
+                        <SliderWrapper>
+                          <VolumeDownIcon />
+                          <Slider
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={trackState.volume}
+                            onChange={handleVolumeChange}
+                          />
+                          <VolumeUpIcon />
+                        </SliderWrapper>
+                        <SliderWrapper>
+                          <span>L</span>
+                          <Slider
+                            min="-1"
+                            max="1"
+                            step="0.01"
+                            value={trackState.pan}
+                            onChange={handlePanChange}
+                          />
+                          <span>R</span>
+                        </SliderWrapper>
+                      </Controls>
+                    );
+
+                    return (
+                      <TrackControlsContext.Provider key={trackIndex} value={trackControls}>
+                        <TrackComponent
+                          numChannels={peaksData.data.length}
+                          backgroundColor={theme.waveOutlineColor}
+                          offset={0}
+                          width={tracksFullWidth}
+                        >
+                          {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
+                            <SmartChannel
+                              key={`${trackIndex}-${channelIndex}`}
+                              index={channelIndex}
+                              data={channelPeaks}
+                              bits={peaksData.bits}
+                              length={width}
+                              progress={0}
+                            />
+                          ))}
+                        </TrackComponent>
+                      </TrackControlsContext.Provider>
+                    );
+                  })}
                   {annotations.length > 0 && (
                     <AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
                       {annotations.map((annotation) => {
@@ -895,14 +1012,14 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                   )}
                   {selectionStart !== selectionEnd && (
                     <Selection
-                      startPosition={(Math.min(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
-                      endPosition={(Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
+                      startPosition={(Math.min(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel + (controls.show ? controls.width : 0)}
+                      endPosition={(Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel + (controls.show ? controls.width : 0)}
                       color="rgba(0, 255, 0, 0.3)"
                     />
                   )}
                   {(isPlaying || (selectionStart === selectionEnd && !activeAnnotationId)) && (
                     <Playhead
-                      position={(currentTime * sampleRate) / samplesPerPixel}
+                      position={(currentTime * sampleRate) / samplesPerPixel + (controls.show ? controls.width : 0)}
                       color="#f00"
                     />
                   )}

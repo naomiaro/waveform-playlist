@@ -69,4 +69,35 @@ module.exports = [
     },
     devtool: 'source-map',
   },
+  // Stem tracks app bundle
+  {
+    entry: './src/stem-tracks-app.tsx',
+    output: {
+      path: path.resolve(__dirname, '../../ghpages/js'),
+      filename: 'stem-tracks-bundle.js',
+    },
+    resolve: {
+      extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    },
+    module: {
+      rules: [
+        {
+          test: /\.tsx?$/,
+          use: {
+            loader: 'ts-loader',
+            options: {
+              configFile: path.resolve(__dirname, 'tsconfig.json'),
+              transpileOnly: true,
+            },
+          },
+          exclude: /node_modules/,
+        },
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader'],
+        },
+      ],
+    },
+    devtool: 'source-map',
+  },
 ];
