@@ -1,0 +1,77 @@
+import React from 'react';
+import styled from 'styled-components';
+import { serializeAeneas } from '../parsers/aeneas';
+import type { Annotation } from '../types';
+
+const Button = styled.button`
+  padding: 0.5rem 1rem;
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+
+  &:hover:not(:disabled) {
+    background: #138496;
+  }
+
+  &:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+`;
+
+export interface DownloadAnnotationsButtonProps {
+  annotations: Annotation[];
+  filename?: string;
+  disabled?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps> = ({
+  annotations,
+  filename = 'annotations.json',
+  disabled = false,
+  className,
+  children = 'Download JSON',
+}) => {
+  const handleDownload = () => {
+    if (annotations.length === 0) {
+      return;
+    }
+
+    // Serialize annotations to Aeneas JSON format
+    const jsonData = annotations.map(annotation => serializeAeneas(annotation));
+    const jsonString = JSON.stringify(jsonData, null, 2);
+
+    // Create a blob and download link
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Button
+      onClick={handleDownload}
+      disabled={disabled || annotations.length === 0}
+      className={className}
+      title={annotations.length === 0 ? 'No annotations to download' : 'Download the annotations as JSON'}
+    >
+      {children}
+    </Button>
+  );
+};

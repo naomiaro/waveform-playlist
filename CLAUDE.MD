@@ -312,6 +312,145 @@ const theme = {
 - Playlist component: `packages/ui-components/src/components/Playlist.tsx`
 - Example: `packages/browser/src/flexible-example-app.tsx`
 
+## Optional Packages Architecture (2025-01-19)
+
+### Decision: Annotations as Optional Package
+
+**Rationale:**
+- Annotations are used by a minority of users (subtitle/transcript editing, audio labeling)
+- Including annotation components in core adds ~50KB to bundle size
+- Many users don't need annotation functionality
+
+**Implementation:**
+- Moved all annotation components, hooks, and logic to `@waveform-playlist/annotations` package
+- Users install only if needed: `npm install @waveform-playlist/annotations`
+- Core waveform-playlist remains lean for basic use cases
+
+### Annotations Package Architecture
+
+**Location:** `packages/annotations/`
+
+**Structure:**
+```
+packages/annotations/
+├── src/
+│   ├── components/          # React components
+│   │   ├── Annotation.tsx
+│   │   ├── AnnotationBox.tsx
+│   │   ├── AnnotationBoxesWrapper.tsx
+│   │   ├── AnnotationsTrack.tsx
+│   │   ├── AnnotationText.tsx
+│   │   ├── ContinuousPlayCheckbox.tsx
+│   │   └── LinkEndpointsCheckbox.tsx
+│   ├── hooks/               # Custom hooks
+│   │   └── useAnnotationControls.ts
+│   ├── types/               # TypeScript types
+│   │   └── index.ts
+│   ├── parsers/             # Import/export
+│   │   └── aeneas.ts
+│   └── index.ts             # Public exports
+├── package.json
+└── tsconfig.json
+```
+
+**Peer Dependencies:**
+- `react` ^18.0.0
+- `styled-components` ^6.0.0
+
+**Regular Dependencies:**
+- `@waveform-playlist/core` - Core types
+- `@waveform-playlist/ui-components` - Playlist context, utilities
+
+### useAnnotationControls Hook
+
+**Purpose:** Manages annotation control state and boundary update logic.
+
+**Features:**
+- `continuousPlay` state - Whether playback continues after an annotation
+- `linkEndpoints` state - Whether adjacent annotation boundaries move together
+- `updateAnnotationBoundaries()` - Complex boundary logic with:
+  - Linked endpoints (when boundaries touch, they move together)
+  - Collision detection (prevents overlapping annotations)
+  - Cascading updates (multiple annotations adjust together)
+
+**API:**
+```typescript
+interface UseAnnotationControlsOptions {
+  initialContinuousPlay?: boolean;
+  initialLinkEndpoints?: boolean;
+}
+
+interface UseAnnotationControlsReturn {
+  continuousPlay: boolean;
+  linkEndpoints: boolean;
+  setContinuousPlay: (value: boolean) => void;
+  setLinkEndpoints: (value: boolean) => void;
+  updateAnnotationBoundaries: (params: AnnotationUpdateParams) => Annotation[];
+}
+
+const useAnnotationControls = (
+  options?: UseAnnotationControlsOptions
+): UseAnnotationControlsReturn;
+```
+
+**Usage Example:**
+```typescript
+import { useAnnotationControls, ContinuousPlayCheckbox, LinkEndpointsCheckbox }
+  from '@waveform-playlist/annotations';
+
+function AnnotationControls() {
+  const {
+    continuousPlay,
+    linkEndpoints,
+    setContinuousPlay,
+    setLinkEndpoints,
+    updateAnnotationBoundaries,
+  } = useAnnotationControls({
+    initialContinuousPlay: false,
+    initialLinkEndpoints: true,
+  });
+
+  // Use in drag handlers
+  const handleDrag = (annotationIndex, newTime, isDraggingStart) => {
+    const updated = updateAnnotationBoundaries({
+      annotationIndex,
+      newTime,
+      isDraggingStart,
+      annotations,
+      duration,
+    });
+    setAnnotations(updated);
+  };
+
+  return (
+    <>
+      <ContinuousPlayCheckbox
+        checked={continuousPlay}
+        onChange={setContinuousPlay}
+      />
+      <LinkEndpointsCheckbox
+        checked={linkEndpoints}
+        onChange={setLinkEndpoints}
+      />
+    </>
+  );
+}
+```
+
+**Benefits:**
+- Extracted ~110 lines of complex logic from WaveformPlaylistComponent
+- Reusable across different components
+- Testable independently
+- Type-safe with full TypeScript support
+- No DOM manipulation - pure React pattern
+
+**Integration:**
+The `WaveformPlaylistComponent` uses this hook internally and renders the React checkbox components, replacing the old DOM manipulation approach.
+
+**Documentation:**
+- See `OPTIONAL_PACKAGES.md` for installation and usage guide
+- Example: `ghpages/_examples/13annotations.html`
+
 ## Current Work (Tone.js Overhaul Branch)
 
 ### Status
@@ -322,10 +461,13 @@ const theme = {
 - **Flexible/headless API architecture implemented**
 - **Complete theming system implemented**
 - **Custom timestamp rendering implemented**
+- **Annotations package as optional dependency implemented**
+- **useAnnotationControls hook implemented**
 - Track controls with mute/solo/volume/pan working
 - Stop button remembers start position behavior fixed
 
 ### Next Steps / Ideas
+- Consider creating more optional packages (effects, fades, etc.)
 - Build out primitives library as needed
 - Add more examples showing different layout patterns
 - Document all hooks and components in detail
@@ -347,4 +489,4 @@ const theme = {
 ---
 
 **Last Updated:** 2025-01-19
-**Session Notes:** Implemented complete theming system with all color properties (waveOutlineColor, waveFillColor, waveProgressColor, timeColor, timescaleBackgroundColor, playheadColor, selectionColor). Added custom timestamp rendering via renderTimestamp prop. Implemented dynamic padding calculation for timestamp overflow. Enhanced flexible-api example with dark theme and custom styled timestamp components. All theming properties are optional and fully customizable.
+**Session Notes:** Refactored annotations functionality into optional package `@waveform-playlist/annotations`. Created `useAnnotationControls` hook to manage annotation state and complex boundary logic (linked endpoints, collision detection, cascading updates). Moved all annotation components (Annotation, AnnotationBox, AnnotationBoxesWrapper, AnnotationsTrack, AnnotationText, ContinuousPlayCheckbox, LinkEndpointsCheckbox) to annotations package. Replaced DOM manipulation with pure React pattern. Created OPTIONAL_PACKAGES.md documentation. Bundle size reduction: users who don't need annotations save ~50KB. Hook architecture follows same pattern as other playlist hooks.

@@ -21,10 +21,17 @@
   "author": "Naomi Aro",
   "license": "MIT",
   "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/styled-components": "^5.1.26",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@waveform-playlist/core": "workspace:*"
+    "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/ui-components": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "styled-components": "^6.0.0"
   }
 }

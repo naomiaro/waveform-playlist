@@ -2,9 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled, { ThemeProvider } from 'styled-components';
 import {
-  AnnotationBox,
-  AnnotationBoxesWrapper,
-  AnnotationText,
   Playlist,
   Track as TrackComponent,
   SmartChannel,
@@ -15,7 +12,6 @@ import {
   DevicePixelRatioProvider,
   StyledTimeScale,
   secondsToPixels,
-  type AnnotationData,
   Controls,
   Header,
   Button,
@@ -30,6 +26,15 @@ import {
   TimeFormatSelect,
   AudioPosition,
 } from '@waveform-playlist/ui-components';
+import {
+  type AnnotationData,
+  AnnotationBox,
+  AnnotationBoxesWrapper,
+  AnnotationText,
+  useAnnotationControls,
+  ContinuousPlayCheckbox,
+  LinkEndpointsCheckbox,
+} from '@waveform-playlist/annotations';
 import { TonePlayout } from '@waveform-playlist/playout';
 import { type Track } from '@waveform-playlist/core';
 import * as Tone from 'tone';
@@ -118,8 +123,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     volume: number;
     pan: number;
   }>>([]);
-  const [isContinuousPlay, setIsContinuousPlay] = useState(annotationList?.isContinuousPlay ?? false);
-  const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
+  const annotationControls = useAnnotationControls({
+    initialContinuousPlay: annotationList?.isContinuousPlay ?? false,
+    initialLinkEndpoints: annotationList?.linkEndpoints ?? true,
+  });
+  const { continuousPlay: isContinuousPlay, linkEndpoints, setContinuousPlay: setIsContinuousPlay, setLinkEndpoints } = annotationControls;
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
@@ -455,104 +463,16 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const x = e.clientX - rect.left + scrollContainer.scrollLeft;
     const newTime = (x * samplesPerPixel) / sampleRate;
 
-    const updatedAnnotations = [...annotations];
-    const annotationIndex = updatedAnnotations.findIndex(a => a.id === draggingAnnotation.id);
+    const annotationIndex = annotations.findIndex(a => a.id === draggingAnnotation.id);
 
     if (annotationIndex !== -1) {
-      const annotation = updatedAnnotations[annotationIndex];
-      const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
-
-      if (draggingAnnotation.edge === 'start') {
-        // Dragging start edge
-        const constrainedStart = Math.max(0, Math.min(newTime, annotation.end - 0.1));
-        const delta = constrainedStart - annotation.start;
-
-        updatedAnnotations[annotationIndex] = {
-          ...annotation,
-          start: constrainedStart,
-        };
-
-        if (linkEndpoints && annotationIndex > 0) {
-          // Link Endpoints: if previous annotation's end is touching this start, move it together
-          const prevAnnotation = updatedAnnotations[annotationIndex - 1];
-          if (Math.abs(prevAnnotation.end - annotation.start) < LINK_THRESHOLD) {
-            updatedAnnotations[annotationIndex - 1] = {
-              ...prevAnnotation,
-              end: Math.max(prevAnnotation.start + 0.1, prevAnnotation.end + delta),
-            };
-          }
-        } else if (!linkEndpoints && annotationIndex > 0 && constrainedStart < updatedAnnotations[annotationIndex - 1].end) {
-          // Collision detection: push previous annotation's end back
-          updatedAnnotations[annotationIndex - 1] = {
-            ...updatedAnnotations[annotationIndex - 1],
-            end: constrainedStart,
-          };
-        }
-      } else {
-        // Dragging end edge
-        const constrainedEnd = Math.max(annotation.start + 0.1, Math.min(newTime, duration));
-        const delta = constrainedEnd - annotation.end;
-
-        updatedAnnotations[annotationIndex] = {
-          ...annotation,
-          end: constrainedEnd,
-        };
-
-        if (linkEndpoints && annotationIndex < updatedAnnotations.length - 1) {
-          // Link Endpoints: if next annotation's start is touching this end, move it together
-          const nextAnnotation = updatedAnnotations[annotationIndex + 1];
-          if (Math.abs(nextAnnotation.start - annotation.end) < LINK_THRESHOLD) {
-            const newStart = nextAnnotation.start + delta;
-            updatedAnnotations[annotationIndex + 1] = {
-              ...nextAnnotation,
-              start: Math.min(nextAnnotation.end - 0.1, newStart),
-            };
-
-            // Cascade linked endpoints
-            let currentIndex = annotationIndex + 1;
-            while (currentIndex < updatedAnnotations.length - 1) {
-              const current = updatedAnnotations[currentIndex];
-              const next = updatedAnnotations[currentIndex + 1];
-
-              if (Math.abs(next.start - current.end) < LINK_THRESHOLD) {
-                const nextDelta = current.end - annotations[currentIndex].end;
-                updatedAnnotations[currentIndex + 1] = {
-                  ...next,
-                  start: Math.min(next.end - 0.1, next.start + nextDelta),
-                };
-                currentIndex++;
-              } else {
-                break; // No more linked endpoints
-              }
-            }
-          }
-        } else if (!linkEndpoints && annotationIndex < updatedAnnotations.length - 1 && constrainedEnd > updatedAnnotations[annotationIndex + 1].start) {
-          // Collision detection: push next annotation's start forward
-          const nextAnnotation = updatedAnnotations[annotationIndex + 1];
-
-          updatedAnnotations[annotationIndex + 1] = {
-            ...nextAnnotation,
-            start: constrainedEnd,
-          };
-
-          // Cascade collisions
-          let currentIndex = annotationIndex + 1;
-          while (currentIndex < updatedAnnotations.length - 1) {
-            const current = updatedAnnotations[currentIndex];
-            const next = updatedAnnotations[currentIndex + 1];
-
-            if (current.end > next.start) {
-              updatedAnnotations[currentIndex + 1] = {
-                ...next,
-                start: current.end,
-              };
-              currentIndex++;
-            } else {
-              break;
-            }
-          }
-        }
-      }
+      const updatedAnnotations = annotationControls.updateAnnotationBoundaries({
+        annotationIndex,
+        newTime,
+        isDraggingStart: draggingAnnotation.edge === 'start',
+        annotations,
+        duration,
+      });
 
       setAnnotations(updatedAnnotations);
     }
@@ -719,28 +639,25 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  // Checkbox listeners for continuous play, link endpoints, and automatic scroll
+  // Handlers for annotation checkboxes
+  const handleContinuousPlayChange = (checked: boolean) => {
+    setIsContinuousPlay(checked);
+
+    // If turning off continuous play while playing, stop playback
+    if (!checked && isPlayingRef.current && playoutRef.current) {
+      playoutRef.current.stop();
+      setIsPlaying(false);
+      stopAnimationLoop();
+    }
+  };
+
+  const handleLinkEndpointsChange = (checked: boolean) => {
+    setLinkEndpoints(checked);
+  };
+
+  // Checkbox listener for automatic scroll
   useEffect(() => {
-    const continuousPlayCheckbox = document.querySelector('.continuous-play') as HTMLInputElement;
-    const linkEndpointsCheckbox = document.querySelector('.link-endpoints') as HTMLInputElement;
     const automaticScrollCheckbox = document.querySelector('.automatic-scroll') as HTMLInputElement;
-
-    const handleContinuousPlayChange = (e: Event) => {
-      const checked = (e.target as HTMLInputElement).checked;
-      setIsContinuousPlay(checked);
-
-      // If turning off continuous play while playing, stop playback
-      if (!checked && isPlayingRef.current && playoutRef.current) {
-        playoutRef.current.stop();
-        setIsPlaying(false);
-        stopAnimationLoop();
-      }
-    };
-
-    const handleLinkEndpointsChange = (e: Event) => {
-      const checked = (e.target as HTMLInputElement).checked;
-      setLinkEndpoints(checked);
-    };
 
     const handleAutomaticScrollChange = (e: Event) => {
       const checked = (e.target as HTMLInputElement).checked;
@@ -749,24 +666,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       setIsAutomaticScroll(checked);
     };
 
-    if (continuousPlayCheckbox) {
-      continuousPlayCheckbox.checked = isContinuousPlay;
-      continuousPlayCheckbox.addEventListener('change', handleContinuousPlayChange);
-    }
-
-    if (linkEndpointsCheckbox) {
-      linkEndpointsCheckbox.checked = linkEndpoints;
-      linkEndpointsCheckbox.addEventListener('change', handleLinkEndpointsChange);
-    }
-
     if (automaticScrollCheckbox) {
       automaticScrollCheckbox.checked = isAutomaticScroll;
       automaticScrollCheckbox.addEventListener('change', handleAutomaticScrollChange);
     }
 
     return () => {
-      continuousPlayCheckbox?.removeEventListener('change', handleContinuousPlayChange);
-      linkEndpointsCheckbox?.removeEventListener('change', handleLinkEndpointsChange);
       automaticScrollCheckbox?.removeEventListener('change', handleAutomaticScrollChange);
     };
   }, []);
@@ -882,6 +787,22 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
               <ControlGroup>
                 <AudioPosition formattedTime={formatTime(currentTime)} />
               </ControlGroup>
+              {annotationList && (
+                <>
+                  <ControlGroup>
+                    <ContinuousPlayCheckbox
+                      checked={isContinuousPlay}
+                      onChange={handleContinuousPlayChange}
+                    />
+                  </ControlGroup>
+                  <ControlGroup>
+                    <LinkEndpointsCheckbox
+                      checked={linkEndpoints}
+                      onChange={handleLinkEndpointsChange}
+                    />
+                  </ControlGroup>
+                </>
+              )}
             </ControlsWrapper>
 
             {audioBuffers.length > 0 && peaksDataArray.length > 0 ? (

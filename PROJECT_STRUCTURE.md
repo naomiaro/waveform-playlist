@@ -13,7 +13,7 @@ Waveform-playlist is a **monorepo** organized with pnpm workspaces. It's a multi
 ```
 waveform-playlist/
 ├── packages/              # Workspace packages (modular architecture)
-│   ├── annotations/       # Annotation data structures
+│   ├── annotations/       # 📦 OPTIONAL: Annotation components & hooks
 │   ├── browser/           # React apps & webpack bundles
 │   ├── core/              # Core types and interfaces
 │   ├── loaders/           # Audio file loaders
@@ -138,12 +138,46 @@ waveform-playlist/
 - **Exports:** Audio loading utilities
 - **Dependencies:** Core
 
-### 📝 Data Layer
+### 📦 Optional Packages
 
 #### `@waveform-playlist/annotations`
-- **Purpose:** Annotation data structures and types
-- **Exports:** Annotation interfaces
-- **Used in:** Annotations example, subtitle/transcript features
+- **Type:** Optional package (install separately)
+- **Purpose:** Complete annotation support for time-synchronized text segments
+- **Tech:** React, styled-components, custom hooks
+- **Install:** `npm install @waveform-playlist/annotations`
+- **Structure:**
+  ```
+  src/
+  ├── components/        # React components
+  │   ├── Annotation.tsx
+  │   ├── AnnotationBox.tsx
+  │   ├── AnnotationBoxesWrapper.tsx
+  │   ├── AnnotationsTrack.tsx
+  │   ├── AnnotationText.tsx
+  │   ├── ContinuousPlayCheckbox.tsx
+  │   └── LinkEndpointsCheckbox.tsx
+  ├── hooks/             # Custom hooks
+  │   └── useAnnotationControls.ts
+  ├── types/             # TypeScript types
+  │   └── index.ts
+  ├── parsers/           # Import/export (Aeneas JSON)
+  │   └── aeneas.ts
+  └── index.ts           # Public exports
+  ```
+- **Key Hook:** `useAnnotationControls`
+  - Manages `continuousPlay` and `linkEndpoints` state
+  - Provides `updateAnnotationBoundaries()` with complex logic:
+    - Linked endpoints (boundaries move together when touching)
+    - Collision detection (prevents overlap)
+    - Cascading updates (multiple annotations adjust together)
+- **Components:**
+  - Visual: AnnotationBox, AnnotationBoxesWrapper, AnnotationsTrack
+  - Text: Annotation, AnnotationText
+  - Controls: ContinuousPlayCheckbox, LinkEndpointsCheckbox
+- **Peer Dependencies:** React ^18.0.0, styled-components ^6.0.0
+- **Bundle Size Impact:** ~50KB (only included if installed)
+- **Use Cases:** Subtitle/caption editing, transcripts, audio labeling
+- **Documentation:** See `OPTIONAL_PACKAGES.md`
 
 ## Data Flow Architecture
 
@@ -396,7 +430,13 @@ Re-render Playhead position
   - `Waveform` component with render prop for custom track controls
   - `useWaveformPlaylist` hook for accessing context
   - Full example showing custom layout (`flexible-api.html`)
-- Annotations example
+- **Optional Packages Architecture** - Annotations as separate package
+  - `@waveform-playlist/annotations` package with components, hooks, types, and parsers
+  - `useAnnotationControls` hook for annotation state and boundary logic
+  - React checkbox components (ContinuousPlayCheckbox, LinkEndpointsCheckbox)
+  - ~50KB bundle size reduction for users who don't need annotations
+  - Documentation in `OPTIONAL_PACKAGES.md`
+- Annotations example (using annotations package)
 - Stem-tracks example (cleaned up with React controls)
 - Selection time inputs
 - Playback controls (play/pause/stop/seek)
@@ -413,7 +453,8 @@ Re-render Playhead position
 - More examples showing different layouts
 
 ### 🔮 Planned
-- Additional hooks (`useSelection`, `useAnnotations`, `useKeyboardShortcuts`)
+- Additional optional packages (effects, fades, etc.)
+- Additional hooks (`useSelection`, `useKeyboardShortcuts`)
 - Component library documentation
 - Unit tests for hooks and components
 
@@ -464,6 +505,7 @@ pnpm build && jekyll build -s ghpages -d _site
 ### Documentation
 - `packages/browser/HOOKS_ARCHITECTURE.md` - Hooks architecture overview
 - `packages/browser/src/hooks/README.md` - Hooks API documentation
+- `OPTIONAL_PACKAGES.md` - Optional packages guide (annotations, etc.)
 - `CLAUDE.md` - AI development notes and architectural decisions
 - `PROJECT_STRUCTURE.md` - This file
 
@@ -574,4 +616,4 @@ See `CLAUDE.md` for architectural decisions and next steps:
 
 ---
 
-**Last Updated:** 2025-01-19 (Added flexible/headless API architecture documentation with WaveformPlaylistProvider, primitive components, and render props)
+**Last Updated:** 2025-01-19 (Refactored annotations into optional package `@waveform-playlist/annotations` with `useAnnotationControls` hook, React components, and ~50KB bundle size reduction for users who don't need annotations. Created OPTIONAL_PACKAGES.md documentation)

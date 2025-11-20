@@ -1,8 +1,31 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { WaveformPlaylistComponent } from './WaveformPlaylistComponent';
+import styled from 'styled-components';
+import { WaveformPlaylistProvider } from './WaveformPlaylistContext';
+import {
+  PlayButton,
+  PauseButton,
+  StopButton,
+  RewindButton,
+  FastForwardButton,
+  ZoomInButton,
+  ZoomOutButton,
+  MasterVolumeControl,
+  TimeFormatSelect,
+  AudioPosition,
+  SelectionTimeInputs,
+  AutomaticScrollCheckbox,
+  ContinuousPlayCheckbox,
+  LinkEndpointsCheckbox,
+  EditableCheckbox,
+  DownloadAnnotationsButton,
+  Waveform,
+} from './components';
 
-// Annotation actions for the UI
+// Load annotation data
+declare const notes: any[];
+
+// Annotation actions for the UI (kept for future implementation)
 const annotationActions = [
   {
     class: 'bi bi-dash',
@@ -76,9 +99,6 @@ const annotationActions = [
   }
 ];
 
-// Load annotation data
-declare const notes: any[];
-
 // Theme for waveform colors
 const theme = {
   waveOutlineColor: '#005BBB',
@@ -86,6 +106,35 @@ const theme = {
   waveProgressColor: '#ff0000',
   timeColor: '#000',
 };
+
+// Styled components for layout
+const Container = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const TopBar = styled.div`
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-radius: 0.25rem;
+  flex-wrap: wrap;
+`;
+
+const ControlGroup = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+`;
+
+const Separator = styled.div`
+  width: 1px;
+  height: 2rem;
+  background: #ddd;
+`;
 
 // Initialize the app
 export function initAnnotationsApp() {
@@ -97,7 +146,7 @@ export function initAnnotationsApp() {
 
   const root = createRoot(container);
   root.render(
-    <WaveformPlaylistComponent
+    <WaveformPlaylistProvider
       tracks={[{ src: 'media/audio/sonnet.mp3', name: 'Sonnet' }]}
       timescale={true}
       mono={true}
@@ -113,7 +162,62 @@ export function initAnnotationsApp() {
       }}
       onReady={() => console.log('Waveform playlist ready')}
       onAnnotationUpdate={(annotations) => console.log('Annotations updated:', annotations)}
-    />
+    >
+      <Container>
+        <TopBar>
+          <ControlGroup>
+            <PlayButton />
+            <PauseButton />
+            <StopButton />
+            <RewindButton />
+            <FastForwardButton />
+          </ControlGroup>
+
+          <Separator />
+
+          <ControlGroup>
+            <ZoomInButton />
+            <ZoomOutButton />
+          </ControlGroup>
+
+          <Separator />
+
+          <ControlGroup>
+            <TimeFormatSelect />
+            <AudioPosition />
+          </ControlGroup>
+
+          <Separator />
+
+          <ControlGroup>
+            <SelectionTimeInputs />
+          </ControlGroup>
+
+          <Separator />
+
+          <ControlGroup>
+            <MasterVolumeControl />
+          </ControlGroup>
+
+          <Separator />
+
+          <ControlGroup>
+            <AutomaticScrollCheckbox />
+            <ContinuousPlayCheckbox />
+            <LinkEndpointsCheckbox />
+            <EditableCheckbox />
+          </ControlGroup>
+
+          <Separator />
+
+          <ControlGroup>
+            <DownloadAnnotationsButton />
+          </ControlGroup>
+        </TopBar>
+
+        <Waveform theme={theme} annotationControls={annotationActions} />
+      </Container>
+    </WaveformPlaylistProvider>
   );
 }
 

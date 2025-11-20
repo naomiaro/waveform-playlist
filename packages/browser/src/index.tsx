@@ -1294,6 +1294,9 @@ export {
   AudioPosition,
   SelectionTimeInputs,
   AutomaticScrollCheckbox,
+  ContinuousPlayCheckbox,
+  LinkEndpointsCheckbox,
+  DownloadAnnotationsButton,
   Waveform,
 } from './components';
 export type { WaveformProps } from './components/Waveform';

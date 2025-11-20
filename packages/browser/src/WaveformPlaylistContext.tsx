@@ -5,6 +5,7 @@ import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData } from '@waveform-playlist/webaudio-peaks';
 import { type AnnotationData } from '@waveform-playlist/ui-components';
+import { parseAeneas } from '@waveform-playlist/annotations';
 import { useTimeFormat, useZoomControls, useMasterVolume } from './hooks';
 
 // Types
@@ -33,6 +34,9 @@ export interface WaveformPlaylistContextValue {
   selectionStart: number;
   selectionEnd: number;
   isAutomaticScroll: boolean;
+  continuousPlay: boolean;
+  linkEndpoints: boolean;
+  annotationsEditable: boolean;
 
   // Playback controls
   play: (startTime?: number, playDuration?: number) => Promise<void>;
@@ -68,6 +72,13 @@ export interface WaveformPlaylistContextValue {
   // Automatic scroll
   setAutomaticScroll: (enabled: boolean) => void;
   setScrollContainer: (element: HTMLDivElement | null) => void;
+
+  // Annotation controls
+  setContinuousPlay: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setAnnotations: (annotations: AnnotationData[]) => void;
+  setActiveAnnotationId: (id: string | null) => void;
 
   // Refs
   playoutRef: React.RefObject<TonePlayout | null>;
@@ -136,6 +147,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
+  const [continuousPlay, setContinuousPlay] = useState(annotationList?.isContinuousPlay ?? false);
+  const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
+  const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
 
   // Refs
   const playoutRef = useRef<TonePlayout | null>(null);
@@ -232,6 +246,22 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     };
   }, [tracks, samplesPerPixel, mono, onReady]);
 
+  // Load annotations from annotationList prop
+  useEffect(() => {
+    if (annotationList?.annotations) {
+      // Parse Aeneas format annotations to AnnotationData format
+      const parsedAnnotations = annotationList.annotations.map((ann: any) => {
+        // If it's already in the correct format, use it
+        if (typeof ann.start === 'number') {
+          return ann;
+        }
+        // Otherwise parse from Aeneas format
+        return parseAeneas(ann);
+      });
+      setAnnotations(parsedAnnotations);
+    }
+  }, [annotationList]);
+
   // Animation loop
   const startAnimationLoop = useCallback(() => {
     const updateTime = () => {
@@ -240,6 +270,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       const time = audioStartPositionRef.current + elapsed;
       currentTimeRef.current = time;
       setCurrentTime(time);
+
+      // Update active annotation based on playback time
+      if (annotations.length > 0) {
+        const currentAnnotation = annotations.find(
+          (ann) => time >= ann.start && time < ann.end
+        );
+        if (currentAnnotation && currentAnnotation.id !== activeAnnotationId) {
+          setActiveAnnotationId(currentAnnotation.id);
+        }
+      }
 
       // Handle automatic scroll - continuously center the playhead
       if (isAutomaticScrollRef.current && scrollContainerRef.current && audioBuffers.length > 0) {
@@ -258,13 +298,20 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       }
 
       if (time >= duration) {
-        stop();
+        // Stop playback - inline to avoid circular dependency
+        if (playoutRef.current) {
+          playoutRef.current.stop();
+        }
+        setIsPlaying(false);
+        currentTimeRef.current = playStartPositionRef.current;
+        setCurrentTime(playStartPositionRef.current);
+        setActiveAnnotationId(null);
         return;
       }
       animationFrameRef.current = requestAnimationFrame(updateTime);
     };
     animationFrameRef.current = requestAnimationFrame(updateTime);
-  }, [duration, audioBuffers, samplesPerPixel]);
+  }, [duration, audioBuffers, samplesPerPixel, annotations, activeAnnotationId]);
 
   const stopAnimationLoop = useCallback(() => {
     if (animationFrameRef.current) {
@@ -416,6 +463,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     selectionStart,
     selectionEnd,
     isAutomaticScroll,
+    continuousPlay,
+    linkEndpoints,
+    annotationsEditable,
 
     // Playback controls
     play,
@@ -456,6 +506,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsAutomaticScroll(enabled);
     },
     setScrollContainer,
+
+    // Annotation controls
+    setContinuousPlay,
+    setLinkEndpoints,
+    setAnnotationsEditable,
+    setAnnotations,
+    setActiveAnnotationId,
 
     // Refs
     playoutRef,

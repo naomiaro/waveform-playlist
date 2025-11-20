@@ -1,6 +1,6 @@
 import React, { FunctionComponent } from 'react';
 import styled from 'styled-components';
-import { usePlaylistInfo } from '../contexts/PlaylistInfo';
+import { usePlaylistInfo } from '@waveform-playlist/ui-components';
 
 interface ContainerProps {
   readonly $height: number;

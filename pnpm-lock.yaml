@@ -23,7 +23,22 @@ importers:
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
+      '@waveform-playlist/ui-components':
+        specifier: workspace:*
+        version: link:../ui-components
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+      styled-components:
+        specifier: ^6.0.0
+        version: 6.1.19(react-dom@18.3.1)(react@18.3.1)
     devDependencies:
+      '@types/react':
+        specifier: ^18.2.45
+        version: 18.3.26
+      '@types/styled-components':
+        specifier: ^5.1.26
+        version: 5.1.35
       tsup:
         specifier: ^8.0.1
         version: 8.5.1(typescript@5.9.3)
