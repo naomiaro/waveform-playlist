@@ -62,12 +62,15 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   timescale = true,
   mono = true,
   waveHeight = 80,
-  samplesPerPixel = 1024,
+  samplesPerPixel: initialSamplesPerPixel = 1024,
   theme: userTheme,
   annotationList,
   onReady,
   onAnnotationUpdate,
 }) => {
+  // Zoom levels - lower values = more zoomed in
+  const ZOOM_LEVELS = [256, 512, 1024, 2048, 4096, 8192];
+
   const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const [shouldScrollToActive, setShouldScrollToActive] = useState(false);
@@ -76,6 +79,8 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const [duration, setDuration] = useState(0);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [peaksData, setPeaksData] = useState<PeakData | null>(null);
+  const [samplesPerPixel, setSamplesPerPixel] = useState(initialSamplesPerPixel);
+  const [zoomIndex, setZoomIndex] = useState(() => ZOOM_LEVELS.indexOf(initialSamplesPerPixel) !== -1 ? ZOOM_LEVELS.indexOf(initialSamplesPerPixel) : 2);
   const [isContinuousPlay, setIsContinuousPlay] = useState(annotationList?.isContinuousPlay ?? false);
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
   const [selectionStart, setSelectionStart] = useState(0);
@@ -706,6 +711,36 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       downloadButton?.removeEventListener('click', handleDownloadClick);
     };
   }, [annotations]);
+
+  // Zoom in/out buttons
+  useEffect(() => {
+    const zoomInButton = document.querySelector('.btn-zoom-in');
+    const zoomOutButton = document.querySelector('.btn-zoom-out');
+
+    const handleZoomIn = () => {
+      if (zoomIndex > 0) {
+        const newIndex = zoomIndex - 1;
+        setZoomIndex(newIndex);
+        setSamplesPerPixel(ZOOM_LEVELS[newIndex]);
+      }
+    };
+
+    const handleZoomOut = () => {
+      if (zoomIndex < ZOOM_LEVELS.length - 1) {
+        const newIndex = zoomIndex + 1;
+        setZoomIndex(newIndex);
+        setSamplesPerPixel(ZOOM_LEVELS[newIndex]);
+      }
+    };
+
+    zoomInButton?.addEventListener('click', handleZoomIn);
+    zoomOutButton?.addEventListener('click', handleZoomOut);
+
+    return () => {
+      zoomInButton?.removeEventListener('click', handleZoomIn);
+      zoomOutButton?.removeEventListener('click', handleZoomOut);
+    };
+  }, [zoomIndex, ZOOM_LEVELS]);
 
   // Initialize selection time inputs manager
   useEffect(() => {
