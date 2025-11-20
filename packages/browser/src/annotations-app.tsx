@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
-import { WaveformPlaylistProvider } from './WaveformPlaylistContext';
+import { WaveformPlaylistProvider, useWaveformPlaylist } from './WaveformPlaylistContext';
 import {
   PlayButton,
   PauseButton,
@@ -12,7 +12,6 @@ import {
   ZoomOutButton,
   MasterVolumeControl,
   TimeFormatSelect,
-  AudioPosition,
   SelectionTimeInputs,
   AutomaticScrollCheckbox,
   ContinuousPlayCheckbox,
@@ -136,6 +135,95 @@ const Separator = styled.div`
   background: #ddd;
 `;
 
+const TimeControlsBar = styled.div`
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-radius: 0.25rem;
+  flex-wrap: wrap;
+`;
+
+const AudioPositionText = styled.div`
+  font-family: 'Courier New', Monaco, monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+`;
+
+// Custom AudioPosition that displays as text only
+const AudioPositionDisplay: React.FC = () => {
+  const { currentTime, formatTime } = useWaveformPlaylist();
+  return <AudioPositionText>{formatTime(currentTime)}</AudioPositionText>;
+};
+
+// Main app content component
+const AnnotationsAppContent: React.FC = () => {
+  return (
+    <Container>
+      <TopBar>
+        <ControlGroup>
+          <PlayButton />
+          <PauseButton />
+          <StopButton />
+          <RewindButton />
+          <FastForwardButton />
+        </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <ZoomInButton />
+          <ZoomOutButton />
+        </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <DownloadAnnotationsButton />
+        </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <AutomaticScrollCheckbox />
+          <ContinuousPlayCheckbox />
+          <LinkEndpointsCheckbox />
+          <EditableCheckbox />
+        </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <MasterVolumeControl />
+        </ControlGroup>
+      </TopBar>
+
+      <Waveform theme={theme} annotationControls={annotationActions} />
+
+      <TimeControlsBar>
+        <ControlGroup>
+          <TimeFormatSelect />
+        </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <SelectionTimeInputs />
+        </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <AudioPositionDisplay />
+        </ControlGroup>
+      </TimeControlsBar>
+    </Container>
+  );
+};
+
 // Initialize the app
 export function initAnnotationsApp() {
   const container = document.getElementById('playlist');
@@ -163,60 +251,7 @@ export function initAnnotationsApp() {
       onReady={() => console.log('Waveform playlist ready')}
       onAnnotationUpdate={(annotations) => console.log('Annotations updated:', annotations)}
     >
-      <Container>
-        <TopBar>
-          <ControlGroup>
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-            <RewindButton />
-            <FastForwardButton />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup>
-            <ZoomInButton />
-            <ZoomOutButton />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup>
-            <TimeFormatSelect />
-            <AudioPosition />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup>
-            <SelectionTimeInputs />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup>
-            <MasterVolumeControl />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup>
-            <AutomaticScrollCheckbox />
-            <ContinuousPlayCheckbox />
-            <LinkEndpointsCheckbox />
-            <EditableCheckbox />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup>
-            <DownloadAnnotationsButton />
-          </ControlGroup>
-        </TopBar>
-
-        <Waveform theme={theme} annotationControls={annotationActions} />
-      </Container>
+      <AnnotationsAppContent />
     </WaveformPlaylistProvider>
   );
 }

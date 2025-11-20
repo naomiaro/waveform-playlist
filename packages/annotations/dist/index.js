@@ -787,31 +787,35 @@ var LinkEndpointsCheckbox = ({
 // src/components/EditableCheckbox.tsx
 var import_styled_components8 = __toESM(require("styled-components"));
 var import_jsx_runtime8 = require("react/jsx-runtime");
-var Label4 = import_styled_components8.default.label`
-  display: flex;
+var CheckboxWrapper3 = import_styled_components8.default.div`
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-  user-select: none;
 `;
-var Checkbox3 = import_styled_components8.default.input.attrs({ type: "checkbox" })`
+var Checkbox3 = import_styled_components8.default.input`
   cursor: pointer;
+`;
+var Label4 = import_styled_components8.default.label`
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
 `;
 var EditableCheckbox = ({
   checked,
   onChange,
   className
 }) => {
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(Label4, { className, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(CheckboxWrapper3, { className, children: [
     /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
       Checkbox3,
       {
+        type: "checkbox",
+        id: "editable-annotations",
         checked,
         onChange: (e) => onChange(e.target.checked)
       }
     ),
-    "Editable Annotations"
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(Label4, { htmlFor: "editable-annotations", children: "Editable Annotations" })
   ] });
 };
 

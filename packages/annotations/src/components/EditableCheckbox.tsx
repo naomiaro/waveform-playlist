@@ -1,17 +1,20 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const Label = styled.label`
-  display: flex;
+const CheckboxWrapper = styled.div`
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-  user-select: none;
 `;
 
-const Checkbox = styled.input.attrs({ type: 'checkbox' })`
+const Checkbox = styled.input`
   cursor: pointer;
+`;
+
+const Label = styled.label`
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
 `;
 
 export interface EditableCheckboxProps {
@@ -26,12 +29,14 @@ export const EditableCheckbox: React.FC<EditableCheckboxProps> = ({
   className,
 }) => {
   return (
-    <Label className={className}>
+    <CheckboxWrapper className={className}>
       <Checkbox
+        type="checkbox"
+        id="editable-annotations"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      Editable Annotations
-    </Label>
+      <Label htmlFor="editable-annotations">Editable Annotations</Label>
+    </CheckboxWrapper>
   );
 };

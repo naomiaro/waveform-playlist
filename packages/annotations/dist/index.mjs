@@ -740,31 +740,35 @@ var LinkEndpointsCheckbox = ({
 // src/components/EditableCheckbox.tsx
 import styled8 from "styled-components";
 import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
-var Label4 = styled8.label`
-  display: flex;
+var CheckboxWrapper3 = styled8.div`
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-  user-select: none;
 `;
-var Checkbox3 = styled8.input.attrs({ type: "checkbox" })`
+var Checkbox3 = styled8.input`
   cursor: pointer;
+`;
+var Label4 = styled8.label`
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
 `;
 var EditableCheckbox = ({
   checked,
   onChange,
   className
 }) => {
-  return /* @__PURE__ */ jsxs8(Label4, { className, children: [
+  return /* @__PURE__ */ jsxs8(CheckboxWrapper3, { className, children: [
     /* @__PURE__ */ jsx8(
       Checkbox3,
       {
+        type: "checkbox",
+        id: "editable-annotations",
         checked,
         onChange: (e) => onChange(e.target.checked)
       }
     ),
-    "Editable Annotations"
+    /* @__PURE__ */ jsx8(Label4, { htmlFor: "editable-annotations", children: "Editable Annotations" })
   ] });
 };
 
