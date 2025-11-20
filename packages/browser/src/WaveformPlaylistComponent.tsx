@@ -31,7 +31,8 @@ import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
 import { SelectionTimeInputsManager } from './SelectionTimeInputsManager';
-import { useTimeFormat, useZoomControls, useAudioPosition } from './hooks';
+import { MasterVolumeManager } from './MasterVolumeManager';
+import { useTimeFormat, useZoomControls, useAudioPosition, useMasterVolume } from './hooks';
 
 // Default theme
 const defaultTheme = {
@@ -110,12 +111,14 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     startX: number;
   } | null>(null);
 
+  // Refs (defined first so hooks can use them)
+  const playoutRef = useRef<TonePlayout | null>(null);
+
   // Use custom hooks
   const { timeFormat, formatTime } = useTimeFormat();
   const zoom = useZoomControls({ initialSamplesPerPixel });
   const samplesPerPixel = zoom.samplesPerPixel;
-
-  const playoutRef = useRef<TonePlayout | null>(null);
+  const { masterVolume, setMasterVolume } = useMasterVolume({ playoutRef, initialVolume: 100 });
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -125,6 +128,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const isAutomaticScrollRef = useRef(false);
   const isPlayingRef = useRef(false);
   const selectionInputsManagerRef = useRef<SelectionTimeInputsManager | null>(null);
+  const masterVolumeManagerRef = useRef<MasterVolumeManager | null>(null);
 
   const theme = { ...defaultTheme, ...userTheme };
 
@@ -821,6 +825,38 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       selectionInputsManagerRef.current = null;
     };
   }, []);
+
+  // Initialize master volume control
+  useEffect(() => {
+    // Find the form that contains the master-gain slider
+    const masterGainForm = Array.from(document.querySelectorAll('form.form-inline')).find(
+      form => form.querySelector('.master-gain')
+    );
+
+    if (!masterGainForm) {
+      console.warn('MasterVolumeManager: form with master-gain not found');
+      return;
+    }
+
+    // Create the manager with the hook's state and setter
+    masterVolumeManagerRef.current = new MasterVolumeManager({
+      container: masterGainForm as HTMLElement,
+      volume: masterVolume,
+      onVolumeChange: setMasterVolume,
+    });
+
+    return () => {
+      masterVolumeManagerRef.current?.dispose();
+      masterVolumeManagerRef.current = null;
+    };
+  }, []);
+
+  // Update master volume display when volume changes
+  useEffect(() => {
+    if (masterVolumeManagerRef.current) {
+      masterVolumeManagerRef.current.updateVolume(masterVolume);
+    }
+  }, [masterVolume]);
 
   // Update selection inputs when selection changes
   useEffect(() => {

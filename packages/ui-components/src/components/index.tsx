@@ -5,6 +5,7 @@ export * from './AnnotationText';
 export * from './AnnotationsTrack';
 export * from './BBCExtractPeaks';
 export * from './Channel';
+export * from './MasterVolumeControl';
 export * from './Playhead';
 export * from './Playlist';
 export * from './Selection';

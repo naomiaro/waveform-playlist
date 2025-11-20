@@ -10,5 +10,8 @@ export type { UseAudioPositionProps } from './useAudioPosition';
 export { useZoomControls } from './useZoomControls';
 export type { ZoomControls, UseZoomControlsProps } from './useZoomControls';
 
+export { useMasterVolume } from './useMasterVolume';
+export type { MasterVolumeControls, UseMasterVolumeProps } from './useMasterVolume';
+
 export { useWaveformPlaylist } from './useWaveformPlaylist';
 export type { WaveformPlaylistControls, UseWaveformPlaylistProps } from './useWaveformPlaylist';
