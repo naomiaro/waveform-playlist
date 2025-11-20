@@ -1276,5 +1276,27 @@ export const init = WaveformPlaylistAPI.init;
 export type { PlaylistConfig, TrackConfig };
 export { Tone };
 
+// Export new flexible/headless API
+export { WaveformPlaylistProvider, useWaveformPlaylist } from './WaveformPlaylistContext';
+export type { WaveformPlaylistContextValue, WaveformTrack, TrackState } from './WaveformPlaylistContext';
+export {
+  PlayButton,
+  PauseButton,
+  StopButton,
+  RewindButton,
+  FastForwardButton,
+  SkipBackwardButton,
+  SkipForwardButton,
+  ZoomInButton,
+  ZoomOutButton,
+  MasterVolumeControl,
+  TimeFormatSelect,
+  AudioPosition,
+  SelectionTimeInputs,
+  AutomaticScrollCheckbox,
+  Waveform,
+} from './components';
+export type { WaveformProps } from './components/Waveform';
+
 // Default export for UMD
 export default WaveformPlaylistAPI;

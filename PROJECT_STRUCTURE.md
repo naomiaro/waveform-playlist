@@ -87,28 +87,37 @@ waveform-playlist/
 #### `@waveform-playlist/browser`
 - **Purpose:** Browser-ready React applications and webpack bundles
 - **Outputs:**
-  - `waveform-playlist.js` - Main bundle
+  - `waveform-playlist.js` - Main bundle (UMD)
   - `annotations-bundle.js` - Annotations example bundle
+  - `stem-tracks-bundle.js` - Stem tracks example bundle
+  - `flexible-example-bundle.js` - Flexible API example bundle
 - **Structure:**
   ```
   src/
-  ├── index.tsx                      # Main entry point
-  ├── annotations-app.tsx            # Annotations example app
-  ├── WaveformPlaylistComponent.tsx  # Main React component
-  ├── SelectionTimeInputsManager.tsx # HTML↔React bridge
-  ├── peaksUtil.ts                   # Peak generation helper
-  ├── hooks/                         # Custom hooks for logic extraction
-  │   ├── usePlaybackControls.ts     # Play/pause/stop/seek
-  │   ├── useTimeFormat.ts           # Time formatting
-  │   ├── useZoomControls.ts         # Zoom in/out
-  │   ├── useAudioPosition.ts        # Audio position display
-  │   ├── useWaveformPlaylist.ts     # Composite hook
-  │   ├── index.ts                   # Hook exports
-  │   └── README.md                  # Hook API docs
-  ├── components/                    # React components
-  │   └── DefaultPlaylistControls.tsx
-  └── examples/                      # Usage examples
-      └── CustomControlsExample.tsx
+  ├── index.tsx                         # Main entry point + API exports
+  ├── annotations-app.tsx               # Annotations example app
+  ├── stem-tracks-app.tsx               # Stem tracks example app
+  ├── flexible-example-app.tsx          # Flexible API example app
+  ├── WaveformPlaylistComponent.tsx     # Main React component (backward compatible)
+  ├── WaveformPlaylistContext.tsx       # Context provider for flexible API
+  ├── peaksUtil.ts                      # Peak generation helper
+  ├── hooks/                            # Custom hooks for logic extraction
+  │   ├── usePlaybackControls.ts        # Play/pause/stop/seek
+  │   ├── useTimeFormat.ts              # Time formatting
+  │   ├── useZoomControls.ts            # Zoom in/out
+  │   ├── useAudioPosition.ts           # Audio position display
+  │   ├── useMasterVolume.ts            # Master volume control
+  │   ├── useWaveformPlaylist.ts        # Composite hook
+  │   ├── index.ts                      # Hook exports
+  │   └── README.md                     # Hook API docs
+  ├── components/                       # Flexible API primitive components
+  │   ├── PlaybackControls.tsx          # Play/Pause/Stop/Rewind/FF buttons
+  │   ├── ZoomControls.tsx              # Zoom in/out buttons
+  │   ├── ContextualControls.tsx        # Context-aware wrappers
+  │   ├── Waveform.tsx                  # Main waveform visualization
+  │   └── index.tsx                     # Component exports
+  └── examples/                         # Usage examples
+      └── CustomControlsExample.tsx     # Custom UI example
   ```
 - **Build:** Webpack production builds → `ghpages/js/`
 
@@ -155,8 +164,31 @@ Web Audio API (direct)
 - `ghpages/js/annotations.js` - Annotations data
 - HTML templates with inline event listeners
 
-### New Architecture (React + Hooks)
+### New Architecture (React + Hooks + Context)
 
+**Flexible API Pattern (Provider + Primitives):**
+```
+User Interaction (React Events)
+    ↓
+WaveformPlaylistProvider (Context)
+    ├─→ All playlist state and logic
+    ├─→ Custom hooks internally
+    └─→ useWaveformPlaylist hook
+    ↓
+├─→ Primitive Components (anywhere in tree)
+│   ├─→ PlayButton, PauseButton, StopButton
+│   ├─→ ZoomInButton, ZoomOutButton
+│   ├─→ MasterVolumeControl, TimeFormatSelect
+│   └─→ Waveform (with custom track controls)
+│
+├─→ UI Components (React)
+│   └─→ Canvas Rendering (SmartChannel)
+│
+└─→ TonePlayout (Tone.js)
+    └─→ Web Audio API
+```
+
+**Traditional Pattern (Component-based):**
 ```
 User Interaction (React Events)
     ↓
@@ -166,7 +198,7 @@ WaveformPlaylistComponent (State)
 │   ├─→ usePlaybackControls
 │   ├─→ useTimeFormat
 │   ├─→ useZoomControls
-│   └─→ useAudioPosition
+│   └─→ useMasterVolume
 │
 ├─→ UI Components (React)
 │   └─→ Canvas Rendering (SmartChannel)
@@ -176,8 +208,10 @@ WaveformPlaylistComponent (State)
 ```
 
 **Key Files:**
-- `packages/browser/src/WaveformPlaylistComponent.tsx` - Main orchestrator
+- `packages/browser/src/WaveformPlaylistContext.tsx` - Context provider (flexible API)
+- `packages/browser/src/WaveformPlaylistComponent.tsx` - Main orchestrator (backward compatible)
 - `packages/browser/src/hooks/` - Reusable business logic
+- `packages/browser/src/components/` - Primitive components
 - `packages/ui-components/src/components/Playlist.tsx` - UI container
 - `packages/playout/src/TonePlayout.ts` - Audio playback
 
@@ -353,25 +387,34 @@ Re-render Playhead position
 
 ### ✅ Completed (React)
 - **Custom Hooks Architecture** - Reusable hooks for building custom UIs
-  - `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, `useAudioPosition`
+  - `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, `useAudioPosition`, `useMasterVolume`
   - `useWaveformPlaylist` composite hook
   - Full API documentation and examples
+- **Flexible/Headless API** - Provider pattern with primitive components
+  - `WaveformPlaylistProvider` - Context provider for state management
+  - Primitive components: PlayButton, PauseButton, StopButton, ZoomInButton, etc.
+  - `Waveform` component with render prop for custom track controls
+  - `useWaveformPlaylist` hook for accessing context
+  - Full example showing custom layout (`flexible-api.html`)
 - Annotations example
+- Stem-tracks example (cleaned up with React controls)
 - Selection time inputs
 - Playback controls (play/pause/stop/seek)
 - Waveform rendering
 - Automatic scroll
 - Track controls (mute/solo/volume/pan)
-- Stem-tracks example
+- Master volume control
+- Stop button remembers start position
 
 ### 🚧 In Progress
-- Render props support for custom components
 - Theme system
 - Design tokens
-- More examples
+- More examples showing different layouts
 
 ### 🔮 Planned
-- Additional hooks (`useTrackControls`, `useSelection`, `useAnnotations`, `useKeyboardShortcuts`)
+- Additional hooks (`useSelection`, `useAnnotations`, `useKeyboardShortcuts`)
+- Component library documentation
+- Unit tests for hooks and components
 
 ### ❌ Not Started (Still jQuery)
 - Most other examples (fades, effects, etc.)
@@ -423,21 +466,73 @@ pnpm build && jekyll build -s ghpages -d _site
 - `CLAUDE.md` - AI development notes and architectural decisions
 - `PROJECT_STRUCTURE.md` - This file
 
-## Custom Hooks Architecture
+## Flexible/Headless API Architecture
 
-The playlist has been refactored to use a **custom hooks architecture** that separates business logic from UI presentation.
+The playlist now provides a **flexible/headless API** using React Context and primitive components, allowing complete customization of layout and controls.
+
+### Architecture Pattern
+
+**Hybrid Approach:** Provider + Primitives + Render Props
+- `WaveformPlaylistProvider` wraps your app and provides state via context
+- Primitive components (PlayButton, ZoomInButton, etc.) work anywhere inside the provider
+- `Waveform` component accepts a render prop for custom track controls
+- `useWaveformPlaylist` hook provides direct access to state/methods
 
 ### Benefits
 
-1. **Separation of Concerns** - Logic extracted into reusable hooks, UI can be completely customized
-2. **Type Safety** - Full TypeScript support with auto-completion
-3. **Flexibility** - Users can build any UI using their own component library
-4. **Testability** - Hooks can be tested independently from presentation
-5. **Backward Compatibility** - Still works with existing HTML structure
+1. **Maximum Flexibility** - Place controls anywhere in your layout
+2. **Customizable Track Controls** - Use render prop to completely customize track UI
+3. **Access to State** - Build entirely custom components using the hook
+4. **Type Safety** - Full TypeScript support with auto-completion
+5. **Good Defaults** - Waveform provides sensible default track controls
+6. **Backward Compatible** - Old class-based API and WaveformPlaylistComponent still work
 
 ### Usage Patterns
 
-**Option 1: Use individual hooks**
+**Option 1: Flexible API with Provider (Recommended)**
+```typescript
+import {
+  WaveformPlaylistProvider,
+  PlayButton,
+  StopButton,
+  Waveform,
+  MasterVolumeControl,
+  useWaveformPlaylist,
+} from '@waveform-playlist/browser';
+
+// Custom track controls
+const CustomTrackControls = ({ trackIndex }) => {
+  const { trackStates, setTrackMute } = useWaveformPlaylist();
+  return (
+    <button onClick={() => setTrackMute(trackIndex, !trackStates[trackIndex].muted)}>
+      {trackStates[trackIndex].muted ? 'Unmute' : 'Mute'}
+    </button>
+  );
+};
+
+// Your custom layout
+function MyPlaylist() {
+  return (
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+      <div className="my-layout">
+        <div className="controls">
+          <PlayButton />
+          <StopButton />
+          <MasterVolumeControl />
+        </div>
+
+        <Waveform
+          renderTrackControls={(trackIndex) => (
+            <CustomTrackControls trackIndex={trackIndex} />
+          )}
+        />
+      </div>
+    </WaveformPlaylistProvider>
+  );
+}
+```
+
+**Option 2: Individual Hooks (Advanced)**
 ```typescript
 import { usePlaybackControls, useTimeFormat } from '@waveform-playlist/browser/hooks';
 
@@ -445,28 +540,28 @@ const { play, pause, stop } = usePlaybackControls({ playoutRef });
 const { formatTime } = useTimeFormat();
 ```
 
-**Option 2: Use composite hook**
+**Option 3: Traditional Component (Backward Compatible)**
 ```typescript
-import { useWaveformPlaylist } from '@waveform-playlist/browser/hooks';
+import { WaveformPlaylistComponent } from '@waveform-playlist/browser';
 
-const controls = useWaveformPlaylist({ playoutRef, currentTime, duration, ... });
-// Access: controls.playback, controls.zoom, controls.timeFormat, controls.state
-```
-
-**Option 3: Future render props pattern**
-```typescript
-<WaveformPlaylist
+<WaveformPlaylistComponent
   tracks={tracks}
-  renderControls={(controls) => <MyCustomControls {...controls} />}
+  samplesPerPixel={1024}
 />
 ```
 
 ### Example Components
 
+- `flexible-example-app.tsx` - Complete custom layout with styled components
+- `stem-tracks-app.tsx` - Simplified example using WaveformPlaylistComponent
 - `DefaultPlaylistControls.tsx` - Reference implementation showing hook usage
 - `CustomControlsExample.tsx` - Fully styled custom player with progress bar
 
-See `packages/browser/HOOKS_ARCHITECTURE.md` for complete documentation.
+### Documentation
+
+- `packages/browser/HOOKS_ARCHITECTURE.md` - Hooks architecture overview
+- `packages/browser/src/hooks/README.md` - Hooks API documentation
+- `ghpages/_examples/flexible-api.html` - Live demo of flexible API
 
 ## Future Improvements
 
@@ -478,4 +573,4 @@ See `CLAUDE.md` for architectural decisions and next steps:
 
 ---
 
-**Last Updated:** 2025-01-19 (Added custom hooks architecture documentation)
+**Last Updated:** 2025-01-19 (Added flexible/headless API architecture documentation with WaveformPlaylistProvider, primitive components, and render props)

@@ -100,4 +100,35 @@ module.exports = [
     },
     devtool: 'source-map',
   },
+  // Flexible API example bundle
+  {
+    entry: './src/flexible-example-app.tsx',
+    output: {
+      path: path.resolve(__dirname, '../../ghpages/js'),
+      filename: 'flexible-example-bundle.js',
+    },
+    resolve: {
+      extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    },
+    module: {
+      rules: [
+        {
+          test: /\.tsx?$/,
+          use: {
+            loader: 'ts-loader',
+            options: {
+              configFile: path.resolve(__dirname, 'tsconfig.json'),
+              transpileOnly: true,
+            },
+          },
+          exclude: /node_modules/,
+        },
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader'],
+        },
+      ],
+    },
+    devtool: 'source-map',
+  },
 ];

@@ -139,6 +139,74 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 // Build any UI you want!
 ```
 
+## Flexible/Headless API Architecture (2025-01-19)
+
+### Decision: Provider Pattern + Primitive Components
+
+**Implemented:** Complete flexible API using React Context and primitive components.
+
+**Architecture Pattern:** Hybrid approach (#3)
+- Provider for state management (`WaveformPlaylistProvider`)
+- Primitive components that work anywhere inside provider
+- Render props for customizable parts (track controls)
+- Hooks for accessing state (`useWaveformPlaylist`)
+
+**Key Components Created:**
+
+**Provider & Context:**
+- `WaveformPlaylistProvider` - Context provider with all playlist state/logic
+- `useWaveformPlaylist` - Hook to access context from any component
+
+**Primitive Control Components:**
+- `PlayButton`, `PauseButton`, `StopButton` - Playback controls
+- `RewindButton`, `FastForwardButton` - Skip controls
+- `ZoomInButton`, `ZoomOutButton` - Zoom controls
+- `MasterVolumeControl` - Master volume slider
+- `TimeFormatSelect` - Time format dropdown
+- `AudioPosition` - Current time display
+- `SelectionTimeInputs` - Selection start/end inputs
+- `AutomaticScrollCheckbox` - Auto-scroll toggle
+
+**Core Components:**
+- `Waveform` - Visualization component with optional custom track controls via render prop
+
+**Benefits:**
+- **Maximum Flexibility:** Controls can be placed anywhere in layout
+- **Customizable Track Controls:** Use render prop to customize per-track UI
+- **Access to State:** Use hook to build completely custom components
+- **Good Defaults:** Waveform component provides default track controls
+- **Backward Compatible:** Old class-based API still works
+
+**Example Usage:**
+```tsx
+<WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+  <div className="my-layout">
+    <div className="top-bar">
+      <PlayButton />
+      <StopButton />
+      <AudioPosition />
+    </div>
+
+    <Waveform
+      renderTrackControls={(trackIndex) => (
+        <CustomTrackControls trackIndex={trackIndex} />
+      )}
+    />
+
+    <div className="footer">
+      <MasterVolumeControl />
+      <TimeFormatSelect />
+    </div>
+  </div>
+</WaveformPlaylistProvider>
+```
+
+**Location:**
+- Context: `packages/browser/src/WaveformPlaylistContext.tsx`
+- Components: `packages/browser/src/components/`
+- Example: `packages/browser/src/flexible-example-app.tsx`
+- Demo page: `ghpages/_examples/flexible-api.html`
+
 ## Current Work (Tone.js Overhaul Branch)
 
 ### Status
@@ -146,16 +214,16 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 - Annotations and stem-tracks examples working with React
 - Selection inputs implemented and functional
 - **Custom hooks architecture implemented**
+- **Flexible/headless API architecture implemented**
 - Track controls with mute/solo/volume/pan working
+- Stop button remembers start position behavior fixed
 
 ### Next Steps / Ideas
-- Add render props support for custom control components
-- Create more custom hooks (useTrackControls, useSelection, useAnnotations)
 - Consider creating theme/design tokens system
-- Evaluate Radix UI for complex components (sliders, dropdowns)
 - Build out primitives library as needed
-- Add more examples to React version
-- Document hooks usage patterns
+- Add more examples showing different layout patterns
+- Document all hooks and components in detail
+- Add unit tests for hooks and components
 
 ## Important Notes
 
@@ -173,4 +241,4 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 ---
 
 **Last Updated:** 2025-01-19
-**Session Notes:** Implemented custom hooks architecture, refactored WaveformPlaylistComponent to use hooks internally, stem-tracks example with React track controls
+**Session Notes:** Implemented flexible/headless API with WaveformPlaylistProvider, primitive control components, and Waveform component with render props. Created flexible-api example showing customizable layout. Fixed stop button behavior to remember start position. Added master volume controls with proper 0-100 to 0-1 gain conversion.

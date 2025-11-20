@@ -45,7 +45,7 @@ export function initStemTracksApp() {
       timescale={true}
       mono={true}
       waveHeight={100}
-      samplesPerPixel={1000}
+      samplesPerPixel={1024}
       theme={theme}
       controls={{
         show: true,
