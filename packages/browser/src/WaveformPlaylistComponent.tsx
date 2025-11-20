@@ -24,6 +24,8 @@ import {
   SliderWrapper,
   VolumeDownIcon,
   VolumeUpIcon,
+  formatTime,
+  type TimeFormat,
 } from '@waveform-playlist/ui-components';
 import { TonePlayout } from '@waveform-playlist/playout';
 import { type Track } from '@waveform-playlist/core';
@@ -106,6 +108,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>('hh:mm:ss.uuu');
   const [draggingAnnotation, setDraggingAnnotation] = useState<{
     id: string;
     edge: 'start' | 'end';
@@ -238,6 +241,32 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     setAnnotations(parsed);
   }, [annotationList?.annotations]);
 
+  // Listen to time format changes
+  useEffect(() => {
+    const timeFormatSelect = document.querySelector('.time-format') as HTMLSelectElement;
+
+    const handleFormatChange = () => {
+      if (timeFormatSelect) {
+        setTimeFormat(timeFormatSelect.value as TimeFormat);
+        // Update audio-pos immediately with new format
+        const audioPosElement = document.querySelector('.audio-pos');
+        if (audioPosElement) {
+          audioPosElement.textContent = formatTime(currentTimeRef.current, timeFormatSelect.value as TimeFormat);
+        }
+      }
+    };
+
+    // Set initial value
+    if (timeFormatSelect) {
+      setTimeFormat(timeFormatSelect.value as TimeFormat);
+      timeFormatSelect.addEventListener('change', handleFormatChange);
+    }
+
+    return () => {
+      timeFormatSelect?.removeEventListener('change', handleFormatChange);
+    };
+  }, []);
+
   // Automatic scroll to keep playhead in view
   const scrollToCurrentTime = () => {
     if (!scrollContainerRef.current || audioBuffers.length === 0) {
@@ -290,6 +319,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
         const time = playoutRef.current.getCurrentTime();
         currentTimeRef.current = time;
         setCurrentTime(time);
+
+        // Update audio-pos display element
+        const audioPosElement = document.querySelector('.audio-pos');
+        if (audioPosElement) {
+          audioPosElement.textContent = formatTime(time, timeFormat);
+        }
 
         // Check if playback has reached the end
         if (time >= duration) {
@@ -377,6 +412,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     setCurrentTime(0);
     setActiveAnnotationId(null);
     setShouldScrollToActive(false);
+
+    // Update audio-pos display
+    const audioPosElement = document.querySelector('.audio-pos');
+    if (audioPosElement) {
+      audioPosElement.textContent = formatTime(0, timeFormat);
+    }
   };
 
   const handleAnnotationClick = async (annotation: AnnotationData) => {
@@ -402,6 +443,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     // Clear any existing selection
     setSelectionStart(clickTime);
     setSelectionEnd(clickTime);
+
+    // Update audio-pos display
+    const audioPosElement = document.querySelector('.audio-pos');
+    if (audioPosElement) {
+      audioPosElement.textContent = formatTime(clickTime, timeFormat);
+    }
   };
 
   const handleAnnotationDragStart = (annotationId: string, edge: 'start' | 'end', e: React.DragEvent) => {
