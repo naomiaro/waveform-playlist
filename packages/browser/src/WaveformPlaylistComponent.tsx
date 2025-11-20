@@ -248,8 +248,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       return;
     }
 
-    // Convert current time to pixels
+    // Convert current time to pixels (waveform coordinates)
     const currentPixel = secondsToPixels(currentTimeRef.current, samplesPerPixel, sampleRate);
+
+    // Add control width to get position in TracksContainer coordinates (where playhead is actually rendered)
+    const controlWidth = controls.show ? controls.width : 0;
+    const playheadPosition = currentPixel + controlWidth;
 
     const viewportWidth = scrollContainerRef.current.clientWidth;
     const currentScrollLeft = scrollContainerRef.current.scrollLeft;
@@ -259,11 +263,12 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     const playheadOffset = viewportWidth * 0.2;
 
     // Check if playhead is outside the visible area
-    const isOutsideLeft = currentPixel < currentScrollLeft;
-    const isOutsideRight = currentPixel > currentScrollRight;
+    const isOutsideLeft = playheadPosition < currentScrollLeft;
+    const isOutsideRight = playheadPosition > currentScrollRight;
 
     console.log('scrollToCurrentTime:', {
       currentPixel,
+      playheadPosition,
       viewportWidth,
       currentScrollLeft,
       currentScrollRight,
@@ -272,7 +277,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     });
 
     if (isOutsideLeft || isOutsideRight) {
-      const newScrollLeft = Math.max(0, currentPixel - playheadOffset);
+      const newScrollLeft = Math.max(0, playheadPosition - playheadOffset);
       console.log('Scrolling to:', newScrollLeft);
       scrollContainerRef.current.scrollLeft = newScrollLeft;
     }
@@ -894,17 +899,29 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                     const trackState = trackStates[trackIndex] || { muted: false, soloed: false, volume: 1.0, pan: 0 };
 
                     const handleMute = () => {
+                      const newMuted = !trackState.muted;
                       const newStates = [...trackStates];
-                      newStates[trackIndex] = { ...trackState, muted: !trackState.muted };
+                      newStates[trackIndex] = { ...trackState, muted: newMuted };
                       setTrackStates(newStates);
-                      // TODO: Update Tone.js track mute state
+
+                      // Update Tone.js track mute state
+                      if (playoutRef.current) {
+                        const trackId = `track-${trackIndex}`;
+                        playoutRef.current.setMute(trackId, newMuted);
+                      }
                     };
 
                     const handleSolo = () => {
+                      const newSoloed = !trackState.soloed;
                       const newStates = [...trackStates];
-                      newStates[trackIndex] = { ...trackState, soloed: !trackState.soloed };
+                      newStates[trackIndex] = { ...trackState, soloed: newSoloed };
                       setTrackStates(newStates);
-                      // TODO: Update Tone.js track solo state
+
+                      // Update Tone.js track solo state
+                      if (playoutRef.current) {
+                        const trackId = `track-${trackIndex}`;
+                        playoutRef.current.setSolo(trackId, newSoloed);
+                      }
                     };
 
                     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -912,7 +929,15 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                       const newStates = [...trackStates];
                       newStates[trackIndex] = { ...trackState, volume };
                       setTrackStates(newStates);
-                      // TODO: Update Tone.js track volume
+
+                      // Update Tone.js track volume
+                      if (playoutRef.current) {
+                        const trackId = `track-${trackIndex}`;
+                        const track = playoutRef.current.getTrack(trackId);
+                        if (track) {
+                          track.setVolume(volume);
+                        }
+                      }
                     };
 
                     const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -920,7 +945,15 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
                       const newStates = [...trackStates];
                       newStates[trackIndex] = { ...trackState, pan };
                       setTrackStates(newStates);
-                      // TODO: Update Tone.js track pan
+
+                      // Update Tone.js track pan
+                      if (playoutRef.current) {
+                        const trackId = `track-${trackIndex}`;
+                        const track = playoutRef.current.getTrack(trackId);
+                        if (track) {
+                          track.setPan(pan);
+                        }
+                      }
                     };
 
                     const trackControls = (
