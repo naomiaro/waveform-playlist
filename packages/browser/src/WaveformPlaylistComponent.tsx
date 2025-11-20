@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ThemeProvider } from 'styled-components';
+import styled, { ThemeProvider } from 'styled-components';
 import {
   AnnotationBox,
   AnnotationBoxesWrapper,
@@ -24,15 +24,18 @@ import {
   SliderWrapper,
   VolumeDownIcon,
   VolumeUpIcon,
+  SelectionTimeInputs,
+  MasterVolumeControl,
+  AutomaticScrollCheckbox,
+  TimeFormatSelect,
+  AudioPosition,
 } from '@waveform-playlist/ui-components';
 import { TonePlayout } from '@waveform-playlist/playout';
 import { type Track } from '@waveform-playlist/core';
 import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
-import { SelectionTimeInputsManager } from './SelectionTimeInputsManager';
-import { MasterVolumeManager } from './MasterVolumeManager';
-import { useTimeFormat, useZoomControls, useAudioPosition, useMasterVolume } from './hooks';
+import { useTimeFormat, useZoomControls, useMasterVolume } from './hooks';
 
 // Default theme
 const defaultTheme = {
@@ -41,6 +44,23 @@ const defaultTheme = {
   waveProgressColor: '#ff0000',
   timeColor: '#000',
 };
+
+// Styled components for controls
+const ControlsWrapper = styled.div`
+  padding: 1rem;
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  flex-wrap: wrap;
+`;
+
+const ControlGroup = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+`;
 
 export interface WaveformPlaylistProps {
   tracks: Array<{
@@ -113,9 +133,10 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
   // Refs (defined first so hooks can use them)
   const playoutRef = useRef<TonePlayout | null>(null);
+  const playStartPositionRef = useRef<number>(0); // Track where playback started
 
   // Use custom hooks
-  const { timeFormat, formatTime } = useTimeFormat();
+  const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
   const zoom = useZoomControls({ initialSamplesPerPixel });
   const samplesPerPixel = zoom.samplesPerPixel;
   const { masterVolume, setMasterVolume } = useMasterVolume({ playoutRef, initialVolume: 100 });
@@ -127,8 +148,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const isSelectingRef = useRef(false);
   const isAutomaticScrollRef = useRef(false);
   const isPlayingRef = useRef(false);
-  const selectionInputsManagerRef = useRef<SelectionTimeInputsManager | null>(null);
-  const masterVolumeManagerRef = useRef<MasterVolumeManager | null>(null);
 
   const theme = { ...defaultTheme, ...userTheme };
 
@@ -222,9 +241,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       }
     };
   }, [tracks, samplesPerPixel, mono, onReady]);
-
-  // Use useAudioPosition hook to update .audio-pos element
-  useAudioPosition({ currentTime, formatTime });
 
   // Parse annotations
   useEffect(() => {
@@ -340,6 +356,9 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
 
     await playoutRef.current.init();
 
+    // Save the position where playback is starting
+    playStartPositionRef.current = startTime ?? currentTimeRef.current;
+
     if (playDuration !== undefined) {
       isPlayingTimedSegmentRef.current = true;
       playoutRef.current.setOnPlaybackComplete(() => {
@@ -381,8 +400,9 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     setIsPlaying(false);
     stopAnimationLoop();
 
-    currentTimeRef.current = 0;
-    setCurrentTime(0);
+    // Reset to the position where playback started (not 0)
+    currentTimeRef.current = playStartPositionRef.current;
+    setCurrentTime(playStartPositionRef.current);
     setActiveAnnotationId(null);
     setShouldScrollToActive(false);
   };
@@ -582,6 +602,8 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
       // Don't clear the selection - keep it as is
 
       if (isPlaying && playoutRef.current) {
+        // Save the new start position when seeking during playback
+        playStartPositionRef.current = start;
         playoutRef.current.stop();
         playoutRef.current.play(Tone.now(), start);
       } else if (playoutRef.current) {
@@ -614,9 +636,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
         await playoutRef.current.init();
         playoutRef.current.stop();
 
+        // Save the position where playback is starting
         // Check if there's a selection
         if (selectionStart !== selectionEnd && selectionEnd > selectionStart) {
           // Play only the selected region
+          playStartPositionRef.current = selectionStart;
           const duration = selectionEnd - selectionStart;
           playoutRef.current.setOnPlaybackComplete(() => {
             handlePause(false);
@@ -624,6 +648,7 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
           playoutRef.current.play(Tone.now(), selectionStart, duration);
         } else {
           // Play from current position to the end
+          playStartPositionRef.current = currentTimeRef.current;
           playoutRef.current.play(Tone.now(), currentTimeRef.current);
         }
 
@@ -791,81 +816,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     };
   }, [zoom.zoomIn, zoom.zoomOut]);
 
-  // Initialize selection time inputs manager
-  useEffect(() => {
-    // Find the form that contains the time inputs
-    const timeFormatForm = Array.from(document.querySelectorAll('form.form-inline')).find(
-      form => form.querySelector('.time-format')
-    );
-
-    if (!timeFormatForm) {
-      console.warn('SelectionTimeInputs: time format form not found');
-      return;
-    }
-
-    // Create the manager with the actual form element
-    selectionInputsManagerRef.current = new SelectionTimeInputsManager({
-      container: timeFormatForm as HTMLElement,
-      onSelectionChange: (start, end) => {
-        setSelectionStart(start);
-        setSelectionEnd(end);
-        currentTimeRef.current = start;
-        setCurrentTime(start);
-
-        // If playing, seek to the new position
-        if (isPlaying && playoutRef.current) {
-          playoutRef.current.stop();
-          playoutRef.current.play(Tone.now(), start);
-        }
-      },
-    });
-
-    return () => {
-      selectionInputsManagerRef.current?.dispose();
-      selectionInputsManagerRef.current = null;
-    };
-  }, []);
-
-  // Initialize master volume control
-  useEffect(() => {
-    // Find the form that contains the master-gain slider
-    const masterGainForm = Array.from(document.querySelectorAll('form.form-inline')).find(
-      form => form.querySelector('.master-gain')
-    );
-
-    if (!masterGainForm) {
-      console.warn('MasterVolumeManager: form with master-gain not found');
-      return;
-    }
-
-    // Create the manager with the hook's state and setter
-    masterVolumeManagerRef.current = new MasterVolumeManager({
-      container: masterGainForm as HTMLElement,
-      volume: masterVolume,
-      onVolumeChange: setMasterVolume,
-    });
-
-    return () => {
-      masterVolumeManagerRef.current?.dispose();
-      masterVolumeManagerRef.current = null;
-    };
-  }, []);
-
-  // Update master volume display when volume changes
-  useEffect(() => {
-    if (masterVolumeManagerRef.current) {
-      masterVolumeManagerRef.current.updateVolume(masterVolume);
-    }
-  }, [masterVolume]);
-
-  // Update selection inputs when selection changes
-  useEffect(() => {
-    console.log('WaveformPlaylist: Selection changed', { selectionStart, selectionEnd, hasManager: !!selectionInputsManagerRef.current });
-    if (selectionInputsManagerRef.current) {
-      selectionInputsManagerRef.current.updateSelection(selectionStart, selectionEnd);
-    }
-  }, [selectionStart, selectionEnd]);
-
   // Calculate dimensions
   const sampleRate = audioBuffers[0]?.sampleRate || 44100;
   const timeScaleHeight = timescale ? 30 : 0;
@@ -889,6 +839,51 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
           controls: controls,
         }}>
           <div ref={containerRef} style={{ width: '100%' }}>
+            {/* Playlist Controls */}
+            <ControlsWrapper>
+              <ControlGroup>
+                <TimeFormatSelect
+                  value={timeFormat}
+                  onChange={setTimeFormat}
+                />
+              </ControlGroup>
+              <ControlGroup>
+                <SelectionTimeInputs
+                  selectionStart={selectionStart}
+                  selectionEnd={selectionEnd}
+                  onSelectionChange={(start, end) => {
+                    setSelectionStart(start);
+                    setSelectionEnd(end);
+                    currentTimeRef.current = start;
+                    setCurrentTime(start);
+
+                    // If playing, seek to the new position
+                    if (isPlaying && playoutRef.current) {
+                      playoutRef.current.stop();
+                      playoutRef.current.play(Tone.now(), start);
+                    }
+                  }}
+                />
+              </ControlGroup>
+              <ControlGroup>
+                <MasterVolumeControl
+                  volume={masterVolume}
+                  onChange={setMasterVolume}
+                />
+              </ControlGroup>
+              <ControlGroup>
+                <AutomaticScrollCheckbox
+                  checked={isAutomaticScrollRef.current}
+                  onChange={(checked) => {
+                    isAutomaticScrollRef.current = checked;
+                  }}
+                />
+              </ControlGroup>
+              <ControlGroup>
+                <AudioPosition formattedTime={formatTime(currentTime)} />
+              </ControlGroup>
+            </ControlsWrapper>
+
             {audioBuffers.length > 0 && peaksDataArray.length > 0 ? (
               <Playlist
                 theme={theme}
