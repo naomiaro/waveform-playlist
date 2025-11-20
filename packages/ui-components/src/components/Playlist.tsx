@@ -15,7 +15,7 @@ interface ScrollContainerProps {
 const ScrollContainer = styled.div<ScrollContainerProps>`
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
-  ${(props) => props.$width !== undefined && `max-width: ${props.$width}px;`}
+  ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
 `;
 
 interface TimescaleWrapperProps {

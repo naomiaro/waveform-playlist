@@ -354,7 +354,7 @@
 `,Re=Ee.default.div`
   position: relative;
   background: ${e=>e.$backgroundColor||"transparent"};
-  ${e=>void 0!==e.$width&&`max-width: ${e.$width}px;`}
+  ${e=>void 0!==e.$width&&`width: ${e.$width}px;`}
 `,Fe=Ee.default.div`
   background: white;
   ${e=>e.$width&&`width: ${e.$width}px;`}
