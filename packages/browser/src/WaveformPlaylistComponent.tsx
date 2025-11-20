@@ -368,10 +368,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   const handleAnnotationDrag = (e: React.DragEvent) => {
     if (!draggingAnnotation || e.clientX === 0) return; // clientX is 0 on dragend
 
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
 
-    const x = e.clientX - rect.left;
+    const rect = scrollContainer.getBoundingClientRect();
+    const x = e.clientX - rect.left + scrollContainer.scrollLeft;
     const newTime = (x * samplesPerPixel) / sampleRate;
 
     const updatedAnnotations = [...annotations];
