@@ -37,7 +37,6 @@
   },
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
-    "@waveform-playlist/state": "workspace:*",
     "@waveform-playlist/playout": "workspace:*",
     "@waveform-playlist/loaders": "workspace:*",
     "@waveform-playlist/webaudio-peaks": "workspace:*",

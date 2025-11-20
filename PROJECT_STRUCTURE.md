@@ -18,7 +18,6 @@ waveform-playlist/
 │   ├── core/              # Core types and interfaces
 │   ├── loaders/           # Audio file loaders
 │   ├── playout/           # Audio playback (Tone.js wrapper)
-│   ├── state/             # State management
 │   ├── ui-components/     # Reusable React UI components
 │   └── webaudio-peaks/    # Waveform peak generation
 │
@@ -47,11 +46,6 @@ waveform-playlist/
 - **Purpose:** Generate waveform visualization data from audio buffers
 - **Exports:** Peak data structures, peak generation functions
 - **Key concept:** Converts AudioBuffer → peak data for canvas rendering
-- **Dependencies:** Core
-
-#### `@waveform-playlist/state`
-- **Purpose:** State management utilities
-- **Exports:** State types and helpers
 - **Dependencies:** Core
 
 ### 🎨 UI Layer

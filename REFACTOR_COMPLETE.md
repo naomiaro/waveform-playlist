@@ -2,7 +2,7 @@
 
 ## Summary
 
-Successfully refactored the waveform-playlist project from a monolithic JavaScript codebase into a modern **TypeScript monorepo** with **React UI components**, **Zustand state management**, and **Tone.js 15.1.22**!
+Successfully refactored the waveform-playlist project from a monolithic JavaScript codebase into a modern **TypeScript monorepo** with **React UI components** and **Tone.js 15.1.22**!
 
 ---
 
@@ -30,11 +30,6 @@ Successfully refactored the waveform-playlist project from a monolithic JavaScri
 - `BlobLoader` for File/Blob objects
 - Event-based progress tracking
 - Modern async/await API
-
-#### `@waveform-playlist/state`
-- **Zustand** state management (replaced MobX)
-- Immutable updates with Immer
-- Track management and playback state
 
 #### `@waveform-playlist/annotations`
 - Annotation types and interfaces
@@ -69,7 +64,6 @@ Successfully refactored the waveform-playlist project from a monolithic JavaScri
 
 ### Core Libraries
 - **Tone.js 15.1.22**: Latest stable audio playback
-- **Zustand 4.x**: Lightweight state management
 - **React 18**: UI framework
 - **Styled-components 6**: Component styling
 
@@ -83,7 +77,6 @@ waveform-playlist/
 │   ├── core/                 # ✅ Types & utilities
 │   ├── playout/             # ✅ Tone.js 15.1.22 engine
 │   ├── loaders/             # ✅ Audio file loaders
-│   ├── state/               # ✅ Zustand state
 │   ├── annotations/         # ✅ Annotation support
 │   ├── ui-components/       # ✅ React components
 │   └── browser/             # ✅ Browser bundle

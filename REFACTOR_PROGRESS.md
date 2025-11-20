@@ -40,17 +40,6 @@ Successfully refactored waveform-playlist into a **pnpm monorepo** with **TypeSc
   - Modern async/await API
 - **Status**: ✅ Building and ready to use
 
-#### `@waveform-playlist/state` ✅ (Built Successfully)
-- **Purpose**: State management using **Zustand**
-- **Key Features**:
-  - Centralized playlist state store
-  - Track management (add, remove, update)
-  - Playback state (play, pause, stop, cursor position)
-  - View controls (zoom, scroll, selection)
-  - Solo/mute functionality
-  - Immer integration for immutable updates
-- **Status**: ✅ Building and ready to use
-
 #### `@waveform-playlist/annotations` ✅ (Built Successfully)
 - **Purpose**: Annotation support
 - **Key Features**:
@@ -80,13 +69,11 @@ Successfully refactored waveform-playlist into a **pnpm monorepo** with **TypeSc
 
 ### Core Libraries
 - **Tone.js 15.1.22**: Latest stable version for audio playback
-- **Zustand 4.x**: Lightweight state management (replaces MobX)
 - **React 18**: For UI components
 - **Styled-components 6**: For component styling
 
 ### Utilities
 - **eventemitter3**: Modern event emitter for loaders
-- **immer**: Immutable state updates for Zustand
 - **fade-maker**: Fade curve generation
 - **webaudio-peaks**: Waveform peak extraction
 
