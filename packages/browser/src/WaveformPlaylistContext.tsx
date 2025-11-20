@@ -32,6 +32,7 @@ export interface WaveformPlaylistContextValue {
   activeAnnotationId: string | null;
   selectionStart: number;
   selectionEnd: number;
+  isAutomaticScroll: boolean;
 
   // Playback controls
   play: (startTime?: number, playDuration?: number) => Promise<void>;
@@ -63,6 +64,10 @@ export interface WaveformPlaylistContextValue {
   // Master volume
   masterVolume: number;
   setMasterVolume: (volume: number) => void;
+
+  // Automatic scroll
+  setAutomaticScroll: (enabled: boolean) => void;
+  setScrollContainer: (element: HTMLDivElement | null) => void;
 
   // Refs
   playoutRef: React.RefObject<TonePlayout | null>;
@@ -130,6 +135,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
+  const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
 
   // Refs
   const playoutRef = useRef<TonePlayout | null>(null);
@@ -138,12 +144,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const animationFrameRef = useRef<number | null>(null);
   const playbackStartTimeRef = useRef<number>(0); // Tone.now() when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isAutomaticScrollRef = useRef<boolean>(false);
 
   // Custom hooks
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
   const zoom = useZoomControls({ initialSamplesPerPixel });
   const samplesPerPixel = zoom.samplesPerPixel;
   const { masterVolume, setMasterVolume } = useMasterVolume({ playoutRef, initialVolume: 100 });
+
+  // Keep ref in sync with state for automatic scroll
+  useEffect(() => {
+    isAutomaticScrollRef.current = isAutomaticScroll;
+  }, [isAutomaticScroll]);
 
   // Load audio and initialize
   useEffect(() => {
@@ -228,6 +241,22 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       currentTimeRef.current = time;
       setCurrentTime(time);
 
+      // Handle automatic scroll - continuously center the playhead
+      if (isAutomaticScrollRef.current && scrollContainerRef.current && audioBuffers.length > 0) {
+        const container = scrollContainerRef.current;
+        const sr = audioBuffers[0].sampleRate;
+        const pixelPosition = (time * sr) / samplesPerPixel;
+        const containerWidth = container.clientWidth;
+
+        // Calculate visual position of playhead (includes controls offset)
+        const controlWidth = controls.show ? controls.width : 0;
+        const visualPosition = pixelPosition + controlWidth;
+
+        // Continuously scroll to keep playhead centered
+        const targetScrollLeft = Math.max(0, visualPosition - containerWidth / 2);
+        container.scrollLeft = targetScrollLeft;
+      }
+
       if (time >= duration) {
         stop();
         return;
@@ -235,7 +264,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       animationFrameRef.current = requestAnimationFrame(updateTime);
     };
     animationFrameRef.current = requestAnimationFrame(updateTime);
-  }, [duration]);
+  }, [duration, audioBuffers, samplesPerPixel]);
 
   const stopAnimationLoop = useCallback(() => {
     if (animationFrameRef.current) {
@@ -365,6 +394,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     }
   }, [isPlaying]);
 
+  // Memoize setScrollContainer callback
+  const setScrollContainer = useCallback((element: HTMLDivElement | null) => {
+    scrollContainerRef.current = element;
+  }, []);
+
   const sampleRate = audioBuffers[0]?.sampleRate || 44100;
   const timeScaleHeight = timescale ? 30 : 0;
   const minimumPlaylistHeight = (tracks.length * waveHeight) + timeScaleHeight;
@@ -381,6 +415,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     activeAnnotationId,
     selectionStart,
     selectionEnd,
+    isAutomaticScroll,
 
     // Playback controls
     play,
@@ -415,6 +450,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // Master volume
     masterVolume,
     setMasterVolume,
+
+    // Automatic scroll
+    setAutomaticScroll: (enabled: boolean) => {
+      setIsAutomaticScroll(enabled);
+    },
+    setScrollContainer,
 
     // Refs
     playoutRef,

@@ -69,14 +69,15 @@ export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ classNam
 };
 
 /**
- * Automatic scroll checkbox (placeholder - needs implementation)
+ * Automatic scroll checkbox that uses the playlist context
  */
 export const AutomaticScrollCheckbox: React.FC<{ className?: string }> = ({ className }) => {
-  // TODO: Implement automatic scroll in context
+  const { isAutomaticScroll, setAutomaticScroll } = useWaveformPlaylist();
+
   return (
     <BaseAutomaticScrollCheckbox
-      checked={false}
-      onChange={() => {}}
+      checked={isAutomaticScroll}
+      onChange={setAutomaticScroll}
       className={className}
     />
   );

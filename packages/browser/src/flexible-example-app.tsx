@@ -568,23 +568,30 @@ const CustomMasterVolumeControl: React.FC = () => {
   );
 };
 
-// Custom Automatic Scroll Checkbox with consistent styling
-const CustomAutomaticScrollCheckbox: React.FC = () => {
-  const [isChecked, setIsChecked] = React.useState(false);
+// Styled wrapper for AutomaticScrollCheckbox
+const StyledAutomaticScrollCheckbox = styled(AutomaticScrollCheckbox)`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
 
-  return (
-    <CheckboxGroup>
-      <StyledCheckboxLabel>
-        <input
-          type="checkbox"
-          checked={isChecked}
-          onChange={(e) => setIsChecked(e.target.checked)}
-        />
-        <TimeLabel as="span">Auto Scroll</TimeLabel>
-      </StyledCheckboxLabel>
-    </CheckboxGroup>
-  );
-};
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #5dade2;
+  }
+
+  label {
+    font-size: 0.7rem;
+    color: #bdc3c7;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    cursor: pointer;
+  }
+`;
 
 // Styled control bar section
 const ControlBar = styled.div`
@@ -651,7 +658,7 @@ const FlexiblePlaylistApp: React.FC = () => {
 
           <ControlDivider />
 
-          <CustomAutomaticScrollCheckbox />
+          <StyledAutomaticScrollCheckbox />
         </ControlBarContent>
       </ControlBar>
 

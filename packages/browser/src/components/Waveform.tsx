@@ -74,10 +74,10 @@ export const Waveform: React.FC<WaveformProps> = ({
     play,
     playoutRef,
     currentTimeRef,
+    setScrollContainer,
   } = useWaveformPlaylist();
 
   const [isSelecting, setIsSelecting] = useState(false);
-  const scrollContainerRef = useRef<HTMLElement | null>(null);
 
   const theme = { ...defaultTheme, ...userTheme };
 
@@ -168,11 +168,7 @@ export const Waveform: React.FC<WaveformProps> = ({
             onTracksMouseDown={handleMouseDown}
             onTracksMouseMove={handleMouseMove}
             onTracksMouseUp={handleMouseUp}
-            scrollContainerRef={(el) => {
-              if (el) {
-                scrollContainerRef.current = el;
-              }
-            }}
+            scrollContainerRef={setScrollContainer}
             timescale={
               timescale ? (
                 <StyledTimeScale
