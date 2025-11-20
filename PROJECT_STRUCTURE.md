@@ -405,10 +405,11 @@ Re-render Playhead position
 - Track controls (mute/solo/volume/pan)
 - Master volume control
 - Stop button remembers start position
+- Complete theming system (waveform colors, timescale, playhead, selection)
+- Custom timestamp rendering
 
 ### 🚧 In Progress
-- Theme system
-- Design tokens
+- Design tokens system
 - More examples showing different layouts
 
 ### 🔮 Planned

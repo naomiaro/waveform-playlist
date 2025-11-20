@@ -259,6 +259,59 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 - Example: `packages/browser/src/flexible-example-app.tsx`
 - Demo page: `ghpages/_examples/flexible-api.html`
 
+## Theming System (2025-01-19)
+
+**Implemented:** Complete theming system for waveform visualization components
+
+**Theme Properties:**
+All theme properties are optional and can be passed to the `Waveform` component:
+
+```typescript
+interface WaveformProps {
+  theme?: {
+    waveOutlineColor?: string;        // Background color of waveform tracks
+    waveFillColor?: string;            // Waveform visualization color
+    waveProgressColor?: string;        // Progress/played portion color
+    timeColor?: string;                // Timescale text and tick marks color
+    timescaleBackgroundColor?: string; // Timescale background color
+    playheadColor?: string;            // Playhead vertical line color
+    selectionColor?: string;           // Selection area overlay color (with alpha)
+  };
+  renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
+  // ... other props
+}
+```
+
+**Custom Timestamp Rendering:**
+- Users can provide custom React components for timescale timestamps
+- Receives `timeMs` (milliseconds) and `pixelPosition` (pixels from left)
+- Enables fully custom styling and formatting
+
+**Implementation Details:**
+- Dynamic padding calculation based on duration for timestamp overflow prevention
+- Timestamps offset 4px from tick marks for better readability
+- Font size 0.75rem to prevent overflow on longer timestamps
+- Full color customization for dark/light themes
+
+**Example (Dark Theme):**
+```typescript
+const theme = {
+  waveOutlineColor: '#1e3a5f',
+  waveFillColor: '#5dade2',
+  waveProgressColor: '#e74c3c',
+  timeColor: '#ecf0f1',
+  timescaleBackgroundColor: '#2c3e50',
+  playheadColor: '#8b0000',
+  selectionColor: 'rgba(231, 76, 60, 0.5)',
+};
+```
+
+**Location:**
+- Waveform component: `packages/browser/src/components/Waveform.tsx`
+- TimeScale component: `packages/ui-components/src/components/TimeScale.tsx`
+- Playlist component: `packages/ui-components/src/components/Playlist.tsx`
+- Example: `packages/browser/src/flexible-example-app.tsx`
+
 ## Current Work (Tone.js Overhaul Branch)
 
 ### Status
@@ -267,11 +320,12 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 - Selection inputs implemented and functional
 - **Custom hooks architecture implemented**
 - **Flexible/headless API architecture implemented**
+- **Complete theming system implemented**
+- **Custom timestamp rendering implemented**
 - Track controls with mute/solo/volume/pan working
 - Stop button remembers start position behavior fixed
 
 ### Next Steps / Ideas
-- Consider creating theme/design tokens system
 - Build out primitives library as needed
 - Add more examples showing different layout patterns
 - Document all hooks and components in detail
@@ -293,4 +347,4 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 ---
 
 **Last Updated:** 2025-01-19
-**Session Notes:** Implemented flexible/headless API with WaveformPlaylistProvider, primitive control components, and Waveform component with render props. Created flexible-api example showing customizable layout. Fixed stop button behavior to remember start position. Added master volume controls with proper 0-100 to 0-1 gain conversion.
+**Session Notes:** Implemented complete theming system with all color properties (waveOutlineColor, waveFillColor, waveProgressColor, timeColor, timescaleBackgroundColor, playheadColor, selectionColor). Added custom timestamp rendering via renderTimestamp prop. Implemented dynamic padding calculation for timestamp overflow. Enhanced flexible-api example with dark theme and custom styled timestamp components. All theming properties are optional and fully customizable.
