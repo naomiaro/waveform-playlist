@@ -91,18 +91,71 @@ Remote debugging is enabled on port 9222. Use proper flags:
 
 Note: Quote the asterisk in zsh to avoid glob expansion.
 
+## Custom Hooks Architecture (2025-01-19)
+
+### Hooks-Based Design
+
+**Decision:** Extract playlist logic into reusable custom hooks for maximum flexibility.
+
+**Created Hooks:**
+- `usePlaybackControls` - Play/pause/stop/seek functionality
+- `useTimeFormat` - Time formatting with dropdown sync
+- `useZoomControls` - Zoom in/out with configurable levels
+- `useAudioPosition` - Auto-updates `.audio-pos` display element
+- `useWaveformPlaylist` - Composite hook combining all controls
+
+**Benefits:**
+- **Separation of Concerns:** Business logic separate from UI
+- **Reusability:** Users can build completely custom UIs
+- **Testability:** Hooks can be tested independently
+- **Type Safety:** Full TypeScript support throughout
+- **Backward Compatible:** Still works with existing HTML structure
+
+**Location:** `packages/browser/src/hooks/`
+
+**Documentation:** See `packages/browser/src/hooks/README.md` and `packages/browser/HOOKS_ARCHITECTURE.md`
+
+### WaveformPlaylistComponent Integration
+
+The main `WaveformPlaylistComponent.tsx` now uses these hooks internally:
+```typescript
+const { timeFormat, formatTime } = useTimeFormat();
+const zoom = useZoomControls({ initialSamplesPerPixel });
+useAudioPosition({ currentTime, formatTime });
+```
+
+This demonstrates proper usage and ensures the component and hooks stay in sync.
+
+### Custom UI Pattern
+
+Users can now build custom UIs using the hooks:
+
+```typescript
+import { useWaveformPlaylist } from '@waveform-playlist/browser/hooks';
+
+const controls = useWaveformPlaylist({ playoutRef, ... });
+
+// Use controls.playback.play(), controls.zoom.zoomIn(), etc.
+// Build any UI you want!
+```
+
 ## Current Work (Tone.js Overhaul Branch)
 
 ### Status
 - React refactor in progress
-- Annotations example working with React components
+- Annotations and stem-tracks examples working with React
 - Selection inputs implemented and functional
+- **Custom hooks architecture implemented**
+- Track controls with mute/solo/volume/pan working
 
 ### Next Steps / Ideas
+- Add render props support for custom control components
+- Create more custom hooks (useTrackControls, useSelection, useAnnotations)
 - Consider creating theme/design tokens system
 - Evaluate Radix UI for complex components (sliders, dropdowns)
 - Build out primitives library as needed
 - Add more examples to React version
+- Document hooks usage patterns
 
 ## Important Notes
 
@@ -120,4 +173,4 @@ Note: Quote the asterisk in zsh to avoid glob expansion.
 ---
 
 **Last Updated:** 2025-01-19
-**Session Notes:** Implemented selection time inputs, discussed UI library strategy
+**Session Notes:** Implemented custom hooks architecture, refactored WaveformPlaylistComponent to use hooks internally, stem-tracks example with React track controls

@@ -24,8 +24,6 @@ import {
   SliderWrapper,
   VolumeDownIcon,
   VolumeUpIcon,
-  formatTime,
-  type TimeFormat,
 } from '@waveform-playlist/ui-components';
 import { TonePlayout } from '@waveform-playlist/playout';
 import { type Track } from '@waveform-playlist/core';
@@ -33,6 +31,7 @@ import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
 import { SelectionTimeInputsManager } from './SelectionTimeInputsManager';
+import { useTimeFormat, useZoomControls, useAudioPosition } from './hooks';
 
 // Default theme
 const defaultTheme = {
@@ -84,9 +83,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
   onReady,
   onAnnotationUpdate,
 }) => {
-  // Zoom levels - lower values = more zoomed in
-  const ZOOM_LEVELS = [256, 512, 1024, 2048, 4096, 8192];
-
   const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const [shouldScrollToActive, setShouldScrollToActive] = useState(false);
@@ -101,14 +97,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     volume: number;
     pan: number;
   }>>([]);
-  const [samplesPerPixel, setSamplesPerPixel] = useState(initialSamplesPerPixel);
-  const [zoomIndex, setZoomIndex] = useState(() => ZOOM_LEVELS.indexOf(initialSamplesPerPixel) !== -1 ? ZOOM_LEVELS.indexOf(initialSamplesPerPixel) : 2);
   const [isContinuousPlay, setIsContinuousPlay] = useState(annotationList?.isContinuousPlay ?? false);
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
-  const [timeFormat, setTimeFormat] = useState<TimeFormat>('hh:mm:ss.uuu');
   const [draggingAnnotation, setDraggingAnnotation] = useState<{
     id: string;
     edge: 'start' | 'end';
@@ -116,6 +109,11 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     originalEnd: number;
     startX: number;
   } | null>(null);
+
+  // Use custom hooks
+  const { timeFormat, formatTime } = useTimeFormat();
+  const zoom = useZoomControls({ initialSamplesPerPixel });
+  const samplesPerPixel = zoom.samplesPerPixel;
 
   const playoutRef = useRef<TonePlayout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -221,6 +219,9 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     };
   }, [tracks, samplesPerPixel, mono, onReady]);
 
+  // Use useAudioPosition hook to update .audio-pos element
+  useAudioPosition({ currentTime, formatTime });
+
   // Parse annotations
   useEffect(() => {
     if (!annotationList?.annotations) return;
@@ -240,32 +241,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     });
     setAnnotations(parsed);
   }, [annotationList?.annotations]);
-
-  // Listen to time format changes
-  useEffect(() => {
-    const timeFormatSelect = document.querySelector('.time-format') as HTMLSelectElement;
-
-    const handleFormatChange = () => {
-      if (timeFormatSelect) {
-        setTimeFormat(timeFormatSelect.value as TimeFormat);
-        // Update audio-pos immediately with new format
-        const audioPosElement = document.querySelector('.audio-pos');
-        if (audioPosElement) {
-          audioPosElement.textContent = formatTime(currentTimeRef.current, timeFormatSelect.value as TimeFormat);
-        }
-      }
-    };
-
-    // Set initial value
-    if (timeFormatSelect) {
-      setTimeFormat(timeFormatSelect.value as TimeFormat);
-      timeFormatSelect.addEventListener('change', handleFormatChange);
-    }
-
-    return () => {
-      timeFormatSelect?.removeEventListener('change', handleFormatChange);
-    };
-  }, []);
 
   // Automatic scroll to keep playhead in view
   const scrollToCurrentTime = () => {
@@ -319,12 +294,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
         const time = playoutRef.current.getCurrentTime();
         currentTimeRef.current = time;
         setCurrentTime(time);
-
-        // Update audio-pos display element
-        const audioPosElement = document.querySelector('.audio-pos');
-        if (audioPosElement) {
-          audioPosElement.textContent = formatTime(time, timeFormat);
-        }
 
         // Check if playback has reached the end
         if (time >= duration) {
@@ -412,12 +381,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     setCurrentTime(0);
     setActiveAnnotationId(null);
     setShouldScrollToActive(false);
-
-    // Update audio-pos display
-    const audioPosElement = document.querySelector('.audio-pos');
-    if (audioPosElement) {
-      audioPosElement.textContent = formatTime(0, timeFormat);
-    }
   };
 
   const handleAnnotationClick = async (annotation: AnnotationData) => {
@@ -443,12 +406,6 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     // Clear any existing selection
     setSelectionStart(clickTime);
     setSelectionEnd(clickTime);
-
-    // Update audio-pos display
-    const audioPosElement = document.querySelector('.audio-pos');
-    if (audioPosElement) {
-      audioPosElement.textContent = formatTime(clickTime, timeFormat);
-    }
   };
 
   const handleAnnotationDragStart = (annotationId: string, edge: 'start' | 'end', e: React.DragEvent) => {
@@ -816,35 +773,19 @@ export const WaveformPlaylistComponent: React.FC<WaveformPlaylistProps> = ({
     };
   }, [annotations]);
 
-  // Zoom in/out buttons
+  // Zoom in/out buttons - use the zoom hook's functions
   useEffect(() => {
     const zoomInButton = document.querySelector('.btn-zoom-in');
     const zoomOutButton = document.querySelector('.btn-zoom-out');
 
-    const handleZoomIn = () => {
-      if (zoomIndex > 0) {
-        const newIndex = zoomIndex - 1;
-        setZoomIndex(newIndex);
-        setSamplesPerPixel(ZOOM_LEVELS[newIndex]);
-      }
-    };
-
-    const handleZoomOut = () => {
-      if (zoomIndex < ZOOM_LEVELS.length - 1) {
-        const newIndex = zoomIndex + 1;
-        setZoomIndex(newIndex);
-        setSamplesPerPixel(ZOOM_LEVELS[newIndex]);
-      }
-    };
-
-    zoomInButton?.addEventListener('click', handleZoomIn);
-    zoomOutButton?.addEventListener('click', handleZoomOut);
+    zoomInButton?.addEventListener('click', zoom.zoomIn);
+    zoomOutButton?.addEventListener('click', zoom.zoomOut);
 
     return () => {
-      zoomInButton?.removeEventListener('click', handleZoomIn);
-      zoomOutButton?.removeEventListener('click', handleZoomOut);
+      zoomInButton?.removeEventListener('click', zoom.zoomIn);
+      zoomOutButton?.removeEventListener('click', zoom.zoomOut);
     };
-  }, [zoomIndex, ZOOM_LEVELS]);
+  }, [zoom.zoomIn, zoom.zoomOut]);
 
   // Initialize selection time inputs manager
   useEffect(() => {

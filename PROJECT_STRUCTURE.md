@@ -96,7 +96,19 @@ waveform-playlist/
   ├── annotations-app.tsx            # Annotations example app
   ├── WaveformPlaylistComponent.tsx  # Main React component
   ├── SelectionTimeInputsManager.tsx # HTML↔React bridge
-  └── peaksUtil.ts                   # Peak generation helper
+  ├── peaksUtil.ts                   # Peak generation helper
+  ├── hooks/                         # Custom hooks for logic extraction
+  │   ├── usePlaybackControls.ts     # Play/pause/stop/seek
+  │   ├── useTimeFormat.ts           # Time formatting
+  │   ├── useZoomControls.ts         # Zoom in/out
+  │   ├── useAudioPosition.ts        # Audio position display
+  │   ├── useWaveformPlaylist.ts     # Composite hook
+  │   ├── index.ts                   # Hook exports
+  │   └── README.md                  # Hook API docs
+  ├── components/                    # React components
+  │   └── DefaultPlaylistControls.tsx
+  └── examples/                      # Usage examples
+      └── CustomControlsExample.tsx
   ```
 - **Build:** Webpack production builds → `ghpages/js/`
 
@@ -143,13 +155,19 @@ Web Audio API (direct)
 - `ghpages/js/annotations.js` - Annotations data
 - HTML templates with inline event listeners
 
-### New Architecture (React)
+### New Architecture (React + Hooks)
 
 ```
 User Interaction (React Events)
     ↓
 WaveformPlaylistComponent (State)
     ↓
+├─→ Custom Hooks (Business Logic)
+│   ├─→ usePlaybackControls
+│   ├─→ useTimeFormat
+│   ├─→ useZoomControls
+│   └─→ useAudioPosition
+│
 ├─→ UI Components (React)
 │   └─→ Canvas Rendering (SmartChannel)
 │
@@ -159,12 +177,34 @@ WaveformPlaylistComponent (State)
 
 **Key Files:**
 - `packages/browser/src/WaveformPlaylistComponent.tsx` - Main orchestrator
+- `packages/browser/src/hooks/` - Reusable business logic
 - `packages/ui-components/src/components/Playlist.tsx` - UI container
 - `packages/playout/src/TonePlayout.ts` - Audio playback
 
 ## State Management
 
-### Current Approach (React useState)
+### Custom Hooks Architecture
+
+Business logic is extracted into reusable custom hooks that can be used by any component:
+
+**Individual Hooks:**
+- `usePlaybackControls` - Play/pause/stop/seek operations
+- `useTimeFormat` - Time formatting and format selection sync
+- `useZoomControls` - Zoom level management with configurable levels
+- `useAudioPosition` - Updates `.audio-pos` display element (backward compatibility)
+
+**Composite Hook:**
+- `useWaveformPlaylist` - Combines all hooks for convenience
+
+Users can:
+1. Use hooks to build custom UIs with their own components
+2. Compose hooks for specific functionality
+3. Maintain full type safety with TypeScript
+4. Test hooks independently from UI
+
+See `packages/browser/src/hooks/README.md` for full API documentation.
+
+### Component State (React useState)
 
 State lives in `WaveformPlaylistComponent`:
 ```typescript
@@ -175,6 +215,13 @@ const [selectionStart, setSelectionStart] = useState(0);
 const [selectionEnd, setSelectionEnd] = useState(0);
 const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
 const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+```
+
+The component uses the custom hooks internally:
+```typescript
+const { timeFormat, formatTime } = useTimeFormat();
+const zoom = useZoomControls({ initialSamplesPerPixel });
+useAudioPosition({ currentTime, formatTime });
 ```
 
 ### Refs for Performance
@@ -305,16 +352,26 @@ Re-render Playhead position
 ## Migration Status
 
 ### ✅ Completed (React)
+- **Custom Hooks Architecture** - Reusable hooks for building custom UIs
+  - `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, `useAudioPosition`
+  - `useWaveformPlaylist` composite hook
+  - Full API documentation and examples
 - Annotations example
 - Selection time inputs
 - Playback controls (play/pause/stop/seek)
 - Waveform rendering
 - Automatic scroll
+- Track controls (mute/solo/volume/pan)
+- Stem-tracks example
 
 ### 🚧 In Progress
+- Render props support for custom components
 - Theme system
 - Design tokens
 - More examples
+
+### 🔮 Planned
+- Additional hooks (`useTrackControls`, `useSelection`, `useAnnotations`, `useKeyboardShortcuts`)
 
 ### ❌ Not Started (Still jQuery)
 - Most other examples (fades, effects, etc.)
@@ -360,6 +417,57 @@ pnpm build && jekyll build -s ghpages -d _site
 - `packages/browser/src/annotations-app.tsx` - Annotations entry
 - `packages/ui-components/src/index.tsx` - Component library exports
 
+### Documentation
+- `packages/browser/HOOKS_ARCHITECTURE.md` - Hooks architecture overview
+- `packages/browser/src/hooks/README.md` - Hooks API documentation
+- `CLAUDE.md` - AI development notes and architectural decisions
+- `PROJECT_STRUCTURE.md` - This file
+
+## Custom Hooks Architecture
+
+The playlist has been refactored to use a **custom hooks architecture** that separates business logic from UI presentation.
+
+### Benefits
+
+1. **Separation of Concerns** - Logic extracted into reusable hooks, UI can be completely customized
+2. **Type Safety** - Full TypeScript support with auto-completion
+3. **Flexibility** - Users can build any UI using their own component library
+4. **Testability** - Hooks can be tested independently from presentation
+5. **Backward Compatibility** - Still works with existing HTML structure
+
+### Usage Patterns
+
+**Option 1: Use individual hooks**
+```typescript
+import { usePlaybackControls, useTimeFormat } from '@waveform-playlist/browser/hooks';
+
+const { play, pause, stop } = usePlaybackControls({ playoutRef });
+const { formatTime } = useTimeFormat();
+```
+
+**Option 2: Use composite hook**
+```typescript
+import { useWaveformPlaylist } from '@waveform-playlist/browser/hooks';
+
+const controls = useWaveformPlaylist({ playoutRef, currentTime, duration, ... });
+// Access: controls.playback, controls.zoom, controls.timeFormat, controls.state
+```
+
+**Option 3: Future render props pattern**
+```typescript
+<WaveformPlaylist
+  tracks={tracks}
+  renderControls={(controls) => <MyCustomControls {...controls} />}
+/>
+```
+
+### Example Components
+
+- `DefaultPlaylistControls.tsx` - Reference implementation showing hook usage
+- `CustomControlsExample.tsx` - Fully styled custom player with progress bar
+
+See `packages/browser/HOOKS_ARCHITECTURE.md` for complete documentation.
+
 ## Future Improvements
 
 See `CLAUDE.md` for architectural decisions and next steps:
@@ -370,4 +478,4 @@ See `CLAUDE.md` for architectural decisions and next steps:
 
 ---
 
-**Last Updated:** 2025-01-19
+**Last Updated:** 2025-01-19 (Added custom hooks architecture documentation)
