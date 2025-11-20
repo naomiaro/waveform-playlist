@@ -91,6 +91,58 @@ Remote debugging is enabled on port 9222. Use proper flags:
 
 Note: Quote the asterisk in zsh to avoid glob expansion.
 
+## MCP Chrome DevTools Usage (2025-01-19)
+
+**IMPORTANT:** When using Chrome DevTools MCP tools for visual inspection:
+
+### Screenshot Tool Issues
+
+**Known Bug:** The `take_screenshot` tool with `format: "png"` has a media type mismatch bug that causes API errors:
+```
+Image does not match the provided media type image/jpeg
+```
+
+**Workarounds:**
+1. **Use JPEG format (RECOMMENDED):**
+   ```typescript
+   format: "jpeg", quality: 90
+   ```
+
+2. **Use WebP format:**
+   ```typescript
+   format: "webp", quality: 90
+   ```
+
+3. **Save to file instead of inline:**
+   ```typescript
+   filePath: "/path/to/screenshot.png"
+   ```
+
+### Best Practices
+
+- **Prefer `take_snapshot` over `take_screenshot`** for page analysis - it provides a text-based accessibility tree view without image format issues
+- Use `take_snapshot` first to understand page structure
+- Only use `take_screenshot` when visual appearance is critical
+- When screenshots are needed, always use JPEG or WebP format
+- Use `list_pages` to see all open pages before selecting one
+- Use `select_page` to switch context before taking snapshots/screenshots
+
+### Example Workflow
+
+```typescript
+// 1. List available pages
+mcp__chrome-devtools__list_pages
+
+// 2. Select the target page
+mcp__chrome-devtools__select_page(pageIdx: 2)
+
+// 3. Take text snapshot for structure analysis
+mcp__chrome-devtools__take_snapshot()
+
+// 4. If visual inspection needed, use JPEG
+mcp__chrome-devtools__take_screenshot(format: "jpeg", quality: 90)
+```
+
 ## Custom Hooks Architecture (2025-01-19)
 
 ### Hooks-Based Design
