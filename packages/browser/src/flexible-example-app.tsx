@@ -245,6 +245,91 @@ const ZoomControls = styled.div`
   flex-wrap: wrap;
 `;
 
+const VolumeControlGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const StyledVolumeSlider = styled.input.attrs({ type: 'range' })<{ $value: number }>`
+  -webkit-appearance: none;
+  appearance: none;
+  width: 150px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #5dade2 0%,
+    #5dade2 ${props => props.$value}%,
+    rgba(255, 255, 255, 0.2) ${props => props.$value}%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  outline: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #5dade2;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      transform: scale(1.3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(93, 173, 226, 0.5);
+    }
+
+    &:active {
+      transform: scale(1.15);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #5dade2;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    border: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      transform: scale(1.3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(93, 173, 226, 0.5);
+    }
+
+    &:active {
+      transform: scale(1.15);
+    }
+  }
+`;
+
+const CheckboxGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const StyledCheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #5dade2;
+  }
+`;
+
 const MainContent = styled.div<{ $minHeight?: number }>`
   flex: 1;
   overflow-x: auto;
@@ -465,6 +550,42 @@ const CustomAudioPosition: React.FC = () => {
   );
 };
 
+// Custom Master Volume Control with consistent styling
+const CustomMasterVolumeControl: React.FC = () => {
+  const { masterVolume, setMasterVolume } = useWaveformPlaylist();
+
+  return (
+    <VolumeControlGroup>
+      <TimeLabel>Master Volume</TimeLabel>
+      <StyledVolumeSlider
+        min="0"
+        max="100"
+        value={masterVolume}
+        $value={masterVolume}
+        onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
+      />
+    </VolumeControlGroup>
+  );
+};
+
+// Custom Automatic Scroll Checkbox with consistent styling
+const CustomAutomaticScrollCheckbox: React.FC = () => {
+  const [isChecked, setIsChecked] = React.useState(false);
+
+  return (
+    <CheckboxGroup>
+      <StyledCheckboxLabel>
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onChange={(e) => setIsChecked(e.target.checked)}
+        />
+        <TimeLabel as="span">Auto Scroll</TimeLabel>
+      </StyledCheckboxLabel>
+    </CheckboxGroup>
+  );
+};
+
 // Styled control bar section
 const ControlBar = styled.div`
   padding: 1.25rem 1.5rem;
@@ -526,11 +647,11 @@ const FlexiblePlaylistApp: React.FC = () => {
 
           <ControlDivider />
 
-          <MasterVolumeControl />
+          <CustomMasterVolumeControl />
 
           <ControlDivider />
 
-          <AutomaticScrollCheckbox />
+          <CustomAutomaticScrollCheckbox />
         </ControlBarContent>
       </ControlBar>
 
