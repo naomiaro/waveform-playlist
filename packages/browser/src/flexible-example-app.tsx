@@ -730,6 +730,8 @@ const theme = {
   waveProgressColor: '#e74c3c',
   timeColor: '#ecf0f1', // Light text for dark background
   timescaleBackgroundColor: '#2c3e50', // Dark background to match the overall theme
+  playheadColor: '#8b0000', // Dark red playhead for contrast with blue waveforms
+  selectionColor: 'rgba(231, 76, 60, 0.5)', // Light red selection for contrast with blue waveforms
 };
 
 // Tracks configuration

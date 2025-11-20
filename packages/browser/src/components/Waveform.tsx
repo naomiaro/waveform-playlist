@@ -30,6 +30,8 @@ const defaultTheme = {
   waveProgressColor: '#ff0000',
   timeColor: '#000',
   timescaleBackgroundColor: '#fff',
+  playheadColor: '#f00',
+  selectionColor: 'rgba(0, 255, 0, 0.3)',
 };
 
 export interface WaveformProps {
@@ -39,6 +41,8 @@ export interface WaveformProps {
     waveProgressColor?: string;
     timeColor?: string;
     timescaleBackgroundColor?: string;
+    playheadColor?: string;
+    selectionColor?: string;
   };
   timescale?: boolean;
   renderTrackControls?: (trackIndex: number) => ReactNode;
@@ -286,7 +290,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                     (Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel +
                     (controls.show ? controls.width : 0)
                   }
-                  color="rgba(0, 255, 0, 0.3)"
+                  color={theme.selectionColor}
                 />
               )}
               {(isPlaying || selectionStart === selectionEnd) && (
@@ -295,7 +299,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                     (currentTime * sampleRate) / samplesPerPixel +
                     (controls.show ? controls.width : 0)
                   }
-                  color="#f00"
+                  color={theme.playheadColor}
                 />
               )}
             </>
