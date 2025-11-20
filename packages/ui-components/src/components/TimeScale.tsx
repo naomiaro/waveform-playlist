@@ -49,10 +49,12 @@ interface TimeStamp {
 }
 const TimeStamp = styled.div.attrs<TimeStamp>((props) => ({
   style: {
-    left: `${props.$left}px`,
+    left: `${props.$left + 4}px`, // Offset 4px to the right of the tick
   },
 }))<TimeStamp>`
   position: absolute;
+  font-size: 0.75rem; /* Smaller font to prevent overflow */
+  white-space: nowrap; /* Prevent text wrapping */
 `;
 
 export interface TimeScaleProps {
@@ -61,6 +63,7 @@ export interface TimeScaleProps {
   readonly marker: number;
   readonly bigStep: number;
   readonly secondStep: number;
+  readonly renderTimestamp?: (timeMs: number, pixelPosition: number) => React.ReactNode;
 }
 
 interface TimeScalePropsWithTheme extends TimeScaleProps {
@@ -74,6 +77,7 @@ export const TimeScale: FunctionComponent<TimeScalePropsWithTheme> = (props) => 
     marker,
     bigStep,
     secondStep,
+    renderTimestamp,
   } = props;
   const canvasInfo = new Map();
   const timeMarkers = [];
@@ -124,12 +128,21 @@ export const TimeScale: FunctionComponent<TimeScalePropsWithTheme> = (props) => 
 
     // create three levels of time markers - at marker point also place a timestamp.
     if (counter % marker === 0) {
-      const timestamp = formatTime(counter);
-      timeMarkers.push(
+      const timeMs = counter;
+      const timestamp = formatTime(timeMs);
+
+      // Use custom renderer if provided, otherwise use default
+      const timestampContent = renderTimestamp ? (
+        <React.Fragment key={`timestamp-${counter}`}>
+          {renderTimestamp(timeMs, pix)}
+        </React.Fragment>
+      ) : (
         <TimeStamp key={timestamp} $left={pix}>
           {timestamp}
         </TimeStamp>
       );
+
+      timeMarkers.push(timestampContent);
       canvasInfo.set(pix, timeScaleHeight);
     } else if (counter % bigStep === 0) {
       canvasInfo.set(pix, Math.floor(timeScaleHeight / 2));

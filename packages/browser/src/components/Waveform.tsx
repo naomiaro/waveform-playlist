@@ -29,6 +29,7 @@ const defaultTheme = {
   waveFillColor: '#FFD500',
   waveProgressColor: '#ff0000',
   timeColor: '#000',
+  timescaleBackgroundColor: '#fff',
 };
 
 export interface WaveformProps {
@@ -37,9 +38,11 @@ export interface WaveformProps {
     waveFillColor?: string;
     waveProgressColor?: string;
     timeColor?: string;
+    timescaleBackgroundColor?: string;
   };
   timescale?: boolean;
   renderTrackControls?: (trackIndex: number) => ReactNode;
+  renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   className?: string;
 }
 
@@ -50,6 +53,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   theme: userTheme,
   timescale = true,
   renderTrackControls,
+  renderTimestamp,
   className,
 }) => {
   const {
@@ -85,6 +89,12 @@ export const Waveform: React.FC<WaveformProps> = ({
   const tracksFullWidth = audioBuffers.length > 0
     ? Math.floor((duration * sampleRate) / samplesPerPixel)
     : 0;
+
+  // Calculate padding for timescale text overflow based on duration
+  // Estimate character width at 0.75rem (~8px/char) for timestamps like "1:00:00" (7 chars)
+  // Longer durations need more padding for wider timestamp text
+  const estimatedMaxTimestampChars = duration >= 3600 ? 8 : duration >= 600 ? 6 : 5;
+  const timescalePadding = estimatedMaxTimestampChars * 8 + 10; // chars * px/char + buffer
 
   // Mouse handlers for selection and click-to-seek
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -161,7 +171,8 @@ export const Waveform: React.FC<WaveformProps> = ({
           <Playlist
             theme={theme}
             backgroundColor={theme.waveOutlineColor}
-            scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0)}
+            timescaleBackgroundColor={theme.timescaleBackgroundColor}
+            scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0) + timescalePadding}
             timescaleWidth={tracksFullWidth}
             tracksWidth={tracksFullWidth}
             controlsWidth={controls.show ? controls.width : 0}
@@ -176,6 +187,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                   marker={10000}
                   bigStep={5000}
                   secondStep={1000}
+                  renderTimestamp={renderTimestamp}
                 />
               ) : undefined
             }

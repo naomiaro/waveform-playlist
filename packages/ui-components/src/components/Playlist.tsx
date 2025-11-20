@@ -20,10 +20,11 @@ const ScrollContainer = styled.div<ScrollContainerProps>`
 
 interface TimescaleWrapperProps {
   readonly $width?: number;
+  readonly $backgroundColor?: string;
 }
 
 const TimescaleWrapper = styled.div<TimescaleWrapperProps>`
-  background: white;
+  background: ${(props) => props.$backgroundColor || 'white'};
   ${(props) => props.$width && `min-width: ${props.$width}px;`}
   width: 100%;
   overflow: visible;
@@ -59,6 +60,7 @@ export interface PlaylistProps {
   readonly theme: DefaultTheme;
   readonly children?: JSX.Element | JSX.Element[];
   readonly backgroundColor?: string;
+  readonly timescaleBackgroundColor?: string;
   readonly timescale?: JSX.Element;
   readonly timescaleWidth?: number;
   readonly tracksWidth?: number;
@@ -73,6 +75,7 @@ export interface PlaylistProps {
 export const Playlist: FunctionComponent<PlaylistProps> = ({
   children,
   backgroundColor,
+  timescaleBackgroundColor,
   timescale,
   timescaleWidth,
   tracksWidth,
@@ -90,7 +93,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
         $backgroundColor={backgroundColor}
         $width={scrollContainerWidth}
       >
-        {timescale && <TimescaleWrapper $width={timescaleWidth}>{timescale}</TimescaleWrapper>}
+        {timescale && <TimescaleWrapper $width={timescaleWidth} $backgroundColor={timescaleBackgroundColor}>{timescale}</TimescaleWrapper>}
         <TracksContainer $width={tracksWidth} $backgroundColor={backgroundColor}>
           {children}
           {(onTracksClick || onTracksMouseDown) && (

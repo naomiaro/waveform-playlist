@@ -623,6 +623,22 @@ const ControlDivider = styled.div`
   }
 `;
 
+// Custom timestamp component with enhanced styling
+const CustomTimestamp = styled.div<{ $left: number }>`
+  position: absolute;
+  left: ${(props) => props.$left + 4}px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #5dade2;
+  background: rgba(44, 62, 80, 0.9);
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(93, 173, 226, 0.3);
+  letter-spacing: 0.05em;
+`;
+
 // Main app component showing the flexible layout
 const FlexiblePlaylistApp: React.FC = () => {
   const { minimumPlaylistHeight } = useWaveformPlaylist();
@@ -668,6 +684,18 @@ const FlexiblePlaylistApp: React.FC = () => {
           renderTrackControls={(trackIndex) => (
             <CustomTrackControls trackIndex={trackIndex} />
           )}
+          renderTimestamp={(timeMs, position) => {
+            const seconds = Math.floor(timeMs / 1000);
+            const s = seconds % 60;
+            const m = Math.floor(seconds / 60);
+            const formattedTime = `${m}:${String(s).padStart(2, '0')}`;
+
+            return (
+              <CustomTimestamp $left={position}>
+                {formattedTime}
+              </CustomTimestamp>
+            );
+          }}
         />
       </MainContent>
 
@@ -700,7 +728,8 @@ const theme = {
   waveOutlineColor: '#1e3a5f',
   waveFillColor: '#5dade2',
   waveProgressColor: '#e74c3c',
-  timeColor: '#2c3e50',
+  timeColor: '#ecf0f1', // Light text for dark background
+  timescaleBackgroundColor: '#2c3e50', // Dark background to match the overall theme
 };
 
 // Tracks configuration
