@@ -18,6 +18,7 @@ import {
   LinkEndpointsCheckbox,
   EditableCheckbox,
   DownloadAnnotationsButton,
+  AudioPosition,
   Waveform,
 } from './components';
 
@@ -146,19 +147,6 @@ const TimeControlsBar = styled.div`
   flex-wrap: wrap;
 `;
 
-const AudioPositionText = styled.div`
-  font-family: 'Courier New', Monaco, monospace;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #333;
-`;
-
-// Custom AudioPosition that displays as text only
-const AudioPositionDisplay: React.FC = () => {
-  const { currentTime, formatTime } = useWaveformPlaylist();
-  return <AudioPositionText>{formatTime(currentTime)}</AudioPositionText>;
-};
-
 // Main app content component
 const AnnotationsAppContent: React.FC = () => {
   return (
@@ -217,7 +205,7 @@ const AnnotationsAppContent: React.FC = () => {
         <Separator />
 
         <ControlGroup>
-          <AudioPositionDisplay />
+          <AudioPosition />
         </ControlGroup>
       </TimeControlsBar>
     </Container>

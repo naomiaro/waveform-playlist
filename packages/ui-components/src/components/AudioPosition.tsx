@@ -2,14 +2,10 @@ import React from 'react';
 import styled from 'styled-components';
 
 const PositionDisplay = styled.span`
-  font-family: monospace;
+  font-family: 'Courier New', Monaco, monospace;
   font-size: 1rem;
-  padding: 0.375rem 0.75rem;
-  background: #f8f9fa;
-  border: 1px solid #ced4da;
-  border-radius: 0.25rem;
-  min-width: 120px;
-  text-align: center;
+  font-weight: 600;
+  color: #333;
   user-select: none;
 `;
 

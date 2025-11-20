@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
-import { TonePlayout } from '@waveform-playlist/playout';
+import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
 import { type Track } from '@waveform-playlist/core';
 import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
@@ -12,6 +12,7 @@ import { useTimeFormat, useZoomControls, useMasterVolume } from './hooks';
 export interface WaveformTrack {
   src: string;
   name?: string;
+  effects?: TrackEffectsFunction;
 }
 
 export interface TrackState {
@@ -117,6 +118,7 @@ export interface WaveformPlaylistProviderProps {
     linkEndpoints?: boolean;
     controls?: any[];
   };
+  effects?: EffectsFunction;
   onReady?: () => void;
   onAnnotationUpdate?: (annotations: AnnotationData[]) => void;
   children: ReactNode;
@@ -131,6 +133,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   theme: userTheme,
   controls = { show: false, width: 0 },
   annotationList,
+  effects,
   onReady,
   onAnnotationUpdate,
   children,
@@ -208,7 +211,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           pan: 0,
         })));
 
-        const playout = new TonePlayout();
+        const playout = new TonePlayout({
+          effects,
+        });
 
         loadedTracks.forEach(({ buffer, track }, index) => {
           const trackObj: Track = {
@@ -224,6 +229,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           playout.addTrack({
             buffer,
             track: trackObj,
+            effects: track.effects,
           });
         });
 

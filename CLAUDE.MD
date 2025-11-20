@@ -230,6 +230,65 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 // Build any UI you want!
 ```
 
+### Audio Effects Hooks (2025-01-20)
+
+**Decision:** Create reusable hooks for common Tone.js audio effects.
+
+**Created Hooks:**
+- `useMasterAnalyser` - FFT analyzer for frequency visualization on master output
+- `useTrackReverb` - Reverb effect with configurable decay time
+- `useTrackAutoWah` - Auto-wah effect with frequency/sensitivity controls
+- `useEffectsChain` - Chains multiple effects together in series
+
+**Benefits:**
+- **Composable:** Effects can be chained together using `useEffectsChain`
+- **Reusable:** Same effects can be applied to multiple tracks
+- **Type-Safe:** Full TypeScript support with Tone.js types
+- **Clean API:** Simple hook interface, complex audio graph management hidden
+
+**Location:** `packages/browser/src/hooks/useAudioEffects.ts`
+
+**Example Usage:**
+```typescript
+import { useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain }
+  from '@waveform-playlist/browser/hooks';
+
+// Master effects with frequency analyzer
+const { analyserRef, masterEffects } = useMasterAnalyser(256);
+
+// Individual track effects
+const autoWahEffect = useTrackAutoWah({
+  baseFrequency: 50,
+  octaves: 6,
+  sensitivity: -30
+});
+const reverbEffect = useTrackReverb(1.2);
+
+// Chain multiple effects together
+const chainedEffect = useEffectsChain([autoWahEffect, reverbEffect]);
+
+// Apply to tracks
+const tracks = [
+  { src: 'audio.mp3', name: 'Track 1', effects: chainedEffect },
+];
+
+// Pass master effects to provider
+<WaveformPlaylistProvider
+  tracks={tracks}
+  effects={masterEffects}
+>
+  {/* Visualize frequency data */}
+  <FrequencyVisualizer analyserRef={analyserRef} />
+</WaveformPlaylistProvider>
+```
+
+**Implementation Notes:**
+- Effects use polling pattern to detect when audio nodes are ready
+- Cleanup functions properly dispose Tone.js nodes
+- Effects work in both realtime and offline (export) modes
+- Example app: `packages/browser/src/effects-app.tsx`
+- Demo page: `ghpages/_examples/16effects.html`
+
 ## Flexible/Headless API Architecture (2025-01-19)
 
 ### Decision: Provider Pattern + Primitive Components
@@ -254,7 +313,7 @@ const controls = useWaveformPlaylist({ playoutRef, ... });
 - `ZoomInButton`, `ZoomOutButton` - Zoom controls
 - `MasterVolumeControl` - Master volume slider
 - `TimeFormatSelect` - Time format dropdown
-- `AudioPosition` - Current time display
+- `AudioPosition` - Current time display (text-only, monospace styling)
 - `SelectionTimeInputs` - Selection start/end inputs
 - `AutomaticScrollCheckbox` - Auto-scroll toggle
 
@@ -490,6 +549,90 @@ The `WaveformPlaylistComponent` uses this hook internally and renders the React 
 - See `OPTIONAL_PACKAGES.md` for installation and usage guide
 - Example: `ghpages/_examples/13annotations.html`
 
+## Component Design Decisions
+
+### AudioPosition Component Styling (2025-01-20)
+
+**Decision:** AudioPosition should display as plain monospace text, not as a button-like element.
+
+**Reasoning:**
+- Component displays read-only information (current playback time)
+- Button-like appearance (background, border, padding) suggests interactivity
+- Users were confused by visual weight - looked clickable but isn't
+- Plain text styling is more semantically correct for read-only display
+
+**Implementation:**
+Located in `packages/ui-components/src/components/AudioPosition.tsx`
+
+**Styling:**
+```typescript
+const PositionDisplay = styled.span`
+  font-family: 'Courier New', Monaco, monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  user-select: none;
+`;
+```
+
+**Removed Properties:**
+- ~~`background: #f8f9fa`~~ (light gray background)
+- ~~`border: 1px solid #ced4da`~~ (gray border)
+- ~~`padding: 0.375rem 0.75rem`~~ (padding)
+- ~~`border-radius: 0.25rem`~~ (rounded corners)
+- ~~`min-width: 120px`~~ (fixed width)
+- ~~`text-align: center`~~ (centering)
+
+**Impact:**
+- Cleaner, more minimal UI
+- Consistent with text-only display pattern
+- No breaking changes - still accepts `className` prop for custom styling
+- Used in all React example apps (effects, annotations, flexible-api, stem-tracks)
+
+## Example Pages Setup
+
+### Annotations Example Data Loading (2025-01-20)
+
+**Important:** The annotations example requires loading annotation data before the React bundle.
+
+**Setup:**
+File: `ghpages/_examples/13annotations.html`
+
+```html
+---
+javascript: annotations-bundle.js
+---
+
+<script src="js/annotations.js"></script>  <!-- Load data first -->
+<div id="playlist"></div>                   <!-- React mounts here -->
+```
+
+**Why:**
+- The React app (`annotations-app.tsx`) expects a global `notes` variable
+- `annotations.js` defines this variable with the annotation data
+- Must be loaded before `annotations-bundle.js` executes
+- The footer.html conditionally loads the correct bundle based on `javascript:` value
+
+**Data Format:**
+The `notes` array contains Aeneas JSON format annotations:
+```javascript
+var notes = [
+  {
+    "begin": "0.000",
+    "end": "2.680",
+    "id": "f000001",
+    "language": "eng",
+    "lines": ["1"]
+  },
+  // ... more annotations
+];
+```
+
+**Why Not Bundle Data:**
+- Keeps data separate for easy editing/testing
+- Users may want to load different annotation sets dynamically
+- Maintains compatibility with existing annotation workflow
+
 ## Current Work (Tone.js Overhaul Branch)
 
 ### Status
@@ -502,6 +645,8 @@ The `WaveformPlaylistComponent` uses this hook internally and renders the React 
 - **Custom timestamp rendering implemented**
 - **Annotations package as optional dependency implemented**
 - **useAnnotationControls hook implemented**
+- **Audio effects hooks implemented** (useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain)
+- **AudioPosition component styling updated** (text-only display)
 - Track controls with mute/solo/volume/pan working
 - Stop button remembers start position behavior fixed
 
@@ -527,5 +672,5 @@ The `WaveformPlaylistComponent` uses this hook internally and renders the React 
 
 ---
 
-**Last Updated:** 2025-01-19
-**Session Notes:** Refactored annotations functionality into optional package `@waveform-playlist/annotations`. Created `useAnnotationControls` hook to manage annotation state and complex boundary logic (linked endpoints, collision detection, cascading updates). Moved all annotation components (Annotation, AnnotationBox, AnnotationBoxesWrapper, AnnotationsTrack, AnnotationText, ContinuousPlayCheckbox, LinkEndpointsCheckbox) to annotations package. Replaced DOM manipulation with pure React pattern. Created OPTIONAL_PACKAGES.md documentation. Bundle size reduction: users who don't need annotations save ~50KB. Hook architecture follows same pattern as other playlist hooks.
+**Last Updated:** 2025-01-20
+**Session Notes:** Created audio effects hooks (`useMasterAnalyser`, `useTrackReverb`, `useTrackAutoWah`, `useEffectsChain`) for reusable Tone.js effects with composable architecture. Updated AudioPosition component styling from button-like (background, border, padding) to plain monospace text for better semantic correctness and cleaner UI. Removed duplicate custom AudioPosition implementations from effects-app.tsx and annotations-app.tsx. Fixed annotations example page by adding data loading step (annotations.js must load before annotations-bundle.js). Documented component design decisions and example page setup requirements. Effects hooks use polling pattern for audio node readiness and provide proper cleanup via Tone.js dispose.

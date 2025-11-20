@@ -131,4 +131,35 @@ module.exports = [
     },
     devtool: 'source-map',
   },
+  // Effects app bundle
+  {
+    entry: './src/effects-app.tsx',
+    output: {
+      path: path.resolve(__dirname, '../../ghpages/js'),
+      filename: 'effects-bundle.js',
+    },
+    resolve: {
+      extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    },
+    module: {
+      rules: [
+        {
+          test: /\.tsx?$/,
+          use: {
+            loader: 'ts-loader',
+            options: {
+              configFile: path.resolve(__dirname, 'tsconfig.json'),
+              transpileOnly: true,
+            },
+          },
+          exclude: /node_modules/,
+        },
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader'],
+        },
+      ],
+    },
+    devtool: 'source-map',
+  },
 ];

@@ -15,3 +15,5 @@ export type { MasterVolumeControls, UseMasterVolumeProps } from './useMasterVolu
 
 export { useWaveformPlaylist } from './useWaveformPlaylist';
 export type { WaveformPlaylistControls, UseWaveformPlaylistProps } from './useWaveformPlaylist';
+
+export { useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain } from './useAudioEffects';
