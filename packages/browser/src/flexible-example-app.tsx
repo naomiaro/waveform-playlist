@@ -128,7 +128,7 @@ const TimeControlsSection = styled.div`
 const TimeDisplayGroup = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
 `;
 

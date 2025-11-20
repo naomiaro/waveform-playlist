@@ -658,7 +658,7 @@
 `,h=i.default.div`
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
 `,d=i.default.label`
   font-size: 0.7rem;
