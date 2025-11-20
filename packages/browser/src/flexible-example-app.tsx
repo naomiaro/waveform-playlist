@@ -128,7 +128,7 @@ const TimeControlsSection = styled.div`
 const TimeDisplayGroup = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.5rem;
 `;
 
@@ -142,20 +142,18 @@ const TimeLabel = styled.label`
 `;
 
 const TimeDisplay = styled.div`
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: bold;
   font-family: 'Courier New', Monaco, monospace;
   color: #5dade2;
   letter-spacing: 0.08em;
-  min-width: 200px;
-  text-align: right;
-  text-shadow: 0 0 20px rgba(93, 173, 226, 0.4);
-  padding: 0.25rem 0.5rem;
-  background: rgba(52, 152, 219, 0.1);
-  border-radius: 0.25rem;
+  min-width: 180px;
+  text-align: center;
+  text-shadow: 0 0 20px rgba(93, 173, 226, 0.5);
+  padding: 0;
 
   @media (max-width: 768px) {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     min-width: 150px;
   }
 `;
@@ -200,8 +198,9 @@ const CompactSelectionInputs = styled.div`
 
   input {
     width: 140px;
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-family: 'Courier New', Monaco, monospace;
+    font-weight: 600;
     padding: 0.5rem 0.75rem;
     background: #2c3e50;
     border: 1px solid #546e7a;
@@ -210,9 +209,10 @@ const CompactSelectionInputs = styled.div`
 
     &:focus {
       outline: none;
-      border-color: #3498db;
-      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-      background: #273746;
+      border-color: #5dade2;
+      box-shadow: 0 0 0 3px rgba(93, 173, 226, 0.3);
+      background: #1a252f;
+      color: #ffffff;
     }
 
     &:hover:not(:focus) {
@@ -222,7 +222,7 @@ const CompactSelectionInputs = styled.div`
 
     @media (max-width: 768px) {
       width: 100px;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       padding: 0.375rem 0.5rem;
     }
   }
@@ -549,13 +549,13 @@ const FlexiblePlaylistApp: React.FC = () => {
             <TimeLabel>Time Format</TimeLabel>
             <TimeFormatSelect />
           </FormatSelectGroup>
-          <CustomAudioPosition />
           <SelectionGroup>
             <TimeLabel>Selection Range</TimeLabel>
             <CompactSelectionInputs>
               <SelectionTimeInputs />
             </CompactSelectionInputs>
           </SelectionGroup>
+          <CustomAudioPosition />
         </TimeControlsSection>
       </TimeControlsBar>
 

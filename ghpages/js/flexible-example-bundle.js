@@ -658,7 +658,7 @@
 `,h=i.default.div`
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.5rem;
 `,d=i.default.label`
   font-size: 0.7rem;
@@ -668,20 +668,18 @@
   font-weight: 700;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 `,p=i.default.div`
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: bold;
   font-family: 'Courier New', Monaco, monospace;
   color: #5dade2;
   letter-spacing: 0.08em;
-  min-width: 200px;
-  text-align: right;
-  text-shadow: 0 0 20px rgba(93, 173, 226, 0.4);
-  padding: 0.25rem 0.5rem;
-  background: rgba(52, 152, 219, 0.1);
-  border-radius: 0.25rem;
+  min-width: 180px;
+  text-align: center;
+  text-shadow: 0 0 20px rgba(93, 173, 226, 0.5);
+  padding: 0;
 
   @media (max-width: 768px) {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     min-width: 150px;
   }
 `,m=i.default.div`
@@ -720,8 +718,9 @@
 
   input {
     width: 140px;
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-family: 'Courier New', Monaco, monospace;
+    font-weight: 600;
     padding: 0.5rem 0.75rem;
     background: #2c3e50;
     border: 1px solid #546e7a;
@@ -730,9 +729,10 @@
 
     &:focus {
       outline: none;
-      border-color: #3498db;
-      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-      background: #273746;
+      border-color: #5dade2;
+      box-shadow: 0 0 0 3px rgba(93, 173, 226, 0.3);
+      background: #1a252f;
+      color: #ffffff;
     }
 
     &:hover:not(:focus) {
@@ -742,7 +742,7 @@
 
     @media (max-width: 768px) {
       width: 100px;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       padding: 0.375rem 0.5rem;
     }
   }
@@ -926,5 +926,5 @@
   @media (max-width: 768px) {
     display: none;
   }
-`,E=()=>{const{minimumPlaylistHeight:e}=(0,l.useWaveformPlaylist)();return(0,s.jsxs)(r,{children:[(0,s.jsx)(o,{children:(0,s.jsx)("h1",{style:{margin:0,fontSize:"1.5rem"},children:"Flexible Waveform Playlist"})}),(0,s.jsx)(T,{children:(0,s.jsxs)(P,{children:[(0,s.jsxs)(L,{children:[(0,s.jsx)(l.RewindButton,{}),(0,s.jsx)(l.SkipBackwardButton,{}),(0,s.jsx)(l.PlayButton,{}),(0,s.jsx)(l.PauseButton,{}),(0,s.jsx)(l.StopButton,{}),(0,s.jsx)(l.SkipForwardButton,{}),(0,s.jsx)(l.FastForwardButton,{})]}),(0,s.jsx)(D,{}),(0,s.jsxs)(C,{children:[(0,s.jsx)(l.ZoomInButton,{}),(0,s.jsx)(l.ZoomOutButton,{})]}),(0,s.jsx)(D,{}),(0,s.jsx)(l.MasterVolumeControl,{}),(0,s.jsx)(D,{}),(0,s.jsx)(l.AutomaticScrollCheckbox,{})]})}),(0,s.jsx)(y,{$minHeight:e,children:(0,s.jsx)(l.Waveform,{theme:I,renderTrackControls:e=>(0,s.jsx)(A,{trackIndex:e})})}),(0,s.jsx)(u,{children:(0,s.jsxs)(f,{children:[(0,s.jsxs)(m,{children:[(0,s.jsx)(d,{children:"Time Format"}),(0,s.jsx)(l.TimeFormatSelect,{})]}),(0,s.jsx)(N,{}),(0,s.jsxs)(g,{children:[(0,s.jsx)(d,{children:"Selection Range"}),(0,s.jsx)(z,{children:(0,s.jsx)(l.SelectionTimeInputs,{})})]})]})}),(0,s.jsxs)(v,{children:[(0,s.jsx)("div",{children:"✨ This layout is completely customizable!"}),(0,s.jsx)("div",{children:"Powered by the new flexible Waveform Playlist API"})]})]})},I={waveOutlineColor:"#1e3a5f",waveFillColor:"#5dade2",waveProgressColor:"#e74c3c",timeColor:"#2c3e50"},O=[{src:"media/audio/Vocals30.mp3",name:"Vocals"},{src:"media/audio/Guitar30.mp3",name:"Guitar"},{src:"media/audio/PianoSynth30.mp3",name:"Pianos & Synth"},{src:"media/audio/BassDrums30.mp3",name:"Drums"}];function R(){const e=document.getElementById("playlist");e?(0,a.createRoot)(e).render((0,s.jsx)(l.WaveformPlaylistProvider,{tracks:O,timescale:!0,mono:!0,waveHeight:100,samplesPerPixel:1024,theme:I,controls:{show:!0,width:120},onReady:()=>console.log("Flexible playlist loaded!"),children:(0,s.jsx)(E,{})})):console.error("Playlist container not found")}"loading"===document.readyState?document.addEventListener("DOMContentLoaded",R):R()},9452:e=>{e.exports=function(e){if(Array.isArray(e))return e},e.exports.__esModule=!0,e.exports.default=e.exports},9593:(e,t,c)=>{"use strict";e.exports=c(3910)},9858:function(e,t,c){"use strict";var n,s=this&&this.__createBinding||(Object.create?function(e,t,c,n){void 0===n&&(n=c);var s=Object.getOwnPropertyDescriptor(t,c);s&&!("get"in s?!t.__esModule:s.writable||s.configurable)||(s={enumerable:!0,get:function(){return t[c]}}),Object.defineProperty(e,n,s)}:function(e,t,c,n){void 0===n&&(n=c),e[n]=t[c]}),a=this&&this.__setModuleDefault||(Object.create?function(e,t){Object.defineProperty(e,"default",{enumerable:!0,value:t})}:function(e,t){e.default=t}),i=this&&this.__importStar||(n=function(e){return n=Object.getOwnPropertyNames||function(e){var t=[];for(var c in e)Object.prototype.hasOwnProperty.call(e,c)&&(t[t.length]=c);return t},n(e)},function(e){if(e&&e.__esModule)return e;var t={};if(null!=e)for(var c=n(e),i=0;i<c.length;i++)"default"!==c[i]&&s(t,e,c[i]);return a(t,e),t}),l=this&&this.__awaiter||function(e,t,c,n){return new(c||(c=Promise))(function(s,a){function i(e){try{r(n.next(e))}catch(e){a(e)}}function l(e){try{r(n.throw(e))}catch(e){a(e)}}function r(e){e.done?s(e.value):function(e){return e instanceof c?e:new c(function(t){t(e)})}(e.value).then(i,l)}r((n=n.apply(e,t||[])).next())})};Object.defineProperty(t,"__esModule",{value:!0}),t.usePlaybackControls=function({playoutRef:e,onPlayStart:t,onPause:c,onStop:n,onTimeUpdate:s}){return{play:(0,r.useCallback)((c,n)=>l(this,void 0,void 0,function*(){e.current&&(yield e.current.init(),e.current.play(o.now(),c,n),null==t||t())}),[e,t]),pause:(0,r.useCallback)(()=>{if(!e.current)return;const t=e.current.getCurrentTime();e.current.pause(),null==c||c(t)},[e,c]),stop:(0,r.useCallback)(()=>{e.current&&(e.current.stop(),null==n||n())},[e,n]),seekTo:(0,r.useCallback)(t=>{e.current&&(e.current.seekTo(t),null==s||s(t))},[e,s]),getCurrentTime:(0,r.useCallback)(()=>e.current?e.current.getCurrentTime():0,[e])}};const r=c(2155),o=i(c(5193))}},t={};function c(n){var s=t[n];if(void 0!==s)return s.exports;var a=t[n]={exports:{}};return e[n].call(a.exports,a,a.exports,c),a.exports}c.n=e=>{var t=e&&e.__esModule?()=>e.default:()=>e;return c.d(t,{a:t}),t},c.d=(e,t)=>{for(var n in t)c.o(t,n)&&!c.o(e,n)&&Object.defineProperty(e,n,{enumerable:!0,get:t[n]})},c.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t),c.r=e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},c.nc=void 0,c(9253)})();
+`,E=()=>{const{minimumPlaylistHeight:e}=(0,l.useWaveformPlaylist)();return(0,s.jsxs)(r,{children:[(0,s.jsx)(o,{children:(0,s.jsx)("h1",{style:{margin:0,fontSize:"1.5rem"},children:"Flexible Waveform Playlist"})}),(0,s.jsx)(T,{children:(0,s.jsxs)(P,{children:[(0,s.jsxs)(L,{children:[(0,s.jsx)(l.RewindButton,{}),(0,s.jsx)(l.SkipBackwardButton,{}),(0,s.jsx)(l.PlayButton,{}),(0,s.jsx)(l.PauseButton,{}),(0,s.jsx)(l.StopButton,{}),(0,s.jsx)(l.SkipForwardButton,{}),(0,s.jsx)(l.FastForwardButton,{})]}),(0,s.jsx)(D,{}),(0,s.jsxs)(C,{children:[(0,s.jsx)(l.ZoomInButton,{}),(0,s.jsx)(l.ZoomOutButton,{})]}),(0,s.jsx)(D,{}),(0,s.jsx)(l.MasterVolumeControl,{}),(0,s.jsx)(D,{}),(0,s.jsx)(l.AutomaticScrollCheckbox,{})]})}),(0,s.jsx)(y,{$minHeight:e,children:(0,s.jsx)(l.Waveform,{theme:I,renderTrackControls:e=>(0,s.jsx)(A,{trackIndex:e})})}),(0,s.jsx)(u,{children:(0,s.jsxs)(f,{children:[(0,s.jsxs)(m,{children:[(0,s.jsx)(d,{children:"Time Format"}),(0,s.jsx)(l.TimeFormatSelect,{})]}),(0,s.jsxs)(g,{children:[(0,s.jsx)(d,{children:"Selection Range"}),(0,s.jsx)(z,{children:(0,s.jsx)(l.SelectionTimeInputs,{})})]}),(0,s.jsx)(N,{})]})}),(0,s.jsxs)(v,{children:[(0,s.jsx)("div",{children:"✨ This layout is completely customizable!"}),(0,s.jsx)("div",{children:"Powered by the new flexible Waveform Playlist API"})]})]})},I={waveOutlineColor:"#1e3a5f",waveFillColor:"#5dade2",waveProgressColor:"#e74c3c",timeColor:"#2c3e50"},O=[{src:"media/audio/Vocals30.mp3",name:"Vocals"},{src:"media/audio/Guitar30.mp3",name:"Guitar"},{src:"media/audio/PianoSynth30.mp3",name:"Pianos & Synth"},{src:"media/audio/BassDrums30.mp3",name:"Drums"}];function R(){const e=document.getElementById("playlist");e?(0,a.createRoot)(e).render((0,s.jsx)(l.WaveformPlaylistProvider,{tracks:O,timescale:!0,mono:!0,waveHeight:100,samplesPerPixel:1024,theme:I,controls:{show:!0,width:120},onReady:()=>console.log("Flexible playlist loaded!"),children:(0,s.jsx)(E,{})})):console.error("Playlist container not found")}"loading"===document.readyState?document.addEventListener("DOMContentLoaded",R):R()},9452:e=>{e.exports=function(e){if(Array.isArray(e))return e},e.exports.__esModule=!0,e.exports.default=e.exports},9593:(e,t,c)=>{"use strict";e.exports=c(3910)},9858:function(e,t,c){"use strict";var n,s=this&&this.__createBinding||(Object.create?function(e,t,c,n){void 0===n&&(n=c);var s=Object.getOwnPropertyDescriptor(t,c);s&&!("get"in s?!t.__esModule:s.writable||s.configurable)||(s={enumerable:!0,get:function(){return t[c]}}),Object.defineProperty(e,n,s)}:function(e,t,c,n){void 0===n&&(n=c),e[n]=t[c]}),a=this&&this.__setModuleDefault||(Object.create?function(e,t){Object.defineProperty(e,"default",{enumerable:!0,value:t})}:function(e,t){e.default=t}),i=this&&this.__importStar||(n=function(e){return n=Object.getOwnPropertyNames||function(e){var t=[];for(var c in e)Object.prototype.hasOwnProperty.call(e,c)&&(t[t.length]=c);return t},n(e)},function(e){if(e&&e.__esModule)return e;var t={};if(null!=e)for(var c=n(e),i=0;i<c.length;i++)"default"!==c[i]&&s(t,e,c[i]);return a(t,e),t}),l=this&&this.__awaiter||function(e,t,c,n){return new(c||(c=Promise))(function(s,a){function i(e){try{r(n.next(e))}catch(e){a(e)}}function l(e){try{r(n.throw(e))}catch(e){a(e)}}function r(e){e.done?s(e.value):function(e){return e instanceof c?e:new c(function(t){t(e)})}(e.value).then(i,l)}r((n=n.apply(e,t||[])).next())})};Object.defineProperty(t,"__esModule",{value:!0}),t.usePlaybackControls=function({playoutRef:e,onPlayStart:t,onPause:c,onStop:n,onTimeUpdate:s}){return{play:(0,r.useCallback)((c,n)=>l(this,void 0,void 0,function*(){e.current&&(yield e.current.init(),e.current.play(o.now(),c,n),null==t||t())}),[e,t]),pause:(0,r.useCallback)(()=>{if(!e.current)return;const t=e.current.getCurrentTime();e.current.pause(),null==c||c(t)},[e,c]),stop:(0,r.useCallback)(()=>{e.current&&(e.current.stop(),null==n||n())},[e,n]),seekTo:(0,r.useCallback)(t=>{e.current&&(e.current.seekTo(t),null==s||s(t))},[e,s]),getCurrentTime:(0,r.useCallback)(()=>e.current?e.current.getCurrentTime():0,[e])}};const r=c(2155),o=i(c(5193))}},t={};function c(n){var s=t[n];if(void 0!==s)return s.exports;var a=t[n]={exports:{}};return e[n].call(a.exports,a,a.exports,c),a.exports}c.n=e=>{var t=e&&e.__esModule?()=>e.default:()=>e;return c.d(t,{a:t}),t},c.d=(e,t)=>{for(var n in t)c.o(t,n)&&!c.o(e,n)&&Object.defineProperty(e,n,{enumerable:!0,get:t[n]})},c.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t),c.r=e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},c.nc=void 0,c(9253)})();
 //# sourceMappingURL=flexible-example-bundle.js.map
