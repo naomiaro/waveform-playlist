@@ -670,7 +670,285 @@ var notes = [
 - Current work: `tonejs-overhaul`
 - Example pages served at: `http://localhost:4000/waveform-playlist/`
 
+## Performance Optimizations (2025-11-20)
+
+### Playhead Animation with GPU Acceleration
+
+**Issue:** Playhead animation was janky when zoomed in, especially with automatic scroll enabled.
+
+**Solution:** Changed from CSS `left` positioning to `transform: translate3d()` for GPU-accelerated rendering.
+
+**Implementation:**
+```typescript
+// In Playhead.tsx
+const PlayheadLine = styled.div.attrs<PlayheadLineProps>((props) => ({
+  style: {
+    transform: `translate3d(${props.$position}px, 0, 0)`,
+  },
+}))<PlayheadLineProps>`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  background: ${(props) => props.$color};
+  height: 100%;
+  z-index: 150;
+  pointer-events: none;
+  will-change: transform;
+`;
+```
+
+**Benefits:**
+- GPU-accelerated rendering (no layout/paint operations)
+- Smooth 60fps animation even when zoomed in
+- Added `will-change: transform` for browser optimization hints
+
+**Location:** `packages/ui-components/src/components/Playhead.tsx`
+
+### Zoom Performance Fixes (2025-11-20)
+
+**Issue 1:** Zooming during playback would break/stop audio playback.
+
+**Root Cause:** The audio loading `useEffect` had `samplesPerPixel` in its dependency array, causing complete audio reload and playout disposal on every zoom change.
+
+**Solution:** Separated peak generation from audio loading:
+
+```typescript
+// Audio loading - only depends on tracks
+useEffect(() => {
+  // Load audio buffers and create playout
+  // Generate initial peaks
+}, [tracks, onReady]);
+
+// Peak regeneration - depends on zoom
+useEffect(() => {
+  if (audioBuffers.length === 0) return;
+  const peaks = audioBuffers.map(buffer => generatePeaks(buffer, samplesPerPixel, mono, bits));
+  setPeaksDataArray(peaks);
+}, [audioBuffers, samplesPerPixel, mono]);
+```
+
+**Issue 2:** Zooming with automatic scroll enabled caused jarring jumps.
+
+**Root Cause:** Pixel position calculations changed dramatically when `samplesPerPixel` changed, causing scroll to jump.
+
+**Solution:** Proportional scroll adjustment that maintains visual center:
+
+```typescript
+// Track current samplesPerPixel in a ref
+const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
+
+// Adjust scroll proportionally when zoom changes
+useEffect(() => {
+  if (!scrollContainerRef.current || !audioBuffers.length) return;
+
+  const oldSamplesPerPixel = samplesPerPixelRef.current;
+  const newSamplesPerPixel = samplesPerPixel;
+
+  // Calculate what time is currently at center of viewport
+  const centerPixel = currentScrollLeft + containerWidth / 2 - controlWidth;
+  const centerTime = (centerPixel * oldSamplesPerPixel) / sampleRate;
+
+  // Adjust scroll to keep same center time after zoom
+  const newCenterPixel = (centerTime * sampleRate) / newSamplesPerPixel;
+  const newScrollLeft = newCenterPixel + controlWidth - containerWidth / 2;
+
+  container.scrollLeft = newScrollLeft;
+  samplesPerPixelRef.current = newSamplesPerPixel;
+}, [samplesPerPixel, audioBuffers, controls]);
+
+// Animation loop uses ref for stable value
+const pixelPosition = (time * sr) / samplesPerPixelRef.current;
+```
+
+**Benefits:**
+- Zoom works smoothly during playback without interrupting audio
+- Automatic scroll maintains visual center when zooming
+- No jarring jumps or position changes
+
+**Location:** `packages/browser/src/WaveformPlaylistContext.tsx`
+
+### Automatic Scroll Configuration (2025-11-20)
+
+**Added:** `automaticScroll` prop to `WaveformPlaylistProvider` for enabling automatic scroll by default.
+
+**Implementation:**
+```typescript
+// In WaveformPlaylistProviderProps
+automaticScroll?: boolean;
+
+// Usage in provider
+const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
+
+// Usage in example
+<WaveformPlaylistProvider
+  tracks={tracks}
+  automaticScroll={true}  // Enabled by default
+  // ... other props
+>
+```
+
+**Location:** `packages/browser/src/WaveformPlaylistContext.tsx`
+
+## Example Migrations (2025-11-20)
+
+### New Tracks Example with Provider Pattern
+
+**Converted:** `newtracks-app.tsx` to use modern provider pattern instead of old component.
+
+**Features Added:**
+- Drag & drop file upload
+- Dynamic track loading
+- TrackControlsWithDelete component (compact layout with trash icon)
+- Playback controls (Play, Pause, Stop)
+- Zoom controls with smooth performance
+- Audio position display
+- Automatic scroll (enabled by default)
+- Master volume control
+- Track controls (Mute, Solo, Volume, Pan, Delete)
+
+**New Component Created:** `TrackControlsWithDelete`
+- Location: `packages/ui-components/src/components/TrackControlsWithDelete.tsx`
+- Compact header layout: trash icon, track name, M/S buttons
+- Volume and pan sliders below header
+- Uses standard Button and ButtonGroup components
+- Integrates with WaveformPlaylistProvider context
+
+**Layout:**
+```typescript
+<Container>
+  <DropZone /> {/* Drag & drop UI */}
+
+  <WaveformPlaylistProvider
+    tracks={tracks}
+    samplesPerPixel={2048}
+    mono={true}
+    waveHeight={120}
+    automaticScroll={true}
+    controls={{ show: true, width: 200 }}
+  >
+    <Controls>
+      <ControlGroup>
+        <PlayButton />
+        <PauseButton />
+        <StopButton />
+      </ControlGroup>
+      <ControlGroup>
+        <ZoomInButton />
+        <ZoomOutButton />
+      </ControlGroup>
+      <ControlGroup>
+        <AudioPosition />
+      </ControlGroup>
+      <ControlGroup>
+        <AutomaticScrollCheckbox />
+      </ControlGroup>
+    </Controls>
+
+    <Waveform renderTrackControls={(trackIndex) => (
+      <TrackControlsWithDelete ... />
+    )} />
+  </WaveformPlaylistProvider>
+</Container>
+```
+
+### Stem Tracks Example Migration
+
+**Converted:** `stem-tracks-app.tsx` from `WaveformPlaylistComponent` to provider pattern.
+
+**Features:**
+- All modern components (PlayButton, PauseButton, StopButton, etc.)
+- Zoom controls with performance fixes
+- Master volume control
+- Automatic scroll checkbox
+- Audio position display
+- Standard track controls (Mute, Solo, Volume, Pan)
+
+**Template Cleanup:**
+- Removed old bootstrap buttons from `ghpages/_examples/04stemtracks.html`
+- Now just `<div id="playlist"></div>` - React handles all UI
+
+## Codebase Cleanup (2025-11-20)
+
+### Removed Obsolete Files
+
+**WaveformPlaylistComponent.tsx**
+- Old React component wrapper (intermediate migration step)
+- No longer used anywhere
+- All examples now use WaveformPlaylistProvider pattern
+- File deleted: `packages/browser/src/WaveformPlaylistComponent.tsx`
+
+**Jekyll Include Fragments**
+- All old control includes removed (no longer needed with React components)
+- Deleted directories:
+  - `ghpages/_includes/buttons/` (playback.html, zoom.html, fades.html, random.html, states.html)
+  - `ghpages/_includes/forms/` (seek.html)
+  - `ghpages/_includes/checkboxes/` (automaticscroll.html, continuousplay.html, linkendpoints.html)
+  - `ghpages/_includes/sliders/` (mastergain.html)
+  - `ghpages/_includes/timeformat.html`
+- Kept essential includes: head.html, header.html, footer.html, cta.html, sponsors.html
+
+**Simplified Footer Template**
+- Already cleaned up in previous session
+- Now just loads React bundle: `<script src="js/{{ page.javascript }}"></script>`
+
+### Current Architecture
+
+**Two API Patterns:**
+1. **Old Class-Based API** (`WaveformPlaylistClass` in `index.tsx`)
+   - Kept for backward compatibility
+   - Used by existing users who haven't migrated
+
+2. **New Provider Pattern** (Recommended)
+   - `WaveformPlaylistProvider` + `Waveform` component
+   - Primitive control components (PlayButton, PauseButton, etc.)
+   - Maximum flexibility for custom layouts
+   - All new examples use this pattern
+
+## Current Work (Tone.js Overhaul Branch)
+
+### Status
+- React refactor in progress
+- **All React examples migrated to provider pattern** (newtracks, stem-tracks, effects, annotations, flexible-api)
+- **Performance optimizations completed** (GPU-accelerated playhead, smooth zoom, automatic scroll)
+- **TrackControlsWithDelete component created** (compact, reusable)
+- Selection inputs implemented and functional
+- Custom hooks architecture implemented
+- Flexible/headless API architecture implemented
+- Complete theming system implemented
+- Custom timestamp rendering implemented
+- Annotations package as optional dependency implemented
+- useAnnotationControls hook implemented
+- Audio effects hooks implemented (useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain)
+- AudioPosition component styling updated (text-only display)
+- Track controls with mute/solo/volume/pan working
+- Stop button remembers start position behavior fixed
+- **Obsolete code removed** (WaveformPlaylistComponent, old Jekyll includes)
+
+### Next Steps / Ideas
+- Consider creating more optional packages (effects, fades, etc.)
+- Build out primitives library as needed
+- Add more examples showing different layout patterns
+- Document all hooks and components in detail
+- Add unit tests for hooks and components
+- Consider migrating remaining old examples to provider pattern
+
+## Important Notes
+
+- **Don't remove old examples** - They're still in use during migration
+- **Bundle size matters** - This is a library, not an app
+- **Users need flexibility** - Don't lock them into specific UI patterns
+- **Accessibility is important** - Use headless UI libs where complex a11y is needed
+- **Performance is critical** - Use GPU acceleration (transform) instead of layout-triggering properties (left/top)
+- **Separation of concerns** - Audio operations (loading/playback) separate from visualization operations (peak generation)
+
+## References
+
+- Main branch: `main`
+- Current work: `tonejs-overhaul`
+- Example pages served at: `http://localhost:4000/waveform-playlist/`
+
 ---
 
-**Last Updated:** 2025-01-20
-**Session Notes:** Created audio effects hooks (`useMasterAnalyser`, `useTrackReverb`, `useTrackAutoWah`, `useEffectsChain`) for reusable Tone.js effects with composable architecture. Updated AudioPosition component styling from button-like (background, border, padding) to plain monospace text for better semantic correctness and cleaner UI. Removed duplicate custom AudioPosition implementations from effects-app.tsx and annotations-app.tsx. Fixed annotations example page by adding data loading step (annotations.js must load before annotations-bundle.js). Documented component design decisions and example page setup requirements. Effects hooks use polling pattern for audio node readiness and provide proper cleanup via Tone.js dispose.
+**Last Updated:** 2025-11-20
+**Session Notes:** Major performance optimizations and example migrations. Fixed zoom breaking playback by separating audio loading from peak generation. Implemented GPU-accelerated playhead animation using `transform: translate3d()` instead of `left` for 60fps smoothness. Fixed zoom + automatic scroll interaction with proportional scroll adjustment that maintains visual center. Converted newtracks and stem-tracks examples to provider pattern. Created TrackControlsWithDelete component with compact layout and trash icon. Added `automaticScroll` prop to WaveformPlaylistProvider. Removed obsolete WaveformPlaylistComponent and all old Jekyll include fragments (buttons, forms, checkboxes, sliders). Cleaned up stem-tracks Jekyll template. All React examples now use modern provider pattern with full performance optimizations.
