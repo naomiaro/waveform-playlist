@@ -5,6 +5,7 @@
 Waveform-playlist is a **monorepo** organized with pnpm workspaces. It's a multitrack Web Audio editor and player with canvas-based waveform visualizations.
 
 **Current State:** Undergoing React migration (Tone.js overhaul branch)
+
 - Old architecture: jQuery + EventEmitter pattern
 - New architecture: React + Tone.js + styled-components
 
@@ -37,12 +38,14 @@ waveform-playlist/
 ### 🎯 Core Packages
 
 #### `@waveform-playlist/core`
+
 - **Purpose:** Core TypeScript interfaces and types
 - **Exports:** Track interface, common types
 - **Dependencies:** None (pure types)
 - **Used by:** All other packages
 
 #### `@waveform-playlist/webaudio-peaks`
+
 - **Purpose:** Generate waveform visualization data from audio buffers
 - **Exports:** Peak data structures, peak generation functions
 - **Key concept:** Converts AudioBuffer → peak data for canvas rendering
@@ -51,6 +54,7 @@ waveform-playlist/
 ### 🎨 UI Layer
 
 #### `@waveform-playlist/ui-components`
+
 - **Purpose:** Reusable React components for waveform UI
 - **Tech:** React, styled-components
 - **Structure:**
@@ -91,6 +95,7 @@ waveform-playlist/
   - `AnnotationBox` - Annotation display/editing
 
 #### `@waveform-playlist/browser`
+
 - **Purpose:** Browser-ready React applications and webpack bundles
 - **Outputs:**
   - `waveform-playlist.js` - Main bundle (UMD)
@@ -130,6 +135,7 @@ waveform-playlist/
 ### 🔊 Audio Layer
 
 #### `@waveform-playlist/playout`
+
 - **Purpose:** Audio playback abstraction using Tone.js
 - **Key class:** `TonePlayout`
 - **Features:**
@@ -140,6 +146,7 @@ waveform-playlist/
 - **Dependencies:** Tone.js, Core
 
 #### `@waveform-playlist/loaders`
+
 - **Purpose:** Load audio files from various sources
 - **Exports:** Audio loading utilities
 - **Dependencies:** Core
@@ -147,6 +154,7 @@ waveform-playlist/
 ### 📦 Optional Packages
 
 #### `@waveform-playlist/annotations`
+
 - **Type:** Optional package (install separately)
 - **Purpose:** Complete annotation support for time-synchronized text segments
 - **Tech:** React, styled-components, custom hooks
@@ -200,6 +208,7 @@ Web Audio API (direct)
 ```
 
 **Files:**
+
 - `ghpages/js/emitter.js` - Central event coordinator
 - `ghpages/js/annotations.js` - Annotations data
 - HTML templates with inline event listeners
@@ -207,15 +216,21 @@ Web Audio API (direct)
 ### New Architecture (React + Hooks + Context)
 
 **Flexible API Pattern (Provider + Primitives):**
+
 ```
 User Interaction (React Events)
     ↓
-WaveformPlaylistProvider (Context)
-    ├─→ All playlist state and logic
-    ├─→ Custom hooks internally
-    └─→ useWaveformPlaylist hook
+WaveformPlaylistProvider (Split Contexts for Performance)
+    ├─→ PlaybackAnimationContext (60fps updates)
+    │   └─→ isPlaying, currentTime, currentTimeRef
+    ├─→ PlaylistStateContext (user interactions)
+    │   └─→ continuousPlay, annotations, selection, etc.
+    ├─→ PlaylistControlsContext (stable functions)
+    │   └─→ play(), pause(), setContinuousPlay(), etc.
+    └─→ PlaylistDataContext (static/infrequent updates)
+        └─→ duration, audioBuffers, peaksDataArray, etc.
     ↓
-├─→ Primitive Components (anywhere in tree)
+├─→ Primitive Components (subscribe to relevant contexts only)
 │   ├─→ PlayButton, PauseButton, StopButton
 │   ├─→ ZoomInButton, ZoomOutButton
 │   ├─→ MasterVolumeControl, TimeFormatSelect
@@ -228,7 +243,28 @@ WaveformPlaylistProvider (Context)
     └─→ Web Audio API
 ```
 
+**Context Splitting Architecture:**
+
+The provider uses **4 separate contexts** to optimize performance by isolating different update frequencies:
+
+1. **PlaybackAnimationContext** - High-frequency (60fps)
+   - Only animation subscribers (Playhead, automatic scroll)
+   - Prevents re-renders in UI controls
+
+2. **PlaylistStateContext** - User interactions
+   - State that changes on user actions
+   - UI components subscribe here
+
+3. **PlaylistControlsContext** - Stable functions
+   - Doesn't cause re-renders when accessed
+   - All control functions
+
+4. **PlaylistDataContext** - Static/infrequent
+   - Audio buffers, duration, sample rate
+   - Changes rarely after initialization
+
 **Traditional Pattern (Component-based):**
+
 ```
 User Interaction (React Events)
     ↓
@@ -248,6 +284,7 @@ WaveformPlaylistComponent (State)
 ```
 
 **Key Files:**
+
 - `packages/browser/src/WaveformPlaylistContext.tsx` - Context provider (flexible API)
 - `packages/browser/src/WaveformPlaylistComponent.tsx` - Main orchestrator (backward compatible)
 - `packages/browser/src/hooks/` - Reusable business logic
@@ -257,20 +294,101 @@ WaveformPlaylistComponent (State)
 
 ## State Management
 
+### Context Splitting for Performance (2025-01-21)
+
+The `WaveformPlaylistProvider` uses **4 separate contexts** to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when high-frequency values (like `currentTime` at 60fps) update.
+
+**Architecture:**
+
+```typescript
+// 1. High-frequency updates (60fps) - Only animation subscribers
+export interface PlaybackAnimationContextValue {
+  isPlaying: boolean;
+  currentTime: number;
+  currentTimeRef: React.RefObject<number>;
+}
+
+// 2. User interaction state - UI components
+export interface PlaylistStateContextValue {
+  continuousPlay: boolean;
+  linkEndpoints: boolean;
+  annotationsEditable: boolean;
+  isAutomaticScroll: boolean;
+  annotations: AnnotationData[];
+  activeAnnotationId: string | null;
+  selectionStart: number;
+  selectionEnd: number;
+}
+
+// 3. Control functions - Stable, don't cause re-renders
+export interface PlaylistControlsContextValue {
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
+  pause: () => void;
+  stop: () => void;
+  setContinuousPlay: (value: boolean) => void;
+  setAnnotations: (annotations: AnnotationData[]) => void;
+  // ... other controls
+}
+
+// 4. Static/infrequent data
+export interface PlaylistDataContextValue {
+  duration: number;
+  audioBuffers: AudioBuffer[];
+  peaksDataArray: PeakData[];
+  sampleRate: number;
+  playoutRef: React.RefObject<Playout | null>;
+  // ... other data
+}
+```
+
+**Usage Pattern:**
+
+Components subscribe only to the contexts they need:
+
+```typescript
+// Animation component subscribes to high-frequency updates
+export const Playhead = () => {
+  const { currentTime } = usePlaybackAnimation(); // 60fps updates
+  const { sampleRate, samplesPerPixel } = usePlaylistData(); // Static
+  // ... render playhead
+};
+
+// Control component subscribes to state and controls only
+export const ContinuousPlayCheckbox = () => {
+  const { continuousPlay } = usePlaylistState(); // User interactions
+  const { setContinuousPlay } = usePlaylistControls(); // Stable functions
+  // NO re-renders during 60fps animation!
+};
+```
+
+**Benefits:**
+
+- ✅ **No unnecessary re-renders:** Checkboxes don't re-render during animation
+- ✅ **Stable 60fps:** Animation loop runs smoothly without UI thrashing
+- ✅ **Better performance:** Each component updates only when relevant data changes
+- ✅ **Type-safe:** Full TypeScript support with separate interfaces
+
+**Location:** `packages/browser/src/WaveformPlaylistContext.tsx`
+
+**Documentation:** See `CLAUDE.md` → "Continuous Play Toggle Fix" for detailed implementation
+
 ### Custom Hooks Architecture
 
 Business logic is extracted into reusable custom hooks that can be used by any component:
 
 **Individual Hooks:**
+
 - `usePlaybackControls` - Play/pause/stop/seek operations
 - `useTimeFormat` - Time formatting and format selection sync
 - `useZoomControls` - Zoom level management with configurable levels
 - `useAudioPosition` - Updates `.audio-pos` display element (backward compatibility)
 
 **Composite Hook:**
+
 - `useWaveformPlaylist` - Combines all hooks for convenience
 
 Users can:
+
 1. Use hooks to build custom UIs with their own components
 2. Compose hooks for specific functionality
 3. Maintain full type safety with TypeScript
@@ -280,58 +398,75 @@ See `packages/browser/src/hooks/README.md` for full API documentation.
 
 ### Component State (React useState)
 
-State lives in `WaveformPlaylistComponent`:
+State lives in `WaveformPlaylistContext` and is distributed across the 4 split contexts:
+
 ```typescript
-const [currentTime, setCurrentTime] = useState(0);
-const [duration, setDuration] = useState(0);
+// PlaybackAnimationContext
 const [isPlaying, setIsPlaying] = useState(false);
+const [currentTime, setCurrentTime] = useState(0);
+
+// PlaylistStateContext
+const [continuousPlay, setContinuousPlay] = useState(false);
+const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
 const [selectionStart, setSelectionStart] = useState(0);
 const [selectionEnd, setSelectionEnd] = useState(0);
-const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
-const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+
+// PlaylistDataContext
+const [duration, setDuration] = useState(0);
+const [audioBuffers, setAudioBuffers] = useState<AudioBuffer[]>([]);
 ```
 
-The component uses the custom hooks internally:
+Access contexts using specialized hooks:
+
 ```typescript
-const { timeFormat, formatTime } = useTimeFormat();
-const zoom = useZoomControls({ initialSamplesPerPixel });
-useAudioPosition({ currentTime, formatTime });
+const { isPlaying, currentTime } = usePlaybackAnimation();
+const { continuousPlay, annotations } = usePlaylistState();
+const { play, pause, setContinuousPlay } = usePlaylistControls();
+const { duration, audioBuffers } = usePlaylistData();
 ```
 
 ### Refs for Performance
+
 ```typescript
 const playoutRef = useRef<TonePlayout | null>(null);
-const currentTimeRef = useRef<number>(0);  // For animation loop
-const isSelectingRef = useRef(false);       // For mouse interactions
+const currentTimeRef = useRef<number>(0); // For animation loop
+const isSelectingRef = useRef(false); // For mouse interactions
 ```
 
 ## Build Process
 
 ### 1. TypeScript Compilation (tsup)
+
 Each package builds independently:
+
 ```bash
 pnpm build  # Runs tsup for all packages
 ```
 
 Output per package:
+
 - `dist/index.js` (CJS)
 - `dist/index.mjs` (ESM)
 - `dist/index.d.ts` (Types)
 
 ### 2. Webpack Bundles (browser package)
+
 ```bash
 # Auto-runs during pnpm build
 webpack --mode production
 ```
 
 Outputs:
+
 - `packages/browser/dist/waveform-playlist.js`
 - `packages/browser/dist/annotations-bundle.js`
 
 These are copied to:
+
 - `ghpages/js/` (for Jekyll)
 
 ### 3. Jekyll Site
+
 ```bash
 jekyll build -s ghpages -d _site        # Local dev
 jekyll build -s ghpages -d dist/waveform-playlist  # Production
@@ -344,6 +479,7 @@ jekyll build -s ghpages -d dist/waveform-playlist  # Production
 **Problem:** Jekyll templates have HTML inputs, React components need to control them
 
 **Solution:** `SelectionTimeInputsManager`
+
 ```
 HTML Template (timeformat.html)
     ↓
@@ -359,13 +495,15 @@ WaveformPlaylistComponent  ← State updates
 ### 2. Event Emitter → React Events (Migration)
 
 **Old:**
+
 ```javascript
-ee.on('select', (start, end) => {
+ee.on("select", (start, end) => {
   updateInputs(start, end);
 });
 ```
 
 **New:**
+
 ```typescript
 const handleMouseUp = (e: MouseEvent) => {
   setSelectionStart(start);
@@ -409,6 +547,7 @@ Re-render Playhead position
    - Mounts `WaveformPlaylistComponent`
 
 3. **React Render:**
+
    ```tsx
    <WaveformPlaylistComponent
      tracks={[{ src: 'media/audio/sonnet.mp3' }]}
@@ -426,6 +565,7 @@ Re-render Playhead position
 ## Migration Status
 
 ### ✅ Completed (React)
+
 - **Custom Hooks Architecture** - Reusable hooks for building custom UIs
   - `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, `useAudioPosition`, `useMasterVolume`
   - `useWaveformPlaylist` composite hook
@@ -455,22 +595,26 @@ Re-render Playhead position
 - Custom timestamp rendering
 
 ### 🚧 In Progress
+
 - Design tokens system
 - More examples showing different layouts
 
 ### 🔮 Planned
+
 - Additional optional packages (effects, fades, etc.)
 - Additional hooks (`useSelection`, `useKeyboardShortcuts`)
 - Component library documentation
 - Unit tests for hooks and components
 
 ### ❌ Not Started (Still jQuery)
+
 - Most other examples (fades, effects, etc.)
 - Some advanced features
 
 ## Development Workflow
 
 ### Local Development
+
 ```bash
 # Terminal 1: Watch mode (if needed)
 pnpm dev
@@ -483,6 +627,7 @@ pnpm build && jekyll build -s ghpages -d _site
 ```
 
 ### Testing Changes
+
 1. Edit code in `packages/`
 2. Run `pnpm build`
 3. Rebuild Jekyll site
@@ -492,6 +637,7 @@ pnpm build && jekyll build -s ghpages -d _site
 ## Important Files
 
 ### Configuration
+
 - `pnpm-workspace.yaml` - Workspace configuration
 - `package.json` - Root package, scripts
 - `tsconfig.json` - TypeScript base config
@@ -499,16 +645,19 @@ pnpm build && jekyll build -s ghpages -d _site
 - `packages/browser/webpack.config.js` - Bundle config
 
 ### Jekyll
+
 - `ghpages/_config.yml` - Jekyll configuration
 - `ghpages/_layouts/page.html` - Page template
 - `ghpages/_includes/` - Reusable HTML snippets
 
 ### Entry Points
+
 - `packages/browser/src/index.tsx` - Main bundle entry
 - `packages/browser/src/annotations-app.tsx` - Annotations entry
 - `packages/ui-components/src/index.tsx` - Component library exports
 
 ### Documentation
+
 - `packages/browser/HOOKS_ARCHITECTURE.md` - Hooks architecture overview
 - `packages/browser/src/hooks/README.md` - Hooks API documentation
 - `OPTIONAL_PACKAGES.md` - Optional packages guide (annotations, etc.)
@@ -522,6 +671,7 @@ The playlist now provides a **flexible/headless API** using React Context and pr
 ### Architecture Pattern
 
 **Hybrid Approach:** Provider + Primitives + Render Props
+
 - `WaveformPlaylistProvider` wraps your app and provides state via context
 - Primitive components (PlayButton, ZoomInButton, etc.) work anywhere inside the provider
 - `Waveform` component accepts a render prop for custom track controls
@@ -539,6 +689,7 @@ The playlist now provides a **flexible/headless API** using React Context and pr
 ### Usage Patterns
 
 **Option 1: Flexible API with Provider (Recommended)**
+
 ```typescript
 import {
   WaveformPlaylistProvider,
@@ -582,14 +733,19 @@ function MyPlaylist() {
 ```
 
 **Option 2: Individual Hooks (Advanced)**
+
 ```typescript
-import { usePlaybackControls, useTimeFormat } from '@waveform-playlist/browser/hooks';
+import {
+  usePlaybackControls,
+  useTimeFormat,
+} from "@waveform-playlist/browser/hooks";
 
 const { play, pause, stop } = usePlaybackControls({ playoutRef });
 const { formatTime } = useTimeFormat();
 ```
 
 **Option 3: Traditional Component (Backward Compatible)**
+
 ```typescript
 import { WaveformPlaylistComponent } from '@waveform-playlist/browser';
 
@@ -615,6 +771,7 @@ import { WaveformPlaylistComponent } from '@waveform-playlist/browser';
 ## Future Improvements
 
 See `CLAUDE.md` for architectural decisions and next steps:
+
 - Theme/design tokens system
 - Radix UI for complex components
 - More React examples
@@ -622,7 +779,12 @@ See `CLAUDE.md` for architectural decisions and next steps:
 
 ---
 
-**Last Updated:** 2025-01-19
+**Last Updated:** 2025-11-21
+
+- **Context Splitting Architecture:** Documented the 4-context split in `WaveformPlaylistProvider` for performance optimization (PlaybackAnimationContext, PlaylistStateContext, PlaylistControlsContext, PlaylistDataContext)
+- **Continuous Play Toggle Fix:** Fixed toggling Continuous Play checkbox during active playback in both directions (ON and OFF) through context splitting, animation loop restart, and playout rescheduling
+- Updated data flow diagrams to show split context architecture
+- Added detailed context usage patterns and benefits
 - Refactored annotations into optional package `@waveform-playlist/annotations` with `useAnnotationControls` hook, React components, and ~50KB bundle size reduction for users who don't need annotations
 - Created OPTIONAL_PACKAGES.md documentation
 - Extracted duplicated styled components (checkboxes and buttons) into shared definitions in `ui-components/styled/`

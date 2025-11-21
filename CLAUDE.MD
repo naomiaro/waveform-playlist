@@ -549,6 +549,203 @@ The `WaveformPlaylistComponent` uses this hook internally and renders the React 
 - See `OPTIONAL_PACKAGES.md` for installation and usage guide
 - Example: `ghpages/_examples/13annotations.html`
 
+### Continuous Play Toggle Fix (2025-01-21)
+
+**Problem:** Toggling the Continuous Play checkbox during active playback wasn't working correctly in both directions:
+
+1. **Toggling OFF during playback:** When unchecking Continuous Play while an annotation is playing, audio would continue to the end of the track instead of stopping at the current annotation's end.
+
+2. **Toggling ON during playback:** When starting playback from an annotation with Continuous Play OFF, then checking Continuous Play mid-playback, audio would still stop at the annotation end instead of continuing through all annotations.
+
+**Root Causes:**
+
+1. **Stale Closures in Animation Loop:** The `requestAnimationFrame` loop captured the `continuousPlay` value from its closure, so toggling the checkbox didn't affect the already-running loop. The loop would keep checking the old value even after state changed.
+
+2. **Scheduled Audio Callbacks:** When clicking an annotation with Continuous Play OFF, the `play()` function is called with a `playDuration` parameter. This sets up an `onPlaybackComplete` callback in Tone.js that calls `pause()` when the duration ends. Even after toggling Continuous Play ON, this callback would still fire and stop the audio.
+
+3. **Monolithic Context Performance:** The original single context containing all state (including 60fps `currentTime` updates) caused all subscribers to re-render constantly, including checkbox components.
+
+**Solution Overview:**
+
+The fix required a three-part solution:
+
+1. **Context Splitting** - Separate contexts for different update frequencies
+2. **Animation Loop Restart** - Restart loop when continuousPlay changes
+3. **Playout Rescheduling** - Clear callbacks and reschedule audio without duration limits
+
+**Technical Implementation:**
+
+**Part 1: Context Splitting**
+
+Split the monolithic context into 4 separate contexts based on update frequency and usage patterns:
+
+```typescript
+// High-frequency updates (60fps) - only animation subscribers
+export interface PlaybackAnimationContextValue {
+  isPlaying: boolean;
+  currentTime: number;
+  currentTimeRef: React.RefObject<number>;
+}
+
+// State that changes on user interaction - UI components
+export interface PlaylistStateContextValue {
+  continuousPlay: boolean;
+  linkEndpoints: boolean;
+  annotationsEditable: boolean;
+  isAutomaticScroll: boolean;
+  annotations: AnnotationData[];
+  activeAnnotationId: string | null;
+  selectionStart: number;
+  selectionEnd: number;
+}
+
+// Control functions - stable, don't cause re-renders
+export interface PlaylistControlsContextValue {
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
+  pause: () => void;
+  stop: () => void;
+  setContinuousPlay: (value: boolean) => void;
+  setAnnotations: (annotations: AnnotationData[]) => void;
+  // ... other controls
+}
+
+// Static or infrequently changing data
+export interface PlaylistDataContextValue {
+  duration: number;
+  audioBuffers: AudioBuffer[];
+  peaksDataArray: PeakData[];
+  sampleRate: number;
+  playoutRef: React.RefObject<Playout | null>;
+  // ... other data
+}
+```
+
+**Benefits:**
+- Checkbox components subscribe only to `PlaylistStateContextValue` and `PlaylistControlsContextValue`
+- No re-renders during 60fps animation updates
+- `currentTime` updates isolated to `PlaybackAnimationContextValue`
+
+**Part 2: Animation Loop Restart**
+
+Added `useEffect` to restart the animation loop when `continuousPlay` changes:
+
+```typescript
+// Restart animation loop when continuousPlay changes during playback
+// This ensures the loop always has the current continuousPlay value
+useEffect(() => {
+  if (isPlaying && animationFrameRef.current) {
+    // When toggling OFF, restart loop so it can check current continuousPlay state
+    // and stop at annotation end
+    stopAnimationLoop();
+    startAnimationLoop();
+  }
+}, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop]);
+```
+
+**Why This Works:**
+- Stops the old loop that has stale `continuousPlay` in its closure
+- Starts a new loop that captures the current `continuousPlay` value
+- When toggled OFF, new loop correctly checks for annotation boundaries and stops
+
+**Part 3: Playout Rescheduling**
+
+Extended the animation loop restart to also reschedule Tone.js playout when toggling ON:
+
+```typescript
+// Restart animation loop and reschedule playout when continuousPlay changes during playback
+useEffect(() => {
+  const reschedulePlayback = async () => {
+    if (isPlaying && animationFrameRef.current && playoutRef.current) {
+      // When toggling continuous play ON, reschedule playout without duration limit
+      // so audio continues past the current annotation boundary
+      if (continuousPlay) {
+        const currentPos = currentTimeRef.current;
+
+        // Stop current playout (which may have duration limit + pause callback)
+        playoutRef.current.stop();
+        stopAnimationLoop();
+
+        // Initialize and restart from current position without duration limit
+        await playoutRef.current.init();
+
+        // Clear any existing playback complete callback
+        // This is crucial - prevents the old callback from calling pause()
+        playoutRef.current.setOnPlaybackComplete(() => {});
+
+        const now = Tone.now();
+        playbackStartTimeRef.current = now;
+        audioStartPositionRef.current = currentPos;
+
+        // Play without duration - will play to end of track
+        playoutRef.current.play(now, currentPos);
+        startAnimationLoop();
+      } else {
+        // Just restart animation loop for continuous play OFF
+        stopAnimationLoop();
+        startAnimationLoop();
+      }
+    }
+  };
+
+  reschedulePlayback();
+}, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop]);
+```
+
+**Key Implementation Details:**
+
+1. **Callback Clearing:** `playoutRef.current.setOnPlaybackComplete(() => {})` is essential - it replaces the callback that would call `pause()` with an empty function.
+
+2. **Duration Removal:** When rescheduling, `play()` is called without a duration parameter, so audio continues to the end of the track.
+
+3. **Position Preservation:** Uses `currentTimeRef.current` to continue from the exact current position without seeking.
+
+4. **Async Handling:** Must call `await playoutRef.current.init()` before calling `play()` to ensure audio context is ready.
+
+**Files Involved:**
+
+1. **`packages/browser/src/WaveformPlaylistContext.tsx`** (lines 96-542)
+   - Context splitting definitions
+   - Animation loop with continuousPlay dependency
+   - Playout rescheduling logic in useEffect
+
+2. **`packages/browser/src/components/AnnotationControls.tsx`**
+   - Wrapper components using split contexts
+   - `ContinuousPlayCheckbox` component subscribes to `usePlaylistState()` and `usePlaylistControls()`
+
+3. **`packages/annotations/src/components/ContinuousPlayCheckbox.tsx`**
+   - Base checkbox component (presentation only)
+   - No context dependencies - receives props from wrapper
+
+4. **`packages/browser/src/components/Waveform.tsx`** (lines 73-151)
+   - Uses split contexts for performance
+   - Handles annotation click and continuous play logic
+
+**Key Learnings:**
+
+1. **Context Splitting is Essential:** When you have high-frequency updates (like 60fps animation), split contexts by update frequency to prevent unnecessary re-renders.
+
+2. **Stale Closures in Loops:** `requestAnimationFrame` loops capture variables from their closure. If those variables change, you must restart the loop to capture the new values.
+
+3. **Audio Scheduling State:** Tone.js playout keeps internal state (callbacks, duration limits). When state changes in React, you may need to reschedule audio playback, not just update React state.
+
+4. **Refs for Synchronous Access:** Use refs (`currentTimeRef`) when you need synchronous access to values inside loops or callbacks.
+
+5. **Clear Callbacks Explicitly:** When rescheduling audio playback, explicitly clear old callbacks with `setOnPlaybackComplete(() => {})` to prevent them from interfering with new behavior.
+
+**Performance Characteristics:**
+
+- ✅ Checkbox components no longer re-render during playback
+- ✅ Animation loop runs at stable 60fps
+- ✅ State updates are instant (no lag when toggling)
+- ✅ Audio continues smoothly when rescheduling (no audible glitches)
+- ✅ Works correctly in both directions (ON and OFF)
+
+**Location:**
+- Context: `packages/browser/src/WaveformPlaylistContext.tsx`
+- Components: `packages/browser/src/components/AnnotationControls.tsx`
+- Base Components: `packages/annotations/src/components/ContinuousPlayCheckbox.tsx`
+- Example: `ghpages/_examples/13annotations.html`
+
 ## Component Design Decisions
 
 ### AudioPosition Component Styling (2025-01-20)

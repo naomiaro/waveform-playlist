@@ -416,7 +416,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           (ann) => time >= ann.start && time < ann.end
         );
 
-        console.log('[AnimLoop] continuousPlayRef.current =', continuousPlayRef.current, 'continuousPlay state =', continuousPlay);
         if (continuousPlayRef.current) {
           // Continuous play ON: update active annotation and stop after last annotation
           if (currentAnnotation && currentAnnotation.id !== activeAnnotationId) {
@@ -438,13 +437,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           }
         } else {
           // Continuous play OFF: stop at end of current annotation
-          console.log('[AnimLoop] Continuous play OFF - activeAnnotationId:', activeAnnotationId, 'time:', time);
           if (activeAnnotationId) {
             const activeAnnotation = annotations.find(ann => ann.id === activeAnnotationId);
-            console.log('[AnimLoop] Found active annotation:', activeAnnotation?.id, 'end:', activeAnnotation?.end);
             if (activeAnnotation && time >= activeAnnotation.end) {
               // Stop playback at end of current annotation
-              console.log('[AnimLoop] STOPPING - time >= annotation end');
               if (playoutRef.current) {
                 playoutRef.current.stop();
               }
@@ -454,10 +450,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
               return;
             }
           } else {
-            console.log('[AnimLoop] No activeAnnotationId set - finding current annotation');
             // If no active annotation ID is set, use the current annotation
             if (currentAnnotation) {
-              console.log('[AnimLoop] Setting activeAnnotationId to current:', currentAnnotation.id);
               setActiveAnnotationId(currentAnnotation.id);
             }
           }
@@ -509,12 +503,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   useEffect(() => {
     const reschedulePlayback = async () => {
       if (isPlaying && animationFrameRef.current && playoutRef.current) {
-        console.log('[useEffect] continuousPlay changed during playback, restarting animation loop');
-
         // When toggling continuous play ON, reschedule playout without duration limit
         // so audio continues past the current annotation boundary
         if (continuousPlay) {
-          console.log('[useEffect] Continuous play ON - rescheduling playout without duration limit');
           const currentPos = currentTimeRef.current;
 
           // Stop current playout (which may have duration limit + pause callback)
