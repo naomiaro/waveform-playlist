@@ -20,8 +20,12 @@ import {
   WaveformPlaylistProvider,
   Waveform,
   PlayButton,
+  PauseButton,
   StopButton,
   AudioPosition,
+  ZoomInButton,
+  ZoomOutButton,
+  AutomaticScrollCheckbox,
 } from './components';
 import { Track } from '@waveform-playlist/core';
 import * as Tone from 'tone';
@@ -47,6 +51,12 @@ const ControlGroup = styled.div`
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  padding-right: 1rem;
+  border-right: 1px solid #dee2e6;
+
+  &:last-child {
+    border-right: none;
+  }
 `;
 
 const VUMeterContainer = styled.div`
@@ -150,10 +160,26 @@ const PlaybackControls = styled.div`
   margin-bottom: 1rem;
 `;
 
+const LiveWaveformCanvas = styled.canvas`
+  width: 100%;
+  height: 100px;
+  background: #2c3e50;
+  border-radius: 0.25rem;
+`;
+
+const LiveWaveformContainer = styled.div`
+  margin-top: 1rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+`;
+
 function RecordingApp() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>();
   const recordingCountRef = useRef(1);
+  const liveWaveformRef = useRef<HTMLCanvasElement>(null);
 
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
@@ -173,6 +199,52 @@ function RecordingApp() {
 
   // Microphone level monitoring
   const { level, peakLevel, resetPeak } = useMicrophoneLevel(stream);
+
+  // Draw live waveform as recording progresses
+  React.useEffect(() => {
+    if (!liveWaveformRef.current || peaks.length === 0) return;
+
+    const canvas = liveWaveformRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+
+    // Set canvas size accounting for device pixel ratio
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+
+    ctx.scale(dpr, dpr);
+
+    const width = rect.width;
+    const height = rect.height;
+    const halfHeight = height / 2;
+
+    // Clear canvas
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw waveform
+    ctx.fillStyle = '#3498db';
+    ctx.strokeStyle = '#3498db';
+
+    const peaksPerPixel = Math.max(1, Math.floor(peaks.length / width));
+
+    for (let x = 0; x < width; x++) {
+      const peakIndex = Math.floor((x / width) * (peaks.length / 2));
+      const minPeak = peaks[peakIndex * 2] || 0;
+      const maxPeak = peaks[peakIndex * 2 + 1] || 0;
+
+      const normalizedMin = minPeak / 128; // Assuming 8-bit peaks
+      const normalizedMax = maxPeak / 128;
+
+      const yMin = halfHeight + (normalizedMin * halfHeight);
+      const yMax = halfHeight - (normalizedMax * halfHeight);
+
+      ctx.fillRect(x, yMax, 1, yMin - yMax);
+    }
+  }, [peaks]);
 
   // Handle device selection
   const handleDeviceChange = async (deviceId: string) => {
@@ -258,6 +330,13 @@ function RecordingApp() {
             </VUMeterContainer>
           )}
         </ControlPanel>
+
+        {isRecording && (
+          <LiveWaveformContainer>
+            <Label>Live Recording</Label>
+            <LiveWaveformCanvas ref={liveWaveformRef} />
+          </LiveWaveformContainer>
+        )}
       </Section>
 
       <Section>
@@ -288,11 +367,33 @@ function RecordingApp() {
       {tracks.length > 0 && (
         <Section>
           <Subtitle>Playback</Subtitle>
-          <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+          <WaveformPlaylistProvider
+            tracks={tracks}
+            samplesPerPixel={1024}
+            mono={true}
+            waveHeight={100}
+            automaticScroll={true}
+            controls={{ show: true, width: 200 }}
+          >
             <PlaybackControls>
-              <PlayButton />
-              <StopButton />
-              <AudioPosition />
+              <ControlGroup>
+                <PlayButton />
+                <PauseButton />
+                <StopButton />
+              </ControlGroup>
+
+              <ControlGroup>
+                <ZoomInButton />
+                <ZoomOutButton />
+              </ControlGroup>
+
+              <ControlGroup>
+                <AudioPosition />
+              </ControlGroup>
+
+              <ControlGroup>
+                <AutomaticScrollCheckbox />
+              </ControlGroup>
             </PlaybackControls>
             <Waveform />
           </WaveformPlaylistProvider>

@@ -3,7 +3,6 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import * as Tone from 'tone';
 import { UseRecordingReturn, RecordingOptions } from '../types';
 import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUtils';
 import { appendPeaks } from '../utils/peaksGenerator';
@@ -13,7 +12,7 @@ export function useRecording(
   options: RecordingOptions = {}
 ): UseRecordingReturn {
   const {
-    sampleRate = Tone.context.sampleRate,
+    sampleRate,
     channelCount = 1,
     samplesPerPixel = 1024,
   } = options;
@@ -27,6 +26,7 @@ export function useRecording(
   const [error, setError] = useState<Error | null>(null);
 
   // Refs for AudioWorklet and data accumulation
+  const audioContextRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const recordedChunksRef = useRef<Float32Array[]>([]);
@@ -34,11 +34,19 @@ export function useRecording(
   const animationFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  // Load AudioWorklet module
-  const loadWorklet = useCallback(async () => {
-    try {
-      const context = Tone.context.rawContext;
+  // Get or create AudioContext for recording
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = sampleRate
+        ? new AudioContext({ sampleRate })
+        : new AudioContext();
+    }
+    return audioContextRef.current;
+  }, [sampleRate]);
 
+  // Load AudioWorklet module
+  const loadWorklet = useCallback(async (context: AudioContext) => {
+    try {
       // Check if already loaded
       // @ts-ignore - AudioWorklet doesn't have a way to check if module is loaded
       if (context._workletModuleLoaded) {
@@ -71,15 +79,16 @@ export function useRecording(
     try {
       setError(null);
 
-      // Ensure AudioContext is started
-      if (Tone.context.state !== 'running') {
-        await Tone.start();
+      // Get or create dedicated AudioContext for recording
+      const context = getAudioContext();
+
+      // Resume AudioContext if suspended
+      if (context.state === 'suspended') {
+        await context.resume();
       }
 
       // Load worklet module
-      await loadWorklet();
-
-      const context = Tone.context.rawContext as AudioContext;
+      await loadWorklet(context);
 
       // Create media stream source
       const source = context.createMediaStreamSource(stream);
@@ -114,7 +123,7 @@ export function useRecording(
       // Start the worklet processor
       workletNode.port.postMessage({
         command: 'start',
-        sampleRate,
+        sampleRate: context.sampleRate,
         channelCount,
       });
 
@@ -140,7 +149,7 @@ export function useRecording(
       console.error('Failed to start recording:', err);
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
     }
-  }, [stream, sampleRate, channelCount, samplesPerPixel, loadWorklet, isRecording, isPaused]);
+  }, [stream, sampleRate, channelCount, samplesPerPixel, getAudioContext, loadWorklet, isRecording, isPaused]);
 
   // Stop recording
   const stopRecording = useCallback(async (): Promise<AudioBuffer | null> => {
@@ -168,10 +177,11 @@ export function useRecording(
 
       // Create final AudioBuffer from accumulated chunks
       const allSamples = concatenateAudioData(recordedChunksRef.current);
+      const context = audioContextRef.current || getAudioContext();
       const buffer = createAudioBuffer(
-        Tone.context.rawContext as AudioContext,
+        context,
         allSamples,
-        sampleRate,
+        context.sampleRate,
         channelCount
       );
 
@@ -186,7 +196,7 @@ export function useRecording(
       setError(err instanceof Error ? err : new Error('Failed to stop recording'));
       return null;
     }
-  }, [isRecording, sampleRate, channelCount]);
+  }, [isRecording, sampleRate, channelCount, getAudioContext]);
 
   // Pause recording
   const pauseRecording = useCallback(() => {
@@ -228,6 +238,9 @@ export function useRecording(
       }
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
       }
     };
   }, []);

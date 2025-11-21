@@ -10,7 +10,7 @@ import { useTimeFormat, useZoomControls, useMasterVolume } from './hooks';
 
 // Types
 export interface WaveformTrack {
-  src: string;
+  src: string | AudioBuffer; // Support both URL strings and AudioBuffer objects
   name?: string;
   effects?: TrackEffectsFunction;
 }
@@ -213,9 +213,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         const audioContext = Tone.getContext().rawContext as AudioContext;
 
         const loadPromises = tracks.map(async (track, index) => {
-          const response = await fetch(track.src);
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = await audioContext.decodeAudioData(arrayBuffer);
+          let buffer: AudioBuffer;
+
+          // Handle both URL strings and AudioBuffer objects
+          if (typeof track.src === 'string') {
+            const response = await fetch(track.src);
+            const arrayBuffer = await response.arrayBuffer();
+            buffer = await audioContext.decodeAudioData(arrayBuffer);
+          } else {
+            // track.src is already an AudioBuffer
+            buffer = track.src;
+          }
 
           return { buffer, track, index };
         });
