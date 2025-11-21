@@ -175,7 +175,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     isAutomaticScrollRef.current = isAutomaticScroll;
   }, [isAutomaticScroll]);
 
-  // Load audio and initialize
+  // Load audio buffers (only when tracks change)
   useEffect(() => {
     if (tracks.length === 0) return;
 
@@ -188,20 +188,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           const arrayBuffer = await response.arrayBuffer();
           const buffer = await audioContext.decodeAudioData(arrayBuffer);
 
-          const bits = 16;
-          const peaks = generatePeaks(buffer, samplesPerPixel, mono, bits);
-
-          return { buffer, peaks, track, index };
+          return { buffer, track, index };
         });
 
         const loadedTracks = await Promise.all(loadPromises);
 
         const buffers = loadedTracks.map(t => t.buffer);
-        const peaks = loadedTracks.map(t => t.peaks);
         const maxDuration = Math.max(...buffers.map(b => b.duration));
 
         setAudioBuffers(buffers);
-        setPeaksDataArray(peaks);
         setDuration(maxDuration);
 
         setTrackStates(tracks.map(() => ({
@@ -250,7 +245,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         playoutRef.current.dispose();
       }
     };
-  }, [tracks, samplesPerPixel, mono, onReady]);
+  }, [tracks, onReady]);
+
+  // Regenerate peaks when zoom or mono changes (without reloading audio)
+  useEffect(() => {
+    if (audioBuffers.length === 0) return;
+
+    const bits = 16;
+    const peaks = audioBuffers.map(buffer => generatePeaks(buffer, samplesPerPixel, mono, bits));
+    setPeaksDataArray(peaks);
+  }, [audioBuffers, samplesPerPixel, mono]);
 
   // Load annotations from annotationList prop
   useEffect(() => {
