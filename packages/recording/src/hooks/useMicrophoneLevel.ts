@@ -79,7 +79,6 @@ export function useMicrophoneLevel(
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
-  const contextStateRef = useRef<AudioContextState>('suspended');
 
   const resetPeak = () => setPeakLevel(0);
 
@@ -123,21 +122,6 @@ export function useMicrophoneLevel(
       let lastUpdateTime = 0;
 
       const updateLevel = (timestamp: number) => {
-        // Check if AudioContext state changed from suspended to running
-        const currentState = context.state;
-        if (contextStateRef.current === 'suspended' && currentState === 'running') {
-          contextStateRef.current = currentState;
-
-          // Disconnect and reconnect to ensure proper data flow
-          // IMPORTANT: Use targeted disconnect to avoid breaking other consumers (e.g., worklet)
-          if (sourceRef.current && analyserRef.current) {
-            sourceRef.current.disconnect(analyserRef.current);
-            sourceRef.current.connect(analyserRef.current);
-          }
-        } else if (currentState !== contextStateRef.current) {
-          contextStateRef.current = currentState;
-        }
-
         if (timestamp - lastUpdateTime >= updateInterval) {
           lastUpdateTime = timestamp;
 

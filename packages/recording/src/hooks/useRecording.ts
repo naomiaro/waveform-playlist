@@ -33,6 +33,10 @@ export function useRecording(
 
   const bits: 8 | 16 = 16; // Match the bit depth used by the final waveform
 
+  // Global flag to prevent loading worklet multiple times
+  // (AudioWorklet processors can only be registered once per AudioContext)
+  const workletLoadedRef = useRef<boolean>(false);
+
   // Refs for AudioWorklet and data accumulation
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -45,10 +49,12 @@ export function useRecording(
 
   // Load AudioWorklet module
   const loadWorklet = useCallback(async (context: AudioContext) => {
-    try {
-      // NOTE: Removed the check for context._workletModuleLoaded to allow reloading
-      // This ensures we always load the latest worklet code during development
+    // Skip if already loaded to prevent "already registered" error
+    if (workletLoadedRef.current) {
+      return;
+    }
 
+    try {
       // Load the worklet module
       // Use a relative path that works when bundled
       const workletUrl = new URL(
@@ -56,10 +62,8 @@ export function useRecording(
         import.meta.url
       ).href;
 
-      // Add cache-busting parameter to force reload during development
-      const cacheBustedUrl = `${workletUrl}?v=${Date.now()}`;
-
-      await context.audioWorklet.addModule(cacheBustedUrl);
+      await context.audioWorklet.addModule(workletUrl);
+      workletLoadedRef.current = true;
     } catch (err) {
       console.error('Failed to load AudioWorklet module:', err);
       throw new Error('Failed to load recording processor');
@@ -98,13 +102,13 @@ export function useRecording(
 
       //Listen for audio data from worklet
       workletNode.port.onmessage = (event) => {
-        const { samples, rmsLevel } = event.data;
+        const { samples } = event.data;
 
         // Accumulate samples
         recordedChunksRef.current.push(samples);
         totalSamplesRef.current += samples.length;
 
-        // Update peaks incrementally
+        // Update peaks incrementally for live waveform visualization
         setPeaks((prevPeaks) =>
           appendPeaks(
             prevPeaks,
@@ -115,9 +119,8 @@ export function useRecording(
           )
         );
 
-        // Update VU meter levels
-        setLevel(rmsLevel);
-        setPeakLevel((prev) => Math.max(prev, rmsLevel));
+        // Note: VU meter levels come from useMicrophoneLevel (AnalyserNode)
+        // We don't update level/peakLevel here to avoid conflicting state updates
       };
 
       // Start the worklet processor

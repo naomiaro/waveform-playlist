@@ -215,12 +215,14 @@ function RecordingApp() {
     samplesPerPixel: 1024,
   });
 
-  // Microphone level monitoring (for pre-recording level checking)
+  // Microphone level monitoring (for VU meter - works during monitoring AND recording)
   const { level: monitorLevel, peakLevel: monitorPeakLevel, resetPeak } = useMicrophoneLevel(stream);
 
-  // Use recording levels during recording, monitoring levels otherwise
-  const level = isRecording ? recordingLevel : monitorLevel;
-  const peakLevel = isRecording ? recordingPeakLevel : monitorPeakLevel;
+  // Always use AnalyserNode for VU meter (smooth, stable updates)
+  // Apply 3x gain to make typical speech levels more visible (0.1 RMS → 30% fill)
+  const VU_METER_GAIN = 3;
+  const level = monitorLevel * VU_METER_GAIN;
+  const peakLevel = monitorPeakLevel * VU_METER_GAIN;
 
   // Draw live waveform as recording progresses
   // Matches the Channel component's rendering approach

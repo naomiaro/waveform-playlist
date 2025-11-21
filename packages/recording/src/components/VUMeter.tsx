@@ -104,7 +104,7 @@ const ScaleMark = styled.div<{ $position: number; $height: number }>`
  * return <VUMeter level={level} peakLevel={peakLevel} width={300} height={24} />;
  * ```
  */
-export const VUMeter: React.FC<VUMeterProps> = ({
+const VUMeterComponent: React.FC<VUMeterProps> = ({
   level,
   peakLevel,
   width = 200,
@@ -132,3 +132,6 @@ export const VUMeter: React.FC<VUMeterProps> = ({
     </MeterContainer>
   );
 };
+
+// Memoize to prevent unnecessary re-renders when parent updates
+export const VUMeter = React.memo(VUMeterComponent);
