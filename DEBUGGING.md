@@ -18,10 +18,10 @@ This guide documents common debugging issues and solutions for the waveform-play
    - Worklet files in `ghpages/js/worklet/` may be served from cache
    - This happens even with browser hard refresh!
 
-2. **Build Process Not Copying Worklets**
+2. **Build Process Copying Worklets**
    - Worklets are built to `packages/recording/dist/`
-   - They must be manually copied to `ghpages/js/worklet/`
-   - The standard build process may not copy them automatically
+   - They are automatically copied to `ghpages/js/worklet/` by the build script
+   - The `build-all.sh` script handles this after building the recording bundle
 
 3. **Browser AudioContext Caching**
    - Once an AudioWorklet module is registered, it persists in the AudioContext
@@ -58,13 +58,17 @@ ls -lh packages/recording/dist/recording-processor.worklet.js
 ls -lh ghpages/js/worklet/recording-processor.worklet.js
 ```
 
-#### 4. Copy Worklet to Deployment Directory
+#### 4. Verify Worklet Was Copied
 
-If the deployed file doesn't match the built file:
+The build script automatically copies the worklet, but you can verify:
 
 ```bash
-# Manually copy the updated worklet
-cp packages/recording/dist/recording-processor.worklet.js ghpages/js/worklet/
+# Check that the worklet was copied
+ls -lh ghpages/js/worklet/recording-processor.worklet.js
+
+# If needed, manually copy
+# (normally not required - build script does this automatically)
+# cp packages/recording/dist/recording-processor.worklet.js ghpages/js/worklet/
 ```
 
 #### 5. Restart Jekyll Server
@@ -185,16 +189,13 @@ console.log('Sample rate:', context.sampleRate);
 ## Build Commands Reference
 
 ```bash
-# Build everything
+# Build everything (includes automatic worklet copy)
 pnpm build
 
 # Build and serve locally
 pnpm build
 cd ghpages
 jekyll serve --livereload
-
-# Manual worklet deployment
-cp packages/recording/dist/recording-processor.worklet.js ghpages/js/worklet/
 ```
 
 ## Network Debugging
@@ -236,16 +237,13 @@ Main bundle:
 When debugging recording/worklet issues:
 
 - [ ] Modified source file (`.ts`)
-- [ ] Ran `pnpm build`
+- [ ] Ran `pnpm build` (automatically copies worklet)
 - [ ] Verified built file has changes (`dist/`)
-- [ ] Copied worklet to `ghpages/js/worklet/`
+- [ ] Verified worklet was copied to `ghpages/js/worklet/`
 - [ ] Restarted Jekyll server
 - [ ] Hard refreshed browser (Cmd+Shift+R)
 - [ ] Verified server is serving new file (fetch in console)
 - [ ] Checked for worklet request in Network tab
-- [ ] Checked document title for RMS values
-- [ ] Checked browser console for `[useRecording]` logs
-- [ ] Inspected VU meter element width
 
 ## Understanding the Architecture
 

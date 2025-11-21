@@ -16,7 +16,7 @@ interface AudioBuffer {
 interface Track {
     id: string;
     name: string;
-    src?: string;
+    src?: string | AudioBuffer;
     gain: number;
     muted: boolean;
     soloed: boolean;

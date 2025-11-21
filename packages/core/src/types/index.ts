@@ -18,7 +18,7 @@ export interface AudioBuffer {
 export interface Track {
   id: string;
   name: string;
-  src?: string;
+  src?: string | AudioBuffer; // Support both URL strings and AudioBuffer objects
   gain: number;
   muted: boolean;
   soloed: boolean;
