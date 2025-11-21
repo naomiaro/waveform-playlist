@@ -185,6 +185,8 @@ function NewTracksApp() {
         <WaveformPlaylistProvider
           tracks={tracks}
           samplesPerPixel={2048}
+          mono={true}
+          waveHeight={120}
           controls={{ show: true, width: 200 }}
         >
           <Controls>

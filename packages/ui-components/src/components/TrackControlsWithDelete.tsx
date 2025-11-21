@@ -9,13 +9,13 @@ import React from 'react';
 import styled from 'styled-components';
 import {
   Controls,
-  Header,
-  ButtonGroup,
-  Button,
   SliderWrapper,
   Slider,
   VolumeDownIcon,
   VolumeUpIcon,
+  Button,
+  ButtonGroup,
+  TrashIcon,
 } from './TrackControls';
 
 export interface TrackControlsWithDeleteProps {
@@ -32,8 +32,48 @@ export interface TrackControlsWithDeleteProps {
   onDelete: () => void;
 }
 
-const DeleteButton = styled(Button)`
-  margin-top: 0.5rem;
+const HeaderContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.5rem 0.25rem 0.5rem;
+`;
+
+const TrackNameSpan = styled.span`
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0 0.25rem;
+`;
+
+const DeleteIconButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: all 0.2s ease-in-out;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #dc3545;
+    color: white;
+  }
+
+  &:active {
+    transform: scale(0.9);
+  }
 `;
 
 /**
@@ -70,7 +110,13 @@ export const TrackControlsWithDelete: React.FC<TrackControlsWithDeleteProps> = (
 }) => {
   return (
     <Controls>
-      <Header style={{ justifyContent: 'center' }}>{trackName}</Header>
+      <HeaderContainer>
+        <DeleteIconButton onClick={onDelete} title="Delete track">
+          {/* @ts-expect-error - TrashIcon has icon prop set via attrs */}
+          <TrashIcon />
+        </DeleteIconButton>
+        <TrackNameSpan>{trackName}</TrackNameSpan>
+      </HeaderContainer>
       <ButtonGroup>
         <Button
           $variant={muted ? 'danger' : 'outline'}
@@ -109,9 +155,6 @@ export const TrackControlsWithDelete: React.FC<TrackControlsWithDeleteProps> = (
         />
         <span>R</span>
       </SliderWrapper>
-      <DeleteButton $variant="danger" onClick={onDelete}>
-        Delete
-      </DeleteButton>
     </Controls>
   );
 };

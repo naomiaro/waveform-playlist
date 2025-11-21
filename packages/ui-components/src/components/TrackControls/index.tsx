@@ -4,6 +4,7 @@ import { Controls } from './Controls';
 import { Header } from './Header';
 import { VolumeDownIcon } from './VolumeDownIcon';
 import { VolumeUpIcon } from './VolumeUpIcon';
+import { TrashIcon } from './TrashIcon';
 import { Slider } from './Slider';
 import { SliderWrapper } from './SliderWrapper';
 import { Knob } from './Knob';
@@ -15,6 +16,7 @@ export {
   Header,
   VolumeDownIcon,
   VolumeUpIcon,
+  TrashIcon,
   Slider,
   SliderWrapper,
   Knob,
