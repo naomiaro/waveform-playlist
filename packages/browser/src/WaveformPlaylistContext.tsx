@@ -503,14 +503,46 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     }
   }, []);
 
-  // Restart animation loop when continuousPlay changes during playback
+  // Restart animation loop and reschedule playout when continuousPlay changes during playback
   // This ensures the loop always has the current continuousPlay value
+  // and removes duration limits when switching to continuous play
   useEffect(() => {
-    if (isPlaying && animationFrameRef.current) {
-      console.log('[useEffect] continuousPlay changed during playback, restarting animation loop');
-      stopAnimationLoop();
-      startAnimationLoop();
-    }
+    const reschedulePlayback = async () => {
+      if (isPlaying && animationFrameRef.current && playoutRef.current) {
+        console.log('[useEffect] continuousPlay changed during playback, restarting animation loop');
+
+        // When toggling continuous play ON, reschedule playout without duration limit
+        // so audio continues past the current annotation boundary
+        if (continuousPlay) {
+          console.log('[useEffect] Continuous play ON - rescheduling playout without duration limit');
+          const currentPos = currentTimeRef.current;
+
+          // Stop current playout (which may have duration limit + pause callback)
+          playoutRef.current.stop();
+          stopAnimationLoop();
+
+          // Initialize and restart from current position without duration limit
+          await playoutRef.current.init();
+
+          // Clear any existing playback complete callback
+          playoutRef.current.setOnPlaybackComplete(() => {});
+
+          const now = Tone.now();
+          playbackStartTimeRef.current = now;
+          audioStartPositionRef.current = currentPos;
+
+          // Play without duration - will play to end of track
+          playoutRef.current.play(now, currentPos);
+          startAnimationLoop();
+        } else {
+          // Just restart animation loop for continuous play OFF
+          stopAnimationLoop();
+          startAnimationLoop();
+        }
+      }
+    };
+
+    reschedulePlayback();
   }, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop]);
 
   // Playback controls
