@@ -21,9 +21,11 @@ export function useRecording(
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
-  const [peaks, setPeaks] = useState<number[]>([]);
+  const [peaks, setPeaks] = useState<Int8Array | Int16Array>(new Int16Array(0));
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [error, setError] = useState<Error | null>(null);
+
+  const bits: 8 | 16 = 16; // Match the bit depth used by the final waveform
 
   // Refs for AudioWorklet and data accumulation
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -115,7 +117,8 @@ export function useRecording(
             prevPeaks,
             samples,
             samplesPerPixel,
-            totalSamplesRef.current - samples.length
+            totalSamplesRef.current - samples.length,
+            bits
           )
         );
       };
@@ -130,7 +133,7 @@ export function useRecording(
       // Reset state
       recordedChunksRef.current = [];
       totalSamplesRef.current = 0;
-      setPeaks([]);
+      setPeaks(new Int16Array(0));
       setAudioBuffer(null);
       setIsRecording(true);
       setIsPaused(false);

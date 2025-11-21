@@ -11,7 +11,7 @@ export interface RecordingState {
 
 export interface RecordingData {
   buffer: AudioBuffer | null;
-  peaks: number[];
+  peaks: Int8Array | Int16Array;
   duration: number;
 }
 
@@ -50,7 +50,7 @@ export interface UseRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
   duration: number;
-  peaks: number[];
+  peaks: Int8Array | Int16Array;
   audioBuffer: AudioBuffer | null;
 
   // Controls

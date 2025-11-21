@@ -201,6 +201,7 @@ function RecordingApp() {
   const { level, peakLevel, resetPeak } = useMicrophoneLevel(stream);
 
   // Draw live waveform as recording progresses
+  // Matches the Channel component's rendering approach
   React.useEffect(() => {
     if (!liveWaveformRef.current || peaks.length === 0) return;
 
@@ -219,30 +220,36 @@ function RecordingApp() {
 
     const width = rect.width;
     const height = rect.height;
-    const halfHeight = height / 2;
+    const h2 = Math.floor(height / 2);
+
+    // 16-bit peaks (matches the final waveform)
+    const bits = 16;
+    const maxValue = 2 ** (bits - 1);
 
     // Clear canvas
     ctx.fillStyle = '#2c3e50';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw waveform
+    // Draw waveform (matches Channel component approach)
     ctx.fillStyle = '#3498db';
-    ctx.strokeStyle = '#3498db';
 
-    const peaksPerPixel = Math.max(1, Math.floor(peaks.length / width));
+    const numPeaks = peaks.length / 2; // Each peak is a min/max pair
 
     for (let x = 0; x < width; x++) {
-      const peakIndex = Math.floor((x / width) * (peaks.length / 2));
-      const minPeak = peaks[peakIndex * 2] || 0;
-      const maxPeak = peaks[peakIndex * 2 + 1] || 0;
+      const peakIndex = Math.floor((x / width) * numPeaks);
 
-      const normalizedMin = minPeak / 128; // Assuming 8-bit peaks
-      const normalizedMax = maxPeak / 128;
+      if (peakIndex * 2 + 1 < peaks.length) {
+        const minPeak = peaks[peakIndex * 2] / maxValue;
+        const maxPeak = peaks[peakIndex * 2 + 1] / maxValue;
 
-      const yMin = halfHeight + (normalizedMin * halfHeight);
-      const yMax = halfHeight - (normalizedMax * halfHeight);
+        const min = Math.abs(minPeak * h2);
+        const max = Math.abs(maxPeak * h2);
 
-      ctx.fillRect(x, yMax, 1, yMin - yMax);
+        // Draw max (from top toward center)
+        ctx.fillRect(x, 0, 1, h2 - max);
+        // Draw min (from center toward bottom)
+        ctx.fillRect(x, h2 + min, 1, h2 - min);
+      }
     }
   }, [peaks]);
 
