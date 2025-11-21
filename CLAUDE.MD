@@ -6,6 +6,39 @@ This file contains important context, decisions, and conventions for AI-assisted
 
 Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas waveform visualizations. Currently undergoing a React refactor (Tone.js overhaul branch).
 
+## Project Roadmap
+
+**Source of Truth:** `TODO.md` contains the complete multi-track editing roadmap.
+
+### Current Phase: Phase 1 Complete ✅
+
+**Phase 1: Foundation** - All core features implemented:
+- WaveformPlaylistProvider, primitive components, track controls
+- Recording with AudioWorklet, VU meter, live waveform
+- Annotations (optional package), audio effects hooks
+- GPU-accelerated playhead, smooth zoom, performance optimizations
+
+**Next Phase: Phase 2 - Clip-Based Model**
+- Transition from track-based to clip-based data model
+- Multiple clips per track (not just one audio file per track)
+- Foundation for drag, trim, split, copy/paste features
+
+### Tracking Progress
+
+**When completing tasks:**
+1. Check off task in TODO.md: `- [x] Task description`
+2. Move to "Recently Completed" section with date
+3. Update "Current Work" section in this file (CLAUDE.md)
+4. Update session notes at bottom of this file
+
+**When planning work:**
+1. Review TODO.md roadmap phases
+2. Check "Next Immediate Steps" section
+3. Consider bundle size goals and performance targets
+4. Follow architectural decisions (Hybrid Canvas + DOM, no canvas libraries)
+
+**Important:** Always check TODO.md at the start of significant work sessions to understand current phase and next steps.
+
 ## Recent Architectural Decisions
 
 ### UI Library Strategy (2025-01-19)
@@ -315,12 +348,20 @@ try {
 - Obsolete code removed
 - Worklet copy automated in build script
 
-### Next Steps / Ideas
+### Next Steps
 
-- Consider more optional packages (effects, fades, etc.)
-- Add more example layouts
-- Document all hooks and components
-- Add unit tests
+**See `TODO.md` for complete roadmap. Next immediate steps:**
+
+1. Define clip-based TypeScript interfaces (`packages/core/src/types/clip.ts`)
+2. Update WaveformPlaylistContext for clips
+3. Implement basic clip rendering (multiple clips per track)
+4. Update playback engine for multiple clips
+5. Create simple clips demo example
+
+**Future Phases:**
+- Phase 3: Drag, trim, split, copy/paste operations
+- Phase 4: Performance & virtual scrolling
+- Phase 5: Polish (undo/redo, keyboard shortcuts, accessibility)
 
 ## Important Notes
 
@@ -346,4 +387,7 @@ try {
 
 **Last Updated:** 2025-11-21
 
-**Session Notes:** Fixed VU meter jittery/flat issue during recording. Root cause: Worklet was sending RMS values at 60fps (180 state updates/sec) conflicting with AnalyserNode also updating at 60fps (120 state updates/sec) = 300 total state updates causing rendering bottleneck. Solution: Removed all RMS calculation from worklet - it now only captures samples and generates peaks for live waveform. AnalyserNode is single source of truth for VU meter levels (smoothingTimeConstant=0.8). No gain boost needed. Also automated worklet copy in build-all.sh script, fixed TypeScript errors (AudioParamDescriptor type, Track.src union type), and removed debug logging. Updated DEBUGGING.md with architecture decision and troubleshooting steps.
+**Session Notes:**
+1. Fixed VU meter jittery/flat issue during recording. Root cause: Worklet was sending RMS values at 60fps (180 state updates/sec) conflicting with AnalyserNode also updating at 60fps (120 state updates/sec) = 300 total state updates causing rendering bottleneck. Solution: Removed all RMS calculation from worklet - it now only captures samples and generates peaks for live waveform. AnalyserNode is single source of truth for VU meter levels (smoothingTimeConstant=0.8). No gain boost needed. Also automated worklet copy in build-all.sh script, fixed TypeScript errors (AudioParamDescriptor type, Track.src union type), and removed debug logging. Updated DEBUGGING.md with architecture decision and troubleshooting steps.
+
+2. Created comprehensive multi-track editing roadmap in TODO.md. Documented complete plan for clip-based model (Phase 2), advanced editing features (Phase 3: drag, trim, split, copy/paste), performance optimizations (Phase 4: virtual scrolling), and polish (Phase 5: undo/redo, keyboard shortcuts, accessibility). Architectural decision: Hybrid Canvas + DOM approach (like Ableton Live) - NOT canvas libraries (Konva, Fabric, PixiJS) due to bundle size. Will use @dnd-kit (13KB) for interactions. Bundle size goal: <1MB total. Performance target: 60fps with 12+ tracks, 2+ hour timelines. Added "Project Roadmap" section to CLAUDE.md with guidance on tracking progress in TODO.md.
