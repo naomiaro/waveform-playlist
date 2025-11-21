@@ -1,275 +1,787 @@
 # TODO & Roadmap
 
-Project roadmap and task list for waveform-playlist.
+Multi-track audio editor roadmap for waveform-playlist.
 
 **Branch:** `tonejs-overhaul` (React migration)
-**Last Updated:** 2025-11-19
+**Last Updated:** 2025-11-21
 
 ---
 
-## 🔥 High Priority
+## 🎯 Vision
 
-### React Migration - Core Features
+Transform waveform-playlist into a professional multi-track audio editor with:
+- **Track shifting in time** - Move entire tracks forward/backward on timeline
+- **Clip-based editing** - Multiple audio clips per track (not just one audio file per track)
+- **Dragging** - Drag clips horizontally to reposition in time
+- **Trimming** - Adjust clip start/end points with drag handles
+- **Copy/Paste** - Duplicate clips across tracks and timeline positions
+- **Splitting** - Cut clips at playhead or selection boundaries
+- **Professional performance** - Smooth 60fps with 8-12+ tracks
 
-- [ ] Migrate remaining examples to React
-  - [ ] Fades example
-  - [ ] Effects example
-  - [ ] Multi-channel example
-  - [ ] Stem tracks example
-  - [ ] Record example
-- [ ] Remove/deprecate jQuery dependencies
-- [ ] Complete EventEmitter → React events migration
-- [ ] Create migration guide for users
-
-### Critical Bugs/Issues
-
-- [x] ~~Selection inputs reset to 0 on click~~ ✅ Fixed 2025-01-19
-- [x] ~~Playback continues past selection end~~ ✅ Fixed 2025-01-19
-- [ ] Test cross-browser compatibility (Safari, Firefox, Edge)
-- [ ] Verify mobile/touch support
+**Target Users:**
+- Podcast editors working with multiple speakers
+- Music producers with stem tracks (drums, bass, vocals, etc.)
+- Audio engineers assembling takes from multiple recordings
+- Anyone who needs more than simple append-only playback
 
 ---
 
-## 🎨 UI Components & Design System
+## 🏗️ Architectural Decisions
 
-### Component Library
+### Hybrid Canvas + DOM (Industry Standard)
 
-- [x] ~~TimeInput component~~ ✅ Implemented 2025-01-19
-- [x] ~~SelectionTimeInputs component~~ ✅ Implemented 2025-01-19
-- [ ] Create design tokens system
-  - [ ] `packages/ui-components/src/theme/tokens.ts`
-  - [ ] Color palette
-  - [ ] Typography scale
-  - [ ] Spacing system
-  - [ ] Border radius, shadows
-- [ ] Build primitives library
-  - [ ] Button component (primary, secondary, icon)
-  - [ ] Input component (text, number)
-  - [ ] Slider component
-  - [ ] Dropdown/Select component
-  - [ ] Toggle/Checkbox component
-  - [ ] Tooltip component
-  - [ ] Dialog/Modal component
+**Decision:** Use Canvas for rendering + DOM for interactions (like Ableton Live, Logic Pro)
 
-### Evaluate Headless UI Libraries
+**Why NOT use canvas libraries (Konva, Fabric.js, PixiJS):**
+- Bundle size: 200-500KB vs our current ~1.5MB library
+- Unnecessary abstraction for waveform rendering (we already have optimized canvas code)
+- Performance overhead for scene graph management
+- Don't need general-purpose graphics features
 
-- [ ] Prototype Radix UI for complex components
-  - [ ] Slider (for volume, zoom controls)
-  - [ ] Select/Dropdown (for time format)
-  - [ ] Dialog (for settings/modals)
-  - [ ] Tooltip
-- [ ] Compare with React Aria
-- [ ] Document decision and integration approach
+**Hybrid Approach Benefits:**
+- ✅ Canvas excels at rendering waveforms (thousands of pixels, 60fps)
+- ✅ DOM/React excels at interactions (buttons, drag handles, context menus)
+- ✅ Best performance for our specific use case
+- ✅ Familiar React patterns for developers
+- ✅ Small bundle size (~13KB for @dnd-kit vs 200-500KB for canvas libs)
 
-### Accessibility (a11y)
+**Technology Stack:**
+- **Rendering:** Canvas API (existing optimized waveform code)
+- **Interactions:** @dnd-kit (13KB gzipped) - Modern React drag-and-drop
+- **State Management:** React Context + useReducer for undo/redo
+- **Performance:** Virtual scrolling (horizontal + vertical), RAF batching
 
-- [ ] Keyboard navigation support
-  - [ ] Play/pause (spacebar)
-  - [ ] Seek (arrow keys)
-  - [ ] Selection (shift + arrows)
-- [ ] Screen reader support
-  - [ ] ARIA labels for all interactive elements
-  - [ ] Announce playback state changes
-  - [ ] Waveform description
-- [ ] Focus management
-- [ ] High contrast mode support
+**References:**
+- Ableton Live uses hybrid approach (canvas rendering, native UI interactions)
+- Logic Pro uses similar pattern
+- Chrome DevTools Performance panel (canvas graphs, DOM controls)
 
 ---
 
-## ⚡ Performance & Optimization
+## 📊 Phase 1: Foundation (Complete) ✅
 
-### Rendering
+**Status:** All core features implemented and working
 
-- [ ] Optimize waveform canvas rendering
-- [ ] Debounce zoom/scroll operations
-- [ ] Virtual scrolling for long tracks
-- [ ] Canvas worker threads for peak generation
-- [ ] Lazy load waveform data for large files
+### Completed Features
 
-### Bundle Size
+- [x] WaveformPlaylistProvider with React Context
+- [x] Primitive control components (Play, Pause, Stop, Zoom, etc.)
+- [x] Track controls (Mute, Solo, Volume, Pan)
+- [x] Waveform rendering with Canvas
+- [x] Playback with Tone.js
+- [x] Selection and seeking
+- [x] Time formatting and display
+- [x] Automatic scrolling
+- [x] Recording with AudioWorklet
+- [x] VU meter with AnalyserNode
+- [x] Live waveform during recording
+- [x] Annotations package (optional)
+- [x] Audio effects hooks (reverb, auto-wah, analyser)
+- [x] Theming system
+- [x] GPU-accelerated playhead animation
+- [x] Smooth zoom performance
+- [x] Performance optimizations (60fps playback)
 
-- [ ] Code splitting for examples
-- [ ] Tree-shaking analysis
-- [ ] Evaluate if Tone.js can be externalized
-- [ ] Lazy load annotation features
-- [ ] Current: ~1.5MB → Goal: <1MB
+### Architecture Established
 
-### Audio Performance
+- [x] Monorepo with pnpm workspaces
+- [x] Package structure (@waveform-playlist/*)
+- [x] Build system with Vite
+- [x] TypeScript throughout
+- [x] styled-components for styling
+- [x] Jekyll site for examples
+- [x] Chrome DevTools MCP for testing
 
-- [ ] Optimize Tone.js configuration
-- [ ] Preload/buffer management
-- [ ] Sample rate conversion strategy
-- [ ] Memory management for large files
-
----
-
-## 🧪 Testing
-
-### Unit Tests
-
-- [ ] Set up testing framework (Vitest or Jest)
-- [ ] Test time formatting utilities
-- [ ] Test peak generation
-- [ ] Test audio playback logic
-- [ ] Component unit tests
-
-### Integration Tests
-
-- [ ] User interaction flows
-- [ ] Selection and playback
-- [ ] Annotation editing
-- [ ] Multi-track operations
-
-### E2E Tests
-
-- [ ] Playwright or Cypress setup
-- [ ] Critical user journeys
-- [ ] Cross-browser testing
+**Current Bundle Sizes:**
+- Core library: ~1.5MB
+- Recording package: ~50KB
+- Annotations package: ~50KB
+- Total: ~1.6MB
 
 ---
 
-## 📚 Documentation
+## 📦 Phase 2: Clip-Based Model
 
-### User Documentation
+**Goal:** Transition from track-based to clip-based data model
 
-- [ ] Getting started guide
-- [ ] Migration guide (v4 → v5)
-- [ ] API reference
-- [ ] Component showcase/Storybook
-- [ ] Common recipes/patterns
-- [ ] Troubleshooting guide
+### Current Model (Track-Based)
 
-### Developer Documentation
+```typescript
+interface WaveformTrack {
+  src: string | AudioBuffer;
+  name?: string;
+  effects?: TrackEffectsFunction;
+}
+```
 
-- [x] ~~CLAUDE.md~~ ✅ Created 2025-01-19
-- [x] ~~PROJECT_STRUCTURE.md~~ ✅ Created 2025-01-19
-- [ ] Contributing guide
-- [ ] Architecture decision records (ADRs)
-- [ ] Code comments and TSDoc
+**Limitation:** Each track has exactly one audio source from start to finish.
 
-### Examples
+### New Model (Clip-Based)
 
-- [ ] Create CodeSandbox examples
-- [ ] Video tutorials
-- [ ] Blog posts/tutorials
+```typescript
+interface AudioClip {
+  id: string;
+  audioBuffer: AudioBuffer;
+  startTime: number;        // Position on timeline (seconds)
+  duration: number;         // Clip duration (seconds)
+  offset: number;           // Start position within audio file (trim start)
+  fadeIn?: Fade;
+  fadeOut?: Fade;
+  gain: number;
+}
 
----
+interface Track {
+  id: string;
+  name: string;
+  clips: AudioClip[];       // Multiple clips per track
+  muted: boolean;
+  soloed: boolean;
+  volume: number;
+  pan: number;
+  effects?: TrackEffectsFunction;
+}
 
-## 🔧 Developer Experience
+interface Timeline {
+  tracks: Track[];
+  duration: number;         // Total timeline duration
+  sampleRate: number;
+}
+```
 
-### Tooling
+**Benefits:**
+- ✅ Multiple audio clips per track
+- ✅ Clips can be positioned anywhere on timeline
+- ✅ Clips can overlap (crossfade support)
+- ✅ Each clip has independent trim points
+- ✅ Gaps between clips are silent (expected behavior)
 
-- [ ] Hot module replacement (HMR) for dev
-- [ ] Better error messages
-- [ ] Dev mode warnings for common mistakes
-- [ ] TypeScript strict mode
-- [ ] ESLint rules optimization
+### Tasks
 
-### Build System
+- [ ] **Define clip-based TypeScript interfaces**
+  - Location: `packages/core/src/types/clip.ts`
+  - AudioClip, Track, Timeline interfaces
+  - Migration helpers from old Track format
 
-- [ ] Optimize build times
-- [ ] Parallel package building
-- [ ] Watch mode improvements
-- [ ] Source maps configuration
+- [ ] **Update WaveformPlaylistContext for clips**
+  - Location: `packages/browser/src/WaveformPlaylistContext.tsx`
+  - Accept `tracks: Track[]` instead of `WaveformTrack[]`
+  - Generate peaks per clip instead of per track
+  - Handle clip positioning in rendering
 
----
+- [ ] **Clip rendering on Canvas**
+  - Location: `packages/ui-components/src/components/Channel.tsx`
+  - Render multiple clips per track row
+  - Show gaps between clips (silence)
+  - Clip boundaries visual indicator
 
-## 🎵 Features & Enhancements
+- [ ] **Playback engine for clips**
+  - Location: `packages/playout/src/Playout.ts`
+  - Schedule multiple clips per track
+  - Handle crossfades between overlapping clips
+  - Skip silent gaps efficiently
 
-### Audio Features
+- [ ] **Example: Simple clips demo**
+  - Location: `packages/browser/src/clips-app.tsx`
+  - Load 2-3 tracks with multiple clips each
+  - Demonstrate playback across clips
+  - Show gaps between clips
 
-- [ ] Audio effects rack (EQ, compressor, reverb)
-- [ ] Real-time waveform during recording
-- [ ] Pitch shifting
-- [ ] Time stretching
-- [ ] Export to different formats (WAV, MP3, OGG)
+**Files to Create:**
+- `packages/core/src/types/clip.ts`
+- `packages/browser/src/clips-app.tsx`
+- `ghpages/_examples/17clips.html`
 
-### Annotation Features
-
-- [ ] Annotation templates
-- [ ] Import/export subtitle formats (SRT, VTT, ASS)
-- [ ] Annotation search/filter
-- [ ] Bulk annotation operations
-- [ ] Speaker labels
-
-### UI Features
-
-- [ ] Minimap/overview panel
-- [ ] Zoom to selection
-- [ ] Undo/redo system
-- [ ] Customizable keyboard shortcuts
-- [ ] Themes (light/dark mode)
-- [ ] Waveform color customization
-- [ ] Markers/regions
-
-### Collaboration
-
-- [ ] Real-time collaborative editing
-- [ ] Comments on annotations
-- [ ] Version history
-
----
-
-## 🌐 Platform Support
-
-### Browsers
-
-- [ ] Test and document browser support matrix
-- [ ] Polyfills for older browsers
-- [ ] Progressive enhancement strategy
-
-### Mobile
-
-- [ ] Touch gesture support
-- [ ] Mobile-optimized UI
-- [ ] Responsive layouts
-- [ ] iOS audio quirks handling
-
-### Frameworks
-
-- [ ] Vue.js wrapper
-- [ ] Angular wrapper
-- [ ] Svelte wrapper
-- [ ] Web Components version
+**Files to Modify:**
+- `packages/browser/src/WaveformPlaylistContext.tsx`
+- `packages/ui-components/src/components/Channel.tsx`
+- `packages/playout/src/Playout.ts`
 
 ---
 
-## 📦 Distribution & Publishing
+## ✂️ Phase 3: Advanced Editing Features
 
-### NPM Packages
+**Goal:** Implement professional editing operations
 
-- [ ] Publish individual packages
-- [ ] Semantic versioning strategy
-- [ ] Changelog generation
-- [ ] Release automation
+### 3.1 Dragging Clips
 
-### CDN
+**User Story:** As a user, I want to drag a clip horizontally to reposition it in time.
 
-- [ ] Unpkg/jsDelivr setup
-- [ ] Standalone bundle versions
-- [ ] Legacy browser bundle
+#### Tasks
+
+- [ ] **Install @dnd-kit**
+  ```bash
+  pnpm add @dnd-kit/core @dnd-kit/utilities
+  ```
+  - Size: 13KB gzipped
+  - Modern, accessible, performant
+
+- [ ] **Create ClipDragOverlay component**
+  - Location: `packages/ui-components/src/components/ClipDragOverlay.tsx`
+  - Transparent div positioned over each clip
+  - Uses `useDraggable` from @dnd-kit
+  - Shows drag cursor on hover
+
+- [ ] **Implement drag logic**
+  - Location: `packages/browser/src/hooks/useClipDragging.ts`
+  - Calculate new startTime from pixel position
+  - Snap to grid (optional, configurable)
+  - Prevent negative startTime
+  - Update clip position in context
+
+- [ ] **Visual feedback during drag**
+  - Ghost outline at original position
+  - Clip moves in real-time with mouse
+  - Snap indicators (grid lines)
+
+- [ ] **Example: Draggable clips**
+  - Location: `packages/browser/src/draggable-clips-app.tsx`
+  - Demo with 3 tracks, 2-3 clips each
+  - Instructions overlay
+  - Show snap-to-grid toggle
+
+**Files to Create:**
+- `packages/ui-components/src/components/ClipDragOverlay.tsx`
+- `packages/browser/src/hooks/useClipDragging.ts`
+- `packages/browser/src/draggable-clips-app.tsx`
+- `ghpages/_examples/18draggable-clips.html`
+
+### 3.2 Trimming Clips
+
+**User Story:** As a user, I want to drag the left/right edge of a clip to adjust its start/end points.
+
+#### Tasks
+
+- [ ] **Create TrimHandle component**
+  - Location: `packages/ui-components/src/components/TrimHandle.tsx`
+  - Small drag handle at clip edges
+  - Visual: 8px wide bar with icon (⋮⋮)
+  - Shows on clip hover
+  - Different cursor: `col-resize`
+
+- [ ] **Implement trim logic**
+  - Location: `packages/browser/src/hooks/useClipTrimming.ts`
+  - Dragging left handle: Adjust `offset` and `startTime`
+  - Dragging right handle: Adjust `duration`
+  - Constraints:
+    - Can't trim past audio buffer bounds
+    - Minimum clip duration (e.g., 0.1s)
+    - Can't overlap with adjacent clips (optional collision)
+
+- [ ] **Visual feedback during trim**
+  - Dimmed region shows trimmed audio
+  - Waveform inside clip updates in real-time
+  - Display duration/offset as tooltip
+
+- [ ] **Example: Trimming demo**
+  - Location: Update `draggable-clips-app.tsx`
+  - Show trim handles on hover
+  - Instructions for trim vs drag
+
+**Files to Create:**
+- `packages/ui-components/src/components/TrimHandle.tsx`
+- `packages/browser/src/hooks/useClipTrimming.ts`
+
+**Files to Modify:**
+- `packages/browser/src/draggable-clips-app.tsx`
+
+### 3.3 Splitting Clips
+
+**User Story:** As a user, I want to click a clip and press 'S' to split it at the playhead position.
+
+#### Tasks
+
+- [ ] **Implement split logic**
+  - Location: `packages/browser/src/hooks/useClipSplitting.ts`
+  - Find clip under playhead/cursor
+  - Create two new clips:
+    - Clip A: `startTime` to split point
+    - Clip B: split point to `startTime + duration`
+  - Adjust `offset` and `duration` for each
+  - Replace original clip with two new clips
+
+- [ ] **Keyboard shortcut**
+  - Location: `packages/browser/src/hooks/useKeyboardShortcuts.ts`
+  - 'S' key to split at playhead
+  - 'Shift+S' to split at selection boundaries
+  - Prevent default browser behavior
+
+- [ ] **Visual feedback**
+  - Show scissors cursor when hovering over clip
+  - Flash split indicator at cursor position
+  - Animate new clips fading in
+
+- [ ] **Example: Splitting demo**
+  - Location: Update `draggable-clips-app.tsx`
+  - Instructions: "Click clip and press S to split"
+  - Show playhead position indicator
+
+**Files to Create:**
+- `packages/browser/src/hooks/useClipSplitting.ts`
+- `packages/browser/src/hooks/useKeyboardShortcuts.ts`
+
+**Files to Modify:**
+- `packages/browser/src/draggable-clips-app.tsx`
+
+### 3.4 Copy/Paste Clips
+
+**User Story:** As a user, I want to select a clip, press Cmd+C to copy, then Cmd+V to paste at playhead position.
+
+#### Tasks
+
+- [ ] **Implement clipboard logic**
+  - Location: `packages/browser/src/hooks/useClipboardOperations.ts`
+  - Copy: Store clip data in context state (not system clipboard)
+  - Cut: Copy + delete original clip
+  - Paste: Create new clip at playhead position
+  - Support multiple clips (array)
+
+- [ ] **Selection model**
+  - Location: `packages/browser/src/hooks/useClipSelection.ts`
+  - Click to select clip (highlight border)
+  - Cmd+Click to multi-select
+  - Shift+Click to select range
+  - Track selected clip IDs in context
+
+- [ ] **Keyboard shortcuts**
+  - Cmd+C / Ctrl+C: Copy selected clips
+  - Cmd+X / Ctrl+X: Cut selected clips
+  - Cmd+V / Ctrl+V: Paste at playhead
+  - Delete/Backspace: Delete selected clips
+
+- [ ] **Visual feedback**
+  - Selected clips: Blue border, slight glow
+  - Copied clips: Dashed border briefly
+  - Paste location: Ghost outline before paste
+
+- [ ] **Example: Copy/paste demo**
+  - Location: Update `draggable-clips-app.tsx`
+  - Instructions overlay with keyboard shortcuts
+  - Show selected clips with border
+
+**Files to Create:**
+- `packages/browser/src/hooks/useClipboardOperations.ts`
+- `packages/browser/src/hooks/useClipSelection.ts`
+
+**Files to Modify:**
+- `packages/browser/src/hooks/useKeyboardShortcuts.ts`
+- `packages/browser/src/draggable-clips-app.tsx`
+
+### 3.5 Multi-Select and Bulk Operations
+
+**User Story:** As a user, I want to select multiple clips and move/delete them together.
+
+#### Tasks
+
+- [ ] **Multi-select gestures**
+  - Cmd+Click: Add/remove from selection
+  - Shift+Click: Select range between last selected and clicked
+  - Drag rectangle: Select all clips within bounds
+
+- [ ] **Bulk drag**
+  - Drag any selected clip moves all selected clips together
+  - Maintain relative positions
+  - Collision detection with other clips
+
+- [ ] **Bulk delete**
+  - Delete key removes all selected clips
+  - Confirmation dialog for >3 clips (optional)
+
+- [ ] **Selection toolbar**
+  - Location: `packages/ui-components/src/components/SelectionToolbar.tsx`
+  - Appears above timeline when clips selected
+  - Buttons: Delete, Copy, Align Left, Distribute
+  - Shows count: "3 clips selected"
+
+**Files to Create:**
+- `packages/ui-components/src/components/SelectionToolbar.tsx`
+
+**Files to Modify:**
+- `packages/browser/src/hooks/useClipSelection.ts`
+- `packages/browser/src/hooks/useClipDragging.ts`
 
 ---
 
-## 🔮 Future / Nice to Have
+## ⚡ Phase 4: Performance & Virtual Scrolling
 
-### Advanced Features
+**Goal:** Support unlimited timeline length and 12+ tracks at 60fps
 
-- [ ] MIDI support
-- [ ] Video sync support
-- [ ] Spectral display
-- [ ] AI-powered transcription integration
-- [ ] Plugin system for extensions
+### 4.1 Horizontal Virtual Scrolling
+
+**Problem:** Canvas width limited to ~32,000px in most browsers. For a 1-hour timeline at 1024 samples/pixel (44100 Hz), we need ~155,000px.
+
+**Solution:** Render only the visible portion of timeline.
+
+#### Tasks
+
+- [ ] **Viewport calculation**
+  - Location: `packages/browser/src/hooks/useVirtualTimeline.ts`
+  - Calculate visible time range from scroll position
+  - Add padding (render 1 screen width on each side)
+  - Only render clips within visible + padding range
+
+- [ ] **Canvas stitching**
+  - Multiple canvas elements (like old version)
+  - Each canvas max 10,000px wide
+  - Stitch together as user scrolls
+  - Recycle canvases for memory efficiency
+
+- [ ] **Scroll sync**
+  - Sync all track canvases together
+  - Use transform for sub-pixel smooth scrolling
+  - RAF-based scroll handler (60fps)
+
+**Files to Create:**
+- `packages/browser/src/hooks/useVirtualTimeline.ts`
+- `packages/ui-components/src/components/VirtualCanvas.tsx`
+
+**Files to Modify:**
+- `packages/ui-components/src/components/Playlist.tsx`
+
+### 4.2 Vertical Virtual Scrolling
+
+**Problem:** 20+ tracks means rendering 20+ canvas elements even if only 5 visible.
+
+**Solution:** Render only visible tracks.
+
+#### Tasks
+
+- [ ] **Track virtualization**
+  - Location: `packages/browser/src/hooks/useVirtualTracks.ts`
+  - Calculate which tracks are in viewport
+  - Render only visible tracks + 2 above/below
+  - Use react-window or custom implementation
+
+- [ ] **Scroll container**
+  - Fixed height container with overflow scroll
+  - Placeholder divs for total height
+  - Absolutely positioned track rows
+
+**Files to Create:**
+- `packages/browser/src/hooks/useVirtualTracks.ts`
+
+**Files to Modify:**
+- `packages/ui-components/src/components/Playlist.tsx`
+
+### 4.3 RAF Batching
+
+**Goal:** Batch DOM updates to prevent layout thrashing.
+
+#### Tasks
+
+- [ ] **RAF scheduler**
+  - Location: `packages/browser/src/utils/rafScheduler.ts`
+  - Queue updates during scroll/zoom
+  - Flush all updates in single RAF
+  - Priority queue (playhead > waveform > controls)
+
+- [ ] **Apply to all animations**
+  - Playhead movement
+  - Scroll position
+  - Zoom level changes
+  - Selection updates
+
+**Files to Create:**
+- `packages/browser/src/utils/rafScheduler.ts`
+
+**Files to Modify:**
+- `packages/browser/src/WaveformPlaylistContext.tsx`
+
+### Performance Targets
+
+- ✅ 60fps playback with 12 tracks
+- ✅ Smooth zoom (no audio interruption)
+- ✅ Smooth scroll (no jank)
+- ✅ Drag operations at 60fps
+- ✅ Sub-100ms interaction latency
+- ✅ Support 2+ hour timelines
+- ✅ Support 20+ tracks
+
+---
+
+## 🎨 Phase 5: Polish & Usability
+
+**Goal:** Professional UX features
+
+### 5.1 Undo/Redo
+
+**User Story:** As a user, I want to undo/redo my edits with Cmd+Z / Cmd+Shift+Z.
+
+#### Tasks
+
+- [ ] **Command pattern implementation**
+  - Location: `packages/core/src/commands/`
+  - Abstract Command interface
+  - Concrete commands: MoveClip, TrimClip, SplitClip, DeleteClip, etc.
+  - Each command has execute() and undo()
+
+- [ ] **History manager**
+  - Location: `packages/browser/src/hooks/useHistory.ts`
+  - Maintain undo/redo stacks
+  - Keyboard shortcuts (Cmd+Z, Cmd+Shift+Z)
+  - Clear redo stack on new action
+  - History limit (e.g., 50 actions)
+
+- [ ] **Integrate with all editing operations**
+  - Wrap all clip modifications in commands
+  - Batch multiple updates (e.g., multi-select drag = 1 undo)
+
+**Files to Create:**
+- `packages/core/src/commands/Command.ts`
+- `packages/core/src/commands/MoveClipCommand.ts`
+- `packages/core/src/commands/TrimClipCommand.ts`
+- `packages/core/src/commands/SplitClipCommand.ts`
+- `packages/core/src/commands/DeleteClipCommand.ts`
+- `packages/browser/src/hooks/useHistory.ts`
+
+### 5.2 Snap to Grid
+
+**User Story:** As a user, I want clips to snap to beat/bar boundaries when dragging.
+
+#### Tasks
+
+- [ ] **Grid calculation**
+  - Location: `packages/browser/src/utils/grid.ts`
+  - Support different grid resolutions:
+    - Bars (4 beats)
+    - Beats (based on BPM)
+    - Seconds (1s, 0.5s, 0.1s)
+    - Frames (based on sample rate)
+  - Snap threshold (e.g., 10px)
+
+- [ ] **Snap toggle**
+  - Location: `packages/ui-components/src/components/SnapToggle.tsx`
+  - Checkbox: "Snap to Grid"
+  - Dropdown: Grid resolution selector
+  - Keyboard shortcut: Cmd+G to toggle
+
+- [ ] **Visual grid lines**
+  - Draw grid on timeline canvas
+  - Different opacity for major/minor divisions
+  - Update on zoom
+
+**Files to Create:**
+- `packages/browser/src/utils/grid.ts`
+- `packages/ui-components/src/components/SnapToggle.tsx`
+- `packages/ui-components/src/components/GridOverlay.tsx`
+
+### 5.3 Keyboard Shortcuts
+
+**Goal:** Comprehensive keyboard navigation and shortcuts.
+
+#### Shortcuts
+
+**Playback:**
+- Space: Play/Pause
+- Enter: Play from start
+- Escape: Stop
+- Left/Right Arrow: Seek ±1s (or grid unit)
+- Shift+Left/Right: Seek ±5s
+- Home/End: Jump to start/end
+
+**Editing:**
+- S: Split clip at playhead
+- D: Duplicate selected clips
+- Delete/Backspace: Delete selected clips
+- Cmd+C: Copy
+- Cmd+X: Cut
+- Cmd+V: Paste
+- Cmd+Z: Undo
+- Cmd+Shift+Z: Redo
+- Cmd+A: Select all clips in view
+
+**Zoom:**
+- Cmd+Plus: Zoom in
+- Cmd+Minus: Zoom out
+- Cmd+0: Zoom to fit
+- Cmd+Shift+F: Zoom to selection
+
+**Selection:**
+- Click: Select clip
+- Cmd+Click: Add to selection
+- Shift+Click: Select range
+- Escape: Clear selection
+
+#### Tasks
+
+- [ ] **Keyboard shortcuts manager**
+  - Location: `packages/browser/src/hooks/useKeyboardShortcuts.ts`
+  - Map keys to actions
+  - Handle modifiers (Cmd, Shift, Alt)
+  - Prevent conflicts with browser shortcuts
+
+- [ ] **Shortcuts help overlay**
+  - Location: `packages/ui-components/src/components/ShortcutsHelp.tsx`
+  - Press '?' to show overlay
+  - Categorized list of shortcuts
+  - Searchable/filterable
+
+**Files to Create:**
+- `packages/ui-components/src/components/ShortcutsHelp.tsx`
+
+**Files to Modify:**
+- `packages/browser/src/hooks/useKeyboardShortcuts.ts`
+
+### 5.4 Accessibility
+
+**Goal:** Keyboard-only and screen reader support.
+
+#### Tasks
+
+- [ ] **Keyboard focus management**
+  - Tab through clips in timeline order
+  - Focus indicators (visible outline)
+  - Focus trap in modals/dialogs
+
+- [ ] **Screen reader support**
+  - ARIA labels for all clips
+  - Announce selection changes
+  - Announce playback state
+  - Describe timeline structure
+
+- [ ] **High contrast mode**
+  - Respect prefers-contrast media query
+  - Ensure 4.5:1 contrast ratios
+  - Larger click targets (44×44px minimum)
+
+**Files to Modify:**
+- All component files (add ARIA attributes)
+- `packages/ui-components/src/theme/tokens.ts` (contrast ratios)
+
+### 5.5 Context Menus
+
+**User Story:** As a user, I want to right-click a clip to see editing options.
+
+#### Tasks
+
+- [ ] **Clip context menu**
+  - Location: `packages/ui-components/src/components/ClipContextMenu.tsx`
+  - Options: Cut, Copy, Delete, Duplicate, Split, Trim to Selection
+  - Positioned near cursor
+  - Closes on click outside
+
+- [ ] **Track context menu**
+  - Options: Add Track, Delete Track, Rename, Duplicate Track
+  - Mute/Solo All, Clear All Clips
+
+**Files to Create:**
+- `packages/ui-components/src/components/ClipContextMenu.tsx`
+- `packages/ui-components/src/components/TrackContextMenu.tsx`
+
+---
+
+## 📦 Bundle Size Goals
+
+**Current:** ~1.6MB (1.5MB core + recording + annotations)
+
+**Target:** <1MB total
+
+### Breakdown
+
+- Core library: 650KB (down from 1.5MB)
+  - Remove unused Tone.js modules
+  - Code splitting for advanced features
+  - Tree-shake styled-components
+
+- @dnd-kit: 13KB ✅
+- Recording (optional): 50KB ✅
+- Annotations (optional): 50KB ✅
+- Effects (future optional): 50KB
+- Undo/Redo: 10KB
+- Virtual scrolling: 15KB
+
+**Total:** ~775KB (under 1MB goal)
+
+### Optimization Tasks
+
+- [ ] Analyze bundle with rollup-plugin-visualizer
+- [ ] Lazy load Tone.js effects
+- [ ] Split annotations into separate chunk
+- [ ] Remove moment.js if used (use native Intl)
+- [ ] Minimize styled-components runtime
+
+---
+
+## 🎯 Success Metrics
+
+### Performance
+
+- ✅ 60fps playback with 12 tracks
+- ✅ 60fps dragging/scrolling
+- ✅ <100ms interaction latency
+- ✅ <3s load time on 3G
+- ✅ Support 2+ hour timelines
+- ✅ Support 20+ tracks with virtual scrolling
+
+### Usability
+
+- ✅ All operations keyboard accessible
+- ✅ Screen reader compatible
+- ✅ Undo/redo for all destructive actions
+- ✅ Context menus for discoverability
+- ✅ Keyboard shortcuts help (press '?')
+
+### Developer Experience
+
+- ✅ TypeScript types for all APIs
+- ✅ Comprehensive examples
+- ✅ Migration guide from v4
+- ✅ Storybook component showcase
+- ✅ <5 min to get started
+
+---
+
+## 🔮 Future Considerations
+
+### Advanced Features (Post-Launch)
+
+- [ ] Crossfades between overlapping clips
+- [ ] Clip grouping (edit multiple clips as one)
+- [ ] Time signatures and tempo changes
+- [ ] Automation lanes (volume, pan)
+- [ ] Markers and regions
+- [ ] Clip colors and labels
+- [ ] Waveform color per clip
+- [ ] Minimap overview panel
+- [ ] Vertical zoom (waveform height)
+- [ ] Offline export (render to WAV)
 
 ### Integrations
 
-- [ ] DAW integration (Ableton Link)
-- [ ] Cloud storage (Dropbox, Google Drive)
-- [ ] Audio analysis (beat detection, key detection)
+- [ ] MIDI support (sync playback to MIDI clock)
+- [ ] Video sync (align audio to video timeline)
+- [ ] Cloud storage (save/load projects)
+- [ ] Collaboration (real-time editing)
+- [ ] Plugin system (user-defined effects/tools)
 
 ---
 
 ## ✅ Recently Completed
+
+### 2025-11-21
+
+- [x] VU meter fix (AnalyserNode single source of truth)
+- [x] Worklet RMS calculation removed
+- [x] Worklet copy automated in build script
+- [x] Debug logs cleanup
+- [x] TypeScript errors fixed (WaveformTrack type)
+- [x] No gain boost needed for VU meter
+- [x] DEBUGGING.md updated with VU meter solution
+- [x] CLAUDE.md updated with architectural notes
+- [x] TODO.md replaced with multi-track editing roadmap
+
+### 2025-11-20
+
+- [x] Recording example migrated to provider pattern
+- [x] Independent AudioContext for recording
+- [x] WaveformTrack.src supports AudioBuffer and string URLs
+- [x] Live waveform visualization during recording
+- [x] Recording peaks match final format (Int16Array)
+- [x] GPU-accelerated playhead animation
+- [x] Smooth zoom performance fixes
+- [x] Automatic scroll proportional adjustment
+- [x] TrackControlsWithDelete component
+- [x] All examples migrated to provider pattern
+- [x] Obsolete code cleanup (WaveformPlaylistComponent, Jekyll includes)
 
 ### 2025-01-19
 
@@ -277,40 +789,45 @@ Project roadmap and task list for waveform-playlist.
 - [x] Time formatting utilities
 - [x] Fixed click clearing selection bug
 - [x] Fixed playback beyond selection bug
-- [x] Created CLAUDE.md
-- [x] Created PROJECT_STRUCTURE.md
-- [x] Created TODO.md
-- [x] Documented UI library decision (no full UI lib)
+- [x] Flexible/headless API architecture
+- [x] Complete theming system
+- [x] Custom timestamp rendering
+- [x] Annotations as optional package
+- [x] useAnnotationControls hook
+- [x] Audio effects hooks (reverb, auto-wah, analyser)
+- [x] Continuous Play toggle fix with context splitting
+- [x] AudioPosition component styling (text-only)
+- [x] CLAUDE.md created
+- [x] PROJECT_STRUCTURE.md created
+- [x] UI library decision documented (no full UI lib)
 
 ---
 
-## 🗂️ Backlog Organization
+## 🗺️ Roadmap Timeline
 
-### Labels/Tags
+**Estimated Milestones:**
 
-- `migration` - React migration tasks
-- `ui` - UI components and design
-- `audio` - Audio playback and processing
-- `docs` - Documentation
-- `performance` - Optimization
-- `a11y` - Accessibility
-- `bug` - Bug fixes
-- `enhancement` - New features
+1. **Phase 2: Clip-Based Model** - Foundation for all editing
+2. **Phase 3.1-3.2: Drag & Trim** - Core editing operations
+3. **Phase 3.3-3.4: Split & Copy/Paste** - Power user features
+4. **Phase 4: Performance** - Scale to professional use cases
+5. **Phase 5: Polish** - Production-ready UX
 
-### Milestone Ideas
+**Next Immediate Steps:**
 
-- **v5.0-alpha.1** - Core React migration complete
-- **v5.0-alpha.2** - Design system implemented
-- **v5.0-beta.1** - All examples migrated
-- **v5.0-rc.1** - Testing and polish
-- **v5.0.0** - Official React release
+1. Define clip-based TypeScript interfaces
+2. Update WaveformPlaylistContext for clips
+3. Implement basic clip rendering
+4. Update playback engine for multiple clips
+5. Create simple clips demo example
 
 ---
 
 **Notes:**
 
-- Keep this file updated as work progresses
-- Move completed items to "Recently Completed"
-- Add dates to completed items
-- Break down large tasks into smaller subtasks
-- Link to GitHub issues when created
+- Break down each phase into smaller PRs for easier review
+- Write tests for core functionality (clip positioning, playback scheduling)
+- Update documentation as features are implemented
+- Get user feedback early and often
+- Consider performance from the start (don't optimize prematurely, but design for scale)
+
