@@ -19,6 +19,7 @@ import {
   AudioPosition,
   ZoomInButton,
   ZoomOutButton,
+  AutomaticScrollCheckbox,
 } from './components';
 import { TrackControlsWithDelete } from '@waveform-playlist/ui-components';
 import { Track } from '@waveform-playlist/core';
@@ -187,6 +188,7 @@ function NewTracksApp() {
           samplesPerPixel={2048}
           mono={true}
           waveHeight={120}
+          automaticScroll={true}
           controls={{ show: true, width: 200 }}
         >
           <Controls>
@@ -203,6 +205,10 @@ function NewTracksApp() {
 
             <ControlGroup>
               <AudioPosition />
+            </ControlGroup>
+
+            <ControlGroup>
+              <AutomaticScrollCheckbox />
             </ControlGroup>
           </Controls>
 

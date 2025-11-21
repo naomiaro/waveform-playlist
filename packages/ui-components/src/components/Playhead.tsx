@@ -8,16 +8,18 @@ interface PlayheadLineProps {
 
 const PlayheadLine = styled.div.attrs<PlayheadLineProps>((props) => ({
   style: {
-    left: `${props.$position}px`,
+    transform: `translate3d(${props.$position}px, 0, 0)`,
   },
 }))<PlayheadLineProps>`
   position: absolute;
   top: 0;
+  left: 0;
   width: 2px;
   background: ${(props) => props.$color};
   height: 100%;
   z-index: 150;
   pointer-events: none;
+  will-change: transform;
 `;
 
 export interface PlayheadProps {

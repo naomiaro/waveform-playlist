@@ -101,6 +101,7 @@ export interface WaveformPlaylistProviderProps {
   mono?: boolean;
   waveHeight?: number;
   samplesPerPixel?: number;
+  automaticScroll?: boolean;
   theme?: {
     waveOutlineColor?: string;
     waveFillColor?: string;
@@ -130,6 +131,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   mono = true,
   waveHeight = 80,
   samplesPerPixel: initialSamplesPerPixel = 1024,
+  automaticScroll = false,
   theme: userTheme,
   controls = { show: false, width: 0 },
   annotationList,
@@ -149,7 +151,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
-  const [isAutomaticScroll, setIsAutomaticScroll] = useState(false);
+  const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
   const [continuousPlay, setContinuousPlay] = useState(annotationList?.isContinuousPlay ?? false);
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
   const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
@@ -163,6 +165,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isAutomaticScrollRef = useRef<boolean>(false);
+  const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
 
   // Custom hooks
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
@@ -174,6 +177,32 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   useEffect(() => {
     isAutomaticScrollRef.current = isAutomaticScroll;
   }, [isAutomaticScroll]);
+
+  // Adjust scroll position proportionally when zoom changes
+  useEffect(() => {
+    if (!scrollContainerRef.current || !audioBuffers.length) return;
+
+    const container = scrollContainerRef.current;
+    const oldSamplesPerPixel = samplesPerPixelRef.current;
+    const newSamplesPerPixel = samplesPerPixel;
+
+    if (oldSamplesPerPixel === newSamplesPerPixel) return;
+
+    // Calculate the current center time in the viewport
+    const controlWidth = controls.show ? controls.width : 0;
+    const containerWidth = container.clientWidth;
+    const currentScrollLeft = container.scrollLeft;
+    const centerPixel = currentScrollLeft + containerWidth / 2 - controlWidth;
+    const sr = audioBuffers[0].sampleRate;
+    const centerTime = (centerPixel * oldSamplesPerPixel) / sr;
+
+    // Calculate new scroll position to keep the same center time
+    const newCenterPixel = (centerTime * sr) / newSamplesPerPixel;
+    const newScrollLeft = Math.max(0, newCenterPixel + controlWidth - containerWidth / 2);
+
+    container.scrollLeft = newScrollLeft;
+    samplesPerPixelRef.current = newSamplesPerPixel;
+  }, [samplesPerPixel, audioBuffers, controls]);
 
   // Load audio buffers (only when tracks change)
   useEffect(() => {
@@ -295,7 +324,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       if (isAutomaticScrollRef.current && scrollContainerRef.current && audioBuffers.length > 0) {
         const container = scrollContainerRef.current;
         const sr = audioBuffers[0].sampleRate;
-        const pixelPosition = (time * sr) / samplesPerPixel;
+        const pixelPosition = (time * sr) / samplesPerPixelRef.current;
         const containerWidth = container.clientWidth;
 
         // Calculate visual position of playhead (includes controls offset)
