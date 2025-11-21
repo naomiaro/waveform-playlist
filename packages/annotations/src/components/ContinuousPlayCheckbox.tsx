@@ -19,7 +19,9 @@ export const ContinuousPlayCheckbox: React.FC<ContinuousPlayCheckboxProps> = ({
   className,
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[ContinuousPlayCheckbox handleChange] e.target.checked =', e.target.checked);
     onChange(e.target.checked);
+    console.log('[ContinuousPlayCheckbox handleChange] onChange called');
   };
 
   return (

@@ -665,7 +665,9 @@ var ContinuousPlayCheckbox = ({
   className
 }) => {
   const handleChange = (e) => {
+    console.log("[ContinuousPlayCheckbox handleChange] e.target.checked =", e.target.checked);
     onChange(e.target.checked);
+    console.log("[ContinuousPlayCheckbox handleChange] onChange called");
   };
   return /* @__PURE__ */ jsxs6(CheckboxWrapper, { className, children: [
     /* @__PURE__ */ jsx6(

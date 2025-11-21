@@ -5,13 +5,15 @@ import {
   EditableCheckbox as BaseEditableCheckbox,
   DownloadAnnotationsButton as BaseDownloadAnnotationsButton,
 } from '@waveform-playlist/annotations';
-import { useWaveformPlaylist } from '../WaveformPlaylistContext';
+import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContext';
 
 /**
  * Continuous play checkbox that uses the playlist context
+ * Uses split contexts to avoid re-rendering during animation
  */
 export const ContinuousPlayCheckbox: React.FC<{ className?: string }> = ({ className }) => {
-  const { continuousPlay, setContinuousPlay } = useWaveformPlaylist();
+  const { continuousPlay } = usePlaylistState();
+  const { setContinuousPlay } = usePlaylistControls();
 
   return (
     <BaseContinuousPlayCheckbox
@@ -24,9 +26,11 @@ export const ContinuousPlayCheckbox: React.FC<{ className?: string }> = ({ class
 
 /**
  * Link endpoints checkbox that uses the playlist context
+ * Uses split contexts to avoid re-rendering during animation
  */
 export const LinkEndpointsCheckbox: React.FC<{ className?: string }> = ({ className }) => {
-  const { linkEndpoints, setLinkEndpoints } = useWaveformPlaylist();
+  const { linkEndpoints } = usePlaylistState();
+  const { setLinkEndpoints } = usePlaylistControls();
 
   return (
     <BaseLinkEndpointsCheckbox
@@ -39,9 +43,11 @@ export const LinkEndpointsCheckbox: React.FC<{ className?: string }> = ({ classN
 
 /**
  * Editable annotations checkbox that uses the playlist context
+ * Uses split contexts to avoid re-rendering during animation
  */
 export const EditableCheckbox: React.FC<{ className?: string }> = ({ className }) => {
-  const { annotationsEditable, setAnnotationsEditable } = useWaveformPlaylist();
+  const { annotationsEditable } = usePlaylistState();
+  const { setAnnotationsEditable } = usePlaylistControls();
 
   return (
     <BaseEditableCheckbox
@@ -54,12 +60,13 @@ export const EditableCheckbox: React.FC<{ className?: string }> = ({ className }
 
 /**
  * Download annotations button that uses the playlist context
+ * Uses split contexts to avoid re-rendering during animation
  */
 export const DownloadAnnotationsButton: React.FC<{ filename?: string; className?: string }> = ({
   filename,
   className,
 }) => {
-  const { annotations } = useWaveformPlaylist();
+  const { annotations } = usePlaylistState();
 
   return (
     <BaseDownloadAnnotationsButton

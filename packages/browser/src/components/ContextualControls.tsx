@@ -6,13 +6,14 @@ import {
   AudioPosition as BaseAudioPosition,
   SelectionTimeInputs as BaseSelectionTimeInputs,
 } from '@waveform-playlist/ui-components';
-import { useWaveformPlaylist } from '../WaveformPlaylistContext';
+import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 
 /**
  * Master volume control that uses the playlist context
  */
 export const MasterVolumeControl: React.FC<{ className?: string }> = ({ className }) => {
-  const { masterVolume, setMasterVolume } = useWaveformPlaylist();
+  const { masterVolume } = usePlaylistData();
+  const { setMasterVolume } = usePlaylistControls();
 
   return (
     <BaseMasterVolumeControl
@@ -27,7 +28,8 @@ export const MasterVolumeControl: React.FC<{ className?: string }> = ({ classNam
  * Time format selector that uses the playlist context
  */
 export const TimeFormatSelect: React.FC<{ className?: string }> = ({ className }) => {
-  const { timeFormat, setTimeFormat } = useWaveformPlaylist();
+  const { timeFormat } = usePlaylistData();
+  const { setTimeFormat } = usePlaylistControls();
 
   return (
     <BaseTimeFormatSelect
@@ -40,9 +42,11 @@ export const TimeFormatSelect: React.FC<{ className?: string }> = ({ className }
 
 /**
  * Audio position display that uses the playlist context
+ * This component subscribes to animation context for high-frequency updates
  */
 export const AudioPosition: React.FC<{ className?: string }> = ({ className }) => {
-  const { currentTime, formatTime } = useWaveformPlaylist();
+  const { currentTime } = usePlaybackAnimation();
+  const { formatTime } = usePlaylistControls();
 
   return (
     <BaseAudioPosition
@@ -56,7 +60,8 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
  * Selection time inputs that use the playlist context
  */
 export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ className }) => {
-  const { selectionStart, selectionEnd, setSelection } = useWaveformPlaylist();
+  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { setSelection } = usePlaylistControls();
 
   return (
     <BaseSelectionTimeInputs
@@ -70,9 +75,11 @@ export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ classNam
 
 /**
  * Automatic scroll checkbox that uses the playlist context
+ * Uses split contexts to avoid re-rendering during animation
  */
 export const AutomaticScrollCheckbox: React.FC<{ className?: string }> = ({ className }) => {
-  const { isAutomaticScroll, setAutomaticScroll } = useWaveformPlaylist();
+  const { isAutomaticScroll } = usePlaylistState();
+  const { setAutomaticScroll } = usePlaylistControls();
 
   return (
     <BaseAutomaticScrollCheckbox

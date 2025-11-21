@@ -1,9 +1,11 @@
 import React from 'react';
 import { ControlButton } from '@waveform-playlist/ui-components';
-import { useWaveformPlaylist } from '../WaveformPlaylistContext';
+import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 
 export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { play, isPlaying, selectionStart, selectionEnd, currentTimeRef } = useWaveformPlaylist();
+  const { isPlaying, currentTimeRef } = usePlaybackAnimation();
+  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { play } = usePlaylistControls();
 
   const handleClick = async () => {
     // Check if there's a selection
@@ -25,7 +27,8 @@ export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
 };
 
 export const PauseButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { pause, isPlaying } = useWaveformPlaylist();
+  const { isPlaying } = usePlaybackAnimation();
+  const { pause } = usePlaylistControls();
 
   return (
     <ControlButton onClick={pause} disabled={!isPlaying} className={className}>
@@ -35,7 +38,8 @@ export const PauseButton: React.FC<{ className?: string }> = ({ className }) => 
 };
 
 export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { stop, isPlaying } = useWaveformPlaylist();
+  const { isPlaying } = usePlaybackAnimation();
+  const { stop } = usePlaylistControls();
 
   return (
     <ControlButton onClick={stop} disabled={!isPlaying} className={className}>
@@ -45,7 +49,9 @@ export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
 };
 
 export const RewindButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying, play, playoutRef, setCurrentTime } = useWaveformPlaylist();
+  const { isPlaying } = usePlaybackAnimation();
+  const { play, setCurrentTime } = usePlaylistControls();
+  const { playoutRef } = usePlaylistData();
 
   const handleClick = () => {
     setCurrentTime(0);
@@ -64,7 +70,9 @@ export const RewindButton: React.FC<{ className?: string }> = ({ className }) =>
 };
 
 export const FastForwardButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { duration, isPlaying, play, playoutRef, setCurrentTime } = useWaveformPlaylist();
+  const { isPlaying } = usePlaybackAnimation();
+  const { play, setCurrentTime } = usePlaylistControls();
+  const { duration, playoutRef } = usePlaylistData();
 
   const handleClick = () => {
     setCurrentTime(duration);
@@ -86,7 +94,9 @@ export const SkipBackwardButton: React.FC<{ skipAmount?: number; className?: str
   skipAmount = 5,
   className
 }) => {
-  const { currentTimeRef, isPlaying, play, playoutRef, setCurrentTime } = useWaveformPlaylist();
+  const { currentTimeRef, isPlaying } = usePlaybackAnimation();
+  const { play, setCurrentTime } = usePlaylistControls();
+  const { playoutRef } = usePlaylistData();
 
   const handleClick = () => {
     const newTime = Math.max(0, currentTimeRef.current - skipAmount);
@@ -109,7 +119,9 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
   skipAmount = 5,
   className
 }) => {
-  const { currentTimeRef, duration, isPlaying, play, playoutRef, setCurrentTime } = useWaveformPlaylist();
+  const { currentTimeRef, isPlaying } = usePlaybackAnimation();
+  const { play, setCurrentTime } = usePlaylistControls();
+  const { duration, playoutRef } = usePlaylistData();
 
   const handleClick = () => {
     const newTime = Math.min(duration, currentTimeRef.current + skipAmount);

@@ -26,7 +26,7 @@ import {
   AnnotationText,
   useAnnotationControls,
 } from '@waveform-playlist/annotations';
-import { useWaveformPlaylist } from '../WaveformPlaylistContext';
+import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 
 // Default theme
@@ -70,25 +70,18 @@ export const Waveform: React.FC<WaveformProps> = ({
   annotationListConfig,
   className,
 }) => {
+  // Split context usage for performance
+  const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
   const {
-    audioBuffers,
-    peaksDataArray,
-    trackStates,
-    isPlaying,
-    currentTime,
-    duration,
     selectionStart,
     selectionEnd,
-    samplesPerPixel,
-    sampleRate,
-    waveHeight,
-    timeScaleHeight,
-    controls,
     annotations,
     activeAnnotationId,
     annotationsEditable,
     linkEndpoints,
     continuousPlay,
+  } = usePlaylistState();
+  const {
     setAnnotations,
     setActiveAnnotationId,
     setTrackMute,
@@ -97,10 +90,20 @@ export const Waveform: React.FC<WaveformProps> = ({
     setTrackPan,
     setSelection,
     play,
-    playoutRef,
-    currentTimeRef,
     setScrollContainer,
-  } = useWaveformPlaylist();
+  } = usePlaylistControls();
+  const {
+    audioBuffers,
+    peaksDataArray,
+    trackStates,
+    duration,
+    samplesPerPixel,
+    sampleRate,
+    waveHeight,
+    timeScaleHeight,
+    controls,
+    playoutRef,
+  } = usePlaylistData();
 
   // Use annotation controls hook for boundary update logic
   const { updateAnnotationBoundaries } = useAnnotationControls({

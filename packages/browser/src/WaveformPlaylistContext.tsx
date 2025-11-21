@@ -93,6 +93,90 @@ export interface WaveformPlaylistContextValue {
   controls: { show: boolean; width: number };
 }
 
+// Split contexts for performance optimization
+// High-frequency updates (currentTime) are isolated from low-frequency state changes
+
+export interface PlaybackAnimationContextValue {
+  isPlaying: boolean;
+  currentTime: number;
+  currentTimeRef: React.RefObject<number>;
+}
+
+export interface PlaylistStateContextValue {
+  continuousPlay: boolean;
+  linkEndpoints: boolean;
+  annotationsEditable: boolean;
+  isAutomaticScroll: boolean;
+  annotations: AnnotationData[];
+  activeAnnotationId: string | null;
+  selectionStart: number;
+  selectionEnd: number;
+}
+
+export interface PlaylistControlsContextValue {
+  // Playback controls
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
+  pause: () => void;
+  stop: () => void;
+  setCurrentTime: (time: number) => void;
+
+  // Track controls
+  setTrackMute: (trackIndex: number, muted: boolean) => void;
+  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
+  setTrackVolume: (trackIndex: number, volume: number) => void;
+  setTrackPan: (trackIndex: number, pan: number) => void;
+
+  // Selection
+  setSelection: (start: number, end: number) => void;
+
+  // Time format
+  setTimeFormat: (format: string) => void;
+  formatTime: (seconds: number) => string;
+
+  // Zoom
+  zoomIn: () => void;
+  zoomOut: () => void;
+
+  // Master volume
+  setMasterVolume: (volume: number) => void;
+
+  // Automatic scroll
+  setAutomaticScroll: (enabled: boolean) => void;
+  setScrollContainer: (element: HTMLDivElement | null) => void;
+
+  // Annotation controls
+  setContinuousPlay: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setAnnotations: (annotations: AnnotationData[]) => void;
+  setActiveAnnotationId: (id: string | null) => void;
+}
+
+export interface PlaylistDataContextValue {
+  duration: number;
+  audioBuffers: AudioBuffer[];
+  peaksDataArray: PeakData[];
+  trackStates: TrackState[];
+  sampleRate: number;
+  waveHeight: number;
+  timeScaleHeight: number;
+  minimumPlaylistHeight: number;
+  controls: { show: boolean; width: number };
+  playoutRef: React.RefObject<TonePlayout | null>;
+  samplesPerPixel: number;
+  timeFormat: string;
+  masterVolume: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
+}
+
+// Create the 4 separate contexts
+const PlaybackAnimationContext = createContext<PlaybackAnimationContextValue | null>(null);
+const PlaylistStateContext = createContext<PlaylistStateContextValue | null>(null);
+const PlaylistControlsContext = createContext<PlaylistControlsContextValue | null>(null);
+const PlaylistDataContext = createContext<PlaylistDataContextValue | null>(null);
+
+// Keep the original context for backwards compatibility
 const WaveformPlaylistContext = createContext<WaveformPlaylistContextValue | null>(null);
 
 export interface WaveformPlaylistProviderProps {
@@ -152,7 +236,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
-  const [continuousPlay, setContinuousPlay] = useState(annotationList?.isContinuousPlay ?? false);
+  const [continuousPlay, setContinuousPlayState] = useState(annotationList?.isContinuousPlay ?? false);
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
   const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
 
@@ -165,6 +249,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isAutomaticScrollRef = useRef<boolean>(false);
+  const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
 
   // Custom hooks
@@ -173,7 +258,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const samplesPerPixel = zoom.samplesPerPixel;
   const { masterVolume, setMasterVolume } = useMasterVolume({ playoutRef, initialVolume: 100 });
 
-  // Keep ref in sync with state for automatic scroll
+  // Custom setter for continuousPlay that updates BOTH state and ref synchronously
+  // This ensures the ref is updated immediately, before the animation loop can read it
+  const setContinuousPlay = useCallback((value: boolean) => {
+    continuousPlayRef.current = value;  // Update ref synchronously
+    setContinuousPlayState(value);       // Update state (triggers re-render)
+  }, []);
+
+  // Keep refs in sync with state
   useEffect(() => {
     isAutomaticScrollRef.current = isAutomaticScroll;
   }, [isAutomaticScroll]);
@@ -318,13 +410,57 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       currentTimeRef.current = time;
       setCurrentTime(time);
 
-      // Update active annotation based on playback time (only in continuous play mode)
-      if (annotations.length > 0 && continuousPlay) {
+      // Handle annotation playback based on continuous play mode
+      if (annotations.length > 0) {
         const currentAnnotation = annotations.find(
           (ann) => time >= ann.start && time < ann.end
         );
-        if (currentAnnotation && currentAnnotation.id !== activeAnnotationId) {
-          setActiveAnnotationId(currentAnnotation.id);
+
+        console.log('[AnimLoop] continuousPlayRef.current =', continuousPlayRef.current, 'continuousPlay state =', continuousPlay);
+        if (continuousPlayRef.current) {
+          // Continuous play ON: update active annotation and stop after last annotation
+          if (currentAnnotation && currentAnnotation.id !== activeAnnotationId) {
+            setActiveAnnotationId(currentAnnotation.id);
+          } else if (!currentAnnotation && activeAnnotationId !== null) {
+            // We're no longer in any annotation - check if we're past the last one
+            const lastAnnotation = annotations[annotations.length - 1];
+            if (time >= lastAnnotation.end) {
+              // Stop playback - we've finished all annotations
+              if (playoutRef.current) {
+                playoutRef.current.stop();
+              }
+              setIsPlaying(false);
+              currentTimeRef.current = playStartPositionRef.current;
+              setCurrentTime(playStartPositionRef.current);
+              setActiveAnnotationId(null);
+              return;
+            }
+          }
+        } else {
+          // Continuous play OFF: stop at end of current annotation
+          console.log('[AnimLoop] Continuous play OFF - activeAnnotationId:', activeAnnotationId, 'time:', time);
+          if (activeAnnotationId) {
+            const activeAnnotation = annotations.find(ann => ann.id === activeAnnotationId);
+            console.log('[AnimLoop] Found active annotation:', activeAnnotation?.id, 'end:', activeAnnotation?.end);
+            if (activeAnnotation && time >= activeAnnotation.end) {
+              // Stop playback at end of current annotation
+              console.log('[AnimLoop] STOPPING - time >= annotation end');
+              if (playoutRef.current) {
+                playoutRef.current.stop();
+              }
+              setIsPlaying(false);
+              currentTimeRef.current = playStartPositionRef.current;
+              setCurrentTime(playStartPositionRef.current);
+              return;
+            }
+          } else {
+            console.log('[AnimLoop] No activeAnnotationId set - finding current annotation');
+            // If no active annotation ID is set, use the current annotation
+            if (currentAnnotation) {
+              console.log('[AnimLoop] Setting activeAnnotationId to current:', currentAnnotation.id);
+              setActiveAnnotationId(currentAnnotation.id);
+            }
+          }
         }
       }
 
@@ -366,6 +502,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       animationFrameRef.current = null;
     }
   }, []);
+
+  // Restart animation loop when continuousPlay changes during playback
+  // This ensures the loop always has the current continuousPlay value
+  useEffect(() => {
+    if (isPlaying && animationFrameRef.current) {
+      console.log('[useEffect] continuousPlay changed during playback, restarting animation loop');
+      stopAnimationLoop();
+      startAnimationLoop();
+    }
+  }, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop]);
 
   // Playback controls
   const play = useCallback(async (startTime?: number, playDuration?: number) => {
@@ -497,23 +643,27 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const timeScaleHeight = timescale ? 30 : 0;
   const minimumPlaylistHeight = (tracks.length * waveHeight) + timeScaleHeight;
 
-  const value: WaveformPlaylistContextValue = {
-    // State
+  // Split context values for performance optimization
+  // High-frequency updates (currentTime) isolated from other state
+
+  const animationValue: PlaybackAnimationContextValue = {
     isPlaying,
     currentTime,
-    duration,
-    audioBuffers,
-    peaksDataArray,
-    trackStates,
+    currentTimeRef,
+  };
+
+  const stateValue: PlaylistStateContextValue = {
+    continuousPlay,
+    linkEndpoints,
+    annotationsEditable,
+    isAutomaticScroll,
     annotations,
     activeAnnotationId,
     selectionStart,
     selectionEnd,
-    isAutomaticScroll,
-    continuousPlay,
-    linkEndpoints,
-    annotationsEditable,
+  };
 
+  const controlsValue: PlaylistControlsContextValue = {
     // Playback controls
     play,
     pause,
@@ -533,19 +683,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setSelection,
 
     // Time format
-    timeFormat,
     setTimeFormat,
     formatTime,
 
     // Zoom
-    samplesPerPixel,
     zoomIn: zoom.zoomIn,
     zoomOut: zoom.zoomOut,
-    canZoomIn: zoom.canZoomIn,
-    canZoomOut: zoom.canZoomOut,
 
     // Master volume
-    masterVolume,
     setMasterVolume,
 
     // Automatic scroll
@@ -560,26 +705,86 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setAnnotationsEditable,
     setAnnotations,
     setActiveAnnotationId,
+  };
 
-    // Refs
-    playoutRef,
-    currentTimeRef,
-
-    // Playlist info
+  const dataValue: PlaylistDataContextValue = {
+    duration,
+    audioBuffers,
+    peaksDataArray,
+    trackStates,
     sampleRate,
     waveHeight,
     timeScaleHeight,
     minimumPlaylistHeight,
     controls,
+    playoutRef,
+    samplesPerPixel,
+    timeFormat,
+    masterVolume,
+    canZoomIn: zoom.canZoomIn,
+    canZoomOut: zoom.canZoomOut,
+  };
+
+  // Combined value for backwards compatibility
+  const value: WaveformPlaylistContextValue = {
+    ...animationValue,
+    ...stateValue,
+    ...controlsValue,
+    ...dataValue,
   };
 
   return (
-    <WaveformPlaylistContext.Provider value={value}>
-      {children}
-    </WaveformPlaylistContext.Provider>
+    <PlaybackAnimationContext.Provider value={animationValue}>
+      <PlaylistStateContext.Provider value={stateValue}>
+        <PlaylistControlsContext.Provider value={controlsValue}>
+          <PlaylistDataContext.Provider value={dataValue}>
+            <WaveformPlaylistContext.Provider value={value}>
+              {children}
+            </WaveformPlaylistContext.Provider>
+          </PlaylistDataContext.Provider>
+        </PlaylistControlsContext.Provider>
+      </PlaylistStateContext.Provider>
+    </PlaybackAnimationContext.Provider>
   );
 };
 
+// Individual hooks for each context - use these for optimal performance
+// Components only re-render when their specific context data changes
+
+export const usePlaybackAnimation = () => {
+  const context = useContext(PlaybackAnimationContext);
+  if (!context) {
+    throw new Error('usePlaybackAnimation must be used within WaveformPlaylistProvider');
+  }
+  return context;
+};
+
+export const usePlaylistState = () => {
+  const context = useContext(PlaylistStateContext);
+  if (!context) {
+    throw new Error('usePlaylistState must be used within WaveformPlaylistProvider');
+  }
+  return context;
+};
+
+export const usePlaylistControls = () => {
+  const context = useContext(PlaylistControlsContext);
+  if (!context) {
+    throw new Error('usePlaylistControls must be used within WaveformPlaylistProvider');
+  }
+  return context;
+};
+
+export const usePlaylistData = () => {
+  const context = useContext(PlaylistDataContext);
+  if (!context) {
+    throw new Error('usePlaylistData must be used within WaveformPlaylistProvider');
+  }
+  return context;
+};
+
+// Main hook that combines all contexts - use this for backwards compatibility
+// or when you need access to multiple contexts
 export const useWaveformPlaylist = () => {
   const context = useContext(WaveformPlaylistContext);
   if (!context) {
