@@ -318,8 +318,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       currentTimeRef.current = time;
       setCurrentTime(time);
 
-      // Update active annotation based on playback time
-      if (annotations.length > 0) {
+      // Update active annotation based on playback time (only in continuous play mode)
+      if (annotations.length > 0 && continuousPlay) {
         const currentAnnotation = annotations.find(
           (ann) => time >= ann.start && time < ann.end
         );
@@ -358,7 +358,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       animationFrameRef.current = requestAnimationFrame(updateTime);
     };
     animationFrameRef.current = requestAnimationFrame(updateTime);
-  }, [duration, audioBuffers, samplesPerPixel, annotations, activeAnnotationId]);
+  }, [duration, audioBuffers, samplesPerPixel, annotations, activeAnnotationId, continuousPlay]);
 
   const stopAnimationLoop = useCallback(() => {
     if (animationFrameRef.current) {
