@@ -5,14 +5,19 @@
  */
 
 // Hooks
-export { useRecording, useMicrophoneAccess } from './hooks';
+export { useRecording, useMicrophoneAccess, useMicrophoneLevel } from './hooks';
+export type {
+  UseMicrophoneLevelOptions,
+  UseMicrophoneLevelReturn,
+} from './hooks';
 
 // Components
-export { RecordButton, MicrophoneSelector, RecordingIndicator } from './components';
+export { RecordButton, MicrophoneSelector, RecordingIndicator, VUMeter } from './components';
 export type {
   RecordButtonProps,
   MicrophoneSelectorProps,
   RecordingIndicatorProps,
+  VUMeterProps,
 } from './components';
 
 // Types

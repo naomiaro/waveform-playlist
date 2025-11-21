@@ -10,9 +10,11 @@ import styled from 'styled-components';
 import {
   useRecording,
   useMicrophoneAccess,
+  useMicrophoneLevel,
   RecordButton,
   MicrophoneSelector,
   RecordingIndicator,
+  VUMeter,
 } from '@waveform-playlist/recording';
 import {
   WaveformPlaylistProvider,
@@ -45,6 +47,19 @@ const ControlGroup = styled.div`
   display: flex;
   gap: 0.5rem;
   align-items: center;
+`;
+
+const VUMeterContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 300px;
+`;
+
+const Label = styled.label`
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #495057;
 `;
 
 const Section = styled.section`
@@ -156,6 +171,9 @@ function RecordingApp() {
     samplesPerPixel: 1024,
   });
 
+  // Microphone level monitoring
+  const { level, peakLevel, resetPeak } = useMicrophoneLevel(stream);
+
   // Handle device selection
   const handleDeviceChange = async (deviceId: string) => {
     setSelectedDevice(deviceId);
@@ -232,6 +250,13 @@ function RecordingApp() {
           />
 
           <RecordingIndicator isRecording={isRecording} duration={duration} />
+
+          {stream && (
+            <VUMeterContainer>
+              <Label>Input Level</Label>
+              <VUMeter level={level} peakLevel={peakLevel} width={300} height={24} />
+            </VUMeterContainer>
+          )}
         </ControlPanel>
       </Section>
 

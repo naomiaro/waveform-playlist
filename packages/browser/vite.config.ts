@@ -7,6 +7,8 @@ const entry = process.env.VITE_ENTRY || 'index';
 
 const entryPoints: Record<string, string> = {
   index: resolve(__dirname, 'src/index.tsx'),
+  minimal: resolve(__dirname, 'src/minimal-app.tsx'),
+  newtracks: resolve(__dirname, 'src/newtracks-app.tsx'),
   annotations: resolve(__dirname, 'src/annotations-app.tsx'),
   'stem-tracks': resolve(__dirname, 'src/stem-tracks-app.tsx'),
   'flexible-example': resolve(__dirname, 'src/flexible-example-app.tsx'),
@@ -16,6 +18,8 @@ const entryPoints: Record<string, string> = {
 
 const outputNames: Record<string, string> = {
   index: 'waveform-playlist',
+  minimal: 'minimal-bundle',
+  newtracks: 'newtracks-bundle',
   annotations: 'annotations-bundle',
   'stem-tracks': 'stem-tracks-bundle',
   'flexible-example': 'flexible-example-bundle',

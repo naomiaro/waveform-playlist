@@ -5,6 +5,12 @@
 echo "Building main library..."
 VITE_ENTRY=index vite build
 
+echo "Building minimal bundle..."
+VITE_ENTRY=minimal vite build
+
+echo "Building newtracks bundle..."
+VITE_ENTRY=newtracks vite build
+
 echo "Building annotations bundle..."
 VITE_ENTRY=annotations vite build
 
