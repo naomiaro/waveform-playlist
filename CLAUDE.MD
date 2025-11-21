@@ -12,115 +12,47 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Decision:** Do NOT add a full UI library (Material-UI, Chakra, etc.) as a peer dependency.
 
-**Reasoning:**
-- Keep bundle size small (library is already ~1.5MB)
-- Maximize user flexibility for custom styling
-- Avoid forcing a design system on users
-- Simple UI needs don't justify the overhead
+**Reasoning:** Keep bundle size small (~1.5MB), maximize user flexibility, avoid forcing design system on users.
 
 **Approved Approach:**
-1. Continue using **styled-components** (already in use)
-2. Use **Radix UI** or **React Aria** selectively for complex components (sliders, dropdowns, dialogs)
-   - Only where accessibility/behavior is complex
-   - Headless (no styling) to maintain flexibility
-3. Build simple components (buttons, inputs) ourselves
+
+1. Continue using **styled-components**
+2. Use **Radix UI** or **React Aria** selectively for complex components (headless only)
+3. Build simple components ourselves
 4. Create internal design system with shared theme tokens
-
-**Implementation Plan:**
-- Create `packages/ui-components/src/theme/tokens.ts` for design tokens
-- Build reusable primitives in `packages/ui-components/src/primitives/`
-- Use headless UI only when complexity justifies it
-
-### Selection Time Inputs (2025-01-19)
-
-**Implemented:** Reusable React components for audio selection time display/editing
-
-**Components Created:**
-- `TimeInput` - Reusable time input with format support
-- `SelectionTimeInputs` - Combines start/end inputs
-- `SelectionTimeInputsManager` - Bridges HTML and React components
-- Time format utilities (`formatTime`, `parseTime`)
-
-**Key Behaviors:**
-- Inputs update when dragging a selection on the waveform
-- Inputs respect the time-format dropdown (seconds, hh:mm:ss, etc.)
-- Clicking (without dragging) seeks but preserves selection
-- Playing with a selection stops at the selection end
 
 ### Shared Styled Components (2025-01-19)
 
 **Pattern:** Extract commonly duplicated styled components into shared definitions in `ui-components/styled/`
 
-**Implemented:**
+1. **CheckboxStyles** - `CheckboxWrapper`, `StyledCheckbox`, `CheckboxLabel`
+2. **ButtonStyles** - `ControlButton` with variants (primary, success, info)
 
-1. **CheckboxStyles** (`packages/ui-components/src/styled/CheckboxStyles.tsx`)
-   - `CheckboxWrapper` - Flex container for checkbox + label
-   - `StyledCheckbox` - Base checkbox input styling
-   - `CheckboxLabel` - Label styling with proper cursor and user-select
-   - Used by: `AutomaticScrollCheckbox`, `EditableCheckbox`, `LinkEndpointsCheckbox`, `ContinuousPlayCheckbox`
-
-2. **ButtonStyles** (`packages/ui-components/src/styled/ButtonStyles.tsx`)
-   - `ControlButton` - Large control button with color variants
-   - Variants: `primary` (blue), `success` (green), `info` (cyan)
-   - Features: Consistent padding, hover states, disabled styling
-   - Used by: `PlaybackControls`, `ZoomControls`, `DownloadAnnotationsButton`
-   - Note: Separate from `TrackControls/Button` which is for compact track UI
-
-**Benefits:**
-- Reduces code duplication (~60% reduction in affected components)
-- Ensures consistent styling across all components
-- Easier to maintain and update styles in one place
-- Clearer separation between presentation and logic
-
-**Usage Pattern:**
-```typescript
-// In ui-components package (relative import)
-import { ControlButton } from '../styled/ButtonStyles';
-
-// In other packages (package import)
-import { ControlButton } from '@waveform-playlist/ui-components';
-
-// Use with variant
-<ControlButton variant="success" onClick={handleClick}>
-  Zoom In
-</ControlButton>
-```
+Benefits: ~60% code reduction, consistent styling, easier maintenance.
 
 ## Code Conventions
 
 ### React/TypeScript
+
 - Use functional components with hooks
-- Props interfaces should be exported and named `{ComponentName}Props`
+- Props interfaces: `{ComponentName}Props`
 - Use `React.FC<Props>` for component types
-- Prefer `const` over `let` where possible
+- Prefer `const` over `let`
 
 ### Styled Components
+
 - Use transient props (prefix with `$`) for props that shouldn't pass to DOM
 - Example: `$left`, `$width`, `$color`
 
-### File Organization
-```
-packages/
-├── browser/          # React apps and entry points
-├── ui-components/    # Reusable React components
-│   ├── components/   # Public components
-│   ├── contexts/     # React contexts
-│   ├── utils/        # Utilities (conversions, formatting)
-│   └── theme/        # Design tokens (future)
-├── core/             # Core types and interfaces
-├── playout/          # Audio playback (Tone.js)
-└── ...
-```
-
 ### Building and Testing
-- Build command: `pnpm build`
-- Jekyll site: `jekyll build -s ghpages -d _site`
-- Local dev server: `http://localhost:4000/waveform-playlist/`
+
+- Build: `pnpm build`
+- Jekyll: `jekyll build -s ghpages -d _site`
+- Dev server: `http://localhost:4000/waveform-playlist/`
 - Always hard refresh (Cmd+Shift+R) after builds
 
 ## Chrome Remote Debugging
 
-Remote debugging is enabled on port 9222. Use proper flags:
 ```bash
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   --remote-debugging-port=9222 \
@@ -128,1159 +60,285 @@ Remote debugging is enabled on port 9222. Use proper flags:
   --remote-allow-origins='*'
 ```
 
-Note: Quote the asterisk in zsh to avoid glob expansion.
+## MCP Chrome DevTools Usage
 
-## MCP Chrome DevTools Usage (2025-01-19)
+**Known Bug:** PNG screenshots cause media type mismatch. Use JPEG or WebP format.
 
-**IMPORTANT:** When using Chrome DevTools MCP tools for visual inspection:
+**Best Practices:**
 
-### Screenshot Tool Issues
-
-**Known Bug:** The `take_screenshot` tool with `format: "png"` has a media type mismatch bug that causes API errors:
-```
-Image does not match the provided media type image/jpeg
-```
-
-**Workarounds:**
-1. **Use JPEG format (RECOMMENDED):**
-   ```typescript
-   format: "jpeg", quality: 90
-   ```
-
-2. **Use WebP format:**
-   ```typescript
-   format: "webp", quality: 90
-   ```
-
-3. **Save to file instead of inline:**
-   ```typescript
-   filePath: "/path/to/screenshot.png"
-   ```
-
-### Best Practices
-
-- **Prefer `take_snapshot` over `take_screenshot`** for page analysis - it provides a text-based accessibility tree view without image format issues
-- Use `take_snapshot` first to understand page structure
-- Only use `take_screenshot` when visual appearance is critical
-- When screenshots are needed, always use JPEG or WebP format
-- Use `list_pages` to see all open pages before selecting one
-- Use `select_page` to switch context before taking snapshots/screenshots
-
-### Example Workflow
-
-```typescript
-// 1. List available pages
-mcp__chrome-devtools__list_pages
-
-// 2. Select the target page
-mcp__chrome-devtools__select_page(pageIdx: 2)
-
-// 3. Take text snapshot for structure analysis
-mcp__chrome-devtools__take_snapshot()
-
-// 4. If visual inspection needed, use JPEG
-mcp__chrome-devtools__take_screenshot(format: "jpeg", quality: 90)
-```
+- Prefer `take_snapshot` (text-based) over `take_screenshot`
+- Use JPEG/WebP when screenshots needed
+- Use `list_pages` → `select_page` → `take_snapshot`
 
 ## Custom Hooks Architecture (2025-01-19)
-
-### Hooks-Based Design
 
 **Decision:** Extract playlist logic into reusable custom hooks for maximum flexibility.
 
 **Created Hooks:**
-- `usePlaybackControls` - Play/pause/stop/seek functionality
-- `useTimeFormat` - Time formatting with dropdown sync
-- `useZoomControls` - Zoom in/out with configurable levels
-- `useAudioPosition` - Auto-updates `.audio-pos` display element
-- `useWaveformPlaylist` - Composite hook combining all controls
 
-**Benefits:**
-- **Separation of Concerns:** Business logic separate from UI
-- **Reusability:** Users can build completely custom UIs
-- **Testability:** Hooks can be tested independently
-- **Type Safety:** Full TypeScript support throughout
-- **Backward Compatible:** Still works with existing HTML structure
+- `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, `useAudioPosition`, `useWaveformPlaylist`
+- `useMasterAnalyser`, `useTrackReverb`, `useTrackAutoWah`, `useEffectsChain`
 
 **Location:** `packages/browser/src/hooks/`
 
-**Documentation:** See `packages/browser/src/hooks/README.md` and `packages/browser/HOOKS_ARCHITECTURE.md`
-
-### WaveformPlaylistComponent Integration
-
-The main `WaveformPlaylistComponent.tsx` now uses these hooks internally:
-```typescript
-const { timeFormat, formatTime } = useTimeFormat();
-const zoom = useZoomControls({ initialSamplesPerPixel });
-useAudioPosition({ currentTime, formatTime });
-```
-
-This demonstrates proper usage and ensures the component and hooks stay in sync.
-
-### Custom UI Pattern
-
-Users can now build custom UIs using the hooks:
-
-```typescript
-import { useWaveformPlaylist } from '@waveform-playlist/browser/hooks';
-
-const controls = useWaveformPlaylist({ playoutRef, ... });
-
-// Use controls.playback.play(), controls.zoom.zoomIn(), etc.
-// Build any UI you want!
-```
-
-### Audio Effects Hooks (2025-01-20)
-
-**Decision:** Create reusable hooks for common Tone.js audio effects.
-
-**Created Hooks:**
-- `useMasterAnalyser` - FFT analyzer for frequency visualization on master output
-- `useTrackReverb` - Reverb effect with configurable decay time
-- `useTrackAutoWah` - Auto-wah effect with frequency/sensitivity controls
-- `useEffectsChain` - Chains multiple effects together in series
-
-**Benefits:**
-- **Composable:** Effects can be chained together using `useEffectsChain`
-- **Reusable:** Same effects can be applied to multiple tracks
-- **Type-Safe:** Full TypeScript support with Tone.js types
-- **Clean API:** Simple hook interface, complex audio graph management hidden
-
-**Location:** `packages/browser/src/hooks/useAudioEffects.ts`
-
-**Example Usage:**
-```typescript
-import { useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain }
-  from '@waveform-playlist/browser/hooks';
-
-// Master effects with frequency analyzer
-const { analyserRef, masterEffects } = useMasterAnalyser(256);
-
-// Individual track effects
-const autoWahEffect = useTrackAutoWah({
-  baseFrequency: 50,
-  octaves: 6,
-  sensitivity: -30
-});
-const reverbEffect = useTrackReverb(1.2);
-
-// Chain multiple effects together
-const chainedEffect = useEffectsChain([autoWahEffect, reverbEffect]);
-
-// Apply to tracks
-const tracks = [
-  { src: 'audio.mp3', name: 'Track 1', effects: chainedEffect },
-];
-
-// Pass master effects to provider
-<WaveformPlaylistProvider
-  tracks={tracks}
-  effects={masterEffects}
->
-  {/* Visualize frequency data */}
-  <FrequencyVisualizer analyserRef={analyserRef} />
-</WaveformPlaylistProvider>
-```
-
-**Implementation Notes:**
-- Effects use polling pattern to detect when audio nodes are ready
-- Cleanup functions properly dispose Tone.js nodes
-- Effects work in both realtime and offline (export) modes
-- Example app: `packages/browser/src/effects-app.tsx`
-- Demo page: `ghpages/_examples/16effects.html`
-
 ## Flexible/Headless API Architecture (2025-01-19)
 
-### Decision: Provider Pattern + Primitive Components
+**Pattern:** Provider + Primitive Components
 
-**Implemented:** Complete flexible API using React Context and primitive components.
+**Key Components:**
 
-**Architecture Pattern:** Hybrid approach (#3)
-- Provider for state management (`WaveformPlaylistProvider`)
-- Primitive components that work anywhere inside provider
-- Render props for customizable parts (track controls)
-- Hooks for accessing state (`useWaveformPlaylist`)
+- `WaveformPlaylistProvider` - Context provider
+- Primitives: `PlayButton`, `PauseButton`, `StopButton`, `ZoomInButton`, `ZoomOutButton`, etc.
+- `Waveform` - Visualization with render prop for custom track controls
 
-**Key Components Created:**
-
-**Provider & Context:**
-- `WaveformPlaylistProvider` - Context provider with all playlist state/logic
-- `useWaveformPlaylist` - Hook to access context from any component
-
-**Primitive Control Components:**
-- `PlayButton`, `PauseButton`, `StopButton` - Playback controls
-- `RewindButton`, `FastForwardButton` - Skip controls
-- `ZoomInButton`, `ZoomOutButton` - Zoom controls
-- `MasterVolumeControl` - Master volume slider
-- `TimeFormatSelect` - Time format dropdown
-- `AudioPosition` - Current time display (text-only, monospace styling)
-- `SelectionTimeInputs` - Selection start/end inputs
-- `AutomaticScrollCheckbox` - Auto-scroll toggle
-
-**Core Components:**
-- `Waveform` - Visualization component with optional custom track controls via render prop
-
-**Benefits:**
-- **Maximum Flexibility:** Controls can be placed anywhere in layout
-- **Customizable Track Controls:** Use render prop to customize per-track UI
-- **Access to State:** Use hook to build completely custom components
-- **Good Defaults:** Waveform component provides default track controls
-- **Backward Compatible:** Old class-based API still works
-
-**Example Usage:**
-```tsx
-<WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
-  <div className="my-layout">
-    <div className="top-bar">
-      <PlayButton />
-      <StopButton />
-      <AudioPosition />
-    </div>
-
-    <Waveform
-      renderTrackControls={(trackIndex) => (
-        <CustomTrackControls trackIndex={trackIndex} />
-      )}
-    />
-
-    <div className="footer">
-      <MasterVolumeControl />
-      <TimeFormatSelect />
-    </div>
-  </div>
-</WaveformPlaylistProvider>
-```
-
-**Location:**
-- Context: `packages/browser/src/WaveformPlaylistContext.tsx`
-- Components: `packages/browser/src/components/`
-- Example: `packages/browser/src/flexible-example-app.tsx`
-- Demo page: `ghpages/_examples/flexible-api.html`
+**Benefits:** Maximum flexibility, controls anywhere in layout, access to state via hooks.
 
 ## Theming System (2025-01-19)
 
-**Implemented:** Complete theming system for waveform visualization components
+All theme properties optional on `Waveform` component:
 
-**Theme Properties:**
-All theme properties are optional and can be passed to the `Waveform` component:
-
-```typescript
-interface WaveformProps {
-  theme?: {
-    waveOutlineColor?: string;        // Background color of waveform tracks
-    waveFillColor?: string;            // Waveform visualization color
-    waveProgressColor?: string;        // Progress/played portion color
-    timeColor?: string;                // Timescale text and tick marks color
-    timescaleBackgroundColor?: string; // Timescale background color
-    playheadColor?: string;            // Playhead vertical line color
-    selectionColor?: string;           // Selection area overlay color (with alpha)
-  };
-  renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
-  // ... other props
-}
-```
-
-**Custom Timestamp Rendering:**
-- Users can provide custom React components for timescale timestamps
-- Receives `timeMs` (milliseconds) and `pixelPosition` (pixels from left)
-- Enables fully custom styling and formatting
-
-**Implementation Details:**
-- Dynamic padding calculation based on duration for timestamp overflow prevention
-- Timestamps offset 4px from tick marks for better readability
-- Font size 0.75rem to prevent overflow on longer timestamps
-- Full color customization for dark/light themes
-
-**Example (Dark Theme):**
-```typescript
-const theme = {
-  waveOutlineColor: '#1e3a5f',
-  waveFillColor: '#5dade2',
-  waveProgressColor: '#e74c3c',
-  timeColor: '#ecf0f1',
-  timescaleBackgroundColor: '#2c3e50',
-  playheadColor: '#8b0000',
-  selectionColor: 'rgba(231, 76, 60, 0.5)',
-};
-```
-
-**Location:**
-- Waveform component: `packages/browser/src/components/Waveform.tsx`
-- TimeScale component: `packages/ui-components/src/components/TimeScale.tsx`
-- Playlist component: `packages/ui-components/src/components/Playlist.tsx`
-- Example: `packages/browser/src/flexible-example-app.tsx`
+- `waveOutlineColor`, `waveFillColor`, `waveProgressColor`
+- `timeColor`, `timescaleBackgroundColor`, `playheadColor`, `selectionColor`
+- `renderTimestamp` - Custom React components for timescale timestamps
 
 ## Optional Packages Architecture (2025-01-19)
 
-### Decision: Annotations as Optional Package
+**Decision:** Annotations as optional package (`@waveform-playlist/annotations`)
 
-**Rationale:**
-- Annotations are used by a minority of users (subtitle/transcript editing, audio labeling)
-- Including annotation components in core adds ~50KB to bundle size
-- Many users don't need annotation functionality
-
-**Implementation:**
-- Moved all annotation components, hooks, and logic to `@waveform-playlist/annotations` package
-- Users install only if needed: `npm install @waveform-playlist/annotations`
-- Core waveform-playlist remains lean for basic use cases
-
-### Annotations Package Architecture
-
-**Location:** `packages/annotations/`
-
-**Structure:**
-```
-packages/annotations/
-├── src/
-│   ├── components/          # React components
-│   │   ├── Annotation.tsx
-│   │   ├── AnnotationBox.tsx
-│   │   ├── AnnotationBoxesWrapper.tsx
-│   │   ├── AnnotationsTrack.tsx
-│   │   ├── AnnotationText.tsx
-│   │   ├── ContinuousPlayCheckbox.tsx
-│   │   └── LinkEndpointsCheckbox.tsx
-│   ├── hooks/               # Custom hooks
-│   │   └── useAnnotationControls.ts
-│   ├── types/               # TypeScript types
-│   │   └── index.ts
-│   ├── parsers/             # Import/export
-│   │   └── aeneas.ts
-│   └── index.ts             # Public exports
-├── package.json
-└── tsconfig.json
-```
-
-**Peer Dependencies:**
-- `react` ^18.0.0
-- `styled-components` ^6.0.0
-
-**Regular Dependencies:**
-- `@waveform-playlist/core` - Core types
-- `@waveform-playlist/ui-components` - Playlist context, utilities
+**Rationale:** ~50KB bundle size, used by minority of users.
 
 ### useAnnotationControls Hook
 
-**Purpose:** Manages annotation control state and boundary update logic.
-
-**Features:**
-- `continuousPlay` state - Whether playback continues after an annotation
-- `linkEndpoints` state - Whether adjacent annotation boundaries move together
-- `updateAnnotationBoundaries()` - Complex boundary logic with:
-  - Linked endpoints (when boundaries touch, they move together)
-  - Collision detection (prevents overlapping annotations)
-  - Cascading updates (multiple annotations adjust together)
-
-**API:**
-```typescript
-interface UseAnnotationControlsOptions {
-  initialContinuousPlay?: boolean;
-  initialLinkEndpoints?: boolean;
-}
-
-interface UseAnnotationControlsReturn {
-  continuousPlay: boolean;
-  linkEndpoints: boolean;
-  setContinuousPlay: (value: boolean) => void;
-  setLinkEndpoints: (value: boolean) => void;
-  updateAnnotationBoundaries: (params: AnnotationUpdateParams) => Annotation[];
-}
-
-const useAnnotationControls = (
-  options?: UseAnnotationControlsOptions
-): UseAnnotationControlsReturn;
-```
-
-**Usage Example:**
-```typescript
-import { useAnnotationControls, ContinuousPlayCheckbox, LinkEndpointsCheckbox }
-  from '@waveform-playlist/annotations';
-
-function AnnotationControls() {
-  const {
-    continuousPlay,
-    linkEndpoints,
-    setContinuousPlay,
-    setLinkEndpoints,
-    updateAnnotationBoundaries,
-  } = useAnnotationControls({
-    initialContinuousPlay: false,
-    initialLinkEndpoints: true,
-  });
-
-  // Use in drag handlers
-  const handleDrag = (annotationIndex, newTime, isDraggingStart) => {
-    const updated = updateAnnotationBoundaries({
-      annotationIndex,
-      newTime,
-      isDraggingStart,
-      annotations,
-      duration,
-    });
-    setAnnotations(updated);
-  };
-
-  return (
-    <>
-      <ContinuousPlayCheckbox
-        checked={continuousPlay}
-        onChange={setContinuousPlay}
-      />
-      <LinkEndpointsCheckbox
-        checked={linkEndpoints}
-        onChange={setLinkEndpoints}
-      />
-    </>
-  );
-}
-```
-
-**Benefits:**
-- Extracted ~110 lines of complex logic from WaveformPlaylistComponent
-- Reusable across different components
-- Testable independently
-- Type-safe with full TypeScript support
-- No DOM manipulation - pure React pattern
-
-**Integration:**
-The `WaveformPlaylistComponent` uses this hook internally and renders the React checkbox components, replacing the old DOM manipulation approach.
-
-**Documentation:**
-- See `OPTIONAL_PACKAGES.md` for installation and usage guide
-- Example: `ghpages/_examples/13annotations.html`
+Manages `continuousPlay`, `linkEndpoints`, and `updateAnnotationBoundaries()` logic. Extracted ~110 lines of complex logic from main component.
 
 ### Continuous Play Toggle Fix (2025-01-21)
 
-**Problem:** Toggling the Continuous Play checkbox during active playback wasn't working correctly in both directions:
-
-1. **Toggling OFF during playback:** When unchecking Continuous Play while an annotation is playing, audio would continue to the end of the track instead of stopping at the current annotation's end.
-
-2. **Toggling ON during playback:** When starting playback from an annotation with Continuous Play OFF, then checking Continuous Play mid-playback, audio would still stop at the annotation end instead of continuing through all annotations.
+**Problem:** Toggling during playback didn't work correctly.
 
 **Root Causes:**
 
-1. **Stale Closures in Animation Loop:** The `requestAnimationFrame` loop captured the `continuousPlay` value from its closure, so toggling the checkbox didn't affect the already-running loop. The loop would keep checking the old value even after state changed.
+1. Stale closures in animation loop
+2. Scheduled audio callbacks
+3. Monolithic context causing constant re-renders
 
-2. **Scheduled Audio Callbacks:** When clicking an annotation with Continuous Play OFF, the `play()` function is called with a `playDuration` parameter. This sets up an `onPlaybackComplete` callback in Tone.js that calls `pause()` when the duration ends. Even after toggling Continuous Play ON, this callback would still fire and stop the audio.
+**Solution:**
 
-3. **Monolithic Context Performance:** The original single context containing all state (including 60fps `currentTime` updates) caused all subscribers to re-render constantly, including checkbox components.
+1. **Context Splitting** - 4 separate contexts by update frequency
+2. **Animation Loop Restart** - Restart when `continuousPlay` changes
+3. **Playout Rescheduling** - Clear callbacks, reschedule without duration limits
 
-**Solution Overview:**
-
-The fix required a three-part solution:
-
-1. **Context Splitting** - Separate contexts for different update frequencies
-2. **Animation Loop Restart** - Restart loop when continuousPlay changes
-3. **Playout Rescheduling** - Clear callbacks and reschedule audio without duration limits
-
-**Technical Implementation:**
-
-**Part 1: Context Splitting**
-
-Split the monolithic context into 4 separate contexts based on update frequency and usage patterns:
-
-```typescript
-// High-frequency updates (60fps) - only animation subscribers
-export interface PlaybackAnimationContextValue {
-  isPlaying: boolean;
-  currentTime: number;
-  currentTimeRef: React.RefObject<number>;
-}
-
-// State that changes on user interaction - UI components
-export interface PlaylistStateContextValue {
-  continuousPlay: boolean;
-  linkEndpoints: boolean;
-  annotationsEditable: boolean;
-  isAutomaticScroll: boolean;
-  annotations: AnnotationData[];
-  activeAnnotationId: string | null;
-  selectionStart: number;
-  selectionEnd: number;
-}
-
-// Control functions - stable, don't cause re-renders
-export interface PlaylistControlsContextValue {
-  play: (startTime?: number, playDuration?: number) => Promise<void>;
-  pause: () => void;
-  stop: () => void;
-  setContinuousPlay: (value: boolean) => void;
-  setAnnotations: (annotations: AnnotationData[]) => void;
-  // ... other controls
-}
-
-// Static or infrequently changing data
-export interface PlaylistDataContextValue {
-  duration: number;
-  audioBuffers: AudioBuffer[];
-  peaksDataArray: PeakData[];
-  sampleRate: number;
-  playoutRef: React.RefObject<Playout | null>;
-  // ... other data
-}
-```
-
-**Benefits:**
-- Checkbox components subscribe only to `PlaylistStateContextValue` and `PlaylistControlsContextValue`
-- No re-renders during 60fps animation updates
-- `currentTime` updates isolated to `PlaybackAnimationContextValue`
-
-**Part 2: Animation Loop Restart**
-
-Added `useEffect` to restart the animation loop when `continuousPlay` changes:
-
-```typescript
-// Restart animation loop when continuousPlay changes during playback
-// This ensures the loop always has the current continuousPlay value
-useEffect(() => {
-  if (isPlaying && animationFrameRef.current) {
-    // When toggling OFF, restart loop so it can check current continuousPlay state
-    // and stop at annotation end
-    stopAnimationLoop();
-    startAnimationLoop();
-  }
-}, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop]);
-```
-
-**Why This Works:**
-- Stops the old loop that has stale `continuousPlay` in its closure
-- Starts a new loop that captures the current `continuousPlay` value
-- When toggled OFF, new loop correctly checks for annotation boundaries and stops
-
-**Part 3: Playout Rescheduling**
-
-Extended the animation loop restart to also reschedule Tone.js playout when toggling ON:
-
-```typescript
-// Restart animation loop and reschedule playout when continuousPlay changes during playback
-useEffect(() => {
-  const reschedulePlayback = async () => {
-    if (isPlaying && animationFrameRef.current && playoutRef.current) {
-      // When toggling continuous play ON, reschedule playout without duration limit
-      // so audio continues past the current annotation boundary
-      if (continuousPlay) {
-        const currentPos = currentTimeRef.current;
-
-        // Stop current playout (which may have duration limit + pause callback)
-        playoutRef.current.stop();
-        stopAnimationLoop();
-
-        // Initialize and restart from current position without duration limit
-        await playoutRef.current.init();
-
-        // Clear any existing playback complete callback
-        // This is crucial - prevents the old callback from calling pause()
-        playoutRef.current.setOnPlaybackComplete(() => {});
-
-        const now = Tone.now();
-        playbackStartTimeRef.current = now;
-        audioStartPositionRef.current = currentPos;
-
-        // Play without duration - will play to end of track
-        playoutRef.current.play(now, currentPos);
-        startAnimationLoop();
-      } else {
-        // Just restart animation loop for continuous play OFF
-        stopAnimationLoop();
-        startAnimationLoop();
-      }
-    }
-  };
-
-  reschedulePlayback();
-}, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop]);
-```
-
-**Key Implementation Details:**
-
-1. **Callback Clearing:** `playoutRef.current.setOnPlaybackComplete(() => {})` is essential - it replaces the callback that would call `pause()` with an empty function.
-
-2. **Duration Removal:** When rescheduling, `play()` is called without a duration parameter, so audio continues to the end of the track.
-
-3. **Position Preservation:** Uses `currentTimeRef.current` to continue from the exact current position without seeking.
-
-4. **Async Handling:** Must call `await playoutRef.current.init()` before calling `play()` to ensure audio context is ready.
-
-**Files Involved:**
-
-1. **`packages/browser/src/WaveformPlaylistContext.tsx`** (lines 96-542)
-   - Context splitting definitions
-   - Animation loop with continuousPlay dependency
-   - Playout rescheduling logic in useEffect
-
-2. **`packages/browser/src/components/AnnotationControls.tsx`**
-   - Wrapper components using split contexts
-   - `ContinuousPlayCheckbox` component subscribes to `usePlaylistState()` and `usePlaylistControls()`
-
-3. **`packages/annotations/src/components/ContinuousPlayCheckbox.tsx`**
-   - Base checkbox component (presentation only)
-   - No context dependencies - receives props from wrapper
-
-4. **`packages/browser/src/components/Waveform.tsx`** (lines 73-151)
-   - Uses split contexts for performance
-   - Handles annotation click and continuous play logic
-
-**Key Learnings:**
-
-1. **Context Splitting is Essential:** When you have high-frequency updates (like 60fps animation), split contexts by update frequency to prevent unnecessary re-renders.
-
-2. **Stale Closures in Loops:** `requestAnimationFrame` loops capture variables from their closure. If those variables change, you must restart the loop to capture the new values.
-
-3. **Audio Scheduling State:** Tone.js playout keeps internal state (callbacks, duration limits). When state changes in React, you may need to reschedule audio playback, not just update React state.
-
-4. **Refs for Synchronous Access:** Use refs (`currentTimeRef`) when you need synchronous access to values inside loops or callbacks.
-
-5. **Clear Callbacks Explicitly:** When rescheduling audio playback, explicitly clear old callbacks with `setOnPlaybackComplete(() => {})` to prevent them from interfering with new behavior.
-
-**Performance Characteristics:**
-
-- ✅ Checkbox components no longer re-render during playback
-- ✅ Animation loop runs at stable 60fps
-- ✅ State updates are instant (no lag when toggling)
-- ✅ Audio continues smoothly when rescheduling (no audible glitches)
-- ✅ Works correctly in both directions (ON and OFF)
-
-**Location:**
-- Context: `packages/browser/src/WaveformPlaylistContext.tsx`
-- Components: `packages/browser/src/components/AnnotationControls.tsx`
-- Base Components: `packages/annotations/src/components/ContinuousPlayCheckbox.tsx`
-- Example: `ghpages/_examples/13annotations.html`
+**Key Pattern:** `playoutRef.current.setOnPlaybackComplete(() => {})` to clear old callbacks.
 
 ## Component Design Decisions
 
-### AudioPosition Component Styling (2025-01-20)
+### AudioPosition Component (2025-01-20)
 
-**Decision:** AudioPosition should display as plain monospace text, not as a button-like element.
+**Decision:** Plain monospace text, not button-like.
 
-**Reasoning:**
-- Component displays read-only information (current playback time)
-- Button-like appearance (background, border, padding) suggests interactivity
-- Users were confused by visual weight - looked clickable but isn't
-- Plain text styling is more semantically correct for read-only display
-
-**Implementation:**
-Located in `packages/ui-components/src/components/AudioPosition.tsx`
-
-**Styling:**
-```typescript
-const PositionDisplay = styled.span`
-  font-family: 'Courier New', Monaco, monospace;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #333;
-  user-select: none;
-`;
-```
-
-**Removed Properties:**
-- ~~`background: #f8f9fa`~~ (light gray background)
-- ~~`border: 1px solid #ced4da`~~ (gray border)
-- ~~`padding: 0.375rem 0.75rem`~~ (padding)
-- ~~`border-radius: 0.25rem`~~ (rounded corners)
-- ~~`min-width: 120px`~~ (fixed width)
-- ~~`text-align: center`~~ (centering)
-
-**Impact:**
-- Cleaner, more minimal UI
-- Consistent with text-only display pattern
-- No breaking changes - still accepts `className` prop for custom styling
-- Used in all React example apps (effects, annotations, flexible-api, stem-tracks)
-
-## Example Pages Setup
-
-### Annotations Example Data Loading (2025-01-20)
-
-**Important:** The annotations example requires loading annotation data before the React bundle.
-
-**Setup:**
-File: `ghpages/_examples/13annotations.html`
-
-```html
----
-javascript: annotations-bundle.js
----
-
-<script src="js/annotations.js"></script>  <!-- Load data first -->
-<div id="playlist"></div>                   <!-- React mounts here -->
-```
-
-**Why:**
-- The React app (`annotations-app.tsx`) expects a global `notes` variable
-- `annotations.js` defines this variable with the annotation data
-- Must be loaded before `annotations-bundle.js` executes
-- The footer.html conditionally loads the correct bundle based on `javascript:` value
-
-**Data Format:**
-The `notes` array contains Aeneas JSON format annotations:
-```javascript
-var notes = [
-  {
-    "begin": "0.000",
-    "end": "2.680",
-    "id": "f000001",
-    "language": "eng",
-    "lines": ["1"]
-  },
-  // ... more annotations
-];
-```
-
-**Why Not Bundle Data:**
-- Keeps data separate for easy editing/testing
-- Users may want to load different annotation sets dynamically
-- Maintains compatibility with existing annotation workflow
-
-## Current Work (Tone.js Overhaul Branch)
-
-### Status
-- React refactor in progress
-- Annotations and stem-tracks examples working with React
-- Selection inputs implemented and functional
-- **Custom hooks architecture implemented**
-- **Flexible/headless API architecture implemented**
-- **Complete theming system implemented**
-- **Custom timestamp rendering implemented**
-- **Annotations package as optional dependency implemented**
-- **useAnnotationControls hook implemented**
-- **Audio effects hooks implemented** (useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain)
-- **AudioPosition component styling updated** (text-only display)
-- Track controls with mute/solo/volume/pan working
-- Stop button remembers start position behavior fixed
-
-### Next Steps / Ideas
-- Consider creating more optional packages (effects, fades, etc.)
-- Build out primitives library as needed
-- Add more examples showing different layout patterns
-- Document all hooks and components in detail
-- Add unit tests for hooks and components
-
-## Important Notes
-
-- **Don't remove old examples** - They're still in use during migration
-- **Bundle size matters** - This is a library, not an app
-- **Users need flexibility** - Don't lock them into specific UI patterns
-- **Accessibility is important** - Use headless UI libs where complex a11y is needed
-
-## References
-
-- Main branch: `main`
-- Current work: `tonejs-overhaul`
-- Example pages served at: `http://localhost:4000/waveform-playlist/`
+**Reasoning:** Read-only display shouldn't look interactive.
 
 ## Performance Optimizations (2025-11-20)
 
-### Playhead Animation with GPU Acceleration
+### Playhead Animation
 
-**Issue:** Playhead animation was janky when zoomed in, especially with automatic scroll enabled.
+**Solution:** Use `transform: translate3d()` instead of `left` positioning for GPU acceleration.
 
-**Solution:** Changed from CSS `left` positioning to `transform: translate3d()` for GPU-accelerated rendering.
+### Zoom Performance
 
-**Implementation:**
-```typescript
-// In Playhead.tsx
-const PlayheadLine = styled.div.attrs<PlayheadLineProps>((props) => ({
-  style: {
-    transform: `translate3d(${props.$position}px, 0, 0)`,
-  },
-}))<PlayheadLineProps>`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 2px;
-  background: ${(props) => props.$color};
-  height: 100%;
-  z-index: 150;
-  pointer-events: none;
-  will-change: transform;
-`;
-```
+**Issue 1:** Zooming broke playback.
+**Solution:** Separate peak generation from audio loading in separate useEffects.
 
-**Benefits:**
-- GPU-accelerated rendering (no layout/paint operations)
-- Smooth 60fps animation even when zoomed in
-- Added `will-change: transform` for browser optimization hints
-
-**Location:** `packages/ui-components/src/components/Playhead.tsx`
-
-### Zoom Performance Fixes (2025-11-20)
-
-**Issue 1:** Zooming during playback would break/stop audio playback.
-
-**Root Cause:** The audio loading `useEffect` had `samplesPerPixel` in its dependency array, causing complete audio reload and playout disposal on every zoom change.
-
-**Solution:** Separated peak generation from audio loading:
-
-```typescript
-// Audio loading - only depends on tracks
-useEffect(() => {
-  // Load audio buffers and create playout
-  // Generate initial peaks
-}, [tracks, onReady]);
-
-// Peak regeneration - depends on zoom
-useEffect(() => {
-  if (audioBuffers.length === 0) return;
-  const peaks = audioBuffers.map(buffer => generatePeaks(buffer, samplesPerPixel, mono, bits));
-  setPeaksDataArray(peaks);
-}, [audioBuffers, samplesPerPixel, mono]);
-```
-
-**Issue 2:** Zooming with automatic scroll enabled caused jarring jumps.
-
-**Root Cause:** Pixel position calculations changed dramatically when `samplesPerPixel` changed, causing scroll to jump.
-
-**Solution:** Proportional scroll adjustment that maintains visual center:
-
-```typescript
-// Track current samplesPerPixel in a ref
-const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-
-// Adjust scroll proportionally when zoom changes
-useEffect(() => {
-  if (!scrollContainerRef.current || !audioBuffers.length) return;
-
-  const oldSamplesPerPixel = samplesPerPixelRef.current;
-  const newSamplesPerPixel = samplesPerPixel;
-
-  // Calculate what time is currently at center of viewport
-  const centerPixel = currentScrollLeft + containerWidth / 2 - controlWidth;
-  const centerTime = (centerPixel * oldSamplesPerPixel) / sampleRate;
-
-  // Adjust scroll to keep same center time after zoom
-  const newCenterPixel = (centerTime * sampleRate) / newSamplesPerPixel;
-  const newScrollLeft = newCenterPixel + controlWidth - containerWidth / 2;
-
-  container.scrollLeft = newScrollLeft;
-  samplesPerPixelRef.current = newSamplesPerPixel;
-}, [samplesPerPixel, audioBuffers, controls]);
-
-// Animation loop uses ref for stable value
-const pixelPosition = (time * sr) / samplesPerPixelRef.current;
-```
-
-**Benefits:**
-- Zoom works smoothly during playback without interrupting audio
-- Automatic scroll maintains visual center when zooming
-- No jarring jumps or position changes
-
-**Location:** `packages/browser/src/WaveformPlaylistContext.tsx`
-
-### Automatic Scroll Configuration (2025-11-20)
-
-**Added:** `automaticScroll` prop to `WaveformPlaylistProvider` for enabling automatic scroll by default.
-
-**Implementation:**
-```typescript
-// In WaveformPlaylistProviderProps
-automaticScroll?: boolean;
-
-// Usage in provider
-const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
-
-// Usage in example
-<WaveformPlaylistProvider
-  tracks={tracks}
-  automaticScroll={true}  // Enabled by default
-  // ... other props
->
-```
-
-**Location:** `packages/browser/src/WaveformPlaylistContext.tsx`
+**Issue 2:** Zooming caused jarring scroll jumps.
+**Solution:** Proportional scroll adjustment maintaining visual center using refs.
 
 ## Example Migrations (2025-11-20)
 
-### New Tracks Example with Provider Pattern
+**Converted:** newtracks, stem-tracks, recording examples to provider pattern.
 
-**Converted:** `newtracks-app.tsx` to use modern provider pattern instead of old component.
-
-**Features Added:**
-- Drag & drop file upload
-- Dynamic track loading
-- TrackControlsWithDelete component (compact layout with trash icon)
-- Playback controls (Play, Pause, Stop)
-- Zoom controls with smooth performance
-- Audio position display
-- Automatic scroll (enabled by default)
-- Master volume control
-- Track controls (Mute, Solo, Volume, Pan, Delete)
-
-**New Component Created:** `TrackControlsWithDelete`
-- Location: `packages/ui-components/src/components/TrackControlsWithDelete.tsx`
-- Compact header layout: trash icon, track name, M/S buttons
-- Volume and pan sliders below header
-- Uses standard Button and ButtonGroup components
-- Integrates with WaveformPlaylistProvider context
-
-**Layout:**
-```typescript
-<Container>
-  <DropZone /> {/* Drag & drop UI */}
-
-  <WaveformPlaylistProvider
-    tracks={tracks}
-    samplesPerPixel={2048}
-    mono={true}
-    waveHeight={120}
-    automaticScroll={true}
-    controls={{ show: true, width: 200 }}
-  >
-    <Controls>
-      <ControlGroup>
-        <PlayButton />
-        <PauseButton />
-        <StopButton />
-      </ControlGroup>
-      <ControlGroup>
-        <ZoomInButton />
-        <ZoomOutButton />
-      </ControlGroup>
-      <ControlGroup>
-        <AudioPosition />
-      </ControlGroup>
-      <ControlGroup>
-        <AutomaticScrollCheckbox />
-      </ControlGroup>
-    </Controls>
-
-    <Waveform renderTrackControls={(trackIndex) => (
-      <TrackControlsWithDelete ... />
-    )} />
-  </WaveformPlaylistProvider>
-</Container>
-```
-
-### Stem Tracks Example Migration
-
-**Converted:** `stem-tracks-app.tsx` from `WaveformPlaylistComponent` to provider pattern.
-
-**Features:**
-- All modern components (PlayButton, PauseButton, StopButton, etc.)
-- Zoom controls with performance fixes
-- Master volume control
-- Automatic scroll checkbox
-- Audio position display
-- Standard track controls (Mute, Solo, Volume, Pan)
-
-**Template Cleanup:**
-- Removed old bootstrap buttons from `ghpages/_examples/04stemtracks.html`
-- Now just `<div id="playlist"></div>` - React handles all UI
+**New Component:** `TrackControlsWithDelete` - Compact layout with trash icon, mute/solo, volume/pan.
 
 ## Codebase Cleanup (2025-11-20)
 
-### Removed Obsolete Files
+**Removed:**
 
-**WaveformPlaylistComponent.tsx**
-- Old React component wrapper (intermediate migration step)
-- No longer used anywhere
-- All examples now use WaveformPlaylistProvider pattern
-- File deleted: `packages/browser/src/WaveformPlaylistComponent.tsx`
+- `WaveformPlaylistComponent.tsx` - obsolete
+- All old Jekyll includes (`buttons/`, `forms/`, `checkboxes/`, `sliders/`, `timeformat.html`)
 
-**Jekyll Include Fragments**
-- All old control includes removed (no longer needed with React components)
-- Deleted directories:
-  - `ghpages/_includes/buttons/` (playback.html, zoom.html, fades.html, random.html, states.html)
-  - `ghpages/_includes/forms/` (seek.html)
-  - `ghpages/_includes/checkboxes/` (automaticscroll.html, continuousplay.html, linkendpoints.html)
-  - `ghpages/_includes/sliders/` (mastergain.html)
-  - `ghpages/_includes/timeformat.html`
-- Kept essential includes: head.html, header.html, footer.html, cta.html, sponsors.html
+**Current API Patterns:**
 
-**Simplified Footer Template**
-- Already cleaned up in previous session
-- Now just loads React bundle: `<script src="js/{{ page.javascript }}"></script>`
+1. Old class-based API (backward compatibility)
+2. New provider pattern (recommended)
 
-### Current Architecture
+## Recording Architecture (2025-11-21)
 
-**Two API Patterns:**
-1. **Old Class-Based API** (`WaveformPlaylistClass` in `index.tsx`)
-   - Kept for backward compatibility
-   - Used by existing users who haven't migrated
-
-2. **New Provider Pattern** (Recommended)
-   - `WaveformPlaylistProvider` + `Waveform` component
-   - Primitive control components (PlayButton, PauseButton, etc.)
-   - Maximum flexibility for custom layouts
-   - All new examples use this pattern
-
-## Recording Architecture (2025-11-20)
-
-### Independent AudioContext for Recording
-
-**Problem:** Recording functionality was failing with "Failed to construct 'AudioWorkletNode': parameter 1 is not of type 'BaseAudioContext'" when trying to use Tone.js context.
-
-**Solution:** Recording now uses its own dedicated AudioContext, completely independent of Tone.js.
+### Global AudioContext Pattern
 
 **Implementation:**
-- `useRecording` hook creates and manages its own `AudioContext`
-- No dependency on Tone.js for recording operations
-- Context is properly cleaned up on unmount
 
-**Benefits:**
-- ✅ **Cleaner separation** - Recording and playback use separate audio contexts
-- ✅ **No conflicts** - Recording doesn't interfere with Tone.js playback
-- ✅ **Simpler** - Recording doesn't need Tone.js features
-- ✅ **Better performance** - Dedicated context optimized for recording only
+- Recording uses **global shared AudioContext** (same as Tone.js and playback)
+- Uses `getGlobalAudioContext()` from `@waveform-playlist/playout`
+- Context must be resumed on user interaction via `resumeGlobalAudioContext()`
 
-**Location:** `packages/recording/src/hooks/useRecording.ts`
+**Location:** `packages/recording/src/hooks/useRecording.ts`, `useMicrophoneLevel.ts`
 
-### WaveformTrack Source Flexibility
+### Shared MediaStreamSource Pattern
 
-**Decision:** `WaveformTrack.src` supports both URL strings and AudioBuffer objects.
+**Critical Pattern:** Both `useRecording` and `useMicrophoneLevel` connect to the same shared `MediaStreamAudioSourceNode`.
 
-**Reasoning:**
-- **newtracks example** uses `URL.createObjectURL(file)` to create blob URLs from dropped files
-- **recording example** passes AudioBuffer directly from recording (more efficient)
-- Supporting both avoids unnecessary conversions
+**Key Rule:** Always use **targeted disconnect** when reconnecting:
 
-**Implementation:**
 ```typescript
-export interface WaveformTrack {
-  src: string | AudioBuffer; // Support both URL strings and AudioBuffer objects
-  name?: string;
-  effects?: TrackEffectsFunction;
-}
+// ✅ CORRECT - Only disconnects specific connection
+source.disconnect(analyser);
+source.connect(analyser);
 
-// In WaveformPlaylistContext:
-if (typeof track.src === 'string') {
-  // Fetch and decode
-  const response = await fetch(track.src);
-  buffer = await audioContext.decodeAudioData(arrayBuffer);
-} else {
-  // Use AudioBuffer directly
-  buffer = track.src;
-}
-```
-
-**Location:** `packages/browser/src/WaveformPlaylistContext.tsx`
-
-### Live Recording Peaks Format
-
-**Decision:** Recording peaks match the exact format used by final waveform rendering.
-
-**Format Specification:**
-- **Data type:** `Int16Array` (not `Int8Array` or plain arrays)
-- **Structure:** Min/max pairs (each pixel represented by 2 values)
-- **Bit depth:** 16-bit (matches `webaudio-peaks` default)
-- **Range:** -32768 to 32767 (signed 16-bit integers)
-
-**Peak Generation:**
-```typescript
-// For each pixel/sample window:
-const min = Math.floor(minValue * 32768); // Min amplitude
-const max = Math.floor(maxValue * 32768); // Max amplitude
-peakArray[i * 2] = min;     // Store min
-peakArray[i * 2 + 1] = max; // Store max
-```
-
-**Drawing Approach (matches Channel component):**
-```typescript
-const h2 = height / 2;
-const maxValue = 2 ** 15; // 32768
-
-const minPeak = peaks[i * 2] / maxValue;     // Normalize to -1..1
-const maxPeak = peaks[i * 2 + 1] / maxValue;
-
-const min = Math.abs(minPeak * h2);
-const max = Math.abs(maxPeak * h2);
-
-// Draw from edges toward center
-ctx.fillRect(x, 0, 1, h2 - max);        // Top half
-ctx.fillRect(x, h2 + min, 1, h2 - min); // Bottom half
+// ❌ WRONG - Breaks ALL connections including other consumers
+source.disconnect();
+source.connect(analyser);
 ```
 
 **Why This Matters:**
-- Live waveform looks **identical** to final result
-- Same detail level during and after recording
-- Same `samplesPerPixel` value (1024)
-- No visual discontinuity when recording stops
 
-**Files Updated:**
-- `packages/recording/src/utils/peaksGenerator.ts` - Generate min/max pairs with bit depth
-- `packages/recording/src/hooks/useRecording.ts` - Use `Int16Array` for peaks state
-- `packages/recording/src/types/index.ts` - Update type definitions
-- `packages/browser/src/recording-app.tsx` - Match Channel component drawing
+- `disconnect()` without arguments disconnects **all connections** from the node
+- Breaks connections from other consumers (worklet, analyser, etc.)
+- Causes VU meter to go flat, recording to fail silently
 
-### Recording Example Features
+**Fixed in:** `packages/recording/src/hooks/useMicrophoneLevel.ts` line 134
 
-**Implemented:** Full-featured recording example matching other React examples.
+### Two-System Monitoring
 
-**Features Added:**
-1. **Complete Playback Controls:**
-   - PlayButton, PauseButton, StopButton
-   - ZoomInButton, ZoomOutButton
-   - AutomaticScrollCheckbox
-   - AudioPosition display
+1. **Pre-recording** (`useMicrophoneLevel`) - AnalyserNode, shows level before recording
+2. **During recording** (`useRecording`) - AudioWorklet, calculates RMS in worklet thread
 
-2. **Live Waveform Visualization:**
-   - Real-time canvas rendering during recording
-   - Updates as peaks arrive from AudioWorklet
-   - Matches final waveform appearance exactly
-   - Shows only while recording is active
+### VU Meter During Recording
 
-3. **Control Layout:**
-   - Organized into control groups with visual dividers
-   - Consistent styling with stem-tracks and newtracks examples
-   - Responsive layout with flex wrapping
+- Recording hook sends RMS level via worklet `postMessage()`
+- VU meter switches between monitoring level (pre-recording) and recording level (during recording)
+- Both hooks run simultaneously, sharing the MediaStreamSource
 
-**Configuration:**
-```typescript
-<WaveformPlaylistProvider
-  tracks={recordedTracks}
-  samplesPerPixel={1024}
-  mono={true}
-  waveHeight={100}
-  automaticScroll={true}
-  controls={{ show: true, width: 200 }}
->
-```
+### Test Microphone Button
+
+**Purpose:** Resume AudioContext before recording to enable monitoring.
+
+**Implementation:** `handleTestMicrophone()` calls `resumeGlobalAudioContext()`, sets `isMonitoring` state.
 
 **Location:** `packages/browser/src/recording-app.tsx`
+
+### Duration Timer with Refs
+
+**Problem:** Duration timer stuck at 00:00 during recording.
+
+**Root Cause:** Animation loop checked `isRecording` state (asynchronous), which was still false when loop started.
+
+**Solution:** Use refs for synchronous checks in `requestAnimationFrame` loops:
+
+```typescript
+const isRecordingRef = useRef(false);
+const isPausedRef = useRef(false);
+
+// Set ref BEFORE starting loop (synchronous)
+isRecordingRef.current = true;
+setIsRecording(true); // State update (asynchronous)
+
+// Animation loop checks ref
+const updateDuration = () => {
+  if (isRecordingRef.current && !isPausedRef.current) {
+    // ... update
+  }
+};
+```
+
+**Location:** `packages/recording/src/hooks/useRecording.ts` lines 43-44, 137-151
+
+### Try-Catch for Cleanup
+
+**Pattern:** Wrap disconnect calls in try-catch for device switching:
+
+```typescript
+try {
+  source.disconnect(destination);
+} catch (e) {
+  // Source may already be disconnected - ignore
+}
+```
+
+**Location:** Both `useRecording.ts` and `useMicrophoneLevel.ts` cleanup functions.
+
+### WaveformTrack Source Flexibility
+
+`WaveformTrack.src` supports both URL strings and AudioBuffer objects:
+
+- **newtracks** uses blob URLs from dropped files
+- **recording** passes AudioBuffer directly (more efficient)
+
+### Live Recording Peaks Format
+
+**Format:** `Int16Array` min/max pairs, 16-bit depth (-32768 to 32767)
+
+**Why:** Matches final waveform rendering exactly - identical appearance during and after recording.
+
+### Debugging AudioWorklets
+
+**Critical Note:** `console.log()` in AudioWorklet **DOES NOT** appear in browser console!
+
+**Solutions:**
+
+1. Send debug data via `postMessage()` to main thread
+2. Update React state/UI to display values
+3. Use live waveform visualization
+
+**See:** `DEBUGGING.md` for complete worklet debugging guide.
+
+### Important Patterns
+
+1. **Targeted Disconnect** - Always specify destination on shared nodes
+2. **Refs in Animation Loops** - Use refs for synchronous checks in `requestAnimationFrame`
+3. **AudioWorklet Debugging** - Use postMessage, not console.log
+4. **Worklet Deployment** - Manual copy + Jekyll restart required
+5. **Try-Catch Cleanup** - Wrap disconnects for device switching
+
+**Documentation:** See `DEBUGGING.md` and `PROJECT_STRUCTURE.md` for complete details.
 
 ## Current Work (Tone.js Overhaul Branch)
 
 ### Status
+
 - React refactor in progress
-- **All React examples migrated to provider pattern** (newtracks, stem-tracks, effects, annotations, flexible-api, recording)
-- **Performance optimizations completed** (GPU-accelerated playhead, smooth zoom, automatic scroll)
-- **Recording architecture implemented** (independent AudioContext, live peaks, AudioBuffer support)
-- **TrackControlsWithDelete component created** (compact, reusable)
-- Selection inputs implemented and functional
-- Custom hooks architecture implemented
-- Flexible/headless API architecture implemented
-- Complete theming system implemented
-- Custom timestamp rendering implemented
-- Annotations package as optional dependency implemented
-- useAnnotationControls hook implemented
-- Audio effects hooks implemented (useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain)
-- AudioPosition component styling updated (text-only display)
-- Track controls with mute/solo/volume/pan working
-- Stop button remembers start position behavior fixed
-- **Obsolete code removed** (WaveformPlaylistComponent, old Jekyll includes)
+- All React examples migrated to provider pattern
+- Performance optimizations completed (GPU playhead, smooth zoom)
+- Recording architecture implemented (global AudioContext, shared MediaStreamSource)
+- Selection inputs, custom hooks, flexible API, theming all implemented
+- Annotations as optional package
+- Audio effects hooks (analyser, reverb, auto-wah, effects chain)
+- TrackControlsWithDelete component created
+- Obsolete code removed
 
 ### Next Steps / Ideas
-- Consider creating more optional packages (effects, fades, etc.)
-- Build out primitives library as needed
-- Add more examples showing different layout patterns
-- Document all hooks and components in detail
-- Add unit tests for hooks and components
-- Consider migrating remaining old examples to provider pattern
+
+- Consider more optional packages (effects, fades, etc.)
+- Add more example layouts
+- Document all hooks and components
+- Add unit tests
 
 ## Important Notes
 
-- **Don't remove old examples** - They're still in use during migration
 - **Bundle size matters** - This is a library, not an app
-- **Users need flexibility** - Don't lock them into specific UI patterns
-- **Accessibility is important** - Use headless UI libs where complex a11y is needed
-- **Performance is critical** - Use GPU acceleration (transform) instead of layout-triggering properties (left/top)
-- **Separation of concerns** - Audio operations (loading/playback) separate from visualization operations (peak generation)
+- **Users need flexibility** - Don't lock into specific UI patterns
+- **Performance is critical** - Use GPU acceleration (transform not left/top)
+- **Separation of concerns** - Audio ops separate from visualization
+- **Global AudioContext** - Shared across recording, monitoring, and playback
+- **Targeted Disconnect** - Always specify destination on shared nodes
+- **Refs for Animation** - Synchronous checks in requestAnimationFrame loops
 
 ## References
 
 - Main branch: `main`
 - Current work: `tonejs-overhaul`
-- Example pages served at: `http://localhost:4000/waveform-playlist/`
+- Dev server: `http://localhost:4000/waveform-playlist/`
+- Debugging: See `DEBUGGING.md`
+- Architecture: See `PROJECT_STRUCTURE.md`
 
 ---
 
-**Last Updated:** 2025-11-20
-**Session Notes:** Recording example enhancement and architecture improvements. Migrated recording example to provider pattern with full playback controls (play, pause, stop, zoom, automatic scroll). Fixed AudioWorkletNode error by creating dedicated AudioContext for recording independent of Tone.js. Added WaveformTrack.src flexibility to support both string URLs (blob URLs from dropped files) and AudioBuffer objects (direct from recording). Implemented live waveform visualization during recording with peaks matching final format (Int16Array min/max pairs, 16-bit depth). Updated recording peak generation to match Channel component rendering for identical appearance during and after recording. Recording functionality now has complete feature parity with other React examples while maintaining clean architecture separation between recording and playback contexts.
+**Last Updated:** 2025-11-21
+**Session Notes:** Added recording architecture documentation covering global AudioContext pattern, shared MediaStreamSource with targeted disconnect requirement, two-system monitoring (AnalyserNode vs AudioWorklet), VU meter during recording, Test Microphone button, duration timer with refs pattern, try-catch cleanup for device switching, and AudioWorklet debugging alternatives. Compacted file from 45.9k to under 40k characters while preserving all critical architectural decisions and patterns.

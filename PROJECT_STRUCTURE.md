@@ -229,22 +229,82 @@ waveform-playlist/
   │   └── recording-processor.worklet.ts
   └── index.ts           # Public exports
   ```
+
+- **Key Architecture:**
+  - **Shared MediaStreamSource** - Single source per MediaStream, shared across multiple consumers
+    - Managed by `mediaStreamSourceManager.ts` in playout package
+    - Both `useRecording` (AudioWorklet) and `useMicrophoneLevel` (AnalyserNode) connect to same source
+    - **CRITICAL:** Always use targeted disconnect: `source.disconnect(destination)` not `source.disconnect()`
+    - Blanket `disconnect()` breaks ALL connections, including other consumers!
+  - **Two-System Monitoring:**
+    - `useMicrophoneLevel` - Pre-recording monitoring using AnalyserNode (60fps)
+    - `useRecording` - During-recording RMS calculation in AudioWorklet (~16ms chunks)
+  - **Test Microphone Button** - Resumes AudioContext to enable pre-recording level checks
+  - **AudioWorklet RMS Calculation** - Calculates audio levels in worklet thread, sends to main thread
+  - **Duration Timer with Refs** - Uses `isRecordingRef`/`isPausedRef` for synchronous checks in animation loop
+    - React state updates are asynchronous, can't be used in `requestAnimationFrame` loops
+    - Refs update immediately and can be checked reliably in the animation loop
+
 - **Key Features:**
   - **Global AudioContext** - Uses shared global context (same as Tone.js playback)
-  - **Live waveform visualization** - Real-time peaks generation during recording
+  - **Live waveform visualization** - Real-time Int16Array peaks (min/max pairs) during recording
   - **AudioBuffer support** - WaveformTrack accepts both URLs and AudioBuffer objects
-  - **Microphone selection** - Enumerate and select input devices
-  - **VU meter** - Real-time audio level monitoring (planned)
+  - **Microphone selection** - Enumerate and switch between input devices
+  - **VU meter** - Real-time RMS level display with peak hold
+  - **Test Microphone** - Pre-recording level monitoring before committing to record
+
 - **Hooks:**
-  - `useRecording` - Complete recording lifecycle management
+  - `useRecording` - Complete recording lifecycle with AudioWorklet
+    - Returns: `isRecording`, `isPaused`, `duration`, `peaks`, `audioBuffer`, `level`, `peakLevel`
+    - Methods: `startRecording()`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`
   - `useMicrophoneAccess` - Device enumeration and permission handling
-  - `useMicrophoneLevel` - Real-time audio level monitoring
+    - Returns: `stream`, `devices`, `hasPermission`, `requestAccess()`, `error`
+  - `useMicrophoneLevel` - Real-time audio level monitoring with AnalyserNode
+    - Returns: `level`, `peakLevel`, `resetPeak()`
+
 - **Components:**
-  - Visual: RecordButton, RecordingIndicator, VUMeter
+  - Visual: RecordButton, RecordingIndicator (with duration timer), VUMeter
   - Controls: MicrophoneSelector
+
+- **Important Patterns:**
+  1. **Targeted Disconnect** - Always specify destination when disconnecting shared nodes:
+     ```typescript
+     // ✅ CORRECT - Only disconnects specific connection
+     source.disconnect(analyser);
+
+     // ❌ WRONG - Breaks ALL connections including other consumers
+     source.disconnect();
+     ```
+  2. **Refs in Animation Loops** - Use refs for values checked in `requestAnimationFrame`:
+     ```typescript
+     const isRecordingRef = useRef(false);
+     const updateDuration = () => {
+       if (isRecordingRef.current) { // Synchronous check
+         // ... update duration
+         requestAnimationFrame(updateDuration);
+       }
+     };
+     ```
+  3. **AudioWorklet Debugging** - console.log in worklets doesn't appear in browser console
+     - Use `postMessage()` to send debug data to main thread
+     - Update UI/document.title to display values
+  4. **Worklet Deployment** - Worklet files require manual steps:
+     - Build: `pnpm build` (creates `dist/recording-processor.worklet.js`)
+     - Copy: `cp packages/recording/dist/recording-processor.worklet.js ghpages/js/worklet/`
+     - Restart Jekyll server to clear cache
+  5. **Try-Catch for Cleanup** - Wrap disconnect calls in try-catch for microphone switching:
+     ```typescript
+     try {
+       source.disconnect(destination);
+     } catch (e) {
+       // Source may already be disconnected when stream changed
+     }
+     ```
+
 - **Peer Dependencies:** React ^18.0.0, styled-components ^6.0.0
-- **Use Cases:** Voice recording, podcast editing, audio capture, live input
+- **Use Cases:** Voice recording, podcast editing, audio capture, live input, microphone testing
 - **Example:** `ghpages/_examples/17recording.html`
+- **Debugging:** See `DEBUGGING.md` for comprehensive troubleshooting guide
 
 ## Data Flow Architecture
 

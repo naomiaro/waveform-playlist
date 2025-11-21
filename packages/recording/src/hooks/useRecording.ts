@@ -40,6 +40,8 @@ export function useRecording(
   const totalSamplesRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
+  const isRecordingRef = useRef<boolean>(false);
+  const isPausedRef = useRef<boolean>(false);
 
   // Load AudioWorklet module
   const loadWorklet = useCallback(async (context: AudioContext) => {
@@ -132,13 +134,15 @@ export function useRecording(
       setAudioBuffer(null);
       setLevel(0);
       setPeakLevel(0);
+      isRecordingRef.current = true;
+      isPausedRef.current = false;
       setIsRecording(true);
       setIsPaused(false);
       startTimeRef.current = performance.now();
 
       // Start duration update loop
       const updateDuration = () => {
-        if (isRecording && !isPaused) {
+        if (isRecordingRef.current && !isPausedRef.current) {
           const elapsed = (performance.now() - startTimeRef.current) / 1000;
           setDuration(elapsed);
           animationFrameRef.current = requestAnimationFrame(updateDuration);
@@ -193,6 +197,8 @@ export function useRecording(
 
       setAudioBuffer(buffer);
       setDuration(buffer.duration);
+      isRecordingRef.current = false;
+      isPausedRef.current = false;
       setIsRecording(false);
       setIsPaused(false);
       setLevel(0);
@@ -213,6 +219,7 @@ export function useRecording(
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
+      isPausedRef.current = true;
       setIsPaused(true);
     }
   }, [isRecording, isPaused]);
@@ -220,11 +227,12 @@ export function useRecording(
   // Resume recording
   const resumeRecording = useCallback(() => {
     if (isRecording && isPaused) {
+      isPausedRef.current = false;
       setIsPaused(false);
       startTimeRef.current = performance.now() - duration * 1000;
 
       const updateDuration = () => {
-        if (isRecording && !isPaused) {
+        if (isRecordingRef.current && !isPausedRef.current) {
           const elapsed = (performance.now() - startTimeRef.current) / 1000;
           setDuration(elapsed);
           animationFrameRef.current = requestAnimationFrame(updateDuration);

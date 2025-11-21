@@ -97,8 +97,6 @@ export function useMicrophoneLevel(
       // Use global AudioContext (shared with Tone.js and recording)
       const context = getGlobalAudioContext();
 
-      console.log('[useMicrophoneLevel] Setting up monitoring, AudioContext state:', context.state);
-
       // Note: AudioContext will be resumed by Record button click
       // We set up the nodes now, and they'll start working when context is resumed
 
@@ -128,7 +126,6 @@ export function useMicrophoneLevel(
         // Check if AudioContext state changed from suspended to running
         const currentState = context.state;
         if (contextStateRef.current === 'suspended' && currentState === 'running') {
-          console.log('[useMicrophoneLevel] AudioContext transitioned to running, reconnecting...');
           contextStateRef.current = currentState;
 
           // Disconnect and reconnect to ensure proper data flow
@@ -136,7 +133,6 @@ export function useMicrophoneLevel(
           if (sourceRef.current && analyserRef.current) {
             sourceRef.current.disconnect(analyserRef.current);
             sourceRef.current.connect(analyserRef.current);
-            console.log('[useMicrophoneLevel] Reconnected source to analyser');
           }
         } else if (currentState !== contextStateRef.current) {
           contextStateRef.current = currentState;
@@ -155,11 +151,6 @@ export function useMicrophoneLevel(
             sum += normalized * normalized;
           }
           const rms = Math.sqrt(sum / bufferLength);
-
-          // Debug logging (sample first few values)
-          if (Math.random() < 0.1) { // Log 10% of the time to avoid spam
-            console.log('[useMicrophoneLevel] RMS:', rms, 'Sample data:', dataArray.slice(0, 5), 'Context state:', currentState);
-          }
 
           setLevel(rms);
           setPeakLevel(prev => Math.max(prev, rms));
