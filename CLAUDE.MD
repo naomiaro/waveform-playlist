@@ -905,12 +905,147 @@ const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
    - Maximum flexibility for custom layouts
    - All new examples use this pattern
 
+## Recording Architecture (2025-11-20)
+
+### Independent AudioContext for Recording
+
+**Problem:** Recording functionality was failing with "Failed to construct 'AudioWorkletNode': parameter 1 is not of type 'BaseAudioContext'" when trying to use Tone.js context.
+
+**Solution:** Recording now uses its own dedicated AudioContext, completely independent of Tone.js.
+
+**Implementation:**
+- `useRecording` hook creates and manages its own `AudioContext`
+- No dependency on Tone.js for recording operations
+- Context is properly cleaned up on unmount
+
+**Benefits:**
+- ✅ **Cleaner separation** - Recording and playback use separate audio contexts
+- ✅ **No conflicts** - Recording doesn't interfere with Tone.js playback
+- ✅ **Simpler** - Recording doesn't need Tone.js features
+- ✅ **Better performance** - Dedicated context optimized for recording only
+
+**Location:** `packages/recording/src/hooks/useRecording.ts`
+
+### WaveformTrack Source Flexibility
+
+**Decision:** `WaveformTrack.src` supports both URL strings and AudioBuffer objects.
+
+**Reasoning:**
+- **newtracks example** uses `URL.createObjectURL(file)` to create blob URLs from dropped files
+- **recording example** passes AudioBuffer directly from recording (more efficient)
+- Supporting both avoids unnecessary conversions
+
+**Implementation:**
+```typescript
+export interface WaveformTrack {
+  src: string | AudioBuffer; // Support both URL strings and AudioBuffer objects
+  name?: string;
+  effects?: TrackEffectsFunction;
+}
+
+// In WaveformPlaylistContext:
+if (typeof track.src === 'string') {
+  // Fetch and decode
+  const response = await fetch(track.src);
+  buffer = await audioContext.decodeAudioData(arrayBuffer);
+} else {
+  // Use AudioBuffer directly
+  buffer = track.src;
+}
+```
+
+**Location:** `packages/browser/src/WaveformPlaylistContext.tsx`
+
+### Live Recording Peaks Format
+
+**Decision:** Recording peaks match the exact format used by final waveform rendering.
+
+**Format Specification:**
+- **Data type:** `Int16Array` (not `Int8Array` or plain arrays)
+- **Structure:** Min/max pairs (each pixel represented by 2 values)
+- **Bit depth:** 16-bit (matches `webaudio-peaks` default)
+- **Range:** -32768 to 32767 (signed 16-bit integers)
+
+**Peak Generation:**
+```typescript
+// For each pixel/sample window:
+const min = Math.floor(minValue * 32768); // Min amplitude
+const max = Math.floor(maxValue * 32768); // Max amplitude
+peakArray[i * 2] = min;     // Store min
+peakArray[i * 2 + 1] = max; // Store max
+```
+
+**Drawing Approach (matches Channel component):**
+```typescript
+const h2 = height / 2;
+const maxValue = 2 ** 15; // 32768
+
+const minPeak = peaks[i * 2] / maxValue;     // Normalize to -1..1
+const maxPeak = peaks[i * 2 + 1] / maxValue;
+
+const min = Math.abs(minPeak * h2);
+const max = Math.abs(maxPeak * h2);
+
+// Draw from edges toward center
+ctx.fillRect(x, 0, 1, h2 - max);        // Top half
+ctx.fillRect(x, h2 + min, 1, h2 - min); // Bottom half
+```
+
+**Why This Matters:**
+- Live waveform looks **identical** to final result
+- Same detail level during and after recording
+- Same `samplesPerPixel` value (1024)
+- No visual discontinuity when recording stops
+
+**Files Updated:**
+- `packages/recording/src/utils/peaksGenerator.ts` - Generate min/max pairs with bit depth
+- `packages/recording/src/hooks/useRecording.ts` - Use `Int16Array` for peaks state
+- `packages/recording/src/types/index.ts` - Update type definitions
+- `packages/browser/src/recording-app.tsx` - Match Channel component drawing
+
+### Recording Example Features
+
+**Implemented:** Full-featured recording example matching other React examples.
+
+**Features Added:**
+1. **Complete Playback Controls:**
+   - PlayButton, PauseButton, StopButton
+   - ZoomInButton, ZoomOutButton
+   - AutomaticScrollCheckbox
+   - AudioPosition display
+
+2. **Live Waveform Visualization:**
+   - Real-time canvas rendering during recording
+   - Updates as peaks arrive from AudioWorklet
+   - Matches final waveform appearance exactly
+   - Shows only while recording is active
+
+3. **Control Layout:**
+   - Organized into control groups with visual dividers
+   - Consistent styling with stem-tracks and newtracks examples
+   - Responsive layout with flex wrapping
+
+**Configuration:**
+```typescript
+<WaveformPlaylistProvider
+  tracks={recordedTracks}
+  samplesPerPixel={1024}
+  mono={true}
+  waveHeight={100}
+  automaticScroll={true}
+  controls={{ show: true, width: 200 }}
+>
+```
+
+**Location:** `packages/browser/src/recording-app.tsx`
+
 ## Current Work (Tone.js Overhaul Branch)
 
 ### Status
 - React refactor in progress
-- **All React examples migrated to provider pattern** (newtracks, stem-tracks, effects, annotations, flexible-api)
+- **All React examples migrated to provider pattern** (newtracks, stem-tracks, effects, annotations, flexible-api, recording)
 - **Performance optimizations completed** (GPU-accelerated playhead, smooth zoom, automatic scroll)
+- **Recording architecture implemented** (independent AudioContext, live peaks, AudioBuffer support)
 - **TrackControlsWithDelete component created** (compact, reusable)
 - Selection inputs implemented and functional
 - Custom hooks architecture implemented
@@ -951,4 +1086,4 @@ const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
 ---
 
 **Last Updated:** 2025-11-20
-**Session Notes:** Major performance optimizations and example migrations. Fixed zoom breaking playback by separating audio loading from peak generation. Implemented GPU-accelerated playhead animation using `transform: translate3d()` instead of `left` for 60fps smoothness. Fixed zoom + automatic scroll interaction with proportional scroll adjustment that maintains visual center. Converted newtracks and stem-tracks examples to provider pattern. Created TrackControlsWithDelete component with compact layout and trash icon. Added `automaticScroll` prop to WaveformPlaylistProvider. Removed obsolete WaveformPlaylistComponent and all old Jekyll include fragments (buttons, forms, checkboxes, sliders). Cleaned up stem-tracks Jekyll template. All React examples now use modern provider pattern with full performance optimizations.
+**Session Notes:** Recording example enhancement and architecture improvements. Migrated recording example to provider pattern with full playback controls (play, pause, stop, zoom, automatic scroll). Fixed AudioWorkletNode error by creating dedicated AudioContext for recording independent of Tone.js. Added WaveformTrack.src flexibility to support both string URLs (blob URLs from dropped files) and AudioBuffer objects (direct from recording). Implemented live waveform visualization during recording with peaks matching final format (Int16Array min/max pairs, 16-bit depth). Updated recording peak generation to match Channel component rendering for identical appearance during and after recording. Recording functionality now has complete feature parity with other React examples while maintaining clean architecture separation between recording and playback contexts.
