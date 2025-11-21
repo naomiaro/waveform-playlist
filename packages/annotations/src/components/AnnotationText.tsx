@@ -110,7 +110,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
 
   // Track component renders and scroll position
   useEffect(() => {
-    console.log('[AnnotationText] Render - activeAnnotationId:', activeAnnotationId, 'prev:', prevActiveIdRef.current, 'scrollTop:', containerRef.current?.scrollTop);
+    // Render tracking removed
   });
 
   // Track scroll changes
@@ -119,7 +119,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
     if (!container) return;
 
     const handleScroll = () => {
-      console.log('[AnnotationText] Scroll event - scrollTop:', container.scrollTop);
+      // Scroll tracking removed
     };
 
     container.addEventListener('scroll', handleScroll);
@@ -128,11 +128,8 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
 
   // Auto-scroll to active annotation when it changes
   useEffect(() => {
-    console.log('[AnnotationText] useEffect triggered - activeAnnotationId:', activeAnnotationId, 'shouldScrollToActive:', shouldScrollToActive, 'will scroll:', !!(activeAnnotationId && activeAnnotationRef.current && shouldScrollToActive));
-
     // Only scroll if parent says we should (prevents scrolling on remount after pause)
     if (activeAnnotationId && activeAnnotationRef.current && shouldScrollToActive) {
-      console.log('[AnnotationText] Calling scrollIntoView for:', activeAnnotationId);
       activeAnnotationRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',

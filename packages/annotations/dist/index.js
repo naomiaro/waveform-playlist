@@ -612,21 +612,17 @@ var AnnotationTextComponent = ({
   const containerRef = (0, import_react2.useRef)(null);
   const prevActiveIdRef = (0, import_react2.useRef)(void 0);
   (0, import_react2.useEffect)(() => {
-    console.log("[AnnotationText] Render - activeAnnotationId:", activeAnnotationId, "prev:", prevActiveIdRef.current, "scrollTop:", containerRef.current?.scrollTop);
   });
   (0, import_react2.useEffect)(() => {
     const container = containerRef.current;
     if (!container) return;
     const handleScroll = () => {
-      console.log("[AnnotationText] Scroll event - scrollTop:", container.scrollTop);
     };
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
   (0, import_react2.useEffect)(() => {
-    console.log("[AnnotationText] useEffect triggered - activeAnnotationId:", activeAnnotationId, "shouldScrollToActive:", shouldScrollToActive, "will scroll:", !!(activeAnnotationId && activeAnnotationRef.current && shouldScrollToActive));
     if (activeAnnotationId && activeAnnotationRef.current && shouldScrollToActive) {
-      console.log("[AnnotationText] Calling scrollIntoView for:", activeAnnotationId);
       activeAnnotationRef.current.scrollIntoView({
         behavior: "smooth",
         block: "nearest"
@@ -712,9 +708,7 @@ var ContinuousPlayCheckbox = ({
   className
 }) => {
   const handleChange = (e) => {
-    console.log("[ContinuousPlayCheckbox handleChange] e.target.checked =", e.target.checked);
     onChange(e.target.checked);
-    console.log("[ContinuousPlayCheckbox handleChange] onChange called");
   };
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_ui_components3.CheckboxWrapper, { className, children: [
     /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
