@@ -26,8 +26,8 @@ import {
   ZoomInButton,
   ZoomOutButton,
   AutomaticScrollCheckbox,
+  type WaveformTrack,
 } from './components';
-import { Track } from '@waveform-playlist/core';
 import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
 
 const Container = styled.div`
@@ -191,7 +191,7 @@ const TestButton = styled.button`
 `;
 
 function RecordingApp() {
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [tracks, setTracks] = useState<WaveformTrack[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>();
   const [isMonitoring, setIsMonitoring] = useState(false);
   const recordingCountRef = useRef(1);
@@ -290,12 +290,9 @@ function RecordingApp() {
       const buffer = await stopRecording();
       if (buffer) {
         // Add recorded track to playlist
-        const newTrack: Track = {
+        const newTrack: WaveformTrack = {
           src: buffer,
           name: `Recording ${recordingCountRef.current}`,
-          gain: 1,
-          muted: false,
-          stereoPan: 0,
         };
         setTracks([...tracks, newTrack]);
         recordingCountRef.current += 1;
@@ -392,7 +389,7 @@ function RecordingApp() {
             tracks.map((track, index) => (
               <TrackItem key={index}>
                 <TrackInfo>
-                  <TrackName>{track.name}</TrackName>
+                  <TrackName>{track.name || 'Untitled'}</TrackName>
                   <TrackDuration>
                     {typeof track.src === 'string'
                       ? 'Unknown duration'

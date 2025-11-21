@@ -124,46 +124,34 @@ Despite what some documentation suggests, console messages from AudioWorklet pro
 
 ## Common Issues and Solutions
 
-### Issue: VU Meter Flat During Recording
+### Issue: VU Meter Jittery/Flat During Recording
 
 **Symptoms:**
-- Recording appears to work (button changes, timer running)
-- Live waveform may show audio OR be flat
-- VU meter shows no activity (width: 0px)
-- Document title shows "RMS: 0"
+- VU meter works smoothly during monitoring (before recording)
+- During recording, VU meter becomes jittery or doesn't move properly
+- Green bar doesn't bounce naturally with voice input
+- May see rapid flickering or stale values
 
-**Debugging steps:**
+**Root Cause (FIXED):**
+The worklet was calculating and sending RMS values at 60fps, conflicting with the AnalyserNode also updating at 60fps. This caused:
+- 300 React state updates per second (worklet: 180, AnalyserNode: 120)
+- State update conflicts between two different RMS sources
+- Performance bottleneck preventing smooth rendering
 
-1. **Check if worklet is sending messages:**
-   ```javascript
-   // Add this to useRecording.ts onmessage handler
-   console.log('[useRecording] Received RMS:', rmsLevel, 'Samples:', samples.length);
-   ```
-   If you see these logs, worklet IS sending messages.
+**Solution:**
+1. **Removed RMS calculation from worklet entirely** - Worklet now only captures audio samples and generates peaks for live waveform visualization
+2. **AnalyserNode is single source of truth** - `useMicrophoneLevel` hook provides all VU meter levels using AnalyserNode with smoothingTimeConstant=0.8
+3. **No gain boost needed** - Raw AnalyserNode levels are sufficient for proper VU meter display
 
-2. **Check the message structure:**
-   ```javascript
-   // Log the full message
-   workletNode.port.onmessage = (event) => {
-     console.log('[useRecording] Full message:', event.data);
-   };
-   ```
+**Files Changed:**
+- `packages/recording/src/worklet/recording-processor.worklet.ts` - Removed RMS calculation from `flushBuffers()`
+- `packages/recording/src/hooks/useRecording.ts` - Removed worklet RMS state updates, only processes peaks
+- `packages/browser/src/recording-app.tsx` - Uses AnalyserNode levels directly with no gain
 
-3. **Verify RMS value in message:**
-   The worklet sends:
-   ```typescript
-   {
-     samples: Float32Array,
-     rmsLevel: number  // Should be 0-1 range
-   }
-   ```
-
-4. **Check VU meter rendering:**
-   Inspect the VU meter fill element:
-   ```javascript
-   const fill = document.querySelector('[style*="width"]');
-   console.log('VU meter width:', fill?.style.width);
-   ```
+**Architecture:**
+- **Worklet**: Captures samples → Generates peaks → Updates live waveform (60fps)
+- **AnalyserNode**: Monitors audio → Calculates smooth RMS → Updates VU meter (60fps)
+- No overlap, no conflicts, smooth performance
 
 ### Issue: No Audio from Microphone
 

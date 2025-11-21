@@ -307,11 +307,13 @@ try {
 - All React examples migrated to provider pattern
 - Performance optimizations completed (GPU playhead, smooth zoom)
 - Recording architecture implemented (global AudioContext, shared MediaStreamSource)
+- **VU meter during recording fixed** (AnalyserNode-only, no worklet RMS)
 - Selection inputs, custom hooks, flexible API, theming all implemented
 - Annotations as optional package
 - Audio effects hooks (analyser, reverb, auto-wah, effects chain)
 - TrackControlsWithDelete component created
 - Obsolete code removed
+- Worklet copy automated in build script
 
 ### Next Steps / Ideas
 
@@ -329,6 +331,8 @@ try {
 - **Global AudioContext** - Shared across recording, monitoring, and playback
 - **Targeted Disconnect** - Always specify destination on shared nodes
 - **Refs for Animation** - Synchronous checks in requestAnimationFrame loops
+- **Single Source of Truth** - AnalyserNode for VU meter, worklet only for samples/peaks
+- **Avoid State Conflicts** - Don't update same state from multiple 60fps sources
 
 ## References
 
@@ -341,4 +345,5 @@ try {
 ---
 
 **Last Updated:** 2025-11-21
-**Session Notes:** Added recording architecture documentation covering global AudioContext pattern, shared MediaStreamSource with targeted disconnect requirement, two-system monitoring (AnalyserNode vs AudioWorklet), VU meter during recording, Test Microphone button, duration timer with refs pattern, try-catch cleanup for device switching, and AudioWorklet debugging alternatives. Compacted file from 45.9k to under 40k characters while preserving all critical architectural decisions and patterns.
+
+**Session Notes:** Fixed VU meter jittery/flat issue during recording. Root cause: Worklet was sending RMS values at 60fps (180 state updates/sec) conflicting with AnalyserNode also updating at 60fps (120 state updates/sec) = 300 total state updates causing rendering bottleneck. Solution: Removed all RMS calculation from worklet - it now only captures samples and generates peaks for live waveform. AnalyserNode is single source of truth for VU meter levels (smoothingTimeConstant=0.8). No gain boost needed. Also automated worklet copy in build-all.sh script, fixed TypeScript errors (AudioParamDescriptor type, Track.src union type), and removed debug logging. Updated DEBUGGING.md with architecture decision and troubleshooting steps.
