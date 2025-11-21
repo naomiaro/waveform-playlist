@@ -15,4 +15,5 @@ export * from './TimeInput';
 export * from './TimeScale';
 export * from './Track';
 export * from './TrackControls';
+export * from './TrackControlsWithDelete';
 export { StyledTimeScale } from './TimeScale';

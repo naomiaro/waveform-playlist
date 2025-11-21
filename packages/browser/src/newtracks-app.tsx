@@ -20,6 +20,7 @@ import {
   ZoomInButton,
   ZoomOutButton,
 } from './components';
+import { TrackControlsWithDelete } from '@waveform-playlist/ui-components';
 import { Track } from '@waveform-playlist/core';
 
 const Container = styled.div`
@@ -76,51 +77,6 @@ const DropZoneSubtext = styled.p`
   margin: 0.5rem 0 0 0;
   color: #6c757d;
   font-size: 0.875rem;
-`;
-
-const TrackList = styled.div`
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 0.5rem;
-`;
-
-const TrackItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  border-bottom: 1px solid #e9ecef;
-
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const TrackInfo = styled.div`
-  flex: 1;
-`;
-
-const TrackName = styled.span`
-  font-weight: 500;
-  color: #2c3e50;
-`;
-
-const RemoveButton = styled.button`
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  border: 1px solid #dc3545;
-  border-radius: 0.25rem;
-  background: white;
-  color: #dc3545;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-
-  &:hover {
-    background: #dc3545;
-    color: white;
-  }
 `;
 
 const HiddenFileInput = styled.input`
@@ -226,42 +182,65 @@ function NewTracksApp() {
       />
 
       {tracks.length > 0 && (
-        <>
-          <TrackList>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', fontWeight: 600 }}>
-              Tracks ({tracks.length})
-            </h3>
-            {tracks.map((track, index) => (
-              <TrackItem key={index}>
-                <TrackInfo>
-                  <TrackName>{track.name}</TrackName>
-                </TrackInfo>
-                <RemoveButton onClick={() => handleRemoveTrack(index)}>Remove</RemoveButton>
-              </TrackItem>
-            ))}
-          </TrackList>
+        <WaveformPlaylistProvider
+          tracks={tracks}
+          samplesPerPixel={2048}
+          controls={{ show: true, width: 200 }}
+        >
+          <Controls>
+            <ControlGroup>
+              <PlayButton />
+              <PauseButton />
+              <StopButton />
+            </ControlGroup>
 
-          <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={2048}>
-            <Controls>
-              <ControlGroup>
-                <PlayButton />
-                <PauseButton />
-                <StopButton />
-              </ControlGroup>
+            <ControlGroup>
+              <ZoomInButton />
+              <ZoomOutButton />
+            </ControlGroup>
 
-              <ControlGroup>
-                <ZoomInButton />
-                <ZoomOutButton />
-              </ControlGroup>
+            <ControlGroup>
+              <AudioPosition />
+            </ControlGroup>
+          </Controls>
 
-              <ControlGroup>
-                <AudioPosition />
-              </ControlGroup>
-            </Controls>
+          <Waveform
+            renderTrackControls={(trackIndex) => {
+              const track = tracks[trackIndex];
+              if (!track) return null;
 
-            <Waveform />
-          </WaveformPlaylistProvider>
-        </>
+              return (
+                <TrackControlsWithDelete
+                  trackIndex={trackIndex}
+                  trackName={track.name}
+                  muted={track.muted || false}
+                  soloed={false}
+                  volume={track.gain || 1}
+                  pan={track.stereoPan || 0}
+                  onMuteChange={(muted) => {
+                    const updatedTracks = [...tracks];
+                    updatedTracks[trackIndex] = { ...track, muted };
+                    setTracks(updatedTracks);
+                  }}
+                  onSoloChange={() => {
+                    // Solo not implemented in this example
+                  }}
+                  onVolumeChange={(volume) => {
+                    const updatedTracks = [...tracks];
+                    updatedTracks[trackIndex] = { ...track, gain: volume };
+                    setTracks(updatedTracks);
+                  }}
+                  onPanChange={(pan) => {
+                    const updatedTracks = [...tracks];
+                    updatedTracks[trackIndex] = { ...track, stereoPan: pan };
+                    setTracks(updatedTracks);
+                  }}
+                  onDelete={() => handleRemoveTrack(trackIndex)}
+                />
+              );
+            }}
+          />
+        </WaveformPlaylistProvider>
       )}
     </Container>
   );
