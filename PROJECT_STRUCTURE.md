@@ -19,6 +19,7 @@ waveform-playlist/
 │   ├── core/              # Core types and interfaces
 │   ├── loaders/           # Audio file loaders
 │   ├── playout/           # Audio playback (Tone.js wrapper)
+│   ├── recording/         # 📦 OPTIONAL: Audio recording with AudioWorklet
 │   ├── ui-components/     # Reusable React UI components
 │   └── webaudio-peaks/    # Waveform peak generation
 │
@@ -192,6 +193,50 @@ waveform-playlist/
 - **Bundle Size Impact:** ~50KB (only included if installed)
 - **Use Cases:** Subtitle/caption editing, transcripts, audio labeling
 - **Documentation:** See `OPTIONAL_PACKAGES.md`
+
+#### `@waveform-playlist/recording`
+
+- **Type:** Optional package (install separately)
+- **Purpose:** Audio recording support using AudioWorklet
+- **Tech:** React, styled-components, AudioWorklet
+- **Install:** `npm install @waveform-playlist/recording`
+- **Structure:**
+  ```
+  src/
+  ├── components/        # React components
+  │   ├── RecordButton.tsx
+  │   ├── MicrophoneSelector.tsx
+  │   ├── RecordingIndicator.tsx
+  │   └── VUMeter.tsx
+  ├── hooks/             # Custom hooks
+  │   ├── useRecording.ts
+  │   ├── useMicrophoneAccess.ts
+  │   └── useMicrophoneLevel.ts
+  ├── types/             # TypeScript types
+  │   └── index.ts
+  ├── utils/             # Utilities
+  │   ├── peaksGenerator.ts
+  │   └── audioBufferUtils.ts
+  ├── worklet/           # AudioWorklet processor
+  │   └── recording-processor.worklet.ts
+  └── index.ts           # Public exports
+  ```
+- **Key Features:**
+  - **Independent AudioContext** - Uses dedicated context separate from Tone.js playback
+  - **Live waveform visualization** - Real-time peaks generation during recording
+  - **AudioBuffer support** - WaveformTrack accepts both URLs and AudioBuffer objects
+  - **Microphone selection** - Enumerate and select input devices
+  - **VU meter** - Real-time audio level monitoring
+- **Hooks:**
+  - `useRecording` - Complete recording lifecycle management
+  - `useMicrophoneAccess` - Device enumeration and permission handling
+  - `useMicrophoneLevel` - Real-time audio level monitoring
+- **Components:**
+  - Visual: RecordButton, RecordingIndicator, VUMeter
+  - Controls: MicrophoneSelector
+- **Peer Dependencies:** React ^18.0.0, styled-components ^6.0.0
+- **Use Cases:** Voice recording, podcast editing, audio capture, live input
+- **Example:** `ghpages/_examples/17recording.html`
 
 ## Data Flow Architecture
 
@@ -781,6 +826,7 @@ See `CLAUDE.md` for architectural decisions and next steps:
 
 **Last Updated:** 2025-11-21
 
+- **Recording Package Documentation:** Added comprehensive documentation for `@waveform-playlist/recording` optional package (AudioWorklet-based recording with hooks, components, and live waveform visualization)
 - **Context Splitting Architecture:** Documented the 4-context split in `WaveformPlaylistProvider` for performance optimization (PlaybackAnimationContext, PlaylistStateContext, PlaylistControlsContext, PlaylistDataContext)
 - **Continuous Play Toggle Fix:** Fixed toggling Continuous Play checkbox during active playback in both directions (ON and OFF) through context splitting, animation loop restart, and playout rescheduling
 - Updated data flow diagrams to show split context architecture
