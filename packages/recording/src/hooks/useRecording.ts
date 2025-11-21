@@ -46,9 +46,9 @@ export function useRecording(
       }
 
       // Load the worklet module
-      // In production, this path should be resolved correctly
+      // Use a relative path that works when bundled
       const workletUrl = new URL(
-        '../worklet/recording-processor.worklet.js',
+        './worklet/recording-processor.worklet.js',
         import.meta.url
       ).href;
 
