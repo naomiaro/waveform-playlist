@@ -6,13 +6,17 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { UseRecordingReturn, RecordingOptions } from '../types';
 import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUtils';
 import { appendPeaks } from '../utils/peaksGenerator';
+import {
+  getGlobalAudioContext,
+  resumeGlobalAudioContext,
+  getMediaStreamSource,
+} from '@waveform-playlist/playout';
 
 export function useRecording(
   stream: MediaStream | null,
   options: RecordingOptions = {}
 ): UseRecordingReturn {
   const {
-    sampleRate,
     channelCount = 1,
     samplesPerPixel = 1024,
   } = options;
@@ -24,11 +28,12 @@ export function useRecording(
   const [peaks, setPeaks] = useState<Int8Array | Int16Array>(new Int16Array(0));
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [level, setLevel] = useState(0); // Current RMS level (0-1)
+  const [peakLevel, setPeakLevel] = useState(0); // Peak level since recording started (0-1)
 
   const bits: 8 | 16 = 16; // Match the bit depth used by the final waveform
 
   // Refs for AudioWorklet and data accumulation
-  const audioContextRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const recordedChunksRef = useRef<Float32Array[]>([]);
@@ -36,24 +41,11 @@ export function useRecording(
   const animationFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  // Get or create AudioContext for recording
-  const getAudioContext = useCallback(() => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = sampleRate
-        ? new AudioContext({ sampleRate })
-        : new AudioContext();
-    }
-    return audioContextRef.current;
-  }, [sampleRate]);
-
   // Load AudioWorklet module
   const loadWorklet = useCallback(async (context: AudioContext) => {
     try {
-      // Check if already loaded
-      // @ts-ignore - AudioWorklet doesn't have a way to check if module is loaded
-      if (context._workletModuleLoaded) {
-        return;
-      }
+      // NOTE: Removed the check for context._workletModuleLoaded to allow reloading
+      // This ensures we always load the latest worklet code during development
 
       // Load the worklet module
       // Use a relative path that works when bundled
@@ -62,9 +54,10 @@ export function useRecording(
         import.meta.url
       ).href;
 
-      await context.audioWorklet.addModule(workletUrl);
-      // @ts-ignore
-      context._workletModuleLoaded = true;
+      // Add cache-busting parameter to force reload during development
+      const cacheBustedUrl = `${workletUrl}?v=${Date.now()}`;
+
+      await context.audioWorklet.addModule(cacheBustedUrl);
     } catch (err) {
       console.error('Failed to load AudioWorklet module:', err);
       throw new Error('Failed to load recording processor');
@@ -81,19 +74,17 @@ export function useRecording(
     try {
       setError(null);
 
-      // Get or create dedicated AudioContext for recording
-      const context = getAudioContext();
+      // Use global AudioContext (shared with Tone.js and monitoring)
+      const context = getGlobalAudioContext();
 
       // Resume AudioContext if suspended
-      if (context.state === 'suspended') {
-        await context.resume();
-      }
+      await resumeGlobalAudioContext();
 
       // Load worklet module
       await loadWorklet(context);
 
-      // Create media stream source
-      const source = context.createMediaStreamSource(stream);
+      // Get or create media stream source (managed, shared across consumers)
+      const source = getMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
 
       // Create AudioWorklet node
@@ -103,9 +94,9 @@ export function useRecording(
       // Connect source to worklet (but not to destination - no monitoring)
       source.connect(workletNode);
 
-      // Listen for audio data from worklet
+      //Listen for audio data from worklet
       workletNode.port.onmessage = (event) => {
-        const { samples } = event.data;
+        const { samples, rmsLevel } = event.data;
 
         // Accumulate samples
         recordedChunksRef.current.push(samples);
@@ -121,6 +112,10 @@ export function useRecording(
             bits
           )
         );
+
+        // Update VU meter levels
+        setLevel(rmsLevel);
+        setPeakLevel((prev) => Math.max(prev, rmsLevel));
       };
 
       // Start the worklet processor
@@ -135,6 +130,8 @@ export function useRecording(
       totalSamplesRef.current = 0;
       setPeaks(new Int16Array(0));
       setAudioBuffer(null);
+      setLevel(0);
+      setPeakLevel(0);
       setIsRecording(true);
       setIsPaused(false);
       startTimeRef.current = performance.now();
@@ -152,7 +149,7 @@ export function useRecording(
       console.error('Failed to start recording:', err);
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
     }
-  }, [stream, sampleRate, channelCount, samplesPerPixel, getAudioContext, loadWorklet, isRecording, isPaused]);
+  }, [stream, channelCount, samplesPerPixel, loadWorklet, isRecording, isPaused]);
 
   // Stop recording
   const stopRecording = useCallback(async (): Promise<AudioBuffer | null> => {
@@ -165,9 +162,15 @@ export function useRecording(
       if (workletNodeRef.current) {
         workletNodeRef.current.port.postMessage({ command: 'stop' });
 
-        // Disconnect
+        // Disconnect worklet from source
+        // (Don't disconnect the source itself - it's managed and may have other consumers)
         if (mediaStreamSourceRef.current) {
-          mediaStreamSourceRef.current.disconnect();
+          try {
+            mediaStreamSourceRef.current.disconnect(workletNodeRef.current);
+          } catch (e) {
+            // Source may have already been disconnected when stream changed
+            // This is fine - just ignore the error
+          }
         }
         workletNodeRef.current.disconnect();
       }
@@ -180,7 +183,7 @@ export function useRecording(
 
       // Create final AudioBuffer from accumulated chunks
       const allSamples = concatenateAudioData(recordedChunksRef.current);
-      const context = audioContextRef.current || getAudioContext();
+      const context = getGlobalAudioContext();
       const buffer = createAudioBuffer(
         context,
         allSamples,
@@ -192,6 +195,8 @@ export function useRecording(
       setDuration(buffer.duration);
       setIsRecording(false);
       setIsPaused(false);
+      setLevel(0);
+      // Keep peakLevel to show the peak reached during recording
 
       return buffer;
     } catch (err) {
@@ -199,7 +204,7 @@ export function useRecording(
       setError(err instanceof Error ? err : new Error('Failed to stop recording'));
       return null;
     }
-  }, [isRecording, sampleRate, channelCount, getAudioContext]);
+  }, [isRecording, channelCount]);
 
   // Pause recording
   const pauseRecording = useCallback(() => {
@@ -234,17 +239,23 @@ export function useRecording(
     return () => {
       if (workletNodeRef.current) {
         workletNodeRef.current.port.postMessage({ command: 'stop' });
+
+        // Disconnect worklet from source
+        if (mediaStreamSourceRef.current) {
+          try {
+            mediaStreamSourceRef.current.disconnect(workletNodeRef.current);
+          } catch (e) {
+            // Source may have already been disconnected when stream changed
+            // This is fine - just ignore the error
+          }
+        }
         workletNodeRef.current.disconnect();
-      }
-      if (mediaStreamSourceRef.current) {
-        mediaStreamSourceRef.current.disconnect();
       }
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
+      // Don't close the global AudioContext - it's shared across the app
+      // Don't disconnect the MediaStreamSource - it's managed and shared
     };
   }, []);
 
@@ -254,6 +265,8 @@ export function useRecording(
     duration,
     peaks,
     audioBuffer,
+    level,
+    peakLevel,
     startRecording,
     stopRecording,
     pauseRecording,

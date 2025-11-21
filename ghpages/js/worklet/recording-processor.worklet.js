@@ -52,10 +52,16 @@ var RecordingProcessor = class extends AudioWorkletProcessor {
   }
   flushBuffers() {
     const samples = this.buffers[0].slice(0, this.samplesCollected);
+    let sumSquares = 0;
+    for (let i = 0; i < this.samplesCollected; i++) {
+      sumSquares += samples[i] * samples[i];
+    }
+    const rms = Math.sqrt(sumSquares / this.samplesCollected);
     this.port.postMessage({
       samples,
       sampleRate,
-      channelCount: this.channelCount
+      channelCount: this.channelCount,
+      rmsLevel: rms
     });
     this.samplesCollected = 0;
   }

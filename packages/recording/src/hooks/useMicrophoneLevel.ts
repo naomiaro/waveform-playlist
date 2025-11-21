@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react';
-import * as Tone from 'tone';
+import { getGlobalAudioContext, getMediaStreamSource } from '@waveform-playlist/playout';
 
 export interface UseMicrophoneLevelOptions {
   /**
@@ -79,6 +79,7 @@ export function useMicrophoneLevel(
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
+  const contextStateRef = useRef<AudioContextState>('suspended');
 
   const resetPeak = () => setPeakLevel(0);
 
@@ -89,61 +90,110 @@ export function useMicrophoneLevel(
       return;
     }
 
-    const context = Tone.context.rawContext as AudioContext;
+    let isMounted = true;
 
-    // Create analyser node
-    const analyser = context.createAnalyser();
-    analyser.fftSize = fftSize;
-    analyser.smoothingTimeConstant = smoothingTimeConstant;
-    analyserRef.current = analyser;
+    // Setup audio monitoring asynchronously
+    const setupMonitoring = async () => {
+      // Use global AudioContext (shared with Tone.js and recording)
+      const context = getGlobalAudioContext();
 
-    // Create data array for time domain data
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    dataArrayRef.current = dataArray;
+      console.log('[useMicrophoneLevel] Setting up monitoring, AudioContext state:', context.state);
 
-    // Connect stream to analyser
-    const source = context.createMediaStreamSource(stream);
-    source.connect(analyser);
-    sourceRef.current = source;
+      // Note: AudioContext will be resumed by Record button click
+      // We set up the nodes now, and they'll start working when context is resumed
 
-    // Update level at specified rate
-    const updateInterval = 1000 / updateRate;
-    let lastUpdateTime = 0;
+      if (!isMounted) return;
 
-    const updateLevel = (timestamp: number) => {
-      if (timestamp - lastUpdateTime >= updateInterval) {
-        lastUpdateTime = timestamp;
+      // Create analyser node
+      const analyser = context.createAnalyser();
+      analyser.fftSize = fftSize;
+      analyser.smoothingTimeConstant = smoothingTimeConstant;
+      analyserRef.current = analyser;
 
-        // Get time domain data
-        analyser.getByteTimeDomainData(dataArray);
+      // Create data array for time domain data
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      dataArrayRef.current = dataArray;
 
-        // Calculate RMS (Root Mean Square) level
-        let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          const normalized = (dataArray[i] - 128) / 128;
-          sum += normalized * normalized;
+      // Get or create media stream source (managed, shared across consumers)
+      const source = getMediaStreamSource(stream);
+      source.connect(analyser);
+      sourceRef.current = source;
+
+      // Update level at specified rate
+      const updateInterval = 1000 / updateRate;
+      let lastUpdateTime = 0;
+
+      const updateLevel = (timestamp: number) => {
+        // Check if AudioContext state changed from suspended to running
+        const currentState = context.state;
+        if (contextStateRef.current === 'suspended' && currentState === 'running') {
+          console.log('[useMicrophoneLevel] AudioContext transitioned to running, reconnecting...');
+          contextStateRef.current = currentState;
+
+          // Disconnect and reconnect to ensure proper data flow
+          // IMPORTANT: Use targeted disconnect to avoid breaking other consumers (e.g., worklet)
+          if (sourceRef.current && analyserRef.current) {
+            sourceRef.current.disconnect(analyserRef.current);
+            sourceRef.current.connect(analyserRef.current);
+            console.log('[useMicrophoneLevel] Reconnected source to analyser');
+          }
+        } else if (currentState !== contextStateRef.current) {
+          contextStateRef.current = currentState;
         }
-        const rms = Math.sqrt(sum / bufferLength);
 
-        setLevel(rms);
-        setPeakLevel(prev => Math.max(prev, rms));
-      }
+        if (timestamp - lastUpdateTime >= updateInterval) {
+          lastUpdateTime = timestamp;
+
+          // Get time domain data
+          analyser.getByteTimeDomainData(dataArray);
+
+          // Calculate RMS (Root Mean Square) level
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            const normalized = (dataArray[i] - 128) / 128;
+            sum += normalized * normalized;
+          }
+          const rms = Math.sqrt(sum / bufferLength);
+
+          // Debug logging (sample first few values)
+          if (Math.random() < 0.1) { // Log 10% of the time to avoid spam
+            console.log('[useMicrophoneLevel] RMS:', rms, 'Sample data:', dataArray.slice(0, 5), 'Context state:', currentState);
+          }
+
+          setLevel(rms);
+          setPeakLevel(prev => Math.max(prev, rms));
+        }
+
+        animationFrameRef.current = requestAnimationFrame(updateLevel);
+      };
 
       animationFrameRef.current = requestAnimationFrame(updateLevel);
     };
 
-    animationFrameRef.current = requestAnimationFrame(updateLevel);
+    setupMonitoring();
 
     // Cleanup
     return () => {
+      isMounted = false;
+
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
 
-      if (sourceRef.current) {
-        sourceRef.current.disconnect();
+      // Disconnect analyser from the shared source
+      // (Don't disconnect the source itself - it's managed and may have other consumers)
+      if (analyserRef.current && sourceRef.current) {
+        try {
+          sourceRef.current.disconnect(analyserRef.current);
+        } catch (e) {
+          // Source may have already been disconnected when stream changed
+          // This is fine - just ignore the error
+        }
       }
+
+      // Don't close the global AudioContext - it's shared across the app
+      // Don't disconnect the MediaStreamSource - it's managed and shared
 
       analyserRef.current = null;
       sourceRef.current = null;

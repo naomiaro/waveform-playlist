@@ -28,7 +28,7 @@ import {
   AutomaticScrollCheckbox,
 } from './components';
 import { Track } from '@waveform-playlist/core';
-import * as Tone from 'tone';
+import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
 
 const Container = styled.div`
   max-width: 1200px;
@@ -74,13 +74,6 @@ const Label = styled.label`
 
 const Section = styled.section`
   margin-bottom: 2rem;
-`;
-
-const Title = styled.h2`
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: #2c3e50;
 `;
 
 const Subtitle = styled.h3`
@@ -175,21 +168,46 @@ const LiveWaveformContainer = styled.div`
   border-radius: 0.5rem;
 `;
 
+const TestButton = styled.button`
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid #17a2b8;
+  border-radius: 0.25rem;
+  background: white;
+  color: #17a2b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: #17a2b8;
+    color: white;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 function RecordingApp() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>();
+  const [isMonitoring, setIsMonitoring] = useState(false);
   const recordingCountRef = useRef(1);
   const liveWaveformRef = useRef<HTMLCanvasElement>(null);
 
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
 
-  // Recording
+  // Recording (includes level monitoring via fanout from AudioWorklet during recording)
   const {
     isRecording,
     duration,
     peaks,
     audioBuffer,
+    level: recordingLevel,
+    peakLevel: recordingPeakLevel,
     startRecording,
     stopRecording,
     error: recordError,
@@ -197,8 +215,12 @@ function RecordingApp() {
     samplesPerPixel: 1024,
   });
 
-  // Microphone level monitoring
-  const { level, peakLevel, resetPeak } = useMicrophoneLevel(stream);
+  // Microphone level monitoring (for pre-recording level checking)
+  const { level: monitorLevel, peakLevel: monitorPeakLevel, resetPeak } = useMicrophoneLevel(stream);
+
+  // Use recording levels during recording, monitoring levels otherwise
+  const level = isRecording ? recordingLevel : monitorLevel;
+  const peakLevel = isRecording ? recordingPeakLevel : monitorPeakLevel;
 
   // Draw live waveform as recording progresses
   // Matches the Channel component's rendering approach
@@ -259,6 +281,12 @@ function RecordingApp() {
     await requestAccess(deviceId);
   };
 
+  // Handle test microphone (resume AudioContext to enable monitoring)
+  const handleTestMicrophone = async () => {
+    await resumeGlobalAudioContext();
+    setIsMonitoring(true);
+  };
+
   // Handle recording start/stop
   const handleRecordToggle = async () => {
     if (isRecording) {
@@ -276,6 +304,11 @@ function RecordingApp() {
         recordingCountRef.current += 1;
       }
     } else {
+      // Resume global AudioContext on first user interaction
+      // This ensures VU meter, recording, and playback all work
+      await resumeGlobalAudioContext();
+      setIsMonitoring(true); // Recording also enables monitoring
+
       if (!hasPermission) {
         await requestAccess(selectedDevice);
       }
@@ -300,7 +333,6 @@ function RecordingApp() {
   return (
     <Container>
       <Section>
-        <Title>Audio Recording with AudioWorklet</Title>
         <InfoBox>
           <p>
             <strong>Note:</strong> This example requires HTTPS or localhost. Make sure to grant
@@ -322,6 +354,12 @@ function RecordingApp() {
             disabled={isRecording}
           />
 
+          {stream && !isRecording && !isMonitoring && (
+            <TestButton onClick={handleTestMicrophone}>
+              Test Microphone
+            </TestButton>
+          )}
+
           <RecordButton
             isRecording={isRecording}
             onClick={handleRecordToggle}
@@ -330,7 +368,7 @@ function RecordingApp() {
 
           <RecordingIndicator isRecording={isRecording} duration={duration} />
 
-          {stream && (
+          {stream && (isMonitoring || isRecording) && (
             <VUMeterContainer>
               <Label>Input Level</Label>
               <VUMeter level={level} peakLevel={peakLevel} width={300} height={24} />

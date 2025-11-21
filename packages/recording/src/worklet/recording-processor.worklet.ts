@@ -37,6 +37,7 @@ interface RecordingProcessorMessage {
   samples: Float32Array;
   sampleRate: number;
   channelCount: number;
+  rmsLevel: number; // RMS level for VU meter (0-1)
 }
 
 class RecordingProcessor extends AudioWorkletProcessor {
@@ -128,11 +129,19 @@ class RecordingProcessor extends AudioWorkletProcessor {
     // This simplifies peak generation and waveform display
     const samples = this.buffers[0].slice(0, this.samplesCollected);
 
+    // Calculate RMS level for VU meter
+    let sumSquares = 0;
+    for (let i = 0; i < this.samplesCollected; i++) {
+      sumSquares += samples[i] * samples[i];
+    }
+    const rms = Math.sqrt(sumSquares / this.samplesCollected);
+
     // Send to main thread
     this.port.postMessage({
       samples: samples,
       sampleRate: sampleRate,
       channelCount: this.channelCount,
+      rmsLevel: rms,
     } as RecordingProcessorMessage);
 
     // Reset buffer

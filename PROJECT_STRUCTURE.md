@@ -137,14 +137,22 @@ waveform-playlist/
 
 #### `@waveform-playlist/playout`
 
-- **Purpose:** Audio playback abstraction using Tone.js
+- **Purpose:** Audio playback abstraction using Tone.js + Global AudioContext management
 - **Key class:** `TonePlayout`
+- **Global AudioContext:**
+  - Single AudioContext shared across the entire application
+  - Created on first use, never closed during app lifetime
+  - Used by Tone.js (configured via `Tone.setContext()`)
+  - Used by recording (`useRecording` hook)
+  - Used by monitoring (`useMicrophoneLevel` hook)
+  - Exports: `getGlobalAudioContext()`, `resumeGlobalAudioContext()`, `getGlobalAudioContextState()`, `closeGlobalAudioContext()`
 - **Features:**
   - Play/pause/stop control
   - Seeking
   - Timed segment playback
   - Track mixing
 - **Dependencies:** Tone.js, Core
+- **Location:** `packages/playout/src/audioContext.ts`
 
 #### `@waveform-playlist/loaders`
 
@@ -222,11 +230,11 @@ waveform-playlist/
   └── index.ts           # Public exports
   ```
 - **Key Features:**
-  - **Independent AudioContext** - Uses dedicated context separate from Tone.js playback
+  - **Global AudioContext** - Uses shared global context (same as Tone.js playback)
   - **Live waveform visualization** - Real-time peaks generation during recording
   - **AudioBuffer support** - WaveformTrack accepts both URLs and AudioBuffer objects
   - **Microphone selection** - Enumerate and select input devices
-  - **VU meter** - Real-time audio level monitoring
+  - **VU meter** - Real-time audio level monitoring (planned)
 - **Hooks:**
   - `useRecording` - Complete recording lifecycle management
   - `useMicrophoneAccess` - Device enumeration and permission handling
@@ -826,6 +834,13 @@ See `CLAUDE.md` for architectural decisions and next steps:
 
 **Last Updated:** 2025-11-21
 
+- **Global AudioContext Architecture:** Consolidated to single global AudioContext managed by playout package
+  - `useRecording` now uses global context instead of creating its own
+  - Tone.js configured to use global context via `Tone.setContext()`
+  - All audio operations (playback, recording, monitoring) share one context
+  - Removed `sampleRate` option from `RecordingOptions` (uses global context's sample rate)
+  - Location: `packages/playout/src/audioContext.ts`
+  - Benefits: Simpler architecture, no conflicts between contexts, consistent sample rate
 - **Recording Package Documentation:** Added comprehensive documentation for `@waveform-playlist/recording` optional package (AudioWorklet-based recording with hooks, components, and live waveform visualization)
 - **Context Splitting Architecture:** Documented the 4-context split in `WaveformPlaylistProvider` for performance optimization (PlaybackAnimationContext, PlaylistStateContext, PlaylistControlsContext, PlaylistDataContext)
 - **Continuous Play Toggle Fix:** Fixed toggling Continuous Play checkbox during active playback in both directions (ON and OFF) through context splitting, animation loop restart, and playout rescheduling

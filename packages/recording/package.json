@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/playout": "workspace:*",
     "@waveform-playlist/ui-components": "workspace:*",
     "tone": "^15.0.4"
   },
