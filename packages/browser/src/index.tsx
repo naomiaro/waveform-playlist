@@ -21,11 +21,6 @@ import {
   Playlist,
   Playhead,
   Selection,
-  Annotation as AnnotationComponent,
-  AnnotationBox,
-  AnnotationBoxesWrapper,
-  AnnotationText,
-  AnnotationsTrack,
   Track as TrackComponent,
   PlaylistInfoContext,
   DevicePixelRatioProvider,
@@ -35,6 +30,13 @@ import {
   usePlayoutStatusUpdate,
   secondsToPixels,
 } from '@waveform-playlist/ui-components';
+import {
+  Annotation as AnnotationComponent,
+  AnnotationBox,
+  AnnotationBoxesWrapper,
+  AnnotationText,
+  AnnotationsTrack,
+} from '@waveform-playlist/annotations';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
 

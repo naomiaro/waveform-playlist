@@ -1,0 +1,38 @@
+{
+  "name": "@waveform-playlist/recording",
+  "version": "5.0.0-alpha.0",
+  "description": "Audio recording support for waveform-playlist using AudioWorklet",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["waveform", "audio", "recording", "audioworklet"],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/styled-components": "^5.1.26",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/ui-components": "workspace:*",
+    "tone": "^15.0.4"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "styled-components": "^6.0.0"
+  }
+}
