@@ -891,7 +891,6 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ### Advanced Features (Post-Launch)
 
-- [ ] Crossfades between overlapping clips
 - [ ] Clip grouping (edit multiple clips as one)
 - [ ] Time signatures and tempo changes
 - [ ] Automation lanes (volume, pan)
