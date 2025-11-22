@@ -356,27 +356,37 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           effects,
         });
 
-        // For each track, create a ToneTrack using the first clip
-        // TODO: Full multi-clip playback will be implemented in next phase
+        // For each track, create a ToneTrack with all clips
         tracks.forEach((track, index) => {
           if (track.clips.length > 0) {
-            const firstClip = track.clips[0];
+            // Calculate track start and end times from clips
+            const startTime = Math.min(...track.clips.map(c => c.startTime));
+            const endTime = Math.max(...track.clips.map(c => c.startTime + c.duration));
 
             const trackObj: Track = {
               id: `track-${index}`, // Use consistent index-based ID for track controls
               name: track.name,
-              gain: track.volume, // Use track-level volume, not clip gain
+              gain: track.volume, // Use track-level volume
               muted: track.muted,
               soloed: track.soloed,
               stereoPan: track.pan,
-              startTime: firstClip.startTime,
-              endTime: firstClip.startTime + firstClip.duration,
-              fadeIn: firstClip.fadeIn,
-              fadeOut: firstClip.fadeOut,
+              startTime,
+              endTime,
             };
 
+            // Convert ClipTrack clips to ToneTrack ClipInfo format
+            const clipInfos = track.clips.map(clip => ({
+              buffer: clip.audioBuffer,
+              startTime: clip.startTime,
+              duration: clip.duration,
+              offset: clip.offset,
+              fadeIn: clip.fadeIn,
+              fadeOut: clip.fadeOut,
+              gain: clip.gain,
+            }));
+
             playout.addTrack({
-              buffer: firstClip.audioBuffer,
+              clips: clipInfos,
               track: trackObj,
               effects: track.effects, // Pass track effects
             });
