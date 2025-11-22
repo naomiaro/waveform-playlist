@@ -1,7 +1,7 @@
 import React, { FunctionComponent } from 'react';
 import styled from 'styled-components';
-import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
+import type { DraggableAttributes } from '@dnd-kit/core';
+import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 
 export const CLIP_HEADER_HEIGHT = 22; // Height of the clip header in pixels
 
@@ -75,6 +75,12 @@ export const ClipHeaderPresentational: FunctionComponent<ClipHeaderPresentationa
   );
 };
 
+export interface DragHandleProps {
+  attributes: DraggableAttributes;
+  listeners: SyntheticListenerMap | undefined;
+  setActivatorNodeRef: (element: HTMLElement | null) => void;
+}
+
 export interface ClipHeaderProps {
   clipId: string;
   trackIndex: number;
@@ -84,6 +90,7 @@ export interface ClipHeaderProps {
   borderColor?: string;
   textColor?: string;
   disableDrag?: boolean; // Disable drag behavior (for presentation-only rendering in overlays)
+  dragHandleProps?: DragHandleProps; // Props for drag handle functionality
 }
 
 /**
@@ -102,9 +109,10 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
   borderColor,
   textColor,
   disableDrag = false,
+  dragHandleProps,
 }) => {
-  // Use purely presentational version when drag is disabled to avoid any @dnd-kit conflicts
-  if (disableDrag) {
+  // Use purely presentational version when drag is disabled or no drag handle props
+  if (disableDrag || !dragHandleProps) {
     return (
       <ClipHeaderPresentational
         trackName={trackName}
@@ -115,34 +123,12 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
     );
   }
 
-  const id = `clip-${trackIndex}-${clipIndex}`;
-
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id,
-    data: { clipId, trackIndex, clipIndex },
-  });
-
-  // Apply both transform and opacity - opacity hides original during drag
-  const style = {
-    ...(transform && { transform: CSS.Translate.toString(transform) }),
-    ...(isDragging && { opacity: 0, pointerEvents: 'none' as const }),
-  };
-
-  // Use useEffect to set opacity on parent Clip when dragging
-  React.useEffect(() => {
-    const headerEl = document.querySelector(`[data-clip-id="${clipId}"]`);
-    const clipEl = headerEl?.closest('[data-clip-container="true"]');
-    if (clipEl) {
-      (clipEl as HTMLElement).style.opacity = isDragging ? '0' : '';
-    }
-  }, [isDragging, clipId]);
+  const { attributes, listeners, setActivatorNodeRef } = dragHandleProps;
 
   return (
     <HeaderContainer
-      ref={setNodeRef}
-      style={style}
+      ref={setActivatorNodeRef}
       data-clip-id={clipId}
-      $isDragging={isDragging}
       $backgroundColor={backgroundColor}
       $borderColor={borderColor}
       $interactive={true}

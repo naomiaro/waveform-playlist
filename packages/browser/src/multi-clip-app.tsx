@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
-import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { createTrack, createClip, type ClipTrack } from '@waveform-playlist/core';
@@ -18,8 +18,6 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
 } from './index';
-import { Channel, CLIP_HEADER_HEIGHT, Clip, useTheme } from '@waveform-playlist/ui-components';
-import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 
 const Controls = styled.div`
   display: flex;
@@ -99,24 +97,9 @@ interface PlaylistWithDragProps {
 }
 
 const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
-  const { samplesPerPixel, sampleRate, peaksDataArray, waveHeight } = usePlaylistData();
-  const theme = useTheme();
-  const [activeId, setActiveId] = useState<string | null>(null);
-
-  // Fallback theme colors for DragOverlay (which renders to portal and loses context)
-  // Use default theme colors from Waveform.tsx
-  const themeColors = {
-    waveFillColor: theme?.waveFillColor || '#FFD500',
-    waveOutlineColor: theme?.waveOutlineColor || '#005BBB',
-    waveProgressColor: theme?.waveProgressColor || '#ff0000',
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
+  const { samplesPerPixel, sampleRate } = usePlaylistData();
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveId(null);
     const { active, delta } = event;
 
     // Extract clip metadata from drag data
@@ -155,32 +138,8 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     onTracksChange(newTracks);
   };
 
-  // Get active clip info for drag overlay
-  const activeClip = activeId ? (() => {
-    const [trackIndexStr, clipIndexStr] = activeId.replace('clip-', '').split('-');
-    const trackIndex = parseInt(trackIndexStr, 10);
-    const clipIndex = parseInt(clipIndexStr, 10);
-    const track = tracks[trackIndex];
-
-    if (!track || !peaksDataArray[trackIndex]) return null;
-
-    const clipPeaks = peaksDataArray[trackIndex][clipIndex];
-    if (!clipPeaks) return null;
-
-    return {
-      clipId: clipPeaks.clipId,
-      trackName: clipPeaks.trackName,
-      trackIndex,
-      clipIndex,
-      peaks: clipPeaks.peaks,
-      startTime: clipPeaks.startTime,
-      duration: clipPeaks.duration,
-    };
-  })() : null;
-
   return (
     <DndContext
-      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       modifiers={[restrictToHorizontalAxis]}
     >
@@ -206,46 +165,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
       </Controls>
 
       <Waveform showClipHeaders={true} />
-
-      <DragOverlay dropAnimation={null}>
-        {activeClip ? (() => {
-          // Calculate width to match Clip component's calculation
-          const clipWidth = Math.floor((activeClip.duration * sampleRate) / samplesPerPixel);
-
-          return (
-            <Clip
-              key={`drag-${activeClip.clipId}`}
-              clipId={activeClip.clipId}
-              trackIndex={activeClip.trackIndex}
-              clipIndex={activeClip.clipIndex}
-              trackName={activeClip.trackName}
-              startTime={activeClip.startTime}
-              duration={activeClip.duration}
-              sampleRate={sampleRate}
-              samplesPerPixel={samplesPerPixel}
-              showHeader={true}
-              disableHeaderDrag={true}
-              isOverlay={true}
-            >
-              {activeClip.peaks.data.map((channelPeaks: Peaks, channelIndex: number) => (
-                <Channel
-                  key={channelIndex}
-                  index={channelIndex}
-                  data={channelPeaks}
-                  bits={activeClip.peaks.bits}
-                  length={clipWidth}
-                  progress={0}
-                  waveHeight={waveHeight}
-                  waveFillColor={themeColors.waveFillColor}
-                  waveOutlineColor={themeColors.waveOutlineColor}
-                  waveProgressColor={themeColors.waveProgressColor}
-                  devicePixelRatio={window.devicePixelRatio || 1}
-                />
-              ))}
-            </Clip>
-          );
-        })() : null}
-      </DragOverlay>
     </DndContext>
   );
 };

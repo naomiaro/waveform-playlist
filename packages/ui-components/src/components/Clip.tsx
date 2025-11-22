@@ -1,5 +1,7 @@
 import React, { FunctionComponent, ReactNode } from 'react';
 import styled from 'styled-components';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { ClipHeader, CLIP_HEADER_HEIGHT } from './ClipHeader';
 
 interface ClipContainerProps {
@@ -87,8 +89,26 @@ export const Clip: FunctionComponent<ClipProps> = ({
   // Calculate width based on duration
   const width = Math.floor((duration * sampleRate) / samplesPerPixel);
 
+  // Use draggable only if header is shown and drag is enabled
+  const enableDrag = showHeader && !disableHeaderDrag && !isOverlay;
+
+  const draggableId = `clip-${trackIndex}-${clipIndex}`;
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({
+    id: draggableId,
+    data: { clipId, trackIndex, clipIndex },
+    disabled: !enableDrag,
+  });
+
+  // Apply transform for dragging
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 1000 : undefined,
+  } : undefined;
+
   return (
     <ClipContainer
+      ref={setNodeRef}
+      style={style}
       className={className}
       $left={left}
       $width={width}
@@ -105,6 +125,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
           borderColor={clipHeaderBorderColor}
           textColor={clipHeaderTextColor}
           disableDrag={disableHeaderDrag}
+          dragHandleProps={enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined}
         />
       )}
       <ChannelsWrapper $isOverlay={isOverlay}>
