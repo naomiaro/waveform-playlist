@@ -57,6 +57,7 @@ export interface WaveformProps {
   annotationControls?: any[];
   annotationListConfig?: any;
   className?: string;
+  showClipHeaders?: boolean; // Show draggable headers on clips for multi-clip editing (requires @dnd-kit)
 }
 
 /**
@@ -70,6 +71,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   annotationControls,
   annotationListConfig,
   className,
+  showClipHeaders = false,
 }) => {
   // Split context usage for performance
   const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
@@ -369,6 +371,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                       backgroundColor={theme.waveOutlineColor}
                       offset={0}
                       width={tracksFullWidth}
+                      hasClipHeaders={showClipHeaders}
                     >
                       {trackClipPeaks.map((clip, clipIndex) => {
                         const peaksData = clip.peaks;
@@ -377,10 +380,15 @@ export const Waveform: React.FC<WaveformProps> = ({
                         return (
                           <Clip
                             key={`${trackIndex}-${clipIndex}`}
+                            clipId={clip.clipId}
+                            trackIndex={trackIndex}
+                            clipIndex={clipIndex}
+                            trackName={clip.trackName}
                             startTime={clip.startTime}
                             duration={clip.duration}
                             sampleRate={sampleRate}
                             samplesPerPixel={samplesPerPixel}
+                            showHeader={showClipHeaders}
                           >
                             {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
                               <SmartChannel

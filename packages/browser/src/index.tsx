@@ -1279,7 +1279,14 @@ export type { PlaylistConfig, TrackConfig };
 export { Tone };
 
 // Export new flexible/headless API
-export { WaveformPlaylistProvider, useWaveformPlaylist } from './WaveformPlaylistContext';
+export {
+  WaveformPlaylistProvider,
+  useWaveformPlaylist,
+  usePlaybackAnimation,
+  usePlaylistState,
+  usePlaylistControls,
+  usePlaylistData,
+} from './WaveformPlaylistContext';
 export type { WaveformPlaylistContextValue, WaveformTrack, TrackState } from './WaveformPlaylistContext';
 export {
   PlayButton,

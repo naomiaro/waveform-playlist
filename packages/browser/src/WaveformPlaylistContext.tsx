@@ -11,6 +11,7 @@ import { useTimeFormat, useZoomControls, useMasterVolume } from './hooks';
 // Types
 export interface ClipPeaks {
   clipId: string;
+  trackName: string;
   peaks: PeakData;
   startTime: number;
   duration: number;
@@ -436,6 +437,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         return {
           clipId: clip.id,
+          trackName: track.name,
           peaks,
           startTime: clip.startTime,
           duration: clip.duration,

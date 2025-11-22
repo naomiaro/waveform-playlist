@@ -258,89 +258,136 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ## ✂️ Phase 3: Advanced Editing Features
 
-**Goal:** Implement professional editing operations
+**Goal:** Implement professional Audacity-style clip editing
 
-### 3.1 Dragging Clips
+### Architecture: Audacity-Style Direct Manipulation
 
-**User Story:** As a user, I want to drag a clip horizontally to reposition it in time.
+**UX Pattern:** Visual clips on the waveform have interactive regions for different operations:
+- **Clip header** (title bar) - Drag to move entire clip along timeline
+- **Clip boundaries** (left/right edges) - Drag to trim (adjust cue in/out)
+- **Clip body** - Click to select, double-click to edit properties
+
+**NOT** a separate drag list - all interactions happen directly on the waveform visualization.
+
+### 3.1a Clip Headers & Drag to Move (Audacity-style)
+
+**User Story:** As a user, I want to drag a clip's header to reposition it in time on the timeline.
 
 #### Tasks
 
-- [ ] **Install @dnd-kit**
-  ```bash
-  pnpm add @dnd-kit/core @dnd-kit/utilities
-  ```
+- [x] **Install @dnd-kit** ✅
+  - `@dnd-kit/core` and `@dnd-kit/utilities` installed
   - Size: 13KB gzipped
   - Modern, accessible, performant
 
-- [ ] **Create ClipDragOverlay component**
-  - Location: `packages/ui-components/src/components/ClipDragOverlay.tsx`
-  - Transparent div positioned over each clip
-  - Uses `useDraggable` from @dnd-kit
-  - Shows drag cursor on hover
+- [ ] **Remove ClipsPanel from multi-clip demo**
+  - Location: `packages/browser/src/multi-clip-app.tsx`
+  - Delete ClipsPanel styled component and list UI
+  - Remove DraggableClip component (was for separate list)
+  - Keep DndContext wrapper for future use
 
-- [ ] **Implement drag logic**
-  - Location: `packages/browser/src/hooks/useClipDragging.ts`
-  - Calculate new startTime from pixel position
-  - Snap to grid (optional, configurable)
+- [ ] **Create ClipHeader component**
+  - Location: `packages/ui-components/src/components/ClipHeader.tsx`
+  - Renders at top of each Clip component
+  - Shows clip name/number
+  - Height: 20-24px (like Audacity)
+  - Background: Semi-transparent overlay
+  - Uses `useDraggable` from @dnd-kit
+  - Cursor: `grab` on hover, `grabbing` when dragging
+
+- [ ] **Integrate ClipHeader into Clip component**
+  - Location: `packages/ui-components/src/components/Clip.tsx`
+  - Render ClipHeader as first child
+  - Pass clip metadata (name, id, index)
+  - Handle pointer-events correctly
+
+- [ ] **Implement drag-to-move logic**
+  - Location: `packages/browser/src/WaveformPlaylistContext.tsx`
+  - Handle DragEndEvent from @dnd-kit
+  - Convert pixel delta to time shift
+  - Update clip's startTime
   - Prevent negative startTime
-  - Update clip position in context
+  - Optional: Snap to grid
+
+- [ ] **Handle ClickOverlay conflict**
+  - Location: `packages/ui-components/src/components/Playlist.tsx`
+  - Stop propagation of drag events to ClickOverlay
+  - Or: Add pointer-events logic based on what's being hovered
+  - Or: Use @dnd-kit sensors to prevent selection during drag
 
 - [ ] **Visual feedback during drag**
   - Ghost outline at original position
   - Clip moves in real-time with mouse
-  - Snap indicators (grid lines)
+  - Semi-transparent while dragging
+  - Optional: Snap indicators (grid lines)
 
-- [ ] **Example: Draggable clips**
-  - Location: `packages/browser/src/draggable-clips-app.tsx`
-  - Demo with 3 tracks, 2-3 clips each
-  - Instructions overlay
-  - Show snap-to-grid toggle
+- [ ] **Update multi-clip demo**
+  - Location: `packages/browser/src/multi-clip-app.tsx`
+  - Remove ClipsPanel UI
+  - Instructions: "Drag clip headers to move clips along timeline"
+  - Show clip headers on all clips
 
 **Files to Create:**
-- `packages/ui-components/src/components/ClipDragOverlay.tsx`
-- `packages/browser/src/hooks/useClipDragging.ts`
-- `packages/browser/src/draggable-clips-app.tsx`
-- `ghpages/_examples/18draggable-clips.html`
+- `packages/ui-components/src/components/ClipHeader.tsx`
 
-### 3.2 Trimming Clips
+**Files to Modify:**
+- `packages/browser/src/multi-clip-app.tsx` (remove ClipsPanel)
+- `packages/ui-components/src/components/Clip.tsx` (integrate ClipHeader)
+- `packages/browser/src/WaveformPlaylistContext.tsx` (drag logic)
+- `packages/ui-components/src/components/Playlist.tsx` (handle ClickOverlay conflict)
 
-**User Story:** As a user, I want to drag the left/right edge of a clip to adjust its start/end points.
+### 3.1b Clip Boundaries & Drag to Trim (Audacity-style)
+
+**User Story:** As a user, I want to drag the left/right edge of a clip to adjust its cue in/out (trim).
 
 #### Tasks
 
-- [ ] **Create TrimHandle component**
-  - Location: `packages/ui-components/src/components/TrimHandle.tsx`
-  - Small drag handle at clip edges
-  - Visual: 8px wide bar with icon (⋮⋮)
-  - Shows on clip hover
-  - Different cursor: `col-resize`
+- [ ] **Create ClipBoundary component**
+  - Location: `packages/ui-components/src/components/ClipBoundary.tsx`
+  - Renders at left and right edges of clip
+  - Width: 6-8px hit area (invisible or subtle)
+  - Visual feedback on hover: Highlight edge
+  - Cursor: `col-resize`
+  - Uses `useDraggable` from @dnd-kit with custom sensor
 
-- [ ] **Implement trim logic**
-  - Location: `packages/browser/src/hooks/useClipTrimming.ts`
-  - Dragging left handle: Adjust `offset` and `startTime`
-  - Dragging right handle: Adjust `duration`
+- [ ] **Integrate ClipBoundary into Clip component**
+  - Location: `packages/ui-components/src/components/Clip.tsx`
+  - Render left and right boundaries
+  - Position absolutely at edges
+  - Show on clip hover (optional)
+
+- [ ] **Implement drag-to-trim logic**
+  - Location: `packages/browser/src/WaveformPlaylistContext.tsx`
+  - Dragging left boundary:
+    - Increase `offset` (trim start of audio)
+    - Decrease `duration` by same amount
+    - Increase `startTime` (clip moves right visually)
+  - Dragging right boundary:
+    - Decrease `duration` (trim end of audio)
+    - `offset` and `startTime` stay the same
   - Constraints:
-    - Can't trim past audio buffer bounds
+    - Can't trim past audio buffer bounds (`offset + duration <= buffer.duration`)
     - Minimum clip duration (e.g., 0.1s)
-    - Can't overlap with adjacent clips (optional collision)
+    - Can't overlap with adjacent clips (optional)
 
 - [ ] **Visual feedback during trim**
-  - Dimmed region shows trimmed audio
+  - Dimmed region shows trimmed portion of audio
   - Waveform inside clip updates in real-time
-  - Display duration/offset as tooltip
+  - Tooltip shows duration/offset values
+  - Cursor shows resize direction
 
-- [ ] **Example: Trimming demo**
-  - Location: Update `draggable-clips-app.tsx`
+- [ ] **Update multi-clip demo**
+  - Location: `packages/browser/src/multi-clip-app.tsx`
+  - Instructions: "Drag clip edges to trim (adjust cue in/out)"
   - Show trim handles on hover
-  - Instructions for trim vs drag
 
 **Files to Create:**
-- `packages/ui-components/src/components/TrimHandle.tsx`
-- `packages/browser/src/hooks/useClipTrimming.ts`
+- `packages/ui-components/src/components/ClipBoundary.tsx`
 
 **Files to Modify:**
-- `packages/browser/src/draggable-clips-app.tsx`
+- `packages/ui-components/src/components/Clip.tsx` (integrate ClipBoundary)
+- `packages/browser/src/WaveformPlaylistContext.tsx` (trim logic)
+- `packages/browser/src/multi-clip-app.tsx` (instructions)
 
 ### 3.3 Splitting Clips
 
@@ -937,14 +984,16 @@ See `multi-clip-app.tsx` for complete implementation example.
 5. **Phase 4: Performance** - Scale to professional use cases
 6. **Phase 5: Polish** - Production-ready UX
 
-**Next Immediate Steps (Phase 3.1 - Dragging Clips):**
+**Next Immediate Steps (Phase 3.1a - Audacity-Style Clip Dragging):**
 
-1. Install @dnd-kit (13KB gzipped, modern drag-and-drop)
-2. Create ClipDragOverlay component with useDraggable hook
-3. Implement drag logic with pixel-to-time conversion
-4. Add snap-to-grid support (optional, configurable)
-5. Visual feedback (ghost outline, real-time movement)
-6. Update multi-clip demo to show draggable clips
+1. ✅ Install @dnd-kit (13KB gzipped, modern drag-and-drop) - DONE
+2. Remove ClipsPanel from multi-clip demo (separate list UI)
+3. Create ClipHeader component (title bar on each clip)
+4. Integrate ClipHeader into Clip component
+5. Implement drag-to-move logic (header drag → change startTime)
+6. Handle ClickOverlay conflict (prevent selection during drag)
+7. Add visual feedback (ghost outline, real-time movement)
+8. Update multi-clip demo with instructions
 
 ---
 

@@ -17,15 +17,32 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["waveform", "audio", "react", "components"],
+  "keywords": [
+    "waveform",
+    "audio",
+    "react",
+    "components"
+  ],
   "author": "Naomi Aro",
   "license": "MIT",
   "peerDependencies": {
     "react": ">=17.0.0",
     "react-dom": ">=17.0.0",
-    "styled-components": ">=5.0.0"
+    "styled-components": ">=5.0.0",
+    "@dnd-kit/core": "^6.0.0",
+    "@dnd-kit/utilities": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@dnd-kit/core": {
+      "optional": true
+    },
+    "@dnd-kit/utilities": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/utilities": "^3.2.2",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@types/styled-components": "^5.1.26",
@@ -36,13 +53,13 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@waveform-playlist/core": "workspace:*",
-    "@waveform-playlist/playout": "workspace:*",
-    "@waveform-playlist/loaders": "workspace:*",
-    "@waveform-playlist/webaudio-peaks": "workspace:*",
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
+    "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/loaders": "workspace:*",
+    "@waveform-playlist/playout": "workspace:*",
+    "@waveform-playlist/webaudio-peaks": "workspace:*",
     "react-async-hook": "^4.0.0",
     "waveform-data": "^4.4.0"
   }

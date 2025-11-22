@@ -697,6 +697,7 @@ const FlexiblePlaylistApp: React.FC = () => {
               </CustomTimestamp>
             );
           }}
+          showClipHeaders={true}
         />
       </MainContent>
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
+import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { createTrack, createClip, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
+  usePlaylistData,
   Waveform,
   PlayButton,
   PauseButton,
@@ -35,6 +37,7 @@ const ControlGroup = styled.div`
     border-right: none;
   }
 `;
+
 
 // Audio files - each file is loaded and decoded once
 // Files can be referenced by multiple clips across different tracks
@@ -85,6 +88,116 @@ const trackConfigs = [
     ],
   },
 ];
+
+// Inner component that handles drag events and has access to playlist context
+interface PlaylistWithDragProps {
+  tracks: ClipTrack[];
+  onTracksChange: (tracks: ClipTrack[]) => void;
+}
+
+const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
+  const { samplesPerPixel, sampleRate } = usePlaylistData();
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, delta } = event;
+
+    // Extract clip metadata from drag data
+    const { trackIndex, clipIndex } = active.data.current as {
+      clipId: string;
+      trackIndex: number;
+      clipIndex: number;
+    };
+
+    // Convert pixel delta to time (seconds)
+    const timeDelta = (delta.x * samplesPerPixel) / sampleRate;
+
+    // Create new tracks array with updated clip position
+    const newTracks = tracks.map((track, tIdx) => {
+      if (tIdx !== trackIndex) return track;
+
+      // Update the specific clip in this track
+      const newClips = track.clips.map((clip, cIdx) => {
+        if (cIdx !== clipIndex) return clip;
+
+        // Calculate new start time, ensuring it doesn't go negative
+        const newStartTime = Math.max(0, clip.startTime + timeDelta);
+
+        return {
+          ...clip,
+          startTime: newStartTime,
+        };
+      });
+
+      return {
+        ...track,
+        clips: newClips,
+      };
+    });
+
+    onTracksChange(newTracks);
+  };
+
+  // Get active clip info for drag overlay
+  const activeClip = activeId ? (() => {
+    const [trackIndexStr, clipIndexStr] = activeId.replace('clip-', '').split('-');
+    const trackIndex = parseInt(trackIndexStr, 10);
+    const clipIndex = parseInt(clipIndexStr, 10);
+    const track = tracks[trackIndex];
+    return track ? { trackName: track.name, trackIndex, clipIndex } : null;
+  })() : null;
+
+  return (
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <Controls>
+        <ControlGroup>
+          <PlayButton />
+          <PauseButton />
+          <StopButton />
+        </ControlGroup>
+        <ControlGroup>
+          <ZoomInButton />
+          <ZoomOutButton />
+        </ControlGroup>
+        <ControlGroup>
+          <AudioPosition />
+        </ControlGroup>
+        <ControlGroup>
+          <AutomaticScrollCheckbox />
+        </ControlGroup>
+        <ControlGroup>
+          <MasterVolumeControl />
+        </ControlGroup>
+      </Controls>
+
+      <Waveform showClipHeaders={true} />
+
+      <DragOverlay>
+        {activeClip ? (
+          <div
+            style={{
+              padding: '4px 8px',
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: '#fff',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'grabbing',
+              opacity: 0.8,
+            }}
+          >
+            {activeClip.trackName}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+};
 
 const MultiClipExample: React.FC = () => {
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
@@ -183,39 +296,16 @@ const MultiClipExample: React.FC = () => {
   }
 
   return (
-    <>
-      <WaveformPlaylistProvider
-        tracks={tracks}
-        samplesPerPixel={1024}
-        mono={true}
-        waveHeight={100}
-        automaticScroll={true}
-        controls={{ show: true, width: 200 }}
-      >
-        <Controls>
-          <ControlGroup>
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-          </ControlGroup>
-          <ControlGroup>
-            <ZoomInButton />
-            <ZoomOutButton />
-          </ControlGroup>
-          <ControlGroup>
-            <AudioPosition />
-          </ControlGroup>
-          <ControlGroup>
-            <AutomaticScrollCheckbox />
-          </ControlGroup>
-          <ControlGroup>
-            <MasterVolumeControl />
-          </ControlGroup>
-        </Controls>
-
-        <Waveform />
-      </WaveformPlaylistProvider>
-    </>
+    <WaveformPlaylistProvider
+      tracks={tracks}
+      samplesPerPixel={1024}
+      mono={true}
+      waveHeight={100}
+      automaticScroll={true}
+      controls={{ show: true, width: 200 }}
+    >
+      <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />
+    </WaveformPlaylistProvider>
   );
 };
 

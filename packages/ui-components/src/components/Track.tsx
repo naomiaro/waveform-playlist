@@ -2,6 +2,7 @@ import React, { FunctionComponent, ReactNode } from 'react';
 import styled from 'styled-components';
 import { usePlaylistInfo } from '../contexts/PlaylistInfo';
 import { useTrackControls } from '../contexts/TrackControls';
+import { CLIP_HEADER_HEIGHT } from './Clip';
 
 interface ContainerProps {
   readonly $numChannels: number;
@@ -10,11 +11,15 @@ interface ContainerProps {
   readonly $width?: number;
 }
 
-const Container = styled.div.attrs<ContainerProps>((props) => ({
+interface ContainerWithHeaderProps extends ContainerProps {
+  readonly $hasClipHeaders: boolean;
+}
+
+const Container = styled.div.attrs<ContainerWithHeaderProps>((props) => ({
   style: {
-    height: `${props.$waveHeight * props.$numChannels}px`,
+    height: `${props.$waveHeight * props.$numChannels + (props.$hasClipHeaders ? CLIP_HEADER_HEIGHT : 0)}px`,
   },
-}))<ContainerProps>`
+}))<ContainerWithHeaderProps>`
   position: relative;
   display: flex;
   ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
@@ -59,6 +64,7 @@ export interface TrackProps {
   backgroundColor?: string;
   offset?: number; // Offset in pixels to shift the waveform right
   width?: number; // Total width of the track (for consistent backgrounds across tracks)
+  hasClipHeaders?: boolean; // Whether clips have headers (for multi-clip editing)
 }
 
 export const Track: FunctionComponent<TrackProps> = ({
@@ -68,6 +74,7 @@ export const Track: FunctionComponent<TrackProps> = ({
   backgroundColor,
   offset = 0,
   width,
+  hasClipHeaders = false,
 }) => {
   const {
     waveHeight,
@@ -81,6 +88,7 @@ export const Track: FunctionComponent<TrackProps> = ({
       $waveHeight={waveHeight}
       $controlWidth={show ? controlWidth : 0}
       $width={width}
+      $hasClipHeaders={hasClipHeaders}
     >
       <ControlsWrapper $controlWidth={show ? controlWidth : 0}>
         {controls}
