@@ -26,8 +26,8 @@ import {
   ZoomInButton,
   ZoomOutButton,
   AutomaticScrollCheckbox,
-  type WaveformTrack,
 } from './components';
+import { ClipTrack, createTrack, createClip } from '@waveform-playlist/core';
 import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
 
 const Container = styled.div`
@@ -191,7 +191,7 @@ const TestButton = styled.button`
 `;
 
 function RecordingApp() {
-  const [tracks, setTracks] = useState<WaveformTrack[]>([]);
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>();
   const [isMonitoring, setIsMonitoring] = useState(false);
   const recordingCountRef = useRef(1);
@@ -289,11 +289,25 @@ function RecordingApp() {
     if (isRecording) {
       const buffer = await stopRecording();
       if (buffer) {
-        // Add recorded track to playlist
-        const newTrack: WaveformTrack = {
-          src: buffer,
+        // Create clip from recorded buffer
+        const clip = createClip({
+          audioBuffer: buffer,
+          startTime: 0,
+          duration: buffer.duration,
+          offset: 0,
           name: `Recording ${recordingCountRef.current}`,
-        };
+        });
+
+        // Create track with single clip
+        const newTrack = createTrack({
+          name: `Recording ${recordingCountRef.current}`,
+          clips: [clip],
+          muted: false,
+          soloed: false,
+          volume: 1,
+          pan: 0,
+        });
+
         setTracks([...tracks, newTrack]);
         recordingCountRef.current += 1;
       }
@@ -386,19 +400,20 @@ function RecordingApp() {
               No recordings yet. Click the Record button to start recording.
             </p>
           ) : (
-            tracks.map((track, index) => (
-              <TrackItem key={index}>
-                <TrackInfo>
-                  <TrackName>{track.name || 'Untitled'}</TrackName>
-                  <TrackDuration>
-                    {typeof track.src === 'string'
-                      ? 'Unknown duration'
-                      : formatDuration(track.src.duration)}
-                  </TrackDuration>
-                </TrackInfo>
-                <DeleteButton onClick={() => handleDeleteTrack(index)}>Delete</DeleteButton>
-              </TrackItem>
-            ))
+            tracks.map((track, index) => {
+              const firstClip = track.clips[0];
+              const duration = firstClip ? firstClip.audioBuffer.duration : 0;
+
+              return (
+                <TrackItem key={index}>
+                  <TrackInfo>
+                    <TrackName>{track.name || 'Untitled'}</TrackName>
+                    <TrackDuration>{formatDuration(duration)}</TrackDuration>
+                  </TrackInfo>
+                  <DeleteButton onClick={() => handleDeleteTrack(index)}>Delete</DeleteButton>
+                </TrackItem>
+              );
+            })
           )}
         </TrackList>
       </Section>

@@ -17,3 +17,6 @@ export { useWaveformPlaylist } from './useWaveformPlaylist';
 export type { WaveformPlaylistControls, UseWaveformPlaylistProps } from './useWaveformPlaylist';
 
 export { useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain } from './useAudioEffects';
+
+export { useAudioTracks } from './useAudioTracks';
+export type { AudioTrackConfig } from './useAudioTracks';

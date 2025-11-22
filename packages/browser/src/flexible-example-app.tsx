@@ -20,6 +20,7 @@ import {
   Waveform,
   useWaveformPlaylist,
 } from './index';
+import { useAudioTracks } from './hooks';
 
 // Custom styled components for layout with polished styling
 const AppContainer = styled.div`
@@ -734,8 +735,8 @@ const theme = {
   selectionColor: 'rgba(231, 76, 60, 0.5)', // Light red selection for contrast with blue waveforms
 };
 
-// Tracks configuration
-const tracks = [
+// Audio configs - will be loaded with useAudioTracks hook
+const audioConfigs = [
   {
     src: 'media/audio/Vocals30.mp3',
     name: 'Vocals',
@@ -754,16 +755,34 @@ const tracks = [
   },
 ];
 
-// Initialize the app
-export function initFlexibleExampleApp() {
-  const container = document.getElementById('playlist');
-  if (!container) {
-    console.error('Playlist container not found');
-    return;
+// Wrapper component that loads audio tracks
+const FlexibleExampleAppWithAudio: React.FC = () => {
+  // Use useMemo to prevent re-creating audioConfigs on every render
+  const configs = React.useMemo(() => audioConfigs, []);
+
+  const { tracks, loading, error } = useAudioTracks(configs);
+
+  if (loading) {
+    return (
+      <AppContainer>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          Loading audio tracks...
+        </div>
+      </AppContainer>
+    );
   }
 
-  const root = createRoot(container);
-  root.render(
+  if (error) {
+    return (
+      <AppContainer>
+        <div style={{ padding: '2rem', color: 'red' }}>
+          Error loading audio: {error}
+        </div>
+      </AppContainer>
+    );
+  }
+
+  return (
     <WaveformPlaylistProvider
       tracks={tracks}
       timescale={true}
@@ -780,6 +799,18 @@ export function initFlexibleExampleApp() {
       <FlexiblePlaylistApp />
     </WaveformPlaylistProvider>
   );
+};
+
+// Initialize the app
+export function initFlexibleExampleApp() {
+  const container = document.getElementById('playlist');
+  if (!container) {
+    console.error('Playlist container not found');
+    return;
+  }
+
+  const root = createRoot(container);
+  root.render(<FlexibleExampleAppWithAudio />);
 }
 
 // Auto-initialize if DOM is ready

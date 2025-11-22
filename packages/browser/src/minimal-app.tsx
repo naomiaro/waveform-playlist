@@ -18,7 +18,7 @@ import {
   StopButton,
   AudioPosition,
 } from './components';
-import { Track } from '@waveform-playlist/core';
+import { useAudioTracks } from './hooks';
 
 const Controls = styled.div`
   display: flex;
@@ -30,17 +30,42 @@ const Controls = styled.div`
   margin-bottom: 1.5rem;
 `;
 
+const Container = styled.div`
+  max-width: 1400px;
+  margin: 0 auto;
+`;
+
 function MinimalApp() {
-  // Define your track
-  const tracks: Track[] = [
+  // Define your track configuration - use useMemo to prevent re-creating on every render
+  const audioConfigs = React.useMemo(() => [
     {
       src: 'media/audio/Vocals30.mp3',
       name: 'Vocals',
-      gain: 1,
-      muted: false,
-      stereoPan: 0,
     },
-  ];
+  ], []);
+
+  // Load audio tracks and convert to ClipTrack format
+  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+
+  if (loading) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          Loading audio...
+        </div>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', color: 'red' }}>
+          Error loading audio: {error}
+        </div>
+      </Container>
+    );
+  }
 
   return (
     <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>

@@ -13,6 +13,7 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
 } from './components';
+import { useAudioTracks } from './hooks';
 
 // Theme for waveform colors
 const theme = {
@@ -23,7 +24,7 @@ const theme = {
 };
 
 // Stem tracks configuration
-const tracks = [
+const audioConfigs = [
   {
     src: 'media/audio/Vocals30.mp3',
     name: 'Vocals',
@@ -71,6 +72,29 @@ const ControlGroup = styled.div`
 `;
 
 function StemTracksApp() {
+  // Load audio tracks and convert to ClipTrack format
+  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+
+  if (loading) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          Loading audio tracks...
+        </div>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', color: 'red' }}>
+          Error loading audio: {error}
+        </div>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <WaveformPlaylistProvider

@@ -16,8 +16,8 @@ import {
   AutomaticScrollCheckbox,
   AudioPosition,
 } from './components';
-import type { Track } from '@waveform-playlist/core';
 import { useMasterAnalyser, useTrackAutoWah, useTrackReverb } from './hooks/useAudioEffects';
+import { useAudioTracks } from './hooks';
 
 const Container = styled.div`
   display: flex;
@@ -161,8 +161,8 @@ const EffectsApp: React.FC = () => {
   // const autoWahEffect2 = useTrackAutoWah({ baseFrequency: 100 });
   // const chainedEffect = useEffectsChain([reverbEffect, autoWahEffect2]);
 
-  // Track configurations with effects
-  const tracks: Track[] = [
+  // Track configurations with effects - useMemo to prevent re-creating on every render
+  const audioConfigs = React.useMemo(() => [
     {
       src: 'media/audio/Vocals30.mp3',
       name: 'Vocals',
@@ -182,7 +182,18 @@ const EffectsApp: React.FC = () => {
       name: 'Drums',
       effects: drumsReverbEffect,
     },
-  ];
+  ], [autoWahEffect, guitarReverbEffect, drumsReverbEffect]);
+
+  // Load audio tracks and convert to ClipTrack format
+  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+
+  if (loading) {
+    return <Container><div style={{ padding: '2rem', textAlign: 'center' }}>Loading audio tracks...</div></Container>;
+  }
+
+  if (error) {
+    return <Container><div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error}</div></Container>;
+  }
 
   return (
     <WaveformPlaylistProvider

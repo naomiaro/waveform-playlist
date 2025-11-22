@@ -291,8 +291,7 @@ export const Waveform: React.FC<WaveformProps> = ({
             className={className}
           >
             <>
-              {peaksDataArray.map((peaksData, trackIndex) => {
-                const width = peaksData.length;
+              {peaksDataArray.map((trackClipPeaks, trackIndex) => {
                 const trackState = trackStates[trackIndex] || {
                   muted: false,
                   soloed: false,
@@ -350,6 +349,17 @@ export const Waveform: React.FC<WaveformProps> = ({
                     </SliderWrapper>
                   </Controls>
                 );
+
+                // For now, render only the first clip per track (multi-clip rendering comes next)
+                // This maintains backward compatibility with single-clip tracks
+                const firstClip = trackClipPeaks[0];
+
+                if (!firstClip) {
+                  return null; // Skip tracks with no clips
+                }
+
+                const peaksData = firstClip.peaks;
+                const width = peaksData.length;
 
                 return (
                   <TrackControlsContext.Provider key={trackIndex} value={trackControls}>

@@ -76,3 +76,6 @@ export enum InteractionState {
   FadeIn = 'fadein',
   FadeOut = 'fadeout',
 }
+
+// Export clip-based model types
+export * from './clip';

@@ -25,7 +25,6 @@ export const TimeInput: React.FC<TimeInputProps> = ({
   // Update display value when value or format changes
   useEffect(() => {
     const formatted = formatTime(value, format);
-    console.log(`TimeInput (${id}): value or format changed`, { value, format, formatted });
     setDisplayValue(formatted);
   }, [value, format, id]);
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
-import { type Track } from '@waveform-playlist/core';
+import { type Track, type ClipTrack, type AudioClip } from '@waveform-playlist/core';
 import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData } from '@waveform-playlist/webaudio-peaks';
@@ -9,8 +9,19 @@ import { parseAeneas } from '@waveform-playlist/annotations';
 import { useTimeFormat, useZoomControls, useMasterVolume } from './hooks';
 
 // Types
+export interface ClipPeaks {
+  clipId: string;
+  peaks: PeakData;
+  startTime: number;
+  duration: number;
+}
+
+export type TrackClipPeaks = ClipPeaks[];
+
+// Legacy WaveformTrack type - kept for reference but deprecated
+// @deprecated Use ClipTrack from @waveform-playlist/core instead
 export interface WaveformTrack {
-  src: string | AudioBuffer; // Support both URL strings and AudioBuffer objects
+  src: string | AudioBuffer;
   name?: string;
   effects?: TrackEffectsFunction;
 }
@@ -28,7 +39,7 @@ export interface WaveformPlaylistContextValue {
   currentTime: number;
   duration: number;
   audioBuffers: AudioBuffer[];
-  peaksDataArray: PeakData[];
+  peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
   trackStates: TrackState[];
   annotations: AnnotationData[];
   activeAnnotationId: string | null;
@@ -155,7 +166,7 @@ export interface PlaylistControlsContextValue {
 export interface PlaylistDataContextValue {
   duration: number;
   audioBuffers: AudioBuffer[];
-  peaksDataArray: PeakData[];
+  peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
   trackStates: TrackState[];
   sampleRate: number;
   waveHeight: number;
@@ -180,7 +191,7 @@ const PlaylistDataContext = createContext<PlaylistDataContextValue | null>(null)
 const WaveformPlaylistContext = createContext<WaveformPlaylistContextValue | null>(null);
 
 export interface WaveformPlaylistProviderProps {
-  tracks: WaveformTrack[];
+  tracks: ClipTrack[]; // Updated to use clip-based model
   timescale?: boolean;
   mono?: boolean;
   waveHeight?: number;
@@ -231,7 +242,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [audioBuffers, setAudioBuffers] = useState<AudioBuffer[]>([]);
-  const [peaksDataArray, setPeaksDataArray] = useState<PeakData[]>([]);
+  const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]); // Updated for clip-based peaks
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
@@ -303,65 +314,73 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     samplesPerPixelRef.current = newSamplesPerPixel;
   }, [samplesPerPixel, audioBuffers, controls]);
 
-  // Load audio buffers (only when tracks change)
+  // Load audio from clips (only when tracks change)
   useEffect(() => {
     if (tracks.length === 0) return;
 
     const loadAudio = async () => {
       try {
-        const audioContext = Tone.getContext().rawContext as AudioContext;
+        // Extract all audio buffers from clips
+        // For now, collect the first clip's buffer from each track
+        const buffers: AudioBuffer[] = [];
 
-        const loadPromises = tracks.map(async (track, index) => {
-          let buffer: AudioBuffer;
-
-          // Handle both URL strings and AudioBuffer objects
-          if (typeof track.src === 'string') {
-            const response = await fetch(track.src);
-            const arrayBuffer = await response.arrayBuffer();
-            buffer = await audioContext.decodeAudioData(arrayBuffer);
-          } else {
-            // track.src is already an AudioBuffer
-            buffer = track.src;
+        tracks.forEach((track) => {
+          if (track.clips.length > 0) {
+            // Use first clip's buffer for now (full multi-clip support comes in next phase)
+            buffers.push(track.clips[0].audioBuffer);
           }
-
-          return { buffer, track, index };
         });
 
-        const loadedTracks = await Promise.all(loadPromises);
-
-        const buffers = loadedTracks.map(t => t.buffer);
-        const maxDuration = Math.max(...buffers.map(b => b.duration));
+        // Calculate total timeline duration from all clips across all tracks
+        let maxDuration = 0;
+        tracks.forEach((track) => {
+          track.clips.forEach((clip) => {
+            const clipEnd = clip.startTime + clip.duration;
+            maxDuration = Math.max(maxDuration, clipEnd);
+          });
+        });
 
         setAudioBuffers(buffers);
         setDuration(maxDuration);
 
-        setTrackStates(tracks.map(() => ({
-          muted: false,
-          soloed: false,
-          volume: 1.0,
-          pan: 0,
+        // Initialize track states from ClipTrack properties
+        setTrackStates(tracks.map((track) => ({
+          muted: track.muted,
+          soloed: track.soloed,
+          volume: track.volume,
+          pan: track.pan,
         })));
 
+        // Create playout with clips
         const playout = new TonePlayout({
           effects,
         });
 
-        loadedTracks.forEach(({ buffer, track }, index) => {
-          const trackObj: Track = {
-            id: `track-${index}`,
-            name: track.name || `Audio Track ${index + 1}`,
-            gain: 1,
-            muted: false,
-            soloed: false,
-            stereoPan: 0,
-            startTime: 0,
-          };
+        // For each track, create a ToneTrack using the first clip
+        // TODO: Full multi-clip playback will be implemented in next phase
+        tracks.forEach((track, index) => {
+          if (track.clips.length > 0) {
+            const firstClip = track.clips[0];
 
-          playout.addTrack({
-            buffer,
-            track: trackObj,
-            effects: track.effects,
-          });
+            const trackObj: Track = {
+              id: track.id,
+              name: track.name,
+              gain: firstClip.gain,
+              muted: track.muted,
+              soloed: track.soloed,
+              stereoPan: track.pan,
+              startTime: firstClip.startTime,
+              endTime: firstClip.startTime + firstClip.duration,
+              fadeIn: firstClip.fadeIn,
+              fadeOut: firstClip.fadeOut,
+            };
+
+            playout.addTrack({
+              buffer: firstClip.audioBuffer,
+              track: trackObj,
+              effects: track.effects, // Pass track effects
+            });
+          }
         });
 
         playoutRef.current = playout;
@@ -385,12 +404,33 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Regenerate peaks when zoom or mono changes (without reloading audio)
   useEffect(() => {
-    if (audioBuffers.length === 0) return;
+    if (tracks.length === 0) return;
 
     const bits = 16;
-    const peaks = audioBuffers.map(buffer => generatePeaks(buffer, samplesPerPixel, mono, bits));
-    setPeaksDataArray(peaks);
-  }, [audioBuffers, samplesPerPixel, mono]);
+
+    // Generate peaks for each clip in each track
+    const allTrackPeaks: TrackClipPeaks[] = tracks.map((track) => {
+      const clipPeaks: ClipPeaks[] = track.clips.map((clip) => {
+        const peaks = generatePeaks(
+          clip.audioBuffer,
+          samplesPerPixel,
+          mono,
+          bits
+        );
+
+        return {
+          clipId: clip.id,
+          peaks,
+          startTime: clip.startTime,
+          duration: clip.duration,
+        };
+      });
+
+      return clipPeaks;
+    });
+
+    setPeaksDataArray(allTrackPeaks);
+  }, [tracks, samplesPerPixel, mono]);
 
   // Load annotations from annotationList prop
   useEffect(() => {

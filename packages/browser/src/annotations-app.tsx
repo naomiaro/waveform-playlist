@@ -21,6 +21,7 @@ import {
   AudioPosition,
   Waveform,
 } from './components';
+import { useAudioTracks } from './hooks';
 
 // Load annotation data
 declare const notes: any[];
@@ -212,18 +213,38 @@ const AnnotationsAppContent: React.FC = () => {
   );
 };
 
-// Initialize the app
-export function initAnnotationsApp() {
-  const container = document.getElementById('playlist');
-  if (!container) {
-    console.error('Playlist container not found');
-    return;
+// Wrapper component that loads audio tracks
+const AnnotationsAppWithAudio: React.FC = () => {
+  // Use useMemo to prevent re-creating audioConfigs on every render
+  const audioConfigs = React.useMemo(() => [
+    { src: 'media/audio/sonnet.mp3', name: 'Sonnet' }
+  ], []);
+
+  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+
+  if (loading) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          Loading audio...
+        </div>
+      </Container>
+    );
   }
 
-  const root = createRoot(container);
-  root.render(
+  if (error) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', color: 'red' }}>
+          Error loading audio: {error}
+        </div>
+      </Container>
+    );
+  }
+
+  return (
     <WaveformPlaylistProvider
-      tracks={[{ src: 'media/audio/sonnet.mp3', name: 'Sonnet' }]}
+      tracks={tracks}
       timescale={true}
       mono={true}
       waveHeight={80}
@@ -242,6 +263,18 @@ export function initAnnotationsApp() {
       <AnnotationsAppContent />
     </WaveformPlaylistProvider>
   );
+};
+
+// Initialize the app
+export function initAnnotationsApp() {
+  const container = document.getElementById('playlist');
+  if (!container) {
+    console.error('Playlist container not found');
+    return;
+  }
+
+  const root = createRoot(container);
+  root.render(<AnnotationsAppWithAudio />);
 }
 
 // Auto-initialize if DOM is ready

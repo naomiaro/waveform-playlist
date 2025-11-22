@@ -10,6 +10,7 @@
 import React, { useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
+import * as Tone from 'tone';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -22,7 +23,7 @@ import {
   AutomaticScrollCheckbox,
 } from './components';
 import { TrackControlsWithDelete } from '@waveform-playlist/ui-components';
-import { Track } from '@waveform-playlist/core';
+import { ClipTrack, createTrack, createClip } from '@waveform-playlist/core';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -85,8 +86,9 @@ const HiddenFileInput = styled.input`
 `;
 
 function NewTracksApp() {
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Handle file drop
@@ -118,21 +120,46 @@ function NewTracksApp() {
   );
 
   // Add files as tracks
-  const addFiles = (files: File[]) => {
-    const newTracks: Track[] = files.map((file) => {
-      // Create an object URL for the file
-      const url = URL.createObjectURL(file);
+  const addFiles = async (files: File[]) => {
+    setIsLoading(true);
+    try {
+      const audioContext = Tone.getContext().rawContext as AudioContext;
 
-      return {
-        src: url,
-        name: file.name.replace(/\.[^/.]+$/, ''), // Remove file extension
-        gain: 1,
-        muted: false,
-        stereoPan: 0,
-      };
-    });
+      const newTracks: ClipTrack[] = await Promise.all(
+        files.map(async (file) => {
+          // Read file as ArrayBuffer
+          const arrayBuffer = await file.arrayBuffer();
 
-    setTracks([...tracks, ...newTracks]);
+          // Decode to AudioBuffer
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+          // Create clip with the audio buffer
+          const clip = createClip({
+            audioBuffer,
+            startTime: 0,
+            duration: audioBuffer.duration,
+            offset: 0,
+            name: file.name.replace(/\.[^/.]+$/, ''), // Remove file extension
+          });
+
+          // Create track with single clip
+          return createTrack({
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            clips: [clip],
+            muted: false,
+            soloed: false,
+            volume: 1,
+            pan: 0,
+          });
+        })
+      );
+
+      setTracks([...tracks, ...newTracks]);
+    } catch (error) {
+      console.error('Error loading audio files:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Remove a track
@@ -166,12 +193,21 @@ function NewTracksApp() {
         onDragLeave={handleDragLeave}
         onClick={handleDropZoneClick}
       >
-        <DropZoneText>
-          {isDragging ? '📂 Drop audio files here' : '🎵 Drop audio files here to add tracks'}
-        </DropZoneText>
-        <DropZoneSubtext>
-          or click to browse (supports MP3, WAV, OGG, and more)
-        </DropZoneSubtext>
+        {isLoading ? (
+          <>
+            <DropZoneText>⏳ Loading audio files...</DropZoneText>
+            <DropZoneSubtext>Please wait while we process your files</DropZoneSubtext>
+          </>
+        ) : (
+          <>
+            <DropZoneText>
+              {isDragging ? '📂 Drop audio files here' : '🎵 Drop audio files here to add tracks'}
+            </DropZoneText>
+            <DropZoneSubtext>
+              or click to browse (supports MP3, WAV, OGG, and more)
+            </DropZoneSubtext>
+          </>
+        )}
       </DropZone>
 
       <HiddenFileInput
@@ -221,26 +257,28 @@ function NewTracksApp() {
                 <TrackControlsWithDelete
                   trackIndex={trackIndex}
                   trackName={track.name}
-                  muted={track.muted || false}
-                  soloed={false}
-                  volume={track.gain || 1}
-                  pan={track.stereoPan || 0}
+                  muted={track.muted}
+                  soloed={track.soloed}
+                  volume={track.volume}
+                  pan={track.pan}
                   onMuteChange={(muted) => {
                     const updatedTracks = [...tracks];
                     updatedTracks[trackIndex] = { ...track, muted };
                     setTracks(updatedTracks);
                   }}
-                  onSoloChange={() => {
-                    // Solo not implemented in this example
+                  onSoloChange={(soloed) => {
+                    const updatedTracks = [...tracks];
+                    updatedTracks[trackIndex] = { ...track, soloed };
+                    setTracks(updatedTracks);
                   }}
                   onVolumeChange={(volume) => {
                     const updatedTracks = [...tracks];
-                    updatedTracks[trackIndex] = { ...track, gain: volume };
+                    updatedTracks[trackIndex] = { ...track, volume };
                     setTracks(updatedTracks);
                   }}
                   onPanChange={(pan) => {
                     const updatedTracks = [...tracks];
-                    updatedTracks[trackIndex] = { ...track, stereoPan: pan };
+                    updatedTracks[trackIndex] = { ...track, pan };
                     setTracks(updatedTracks);
                   }}
                   onDelete={() => handleRemoveTrack(trackIndex)}
