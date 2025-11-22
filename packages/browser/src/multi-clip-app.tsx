@@ -36,47 +36,52 @@ const ControlGroup = styled.div`
   }
 `;
 
-// Audio configuration - organized by instrument track
+// Audio files - each file is loaded and decoded once
+// Files can be referenced by multiple clips across different tracks
+const audioFiles = [
+  { id: 'vocals', src: 'media/audio/Vocals30.mp3' },
+  { id: 'guitar', src: 'media/audio/Guitar30.mp3' },
+  { id: 'piano', src: 'media/audio/PianoSynth30.mp3' },
+  { id: 'bass', src: 'media/audio/BassDrums30.mp3' },
+];
+
+// Track configuration - organized by instrument track
 // Each track can have multiple clips demonstrating gaps and positioning
 // All source files are 30s long and musically synchronized
-const audioConfigs = [
+const trackConfigs = [
   // Vocals track - Two clips with gap in middle (cutting out 10-20s)
   {
-    src: 'media/audio/Vocals30.mp3',
     name: 'Vocals',
     clips: [
-      { startTime: 0, duration: 10, offset: 0 },   // 0-10s from source
-      { startTime: 20, duration: 10, offset: 20 }, // 20-30s from source (10s gap)
+      { fileId: 'vocals', startTime: 0, duration: 10, offset: 0 },   // 0-10s from source
+      { fileId: 'vocals', startTime: 20, duration: 10, offset: 20 }, // 20-30s from source (10s gap)
     ],
   },
 
   // Guitar track - Full 30 seconds
   {
-    src: 'media/audio/Guitar30.mp3',
     name: 'Guitar',
     clips: [
-      { startTime: 0, duration: 30, offset: 0 }, // Continuous playback
+      { fileId: 'guitar', startTime: 0, duration: 30, offset: 0 }, // Continuous playback
     ],
   },
 
   // Piano track - Two clips with different timing
   {
-    src: 'media/audio/PianoSynth30.mp3',
     name: 'Piano',
     clips: [
-      { startTime: 5, duration: 10, offset: 5 },  // 5-15s from source, starts at 5s
-      { startTime: 20, duration: 10, offset: 20 }, // 20-30s from source, starts at 20s
+      { fileId: 'piano', startTime: 5, duration: 10, offset: 5 },  // 5-15s from source, starts at 5s
+      { fileId: 'piano', startTime: 20, duration: 10, offset: 20 }, // 20-30s from source, starts at 20s
     ],
   },
 
   // Bass track - Three clips showing gaps
   {
-    src: 'media/audio/BassDrums30.mp3',
     name: 'Bass',
     clips: [
-      { startTime: 0, duration: 8, offset: 0 },   // 0-8s from source
-      { startTime: 10, duration: 6, offset: 10 }, // 10-16s from source (2s gap, skipping 8-10s)
-      { startTime: 20, duration: 10, offset: 20 }, // 20-30s from source (4s gap, skipping 16-20s)
+      { fileId: 'bass', startTime: 0, duration: 8, offset: 0 },   // 0-8s from source
+      { fileId: 'bass', startTime: 10, duration: 6, offset: 10 }, // 10-16s from source (2s gap, skipping 8-10s)
+      { fileId: 'bass', startTime: 20, duration: 10, offset: 20 }, // 20-30s from source (4s gap, skipping 16-20s)
     ],
   },
 ];
@@ -96,31 +101,43 @@ const MultiClipExample: React.FC = () => {
 
         const audioContext = getGlobalAudioContext();
 
-        // Load each track's audio file and create multiple clips
-        const loadPromises = audioConfigs.map(async (config) => {
-          // Fetch and decode audio file once per track
-          const response = await fetch(config.src);
+        // Step 1: Load all audio files once and store in a Map by ID
+        const fileLoadPromises = audioFiles.map(async (file) => {
+          const response = await fetch(file.src);
           if (!response.ok) {
-            throw new Error(`Failed to fetch ${config.src}: ${response.statusText}`);
+            throw new Error(`Failed to fetch ${file.src}: ${response.statusText}`);
           }
 
           const arrayBuffer = await response.arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-          // Create multiple clips from the clips array
-          const clips = config.clips.map((clipConfig) =>
-            createClip({
+          return { id: file.id, buffer: audioBuffer };
+        });
+
+        const loadedFiles = await Promise.all(fileLoadPromises);
+        const fileBuffers = new Map(loadedFiles.map(f => [f.id, f.buffer]));
+
+        // Step 2: Create tracks by referencing loaded audio buffers
+        const loadedTracks = trackConfigs.map((trackConfig) => {
+          // Create clips by looking up the audio buffer for each fileId
+          const clips = trackConfig.clips.map((clipConfig) => {
+            const audioBuffer = fileBuffers.get(clipConfig.fileId);
+            if (!audioBuffer) {
+              throw new Error(`Audio file not found for ID: ${clipConfig.fileId}`);
+            }
+
+            return createClip({
               audioBuffer,
               startTime: clipConfig.startTime,
               duration: clipConfig.duration,
               offset: clipConfig.offset,
-              name: `${config.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
-            })
-          );
+              name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
+            });
+          });
 
           // Create the track with multiple clips
           return createTrack({
-            name: config.name,
+            name: trackConfig.name,
             clips,
             muted: false,
             soloed: false,
@@ -128,8 +145,6 @@ const MultiClipExample: React.FC = () => {
             pan: 0,
           });
         });
-
-        const loadedTracks = await Promise.all(loadPromises);
 
         if (!cancelled) {
           setTracks(loadedTracks);
