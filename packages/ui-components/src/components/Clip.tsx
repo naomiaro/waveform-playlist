@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { ClipHeader, CLIP_HEADER_HEIGHT } from './ClipHeader';
+import { ClipBoundary, CLIP_BOUNDARY_WIDTH } from './ClipBoundary';
 
 interface ClipContainerProps {
   readonly $left?: number; // Horizontal position in pixels (optional for DragOverlay)
@@ -92,10 +93,37 @@ export const Clip: FunctionComponent<ClipProps> = ({
   // Use draggable only if header is shown and drag is enabled
   const enableDrag = showHeader && !disableHeaderDrag && !isOverlay;
 
+  // Main clip draggable (for moving entire clip)
   const draggableId = `clip-${trackIndex}-${clipIndex}`;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({
     id: draggableId,
     data: { clipId, trackIndex, clipIndex },
+    disabled: !enableDrag,
+  });
+
+  // Left boundary draggable (for trimming start)
+  const leftBoundaryId = `clip-boundary-left-${trackIndex}-${clipIndex}`;
+  const {
+    attributes: leftBoundaryAttributes,
+    listeners: leftBoundaryListeners,
+    setActivatorNodeRef: setLeftBoundaryActivatorRef,
+    isDragging: isLeftBoundaryDragging,
+  } = useDraggable({
+    id: leftBoundaryId,
+    data: { clipId, trackIndex, clipIndex, boundary: 'left' },
+    disabled: !enableDrag,
+  });
+
+  // Right boundary draggable (for trimming end)
+  const rightBoundaryId = `clip-boundary-right-${trackIndex}-${clipIndex}`;
+  const {
+    attributes: rightBoundaryAttributes,
+    listeners: rightBoundaryListeners,
+    setActivatorNodeRef: setRightBoundaryActivatorRef,
+    isDragging: isRightBoundaryDragging,
+  } = useDraggable({
+    id: rightBoundaryId,
+    data: { clipId, trackIndex, clipIndex, boundary: 'right' },
     disabled: !enableDrag,
   });
 
@@ -130,6 +158,34 @@ export const Clip: FunctionComponent<ClipProps> = ({
       )}
       <ChannelsWrapper $isOverlay={isOverlay}>
         {children}
+        {showHeader && !disableHeaderDrag && !isOverlay && (
+          <>
+            <ClipBoundary
+              clipId={clipId}
+              trackIndex={trackIndex}
+              clipIndex={clipIndex}
+              edge="left"
+              dragHandleProps={{
+                attributes: leftBoundaryAttributes,
+                listeners: leftBoundaryListeners,
+                setActivatorNodeRef: setLeftBoundaryActivatorRef,
+                isDragging: isLeftBoundaryDragging,
+              }}
+            />
+            <ClipBoundary
+              clipId={clipId}
+              trackIndex={trackIndex}
+              clipIndex={clipIndex}
+              edge="right"
+              dragHandleProps={{
+                attributes: rightBoundaryAttributes,
+                listeners: rightBoundaryListeners,
+                setActivatorNodeRef: setRightBoundaryActivatorRef,
+                isDragging: isRightBoundaryDragging,
+              }}
+            />
+          </>
+        )}
       </ChannelsWrapper>
     </ClipContainer>
   );
