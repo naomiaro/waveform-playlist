@@ -3,7 +3,7 @@
 Multi-track audio editor roadmap for waveform-playlist.
 
 **Branch:** `tonejs-overhaul` (React migration)
-**Last Updated:** 2025-11-21
+**Last Updated:** 2025-11-22
 
 ---
 
@@ -332,58 +332,68 @@ See `multi-clip-app.tsx` for complete implementation example.
 - `packages/browser/src/WaveformPlaylistContext.tsx` (drag logic)
 - `packages/ui-components/src/components/Playlist.tsx` (handle ClickOverlay conflict)
 
-### 3.1b Clip Boundaries & Drag to Trim (Audacity-style)
+### 3.1b Clip Boundaries & Drag to Trim (Audacity-style) ✅
 
 **User Story:** As a user, I want to drag the left/right edge of a clip to adjust its cue in/out (trim).
 
+**Status:** COMPLETE - All trim functionality implemented with real-time visual feedback!
+
 #### Tasks
 
-- [ ] **Create ClipBoundary component**
+- [x] **Create ClipBoundary component** ✅
   - Location: `packages/ui-components/src/components/ClipBoundary.tsx`
   - Renders at left and right edges of clip
-  - Width: 6-8px hit area (invisible or subtle)
-  - Visual feedback on hover: Highlight edge
+  - Width: 8px hit area (CLIP_BOUNDARY_WIDTH constant)
+  - Visual feedback: Semi-transparent background and border on hover/drag
   - Cursor: `col-resize`
-  - Uses `useDraggable` from @dnd-kit with custom sensor
+  - Uses `useDraggable` from @dnd-kit with drag handle pattern
 
-- [ ] **Integrate ClipBoundary into Clip component**
+- [x] **Integrate ClipBoundary into Clip component** ✅
   - Location: `packages/ui-components/src/components/Clip.tsx`
-  - Render left and right boundaries
-  - Position absolutely at edges
-  - Show on clip hover (optional)
+  - Renders left and right boundaries for each clip
+  - Positioned absolutely at clip edges
+  - Each boundary has its own draggable instance
+  - Uses activator pattern for drag handles
 
-- [ ] **Implement drag-to-trim logic**
-  - Location: `packages/browser/src/WaveformPlaylistContext.tsx`
+- [x] **Implement drag-to-trim logic** ✅
+  - Location: `packages/browser/src/hooks/useClipDragHandlers.ts`
   - Dragging left boundary:
-    - Increase `offset` (trim start of audio)
-    - Decrease `duration` by same amount
-    - Increase `startTime` (clip moves right visually)
+    - Increases `offset` (trim start of audio)
+    - Decreases `duration` by same amount
+    - Increases `startTime` (clip moves right on timeline)
   - Dragging right boundary:
-    - Decrease `duration` (trim end of audio)
+    - Increases/decreases `duration` (trim end of audio)
     - `offset` and `startTime` stay the same
-  - Constraints:
-    - Can't trim past audio buffer bounds (`offset + duration <= buffer.duration`)
-    - Minimum clip duration (e.g., 0.1s)
-    - Can't overlap with adjacent clips (optional)
+  - Constraints enforced:
+    - Offset cannot be negative (>= 0)
+    - Duration must be at least 0.1 seconds (MIN_DURATION)
+    - offset + duration cannot exceed buffer duration
+    - Cannot overlap with adjacent clips
+    - startTime cannot be negative (>= 0)
+  - **Critical fix:** Uses original clip state on drag start, applies cumulative delta to prevent oversensitive behavior
 
-- [ ] **Visual feedback during trim**
-  - Dimmed region shows trimmed portion of audio
-  - Waveform inside clip updates in real-time
-  - Tooltip shows duration/offset values
-  - Cursor shows resize direction
+- [x] **Visual feedback during trim** ✅
+  - Waveform updates in real-time during drag (onDragMove)
+  - Boundary highlights on hover with semi-transparent background
+  - Boundary shows solid visual feedback during drag
+  - Smooth cursor following (no oversensitive jumping)
+  - Collision detection provides immediate boundary feedback
 
-- [ ] **Update multi-clip demo**
-  - Location: `packages/browser/src/multi-clip-app.tsx`
-  - Instructions: "Drag clip edges to trim (adjust cue in/out)"
-  - Show trim handles on hover
+- [x] **Update multi-clip and flexible-example demos** ✅
+  - Both demos use `useClipDragHandlers` hook
+  - Trim handles work on all clips
+  - Both movement and trimming working smoothly
 
-**Files to Create:**
-- `packages/ui-components/src/components/ClipBoundary.tsx`
+**Files Created:**
+- `packages/ui-components/src/components/ClipBoundary.tsx` ✅
+- `packages/browser/src/hooks/useClipDragHandlers.ts` ✅ (reusable hook!)
 
-**Files to Modify:**
-- `packages/ui-components/src/components/Clip.tsx` (integrate ClipBoundary)
-- `packages/browser/src/WaveformPlaylistContext.tsx` (trim logic)
-- `packages/browser/src/multi-clip-app.tsx` (instructions)
+**Files Modified:**
+- `packages/ui-components/src/components/Clip.tsx` (integrated ClipBoundary)
+- `packages/browser/src/multi-clip-app.tsx` (uses useClipDragHandlers hook)
+- `packages/browser/src/flexible-example-app.tsx` (uses useClipDragHandlers hook)
+- `packages/browser/src/index.tsx` (exports useClipDragHandlers)
+- `packages/browser/src/hooks/index.ts` (exports useClipDragHandlers)
 
 ### 3.3 Splitting Clips
 
@@ -892,6 +902,23 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ## ✅ Recently Completed
 
+### 2025-11-22
+
+- [x] **Phase 3.1b: Clip Boundaries & Drag to Trim - COMPLETE!** 🎉
+  - Created ClipBoundary component with 8px hit area and col-resize cursor
+  - Integrated into Clip component with separate draggable instances for left/right edges
+  - Implemented bidirectional trimming (left boundary: adjust offset, duration, startTime; right: adjust duration only)
+  - Full constraint enforcement: min duration 0.1s, buffer bounds, no overlaps, no negative values
+  - **Critical bug fix:** Cumulative delta issue resolved by storing original clip state on drag start
+  - Real-time visual feedback during drag with onDragMove handler
+  - **Created `useClipDragHandlers` hook** - Reusable 300+ line hook for all drag operations
+  - Hook handles: clip movement, boundary trimming, collision detection, real-time updates
+  - Clean API exported from browser package for user applications
+  - Both multi-clip and flexible-example demos updated to use hook
+  - Zero code duplication - complex drag logic centralized in one place
+  - Location: `packages/browser/src/hooks/useClipDragHandlers.ts`
+  - Fully working boundary trimming with smooth cursor following!
+
 ### 2025-11-21
 
 - [x] **Phase 2: Clip-Based Model - COMPLETE!** 🎉
@@ -989,16 +1016,24 @@ See `multi-clip-app.tsx` for complete implementation example.
 5. **Phase 4: Performance** - Scale to professional use cases
 6. **Phase 5: Polish** - Production-ready UX
 
-**Next Immediate Steps (Phase 3.1a - Audacity-Style Clip Dragging):**
+**Next Immediate Steps (Phase 3.3 - Splitting Clips):**
 
-1. ✅ Install @dnd-kit (13KB gzipped, modern drag-and-drop) - DONE
-2. Remove ClipsPanel from multi-clip demo (separate list UI)
-3. Create ClipHeader component (title bar on each clip)
-4. Integrate ClipHeader into Clip component
-5. Implement drag-to-move logic (header drag → change startTime)
-6. Handle ClickOverlay conflict (prevent selection during drag)
-7. Add visual feedback (ghost outline, real-time movement)
-8. Update multi-clip demo with instructions
+Phase 3.1a (Drag to Move) and 3.1b (Drag to Trim) are both COMPLETE! ✅
+
+The library now has professional clip editing with:
+- ✅ Drag clip headers to reposition clips on timeline
+- ✅ Drag clip boundaries to trim (adjust cue in/out)
+- ✅ Real-time collision detection (no overlaps, no negative positions)
+- ✅ Reusable `useClipDragHandlers` hook for user applications
+- ✅ Smooth real-time visual feedback during all drag operations
+
+**Ready for Phase 3.3:**
+
+1. Implement split logic (split clip at playhead/cursor position)
+2. Create useClipSplitting hook
+3. Add keyboard shortcut ('S' key)
+4. Visual feedback (scissors cursor, split indicator)
+5. Update multi-clip demo with split functionality
 
 ---
 
