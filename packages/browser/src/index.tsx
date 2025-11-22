@@ -1288,6 +1288,7 @@ export {
   usePlaylistData,
 } from './WaveformPlaylistContext';
 export type { WaveformPlaylistContextValue, WaveformTrack, TrackState } from './WaveformPlaylistContext';
+export { useClipDragHandlers } from './hooks';
 export {
   PlayButton,
   PauseButton,

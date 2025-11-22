@@ -20,3 +20,5 @@ export { useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain } f
 
 export { useAudioTracks } from './useAudioTracks';
 export type { AudioTrackConfig } from './useAudioTracks';
+
+export { useClipDragHandlers } from './useClipDragHandlers';
