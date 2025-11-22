@@ -116,6 +116,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
     const { active, delta } = event;
 
     // Extract clip metadata from drag data
@@ -152,12 +153,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     });
 
     onTracksChange(newTracks);
-
-    // Delay clearing activeId to ensure position update renders first
-    // This prevents flicker of clip at old position when drag ends
-    setTimeout(() => {
-      setActiveId(null);
-    }, 100);
   };
 
   // Get active clip info for drag overlay
@@ -213,38 +208,45 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
       <Waveform showClipHeaders={true} />
 
       <DragOverlay dropAnimation={null}>
-        {activeClip ? (
-          <Clip
-            key={`drag-${activeClip.clipId}`}
-            clipId={activeClip.clipId}
-            trackIndex={activeClip.trackIndex}
-            clipIndex={activeClip.clipIndex}
-            trackName={activeClip.trackName}
-            startTime={activeClip.startTime}
-            duration={activeClip.duration}
-            sampleRate={sampleRate}
-            samplesPerPixel={samplesPerPixel}
-            showHeader={true}
-            disableHeaderDrag={true}
-            isOverlay={true}
-          >
-            {activeClip.peaks.data.map((channelPeaks: Peaks, channelIndex: number) => (
-              <Channel
-                key={channelIndex}
-                index={channelIndex}
-                data={channelPeaks}
-                bits={activeClip.peaks.bits}
-                length={activeClip.peaks.length}
-                progress={0}
-                waveHeight={waveHeight}
-                waveFillColor={themeColors.waveFillColor}
-                waveOutlineColor={themeColors.waveOutlineColor}
-                waveProgressColor={themeColors.waveProgressColor}
-                devicePixelRatio={window.devicePixelRatio || 1}
-              />
-            ))}
-          </Clip>
-        ) : null}
+        {activeClip ? (() => {
+          // Calculate width to match Clip component's calculation
+          // Subtract 2px for borders to match the content area
+          const clipWidth = Math.floor((activeClip.duration * sampleRate) / samplesPerPixel);
+          const channelWidth = clipWidth - 2;
+
+          return (
+            <Clip
+              key={`drag-${activeClip.clipId}`}
+              clipId={activeClip.clipId}
+              trackIndex={activeClip.trackIndex}
+              clipIndex={activeClip.clipIndex}
+              trackName={activeClip.trackName}
+              startTime={activeClip.startTime}
+              duration={activeClip.duration}
+              sampleRate={sampleRate}
+              samplesPerPixel={samplesPerPixel}
+              showHeader={true}
+              disableHeaderDrag={true}
+              isOverlay={true}
+            >
+              {activeClip.peaks.data.map((channelPeaks: Peaks, channelIndex: number) => (
+                <Channel
+                  key={channelIndex}
+                  index={channelIndex}
+                  data={channelPeaks}
+                  bits={activeClip.peaks.bits}
+                  length={channelWidth}
+                  progress={0}
+                  waveHeight={waveHeight}
+                  waveFillColor={themeColors.waveFillColor}
+                  waveOutlineColor={themeColors.waveOutlineColor}
+                  waveProgressColor={themeColors.waveProgressColor}
+                  devicePixelRatio={window.devicePixelRatio || 1}
+                />
+              ))}
+            </Clip>
+          );
+        })() : null}
       </DragOverlay>
     </DndContext>
   );
