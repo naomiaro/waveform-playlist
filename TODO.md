@@ -1022,8 +1022,13 @@ See `multi-clip-app.tsx` for complete implementation example.
    - Types, context, rendering, playback all implemented
    - Multi-clip demo working with file-reference pattern
 
-3. **Phase 3.1-3.2: Drag & Trim** - Core editing operations (NEXT)
-4. **Phase 3.3-3.4: Split & Copy/Paste** - Power user features
+3. ~~**Phase 3.1-3.2: Drag & Trim**~~ ✅ COMPLETE (2025-11-22)
+   - Drag clip headers to move clips along timeline
+   - Drag clip boundaries to trim (bidirectional)
+   - Real-time collision detection and visual feedback
+   - Reusable `useClipDragHandlers` hook
+
+4. **Phase 3.3-3.4: Split & Copy/Paste** - Power user features (NEXT)
 5. **Phase 4: Performance** - Scale to professional use cases
 6. **Phase 5: Polish** - Production-ready UX
 
