@@ -210,9 +210,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
       <DragOverlay dropAnimation={null}>
         {activeClip ? (() => {
           // Calculate width to match Clip component's calculation
-          // Subtract 2px for borders to match the content area
           const clipWidth = Math.floor((activeClip.duration * sampleRate) / samplesPerPixel);
-          const channelWidth = clipWidth - 2;
 
           return (
             <Clip
@@ -235,7 +233,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
                   index={channelIndex}
                   data={channelPeaks}
                   bits={activeClip.peaks.bits}
-                  length={channelWidth}
+                  length={clipWidth}
                   progress={0}
                   waveHeight={waveHeight}
                   waveFillColor={themeColors.waveFillColor}

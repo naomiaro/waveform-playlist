@@ -15,7 +15,6 @@ const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
     width: `${props.$width}px`,
   },
 }))<ClipContainerProps>`
-  box-sizing: border-box;
   position: ${props => props.$isOverlay ? 'relative' : 'absolute'};
   top: 0;
   height: ${props => props.$isOverlay ? 'auto' : '100%'};
@@ -23,7 +22,6 @@ const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.1);
 `;
 
 interface ChannelsWrapperProps {
