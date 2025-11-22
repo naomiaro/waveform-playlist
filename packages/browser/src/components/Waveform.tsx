@@ -39,6 +39,9 @@ const defaultTheme = {
   timescaleBackgroundColor: '#fff',
   playheadColor: '#f00',
   selectionColor: 'rgba(0, 255, 0, 0.3)',
+  clipHeaderBackgroundColor: 'rgba(0, 0, 0, 0.1)',
+  clipHeaderBorderColor: 'rgba(0, 0, 0, 0.2)',
+  clipHeaderTextColor: '#333',
 };
 
 export interface WaveformProps {
@@ -50,6 +53,9 @@ export interface WaveformProps {
     timescaleBackgroundColor?: string;
     playheadColor?: string;
     selectionColor?: string;
+    clipHeaderBackgroundColor?: string; // Background color for clip headers
+    clipHeaderBorderColor?: string; // Border color for clip headers
+    clipHeaderTextColor?: string; // Text color for clip headers
   };
   timescale?: boolean;
   renderTrackControls?: (trackIndex: number) => ReactNode;
@@ -58,9 +64,6 @@ export interface WaveformProps {
   annotationListConfig?: any;
   className?: string;
   showClipHeaders?: boolean; // Show draggable headers on clips for multi-clip editing (requires @dnd-kit)
-  clipHeaderBackgroundColor?: string; // Background color for clip headers
-  clipHeaderBorderColor?: string; // Border color for clip headers
-  clipHeaderTextColor?: string; // Text color for clip headers
 }
 
 /**
@@ -75,9 +78,6 @@ export const Waveform: React.FC<WaveformProps> = ({
   annotationListConfig,
   className,
   showClipHeaders = false,
-  clipHeaderBackgroundColor,
-  clipHeaderBorderColor,
-  clipHeaderTextColor,
 }) => {
   // Split context usage for performance
   const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
@@ -395,9 +395,9 @@ export const Waveform: React.FC<WaveformProps> = ({
                             sampleRate={sampleRate}
                             samplesPerPixel={samplesPerPixel}
                             showHeader={showClipHeaders}
-                            clipHeaderBackgroundColor={clipHeaderBackgroundColor}
-                            clipHeaderBorderColor={clipHeaderBorderColor}
-                            clipHeaderTextColor={clipHeaderTextColor}
+                            clipHeaderBackgroundColor={theme.clipHeaderBackgroundColor}
+                            clipHeaderBorderColor={theme.clipHeaderBorderColor}
+                            clipHeaderTextColor={theme.clipHeaderTextColor}
                           >
                             {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
                               <SmartChannel

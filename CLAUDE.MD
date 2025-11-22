@@ -159,7 +159,31 @@ All theme properties optional on `Waveform` component:
 
 - `waveOutlineColor`, `waveFillColor`, `waveProgressColor`
 - `timeColor`, `timescaleBackgroundColor`, `playheadColor`, `selectionColor`
+- `clipHeaderBackgroundColor`, `clipHeaderBorderColor`, `clipHeaderTextColor`
 - `renderTimestamp` - Custom React components for timescale timestamps
+
+### Theme vs Props: Design Guidelines (2025-01-22)
+
+**When to add to the `theme` object:**
+- Visual/styling properties (colors, backgrounds, borders)
+- Properties that users typically want to customize for aesthetic consistency
+- Properties that don't affect functionality/behavior
+- Examples: `waveOutlineColor`, `playheadColor`, `clipHeaderBackgroundColor`
+
+**When to use separate props:**
+- Functional/behavioral properties (callbacks, data, configuration)
+- Properties that control what is rendered or how it behaves
+- Properties that are frequently changed at runtime
+- Examples: `timescale` (boolean), `renderTrackControls` (function), `showClipHeaders` (boolean)
+
+**Benefits of theme-based approach:**
+- Single prop for all visual customization
+- Consistent styling across all visual elements
+- Easier to apply design systems
+- Reduces prop sprawl on components
+- TypeScript autocomplete for all theme properties in one place
+
+**Pattern established:** All color/styling properties go in `theme` object, not as separate props.
 
 ## Optional Packages Architecture (2025-01-19)
 
@@ -426,3 +450,5 @@ try {
 5. **Recording Example UI Polish** - Moved static content (Features list, Note section) from React component (`recording-app.tsx`) to Jekyll template (`17recording.html`) using Bootstrap alert styling. Used `alert-info` for feature list and `alert-warning` for note section. Benefits: Reduces bundle size, consistent styling across examples, easier to update without rebuilding. Removed InfoBox component duplication from React code.
 
 6. **Multi-Clip Data Model Refactor** - Restructured multi-clip demo to use **file-reference architecture**. Created separate `audioFiles` array (id + src) and `trackConfigs` array (clips with `fileId` references). Implemented two-phase loading: (1) load all audio files once into Map by ID, (2) create tracks by looking up buffers via `fileId`. Benefits: Each audio file loaded only once, multiple clips can reference same file without reloading, easy to copy/paste clip configurations, efficient memory usage. All 4 tracks render correctly with clips and gaps: Vocals (2 clips with 10s gap), Guitar (continuous 30s), Piano (2 clips at different positions), Bass (3 clips with gaps). File-reference architecture verified working - all audio files loaded successfully (200 status), waveforms render correctly with proper timing and gaps. Location: `packages/browser/src/multi-clip-app.tsx`. Updated PROJECT_STRUCTURE.md with multi-clip architecture details and Bootstrap styling convention.
+
+7. **Clip Header Theming & Design Guidelines** - Added full theming support for clip headers by integrating `clipHeaderBackgroundColor`, `clipHeaderBorderColor`, and `clipHeaderTextColor` into the main theme object. Updated `Waveform.tsx` to include these properties in defaultTheme and WaveformProps interface, and modified Clip rendering to pass theme values. Updated `flexible-example-app.tsx` to use custom clip header colors matching the dark blue/teal aesthetic. **Established design guidelines** for theme vs props: All visual/styling properties (colors, backgrounds, borders) go in the `theme` object; functional/behavioral properties (callbacks, data, configuration) remain as separate props. Benefits: Consistent API, single prop for all visual customization, easier design system integration, reduced prop sprawl. Documented guidelines in CLAUDE.md "Theming System" section with clear examples and rationale.

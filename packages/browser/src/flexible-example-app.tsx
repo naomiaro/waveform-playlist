@@ -756,9 +756,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
               );
             }}
             showClipHeaders={true}
-            clipHeaderBackgroundColor="rgba(44, 62, 80, 0.85)"
-            clipHeaderBorderColor="rgba(93, 173, 226, 0.4)"
-            clipHeaderTextColor="#ecf0f1"
           />
         </DndContext>
       </MainContent>
@@ -796,6 +793,9 @@ const theme = {
   timescaleBackgroundColor: '#2c3e50', // Dark background to match the overall theme
   playheadColor: '#8b0000', // Dark red playhead for contrast with blue waveforms
   selectionColor: 'rgba(231, 76, 60, 0.5)', // Light red selection for contrast with blue waveforms
+  clipHeaderBackgroundColor: 'rgba(44, 62, 80, 0.85)', // Dark blue-gray matching theme
+  clipHeaderBorderColor: 'rgba(93, 173, 226, 0.4)', // Light blue accent border
+  clipHeaderTextColor: '#ecf0f1', // Light text for readability
 };
 
 // Audio configs - will be loaded with useAudioTracks hook
