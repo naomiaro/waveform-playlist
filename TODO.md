@@ -795,6 +795,21 @@ interface Timeline {
   - Removed ToneLib parameter from effects functions
   - **Result:** 111KB/23KB savings (13% reduction)
   - Bundle sizes: 507KB/132KB (core), 509KB/150KB (stem-tracks)
+- [x] **Multi-clip demo file-reference architecture**
+  - Separated `audioFiles` (id + src) from `trackConfigs` (clips with fileId references)
+  - Two-phase loading: load files once → create tracks with clip references
+  - Benefits: Each file loaded once, clips can reference same file, efficient memory
+  - All 4 tracks render correctly with gaps: Vocals (2 clips), Guitar (continuous), Piano (2 clips), Bass (3 clips)
+  - Location: `packages/browser/src/multi-clip-app.tsx`
+- [x] **Recording example UI polish**
+  - Moved Features list and Note from React to Jekyll template
+  - Bootstrap alert styling (alert-info, alert-warning)
+  - Reduced bundle size by removing static content from JS
+  - Location: `ghpages/_examples/17recording.html`, `recording-app.tsx`
+- [x] **Documentation updates**
+  - Added multi-clip architecture to PROJECT_STRUCTURE.md
+  - Added Bootstrap styling convention to PROJECT_STRUCTURE.md
+  - Added session notes to CLAUDE.md
 - [x] Bundle analyzer added (rollup-plugin-visualizer)
 - [x] VU meter fix (AnalyserNode single source of truth)
 - [x] Worklet RMS calculation removed

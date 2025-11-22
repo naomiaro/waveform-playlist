@@ -675,6 +675,91 @@ Re-render Playhead position
    - Attach button event listeners
    - Render waveform canvas
 
+### Multi-Clip Example
+
+**Purpose:** Demonstrates multiple audio clips per track with gaps and different timing.
+
+**Architecture - File-Reference Data Model:**
+
+The multi-clip example uses a **file-reference architecture** to efficiently handle multiple clips that share the same audio file:
+
+```typescript
+// Audio files - each loaded and decoded once
+const audioFiles = [
+  { id: 'vocals', src: 'media/audio/Vocals30.mp3' },
+  { id: 'guitar', src: 'media/audio/Guitar30.mp3' },
+  { id: 'piano', src: 'media/audio/PianoSynth30.mp3' },
+  { id: 'bass', src: 'media/audio/BassDrums30.mp3' },
+];
+
+// Track configuration - clips reference files by ID
+const trackConfigs = [
+  {
+    name: 'Vocals',
+    clips: [
+      { fileId: 'vocals', startTime: 0, duration: 10, offset: 0 },
+      { fileId: 'vocals', startTime: 20, duration: 10, offset: 20 },
+    ],
+  },
+  // ... more tracks
+];
+```
+
+**Two-Phase Loading:**
+
+1. **Step 1:** Load all audio files once, store in Map by ID
+   ```typescript
+   const fileBuffers = new Map(loadedFiles.map(f => [f.id, f.buffer]));
+   ```
+
+2. **Step 2:** Create tracks by referencing loaded buffers via `fileId`
+   ```typescript
+   const audioBuffer = fileBuffers.get(clipConfig.fileId);
+   ```
+
+**Benefits:**
+- ✅ Each audio file loaded only once
+- ✅ Multiple clips can reference the same file without reloading
+- ✅ Easy to copy/paste clip configurations
+- ✅ Efficient memory usage
+
+**Location:** `packages/browser/src/multi-clip-app.tsx`
+
+### Bootstrap Styling Convention
+
+**Pattern:** Move static content (notes, feature lists) from React components to Jekyll templates using Bootstrap alert styling.
+
+**Benefits:**
+- Reduces bundle size (static content not in JS)
+- Consistent styling across examples
+- Easier to update without rebuilding
+
+**Example (Recording):**
+
+```html
+<!-- Features list in Jekyll template -->
+<div class="alert alert-info mb-4">
+  <h5>Features:</h5>
+  <ul class="mb-0">
+    <li>AudioWorklet-based recording</li>
+    <li>Real-time waveform visualization</li>
+  </ul>
+</div>
+
+<!-- Note/warning in Jekyll template -->
+<div class="alert alert-warning mb-4">
+  <strong>Note:</strong> Requires HTTPS or localhost.
+</div>
+```
+
+**Alert Variants:**
+- `alert-info` (blue) - Feature lists, informational content
+- `alert-warning` (yellow) - Notes, warnings, prerequisites
+- `alert-success` (green) - Success messages
+- `alert-danger` (red) - Error messages
+
+**Location:** `ghpages/_examples/17recording.html`, `18multi-clip.html`
+
 ## Migration Status
 
 ### ✅ Completed (React)
