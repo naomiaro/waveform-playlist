@@ -191,6 +191,14 @@ export function useClipDragHandlers({
             let newDuration = originalClip.duration - timeDelta;
             let newStartTime = originalClip.startTime + timeDelta;
 
+            // Constraint: startTime >= 0 (apply FIRST to prevent right edge expansion)
+            if (newStartTime < 0) {
+              const correction = -newStartTime;
+              newStartTime = 0;
+              newOffset += correction;  // Reduce the trim amount
+              newDuration -= correction;  // Reduce the duration change
+            }
+
             if (newOffset < 0) {
               const correction = -newOffset;
               newOffset = 0;
@@ -224,8 +232,6 @@ export function useClipDragHandlers({
                 }
               }
             }
-
-            newStartTime = Math.max(0, newStartTime);
 
             return { ...clip, offset: newOffset, duration: newDuration, startTime: newStartTime };
           } else {
