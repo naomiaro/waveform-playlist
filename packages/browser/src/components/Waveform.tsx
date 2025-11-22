@@ -294,6 +294,7 @@ export const Waveform: React.FC<WaveformProps> = ({
             <>
               {peaksDataArray.map((trackClipPeaks, trackIndex) => {
                 const trackState = trackStates[trackIndex] || {
+                  name: `Track ${trackIndex + 1}`,
                   muted: false,
                   soloed: false,
                   volume: 1.0,
@@ -306,7 +307,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                 ) : (
                   <Controls>
                     <Header style={{ justifyContent: 'center' }}>
-                      Track {trackIndex + 1}
+                      {trackState.name || `Track ${trackIndex + 1}`}
                     </Header>
                     <ButtonGroup>
                       <Button

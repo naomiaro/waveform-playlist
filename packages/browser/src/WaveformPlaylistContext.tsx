@@ -27,6 +27,7 @@ export interface WaveformTrack {
 }
 
 export interface TrackState {
+  name: string;
   muted: boolean;
   soloed: boolean;
   volume: number;
@@ -345,6 +346,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         // Initialize track states from ClipTrack properties
         setTrackStates(tracks.map((track) => ({
+          name: track.name,
           muted: track.muted,
           soloed: track.soloed,
           volume: track.volume,
