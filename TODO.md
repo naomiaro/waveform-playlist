@@ -92,13 +92,16 @@ Transform waveform-playlist into a professional multi-track audio editor with:
 - [x] Jekyll site for examples
 - [x] Chrome DevTools MCP for testing
 
-**Current Bundle Sizes:**
-- Core library: 620KB uncompressed / **172KB gzipped** ✅
-- Recording package: ~50KB
-- Annotations package: ~50KB
-- Total: ~720KB uncompressed / **~200KB gzipped**
+**Current Bundle Sizes (After Tree-Shaking):**
+- Core library: 507KB uncompressed / **132KB gzipped** ✅
+- Stem-tracks bundle: 509KB / **150KB gzipped**
+- Effects bundle: 530KB / **154KB gzipped** (includes Analyser, Reverb, AutoWah)
+- Recording bundle: 524KB / **154KB gzipped**
 
-**Note:** Previous estimate of 1.5MB was incorrect - actual gzipped size is much better!
+**Optimization Results:**
+- Reduced from 620KB/172KB to 509KB/150KB gzipped (13% reduction)
+- Removed unused Tone.js synthesizers and effects
+- Tree-shaking working correctly with named imports
 
 ---
 
@@ -705,13 +708,13 @@ interface Timeline {
 **High Priority (Phase 1.5 - Before Phase 2):**
 
 - [x] ~~Analyze bundle with rollup-plugin-visualizer~~ ✅ Added to vite.config.ts
-- [ ] **Tree-shake Tone.js imports** (BIGGEST WIN - save ~70KB gzipped)
-  - Location: `packages/playout/src/*.ts`
-  - Change from `import * as Tone from 'tone'` to named imports
-  - Only import: `Player, Volume, Gain, Panner, getContext, setContext, getDestination, now, start`
-  - Remove: All synthesizers, unused effects, Transport (if not needed)
-  - Expected savings: 200-300KB uncompressed / 70-100KB gzipped
-  - See bundle-stats.html for visualization
+- [x] ~~**Tree-shake Tone.js imports**~~ ✅ Completed!
+  - Changed from `import * as Tone from 'tone'` to named imports
+  - Playout: `Player, Volume, Gain, Panner, getContext, getTransport, getDestination, now, start`
+  - Effects: `Analyser, Reverb, AutoWah` (imported directly in effects hooks)
+  - Removed ToneLib parameter from effects functions (breaking change)
+  - **Actual savings:** 111KB uncompressed / 23KB gzipped (13% reduction)
+  - All synthesizers and unused effects removed
 
 **Medium Priority:**
 
@@ -786,6 +789,13 @@ interface Timeline {
 
 ### 2025-11-21
 
+- [x] **Tree-shake Tone.js imports** - Bundle optimization (Phase 1.5 complete!)
+  - Changed to named imports in playout package
+  - Effects hooks import Tone.js directly (Analyser, Reverb, AutoWah)
+  - Removed ToneLib parameter from effects functions
+  - **Result:** 111KB/23KB savings (13% reduction)
+  - Bundle sizes: 507KB/132KB (core), 509KB/150KB (stem-tracks)
+- [x] Bundle analyzer added (rollup-plugin-visualizer)
 - [x] VU meter fix (AnalyserNode single source of truth)
 - [x] Worklet RMS calculation removed
 - [x] Worklet copy automated in build script

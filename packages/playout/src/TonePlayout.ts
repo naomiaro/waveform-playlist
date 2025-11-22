@@ -1,7 +1,18 @@
-import * as Tone from 'tone';
+// Named imports for tree-shaking
+import {
+  Volume,
+  ToneAudioNode,
+  getDestination,
+  start,
+  now,
+  getTransport,
+  getContext,
+  BaseContext,
+} from 'tone';
 import { ToneTrack, ToneTrackOptions } from './ToneTrack';
 
-export type EffectsFunction = (masterGainNode: Tone.Volume, destination: Tone.ToneAudioNode, isOffline: boolean, ToneLib: typeof Tone) => void | (() => void);
+// Effects function no longer receives ToneLib - effects should import Tone themselves
+export type EffectsFunction = (masterGainNode: Volume, destination: ToneAudioNode, isOffline: boolean) => void | (() => void);
 
 export interface TonePlayoutOptions {
   tracks?: ToneTrack[];
@@ -11,7 +22,7 @@ export interface TonePlayoutOptions {
 
 export class TonePlayout {
   private tracks: Map<string, ToneTrack> = new Map();
-  private masterVolume: Tone.Volume;
+  private masterVolume: Volume;
   private isInitialized = false;
   private soloedTracks: Set<string> = new Set();
   private manualMuteState: Map<string, boolean> = new Map();
@@ -20,11 +31,11 @@ export class TonePlayout {
   private activeTracks: Set<string> = new Set();
 
   constructor(options: TonePlayoutOptions = {}) {
-    this.masterVolume = new Tone.Volume(this.gainToDb(options.masterGain ?? 1));
+    this.masterVolume = new Volume(this.gainToDb(options.masterGain ?? 1));
 
     // Setup effects chain if provided, otherwise connect directly to destination
     if (options.effects) {
-      const cleanup = options.effects(this.masterVolume, Tone.getDestination(), false, Tone);
+      const cleanup = options.effects(this.masterVolume, getDestination(), false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
@@ -48,7 +59,7 @@ export class TonePlayout {
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    await Tone.start();
+    await start();
     this.isInitialized = true;
   }
 
@@ -79,7 +90,7 @@ export class TonePlayout {
     return this.tracks.get(trackId);
   }
 
-  play(when: number = Tone.now(), offset?: number, duration?: number): void {
+  play(when: number = now(), offset?: number, duration?: number): void {
     if (!this.isInitialized) {
       console.warn('TonePlayout not initialized. Call init() first.');
       return;
@@ -130,22 +141,22 @@ export class TonePlayout {
     // Start transport
     if (offset !== undefined) {
       // Explicit offset provided - seek to that position
-      Tone.getTransport().start(when, offset);
+      getTransport().start(when, offset);
     } else {
       // No offset - resume from pause (Transport resumes from current position)
-      Tone.getTransport().start(when);
+      getTransport().start(when);
     }
   }
 
   pause(): void {
-    Tone.getTransport().pause();
+    getTransport().pause();
     this.tracks.forEach(track => {
       track.pause();
     });
   }
 
   stop(): void {
-    Tone.getTransport().stop();
+    getTransport().stop();
     this.tracks.forEach(track => {
       track.stop();
     });
@@ -201,11 +212,11 @@ export class TonePlayout {
   }
 
   getCurrentTime(): number {
-    return Tone.getTransport().seconds;
+    return getTransport().seconds;
   }
 
   seekTo(time: number): void {
-    Tone.getTransport().seconds = time;
+    getTransport().seconds = time;
   }
 
   dispose(): void {
@@ -222,12 +233,12 @@ export class TonePlayout {
     this.masterVolume.dispose();
   }
 
-  get context(): Tone.BaseContext {
-    return Tone.getContext();
+  get context(): BaseContext {
+    return getContext();
   }
 
   get sampleRate(): number {
-    return Tone.getContext().sampleRate;
+    return getContext().sampleRate;
   }
 
   setOnPlaybackComplete(callback: () => void): void {

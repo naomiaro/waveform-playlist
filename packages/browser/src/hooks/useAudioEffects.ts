@@ -1,6 +1,7 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
 import type { EffectsFunction, TrackEffectsFunction } from '@waveform-playlist/playout';
-import type * as Tone from 'tone';
+// Import Tone.js classes directly for tree-shaking
+import { Analyser, Reverb, AutoWah } from 'tone';
 
 /**
  * Hook for master effects with frequency analyzer
@@ -9,9 +10,9 @@ import type * as Tone from 'tone';
 export const useMasterAnalyser = (fftSize: number = 256) => {
   const analyserRef = useRef<any>(null);
 
-  const masterEffects: EffectsFunction = useCallback((masterGainNode, destination, isOffline, ToneLib) => {
+  const masterEffects: EffectsFunction = useCallback((masterGainNode, destination, isOffline) => {
     // Create analyser and connect it in parallel to monitor the output
-    const analyserNode = new ToneLib.Analyser('fft', fftSize);
+    const analyserNode = new Analyser('fft', fftSize);
     masterGainNode.connect(analyserNode);
 
     // Connect master to destination as normal
@@ -34,8 +35,8 @@ export const useMasterAnalyser = (fftSize: number = 256) => {
  * Hook for creating a reverb effect on a track
  */
 export const useTrackReverb = (decay: number = 1.2) => {
-  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline, ToneLib) => {
-    const reverb = new ToneLib.Reverb({
+  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline) => {
+    const reverb = new Reverb({
       context: graphEnd.context,
       decay,
     });
@@ -62,8 +63,8 @@ export const useTrackAutoWah = (options: {
 } = {}) => {
   const { baseFrequency = 50, octaves = 6, sensitivity = -30 } = options;
 
-  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline, ToneLib) => {
-    const autoWah = new ToneLib.AutoWah({
+  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline) => {
+    const autoWah = new AutoWah({
       context: graphEnd.context,
       baseFrequency,
       octaves,

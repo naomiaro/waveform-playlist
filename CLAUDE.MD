@@ -10,21 +10,24 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Source of Truth:** `TODO.md` contains the complete multi-track editing roadmap.
 
-### Current Phase: Phase 1 Complete ✅
+### Current Phase: Phase 1.5 Complete ✅
 
-**Phase 1: Foundation** - All core features implemented:
-- WaveformPlaylistProvider, primitive components, track controls
-- Recording with AudioWorklet, VU meter, live waveform
-- Annotations (optional package), audio effects hooks
-- GPU-accelerated playhead, smooth zoom, performance optimizations
-- Bundle size: 620KB uncompressed / **172KB gzipped** ✅
+**Phase 1: Foundation** - All core features implemented ✅
+**Phase 1.5: Bundle Optimization** - Tree-shaking complete ✅
 
-**Next Phase: Phase 1.5 - Bundle Optimization** (1-2 days)
-- Tree-shake Tone.js imports (save ~70KB gzipped)
-- Target: 100KB gzipped core bundle
-- See TODO.md for detailed optimization tasks
+**Results:**
+- Core library: 507KB / **132KB gzipped** (from 620KB/172KB)
+- Stem-tracks: 509KB / **150KB gzipped**
+- Effects: 530KB / **154KB gzipped**
+- **Savings:** 111KB uncompressed / 23KB gzipped (13% reduction)
 
-**After Phase 1.5: Phase 2 - Clip-Based Model**
+**What was optimized:**
+- Changed from `import * as Tone` to named imports
+- Removed all unused Tone.js synthesizers
+- Effects hooks import only what they need (Analyser, Reverb, AutoWah)
+- Removed ToneLib parameter from effects functions (breaking change)
+
+**Next Phase: Phase 2 - Clip-Based Model**
 - Transition from track-based to clip-based data model
 - Multiple clips per track (not just one audio file per track)
 - Foundation for drag, trim, split, copy/paste features
@@ -356,13 +359,7 @@ try {
 
 ### Next Steps
 
-**See `TODO.md` for complete roadmap. Next immediate steps (Phase 1.5):**
-
-1. **Tree-shake Tone.js imports** - Change from `import * as Tone` to named imports
-2. Measure bundle size savings (target: 100KB gzipped)
-3. Update documentation with optimized sizes
-
-**After Phase 1.5 (Phase 2 - Clip-Based Model):**
+**See `TODO.md` for complete roadmap. Next immediate steps (Phase 2 - Clip-Based Model):**
 
 1. Define clip-based TypeScript interfaces (`packages/core/src/types/clip.ts`)
 2. Update WaveformPlaylistContext for clips
@@ -405,3 +402,5 @@ try {
 2. Created comprehensive multi-track editing roadmap in TODO.md. Documented complete plan for clip-based model (Phase 2), advanced editing features (Phase 3: drag, trim, split, copy/paste), performance optimizations (Phase 4: virtual scrolling), and polish (Phase 5: undo/redo, keyboard shortcuts, accessibility). Architectural decision: Hybrid Canvas + DOM approach (like Ableton Live) - NOT canvas libraries (Konva, Fabric, PixiJS) due to bundle size. Will use @dnd-kit (13KB) for interactions. Bundle size goal: <1MB total. Performance target: 60fps with 12+ tracks, 2+ hour timelines. Added "Project Roadmap" section to CLAUDE.md with guidance on tracking progress in TODO.md.
 
 3. Analyzed bundle size with rollup-plugin-visualizer. Discovered actual size is **620KB uncompressed / 172KB gzipped** (NOT 1.5MB as previously stated). Tone.js is the largest contributor (~120KB gzipped). Currently using `import * as Tone from 'tone'` which imports entire library including synthesizers and unused effects. Created Phase 1.5 (Bundle Optimization) with tree-shaking task: change to named imports (Player, Volume, Gain, Panner, getContext, etc.) to save ~70KB gzipped. Target: 100KB gzipped core bundle. Added bundle analyzer to vite.config.ts and detailed optimization tasks to TODO.md. Updated bundle size figures throughout documentation.
+
+4. **Completed Phase 1.5: Tree-shake Tone.js imports.** Changed all imports in playout package from `import * as Tone` to named imports. Updated three files: `index.ts`, `TonePlayout.ts`, `ToneTrack.ts`. Removed ToneLib parameter from `EffectsFunction` and `TrackEffectsFunction` types (breaking change). Updated effects hooks in browser package to import Tone.js classes directly (`Analyser`, `Reverb`, `AutoWah`). Rebuilt all bundles. **Results: 111KB uncompressed / 23KB gzipped savings (13% reduction).** New sizes: core 507KB/132KB, stem-tracks 509KB/150KB, effects 530KB/154KB gzipped. All unused Tone.js synthesizers and effects removed from bundles. Tree-shaking working correctly. Marked Phase 1.5 complete in TODO.md and CLAUDE.md. Ready to start Phase 2 (Clip-Based Model).

@@ -1,8 +1,8 @@
-import * as Tone from 'tone';
+import { setContext } from 'tone';
 import { getGlobalAudioContext } from './audioContext';
 
 // Initialize Tone.js to use our global AudioContext
-Tone.setContext(getGlobalAudioContext());
+setContext(getGlobalAudioContext());
 
 export { TonePlayout } from './TonePlayout';
 export { ToneTrack } from './ToneTrack';

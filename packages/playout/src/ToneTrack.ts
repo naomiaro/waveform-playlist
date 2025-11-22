@@ -1,22 +1,32 @@
-import * as Tone from 'tone';
+// Named imports for tree-shaking
+import {
+  Player,
+  Volume,
+  Gain,
+  Panner,
+  ToneAudioNode,
+  getDestination,
+  now,
+} from 'tone';
 import { Track, FadeType } from '@waveform-playlist/core';
 import { createFadeIn, createFadeOut } from 'fade-maker';
 
-export type TrackEffectsFunction = (graphEnd: Tone.Gain, masterGainNode: Tone.ToneAudioNode, isOffline: boolean, ToneLib: typeof Tone) => void | (() => void);
+// Effects function no longer receives ToneLib - effects should import Tone themselves
+export type TrackEffectsFunction = (graphEnd: Gain, masterGainNode: ToneAudioNode, isOffline: boolean) => void | (() => void);
 
 export interface ToneTrackOptions {
   buffer: AudioBuffer;
   track: Track;
   effects?: TrackEffectsFunction;
-  destination?: Tone.ToneAudioNode;
+  destination?: ToneAudioNode;
 }
 
 export class ToneTrack {
-  private player: Tone.Player;
-  private volumeNode: Tone.Volume;
-  private panNode: Tone.Panner;
-  private fadeGain: Tone.Gain;
-  private muteGain: Tone.Gain;
+  private player: Player;
+  private volumeNode: Volume;
+  private panNode: Panner;
+  private fadeGain: Gain;
+  private muteGain: Gain;
   private track: Track;
   private audioBuffer: AudioBuffer;
   private pausedPosition: number = 0;
@@ -29,7 +39,7 @@ export class ToneTrack {
     this.audioBuffer = options.buffer;
 
     // Create the audio chain
-    this.player = new Tone.Player({
+    this.player = new Player({
       url: options.buffer,
       loop: false,
       onstop: () => {
@@ -39,10 +49,10 @@ export class ToneTrack {
       },
     });
 
-    this.fadeGain = new Tone.Gain(1);
-    this.volumeNode = new Tone.Volume(this.gainToDb(options.track.gain));
-    this.panNode = new Tone.Panner(options.track.stereoPan);
-    this.muteGain = new Tone.Gain(options.track.muted ? 0 : 1);
+    this.fadeGain = new Gain(1);
+    this.volumeNode = new Volume(this.gainToDb(options.track.gain));
+    this.panNode = new Panner(options.track.stereoPan);
+    this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
     // Build base chain: Player -> FadeGain -> Volume -> Pan -> MuteGain
     this.player.chain(
@@ -53,9 +63,9 @@ export class ToneTrack {
     );
 
     // Connect to destination or apply effects chain
-    const destination = options.destination || Tone.getDestination();
+    const destination = options.destination || getDestination();
     if (options.effects) {
-      const cleanup = options.effects(this.muteGain, destination, false, Tone);
+      const cleanup = options.effects(this.muteGain, destination, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
@@ -116,12 +126,12 @@ export class ToneTrack {
     this.track.soloed = soloed;
   }
 
-  play(when: number = Tone.now(), offset: number = 0, duration?: number): void {
+  play(when: number = now(), offset: number = 0, duration?: number): void {
     // Don't start if already playing
     if (this.isPlaying) return;
 
     // Record when we started playing
-    this.playStartTime = Tone.now();
+    this.playStartTime = now();
 
     // Calculate the buffer position (not including track.startTime - that's handled by the playout scheduling)
     const bufferPosition = this.pausedPosition + offset;
@@ -138,13 +148,13 @@ export class ToneTrack {
     if (!this.isPlaying) return;
 
     // Calculate current position based on elapsed time
-    const elapsed = (Tone.now() - this.playStartTime) * this.player.playbackRate;
+    const elapsed = (now() - this.playStartTime) * this.player.playbackRate;
     this.pausedPosition = this.pausedPosition + elapsed;
 
     this.player.stop();
   }
 
-  stop(when: number = Tone.now()): void {
+  stop(when: number = now()): void {
     this.player.stop(when);
     this.pausedPosition = 0;
   }
