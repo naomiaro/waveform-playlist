@@ -280,52 +280,50 @@ See `multi-clip-app.tsx` for complete implementation example.
   - Size: 13KB gzipped
   - Modern, accessible, performant
 
-- [ ] **Remove ClipsPanel from multi-clip demo**
-  - Location: `packages/browser/src/multi-clip-app.tsx`
-  - Delete ClipsPanel styled component and list UI
-  - Remove DraggableClip component (was for separate list)
-  - Keep DndContext wrapper for future use
-
-- [ ] **Create ClipHeader component**
+- [x] **Create ClipHeader component** ✅
   - Location: `packages/ui-components/src/components/ClipHeader.tsx`
   - Renders at top of each Clip component
-  - Shows clip name/number
-  - Height: 20-24px (like Audacity)
-  - Background: Semi-transparent overlay
-  - Uses `useDraggable` from @dnd-kit
+  - Shows track name
+  - Height: 22px (CLIP_HEADER_HEIGHT constant)
+  - Background: Semi-transparent overlay with customizable colors
+  - Uses drag handle pattern (receives listeners as props)
   - Cursor: `grab` on hover, `grabbing` when dragging
 
-- [ ] **Integrate ClipHeader into Clip component**
+- [x] **Integrate ClipHeader into Clip component** ✅
   - Location: `packages/ui-components/src/components/Clip.tsx`
-  - Render ClipHeader as first child
+  - Clip uses `useDraggable` hook
+  - ClipHeader receives drag handle props (activator pattern)
   - Pass clip metadata (name, id, index)
-  - Handle pointer-events correctly
+  - Proper pointer-events handling
 
-- [ ] **Implement drag-to-move logic**
-  - Location: `packages/browser/src/WaveformPlaylistContext.tsx`
+- [x] **Implement drag-to-move logic** ✅
+  - Location: `packages/browser/src/multi-clip-app.tsx`
   - Handle DragEndEvent from @dnd-kit
   - Convert pixel delta to time shift
   - Update clip's startTime
   - Prevent negative startTime
-  - Optional: Snap to grid
+  - Uses restrictToHorizontalAxis modifier
 
-- [ ] **Handle ClickOverlay conflict**
-  - Location: `packages/ui-components/src/components/Playlist.tsx`
-  - Stop propagation of drag events to ClickOverlay
-  - Or: Add pointer-events logic based on what's being hovered
-  - Or: Use @dnd-kit sensors to prevent selection during drag
-
-- [ ] **Visual feedback during drag**
-  - Ghost outline at original position
-  - Clip moves in real-time with mouse
-  - Semi-transparent while dragging
-  - Optional: Snap indicators (grid lines)
-
-- [ ] **Update multi-clip demo**
+- [x] **Update multi-clip demo** ✅
   - Location: `packages/browser/src/multi-clip-app.tsx`
-  - Remove ClipsPanel UI
+  - DndContext wraps Waveform component
   - Instructions: "Drag clip headers to move clips along timeline"
   - Show clip headers on all clips
+
+- [ ] **Investigate occasional flicker on drop**
+  - Minor visual flicker occurs occasionally when dropping clips
+  - Likely a @dnd-kit library limitation
+  - Current implementation uses simpler drag handle pattern (no DragOverlay)
+  - May need to investigate @dnd-kit configuration or CSS will-change properties
+
+- [ ] **Implement collision detection**
+  - Prevent clips from overlapping when dragging
+  - Options:
+    - Hard collision: Can't drop if would overlap
+    - Push collision: Adjacent clips move out of the way
+    - Swap collision: Clips exchange positions
+  - Use @dnd-kit collision detection algorithms
+  - Visual feedback when collision would occur (red outline, shake animation)
 
 **Files to Create:**
 - `packages/ui-components/src/components/ClipHeader.tsx`
