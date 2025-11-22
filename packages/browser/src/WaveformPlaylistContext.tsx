@@ -226,7 +226,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 }) => {
   // State
   const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -250,6 +250,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isAutomaticScrollRef = useRef<boolean>(false);
   const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
+  const activeAnnotationIdRef = useRef<string | null>(null);
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
 
   // Custom hooks
@@ -263,6 +264,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const setContinuousPlay = useCallback((value: boolean) => {
     continuousPlayRef.current = value;  // Update ref synchronously
     setContinuousPlayState(value);       // Update state (triggers re-render)
+  }, []);
+
+  // Custom setter for activeAnnotationId that updates BOTH state and ref synchronously
+  const setActiveAnnotationId = useCallback((value: string | null) => {
+    activeAnnotationIdRef.current = value;  // Update ref synchronously
+    setActiveAnnotationIdState(value);       // Update state (triggers re-render)
   }, []);
 
   // Keep refs in sync with state
@@ -418,9 +425,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         if (continuousPlayRef.current) {
           // Continuous play ON: update active annotation and stop after last annotation
-          if (currentAnnotation && currentAnnotation.id !== activeAnnotationId) {
+          if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
             setActiveAnnotationId(currentAnnotation.id);
-          } else if (!currentAnnotation && activeAnnotationId !== null) {
+          } else if (!currentAnnotation && activeAnnotationIdRef.current !== null) {
             // We're no longer in any annotation - check if we're past the last one
             const lastAnnotation = annotations[annotations.length - 1];
             if (time >= lastAnnotation.end) {
@@ -437,8 +444,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           }
         } else {
           // Continuous play OFF: stop at end of current annotation
-          if (activeAnnotationId) {
-            const activeAnnotation = annotations.find(ann => ann.id === activeAnnotationId);
+          if (activeAnnotationIdRef.current) {
+            const activeAnnotation = annotations.find(ann => ann.id === activeAnnotationIdRef.current);
             if (activeAnnotation && time >= activeAnnotation.end) {
               // Stop playback at end of current annotation
               if (playoutRef.current) {
@@ -488,7 +495,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       animationFrameRef.current = requestAnimationFrame(updateTime);
     };
     animationFrameRef.current = requestAnimationFrame(updateTime);
-  }, [duration, audioBuffers, samplesPerPixel, annotations, activeAnnotationId, continuousPlay]);
+  }, [duration, audioBuffers, samplesPerPixel, annotations, continuousPlay]);
 
   const stopAnimationLoop = useCallback(() => {
     if (animationFrameRef.current) {
@@ -545,6 +552,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     const actualStartTime = startTime ?? currentTimeRef.current;
     playStartPositionRef.current = actualStartTime;
 
+    // Clear any existing playback complete callback before stopping
+    // Otherwise stopping will trigger the old callback and interfere with new playback
+    playoutRef.current.setOnPlaybackComplete(() => {});
+
     // Stop any existing playback and animation loop before starting
     playoutRef.current.stop();
     stopAnimationLoop();
@@ -554,11 +565,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     playbackStartTimeRef.current = now;
     audioStartPositionRef.current = actualStartTime;
 
-    if (playDuration !== undefined) {
-      playoutRef.current.setOnPlaybackComplete(() => {
-        pause();
-      });
-    }
+    // Don't set up playback complete callback for annotations
+    // The animation loop handles stopping at annotation boundaries
+    // This avoids callback timing issues when switching between annotations
 
     playoutRef.current.play(now, actualStartTime, playDuration);
     setIsPlaying(true);

@@ -28,7 +28,8 @@ export class TonePlayout {
   private manualMuteState: Map<string, boolean> = new Map();
   private effectsCleanup?: () => void;
   private onPlaybackCompleteCallback?: () => void;
-  private activeTracks: Set<string> = new Set();
+  private activeTracks: Map<string, number> = new Map(); // Map track ID to session ID
+  private playbackSessionId: number = 0;
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Volume(this.gainToDb(options.masterGain ?? 1));
@@ -98,6 +99,10 @@ export class TonePlayout {
 
     const playbackPosition = offset ?? 0;
 
+    // Increment session ID to invalidate old callbacks
+    this.playbackSessionId++;
+    const currentSessionId = this.playbackSessionId;
+
     // Clear active tracks and set up stop callbacks if duration is specified
     this.activeTracks.clear();
 
@@ -110,11 +115,14 @@ export class TonePlayout {
         const bufferOffset = playbackPosition - trackStartTime;
 
         if (duration !== undefined) {
-          this.activeTracks.add(toneTrack.id);
+          this.activeTracks.set(toneTrack.id, currentSessionId);
           toneTrack.setOnStopCallback(() => {
-            this.activeTracks.delete(toneTrack.id);
-            if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
-              this.onPlaybackCompleteCallback();
+            // Only process if this track is still in activeTracks with matching session ID
+            if (this.activeTracks.get(toneTrack.id) === currentSessionId) {
+              this.activeTracks.delete(toneTrack.id);
+              if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
+                this.onPlaybackCompleteCallback();
+              }
             }
           });
         }
@@ -125,11 +133,14 @@ export class TonePlayout {
         const delay = trackStartTime - playbackPosition;
 
         if (duration !== undefined) {
-          this.activeTracks.add(toneTrack.id);
+          this.activeTracks.set(toneTrack.id, currentSessionId);
           toneTrack.setOnStopCallback(() => {
-            this.activeTracks.delete(toneTrack.id);
-            if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
-              this.onPlaybackCompleteCallback();
+            // Only process if this track is still in activeTracks with matching session ID
+            if (this.activeTracks.get(toneTrack.id) === currentSessionId) {
+              this.activeTracks.delete(toneTrack.id);
+              if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
+                this.onPlaybackCompleteCallback();
+              }
             }
           });
         }
