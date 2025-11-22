@@ -2,7 +2,7 @@ import React, { FunctionComponent, ReactNode } from 'react';
 import styled from 'styled-components';
 import { usePlaylistInfo } from '../contexts/PlaylistInfo';
 import { useTrackControls } from '../contexts/TrackControls';
-import { CLIP_HEADER_HEIGHT } from './Clip';
+import { CLIP_HEADER_HEIGHT } from './ClipHeader';
 
 interface ContainerProps {
   readonly $numChannels: number;
