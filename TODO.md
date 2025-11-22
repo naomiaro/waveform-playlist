@@ -310,20 +310,18 @@ See `multi-clip-app.tsx` for complete implementation example.
   - Instructions: "Drag clip headers to move clips along timeline"
   - Show clip headers on all clips
 
-- [ ] **Investigate occasional flicker on drop**
-  - Minor visual flicker occurs occasionally when dropping clips
-  - Likely a @dnd-kit library limitation
-  - Current implementation uses simpler drag handle pattern (no DragOverlay)
-  - May need to investigate @dnd-kit configuration or CSS will-change properties
-
-- [ ] **Implement collision detection**
-  - Prevent clips from overlapping when dragging
-  - Options:
-    - Hard collision: Can't drop if would overlap
-    - Push collision: Adjacent clips move out of the way
-    - Swap collision: Clips exchange positions
-  - Use @dnd-kit collision detection algorithms
-  - Visual feedback when collision would occur (red outline, shake animation)
+- [x] **Implement real-time collision detection (Audacity-style)** ✅
+  - Constraints:
+    - Clip startTime cannot be negative (>= 0)
+    - Clip startTime cannot be before previous clip's endTime (startTime >= prevClip.endTime)
+    - Clip endTime cannot be after next clip's startTime (endTime <= nextClip.startTime)
+    - Clips can be adjacent (touching) but not overlapping
+  - Implementation:
+    - Custom modifier function applied during drag (real-time feedback)
+    - Also applied in handleDragEnd for final position validation
+  - Location: `packages/browser/src/multi-clip-app.tsx` and `flexible-example-app.tsx`
+  - Behavior: Drag preview is constrained in real-time, cannot overlap clips or go before time 0
+  - User experience matches Audacity - immediate boundary feedback while dragging
 
 **Files to Create:**
 - `packages/ui-components/src/components/ClipHeader.tsx`
@@ -859,6 +857,15 @@ See `multi-clip-app.tsx` for complete implementation example.
 ---
 
 ## 🔮 Future Considerations
+
+### Polish & Nice to Have
+
+- [ ] **Investigate occasional flicker on drop** (Low Priority)
+  - Minor visual flicker occurs occasionally when dropping clips
+  - Likely a @dnd-kit library limitation
+  - Current implementation uses simpler drag handle pattern (no DragOverlay)
+  - May need to investigate @dnd-kit configuration or CSS will-change properties
+  - Not blocking core functionality
 
 ### Advanced Features (Post-Launch)
 

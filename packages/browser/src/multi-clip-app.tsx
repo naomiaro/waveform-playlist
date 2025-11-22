@@ -99,6 +99,61 @@ interface PlaylistWithDragProps {
 const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
   const { samplesPerPixel, sampleRate } = usePlaylistData();
 
+  // Custom modifier for real-time collision detection during drag
+  const collisionModifier = React.useCallback((args: { transform: { x: number; y: number }; active: any }) => {
+    const { transform, active } = args;
+
+    if (!active?.data?.current) return transform;
+
+    const { trackIndex, clipIndex } = active.data.current as {
+      clipId: string;
+      trackIndex: number;
+      clipIndex: number;
+    };
+
+    const track = tracks[trackIndex];
+    if (!track) return transform;
+
+    const clip = track.clips[clipIndex];
+    if (!clip) return transform;
+
+    // Convert pixel delta to time delta
+    const timeDelta = (transform.x * samplesPerPixel) / sampleRate;
+    let newStartTime = clip.startTime + timeDelta;
+
+    // Get sorted clips for collision detection
+    const sortedClips = [...track.clips].sort((a, b) => a.startTime - b.startTime);
+    const sortedIndex = sortedClips.findIndex(c => c === clip);
+
+    // Constraint 1: Cannot go before time 0
+    newStartTime = Math.max(0, newStartTime);
+
+    // Constraint 2: Cannot overlap with previous clip
+    const previousClip = sortedIndex > 0 ? sortedClips[sortedIndex - 1] : null;
+    if (previousClip) {
+      const previousEndTime = previousClip.startTime + previousClip.duration;
+      newStartTime = Math.max(newStartTime, previousEndTime);
+    }
+
+    // Constraint 3: Cannot overlap with next clip
+    const nextClip = sortedIndex < sortedClips.length - 1 ? sortedClips[sortedIndex + 1] : null;
+    if (nextClip) {
+      const newEndTime = newStartTime + clip.duration;
+      if (newEndTime > nextClip.startTime) {
+        newStartTime = nextClip.startTime - clip.duration;
+      }
+    }
+
+    // Convert constrained time back to pixel delta
+    const constrainedTimeDelta = newStartTime - clip.startTime;
+    const constrainedX = (constrainedTimeDelta * sampleRate) / samplesPerPixel;
+
+    return {
+      ...transform,
+      x: constrainedX,
+    };
+  }, [tracks, samplesPerPixel, sampleRate]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
 
@@ -116,12 +171,37 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     const newTracks = tracks.map((track, tIdx) => {
       if (tIdx !== trackIndex) return track;
 
+      // Get sorted clips for collision detection
+      const sortedClips = [...track.clips].sort((a, b) => a.startTime - b.startTime);
+      const sortedIndex = sortedClips.findIndex(clip => clip === track.clips[clipIndex]);
+
       // Update the specific clip in this track
       const newClips = track.clips.map((clip, cIdx) => {
         if (cIdx !== clipIndex) return clip;
 
-        // Calculate new start time, ensuring it doesn't go negative
-        const newStartTime = Math.max(0, clip.startTime + timeDelta);
+        // Calculate desired new start time
+        let newStartTime = clip.startTime + timeDelta;
+
+        // Collision detection constraints:
+        // 1. Cannot go before time 0
+        newStartTime = Math.max(0, newStartTime);
+
+        // 2. Cannot overlap with previous clip
+        const previousClip = sortedIndex > 0 ? sortedClips[sortedIndex - 1] : null;
+        if (previousClip) {
+          const previousEndTime = previousClip.startTime + previousClip.duration;
+          newStartTime = Math.max(newStartTime, previousEndTime);
+        }
+
+        // 3. Cannot overlap with next clip
+        const nextClip = sortedIndex < sortedClips.length - 1 ? sortedClips[sortedIndex + 1] : null;
+        if (nextClip) {
+          const newEndTime = newStartTime + clip.duration;
+          if (newEndTime > nextClip.startTime) {
+            // Push back to be adjacent to next clip
+            newStartTime = nextClip.startTime - clip.duration;
+          }
+        }
 
         return {
           ...clip,
@@ -141,7 +221,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
   return (
     <DndContext
       onDragEnd={handleDragEnd}
-      modifiers={[restrictToHorizontalAxis]}
+      modifiers={[restrictToHorizontalAxis, collisionModifier]}
     >
       <Controls>
         <ControlGroup>
