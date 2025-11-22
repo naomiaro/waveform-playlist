@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
+import { DndContext, type DragEndEvent } from '@dnd-kit/core';
+import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import type { ClipTrack } from '@waveform-playlist/core';
+import { CLIP_HEADER_HEIGHT } from '@waveform-playlist/ui-components';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -19,6 +23,7 @@ import {
   AutomaticScrollCheckbox,
   Waveform,
   useWaveformPlaylist,
+  usePlaylistData,
 } from './index';
 import { useAudioTracks } from './hooks';
 
@@ -365,6 +370,7 @@ const Footer = styled.div`
 `;
 
 // Styled components for track controls
+// Height accounts for clip header (22px) + controls content
 const TrackControlsContainer = styled.div`
   padding: 0.4rem 0.5rem;
   background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
@@ -373,7 +379,7 @@ const TrackControlsContainer = styled.div`
   flex-direction: column;
   gap: 0.3rem;
   width: 120px;
-  height: 100px;
+  height: ${100 + CLIP_HEADER_HEIGHT}px; /* 122px total: 100px controls + 22px header */
   box-sizing: border-box;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
@@ -506,9 +512,12 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
 
   if (!trackState) return null;
 
+  // Get track name from the track state (from the ClipTrack data)
+  const trackName = trackState.name || `Track ${trackIndex + 1}`;
+
   return (
     <TrackControlsContainer>
-      <TrackTitle>Track {trackIndex + 1}</TrackTitle>
+      <TrackTitle>{trackName}</TrackTitle>
       <TrackButtonsRow>
         <TrackButton
           onClick={() => setTrackMute(trackIndex, !trackState.muted)}
@@ -640,9 +649,54 @@ const CustomTimestamp = styled.div<{ $left: number }>`
   letter-spacing: 0.05em;
 `;
 
-// Main app component showing the flexible layout
-const FlexiblePlaylistApp: React.FC = () => {
+// Inner component with drag handling - has access to playlist context
+interface PlaylistWithDragProps {
+  tracks: ClipTrack[];
+  onTracksChange: (tracks: ClipTrack[]) => void;
+}
+
+const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
   const { minimumPlaylistHeight } = useWaveformPlaylist();
+  const { samplesPerPixel, sampleRate } = usePlaylistData();
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+
+    // Extract clip metadata from drag data
+    const { trackIndex, clipIndex } = active.data.current as {
+      clipId: string;
+      trackIndex: number;
+      clipIndex: number;
+    };
+
+    // Convert pixel delta to time (seconds)
+    const timeDelta = (delta.x * samplesPerPixel) / sampleRate;
+
+    // Create new tracks array with updated clip position
+    const newTracks = tracks.map((track, tIdx) => {
+      if (tIdx !== trackIndex) return track;
+
+      // Update the specific clip in this track
+      const newClips = track.clips.map((clip, cIdx) => {
+        if (cIdx !== clipIndex) return clip;
+
+        // Calculate new start time, ensuring it doesn't go negative
+        const newStartTime = Math.max(0, clip.startTime + timeDelta);
+
+        return {
+          ...clip,
+          startTime: newStartTime,
+        };
+      });
+
+      return {
+        ...track,
+        clips: newClips,
+      };
+    });
+
+    onTracksChange(newTracks);
+  };
 
   return (
     <AppContainer>
@@ -680,25 +734,33 @@ const FlexiblePlaylistApp: React.FC = () => {
       </ControlBar>
 
       <MainContent $minHeight={minimumPlaylistHeight}>
-        <Waveform
-          theme={theme}
-          renderTrackControls={(trackIndex) => (
-            <CustomTrackControls trackIndex={trackIndex} />
-          )}
-          renderTimestamp={(timeMs, position) => {
-            const seconds = Math.floor(timeMs / 1000);
-            const s = seconds % 60;
-            const m = Math.floor(seconds / 60);
-            const formattedTime = `${m}:${String(s).padStart(2, '0')}`;
+        <DndContext
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToHorizontalAxis]}
+        >
+          <Waveform
+            theme={theme}
+            renderTrackControls={(trackIndex) => (
+              <CustomTrackControls trackIndex={trackIndex} />
+            )}
+            renderTimestamp={(timeMs, position) => {
+              const seconds = Math.floor(timeMs / 1000);
+              const s = seconds % 60;
+              const m = Math.floor(seconds / 60);
+              const formattedTime = `${m}:${String(s).padStart(2, '0')}`;
 
-            return (
-              <CustomTimestamp $left={position}>
-                {formattedTime}
-              </CustomTimestamp>
-            );
-          }}
-          showClipHeaders={true}
-        />
+              return (
+                <CustomTimestamp $left={position}>
+                  {formattedTime}
+                </CustomTimestamp>
+              );
+            }}
+            showClipHeaders={true}
+            clipHeaderBackgroundColor="rgba(44, 62, 80, 0.85)"
+            clipHeaderBorderColor="rgba(93, 173, 226, 0.4)"
+            clipHeaderTextColor="#ecf0f1"
+          />
+        </DndContext>
       </MainContent>
 
       <TimeControlsBar>
@@ -718,7 +780,7 @@ const FlexiblePlaylistApp: React.FC = () => {
       </TimeControlsBar>
 
       <Footer>
-        <div>✨ This layout is completely customizable!</div>
+        <div>✨ This layout is completely customizable! Drag clip headers to reposition clips.</div>
         <div>Powered by the new flexible Waveform Playlist API</div>
       </Footer>
     </AppContainer>
@@ -761,7 +823,17 @@ const FlexibleExampleAppWithAudio: React.FC = () => {
   // Use useMemo to prevent re-creating audioConfigs on every render
   const configs = React.useMemo(() => audioConfigs, []);
 
-  const { tracks, loading, error } = useAudioTracks(configs);
+  const { tracks: loadedTracks, loading, error } = useAudioTracks(configs);
+
+  // Local state for tracks so we can update clip positions on drag
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+
+  // Update local tracks when loading completes
+  React.useEffect(() => {
+    if (loadedTracks.length > 0) {
+      setTracks(loadedTracks);
+    }
+  }, [loadedTracks]);
 
   if (loading) {
     return (
@@ -797,7 +869,7 @@ const FlexibleExampleAppWithAudio: React.FC = () => {
       }}
       onReady={() => console.log('Flexible playlist loaded!')}
     >
-      <FlexiblePlaylistApp />
+      <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />
     </WaveformPlaylistProvider>
   );
 };

@@ -58,6 +58,9 @@ export interface WaveformProps {
   annotationListConfig?: any;
   className?: string;
   showClipHeaders?: boolean; // Show draggable headers on clips for multi-clip editing (requires @dnd-kit)
+  clipHeaderBackgroundColor?: string; // Background color for clip headers
+  clipHeaderBorderColor?: string; // Border color for clip headers
+  clipHeaderTextColor?: string; // Text color for clip headers
 }
 
 /**
@@ -72,6 +75,9 @@ export const Waveform: React.FC<WaveformProps> = ({
   annotationListConfig,
   className,
   showClipHeaders = false,
+  clipHeaderBackgroundColor,
+  clipHeaderBorderColor,
+  clipHeaderTextColor,
 }) => {
   // Split context usage for performance
   const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
@@ -389,6 +395,9 @@ export const Waveform: React.FC<WaveformProps> = ({
                             sampleRate={sampleRate}
                             samplesPerPixel={samplesPerPixel}
                             showHeader={showClipHeaders}
+                            clipHeaderBackgroundColor={clipHeaderBackgroundColor}
+                            clipHeaderBorderColor={clipHeaderBorderColor}
+                            clipHeaderTextColor={clipHeaderTextColor}
                           >
                             {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
                               <SmartChannel
