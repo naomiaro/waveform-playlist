@@ -123,35 +123,81 @@ interface WaveformTrack {
 
 ### New Model (Clip-Based)
 
+**Core Data Types** (already implemented in `packages/core/src/types/clip.ts`):
+
 ```typescript
 interface AudioClip {
   id: string;
-  audioBuffer: AudioBuffer;
-  startTime: number;        // Position on timeline (seconds)
-  duration: number;         // Clip duration (seconds)
-  offset: number;           // Start position within audio file (trim start)
+  audioBuffer: AudioBuffer;  // Decoded audio data
+  startTime: number;         // Position on timeline (seconds)
+  duration: number;          // Clip duration (seconds)
+  offset: number;            // Start position within audio file (trim start)
   fadeIn?: Fade;
   fadeOut?: Fade;
   gain: number;
+  name?: string;
+  color?: string;
 }
 
-interface Track {
+interface ClipTrack {
   id: string;
   name: string;
-  clips: AudioClip[];       // Multiple clips per track
+  clips: AudioClip[];        // Multiple clips per track
   muted: boolean;
   soloed: boolean;
   volume: number;
   pan: number;
+  color?: string;
+  height?: number;
   effects?: TrackEffectsFunction;
 }
 
 interface Timeline {
-  tracks: Track[];
-  duration: number;         // Total timeline duration
+  tracks: ClipTrack[];
+  duration: number;          // Total timeline duration
   sampleRate: number;
+  name?: string;
+  tempo?: number;
+  timeSignature?: { numerator: number; denominator: number };
 }
 ```
+
+**File-Reference Loading Pattern** (application-level optimization):
+
+When loading audio files, use a file-reference pattern to avoid duplicate fetches:
+
+```typescript
+// 1. Define source files with unique IDs
+const audioFiles = [
+  { id: 'vocals', src: 'media/audio/Vocals30.mp3' },
+  { id: 'guitar', src: 'media/audio/Guitar30.mp3' },
+];
+
+// 2. Load each file once, store in Map
+const fileBuffers = new Map<string, AudioBuffer>();
+for (const file of audioFiles) {
+  const response = await fetch(file.src);
+  const buffer = await audioContext.decodeAudioData(await response.arrayBuffer());
+  fileBuffers.set(file.id, buffer);
+}
+
+// 3. Create clips by referencing loaded buffers
+const clip1 = createClip({
+  audioBuffer: fileBuffers.get('vocals')!,
+  startTime: 0,
+  duration: 10,
+  offset: 0,
+});
+
+const clip2 = createClip({
+  audioBuffer: fileBuffers.get('vocals')!, // Same buffer, different clip
+  startTime: 20,
+  duration: 10,
+  offset: 20,
+});
+```
+
+See `multi-clip-app.tsx` for complete implementation example.
 
 **Benefits:**
 - ✅ Multiple audio clips per track
@@ -159,13 +205,17 @@ interface Timeline {
 - ✅ Clips can overlap (crossfade support)
 - ✅ Each clip has independent trim points
 - ✅ Gaps between clips are silent (expected behavior)
+- ✅ File-reference pattern prevents duplicate loading
+- ✅ Multiple clips can share the same source file
 
 ### Tasks
 
-- [ ] **Define clip-based TypeScript interfaces**
+- [x] **Define clip-based TypeScript interfaces** ✅ Already implemented!
   - Location: `packages/core/src/types/clip.ts`
-  - AudioClip, Track, Timeline interfaces
-  - Migration helpers from old Track format
+  - AudioClip, ClipTrack, Timeline interfaces
+  - Factory functions: `createClip()`, `createTrack()`, `createTimeline()`
+  - Utility functions: `getClipsInRange()`, `getClipsAtTime()`, `sortClipsByTime()`, `findGaps()`
+  - Used in multi-clip demo (`multi-clip-app.tsx`)
 
 - [ ] **Update WaveformPlaylistContext for clips**
   - Location: `packages/browser/src/WaveformPlaylistContext.tsx`
@@ -192,9 +242,9 @@ interface Timeline {
   - Show gaps between clips
 
 **Files to Create:**
-- `packages/core/src/types/clip.ts`
-- `packages/browser/src/clips-app.tsx`
-- `ghpages/_examples/17clips.html`
+- ~~`packages/core/src/types/clip.ts`~~ ✅ Already exists!
+- `packages/browser/src/clips-app.tsx` (or use existing `multi-clip-app.tsx` as foundation)
+- ~~`ghpages/_examples/17clips.html`~~ ✅ Already exists as `18multi-clip.html`
 
 **Files to Modify:**
 - `packages/browser/src/WaveformPlaylistContext.tsx`
