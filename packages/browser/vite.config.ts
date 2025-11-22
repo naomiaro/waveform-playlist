@@ -15,6 +15,7 @@ const entryPoints: Record<string, string> = {
   'flexible-example': resolve(__dirname, 'src/flexible-example-app.tsx'),
   effects: resolve(__dirname, 'src/effects-app.tsx'),
   recording: resolve(__dirname, 'src/recording-app.tsx'),
+  'multi-clip': resolve(__dirname, 'src/multi-clip-app.tsx'),
 };
 
 const outputNames: Record<string, string> = {
@@ -26,6 +27,7 @@ const outputNames: Record<string, string> = {
   'flexible-example': 'flexible-example-bundle',
   effects: 'effects-bundle',
   recording: 'recording-bundle',
+  'multi-clip': 'multi-clip-bundle',
 };
 
 export default defineConfig({

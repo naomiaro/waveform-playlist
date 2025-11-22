@@ -26,6 +26,9 @@ VITE_ENTRY=effects vite build
 echo "Building recording bundle..."
 VITE_ENTRY=recording vite build
 
+echo "Building multi-clip bundle..."
+VITE_ENTRY=multi-clip vite build
+
 echo "Copying recording worklet..."
 mkdir -p ../../ghpages/js/worklet
 cp ../recording/dist/recording-processor.worklet.js ../../ghpages/js/worklet/

@@ -14,22 +14,34 @@ export interface AudioTrackConfig {
   pan?: number;
   color?: string;
   effects?: any; // TrackEffectsFunction
+  // Multi-clip support
+  startTime?: number;  // When the clip starts on the timeline (default: 0)
+  duration?: number;   // Duration of the clip (default: full audio duration)
+  offset?: number;     // Offset into the source audio file (default: 0)
 }
 
 /**
  * Hook to load audio from URLs and convert to ClipTrack format
  *
  * This hook fetches audio files, decodes them, and creates ClipTrack objects
- * with a single clip per track (positioned at startTime: 0).
+ * with a single clip per track. Supports custom positioning for multi-clip arrangements.
  *
  * @param configs - Array of audio track configurations
  * @returns Object with tracks array and loading state
  *
  * @example
  * ```typescript
+ * // Basic usage (clips positioned at start)
  * const { tracks, loading, error } = useAudioTracks([
  *   { src: 'audio/vocals.mp3', name: 'Vocals' },
  *   { src: 'audio/drums.mp3', name: 'Drums' },
+ * ]);
+ *
+ * // Multi-clip positioning (clips at different times with gaps)
+ * const { tracks, loading, error } = useAudioTracks([
+ *   { src: 'audio/guitar.mp3', name: 'Guitar Clip 1', startTime: 0, duration: 3 },
+ *   { src: 'audio/guitar.mp3', name: 'Guitar Clip 2', startTime: 5, duration: 3, offset: 5 },
+ *   { src: 'audio/vocals.mp3', name: 'Vocals', startTime: 2, duration: 4 },
  * ]);
  *
  * if (loading) return <div>Loading...</div>;
@@ -72,9 +84,9 @@ export function useAudioTracks(configs: AudioTrackConfig[]) {
           // Create a single clip for this track
           const clip = createClip({
             audioBuffer,
-            startTime: 0,  // Single clip starts at beginning
-            duration: audioBuffer.duration,  // Full duration
-            offset: 0,  // No trim
+            startTime: config.startTime ?? 0,  // Use config or default to 0
+            duration: config.duration ?? audioBuffer.duration,  // Use config or full duration
+            offset: config.offset ?? 0,  // Use config or no trim
             name: config.name || `Track ${index + 1}`,
           });
 

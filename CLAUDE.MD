@@ -93,6 +93,24 @@ Benefits: ~60% code reduction, consistent styling, easier maintenance.
 - Dev server: `http://localhost:4000/waveform-playlist/`
 - Always hard refresh (Cmd+Shift+R) after builds
 
+### Jekyll Example Pages Convention
+
+**File naming pattern:** `ghpages/_examples/##name.html`
+
+- **Use numbered prefixes** (e.g., `01minimal.html`, `18multi-clip.html`) to control ordering in Jekyll listings
+- **Keep `flexible-api.html` last** by not numbering it
+- **Always add `permalink:` attribute** in front matter for clean, permanent URLs:
+  ```yaml
+  ---
+  layout: example
+  javascript: multi-clip-bundle.js
+  title: Multi-Clip Playback
+  permalink: /examples/multi-clip.html
+  ---
+  ```
+
+**Why:** Numbered filenames control display order, but permalinks provide clean, permanent URLs that won't break if file ordering changes.
+
 ## Chrome Remote Debugging
 
 ```bash

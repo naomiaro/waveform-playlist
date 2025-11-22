@@ -375,9 +375,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             };
 
             // Convert ClipTrack clips to ToneTrack ClipInfo format
+            // Note: ClipInfo.startTime is relative to track start, not absolute timeline
             const clipInfos = track.clips.map(clip => ({
               buffer: clip.audioBuffer,
-              startTime: clip.startTime,
+              startTime: clip.startTime - startTime, // Make relative to track start
               duration: clip.duration,
               offset: clip.offset,
               fadeIn: clip.fadeIn,
@@ -421,11 +422,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // Generate peaks for each clip in each track
     const allTrackPeaks: TrackClipPeaks[] = tracks.map((track) => {
       const clipPeaks: ClipPeaks[] = track.clips.map((clip) => {
+        // Generate peaks with trimming based on clip's offset and duration
         const peaks = generatePeaks(
           clip.audioBuffer,
           samplesPerPixel,
           mono,
-          bits
+          bits,
+          clip.offset || 0,        // Time offset into the audio file
+          clip.duration            // Duration of the clip
         );
 
         return {

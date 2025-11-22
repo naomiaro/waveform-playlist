@@ -266,8 +266,8 @@ export class ToneTrack {
   }
 
   get startTime(): number {
-    // Return the start time of the first clip
-    return this.clips[0]?.clipInfo.startTime ?? 0;
+    // Return the track's absolute start time on the timeline
+    return this.track.startTime;
   }
 
   setOnStopCallback(callback: () => void): void {
