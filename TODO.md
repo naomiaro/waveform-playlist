@@ -901,7 +901,7 @@ See `multi-clip-app.tsx` for complete implementation example.
 - [x] All examples migrated to provider pattern
 - [x] Obsolete code cleanup (WaveformPlaylistComponent, Jekyll includes)
 
-### 2025-01-19
+### 2025-11-19
 
 - [x] Selection time inputs (React components)
 - [x] Time formatting utilities
