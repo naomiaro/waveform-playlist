@@ -3,6 +3,7 @@ import { ThemeProvider } from 'styled-components';
 import {
   Playlist,
   Track as TrackComponent,
+  Clip,
   SmartChannel,
   Playhead,
   Selection,
@@ -350,35 +351,49 @@ export const Waveform: React.FC<WaveformProps> = ({
                   </Controls>
                 );
 
-                // For now, render only the first clip per track (multi-clip rendering comes next)
-                // This maintains backward compatibility with single-clip tracks
-                const firstClip = trackClipPeaks[0];
-
-                if (!firstClip) {
+                // Render all clips for this track
+                if (trackClipPeaks.length === 0) {
                   return null; // Skip tracks with no clips
                 }
 
-                const peaksData = firstClip.peaks;
-                const width = peaksData.length;
+                // Determine max number of channels across all clips
+                const maxChannels = Math.max(
+                  ...trackClipPeaks.map(clip => clip.peaks.data.length)
+                );
 
                 return (
                   <TrackControlsContext.Provider key={trackIndex} value={trackControls}>
                     <TrackComponent
-                      numChannels={peaksData.data.length}
+                      numChannels={maxChannels}
                       backgroundColor={theme.waveOutlineColor}
                       offset={0}
                       width={tracksFullWidth}
                     >
-                      {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
-                        <SmartChannel
-                          key={`${trackIndex}-${channelIndex}`}
-                          index={channelIndex}
-                          data={channelPeaks}
-                          bits={peaksData.bits}
-                          length={width}
-                          progress={0}
-                        />
-                      ))}
+                      {trackClipPeaks.map((clip, clipIndex) => {
+                        const peaksData = clip.peaks;
+                        const width = peaksData.length;
+
+                        return (
+                          <Clip
+                            key={`${trackIndex}-${clipIndex}`}
+                            startTime={clip.startTime}
+                            duration={clip.duration}
+                            sampleRate={sampleRate}
+                            samplesPerPixel={samplesPerPixel}
+                          >
+                            {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
+                              <SmartChannel
+                                key={`${trackIndex}-${clipIndex}-${channelIndex}`}
+                                index={channelIndex}
+                                data={channelPeaks}
+                                bits={peaksData.bits}
+                                length={width}
+                                progress={0}
+                              />
+                            ))}
+                          </Clip>
+                        );
+                      })}
                     </TrackComponent>
                   </TrackControlsContext.Provider>
                 );

@@ -363,9 +363,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             const firstClip = track.clips[0];
 
             const trackObj: Track = {
-              id: track.id,
+              id: `track-${index}`, // Use consistent index-based ID for track controls
               name: track.name,
-              gain: firstClip.gain,
+              gain: track.volume, // Use track-level volume, not clip gain
               muted: track.muted,
               soloed: track.soloed,
               stereoPan: track.pan,

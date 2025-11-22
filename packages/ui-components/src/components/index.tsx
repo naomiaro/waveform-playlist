@@ -2,6 +2,7 @@ export * from './AudioPosition';
 export * from './AutomaticScrollCheckbox';
 export * from './BBCExtractPeaks';
 export * from './Channel';
+export * from './Clip';
 export * from './MasterVolumeControl';
 export * from './Playhead';
 export * from './Playlist';
