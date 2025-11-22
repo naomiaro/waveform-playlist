@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // Get the entry point from environment variable
 const entry = process.env.VITE_ENTRY || 'index';
@@ -28,7 +29,14 @@ const outputNames: Record<string, string> = {
 };
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    visualizer({
+      filename: './bundle-stats.html',
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ],
   build: {
     outDir: '../../ghpages/js',
     emptyOutDir: false,

@@ -93,10 +93,12 @@ Transform waveform-playlist into a professional multi-track audio editor with:
 - [x] Chrome DevTools MCP for testing
 
 **Current Bundle Sizes:**
-- Core library: ~1.5MB
+- Core library: 620KB uncompressed / **172KB gzipped** ✅
 - Recording package: ~50KB
 - Annotations package: ~50KB
-- Total: ~1.6MB
+- Total: ~720KB uncompressed / **~200KB gzipped**
+
+**Note:** Previous estimate of 1.5MB was incorrect - actual gzipped size is much better!
 
 ---
 
@@ -671,33 +673,58 @@ interface Timeline {
 
 ## 📦 Bundle Size Goals
 
-**Current:** ~1.6MB (1.5MB core + recording + annotations)
+**Current:** 720KB uncompressed / **200KB gzipped**
 
-**Target:** <1MB total
+**Target:** 400KB uncompressed / **<100KB gzipped**
 
-### Breakdown
+### Current Breakdown (Gzipped)
 
-- Core library: 650KB (down from 1.5MB)
-  - Remove unused Tone.js modules
-  - Code splitting for advanced features
-  - Tree-shake styled-components
+- Core library: **172KB** (includes Tone.js, React, styled-components)
+  - Tone.js: ~120KB (can reduce to ~50KB with tree-shaking) ⚡
+  - React + ReactDOM: ~30KB
+  - Your code: ~22KB
+- Recording (optional): ~15KB
+- Annotations (optional): ~15KB
 
-- @dnd-kit: 13KB ✅
-- Recording (optional): 50KB ✅
-- Annotations (optional): 50KB ✅
-- Effects (future optional): 50KB
-- Undo/Redo: 10KB
-- Virtual scrolling: 15KB
+**Total Current:** ~200KB gzipped
 
-**Total:** ~775KB (under 1MB goal)
+### After Optimization (Projected)
+
+- Core library: **100KB** (tree-shaked Tone.js + React)
+- @dnd-kit: 13KB (for drag/drop in Phase 3)
+- Recording (optional): 15KB
+- Annotations (optional): 15KB
+- Effects (future optional): 10KB
+- Undo/Redo: 5KB
+- Virtual scrolling: 10KB
+
+**Total Optimized:** ~168KB gzipped
 
 ### Optimization Tasks
 
-- [ ] Analyze bundle with rollup-plugin-visualizer
-- [ ] Lazy load Tone.js effects
-- [ ] Split annotations into separate chunk
-- [ ] Remove moment.js if used (use native Intl)
+**High Priority (Phase 1.5 - Before Phase 2):**
+
+- [x] ~~Analyze bundle with rollup-plugin-visualizer~~ ✅ Added to vite.config.ts
+- [ ] **Tree-shake Tone.js imports** (BIGGEST WIN - save ~70KB gzipped)
+  - Location: `packages/playout/src/*.ts`
+  - Change from `import * as Tone from 'tone'` to named imports
+  - Only import: `Player, Volume, Gain, Panner, getContext, setContext, getDestination, now, start`
+  - Remove: All synthesizers, unused effects, Transport (if not needed)
+  - Expected savings: 200-300KB uncompressed / 70-100KB gzipped
+  - See bundle-stats.html for visualization
+
+**Medium Priority:**
+
+- [ ] Externalize React/ReactDOM for library builds (when used as npm package)
+- [ ] Code split effects into optional package
+- [ ] Lazy load advanced features (annotations, effects)
 - [ ] Minimize styled-components runtime
+
+**Low Priority:**
+
+- [ ] Remove unused standardized-audio-context polyfills
+- [ ] Optimize waveform rendering code
+- [ ] Use native Intl for date formatting (if moment.js detected)
 
 ---
 
@@ -807,13 +834,20 @@ interface Timeline {
 
 **Estimated Milestones:**
 
-1. **Phase 2: Clip-Based Model** - Foundation for all editing
-2. **Phase 3.1-3.2: Drag & Trim** - Core editing operations
-3. **Phase 3.3-3.4: Split & Copy/Paste** - Power user features
-4. **Phase 4: Performance** - Scale to professional use cases
-5. **Phase 5: Polish** - Production-ready UX
+1. **Phase 1.5: Bundle Optimization** - Tree-shake Tone.js, analyze bundle (1-2 days)
+2. **Phase 2: Clip-Based Model** - Foundation for all editing
+3. **Phase 3.1-3.2: Drag & Trim** - Core editing operations
+4. **Phase 3.3-3.4: Split & Copy/Paste** - Power user features
+5. **Phase 4: Performance** - Scale to professional use cases
+6. **Phase 5: Polish** - Production-ready UX
 
-**Next Immediate Steps:**
+**Next Immediate Steps (Phase 1.5):**
+
+1. **Tree-shake Tone.js imports** - Change to named imports in playout package
+2. Rebuild and measure savings (target: 100KB gzipped)
+3. Update documentation with optimized bundle sizes
+
+**After Phase 1.5 (Phase 2):**
 
 1. Define clip-based TypeScript interfaces
 2. Update WaveformPlaylistContext for clips

@@ -17,8 +17,14 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - Recording with AudioWorklet, VU meter, live waveform
 - Annotations (optional package), audio effects hooks
 - GPU-accelerated playhead, smooth zoom, performance optimizations
+- Bundle size: 620KB uncompressed / **172KB gzipped** ✅
 
-**Next Phase: Phase 2 - Clip-Based Model**
+**Next Phase: Phase 1.5 - Bundle Optimization** (1-2 days)
+- Tree-shake Tone.js imports (save ~70KB gzipped)
+- Target: 100KB gzipped core bundle
+- See TODO.md for detailed optimization tasks
+
+**After Phase 1.5: Phase 2 - Clip-Based Model**
 - Transition from track-based to clip-based data model
 - Multiple clips per track (not just one audio file per track)
 - Foundation for drag, trim, split, copy/paste features
@@ -350,7 +356,13 @@ try {
 
 ### Next Steps
 
-**See `TODO.md` for complete roadmap. Next immediate steps:**
+**See `TODO.md` for complete roadmap. Next immediate steps (Phase 1.5):**
+
+1. **Tree-shake Tone.js imports** - Change from `import * as Tone` to named imports
+2. Measure bundle size savings (target: 100KB gzipped)
+3. Update documentation with optimized sizes
+
+**After Phase 1.5 (Phase 2 - Clip-Based Model):**
 
 1. Define clip-based TypeScript interfaces (`packages/core/src/types/clip.ts`)
 2. Update WaveformPlaylistContext for clips
@@ -391,3 +403,5 @@ try {
 1. Fixed VU meter jittery/flat issue during recording. Root cause: Worklet was sending RMS values at 60fps (180 state updates/sec) conflicting with AnalyserNode also updating at 60fps (120 state updates/sec) = 300 total state updates causing rendering bottleneck. Solution: Removed all RMS calculation from worklet - it now only captures samples and generates peaks for live waveform. AnalyserNode is single source of truth for VU meter levels (smoothingTimeConstant=0.8). No gain boost needed. Also automated worklet copy in build-all.sh script, fixed TypeScript errors (AudioParamDescriptor type, Track.src union type), and removed debug logging. Updated DEBUGGING.md with architecture decision and troubleshooting steps.
 
 2. Created comprehensive multi-track editing roadmap in TODO.md. Documented complete plan for clip-based model (Phase 2), advanced editing features (Phase 3: drag, trim, split, copy/paste), performance optimizations (Phase 4: virtual scrolling), and polish (Phase 5: undo/redo, keyboard shortcuts, accessibility). Architectural decision: Hybrid Canvas + DOM approach (like Ableton Live) - NOT canvas libraries (Konva, Fabric, PixiJS) due to bundle size. Will use @dnd-kit (13KB) for interactions. Bundle size goal: <1MB total. Performance target: 60fps with 12+ tracks, 2+ hour timelines. Added "Project Roadmap" section to CLAUDE.md with guidance on tracking progress in TODO.md.
+
+3. Analyzed bundle size with rollup-plugin-visualizer. Discovered actual size is **620KB uncompressed / 172KB gzipped** (NOT 1.5MB as previously stated). Tone.js is the largest contributor (~120KB gzipped). Currently using `import * as Tone from 'tone'` which imports entire library including synthesizers and unused effects. Created Phase 1.5 (Bundle Optimization) with tree-shaking task: change to named imports (Player, Volume, Gain, Panner, getContext, etc.) to save ~70KB gzipped. Target: 100KB gzipped core bundle. Added bundle analyzer to vite.config.ts and detailed optimization tasks to TODO.md. Updated bundle size figures throughout documentation.
