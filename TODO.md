@@ -877,6 +877,18 @@ See `multi-clip-app.tsx` for complete implementation example.
   - May need to investigate @dnd-kit configuration or CSS will-change properties
   - Not blocking core functionality
 
+- [ ] **Improve peak rendering during trim** (Low Priority)
+  - Waveform peaks adjust/flicker when trimming (especially left boundary drag)
+  - Root cause: Peaks are normalized based on visible audio range
+  - When trimming changes the visible range, max amplitude changes, causing peaks to rescale
+  - Potential solutions:
+    1. **File-level normalization** - Normalize all clips from same source file together (most stable)
+    2. **Cache original peak heights** - Store peaks at full file level, clip to visible range
+    3. **Debounce recalculation** - Only recalculate peaks on drag end (less real-time feedback)
+    4. **Absolute peaks** - Don't normalize, show actual amplitude (might be too quiet/loud)
+  - Trade-off: Stability vs. optimal peak visibility for each clip
+  - Not blocking core functionality, cosmetic issue only
+
 ### Advanced Features (Post-Launch)
 
 - [ ] Crossfades between overlapping clips
