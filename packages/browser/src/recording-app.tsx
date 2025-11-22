@@ -341,13 +341,6 @@ function RecordingApp() {
   return (
     <Container>
       <Section>
-        <InfoBox>
-          <p>
-            <strong>Note:</strong> This example requires HTTPS or localhost. Make sure to grant
-            microphone permissions when prompted.
-          </p>
-        </InfoBox>
-
         {error && (
           <InfoBox style={{ background: '#f8d7da', borderColor: '#f5c6cb', color: '#721c24' }}>
             <strong>Error:</strong> {error.message}
