@@ -10,12 +10,16 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Source of Truth:** `TODO.md` contains the complete multi-track editing roadmap.
 
-### Current Phase: Phase 1.5 Complete ✅
+### Current Phase: Phase 3.3 - Splitting Clips 🚧
 
-**Phase 1: Foundation** - All core features implemented ✅
-**Phase 1.5: Bundle Optimization** - Tree-shaking complete ✅
+**Completed Phases:**
+- ✅ **Phase 1: Foundation** - All core features implemented
+- ✅ **Phase 1.5: Bundle Optimization** - Tree-shaking complete (23KB savings)
+- ✅ **Phase 2: Clip-Based Model** - Multi-clip support fully implemented
+- ✅ **Phase 3.1a: Drag to Move** - Clip headers with drag-to-reposition
+- ✅ **Phase 3.1b: Drag to Trim** - Clip boundaries with bidirectional trimming
 
-**Results:**
+**Bundle Size Results:**
 - Core library: 507KB / **132KB gzipped** (from 620KB/172KB)
 - Stem-tracks: 509KB / **150KB gzipped**
 - Effects: 530KB / **154KB gzipped**
@@ -27,10 +31,18 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - Effects hooks import only what they need (Analyser, Reverb, AutoWah)
 - Removed ToneLib parameter from effects functions (breaking change)
 
-**Next Phase: Phase 2 - Clip-Based Model**
-- Transition from track-based to clip-based data model
-- Multiple clips per track (not just one audio file per track)
-- Foundation for drag, trim, split, copy/paste features
+**Recent Achievements (Phase 3.1):**
+- Clip headers with drag-to-move functionality
+- Clip boundaries with bidirectional trimming (left/right edges)
+- Real-time collision detection (Audacity-style)
+- Reusable `useClipDragHandlers` hook for drag operations
+- Smooth visual feedback during all drag interactions
+
+**Next Phase: Phase 3.3 - Splitting Clips**
+- Implement split logic (split clip at playhead/cursor)
+- Keyboard shortcuts ('S' key)
+- Visual feedback (scissors cursor, split indicator)
+- Foundation for copy/paste and multi-select operations
 
 ### Tracking Progress
 
@@ -387,32 +399,45 @@ try {
 
 ### Status
 
-- React refactor in progress
-- All React examples migrated to provider pattern
-- Performance optimizations completed (GPU playhead, smooth zoom)
+**Completed Phases:**
+- ✅ **Phase 1: Foundation** - All core features implemented
+- ✅ **Phase 1.5: Bundle Optimization** - Tree-shaking complete (23KB gzipped savings)
+- ✅ **Phase 2: Clip-Based Model** - Multi-clip support fully implemented
+- ✅ **Phase 3.1a: Drag to Move** - Clip headers with drag-to-reposition
+- ✅ **Phase 3.1b: Drag to Trim** - Clip boundaries with bidirectional trimming
+
+**Key Achievements:**
+- React refactor complete with provider pattern
+- Performance optimizations completed (GPU playhead, smooth zoom, 60fps)
 - Recording architecture implemented (global AudioContext, shared MediaStreamSource)
-- **VU meter during recording fixed** (AnalyserNode-only, no worklet RMS)
+- VU meter during recording fixed (AnalyserNode-only, no worklet RMS)
 - Selection inputs, custom hooks, flexible API, theming all implemented
-- Annotations as optional package
+- Annotations as optional package with useAnnotationControls hook
 - Audio effects hooks (analyser, reverb, auto-wah, effects chain)
-- TrackControlsWithDelete component created
-- Obsolete code removed
-- Worklet copy automated in build script
+- **Clip-based editing working:** Multiple clips per track with proper playback and gaps
+- **Professional drag operations:** Real-time collision detection, smooth visual feedback
+- **Reusable `useClipDragHandlers` hook** - 300+ lines of centralized drag logic
+
+**Bundle Sizes (Optimized):**
+- Core library: 507KB / **132KB gzipped** (from 620KB/172KB)
+- Stem-tracks: 509KB / **150KB gzipped**
+- Effects: 530KB / **154KB gzipped**
 
 ### Next Steps
 
-**See `TODO.md` for complete roadmap. Next immediate steps (Phase 2 - Clip-Based Model):**
+**See `TODO.md` for complete roadmap. Next immediate steps (Phase 3.3 - Splitting Clips):**
 
-1. Define clip-based TypeScript interfaces (`packages/core/src/types/clip.ts`)
-2. Update WaveformPlaylistContext for clips
-3. Implement basic clip rendering (multiple clips per track)
-4. Update playback engine for multiple clips
-5. Create simple clips demo example
+1. Implement split logic (split clip at playhead/cursor position)
+2. Create `useClipSplitting` hook
+3. Add keyboard shortcut ('S' key)
+4. Visual feedback (scissors cursor, split indicator)
+5. Update multi-clip demo with split functionality
 
 **Future Phases:**
-- Phase 3: Drag, trim, split, copy/paste operations
-- Phase 4: Performance & virtual scrolling
-- Phase 5: Polish (undo/redo, keyboard shortcuts, accessibility)
+- Phase 3.4: Copy/paste clips with keyboard shortcuts
+- Phase 3.5: Multi-select and bulk operations
+- Phase 4: Performance & virtual scrolling (unlimited timeline, 12+ tracks)
+- Phase 5: Polish (undo/redo, snap to grid, keyboard shortcuts, accessibility)
 
 ## Important Notes
 
