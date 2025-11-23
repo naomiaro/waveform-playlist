@@ -8,7 +8,7 @@ import { createTrack, createClip, type ClipTrack } from '@waveform-playlist/core
 import {
   WaveformPlaylistProvider,
   usePlaylistData,
-  usePlaybackAnimation,
+  usePlaylistControls,
   useClipDragHandlers,
   useClipSplitting,
   useKeyboardShortcuts,
@@ -102,21 +102,30 @@ interface PlaylistWithDragProps {
 
 const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
   const { samplesPerPixel, sampleRate } = usePlaylistData();
-  const { currentTime } = usePlaybackAnimation();
+  const { setSelectedTrackId } = usePlaylistControls();
 
   // Use the clip drag handlers hook for all drag operations
-  const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
+  const { onDragStart: handleDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
     tracks,
     onTracksChange,
     samplesPerPixel,
     sampleRate,
   });
 
+  // Wrap onDragStart to track selected track
+  const onDragStart = (event: any) => {
+    const trackIndex = event.active?.data?.current?.trackIndex;
+    if (trackIndex !== undefined && tracks[trackIndex]) {
+      console.log(`[Track Selection] Dragged clip on track "${tracks[trackIndex].name}" (ID: ${tracks[trackIndex].id})`);
+      setSelectedTrackId(tracks[trackIndex].id);
+    }
+    handleDragStart(event);
+  };
+
   // Use the clip splitting hook for split functionality
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
     onTracksChange,
-    currentTime,
   });
 
   // Set up keyboard shortcuts
@@ -124,14 +133,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     shortcuts: [
       {
         key: 's',
-        action: () => {
-          const success = splitClipAtPlayhead();
-          if (success) {
-            console.log('Clip split at playhead position:', currentTime);
-          } else {
-            console.log('No clip found at playhead position');
-          }
-        },
+        action: splitClipAtPlayhead,
         description: 'Split clip at playhead',
         preventDefault: true,
       },

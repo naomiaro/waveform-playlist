@@ -100,11 +100,13 @@ export const Waveform: React.FC<WaveformProps> = ({
     setSelection,
     play,
     setScrollContainer,
+    setSelectedTrackId,
   } = usePlaylistControls();
   const {
     audioBuffers,
     peaksDataArray,
     trackStates,
+    tracks,
     duration,
     samplesPerPixel,
     sampleRate,
@@ -202,12 +204,54 @@ export const Waveform: React.FC<WaveformProps> = ({
     setDraggingAnnotation(null);
   };
 
+  // Shared function for track selection
+  const selectTrack = useCallback((trackIndex: number, source: string = 'unknown') => {
+    if (trackIndex >= 0 && trackIndex < tracks.length) {
+      const track = tracks[trackIndex];
+      console.log(`[Track Selection] ${source}: track "${track.name}" (ID: ${track.id})`);
+      setSelectedTrackId(track.id);
+    }
+  }, [tracks, setSelectedTrackId]);
+
   // Mouse handlers for selection and click-to-seek
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const controlWidth = controls.show ? controls.width : 0;
     const x = e.clientX - rect.left - controlWidth;
     const clickTime = (x * samplesPerPixel) / sampleRate;
+
+    // Calculate which track was clicked based on Y position
+    // The click overlay covers all tracks, so we need to calculate from Y position
+    const y = e.clientY - rect.top;
+
+    // Account for timescale height if present
+    const timescaleOffset = timescale ? timeScaleHeight : 0;
+    const trackY = y - timescaleOffset;
+
+    // Calculate track index based on cumulative heights
+    let cumulativeHeight = 0;
+    let clickedTrackIndex = -1;
+
+    for (let i = 0; i < peaksDataArray.length; i++) {
+      const trackClipPeaks = peaksDataArray[i];
+      if (trackClipPeaks.length === 0) continue;
+
+      // Calculate track height
+      const maxChannels = Math.max(...trackClipPeaks.map(clip => clip.peaks.data.length));
+      const trackHeight = maxChannels * waveHeight + (showClipHeaders ? 22 : 0); // CLIP_HEADER_HEIGHT = 22
+
+      if (trackY >= cumulativeHeight && trackY < cumulativeHeight + trackHeight) {
+        clickedTrackIndex = i;
+        break;
+      }
+
+      cumulativeHeight += trackHeight;
+    }
+
+    // Select the clicked track
+    if (clickedTrackIndex !== -1) {
+      selectTrack(clickedTrackIndex, `Clicked at Y=${trackY}px`);
+    }
 
     setIsSelecting(true);
     currentTimeRef.current = clickTime;
@@ -313,7 +357,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                 const trackControls = renderTrackControls ? (
                   renderTrackControls(trackIndex)
                 ) : (
-                  <Controls>
+                  <Controls onClick={() => selectTrack(trackIndex, 'Clicked controls')}>
                     <Header style={{ justifyContent: 'center' }}>
                       {trackState.name || `Track ${trackIndex + 1}`}
                     </Header>
@@ -378,6 +422,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                       offset={0}
                       width={tracksFullWidth}
                       hasClipHeaders={showClipHeaders}
+                      trackId={tracks[trackIndex].id}
                     >
                       {trackClipPeaks.map((clip, clipIndex) => {
                         const peaksData = clip.peaks;
@@ -395,9 +440,11 @@ export const Waveform: React.FC<WaveformProps> = ({
                             sampleRate={sampleRate}
                             samplesPerPixel={samplesPerPixel}
                             showHeader={showClipHeaders}
+                            trackId={tracks[trackIndex].id}
                             clipHeaderBackgroundColor={theme.clipHeaderBackgroundColor}
                             clipHeaderBorderColor={theme.clipHeaderBorderColor}
                             clipHeaderTextColor={theme.clipHeaderTextColor}
+                            onMouseDown={() => selectTrack(trackIndex, 'Clicked clip')}
                           >
                             {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
                               <SmartChannel

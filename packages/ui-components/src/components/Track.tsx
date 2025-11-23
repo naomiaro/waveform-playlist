@@ -65,6 +65,8 @@ export interface TrackProps {
   offset?: number; // Offset in pixels to shift the waveform right
   width?: number; // Total width of the track (for consistent backgrounds across tracks)
   hasClipHeaders?: boolean; // Whether clips have headers (for multi-clip editing)
+  onClick?: () => void; // Called when track is clicked (for track selection)
+  trackId?: string; // Track ID for identifying which track was clicked
 }
 
 export const Track: FunctionComponent<TrackProps> = ({
@@ -75,6 +77,8 @@ export const Track: FunctionComponent<TrackProps> = ({
   offset = 0,
   width,
   hasClipHeaders = false,
+  onClick,
+  trackId,
 }) => {
   const {
     waveHeight,
@@ -97,6 +101,8 @@ export const Track: FunctionComponent<TrackProps> = ({
         $controlWidth={show ? controlWidth : 0}
         $backgroundColor={backgroundColor}
         $offset={offset}
+        onClick={onClick}
+        data-track-id={trackId}
       >
         {children}
       </ChannelContainer>

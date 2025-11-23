@@ -25,6 +25,11 @@ const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.05);
+  cursor: crosshair; /* Indicates that pressing 'S' will split the clip */
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
 `;
 
 interface ChannelsWrapperProps {
@@ -56,6 +61,9 @@ export interface ClipProps {
   clipHeaderBackgroundColor?: string;
   clipHeaderBorderColor?: string;
   clipHeaderTextColor?: string;
+  // Track selection
+  onMouseDown?: () => void; // Called when clip is pressed (for track selection - fires before drag)
+  trackId?: string; // Track ID for identifying which track this clip belongs to
 }
 
 /**
@@ -83,6 +91,8 @@ export const Clip: FunctionComponent<ClipProps> = ({
   clipHeaderBackgroundColor,
   clipHeaderBorderColor,
   clipHeaderTextColor,
+  onMouseDown,
+  trackId,
 }) => {
   // Calculate horizontal position based on start time
   const left = Math.floor((startTime * sampleRate) / samplesPerPixel);
@@ -142,6 +152,8 @@ export const Clip: FunctionComponent<ClipProps> = ({
       $width={width}
       $isOverlay={isOverlay}
       data-clip-container="true"
+      data-track-id={trackId}
+      onMouseDown={onMouseDown}
     >
       {showHeader && (
         <ClipHeader

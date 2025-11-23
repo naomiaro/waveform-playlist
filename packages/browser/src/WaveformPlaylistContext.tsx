@@ -124,6 +124,7 @@ export interface PlaylistStateContextValue {
   activeAnnotationId: string | null;
   selectionStart: number;
   selectionEnd: number;
+  selectedTrackId: string | null; // ID of currently selected track for editing operations
 }
 
 export interface PlaylistControlsContextValue {
@@ -141,6 +142,7 @@ export interface PlaylistControlsContextValue {
 
   // Selection
   setSelection: (start: number, end: number) => void;
+  setSelectedTrackId: (trackId: string | null) => void;
 
   // Time format
   setTimeFormat: (format: string) => void;
@@ -170,6 +172,7 @@ export interface PlaylistDataContextValue {
   audioBuffers: AudioBuffer[];
   peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
   trackStates: TrackState[];
+  tracks: ClipTrack[]; // Original tracks array with IDs
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
@@ -248,6 +251,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
   const [continuousPlay, setContinuousPlayState] = useState(annotationList?.isContinuousPlay ?? false);
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? true);
@@ -751,6 +755,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     activeAnnotationId,
     selectionStart,
     selectionEnd,
+    selectedTrackId,
   };
 
   const controlsValue: PlaylistControlsContextValue = {
@@ -771,6 +776,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     // Selection
     setSelection,
+    setSelectedTrackId,
 
     // Time format
     setTimeFormat,
@@ -802,6 +808,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     audioBuffers,
     peaksDataArray,
     trackStates,
+    tracks,
     sampleRate,
     waveHeight,
     timeScaleHeight,

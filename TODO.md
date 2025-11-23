@@ -395,13 +395,15 @@ See `multi-clip-app.tsx` for complete implementation example.
 - `packages/browser/src/index.tsx` (exports useClipDragHandlers)
 - `packages/browser/src/hooks/index.ts` (exports useClipDragHandlers)
 
-### 3.3 Splitting Clips
+### 3.3 Splitting Clips ✅
 
 **User Story:** As a user, I want to click a clip and press 'S' to split it at the playhead position.
 
+**Status:** COMPLETE - Core split functionality working! Press 'S' during playback to split clips.
+
 #### Tasks
 
-- [ ] **Implement split logic**
+- [x] **Implement split logic** ✅
   - Location: `packages/browser/src/hooks/useClipSplitting.ts`
   - Find clip under playhead/cursor
   - Create two new clips:
@@ -409,29 +411,35 @@ See `multi-clip-app.tsx` for complete implementation example.
     - Clip B: split point to `startTime + duration`
   - Adjust `offset` and `duration` for each
   - Replace original clip with two new clips
+  - Returns boolean indicating success/failure
 
-- [ ] **Keyboard shortcut**
+- [x] **Keyboard shortcut** ✅
   - Location: `packages/browser/src/hooks/useKeyboardShortcuts.ts`
   - 'S' key to split at playhead
-  - 'Shift+S' to split at selection boundaries
+  - Flexible shortcut system supporting modifiers (Ctrl, Shift, Meta, Alt)
+  - Input field detection (doesn't trigger in text inputs)
   - Prevent default browser behavior
 
-- [ ] **Visual feedback**
+- [ ] **Visual feedback** (In Progress)
   - Show scissors cursor when hovering over clip
   - Flash split indicator at cursor position
   - Animate new clips fading in
 
-- [ ] **Example: Splitting demo**
-  - Location: Update `draggable-clips-app.tsx`
-  - Instructions: "Click clip and press S to split"
-  - Show playhead position indicator
+- [x] **Example: Multi-clip demo** ✅
+  - Location: `packages/browser/src/multi-clip-app.tsx`
+  - Instructions added to HTML template
+  - Press 'S' during playback to split
+  - Console logging confirms splits
 
-**Files to Create:**
-- `packages/browser/src/hooks/useClipSplitting.ts`
-- `packages/browser/src/hooks/useKeyboardShortcuts.ts`
+**Files Created:**
+- `packages/browser/src/hooks/useClipSplitting.ts` ✅
+- `packages/browser/src/hooks/useKeyboardShortcuts.ts` ✅
 
-**Files to Modify:**
-- `packages/browser/src/draggable-clips-app.tsx`
+**Files Modified:**
+- `packages/browser/src/multi-clip-app.tsx` ✅
+- `packages/browser/src/hooks/index.ts` (exports new hooks) ✅
+- `packages/browser/src/index.tsx` (exports new hooks) ✅
+- `ghpages/_examples/18multi-clip.html` (instructions) ✅
 
 ### 3.4 Copy/Paste Clips
 
@@ -913,6 +921,27 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ## ✅ Recently Completed
 
+### 2025-11-23
+
+- [x] **Phase 3.3: Splitting Clips - COMPLETE!** 🎉
+  - Created `useClipSplitting` hook for splitting clips at playhead position
+  - Implements split logic: finds clip at currentTime, creates two new clips with proper timing
+  - First clip: from original start to split point (maintains original offset)
+  - Second clip: from split point to original end (adjusted offset and startTime)
+  - Full validation: checks clip bounds, prevents splits at boundaries
+  - Adds (1) and (2) name suffixes to split clips
+  - Created `useKeyboardShortcuts` hook - Flexible keyboard shortcut system
+  - Supports modifier keys (Ctrl, Shift, Meta, Alt) and key combinations
+  - Input field detection (doesn't trigger in text inputs)
+  - Prevents default browser behavior
+  - Reusable for future shortcuts (copy/paste, undo/redo, etc.)
+  - Integrated into multi-clip demo with 'S' key
+  - Added user instructions to HTML template
+  - Console logging confirms successful splits
+  - **Files created:** `useClipSplitting.ts`, `useKeyboardShortcuts.ts`
+  - **Files modified:** `multi-clip-app.tsx`, `hooks/index.ts`, `index.tsx`, `18multi-clip.html`
+  - Visual feedback (scissors cursor, split indicator) - in progress
+
 ### 2025-11-22
 
 - [x] **Phase 3.1b: Clip Boundaries & Drag to Trim - COMPLETE!** 🎉
@@ -1028,28 +1057,36 @@ See `multi-clip-app.tsx` for complete implementation example.
    - Real-time collision detection and visual feedback
    - Reusable `useClipDragHandlers` hook
 
-4. **Phase 3.3-3.4: Split & Copy/Paste** - Power user features (NEXT)
-5. **Phase 4: Performance** - Scale to professional use cases
-6. **Phase 5: Polish** - Production-ready UX
+4. ~~**Phase 3.3: Splitting Clips**~~ ✅ COMPLETE (2025-11-23)
+   - Split clips at playhead with 'S' key
+   - `useClipSplitting` and `useKeyboardShortcuts` hooks
+   - Visual feedback in progress
 
-**Next Immediate Steps (Phase 3.3 - Splitting Clips):**
+5. **Phase 3.4-3.5: Copy/Paste & Multi-Select** - Power user features (NEXT)
+6. **Phase 4: Performance** - Scale to professional use cases
+7. **Phase 5: Polish** - Production-ready UX
 
-Phase 3.1a (Drag to Move) and 3.1b (Drag to Trim) are both COMPLETE! ✅
+**Next Immediate Steps (Phase 3.4 - Copy/Paste Clips):**
+
+Phase 3.1a (Drag to Move), 3.1b (Drag to Trim), and 3.3 (Splitting) are all COMPLETE! ✅
 
 The library now has professional clip editing with:
 - ✅ Drag clip headers to reposition clips on timeline
 - ✅ Drag clip boundaries to trim (adjust cue in/out)
+- ✅ Split clips at playhead with 'S' key
 - ✅ Real-time collision detection (no overlaps, no negative positions)
-- ✅ Reusable `useClipDragHandlers` hook for user applications
-- ✅ Smooth real-time visual feedback during all drag operations
+- ✅ Reusable `useClipDragHandlers` and `useClipSplitting` hooks
+- ✅ Flexible `useKeyboardShortcuts` hook for any key combinations
+- ✅ Smooth real-time visual feedback during all operations
 
-**Ready for Phase 3.3:**
+**Ready for Phase 3.4:**
 
-1. Implement split logic (split clip at playhead/cursor position)
-2. Create useClipSplitting hook
-3. Add keyboard shortcut ('S' key)
-4. Visual feedback (scissors cursor, split indicator)
-5. Update multi-clip demo with split functionality
+1. Implement clipboard logic (copy/cut/paste clips)
+2. Create `useClipboardOperations` hook
+3. Create `useClipSelection` hook for selecting clips
+4. Add keyboard shortcuts (Cmd+C, Cmd+X, Cmd+V, Delete)
+5. Visual feedback (selected clips, paste preview)
+6. Update multi-clip demo with copy/paste functionality
 
 ---
 

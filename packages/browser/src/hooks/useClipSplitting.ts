@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { type ClipTrack, type AudioClip, createClip } from '@waveform-playlist/core';
+import { usePlaybackAnimation, usePlaylistState } from '../WaveformPlaylistContext';
 
 export interface UseClipSplittingOptions {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
-  currentTime: number;
 }
 
 export interface UseClipSplittingResult {
@@ -36,7 +36,9 @@ export interface UseClipSplittingResult {
  * ```
  */
 export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
-  const { tracks, onTracksChange, currentTime } = options;
+  const { tracks, onTracksChange } = options;
+  const { currentTime } = usePlaybackAnimation();
+  const { selectedTrackId } = usePlaylistState();
 
   /**
    * Split a specific clip at a given time
@@ -110,31 +112,46 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
   );
 
   /**
-   * Split clip at the current playhead position
-   * Searches through all tracks to find a clip at the playhead position
+   * Split clip at the current playhead position on the selected track
+   * If no track is selected, does nothing
    *
    * @returns true if a clip was split, false otherwise
    */
   const splitClipAtPlayhead = useCallback((): boolean => {
-    // Search through all tracks to find clip(s) at current time
-    for (let trackIndex = 0; trackIndex < tracks.length; trackIndex++) {
-      const track = tracks[trackIndex];
+    // If no track is selected, cannot split
+    if (!selectedTrackId) {
+      console.log('No track selected - click a clip to select a track first');
+      return false;
+    }
 
-      for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
-        const clip = track.clips[clipIndex];
-        const clipEndTime = clip.startTime + clip.duration;
+    // Find the selected track
+    const trackIndex = tracks.findIndex(track => track.id === selectedTrackId);
+    if (trackIndex === -1) {
+      console.warn('Selected track not found');
+      return false;
+    }
 
-        // Check if currentTime is within this clip (not at boundaries)
-        if (currentTime > clip.startTime && currentTime < clipEndTime) {
-          // Found a clip! Split it
-          return splitClipAt(trackIndex, clipIndex, currentTime);
-        }
+    const track = tracks[trackIndex];
+
+    // Find clip at current time on the selected track
+    console.error(`[DEBUG] Searching for clip at currentTime=${currentTime} on track "${track.name}" (${track.clips.length} clips)`);
+    for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
+      const clip = track.clips[clipIndex];
+      const clipEndTime = clip.startTime + clip.duration;
+      console.error(`[DEBUG] Clip ${clipIndex}: startTime=${clip.startTime}, duration=${clip.duration}, endTime=${clipEndTime}`);
+      console.error(`[DEBUG] Check: ${currentTime} > ${clip.startTime} = ${currentTime > clip.startTime}, ${currentTime} < ${clipEndTime} = ${currentTime < clipEndTime}`);
+
+      // Check if currentTime is within this clip (not at boundaries)
+      if (currentTime > clip.startTime && currentTime < clipEndTime) {
+        // Found a clip! Split it
+        console.error(`Splitting clip on track "${track.name}" at ${currentTime}s`);
+        return splitClipAt(trackIndex, clipIndex, currentTime);
       }
     }
 
-    console.log('No clip found at playhead position');
+    console.error(`No clip found at playhead position on track "${track.name}"`);
     return false;
-  }, [tracks, currentTime, splitClipAt]);
+  }, [tracks, currentTime, selectedTrackId, splitClipAt]);
 
   return {
     splitClipAtPlayhead,
