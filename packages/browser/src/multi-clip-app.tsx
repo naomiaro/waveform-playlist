@@ -8,7 +8,10 @@ import { createTrack, createClip, type ClipTrack } from '@waveform-playlist/core
 import {
   WaveformPlaylistProvider,
   usePlaylistData,
+  usePlaybackAnimation,
   useClipDragHandlers,
+  useClipSplitting,
+  useKeyboardShortcuts,
   Waveform,
   PlayButton,
   PauseButton,
@@ -99,6 +102,7 @@ interface PlaylistWithDragProps {
 
 const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
   const { samplesPerPixel, sampleRate } = usePlaylistData();
+  const { currentTime } = usePlaybackAnimation();
 
   // Use the clip drag handlers hook for all drag operations
   const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
@@ -106,6 +110,32 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     onTracksChange,
     samplesPerPixel,
     sampleRate,
+  });
+
+  // Use the clip splitting hook for split functionality
+  const { splitClipAtPlayhead } = useClipSplitting({
+    tracks,
+    onTracksChange,
+    currentTime,
+  });
+
+  // Set up keyboard shortcuts
+  useKeyboardShortcuts({
+    shortcuts: [
+      {
+        key: 's',
+        action: () => {
+          const success = splitClipAtPlayhead();
+          if (success) {
+            console.log('Clip split at playhead position:', currentTime);
+          } else {
+            console.log('No clip found at playhead position');
+          }
+        },
+        description: 'Split clip at playhead',
+        preventDefault: true,
+      },
+    ],
   });
   return (
     <DndContext

@@ -22,3 +22,9 @@ export { useAudioTracks } from './useAudioTracks';
 export type { AudioTrackConfig } from './useAudioTracks';
 
 export { useClipDragHandlers } from './useClipDragHandlers';
+
+export { useClipSplitting } from './useClipSplitting';
+export type { UseClipSplittingOptions, UseClipSplittingResult } from './useClipSplitting';
+
+export { useKeyboardShortcuts, getShortcutLabel } from './useKeyboardShortcuts';
+export type { KeyboardShortcut, UseKeyboardShortcutsOptions } from './useKeyboardShortcuts';
