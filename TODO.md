@@ -256,9 +256,157 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ---
 
-## ✂️ Phase 3: Advanced Editing Features
+## 🚀 Pre Launch - Alpha Release Preparation
+
+**Goal:** Essential features and improvements needed before alpha release
+
+**Priority Order:** Tasks organized by implementation sequence
+
+### Phase 1: Core Features (Must Have)
+
+These features expand core functionality and should be implemented first.
+
+- [ ] **Add waveform-data.js support**
+  - Integrate https://codeberg.org/chrisn/waveform-data.js
+  - BBC's standard format for storing/retrieving waveform data
+  - Benefits: Interoperability with other audio tools, efficient storage, industry standard
+  - Support both input (load existing waveform-data) and output (export peaks in this format)
+
+- [ ] **Integrated multi-track recording (Audacity-style)**
+  - Add hook to create new tracks (`useTrackManagement` or similar)
+  - Record directly into selected track (not separate recording app)
+  - Recording position options: Start at time 0 or append after last clip
+  - Progressive waveform rendering (peaks render left-to-right as clip grows)
+  - New clip automatically added to selected track on recording stop
+
+- [ ] **Complete Tone.js effects library integration**
+  - Expose all Tone.js effects (currently have: Reverb, AutoWah, Analyser)
+  - Add: Distortion, Chorus, Delay, Phaser, Tremolo, Vibrato, Compressor, EQ, etc.
+  - Create UI components for effect configuration
+  - Allow runtime modification of effect parameters
+  - Effect presets and save/load functionality
+  - Visual feedback for effect parameters (knobs, sliders, graphs)
+
+### Phase 2: Developer Experience (Should Have)
+
+Foundation for users to get started and understand the library.
+
+- [ ] **Comprehensive README**
+  - Quick start guide (5 minute setup)
+  - Installation instructions
+  - Basic usage examples
+  - Link to full documentation
+  - Screenshots/GIFs of key features
+
+- [ ] **TypeScript types validation**
+  - Ensure all public APIs are properly typed
+  - No `any` types in public interfaces
+  - Generate .d.ts files correctly
+  - Test type inference works for consumers
+
+- [ ] **Add Storybook for component demos**
+  - Setup Storybook for ui-components package
+  - Interactive component playground
+  - Document all props and usage patterns
+  - Examples for each component (Waveform, Track, Clip, Controls, etc.)
+
+### Phase 3: Documentation Site (Should Have)
+
+Professional documentation infrastructure.
+
+- [ ] **Migrate to Docusaurus**
+  - Replace Jekyll site with https://docusaurus.io/
+  - Modern React-based documentation framework
+  - Better navigation, search, and versioning
+  - Migrate existing examples to Docusaurus pages
+  - Add comprehensive documentation (getting started, API reference, guides)
+
+### Phase 4: Publishing Infrastructure (Must Have Before Release)
+
+Infrastructure needed to actually publish the alpha.
+
+#### Testing & Quality Assurance
+
+- [ ] **Unit tests for core functionality**
+  - Test hooks (useRecording, usePlaybackControls, useClipDragHandlers, etc.)
+  - Test components (Waveform, Track, Clip, Controls)
+  - Test audio processing (effects, playback, recording)
+  - Setup testing framework (Vitest, React Testing Library)
+
+- [ ] **E2E tests for key workflows**
+  - Drag clips to move
+  - Trim clip boundaries
+  - Split clips at playhead
+  - Record new clips
+  - Playback with multiple clips
+  - Setup E2E framework (Playwright or Cypress)
+
+- [ ] **Browser compatibility testing**
+  - Chrome (latest + 2 previous versions)
+  - Firefox (latest + 2 previous versions)
+  - Safari (latest + 2 previous versions)
+  - Edge (latest version)
+  - Document any browser-specific issues/workarounds
+
+#### Publishing & Distribution
+
+- [ ] **NPM publishing setup**
+  - Configure publish scripts for all packages
+  - Setup package.json files correctly (exports, types, etc.)
+  - Verify tree-shaking works for consumers
+  - Test installation in clean project
+
+- [ ] **Versioning strategy**
+  - Adopt semantic versioning (semver)
+  - Setup changelog automation (conventional commits)
+  - Create release process documentation
+
+- [ ] **CI/CD pipeline**
+  - Automated builds on push
+  - Run tests on all PRs
+  - Automated publishing on version tags
+  - Setup GitHub Actions or similar
+
+#### Developer Experience
+
+- [ ] **Migration guide**
+  - Document breaking changes from old version
+  - Provide code examples for common migration scenarios
+  - List deprecated features and alternatives
+
+- [ ] **Contributing guidelines**
+  - Setup instructions for contributors
+  - Code style guide
+  - PR process
+  - How to run tests locally
+
+#### Performance Validation
+
+- [ ] **Bundle size verification**
+  - Verify tree-shaking still working (named imports only pull what's needed)
+  - Core library stays under 150KB gzipped
+  - Document bundle sizes for each package
+  - Setup bundle size monitoring (bundlephobia, size-limit)
+
+- [ ] **Performance benchmarks**
+  - 60fps playback with 8-12 tracks
+  - Load time for 2+ hour timelines
+  - Memory usage during long editing sessions
+  - Document performance targets and measurements
+
+- [ ] **Memory leak testing**
+  - Test for leaks during recording
+  - Test for leaks during long playback sessions
+  - Test proper cleanup on component unmount
+  - Use Chrome DevTools memory profiler
+
+---
+
+## ✂️ Phase 3: Advanced Editing Features (Deferred)
 
 **Goal:** Implement professional Audacity-style clip editing
+
+**Status:** Core features complete (drag, trim, split), remaining features deferred until after alpha launch
 
 ### Architecture: Audacity-Style Direct Manipulation
 
