@@ -3,7 +3,73 @@
 Multi-track audio editor roadmap for waveform-playlist.
 
 **Branch:** `tonejs-overhaul` (React migration)
-**Last Updated:** 2025-11-23
+**Last Updated:** 2025-11-24
+
+---
+
+## 🎉 Recently Completed
+
+### 2025-11-24: Docusaurus Migration (In Progress)
+
+**Goal:** Migrate from Jekyll + separate bundle builds to Docusaurus-native examples
+
+**Completed:**
+- ✅ Set up webpack aliases to transpile workspace packages from source
+- ✅ Added `useAudioTracks` export to browser package
+- ✅ Fixed recording package tsup config to output worklet to correct directory structure
+- ✅ Created Docusaurus-native example components:
+  - MinimalExample.tsx
+  - StemTracksExample.tsx
+  - EffectsExample.tsx (with frequency visualizer, audio effects)
+  - NewTracksExample.tsx (drag-drop file upload)
+  - MultiClipExample.tsx (multiple clips per track, drag/trim, split with 's' key)
+- ✅ Updated example pages to import components directly (no bundle scripts)
+- ✅ Docusaurus compiling successfully with all workspace packages
+
+**Remaining Work:**
+- ⏳ Create 3 more example components:
+  - RecordingExample.tsx (complex - 534 lines with integrated recording)
+  - AnnotationsExample.tsx
+  - FlexibleApiExample.tsx
+- ⏳ Update corresponding page files
+- ⏳ Remove old bundle build scripts from package.json
+- ⏳ Clean up old bundle files in ghpages/js/
+- ⏳ Test all examples work in Docusaurus
+
+**Key Technical Details:**
+
+1. **Webpack Configuration** (website/docusaurus.config.ts):
+   ```typescript
+   // Aliases point to source for transpilation
+   '@waveform-playlist/browser': path.resolve(__dirname, '../packages/browser/src'),
+   '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
+   '@waveform-playlist/playout': path.resolve(__dirname, '../packages/playout/src'),
+   '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
+   // annotations, recording, loaders, webaudio-peaks use built dist/ versions
+   ```
+
+2. **Recording Package Fix:**
+   - Updated tsup.config.ts to output worklet to `worklet/recording-processor.worklet.js`
+   - Matches import path in useRecording hook
+
+3. **Pattern for Examples:**
+   - Import from '@waveform-playlist/browser' (transpiled from source)
+   - Use `useDocusaurusTheme()` hook for theme integration
+   - Export as function component (no createRoot/DOM mounting)
+   - All styled components use Docusaurus CSS variables
+
+**Files Created:**
+- website/src/components/examples/MinimalExample.tsx
+- website/src/components/examples/StemTracksExample.tsx
+- website/src/components/examples/EffectsExample.tsx
+- website/src/components/examples/NewTracksExample.tsx
+- website/src/components/examples/MultiClipExample.tsx
+
+**Files Modified:**
+- packages/browser/src/index.tsx (added useAudioTracks export)
+- packages/recording/tsup.config.ts (fixed worklet output path)
+- website/docusaurus.config.ts (added webpack configuration)
+- website/package.json (already had workspace dependencies)
 
 ---
 

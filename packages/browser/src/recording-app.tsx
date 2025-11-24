@@ -43,12 +43,12 @@ const Header = styled.div`
 
 const Title = styled.h2`
   margin: 0 0 10px 0;
-  color: #333;
+  color: var(--ifm-font-color-base, #333);
 `;
 
 const Description = styled.p`
   margin: 0;
-  color: #666;
+  color: var(--ifm-color-emphasis-700, #666);
   font-size: 14px;
 `;
 
@@ -65,7 +65,7 @@ const ControlGroup = styled.div`
   gap: 5px;
   align-items: center;
   padding-right: 15px;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--ifm-color-emphasis-300, #ddd);
 
   &:last-child {
     border-right: none;
@@ -92,13 +92,13 @@ const VUMeterWrapper = styled.div`
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #f5f5f5;
+  background: var(--ifm-color-emphasis-100, #f5f5f5);
   border-radius: 4px;
 `;
 
 const Label = styled.span`
   font-size: 12px;
-  color: #666;
+  color: var(--ifm-color-emphasis-700, #666);
   font-weight: 500;
 `;
 
@@ -134,9 +134,9 @@ const RecordingControlsRow = styled.div`
   margin-bottom: 15px;
   align-items: center;
   padding: 15px;
-  background: #f5f5f5;
+  background: var(--ifm-background-surface-color, #f5f5f5);
   border-radius: 4px;
-  border: 2px solid #e0e0e0;
+  border: 1px solid var(--ifm-color-emphasis-300, #e0e0e0);
 `;
 
 const PlaybackControlsRow = styled.div`
@@ -150,21 +150,21 @@ const PlaybackControlsRow = styled.div`
 const DropZone = styled.div<{ $isDragging: boolean }>`
   padding: 30px;
   margin-bottom: 20px;
-  border: 2px dashed ${props => props.$isDragging ? '#2196F3' : '#ccc'};
+  border: 2px dashed ${props => props.$isDragging ? '#2196F3' : 'var(--ifm-color-emphasis-400, #ccc)'};
   border-radius: 8px;
-  background: ${props => props.$isDragging ? '#e3f2fd' : '#fafafa'};
+  background: ${props => props.$isDragging ? 'rgba(33, 150, 243, 0.1)' : 'var(--ifm-background-surface-color, #fafafa)'};
   text-align: center;
   transition: all 0.2s ease;
 
   &:hover {
     border-color: #2196F3;
-    background: #f5f5f5;
+    background: var(--ifm-color-emphasis-100, #f5f5f5);
   }
 `;
 
 const DropZoneText = styled.p`
   margin: 0;
-  color: #666;
+  color: var(--ifm-color-emphasis-700, #666);
   font-size: 14px;
 `;
 

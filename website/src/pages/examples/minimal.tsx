@@ -1,24 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Layout from '@theme/Layout';
-import useBaseUrl from '@docusaurus/useBaseUrl';
+import { MinimalExample } from '../../components/examples/MinimalExample';
 
-export default function MinimalExample(): React.ReactElement {
-  // Compute the bundle URL outside of useEffect (hooks must be at top level)
-  const bundleSrc = useBaseUrl('/js/minimal-bundle.js');
-
-  useEffect(() => {
-    // Load the minimal bundle script
-    const script = document.createElement('script');
-    script.src = bundleSrc;
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      // Cleanup
-      document.body.removeChild(script);
-    };
-  }, [bundleSrc]);
-
+export default function MinimalExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Minimal Example"
@@ -33,7 +17,6 @@ export default function MinimalExample(): React.ReactElement {
 
         {/* Container for the waveform playlist */}
         <div
-          id="playlist"
           style={{
             marginTop: '2rem',
             padding: '2rem',
@@ -42,7 +25,9 @@ export default function MinimalExample(): React.ReactElement {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
             border: '1px solid var(--ifm-color-emphasis-300)'
           }}
-        ></div>
+        >
+          <MinimalExample />
+        </div>
 
         <div style={{ marginTop: '2rem' }}>
           <h2>About This Example</h2>
@@ -53,8 +38,7 @@ export default function MinimalExample(): React.ReactElement {
             <li>Loading audio files</li>
             <li>Waveform visualization</li>
             <li>Basic playback controls (play, pause, stop)</li>
-            <li>Zoom controls</li>
-            <li>Time display</li>
+            <li>Audio position display</li>
           </ul>
         </div>
       </main>

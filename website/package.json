@@ -18,15 +18,24 @@
     "@docusaurus/core": "3.9.2",
     "@docusaurus/preset-classic": "3.9.2",
     "@mdx-js/react": "^3.0.0",
+    "@waveform-playlist/browser": "workspace:5.0.0-alpha.0",
+    "@waveform-playlist/core": "workspace:5.0.0-alpha.0",
+    "@waveform-playlist/playout": "workspace:5.0.0-alpha.0",
+    "@waveform-playlist/ui-components": "workspace:5.0.0-alpha.0",
     "clsx": "^2.0.0",
     "prism-react-renderer": "^2.3.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "styled-components": "^6.1.8",
+    "tone": "^15.1.22"
   },
   "devDependencies": {
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
     "@docusaurus/module-type-aliases": "3.9.2",
     "@docusaurus/tsconfig": "3.9.2",
     "@docusaurus/types": "3.9.2",
+    "babel-loader": "^10.0.0",
     "typescript": "~5.6.2"
   },
   "browserslist": {

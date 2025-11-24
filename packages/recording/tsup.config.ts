@@ -15,7 +15,7 @@ export default defineConfig([
   // AudioWorklet processor (no DTS generation)
   {
     entry: {
-      'recording-processor.worklet': 'src/worklet/recording-processor.worklet.ts',
+      'worklet/recording-processor.worklet': 'src/worklet/recording-processor.worklet.ts',
     },
     format: ['cjs', 'esm'],
     dts: false,

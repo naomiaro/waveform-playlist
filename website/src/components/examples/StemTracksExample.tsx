@@ -1,5 +1,4 @@
 import React from 'react';
-import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -12,9 +11,9 @@ import {
   ZoomOutButton,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
-} from './components';
-import { useAudioTracks } from './hooks';
-import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
+  useAudioTracks,
+} from '@waveform-playlist/browser';
+import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Stem tracks configuration
 const audioConfigs = [
@@ -65,27 +64,8 @@ const ControlGroup = styled.div`
   }
 `;
 
-function StemTracksApp() {
-  // Detect Docusaurus theme via data-theme attribute
-  const [isDark, setIsDark] = React.useState(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.getAttribute('data-theme') === 'dark';
-    }
-    return false;
-  });
-
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  const theme = isDark ? darkTheme : defaultTheme;
+export function StemTracksExample() {
+  const theme = useDocusaurusTheme();
 
   // Load audio tracks and convert to ClipTrack format
   const { tracks, loading, error } = useAudioTracks(audioConfigs);
@@ -150,23 +130,4 @@ function StemTracksApp() {
       </WaveformPlaylistProvider>
     </Container>
   );
-}
-
-// Initialize the app
-export function initStemTracksApp() {
-  const container = document.getElementById('playlist');
-  if (!container) {
-    console.error('Playlist container not found');
-    return;
-  }
-
-  const root = createRoot(container);
-  root.render(<StemTracksApp />);
-}
-
-// Auto-initialize if DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initStemTracksApp);
-} else {
-  initStemTracksApp();
 }

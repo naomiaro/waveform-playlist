@@ -22,6 +22,7 @@ import {
   Waveform,
 } from './components';
 import { useAudioTracks } from './hooks';
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 // Load annotation data
 declare const notes: any[];
@@ -100,14 +101,6 @@ const annotationActions = [
   }
 ];
 
-// Theme for waveform colors
-const theme = {
-  waveOutlineColor: '#005BBB',
-  waveFillColor: '#FFD500',
-  waveProgressColor: '#ff0000',
-  timeColor: '#000',
-};
-
 // Styled components for layout
 const Container = styled.div`
   display: flex;
@@ -120,7 +113,8 @@ const TopBar = styled.div`
   gap: 1rem;
   align-items: center;
   padding: 1rem;
-  background: #f5f5f5;
+  background: var(--ifm-background-surface-color, #f5f5f5);
+  border: 1px solid var(--ifm-color-emphasis-300, #ddd);
   border-radius: 0.25rem;
   flex-wrap: wrap;
 `;
@@ -134,7 +128,7 @@ const ControlGroup = styled.div`
 const Separator = styled.div`
   width: 1px;
   height: 2rem;
-  background: #ddd;
+  background: var(--ifm-color-emphasis-300, #ddd);
 `;
 
 const TimeControlsBar = styled.div`
@@ -143,7 +137,8 @@ const TimeControlsBar = styled.div`
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: #f5f5f5;
+  background: var(--ifm-background-surface-color, #f5f5f5);
+  border: 1px solid var(--ifm-color-emphasis-300, #ddd);
   border-radius: 0.25rem;
   flex-wrap: wrap;
 `;
@@ -215,6 +210,27 @@ const AnnotationsAppContent: React.FC = () => {
 
 // Wrapper component that loads audio tracks
 const AnnotationsAppWithAudio: React.FC = () => {
+  // Detect Docusaurus theme via data-theme attribute
+  const [isDark, setIsDark] = React.useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDark ? darkTheme : defaultTheme;
+
   // Use useMemo to prevent re-creating audioConfigs on every render
   const audioConfigs = React.useMemo(() => [
     { src: '/waveform-playlist/media/audio/sonnet.mp3', name: 'Sonnet' }

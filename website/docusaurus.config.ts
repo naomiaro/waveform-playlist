@@ -1,3 +1,4 @@
+import path from 'path';
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
@@ -51,6 +52,54 @@ const config: Config = {
         },
       } satisfies Preset.Options,
     ],
+  ],
+
+  plugins: [
+    function (context, options) {
+      return {
+        name: 'waveform-playlist-webpack',
+        configureWebpack(config, isServer, utils) {
+          return {
+            module: {
+              rules: [
+                {
+                  test: /\.tsx?$/,
+                  include: [
+                    /packages[\\/]browser[\\/]src/,
+                    /packages[\\/]core[\\/]src/,
+                    /packages[\\/]playout[\\/]src/,
+                    /packages[\\/]ui-components[\\/]src/,
+                  ],
+                  use: [
+                    {
+                      loader: 'babel-loader',
+                      options: {
+                        presets: [
+                          '@babel/preset-react',
+                          '@babel/preset-typescript',
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+            resolve: {
+              symlinks: true,
+              extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+              alias: {
+                // These packages we transpile from source
+                '@waveform-playlist/browser': path.resolve(__dirname, '../packages/browser/src'),
+                '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
+                '@waveform-playlist/playout': path.resolve(__dirname, '../packages/playout/src'),
+                '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
+                // annotations, recording, loaders, and webaudio-peaks use their built dist versions via node_modules
+              },
+            },
+          };
+        },
+      };
+    },
   ],
 
   themeConfig: {

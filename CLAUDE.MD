@@ -189,6 +189,79 @@ interface AudioClip {
 - Switch between `defaultTheme` and `darkTheme` based on Docusaurus mode
 - Example: `minimal-app.tsx` detects and responds to theme toggle
 
+### Docusaurus Native Examples (2025-11-24)
+
+**Decision:** Migrate from Jekyll + separate bundle builds to Docusaurus-native React components.
+
+**Why:**
+- Simpler build process (one system instead of Jekyll + Vite)
+- Better code-splitting and smaller bundles per page
+- Hot module reloading for faster development
+- Direct use of `useDocusaurusTheme()` hook without MutationObserver
+- Eliminates need to maintain separate bundle entry points
+
+**Webpack Configuration:**
+```typescript
+// website/docusaurus.config.ts
+resolve: {
+  symlinks: true,
+  extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+  alias: {
+    // Transpile these packages from source
+    '@waveform-playlist/browser': path.resolve(__dirname, '../packages/browser/src'),
+    '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
+    '@waveform-playlist/playout': path.resolve(__dirname, '../packages/playout/src'),
+    '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
+    // annotations, recording use built dist/ versions (have build artifacts like worklets)
+  },
+}
+```
+
+**Example Component Pattern:**
+```typescript
+// website/src/components/examples/MinimalExample.tsx
+import { WaveformPlaylistProvider, Waveform, PlayButton, useAudioTracks } from '@waveform-playlist/browser';
+import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+
+export function MinimalExample() {
+  const theme = useDocusaurusTheme();
+  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <WaveformPlaylistProvider tracks={tracks} theme={theme}>
+      <PlayButton />
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+```
+
+**Page Pattern:**
+```typescript
+// website/src/pages/examples/minimal.tsx
+import { MinimalExample } from '../../components/examples/MinimalExample';
+
+export default function MinimalExamplePage() {
+  return (
+    <Layout title="Minimal Example">
+      <MinimalExample />
+    </Layout>
+  );
+}
+```
+
+**Key Points:**
+- Export components as functions (no `createRoot()` / DOM mounting)
+- Use `useDocusaurusTheme()` for automatic light/dark theme
+- Styled components use Docusaurus CSS variables: `var(--ifm-background-surface-color, #fallback)`
+- No need for MutationObserver - theme changes automatically
+- Built packages (annotations, recording) still use dist/ for build artifacts
+
+**Location:** Example components in `website/src/components/examples/`
+
 ### Track Selection Styling (2025-11-23)
 
 **Visual Feedback for Selected Track:**

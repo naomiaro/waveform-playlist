@@ -1,5 +1,5 @@
 /**
- * New Tracks Example App
+ * New Tracks Example
  *
  * Demonstrates dynamic track management:
  * - Drag and drop audio files to add tracks
@@ -8,7 +8,6 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
 import * as Tone from 'tone';
 import {
@@ -21,10 +20,10 @@ import {
   ZoomInButton,
   ZoomOutButton,
   AutomaticScrollCheckbox,
-} from './components';
+} from '@waveform-playlist/browser';
 import { TrackControlsWithDelete } from '@waveform-playlist/ui-components';
 import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
-import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
+import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -87,32 +86,12 @@ const HiddenFileInput = styled.input`
   display: none;
 `;
 
-function NewTracksApp() {
+export function NewTracksExample() {
+  const theme = useDocusaurusTheme();
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  // Detect Docusaurus theme via data-theme attribute
-  const [isDarkTheme, setIsDarkTheme] = React.useState(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.getAttribute('data-theme') === 'dark';
-    }
-    return false;
-  });
-
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDarkTheme(document.documentElement.getAttribute('data-theme') === 'dark');
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  const theme = isDarkTheme ? darkTheme : defaultTheme;
 
   // Handle file drop
   const handleDrop = useCallback(
@@ -305,7 +284,7 @@ function NewTracksApp() {
                     updatedTracks[trackIndex] = { ...track, pan };
                     setTracks(updatedTracks);
                   }}
-                  onDelete={() => handleRemoveTrack(trackIndex)}
+                  onRemove={() => handleRemoveTrack(trackIndex)}
                 />
               );
             }}
@@ -314,11 +293,4 @@ function NewTracksApp() {
       )}
     </Container>
   );
-}
-
-// Mount the app
-const container = document.getElementById('playlist');
-if (container) {
-  const root = createRoot(container);
-  root.render(<NewTracksApp />);
 }

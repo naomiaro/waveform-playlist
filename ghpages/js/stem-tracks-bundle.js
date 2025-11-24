@@ -1644,7 +1644,8 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   gap: 0.5rem;
   align-items: center;
   padding: 1rem;
-  background: #f8f9fa;
+  background: var(--ifm-background-surface-color, #f8f9fa);
+  border: 1px solid var(--ifm-color-emphasis-300, #dee2e6);
   border-radius: 0.5rem;
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
@@ -1653,7 +1654,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   gap: 0.5rem;
   align-items: center;
   padding-right: 1rem;
-  border-right: 1px solid #dee2e6;
+  border-right: 1px solid var(--ifm-color-emphasis-300, #dee2e6);
 
   &:last-child {
     border-right: none;

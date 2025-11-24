@@ -31,7 +31,8 @@ const TopBar = styled.div`
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  background: #f5f5f5;
+  background: var(--ifm-background-surface-color, #f5f5f5);
+  border: 1px solid var(--ifm-color-emphasis-300, #ddd);
   border-radius: 0.25rem;
 `;
 
@@ -51,9 +52,9 @@ const VisualizerWrapper = styled.div`
 const VisualizerCanvas = styled.canvas`
   max-width: 100%;
   height: 100px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--ifm-color-emphasis-300, #ddd);
   border-radius: 0.25rem;
-  background: white;
+  background: var(--ifm-background-color, white);
 `;
 
 const TimeControlsBar = styled.div`
@@ -62,7 +63,8 @@ const TimeControlsBar = styled.div`
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: #f5f5f5;
+  background: var(--ifm-background-surface-color, #f5f5f5);
+  border: 1px solid var(--ifm-color-emphasis-300, #ddd);
   border-radius: 0.25rem;
   flex-wrap: wrap;
 `;
@@ -76,7 +78,7 @@ const ControlGroup = styled.div`
 const Separator = styled.div`
   width: 1px;
   height: 2rem;
-  background: #ddd;
+  background: var(--ifm-color-emphasis-300, #ddd);
 `;
 
 // Frequency visualizer component that polls for analyser

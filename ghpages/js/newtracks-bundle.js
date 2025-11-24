@@ -1644,7 +1644,8 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   gap: 0.5rem;
   align-items: center;
   padding: 1rem;
-  background: #f8f9fa;
+  background: var(--ifm-background-surface-color, #f8f9fa);
+  border: 1px solid var(--ifm-color-emphasis-300, #dee2e6);
   border-radius: 0.5rem;
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
@@ -1653,32 +1654,32 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   gap: 0.5rem;
   align-items: center;
   padding-right: 1rem;
-  border-right: 1px solid #dee2e6;
+  border-right: 1px solid var(--ifm-color-emphasis-300, #dee2e6);
 
   &:last-child {
     border-right: none;
   }
 `,kN=se.div`
   padding: 3rem 2rem;
-  border: 3px dashed ${t=>t.$isDragging?"#3498db":"#ced4da"};
+  border: 3px dashed ${t=>t.$isDragging?"#3498db":"var(--ifm-color-emphasis-400, #ced4da)"};
   border-radius: 0.5rem;
   text-align: center;
-  background: ${t=>t.$isDragging?"#e3f2fd":"#f8f9fa"};
+  background: ${t=>t.$isDragging?"rgba(52, 152, 219, 0.1)":"var(--ifm-background-surface-color, #f8f9fa)"};
   margin-bottom: 1.5rem;
   transition: all 0.2s ease-in-out;
   cursor: pointer;
 
   &:hover {
     border-color: #3498db;
-    background: #e3f2fd;
+    background: var(--ifm-color-emphasis-100, #e3f2fd);
   }
 `,mv=se.p`
   margin: 0;
-  color: #495057;
+  color: var(--ifm-font-color-base, #495057);
   font-size: 1rem;
 `,gv=se.p`
   margin: 0.5rem 0 0 0;
-  color: #6c757d;
+  color: var(--ifm-color-emphasis-700, #6c757d);
   font-size: 0.875rem;
 `,CN=se.input`
   display: none;

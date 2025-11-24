@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
@@ -22,8 +21,8 @@ import {
   AudioPosition,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
-} from './index';
-import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
+} from '@waveform-playlist/browser';
+import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 const Controls = styled.div`
   display: flex;
@@ -45,9 +44,7 @@ const ControlGroup = styled.div`
   }
 `;
 
-
 // Audio files - each file is loaded and decoded once
-// Files can be referenced by multiple clips across different tracks
 const audioFiles = [
   { id: 'vocals', src: '/waveform-playlist/media/audio/Vocals30.mp3' },
   { id: 'guitar', src: '/waveform-playlist/media/audio/Guitar30.mp3' },
@@ -55,48 +52,38 @@ const audioFiles = [
   { id: 'bass', src: '/waveform-playlist/media/audio/BassDrums30.mp3' },
 ];
 
-// Track configuration - organized by instrument track
-// Each track can have multiple clips demonstrating gaps and positioning
-// All source files are 30s long and musically synchronized
+// Track configuration with multiple clips demonstrating gaps and positioning
 const trackConfigs = [
-  // Vocals track - Two clips with gap in middle (cutting out 10-20s)
   {
     name: 'Vocals',
     clips: [
-      { fileId: 'vocals', startTime: 0, duration: 10, offset: 0 },   // 0-10s from source
-      { fileId: 'vocals', startTime: 20, duration: 10, offset: 20 }, // 20-30s from source (10s gap)
+      { fileId: 'vocals', startTime: 0, duration: 10, offset: 0 },
+      { fileId: 'vocals', startTime: 20, duration: 10, offset: 20 },
     ],
   },
-
-  // Guitar track - Full 30 seconds
   {
     name: 'Guitar',
     clips: [
-      { fileId: 'guitar', startTime: 0, duration: 30, offset: 0 }, // Continuous playback
+      { fileId: 'guitar', startTime: 0, duration: 30, offset: 0 },
     ],
   },
-
-  // Piano track - Two clips with different timing
   {
     name: 'Piano',
     clips: [
-      { fileId: 'piano', startTime: 5, duration: 10, offset: 5 },  // 5-15s from source, starts at 5s
-      { fileId: 'piano', startTime: 20, duration: 10, offset: 20 }, // 20-30s from source, starts at 20s
+      { fileId: 'piano', startTime: 5, duration: 10, offset: 5 },
+      { fileId: 'piano', startTime: 20, duration: 10, offset: 20 },
     ],
   },
-
-  // Bass track - Three clips showing gaps
   {
     name: 'Bass',
     clips: [
-      { fileId: 'bass', startTime: 0, duration: 8, offset: 0 },   // 0-8s from source
-      { fileId: 'bass', startTime: 10, duration: 6, offset: 10 }, // 10-16s from source (2s gap, skipping 8-10s)
-      { fileId: 'bass', startTime: 20, duration: 10, offset: 20 }, // 20-30s from source (4s gap, skipping 16-20s)
+      { fileId: 'bass', startTime: 0, duration: 8, offset: 0 },
+      { fileId: 'bass', startTime: 10, duration: 6, offset: 10 },
+      { fileId: 'bass', startTime: 20, duration: 10, offset: 20 },
     ],
   },
 ];
 
-// Inner component that handles drag events and has access to playlist context
 interface PlaylistWithDragProps {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
@@ -106,7 +93,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
   const { samplesPerPixel, sampleRate } = usePlaylistData();
   const { setSelectedTrackId } = usePlaylistControls();
 
-  // Configure sensors and drag handlers
   const sensors = useDragSensors();
   const { onDragStart: handleDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
     tracks,
@@ -115,17 +101,14 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     sampleRate,
   });
 
-  // Wrap onDragStart to track selected track
   const onDragStart = (event: any) => {
     const trackIndex = event.active?.data?.current?.trackIndex;
     if (trackIndex !== undefined && tracks[trackIndex]) {
-      console.log(`[Track Selection] Dragged clip on track "${tracks[trackIndex].name}" (ID: ${tracks[trackIndex].id})`);
       setSelectedTrackId(tracks[trackIndex].id);
     }
     handleDragStart(event);
   };
 
-  // Use the clip splitting hook for split functionality
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
     onTracksChange,
@@ -133,7 +116,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     samplesPerPixel,
   });
 
-  // Set up keyboard shortcuts
   useKeyboardShortcuts({
     shortcuts: [
       {
@@ -144,6 +126,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
       },
     ],
   });
+
   return (
     <DndContext
       sensors={sensors}
@@ -178,31 +161,11 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
   );
 };
 
-const MultiClipExample: React.FC = () => {
+export function MultiClipExample() {
+  const theme = useDocusaurusTheme();
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-
-  // Detect Docusaurus theme via data-theme attribute
-  const [isDark, setIsDark] = React.useState(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.getAttribute('data-theme') === 'dark';
-    }
-    return false;
-  });
-
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  const theme = isDark ? darkTheme : defaultTheme;
 
   useEffect(() => {
     let cancelled = false;
@@ -214,7 +177,7 @@ const MultiClipExample: React.FC = () => {
 
         const audioContext = getGlobalAudioContext();
 
-        // Step 1: Load all audio files once and store in a Map by ID
+        // Load all audio files
         const fileLoadPromises = audioFiles.map(async (file) => {
           const response = await fetch(file.src);
           if (!response.ok) {
@@ -230,9 +193,8 @@ const MultiClipExample: React.FC = () => {
         const loadedFiles = await Promise.all(fileLoadPromises);
         const fileBuffers = new Map(loadedFiles.map(f => [f.id, f.buffer]));
 
-        // Step 2: Create tracks by referencing loaded audio buffers
+        // Create tracks
         const loadedTracks = trackConfigs.map((trackConfig) => {
-          // Create clips by looking up the audio buffer for each fileId
           const clips = trackConfig.clips.map((clipConfig) => {
             const audioBuffer = fileBuffers.get(clipConfig.fileId);
             if (!audioBuffer) {
@@ -248,13 +210,12 @@ const MultiClipExample: React.FC = () => {
             });
           });
 
-          // Create the track with multiple clips
           return createTrack({
             name: trackConfig.name,
             clips,
             muted: false,
             soloed: false,
-            volume: 1.0,
+            volume: 1,
             pan: 0,
           });
         });
@@ -265,9 +226,9 @@ const MultiClipExample: React.FC = () => {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err : new Error('Unknown error loading audio'));
+          console.error('Failed to load tracks:', err);
+          setError(err as Error);
           setLoading(false);
-          console.error('Error loading audio tracks:', err);
         }
       }
     };
@@ -289,7 +250,7 @@ const MultiClipExample: React.FC = () => {
 
   if (error) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'red' }}>
+      <div style={{ padding: '2rem', color: 'red' }}>
         Error loading audio: {error.message}
       </div>
     );
@@ -299,7 +260,6 @@ const MultiClipExample: React.FC = () => {
     <WaveformPlaylistProvider
       tracks={tracks}
       samplesPerPixel={1024}
-      zoomLevels={[512, 1024, 2048, 4096, 8192]}
       mono={true}
       waveHeight={100}
       automaticScroll={true}
@@ -309,11 +269,4 @@ const MultiClipExample: React.FC = () => {
       <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />
     </WaveformPlaylistProvider>
   );
-};
-
-// Mount the app
-const container = document.getElementById('playlist');
-if (container) {
-  const root = createRoot(container);
-  root.render(<MultiClipExample />);
 }
