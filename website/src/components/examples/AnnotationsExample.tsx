@@ -148,9 +148,10 @@ const notes = [
 ];
 
 // Annotation actions for the UI
+// Using text labels instead of Bootstrap icons for Docusaurus compatibility
 const annotationActions = [
   {
-    class: 'bi bi-dash',
+    text: '−',  // minus sign
     title: 'Reduce annotation end by 0.010s',
     action: (annotation: any, i: number, annotations: any[], opts: any) => {
       const delta = 0.010;
@@ -171,7 +172,7 @@ const annotationActions = [
     }
   },
   {
-    class: 'bi bi-plus',
+    text: '+',
     title: 'Increase annotation end by 0.010s',
     action: (annotation: any, i: number, annotations: any[], opts: any) => {
       const delta = 0.010;
@@ -192,7 +193,7 @@ const annotationActions = [
     }
   },
   {
-    class: 'bi bi-scissors',
+    text: '✂',  // scissors
     title: 'Split annotation in half',
     action: (annotation: any, i: number, annotations: any[]) => {
       const halfDuration = (annotation.end - annotation.start) / 2;
@@ -213,7 +214,7 @@ const annotationActions = [
     }
   },
   {
-    class: 'bi bi-trash',
+    text: '🗑',  // trash
     title: 'Delete annotation',
     action: (annotation: any, i: number, annotations: any[]) => {
       annotations.splice(i, 1);

@@ -3,35 +3,6 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 
-// Get the entry point from environment variable
-const entry = process.env.VITE_ENTRY || 'index';
-
-const entryPoints: Record<string, string> = {
-  index: resolve(__dirname, 'src/index.tsx'),
-  minimal: resolve(__dirname, 'src/minimal-app.tsx'),
-  newtracks: resolve(__dirname, 'src/newtracks-app.tsx'),
-  annotations: resolve(__dirname, 'src/annotations-app.tsx'),
-  'stem-tracks': resolve(__dirname, 'src/stem-tracks-app.tsx'),
-  'flexible-example': resolve(__dirname, 'src/flexible-example-app.tsx'),
-  effects: resolve(__dirname, 'src/effects-app.tsx'),
-  recording: resolve(__dirname, 'src/recording-app.tsx'),
-  'multi-clip': resolve(__dirname, 'src/multi-clip-app.tsx'),
-  'waveform-data': resolve(__dirname, 'src/waveform-data-app.tsx'),
-};
-
-const outputNames: Record<string, string> = {
-  index: 'waveform-playlist',
-  minimal: 'minimal-bundle',
-  newtracks: 'newtracks-bundle',
-  annotations: 'annotations-bundle',
-  'stem-tracks': 'stem-tracks-bundle',
-  'flexible-example': 'flexible-example-bundle',
-  effects: 'effects-bundle',
-  recording: 'recording-bundle',
-  'multi-clip': 'multi-clip-bundle',
-  'waveform-data': 'waveform-data-bundle',
-};
-
 export default defineConfig({
   plugins: [
     react(),
@@ -42,23 +13,23 @@ export default defineConfig({
     }),
   ],
   build: {
-    outDir: '../../ghpages/js',
-    emptyOutDir: false,
-    lib: entry === 'index' ? {
-      entry: entryPoints[entry],
+    outDir: 'dist',
+    lib: {
+      entry: resolve(__dirname, 'src/index.tsx'),
       name: 'WaveformPlaylist',
-      formats: ['umd'],
-      fileName: () => `${outputNames[entry]}.js`,
-    } : undefined,
+      formats: ['es', 'cjs'],
+      fileName: (format) => `index.${format === 'es' ? 'mjs' : 'js'}`,
+    },
     rollupOptions: {
-      input: entry === 'index' ? undefined : entryPoints[entry],
-      output: entry === 'index' ? {
+      external: ['react', 'react-dom', 'styled-components'],
+      output: {
         exports: 'named',
-      } : {
-        entryFileNames: `${outputNames[entry]}.js`,
-        format: 'iife',
+        globals: {
+          react: 'React',
+          'react-dom': 'ReactDOM',
+          'styled-components': 'styled',
+        },
       },
-      external: entry === 'index' ? ['react', 'react-dom', 'styled-components'] : undefined,
     },
     sourcemap: true,
   },

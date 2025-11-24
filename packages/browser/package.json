@@ -9,8 +9,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "pnpm typecheck && ./build-all.sh",
-    "build:single": "pnpm typecheck && vite build",
+    "build": "pnpm typecheck && vite build",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit"
   },

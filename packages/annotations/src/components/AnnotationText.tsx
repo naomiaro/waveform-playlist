@@ -193,7 +193,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
                     title={control.title}
                     onClick={() => handleControlClick(control, annotation, index)}
                   >
-                    <i className={getIconClass(control.class)} />
+                    {control.text ? control.text : <i className={getIconClass(control.class || '')} />}
                   </ControlButton>
                 ))}
               </AnnotationControls>

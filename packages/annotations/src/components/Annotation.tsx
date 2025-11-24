@@ -108,7 +108,8 @@ const ControlButton = styled.button`
 `;
 
 export interface AnnotationAction {
-  class: string;
+  class?: string;
+  text?: string;
   title: string;
   action: (annotation: AnnotationData, index: number, annotations: AnnotationData[], opts: any) => void;
 }
@@ -216,7 +217,7 @@ export const Annotation: FunctionComponent<AnnotationProps> = ({
                 handleControlClick(control);
               }}
             >
-              <i className={getIconClass(control.class)} />
+              {control.text ? control.text : <i className={getIconClass(control.class || '')} />}
             </ControlButton>
           ))}
         </ControlsBar>
