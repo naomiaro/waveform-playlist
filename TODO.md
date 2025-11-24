@@ -949,7 +949,30 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ## ✅ Recently Completed
 
-### 2025-11-23
+### 2025-11-23 (Afternoon)
+
+- [x] **TypeScript Build Integration & Drag/Trim Bug Fixes - ALL WORKING!** 🎉
+  - **Problem:** Drag visual feedback worked but state didn't update on drop; trim handles not draggable at all
+  - **Root Causes:** Multiple TypeScript errors silently breaking runtime code (Vite doesn't fail builds on TS errors)
+  - **Solution:** Added `pnpm typecheck &&` to all build scripts for type-safe builds
+  - **Fixed TypeScript Errors:**
+    - Clip `onMouseDown` handler - Updated to accept `React.MouseEvent<HTMLDivElement>` parameter for track selection logic
+    - collisionModifier return type - Added `scaleX: 1, scaleY: 1` to all return paths (required by @dnd-kit Transform type)
+    - PlaybackControls null handling - Fixed `currentTimeRef.current` access with `?? 0` operator
+    - Waveform ref assignments - Changed `currentTimeRef.current =` to `setCurrentTime()` calls (readonly property)
+    - Export issues - Exported `EffectsFunction` and `TrackEffectsFunction` from playout package index
+    - Import issues - Fixed `AnnotationData` to import from annotations package, imported `TimeFormat` type from ui-components
+  - **Package Rebuilds:** Rebuilt playout, ui-components, and browser packages with all type changes
+  - **Result:** Full drag-and-drop functionality now working perfectly!
+    - ✅ Drag clip headers to move clips horizontally
+    - ✅ Real-time collision detection (Audacity-style constraints)
+    - ✅ State updates on drop (clips stay in new position)
+    - ✅ Boundary trimming works (drag left/right edges)
+    - ✅ Track selection on drag/click
+  - **Files modified:** `Clip.tsx`, `useClipDragHandlers.ts`, `PlaybackControls.tsx`, `Waveform.tsx`, `WaveformPlaylistContext.tsx`, `playout/src/index.ts`
+  - **Build enforcement:** TypeScript type checking now enforced in all build scripts
+
+### 2025-11-23 (Morning)
 
 - [x] **Phase 3.3: Splitting Clips - COMPLETE!** 🎉
   - Created `useClipSplitting` hook for splitting clips at playhead position
