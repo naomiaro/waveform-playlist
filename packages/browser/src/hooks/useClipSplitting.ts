@@ -6,6 +6,8 @@ import { usePlaybackAnimation, usePlaylistState } from '../WaveformPlaylistConte
 export interface UseClipSplittingOptions {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
+  sampleRate: number;
+  samplesPerPixel: number;
 }
 
 export interface UseClipSplittingResult {
@@ -36,7 +38,7 @@ export interface UseClipSplittingResult {
  * ```
  */
 export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
-  const { tracks, onTracksChange } = options;
+  const { tracks, onTracksChange, sampleRate } = options;
   const { currentTime } = usePlaybackAnimation();
   const { selectedTrackId } = usePlaylistState();
 
@@ -56,24 +58,64 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       const clip = track.clips[clipIndex];
       if (!clip) return false;
 
-      // Calculate clip end time
-      const clipEndTime = clip.startTime + clip.duration;
+      // Convert clip positions from samples to seconds for bounds checking
+      const clipStartTime = clip.startSample / sampleRate;
+      const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
 
       // Validate that split time is within clip bounds
-      if (splitTime <= clip.startTime || splitTime >= clipEndTime) {
+      if (splitTime <= clipStartTime || splitTime >= clipEndTime) {
         console.warn('Split time is outside clip bounds');
         return false;
       }
 
-      // Calculate relative position within the clip
-      const relativeTime = splitTime - clip.startTime;
+      // Work with samples and pixels (all integers!) to avoid floating-point precision issues
+      // Key insight: A pixel represents a RANGE of samples (samplesPerPixel samples)
+      // By working in samples, we eliminate all floating-point errors
+      const { sampleRate, samplesPerPixel } = options;
+
+      // Convert split time from seconds to samples (round to nearest sample)
+      const splitSample = Math.round(splitTime * sampleRate);
+
+      // Calculate pixel positions from sample positions using integer division
+      const clipStartPixel = Math.floor(clip.startSample / samplesPerPixel);
+      const splitPixel = Math.floor(splitSample / samplesPerPixel);
+      const clipEndSample = clip.startSample + clip.durationSamples;
+      const clipEndPixel = Math.floor(clipEndSample / samplesPerPixel);
+
+      // Calculate pixel widths (ensuring clips are adjacent)
+      const firstClipPixelWidth = splitPixel - clipStartPixel;
+      const secondClipPixelWidth = clipEndPixel - splitPixel;
+
+      // Calculate sample positions from exact pixel boundaries
+      // Both clips share the same boundary: the start of the split pixel
+      const snappedSplitSample = splitPixel * samplesPerPixel;
+
+      // First clip: starts at clip's original start, ends at split pixel boundary
+      const firstClipStartSample = clip.startSample;
+      const firstClipDurationSamples = snappedSplitSample - firstClipStartSample;
+
+      // Second clip: starts at split pixel boundary, ends at clip's original end
+      const secondClipStartSample = snappedSplitSample;
+      const secondClipDurationSamples = clipEndSample - secondClipStartSample;
+
+      // Calculate offset increment for second clip (in samples)
+      const offsetIncrement = snappedSplitSample - clip.startSample;
+
+      // Debug: log sample/pixel calculations
+      console.error(`[SNAP DEBUG] Original: startSample=${clip.startSample}, splitSample=${splitSample}, endSample=${clipEndSample}`);
+      console.error(`[SNAP DEBUG] Pixel positions: start=${clipStartPixel}, split=${splitPixel}, end=${clipEndPixel}`);
+      console.error(`[SNAP DEBUG] Pixel widths: first=${firstClipPixelWidth}, second=${secondClipPixelWidth}`);
+      console.error(`[SNAP DEBUG] Snapped split sample: ${snappedSplitSample}`);
+      console.error(`[SNAP DEBUG] First clip: startSample=${firstClipStartSample}, durationSamples=${firstClipDurationSamples}`);
+      console.error(`[SNAP DEBUG] Second clip: startSample=${secondClipStartSample}, durationSamples=${secondClipDurationSamples}`);
+      console.error(`[SNAP DEBUG] Offset increment (samples): ${offsetIncrement}`);
 
       // Create first clip (from start to split point)
       const firstClip = createClip({
         audioBuffer: clip.audioBuffer,
-        startTime: clip.startTime,
-        duration: relativeTime,
-        offset: clip.offset,
+        startSample: firstClipStartSample,
+        durationSamples: firstClipDurationSamples,
+        offsetSamples: clip.offsetSamples,
         gain: clip.gain,
         name: clip.name ? `${clip.name} (1)` : undefined,
         color: clip.color,
@@ -84,9 +126,9 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       // Create second clip (from split point to end)
       const secondClip = createClip({
         audioBuffer: clip.audioBuffer,
-        startTime: splitTime,
-        duration: clip.duration - relativeTime,
-        offset: clip.offset + relativeTime,
+        startSample: secondClipStartSample,
+        durationSamples: secondClipDurationSamples,
+        offsetSamples: clip.offsetSamples + offsetIncrement,
         gain: clip.gain,
         name: clip.name ? `${clip.name} (2)` : undefined,
         color: clip.color,
@@ -108,7 +150,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       onTracksChange(newTracks);
       return true;
     },
-    [tracks, onTracksChange]
+    [tracks, onTracksChange, options]
   );
 
   /**
@@ -137,12 +179,14 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
     console.error(`[DEBUG] Searching for clip at currentTime=${currentTime} on track "${track.name}" (${track.clips.length} clips)`);
     for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
       const clip = track.clips[clipIndex];
-      const clipEndTime = clip.startTime + clip.duration;
-      console.error(`[DEBUG] Clip ${clipIndex}: startTime=${clip.startTime}, duration=${clip.duration}, endTime=${clipEndTime}`);
-      console.error(`[DEBUG] Check: ${currentTime} > ${clip.startTime} = ${currentTime > clip.startTime}, ${currentTime} < ${clipEndTime} = ${currentTime < clipEndTime}`);
+      const clipStartTime = clip.startSample / sampleRate;
+      const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
+      console.error(`[DEBUG] Clip ${clipIndex}: startSample=${clip.startSample}, durationSamples=${clip.durationSamples}, endSample=${clip.startSample + clip.durationSamples}`);
+      console.error(`[DEBUG] In seconds: startTime=${clipStartTime}, endTime=${clipEndTime}`);
+      console.error(`[DEBUG] Check: ${currentTime} > ${clipStartTime} = ${currentTime > clipStartTime}, ${currentTime} < ${clipEndTime} = ${currentTime < clipEndTime}`);
 
       // Check if currentTime is within this clip (not at boundaries)
-      if (currentTime > clip.startTime && currentTime < clipEndTime) {
+      if (currentTime > clipStartTime && currentTime < clipEndTime) {
         // Found a clip! Split it
         console.error(`Splitting clip on track "${track.name}" at ${currentTime}s`);
         return splitClipAt(trackIndex, clipIndex, currentTime);
@@ -151,7 +195,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
 
     console.error(`No clip found at playhead position on track "${track.name}"`);
     return false;
-  }, [tracks, currentTime, selectedTrackId, splitClipAt]);
+  }, [tracks, currentTime, selectedTrackId, splitClipAt, sampleRate]);
 
   return {
     splitClipAtPlayhead,

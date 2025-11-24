@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { createTrack, createClip, type ClipTrack } from '@waveform-playlist/core';
+import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   usePlaylistData,
@@ -126,6 +126,8 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
     onTracksChange,
+    sampleRate,
+    samplesPerPixel,
   });
 
   // Set up keyboard shortcuts
@@ -212,13 +214,15 @@ const MultiClipExample: React.FC = () => {
               throw new Error(`Audio file not found for ID: ${clipConfig.fileId}`);
             }
 
-            return createClip({
+            const clip = createClipFromSeconds({
               audioBuffer,
               startTime: clipConfig.startTime,
               duration: clipConfig.duration,
               offset: clipConfig.offset,
               name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
             });
+            console.log(`[CLIP CREATE] ${trackConfig.name}: startSample=${clip.startSample}, durationSamples=${clip.durationSamples}, sampleRate=${audioBuffer.sampleRate}`);
+            return clip;
           });
 
           // Create the track with multiple clips

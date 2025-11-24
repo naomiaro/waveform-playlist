@@ -49,9 +49,8 @@ export interface ClipProps {
   trackIndex: number; // Track index (for drag operations)
   clipIndex: number; // Clip index within track (for drag operations)
   trackName: string; // Track name (shown in header)
-  startTime: number; // Start time in seconds
-  duration: number; // Duration in seconds
-  sampleRate: number;
+  startSample: number; // Start position in samples
+  durationSamples: number; // Duration in samples
   samplesPerPixel: number;
   // Optional header (for multi-clip editing with drag-to-move)
   showHeader?: boolean;
@@ -81,9 +80,8 @@ export const Clip: FunctionComponent<ClipProps> = ({
   trackIndex,
   clipIndex,
   trackName,
-  startTime,
-  duration,
-  sampleRate,
+  startSample,
+  durationSamples,
   samplesPerPixel,
   showHeader = false,
   disableHeaderDrag = false,
@@ -94,11 +92,16 @@ export const Clip: FunctionComponent<ClipProps> = ({
   onMouseDown,
   trackId,
 }) => {
-  // Calculate horizontal position based on start time
-  const left = Math.floor((startTime * sampleRate) / samplesPerPixel);
+  // Calculate horizontal position based on start sample
+  // Use Math.floor to always snap to pixel boundaries
+  const left = Math.floor(startSample / samplesPerPixel);
 
-  // Calculate width based on duration
-  const width = Math.floor((duration * sampleRate) / samplesPerPixel);
+  // Calculate width based on duration samples
+  // Use Math.floor for consistent pixel snapping (Math.ceil only for final waveform edge)
+  const width = Math.floor(durationSamples / samplesPerPixel);
+
+  // Debug logging
+  console.log(`[CLIP RENDER] ${trackName}: startSample=${startSample}, durationSamples=${durationSamples}, samplesPerPixel=${samplesPerPixel}, left=${left}, width=${width}`);
 
   // Use draggable only if header is shown and drag is enabled
   const enableDrag = showHeader && !disableHeaderDrag && !isOverlay;

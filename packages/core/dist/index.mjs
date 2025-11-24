@@ -2,9 +2,10 @@
 function createClip(options) {
   const {
     audioBuffer,
-    startTime,
-    duration = audioBuffer.duration,
-    offset = 0,
+    startSample,
+    durationSamples = audioBuffer.length,
+    // Full buffer by default
+    offsetSamples = 0,
     gain = 1,
     name,
     color,
@@ -14,15 +15,40 @@ function createClip(options) {
   return {
     id: generateId(),
     audioBuffer,
-    startTime,
-    duration,
-    offset,
+    startSample,
+    durationSamples,
+    offsetSamples,
     gain,
     name,
     color,
     fadeIn,
     fadeOut
   };
+}
+function createClipFromSeconds(options) {
+  const {
+    audioBuffer,
+    startTime,
+    duration = audioBuffer.duration,
+    offset = 0,
+    gain = 1,
+    name,
+    color,
+    fadeIn,
+    fadeOut
+  } = options;
+  const sampleRate = audioBuffer.sampleRate;
+  return createClip({
+    audioBuffer,
+    startSample: Math.round(startTime * sampleRate),
+    durationSamples: Math.round(duration * sampleRate),
+    offsetSamples: Math.round(offset * sampleRate),
+    gain,
+    name,
+    color,
+    fadeIn,
+    fadeOut
+  });
 }
 function createTrack(options) {
   const {
@@ -48,12 +74,13 @@ function createTrack(options) {
   };
 }
 function createTimeline(tracks, sampleRate = 44100, options) {
-  const duration = tracks.reduce((maxDuration, track) => {
-    const trackDuration = track.clips.reduce((max, clip) => {
-      return Math.max(max, clip.startTime + clip.duration);
+  const durationSamples = tracks.reduce((maxSamples, track) => {
+    const trackSamples = track.clips.reduce((max, clip) => {
+      return Math.max(max, clip.startSample + clip.durationSamples);
     }, 0);
-    return Math.max(maxDuration, trackDuration);
+    return Math.max(maxSamples, trackSamples);
   }, 0);
+  const duration = durationSamples / sampleRate;
   return {
     tracks,
     duration,
@@ -66,38 +93,38 @@ function createTimeline(tracks, sampleRate = 44100, options) {
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
-function getClipsInRange(track, startTime, endTime) {
+function getClipsInRange(track, startSample, endSample) {
   return track.clips.filter((clip) => {
-    const clipEnd = clip.startTime + clip.duration;
-    return clip.startTime < endTime && clipEnd > startTime;
+    const clipEnd = clip.startSample + clip.durationSamples;
+    return clip.startSample < endSample && clipEnd > startSample;
   });
 }
-function getClipsAtTime(track, time) {
+function getClipsAtSample(track, sample) {
   return track.clips.filter((clip) => {
-    const clipEnd = clip.startTime + clip.duration;
-    return time >= clip.startTime && time < clipEnd;
+    const clipEnd = clip.startSample + clip.durationSamples;
+    return sample >= clip.startSample && sample < clipEnd;
   });
 }
 function clipsOverlap(clip1, clip2) {
-  const clip1End = clip1.startTime + clip1.duration;
-  const clip2End = clip2.startTime + clip2.duration;
-  return clip1.startTime < clip2End && clip1End > clip2.startTime;
+  const clip1End = clip1.startSample + clip1.durationSamples;
+  const clip2End = clip2.startSample + clip2.durationSamples;
+  return clip1.startSample < clip2End && clip1End > clip2.startSample;
 }
 function sortClipsByTime(clips) {
-  return [...clips].sort((a, b) => a.startTime - b.startTime);
+  return [...clips].sort((a, b) => a.startSample - b.startSample);
 }
 function findGaps(track) {
   if (track.clips.length === 0) return [];
   const sorted = sortClipsByTime(track.clips);
   const gaps = [];
   for (let i = 0; i < sorted.length - 1; i++) {
-    const currentClipEnd = sorted[i].startTime + sorted[i].duration;
-    const nextClipStart = sorted[i + 1].startTime;
+    const currentClipEnd = sorted[i].startSample + sorted[i].durationSamples;
+    const nextClipStart = sorted[i + 1].startSample;
     if (nextClipStart > currentClipEnd) {
       gaps.push({
-        startTime: currentClipEnd,
-        endTime: nextClipStart,
-        duration: nextClipStart - currentClipEnd
+        startSample: currentClipEnd,
+        endSample: nextClipStart,
+        durationSamples: nextClipStart - currentClipEnd
       });
     }
   }
@@ -137,10 +164,11 @@ export {
   InteractionState,
   clipsOverlap,
   createClip,
+  createClipFromSeconds,
   createTimeline,
   createTrack,
   findGaps,
-  getClipsAtTime,
+  getClipsAtSample,
   getClipsInRange,
   pixelsToSamples,
   pixelsToSeconds,

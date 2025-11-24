@@ -13,6 +13,10 @@ import { Fade } from './index';
 
 /**
  * Represents a single audio clip on the timeline
+ *
+ * IMPORTANT: All positions/durations are stored as SAMPLE COUNTS (integers)
+ * to avoid floating-point precision errors. Convert to seconds only when
+ * needed for playback using: seconds = samples / sampleRate
  */
 export interface AudioClip {
   /** Unique identifier for this clip */
@@ -21,14 +25,14 @@ export interface AudioClip {
   /** The audio buffer containing the audio data */
   audioBuffer: AudioBuffer;
 
-  /** Position on timeline where this clip starts (seconds) */
-  startTime: number;
+  /** Position on timeline where this clip starts (in samples at timeline sampleRate) */
+  startSample: number;
 
-  /** Duration of this clip (seconds) - how much of the audio buffer to play */
-  duration: number;
+  /** Duration of this clip (in samples) - how much of the audio buffer to play */
+  durationSamples: number;
 
-  /** Offset into the audio buffer where playback starts (seconds) - the "trim start" point */
-  offset: number;
+  /** Offset into the audio buffer where playback starts (in samples) - the "trim start" point */
+  offsetSamples: number;
 
   /** Optional fade in effect */
   fadeIn?: Fade;
@@ -108,14 +112,29 @@ export interface Timeline {
 }
 
 /**
- * Options for creating a new audio clip
+ * Options for creating a new audio clip (using sample counts)
  */
 export interface CreateClipOptions {
   audioBuffer: AudioBuffer;
-  startTime: number;
-  duration?: number;      // Defaults to full buffer duration
-  offset?: number;        // Defaults to 0
-  gain?: number;          // Defaults to 1.0
+  startSample: number;           // Position on timeline (in samples)
+  durationSamples?: number;      // Defaults to full buffer duration (in samples)
+  offsetSamples?: number;        // Defaults to 0
+  gain?: number;                 // Defaults to 1.0
+  name?: string;
+  color?: string;
+  fadeIn?: Fade;
+  fadeOut?: Fade;
+}
+
+/**
+ * Options for creating a new audio clip (using seconds for convenience)
+ */
+export interface CreateClipOptionsSeconds {
+  audioBuffer: AudioBuffer;
+  startTime: number;        // Position on timeline (in seconds)
+  duration?: number;        // Defaults to full buffer duration (in seconds)
+  offset?: number;          // Defaults to 0 (in seconds)
+  gain?: number;            // Defaults to 1.0
   name?: string;
   color?: string;
   fadeIn?: Fade;
@@ -137,9 +156,40 @@ export interface CreateTrackOptions {
 }
 
 /**
- * Creates a new AudioClip with sensible defaults
+ * Creates a new AudioClip with sensible defaults (using sample counts)
  */
 export function createClip(options: CreateClipOptions): AudioClip {
+  const {
+    audioBuffer,
+    startSample,
+    durationSamples = audioBuffer.length, // Full buffer by default
+    offsetSamples = 0,
+    gain = 1.0,
+    name,
+    color,
+    fadeIn,
+    fadeOut,
+  } = options;
+
+  return {
+    id: generateId(),
+    audioBuffer,
+    startSample,
+    durationSamples,
+    offsetSamples,
+    gain,
+    name,
+    color,
+    fadeIn,
+    fadeOut,
+  };
+}
+
+/**
+ * Creates a new AudioClip from time-based values (convenience function)
+ * Converts seconds to samples using the audioBuffer's sampleRate
+ */
+export function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioClip {
   const {
     audioBuffer,
     startTime,
@@ -152,18 +202,19 @@ export function createClip(options: CreateClipOptions): AudioClip {
     fadeOut,
   } = options;
 
-  return {
-    id: generateId(),
+  const sampleRate = audioBuffer.sampleRate;
+
+  return createClip({
     audioBuffer,
-    startTime,
-    duration,
-    offset,
+    startSample: Math.round(startTime * sampleRate),
+    durationSamples: Math.round(duration * sampleRate),
+    offsetSamples: Math.round(offset * sampleRate),
     gain,
     name,
     color,
     fadeIn,
     fadeOut,
-  };
+  });
 }
 
 /**
@@ -206,13 +257,15 @@ export function createTimeline(
     timeSignature?: { numerator: number; denominator: number };
   }
 ): Timeline {
-  // Calculate total duration from all clips across all tracks
-  const duration = tracks.reduce((maxDuration, track) => {
-    const trackDuration = track.clips.reduce((max, clip) => {
-      return Math.max(max, clip.startTime + clip.duration);
+  // Calculate total duration from all clips across all tracks (in seconds)
+  const durationSamples = tracks.reduce((maxSamples, track) => {
+    const trackSamples = track.clips.reduce((max, clip) => {
+      return Math.max(max, clip.startSample + clip.durationSamples);
     }, 0);
-    return Math.max(maxDuration, trackDuration);
+    return Math.max(maxSamples, trackSamples);
   }, 0);
+
+  const duration = durationSamples / sampleRate;
 
   return {
     tracks,
@@ -232,29 +285,29 @@ function generateId(): string {
 }
 
 /**
- * Utility: Get all clips within a time range
+ * Utility: Get all clips within a sample range
  */
 export function getClipsInRange(
   track: ClipTrack,
-  startTime: number,
-  endTime: number
+  startSample: number,
+  endSample: number
 ): AudioClip[] {
   return track.clips.filter((clip) => {
-    const clipEnd = clip.startTime + clip.duration;
+    const clipEnd = clip.startSample + clip.durationSamples;
     // Clip overlaps with range if:
     // - Clip starts before range ends AND
     // - Clip ends after range starts
-    return clip.startTime < endTime && clipEnd > startTime;
+    return clip.startSample < endSample && clipEnd > startSample;
   });
 }
 
 /**
- * Utility: Get all clips at a specific time position
+ * Utility: Get all clips at a specific sample position
  */
-export function getClipsAtTime(track: ClipTrack, time: number): AudioClip[] {
+export function getClipsAtSample(track: ClipTrack, sample: number): AudioClip[] {
   return track.clips.filter((clip) => {
-    const clipEnd = clip.startTime + clip.duration;
-    return time >= clip.startTime && time < clipEnd;
+    const clipEnd = clip.startSample + clip.durationSamples;
+    return sample >= clip.startSample && sample < clipEnd;
   });
 }
 
@@ -262,26 +315,26 @@ export function getClipsAtTime(track: ClipTrack, time: number): AudioClip[] {
  * Utility: Check if two clips overlap
  */
 export function clipsOverlap(clip1: AudioClip, clip2: AudioClip): boolean {
-  const clip1End = clip1.startTime + clip1.duration;
-  const clip2End = clip2.startTime + clip2.duration;
+  const clip1End = clip1.startSample + clip1.durationSamples;
+  const clip2End = clip2.startSample + clip2.durationSamples;
 
-  return clip1.startTime < clip2End && clip1End > clip2.startTime;
+  return clip1.startSample < clip2End && clip1End > clip2.startSample;
 }
 
 /**
- * Utility: Sort clips by startTime
+ * Utility: Sort clips by startSample
  */
 export function sortClipsByTime(clips: AudioClip[]): AudioClip[] {
-  return [...clips].sort((a, b) => a.startTime - b.startTime);
+  return [...clips].sort((a, b) => a.startSample - b.startSample);
 }
 
 /**
  * Utility: Find gaps between clips (silent regions)
  */
 export interface Gap {
-  startTime: number;
-  endTime: number;
-  duration: number;
+  startSample: number;
+  endSample: number;
+  durationSamples: number;
 }
 
 export function findGaps(track: ClipTrack): Gap[] {
@@ -291,14 +344,14 @@ export function findGaps(track: ClipTrack): Gap[] {
   const gaps: Gap[] = [];
 
   for (let i = 0; i < sorted.length - 1; i++) {
-    const currentClipEnd = sorted[i].startTime + sorted[i].duration;
-    const nextClipStart = sorted[i + 1].startTime;
+    const currentClipEnd = sorted[i].startSample + sorted[i].durationSamples;
+    const nextClipStart = sorted[i + 1].startSample;
 
     if (nextClipStart > currentClipEnd) {
       gaps.push({
-        startTime: currentClipEnd,
-        endTime: nextClipStart,
-        duration: nextClipStart - currentClipEnd,
+        startSample: currentClipEnd,
+        endSample: nextClipStart,
+        durationSamples: nextClipStart - currentClipEnd,
       });
     }
   }

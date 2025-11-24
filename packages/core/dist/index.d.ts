@@ -11,18 +11,22 @@
 
 /**
  * Represents a single audio clip on the timeline
+ *
+ * IMPORTANT: All positions/durations are stored as SAMPLE COUNTS (integers)
+ * to avoid floating-point precision errors. Convert to seconds only when
+ * needed for playback using: seconds = samples / sampleRate
  */
 interface AudioClip {
     /** Unique identifier for this clip */
     id: string;
     /** The audio buffer containing the audio data */
     audioBuffer: AudioBuffer;
-    /** Position on timeline where this clip starts (seconds) */
-    startTime: number;
-    /** Duration of this clip (seconds) - how much of the audio buffer to play */
-    duration: number;
-    /** Offset into the audio buffer where playback starts (seconds) - the "trim start" point */
-    offset: number;
+    /** Position on timeline where this clip starts (in samples at timeline sampleRate) */
+    startSample: number;
+    /** Duration of this clip (in samples) - how much of the audio buffer to play */
+    durationSamples: number;
+    /** Offset into the audio buffer where playback starts (in samples) - the "trim start" point */
+    offsetSamples: number;
     /** Optional fade in effect */
     fadeIn?: Fade;
     /** Optional fade out effect */
@@ -80,9 +84,23 @@ interface Timeline {
     };
 }
 /**
- * Options for creating a new audio clip
+ * Options for creating a new audio clip (using sample counts)
  */
 interface CreateClipOptions {
+    audioBuffer: AudioBuffer;
+    startSample: number;
+    durationSamples?: number;
+    offsetSamples?: number;
+    gain?: number;
+    name?: string;
+    color?: string;
+    fadeIn?: Fade;
+    fadeOut?: Fade;
+}
+/**
+ * Options for creating a new audio clip (using seconds for convenience)
+ */
+interface CreateClipOptionsSeconds {
     audioBuffer: AudioBuffer;
     startTime: number;
     duration?: number;
@@ -107,9 +125,14 @@ interface CreateTrackOptions {
     height?: number;
 }
 /**
- * Creates a new AudioClip with sensible defaults
+ * Creates a new AudioClip with sensible defaults (using sample counts)
  */
 declare function createClip(options: CreateClipOptions): AudioClip;
+/**
+ * Creates a new AudioClip from time-based values (convenience function)
+ * Converts seconds to samples using the audioBuffer's sampleRate
+ */
+declare function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioClip;
 /**
  * Creates a new ClipTrack with sensible defaults
  */
@@ -126,28 +149,28 @@ declare function createTimeline(tracks: ClipTrack[], sampleRate?: number, option
     };
 }): Timeline;
 /**
- * Utility: Get all clips within a time range
+ * Utility: Get all clips within a sample range
  */
-declare function getClipsInRange(track: ClipTrack, startTime: number, endTime: number): AudioClip[];
+declare function getClipsInRange(track: ClipTrack, startSample: number, endSample: number): AudioClip[];
 /**
- * Utility: Get all clips at a specific time position
+ * Utility: Get all clips at a specific sample position
  */
-declare function getClipsAtTime(track: ClipTrack, time: number): AudioClip[];
+declare function getClipsAtSample(track: ClipTrack, sample: number): AudioClip[];
 /**
  * Utility: Check if two clips overlap
  */
 declare function clipsOverlap(clip1: AudioClip, clip2: AudioClip): boolean;
 /**
- * Utility: Sort clips by startTime
+ * Utility: Sort clips by startSample
  */
 declare function sortClipsByTime(clips: AudioClip[]): AudioClip[];
 /**
  * Utility: Find gaps between clips (silent regions)
  */
 interface Gap {
-    startTime: number;
-    endTime: number;
-    duration: number;
+    startSample: number;
+    endSample: number;
+    durationSamples: number;
 }
 declare function findGaps(track: ClipTrack): Gap[];
 
@@ -229,4 +252,4 @@ declare function pixelsToSamples(pixels: number, samplesPerPixel: number): numbe
 declare function pixelsToSeconds(pixels: number, samplesPerPixel: number, sampleRate: number): number;
 declare function secondsToPixels(seconds: number, samplesPerPixel: number, sampleRate: number): number;
 
-export { type AudioBuffer$1 as AudioBuffer, type AudioClip, type ClipTrack, type CreateClipOptions, type CreateTrackOptions, type Fade, type FadeType, type Gap, InteractionState, type PlaylistConfig, type PlayoutState, type TimeSelection, type Timeline, type Track, type WaveformConfig, clipsOverlap, createClip, createTimeline, createTrack, findGaps, getClipsAtTime, getClipsInRange, pixelsToSamples, pixelsToSeconds, samplesToPixels, samplesToSeconds, secondsToPixels, secondsToSamples, sortClipsByTime };
+export { type AudioBuffer$1 as AudioBuffer, type AudioClip, type ClipTrack, type CreateClipOptions, type CreateClipOptionsSeconds, type CreateTrackOptions, type Fade, type FadeType, type Gap, InteractionState, type PlaylistConfig, type PlayoutState, type TimeSelection, type Timeline, type Track, type WaveformConfig, clipsOverlap, createClip, createClipFromSeconds, createTimeline, createTrack, findGaps, getClipsAtSample, getClipsInRange, pixelsToSamples, pixelsToSeconds, samplesToPixels, samplesToSeconds, secondsToPixels, secondsToSamples, sortClipsByTime };

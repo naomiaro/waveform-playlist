@@ -13,8 +13,8 @@ export interface ClipPeaks {
   clipId: string;
   trackName: string;
   peaks: PeakData;
-  startTime: number;
-  duration: number;
+  startSample: number;
+  durationSamples: number;
 }
 
 export type TrackClipPeaks = ClipPeaks[];
@@ -443,8 +443,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           clipId: clip.id,
           trackName: track.name,
           peaks,
-          startTime: clip.startTime,
-          duration: clip.duration,
+          startSample: clip.startSample,
+          durationSamples: clip.durationSamples,
         };
       });
 
