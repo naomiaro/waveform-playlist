@@ -20,6 +20,8 @@ import {
   SliderWrapper,
   VolumeDownIcon,
   VolumeUpIcon,
+  defaultTheme,
+  type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
 import {
   AnnotationBoxesWrapper,
@@ -30,20 +32,6 @@ import {
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 
-// Default theme
-const defaultTheme = {
-  waveOutlineColor: '#005BBB',
-  waveFillColor: '#FFD500',
-  waveProgressColor: '#ff0000',
-  timeColor: '#000',
-  timescaleBackgroundColor: '#fff',
-  playheadColor: '#f00',
-  selectionColor: 'rgba(0, 255, 0, 0.3)',
-  clipHeaderBackgroundColor: 'rgba(0, 0, 0, 0.1)',
-  clipHeaderBorderColor: 'rgba(0, 0, 0, 0.2)',
-  clipHeaderTextColor: '#333',
-};
-
 export interface WaveformProps {
   theme?: {
     waveOutlineColor?: string;
@@ -53,9 +41,9 @@ export interface WaveformProps {
     timescaleBackgroundColor?: string;
     playheadColor?: string;
     selectionColor?: string;
-    clipHeaderBackgroundColor?: string; // Background color for clip headers
-    clipHeaderBorderColor?: string; // Border color for clip headers
-    clipHeaderTextColor?: string; // Text color for clip headers
+    clipHeaderBackgroundColor?: string;
+    clipHeaderBorderColor?: string;
+    clipHeaderTextColor?: string;
   };
   timescale?: boolean;
   renderTrackControls?: (trackIndex: number) => ReactNode;
@@ -442,9 +430,6 @@ export const Waveform: React.FC<WaveformProps> = ({
                             samplesPerPixel={samplesPerPixel}
                             showHeader={showClipHeaders}
                             trackId={tracks[trackIndex].id}
-                            clipHeaderBackgroundColor={theme.clipHeaderBackgroundColor}
-                            clipHeaderBorderColor={theme.clipHeaderBorderColor}
-                            clipHeaderTextColor={theme.clipHeaderTextColor}
                             onMouseDown={(e) => {
                               // Only select track if clicking on the waveform, not on draggable elements
                               const target = e.target as HTMLElement;

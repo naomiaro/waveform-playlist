@@ -1,10 +1,6 @@
 import 'styled-components';
+import { WaveformPlaylistTheme } from './wfpl-theme';
 
 declare module 'styled-components' {
-  export interface DefaultTheme {
-    waveOutlineColor: string;
-    waveFillColor: string;
-    waveProgressColor: string;
-    timeColor: string;
-  }
+  export interface DefaultTheme extends WaveformPlaylistTheme {}
 }

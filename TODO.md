@@ -949,6 +949,43 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ## ✅ Recently Completed
 
+### 2025-11-23 (Evening)
+
+- [x] **Theming System Refactor - Centralized Theme Architecture**
+  - Created `WaveformPlaylistTheme` interface in `ui-components/src/wfpl-theme.ts`
+  - Defined all visual properties: waveform colors, timescale, playback UI, clip headers
+  - Exported `defaultTheme` object with sensible defaults
+  - Created `styled.d.ts` to extend styled-components' `DefaultTheme` for TypeScript autocomplete
+  - Refactored `ClipHeader` component to use theme instead of color props
+  - Removed `clipHeaderBackgroundColor`, `clipHeaderBorderColor`, `clipHeaderTextColor` props from component interfaces
+  - Components now access theme via `props.theme.propertyName` in styled components
+  - Updated `Waveform.tsx` to import and use exported `defaultTheme` from ui-components
+  - Exported theme types from `ui-components/src/index.tsx` for public API
+  - **Benefits:** Single source of truth, TypeScript autocomplete, no prop drilling, consistent theming
+  - **Files created:** `wfpl-theme.ts`, `styled.d.ts`
+  - **Files modified:** `ClipHeader.tsx`, `Clip.tsx`, `Waveform.tsx`, `ui-components/index.tsx`
+  - **Pattern established:** All visual/styling properties go in theme object, functional/behavioral properties as separate props
+
+- [x] **webaudio-peaks Package Simplification - 8-bit & 16-bit Only**
+  - Removed 32-bit peak support (Int32Array) from webaudio-peaks package
+  - Updated `Peaks` type: `Int8Array | Int16Array` (was: `Int8Array | Int16Array | Int32Array`)
+  - Updated `Bits` type: `8 | 16` (was: `8 | 16 | 32`)
+  - Removed `case 32` from `makeTypedArray()` function
+  - Updated validation error message: "Must be 8 or 16"
+  - Updated JSDoc comments to reflect supported bit depths
+  - Updated `peaksUtil.ts` to remove 32 from bits type union
+  - **No breaking changes:** Default is 8-bit, no existing code was using 32-bit peaks
+  - **Files modified:** `webaudio-peaks/src/index.ts`, `browser/src/peaksUtil.ts`
+
+- [x] **Documentation Updates - Pattern Separation**
+  - Updated CLAUDE.md with theming implementation pattern (5 steps)
+  - Updated PROJECT_STRUCTURE.md with detailed theming system documentation
+  - Added `WaveformPlaylistTheme` interface details and code examples
+  - Established documentation pattern: TODO.md for progress, CLAUDE.md for patterns, PROJECT_STRUCTURE.md for architecture
+  - Added "Documentation Guidelines" section to CLAUDE.md
+  - Removed progress/changelog from PROJECT_STRUCTURE.md (moved to TODO.md)
+  - **Pattern:** Progress updates only in TODO.md, architectural decisions in CLAUDE.md, structure/organization in PROJECT_STRUCTURE.md
+
 ### 2025-11-23 (Afternoon)
 
 - [x] **TypeScript Build Integration & Drag/Trim Bug Fixes - ALL WORKING!** 🎉

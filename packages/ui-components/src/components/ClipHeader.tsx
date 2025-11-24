@@ -7,16 +7,14 @@ export const CLIP_HEADER_HEIGHT = 22; // Height of the clip header in pixels
 
 interface HeaderContainerProps {
   readonly $isDragging?: boolean;
-  readonly $backgroundColor?: string;
-  readonly $borderColor?: string;
   readonly $interactive?: boolean; // Whether it's draggable or just presentational
 }
 
 const HeaderContainer = styled.div<HeaderContainerProps>`
   position: relative;
   height: ${CLIP_HEADER_HEIGHT}px;
-  background: ${props => props.$backgroundColor || 'rgba(0, 0, 0, 0.1)'};
-  border-bottom: 1px solid ${props => props.$borderColor || 'rgba(0, 0, 0, 0.2)'};
+  background: ${props => props.theme.clipHeaderBackgroundColor};
+  border-bottom: 1px solid ${props => props.theme.clipHeaderBorderColor};
   display: flex;
   align-items: center;
   padding: 0 8px;
@@ -27,7 +25,7 @@ const HeaderContainer = styled.div<HeaderContainerProps>`
 
   ${props => props.$interactive && `
     &:hover {
-      background: ${props.$backgroundColor ? `${props.$backgroundColor}dd` : 'rgba(0, 0, 0, 0.15)'};
+      background: ${props.theme.clipHeaderBackgroundColor}dd;
     }
 
     &:active {
@@ -36,14 +34,10 @@ const HeaderContainer = styled.div<HeaderContainerProps>`
   `}
 `;
 
-interface TrackNameProps {
-  readonly $textColor?: string;
-}
-
-const TrackName = styled.span<TrackNameProps>`
+const TrackName = styled.span`
   font-size: 11px;
   font-weight: 600;
-  color: ${props => props.$textColor || '#333'};
+  color: ${props => props.theme.clipHeaderTextColor};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -52,25 +46,17 @@ const TrackName = styled.span<TrackNameProps>`
 // Presentational-only header (no drag behavior)
 export interface ClipHeaderPresentationalProps {
   trackName: string;
-  backgroundColor?: string;
-  borderColor?: string;
-  textColor?: string;
 }
 
 export const ClipHeaderPresentational: FunctionComponent<ClipHeaderPresentationalProps> = ({
   trackName,
-  backgroundColor,
-  borderColor,
-  textColor,
 }) => {
   return (
     <HeaderContainer
       $isDragging={false}
-      $backgroundColor={backgroundColor}
-      $borderColor={borderColor}
       $interactive={false}
     >
-      <TrackName $textColor={textColor}>{trackName}</TrackName>
+      <TrackName>{trackName}</TrackName>
     </HeaderContainer>
   );
 };
@@ -86,9 +72,6 @@ export interface ClipHeaderProps {
   trackIndex: number;
   clipIndex: number;
   trackName: string;
-  backgroundColor?: string;
-  borderColor?: string;
-  textColor?: string;
   disableDrag?: boolean; // Disable drag behavior (for presentation-only rendering in overlays)
   dragHandleProps?: DragHandleProps; // Props for drag handle functionality
 }
@@ -99,15 +82,17 @@ export interface ClipHeaderProps {
  * Renders at the top of each clip (above all channels).
  * Drag the header to move the clip along the timeline.
  * Shows the track name (not clip-specific info).
+ *
+ * Theme colors (from useTheme):
+ * - clipHeaderBackgroundColor
+ * - clipHeaderBorderColor
+ * - clipHeaderTextColor
  */
 export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
   clipId,
   trackIndex,
   clipIndex,
   trackName,
-  backgroundColor,
-  borderColor,
-  textColor,
   disableDrag = false,
   dragHandleProps,
 }) => {
@@ -116,9 +101,6 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
     return (
       <ClipHeaderPresentational
         trackName={trackName}
-        backgroundColor={backgroundColor}
-        borderColor={borderColor}
-        textColor={textColor}
       />
     );
   }
@@ -129,13 +111,11 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
     <HeaderContainer
       ref={setActivatorNodeRef}
       data-clip-id={clipId}
-      $backgroundColor={backgroundColor}
-      $borderColor={borderColor}
       $interactive={true}
       {...listeners}
       {...attributes}
     >
-      <TrackName $textColor={textColor}>{trackName}</TrackName>
+      <TrackName>{trackName}</TrackName>
     </HeaderContainer>
   );
 };

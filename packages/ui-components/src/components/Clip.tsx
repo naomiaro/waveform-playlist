@@ -56,10 +56,6 @@ export interface ClipProps {
   showHeader?: boolean;
   disableHeaderDrag?: boolean; // Disable drag on header (for presentation-only rendering)
   isOverlay?: boolean; // Rendering in DragOverlay (disables absolute positioning)
-  // Theme props for header
-  clipHeaderBackgroundColor?: string;
-  clipHeaderBorderColor?: string;
-  clipHeaderTextColor?: string;
   // Track selection
   onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void; // Called when clip is pressed (for track selection - fires before drag)
   trackId?: string; // Track ID for identifying which track this clip belongs to
@@ -86,9 +82,6 @@ export const Clip: FunctionComponent<ClipProps> = ({
   showHeader = false,
   disableHeaderDrag = false,
   isOverlay = false,
-  clipHeaderBackgroundColor,
-  clipHeaderBorderColor,
-  clipHeaderTextColor,
   onMouseDown,
   trackId,
 }) => {
@@ -162,9 +155,6 @@ export const Clip: FunctionComponent<ClipProps> = ({
           trackIndex={trackIndex}
           clipIndex={clipIndex}
           trackName={trackName}
-          backgroundColor={clipHeaderBackgroundColor}
-          borderColor={clipHeaderBorderColor}
-          textColor={clipHeaderTextColor}
           disableDrag={disableHeaderDrag}
           dragHandleProps={enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined}
         />

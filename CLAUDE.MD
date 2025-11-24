@@ -19,10 +19,18 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - ✅ Phase 3.1a/b: Drag & Trim (real-time collision detection, bidirectional trimming)
 - ✅ Phase 3.3: Splitting Clips (sample-based architecture, keyboard shortcuts)
 
-**Progress Tracking:**
-- Check TODO.md "Recently Completed" section for detailed work history
-- Update TODO.md when completing tasks
-- Keep session notes in TODO.md, not here
+## Documentation Guidelines
+
+**Where to track progress/updates:**
+- ✅ **TODO.md** - Roadmap, recently completed work, session notes, progress updates
+- ✅ **CLAUDE.md** - Architectural decisions, conventions, patterns (minimal, timeless)
+- ✅ **PROJECT_STRUCTURE.md** - Architecture, file organization, data flow (NO progress/todos)
+
+**When completing work:**
+1. Update TODO.md "Recently Completed" section with date and details
+2. Update CLAUDE.md only if architectural decision or pattern established
+3. Update PROJECT_STRUCTURE.md only if structure/architecture changed
+4. Never add progress/changelog to PROJECT_STRUCTURE.md
 
 ---
 
@@ -124,6 +132,15 @@ interface AudioClip {
 - Properties that control what is rendered or how it behaves
 
 **Example:** All clip header colors in `theme`, but `showClipHeaders` as boolean prop.
+
+**Implementation Pattern:**
+1. Define theme interface in `packages/ui-components/src/wfpl-theme.ts`
+2. Export `WaveformPlaylistTheme` interface and `defaultTheme`
+3. Extend styled-components DefaultTheme via `styled.d.ts`
+4. Components access theme via `props.theme.propertyName` in styled components
+5. No color/styling props passed through component interfaces
+
+**Location:** Theme types in `ui-components/src/wfpl-theme.ts`, type augmentation in `ui-components/src/styled.d.ts`
 
 ### Custom Hooks Architecture
 

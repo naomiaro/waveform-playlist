@@ -101,6 +101,8 @@ const clip = createClipFromSeconds({
   │   ├── SelectionTimeInputs.tsx
   │   ├── Playlist.tsx
   │   ├── Track.tsx
+  │   ├── Clip.tsx
+  │   ├── ClipHeader.tsx
   │   ├── Playhead.tsx
   │   ├── Selection.tsx
   │   ├── AnnotationBox.tsx
@@ -110,6 +112,8 @@ const clip = createClipFromSeconds({
   ├── styled/            # Shared styled components
   │   ├── CheckboxStyles.tsx  # Checkbox, label, wrapper
   │   └── ButtonStyles.tsx    # ControlButton with variants
+  ├── wfpl-theme.ts      # Theme interface and default theme
+  ├── styled.d.ts        # styled-components type augmentation
   └── index.tsx          # Public API
   ```
 - **Shared Styled Components:**
@@ -121,9 +125,33 @@ const clip = createClipFromSeconds({
     - `ControlButton` - Large control button (primary/success/info variants)
     - Separate from `TrackControls/Button` (compact UI button)
   - **Benefits:** DRY principle, consistent styling, easier maintenance
+- **Theming System:**
+  - **Architecture:** Centralized theme defined in `wfpl-theme.ts`, consumed via styled-components ThemeProvider
+  - **Theme Interface:** `WaveformPlaylistTheme` defines all visual properties
+    - Waveform colors: `waveOutlineColor`, `waveFillColor`, `waveProgressColor`
+    - Timescale: `timeColor`, `timescaleBackgroundColor`
+    - Playback UI: `playheadColor`, `selectionColor`
+    - Clip headers: `clipHeaderBackgroundColor`, `clipHeaderBorderColor`, `clipHeaderTextColor`
+  - **Default Theme:** Exported `defaultTheme` object with sensible defaults
+  - **Type Safety:** `styled.d.ts` extends styled-components' `DefaultTheme` for autocomplete
+  - **Pattern:** Components access theme via `props.theme.propertyName` in styled components
+    ```typescript
+    const Header = styled.div`
+      background: ${props => props.theme.clipHeaderBackgroundColor};
+      color: ${props => props.theme.clipHeaderTextColor};
+    `;
+    ```
+  - **Benefits:**
+    - ✅ Single source of truth for all visual properties
+    - ✅ TypeScript autocomplete for theme properties
+    - ✅ No prop drilling (colors from context, not props)
+    - ✅ Consistent theming across all components
+  - **Location:** `packages/ui-components/src/wfpl-theme.ts`, `packages/ui-components/src/styled.d.ts`
 - **Key components:**
   - `Playlist` - Main container component
   - `Track` - Individual waveform track
+  - `Clip` - Audio clip with optional draggable header
+  - `ClipHeader` - Draggable title bar for clips (uses theme)
   - `SmartChannel` - Waveform rendering with device pixel ratio
   - `TimeInput` - Time value input with format support
   - `Playhead` - Playback position indicator
@@ -1003,31 +1031,6 @@ import { WaveformPlaylistComponent } from '@waveform-playlist/browser';
 
 ## Future Improvements
 
-See `CLAUDE.md` for architectural decisions and next steps:
+See `TODO.md` for roadmap and progress tracking.
 
-- Theme/design tokens system
-- Radix UI for complex components
-- More React examples
-- Component library documentation
-
----
-
-**Last Updated:** 2025-11-21
-
-- **Global AudioContext Architecture:** Consolidated to single global AudioContext managed by playout package
-  - `useRecording` now uses global context instead of creating its own
-  - Tone.js configured to use global context via `Tone.setContext()`
-  - All audio operations (playback, recording, monitoring) share one context
-  - Removed `sampleRate` option from `RecordingOptions` (uses global context's sample rate)
-  - Location: `packages/playout/src/audioContext.ts`
-  - Benefits: Simpler architecture, no conflicts between contexts, consistent sample rate
-- **Recording Package Documentation:** Added comprehensive documentation for `@waveform-playlist/recording` optional package (AudioWorklet-based recording with hooks, components, and live waveform visualization)
-- **Context Splitting Architecture:** Documented the 4-context split in `WaveformPlaylistProvider` for performance optimization (PlaybackAnimationContext, PlaylistStateContext, PlaylistControlsContext, PlaylistDataContext)
-- **Continuous Play Toggle Fix:** Fixed toggling Continuous Play checkbox during active playback in both directions (ON and OFF) through context splitting, animation loop restart, and playout rescheduling
-- Updated data flow diagrams to show split context architecture
-- Added detailed context usage patterns and benefits
-- Refactored annotations into optional package `@waveform-playlist/annotations` with `useAnnotationControls` hook, React components, and ~50KB bundle size reduction for users who don't need annotations
-- Created OPTIONAL_PACKAGES.md documentation
-- Extracted duplicated styled components (checkboxes and buttons) into shared definitions in `ui-components/styled/`
-- Created `CheckboxStyles.tsx` with shared checkbox components (~60% code reduction)
-- Created `ButtonStyles.tsx` with `ControlButton` component supporting primary/success/info variants
+Architectural patterns and conventions documented in `CLAUDE.md`.
