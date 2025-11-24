@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { formatTime, parseTime, type TimeFormat } from '../utils/timeFormat';
-import { BaseInput, ScreenReaderOnly } from '../styled';
+import { BaseInput, ScreenReaderOnly } from '../styled/index';
 
 export interface TimeInputProps {
   id: string;

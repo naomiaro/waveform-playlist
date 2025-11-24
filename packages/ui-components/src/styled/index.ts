@@ -1,8 +1,8 @@
 // Base styled primitives
-export * from './BaseButton';
-export * from './BaseCheckbox';
-export * from './BaseControlButton';
-export * from './BaseInput';
-export * from './BaseLabel';
-export * from './BaseSelect';
-export * from './BaseSlider';
+export { BaseButton } from './BaseButton';
+export { BaseCheckboxWrapper, BaseCheckbox, BaseCheckboxLabel } from './BaseCheckbox';
+export { BaseControlButton } from './BaseControlButton';
+export { BaseInput } from './BaseInput';
+export { BaseLabel, InlineLabel, ScreenReaderOnly } from './BaseLabel';
+export { BaseSelect } from './BaseSelect';
+export { BaseSlider } from './BaseSlider';

@@ -56,12 +56,12 @@ const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
   height: 100%;
   flex-shrink: 0;
   pointer-events: auto;
-  background: #fff;
+  background: ${(props) => props.theme.surfaceColor};
+  transition: background 0.15s ease-in-out;
 
   /* Selected track: highlighted background */
   ${(props) => props.$isSelected && `
     background: ${props.theme.selectedTrackControlsBackground};
-    transition: background 0.15s ease-in-out;
   `}
 `;
 

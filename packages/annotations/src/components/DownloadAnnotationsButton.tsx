@@ -1,5 +1,5 @@
 import React from 'react';
-import { ControlButton } from '@waveform-playlist/ui-components';
+import { BaseControlButton } from '@waveform-playlist/ui-components';
 import { serializeAeneas } from '../parsers/aeneas';
 import type { Annotation } from '../types';
 
@@ -44,7 +44,7 @@ export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps>
   };
 
   return (
-    <ControlButton
+    <BaseControlButton
       variant="info"
       onClick={handleDownload}
       disabled={disabled || annotations.length === 0}
@@ -52,6 +52,6 @@ export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps>
       title={annotations.length === 0 ? 'No annotations to download' : 'Download the annotations as JSON'}
     >
       {children}
-    </ControlButton>
+    </BaseControlButton>
   );
 };

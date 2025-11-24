@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { type TimeFormat } from '../utils/timeFormat';
-import { BaseSelect } from '../styled';
+import { BaseSelect } from '../styled/index';
 
 const SelectWrapper = styled.div`
   display: inline-flex;

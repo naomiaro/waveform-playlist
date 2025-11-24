@@ -25,7 +25,7 @@ const buttonColors = {
  * This is used for prominent actions like Play, Pause, Record.
  * For neutral buttons, use BaseButton from the styled primitives.
  */
-export const ControlButton = styled.button<ControlButtonProps>`
+export const BaseControlButton = styled.button<ControlButtonProps>`
   padding: 0.5rem 1rem;
   background: ${(props) => buttonColors[props.variant || 'primary'].background};
   color: white;

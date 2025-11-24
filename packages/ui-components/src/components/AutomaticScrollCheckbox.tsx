@@ -1,5 +1,5 @@
 import React from 'react';
-import { BaseCheckboxWrapper, BaseCheckbox, BaseCheckboxLabel } from '../styled';
+import { BaseCheckboxWrapper, BaseCheckbox, BaseCheckboxLabel } from '../styled/index';
 
 export interface AutomaticScrollCheckboxProps {
   checked: boolean;

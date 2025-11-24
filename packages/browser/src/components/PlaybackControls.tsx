@@ -1,5 +1,5 @@
 import React from 'react';
-import { ControlButton } from '@waveform-playlist/ui-components';
+import { BaseControlButton } from '@waveform-playlist/ui-components';
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 
 export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
@@ -20,9 +20,9 @@ export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
   };
 
   return (
-    <ControlButton onClick={handleClick} disabled={isPlaying} className={className}>
+    <BaseControlButton onClick={handleClick} disabled={isPlaying} className={className}>
       Play
-    </ControlButton>
+    </BaseControlButton>
   );
 };
 
@@ -31,9 +31,9 @@ export const PauseButton: React.FC<{ className?: string }> = ({ className }) => 
   const { pause } = usePlaylistControls();
 
   return (
-    <ControlButton onClick={pause} disabled={!isPlaying} className={className}>
+    <BaseControlButton onClick={pause} disabled={!isPlaying} className={className}>
       Pause
-    </ControlButton>
+    </BaseControlButton>
   );
 };
 
@@ -42,9 +42,9 @@ export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
   const { stop } = usePlaylistControls();
 
   return (
-    <ControlButton onClick={stop} disabled={!isPlaying} className={className}>
+    <BaseControlButton onClick={stop} disabled={!isPlaying} className={className}>
       Stop
-    </ControlButton>
+    </BaseControlButton>
   );
 };
 
@@ -63,9 +63,9 @@ export const RewindButton: React.FC<{ className?: string }> = ({ className }) =>
   };
 
   return (
-    <ControlButton onClick={handleClick} className={className}>
+    <BaseControlButton onClick={handleClick} className={className}>
       Rewind
-    </ControlButton>
+    </BaseControlButton>
   );
 };
 
@@ -84,9 +84,9 @@ export const FastForwardButton: React.FC<{ className?: string }> = ({ className 
   };
 
   return (
-    <ControlButton onClick={handleClick} className={className}>
+    <BaseControlButton onClick={handleClick} className={className}>
       Fast Forward
-    </ControlButton>
+    </BaseControlButton>
   );
 };
 
@@ -109,9 +109,9 @@ export const SkipBackwardButton: React.FC<{ skipAmount?: number; className?: str
   };
 
   return (
-    <ControlButton onClick={handleClick} className={className}>
+    <BaseControlButton onClick={handleClick} className={className}>
       Skip Backward
-    </ControlButton>
+    </BaseControlButton>
   );
 };
 
@@ -134,8 +134,8 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
   };
 
   return (
-    <ControlButton onClick={handleClick} className={className}>
+    <BaseControlButton onClick={handleClick} className={className}>
       Skip Forward
-    </ControlButton>
+    </BaseControlButton>
   );
 };

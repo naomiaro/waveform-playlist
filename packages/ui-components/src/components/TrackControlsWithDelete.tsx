@@ -138,7 +138,7 @@ export const TrackControlsWithDelete: React.FC<TrackControlsWithDeleteProps> = (
           max="1"
           step="0.01"
           value={volume}
-          onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onVolumeChange(parseFloat(e.target.value))}
         />
         <VolumeUpIcon />
       </SliderWrapper>
@@ -149,7 +149,7 @@ export const TrackControlsWithDelete: React.FC<TrackControlsWithDeleteProps> = (
           max="1"
           step="0.01"
           value={pan}
-          onChange={(e) => onPanChange(parseFloat(e.target.value))}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onPanChange(parseFloat(e.target.value))}
         />
         <span>R</span>
       </SliderWrapper>

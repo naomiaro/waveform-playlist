@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { BaseSlider, BaseLabel } from '../styled';
+import { BaseSlider, BaseLabel } from '../styled/index';
 
 const VolumeContainer = styled.div`
   display: inline-flex;
