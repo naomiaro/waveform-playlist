@@ -45,6 +45,14 @@ export interface WaveformProps {
   className?: string;
   showClipHeaders?: boolean; // Show headers on clips for visual organization
   interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (requires @dnd-kit setup)
+  // Live recording state for real-time waveform preview
+  recordingState?: {
+    isRecording: boolean;
+    trackId: string; // Which track is being recorded into
+    startSample: number; // Where recording started
+    durationSamples: number; // Current recording length
+    peaks: Int8Array | Int16Array; // Live peaks data
+  };
 }
 
 /**
@@ -60,6 +68,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   className,
   showClipHeaders = false,
   interactiveClips = true, // Default to true for backwards compatibility
+  recordingState,
 }) => {
   // Split context usage for performance
   const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
@@ -128,10 +137,16 @@ export const Waveform: React.FC<WaveformProps> = ({
 
   // Calculate dimensions
   // If there are no clips, provide a reasonable default width for recording
-  const displayDuration = audioBuffers.length > 0 ? duration : DEFAULT_EMPTY_TRACK_DURATION;
-  const tracksFullWidth = audioBuffers.length > 0
-    ? Math.floor((duration * sampleRate) / samplesPerPixel)
-    : Math.floor((DEFAULT_EMPTY_TRACK_DURATION * sampleRate) / samplesPerPixel);
+  let displayDuration = audioBuffers.length > 0 ? duration : DEFAULT_EMPTY_TRACK_DURATION;
+
+  // Extend duration during recording if needed
+  if (recordingState?.isRecording) {
+    const recordingEndSample = recordingState.startSample + recordingState.durationSamples;
+    const recordingEndTime = recordingEndSample / sampleRate;
+    displayDuration = Math.max(displayDuration, recordingEndTime + 10); // Add 10s buffer
+  }
+
+  const tracksFullWidth = Math.floor((displayDuration * sampleRate) / samplesPerPixel);
 
   // Calculate padding for timescale text overflow based on duration
   // Estimate character width at 0.75rem (~8px/char) for timestamps like "1:00:00" (7 chars)
@@ -455,6 +470,35 @@ export const Waveform: React.FC<WaveformProps> = ({
                           </Clip>
                         );
                       })}
+                      {/* Render live recording preview if this track is being recorded */}
+                      {recordingState?.isRecording &&
+                       recordingState.trackId === tracks[trackIndex].id &&
+                       recordingState.peaks.length > 0 && (
+                        <Clip
+                          key={`${trackIndex}-recording`}
+                          clipId="recording-preview"
+                          trackIndex={trackIndex}
+                          clipIndex={trackClipPeaks.length}
+                          trackName="Recording..."
+                          startSample={recordingState.startSample}
+                          durationSamples={recordingState.durationSamples}
+                          samplesPerPixel={samplesPerPixel}
+                          showHeader={showClipHeaders}
+                          disableHeaderDrag={true}
+                          isSelected={false}
+                          trackId={tracks[trackIndex].id}
+                        >
+                          <SmartChannel
+                            key={`${trackIndex}-recording-0`}
+                            index={0}
+                            data={recordingState.peaks}
+                            bits={16}
+                            length={Math.floor(recordingState.peaks.length / 2)}
+                            progress={0}
+                            isSelected={false}
+                          />
+                        </Clip>
+                      )}
                     </TrackComponent>
                   </TrackControlsContext.Provider>
                 );

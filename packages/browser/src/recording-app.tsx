@@ -14,6 +14,7 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
   usePlaybackAnimation,
+  usePlaylistData,
 } from './index';
 import { useIntegratedRecording } from './hooks/useIntegratedRecording';
 import {
@@ -129,6 +130,7 @@ const RecordingControlsInner: React.FC<{
 }> = ({ tracks, setTracks, selectedTrackId, setSelectedTrackId, onAddTrack }) => {
   // Get current time from playlist context
   const { currentTime } = usePlaybackAnimation();
+  const { sampleRate } = usePlaylistData();
 
   // Integrated recording hook
   const {
@@ -144,6 +146,7 @@ const RecordingControlsInner: React.FC<{
     requestMicAccess,
     changeDevice,
     error,
+    recordingPeaks,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
 
   const handleRecordClick = () => {
@@ -172,6 +175,23 @@ const RecordingControlsInner: React.FC<{
       startRecording();
     }
   };
+
+  // Calculate recording start position for live preview
+  let recordingStartSample = 0;
+  if (isRecording && selectedTrackId) {
+    const selectedTrack = tracks.find(t => t.id === selectedTrackId);
+    if (selectedTrack) {
+      const currentTimeSamples = Math.floor(currentTime * sampleRate);
+      let lastClipEndSample = 0;
+      if (selectedTrack.clips.length > 0) {
+        const endSamples = selectedTrack.clips.map(clip =>
+          clip.startSample + clip.durationSamples
+        );
+        lastClipEndSample = Math.max(...endSamples);
+      }
+      recordingStartSample = Math.max(currentTimeSamples, lastClipEndSample);
+    }
+  }
 
   return (
     <>
@@ -258,7 +278,20 @@ const RecordingControlsInner: React.FC<{
         </ControlGroup>
       </Controls>
 
-      <Waveform showClipHeaders={true} />
+      <Waveform
+        showClipHeaders={true}
+        recordingState={
+          isRecording && selectedTrackId
+            ? {
+                isRecording: true,
+                trackId: selectedTrackId,
+                startSample: recordingStartSample,
+                durationSamples: Math.floor(duration * sampleRate),
+                peaks: recordingPeaks,
+              }
+            : undefined
+        }
+      />
     </>
   );
 };
