@@ -247,45 +247,16 @@ const CustomSelectionInputs: React.FC = () => {
 
 // Main Example Content Component - Using individual hooks with Radix UI
 const FlexibleApiContent: React.FC = () => {
-  const { play, pause, stop, setMasterVolume, setTimeFormat, setAutomaticScroll, zoomIn, zoomOut, setCurrentTime } = usePlaylistControls();
-  const { currentTime, currentTimeRef, isPlaying } = usePlaybackAnimation();
-  const { duration, masterVolume, timeFormat, playoutRef } = usePlaylistData();
+  const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, zoomIn, zoomOut } = usePlaylistControls();
+  const { currentTime, currentTimeRef } = usePlaybackAnimation();
+  const { duration, masterVolume, timeFormat } = usePlaylistData();
   const { isAutomaticScroll } = usePlaylistState();
 
-  // Custom navigation handlers
-  const handleRewind = () => {
-    setCurrentTime(0);
-    if (isPlaying && playoutRef.current) {
-      playoutRef.current.stop();
-      play(0);
-    }
-  };
-
-  const handleFastForward = () => {
-    setCurrentTime(duration);
-    if (isPlaying && playoutRef.current) {
-      playoutRef.current.stop();
-      play(duration);
-    }
-  };
-
-  const handleSkipBackward = () => {
-    const newTime = Math.max(0, (currentTimeRef.current ?? 0) - 5);
-    setCurrentTime(newTime);
-    if (isPlaying && playoutRef.current) {
-      playoutRef.current.stop();
-      play(newTime);
-    }
-  };
-
-  const handleSkipForward = () => {
-    const newTime = Math.min(duration, (currentTimeRef.current ?? 0) + 5);
-    setCurrentTime(newTime);
-    if (isPlaying && playoutRef.current) {
-      playoutRef.current.stop();
-      play(newTime);
-    }
-  };
+  // Navigation handlers using seekTo
+  const handleRewind = () => seekTo(0);
+  const handleFastForward = () => seekTo(duration);
+  const handleSkipBackward = () => seekTo((currentTimeRef.current ?? 0) - 5);
+  const handleSkipForward = () => seekTo((currentTimeRef.current ?? 0) + 5);
 
   // Format current time based on selected format
   const formattedTime = formatTime(currentTime, timeFormat);

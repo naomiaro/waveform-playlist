@@ -133,6 +133,7 @@ export interface PlaylistControlsContextValue {
   play: (startTime?: number, playDuration?: number) => Promise<void>;
   pause: () => void;
   stop: () => void;
+  seekTo: (time: number) => void;
   setCurrentTime: (time: number) => void;
 
   // Track controls
@@ -693,6 +694,24 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setActiveAnnotationId(null);
   }, [stopAnimationLoop]);
 
+  // Seek to a specific time - works whether playing or stopped
+  const seekTo = useCallback((time: number) => {
+    // Clamp time to valid range
+    const clampedTime = Math.max(0, Math.min(time, duration));
+
+    // Update the current time state
+    currentTimeRef.current = clampedTime;
+    setCurrentTime(clampedTime);
+
+    // If currently playing, stop and restart at the new position
+    if (isPlaying && playoutRef.current) {
+      playoutRef.current.stop();
+      stopAnimationLoop();
+      // Use play() which handles all the timing setup
+      play(clampedTime);
+    }
+  }, [duration, isPlaying, play, stopAnimationLoop]);
+
   // Track controls
   const setTrackMute = useCallback((trackIndex: number, muted: boolean) => {
     const newStates = [...trackStates];
@@ -792,6 +811,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     play,
     pause,
     stop,
+    seekTo,
     setCurrentTime: (time: number) => {
       currentTimeRef.current = time;
       setCurrentTime(time);

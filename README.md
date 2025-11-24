@@ -471,7 +471,7 @@ Currently writing: [Mastering Tone.js](https://leanpub.com/masteringtonejs). 25%
 
 ### Starting a session:
 
-"Read CLAUDE.md and PROJECT_STRUCTURE.md"
+"Read CLAUDE.md and PROJECT_STRUCTURE.md and TODO.md"
 
 ### When stuck:
 
