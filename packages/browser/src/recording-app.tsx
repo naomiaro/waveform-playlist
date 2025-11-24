@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
 import { createTrack, type ClipTrack } from '@waveform-playlist/core';
@@ -15,6 +15,8 @@ import {
   MasterVolumeControl,
   usePlaybackAnimation,
   usePlaylistData,
+  usePlaylistControls,
+  usePlaylistState,
 } from './index';
 import { useIntegratedRecording } from './hooks/useIntegratedRecording';
 import {
@@ -130,7 +132,9 @@ const RecordingControlsInner: React.FC<{
 }> = ({ tracks, setTracks, selectedTrackId, setSelectedTrackId, onAddTrack }) => {
   // Get current time from playlist context
   const { currentTime } = usePlaybackAnimation();
-  const { sampleRate } = usePlaylistData();
+  const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
+  const { scrollContainerRef } = usePlaylistControls();
+  const { isAutomaticScroll } = usePlaylistState();
 
   // Integrated recording hook
   const {
@@ -192,6 +196,31 @@ const RecordingControlsInner: React.FC<{
       recordingStartSample = Math.max(currentTimeSamples, lastClipEndSample);
     }
   }
+
+  // Auto-scroll to keep recording in view (only if automatic scroll is enabled)
+  useEffect(() => {
+    if (!isRecording || !isAutomaticScroll || !scrollContainerRef.current) return;
+
+    const scrollContainer = scrollContainerRef.current;
+    const controlWidth = controls.show ? controls.width : 0;
+
+    // Calculate pixel position of recording end
+    const recordingEndSample = recordingStartSample + Math.floor(duration * sampleRate);
+    const recordingEndPixel = Math.floor(recordingEndSample / samplesPerPixel);
+
+    // Get visible area (accounting for control width)
+    const visibleStart = scrollContainer.scrollLeft;
+    const visibleEnd = visibleStart + scrollContainer.clientWidth - controlWidth;
+
+    // Add buffer zone (100px before edge)
+    const bufferZone = 100;
+
+    // Scroll if recording head is near or past the right edge
+    if (recordingEndPixel > visibleEnd - bufferZone) {
+      const targetScroll = recordingEndPixel - scrollContainer.clientWidth + controlWidth + bufferZone;
+      scrollContainer.scrollLeft = Math.max(0, targetScroll);
+    }
+  }, [isRecording, isAutomaticScroll, duration, recordingStartSample, sampleRate, samplesPerPixel, controls]);
 
   return (
     <>

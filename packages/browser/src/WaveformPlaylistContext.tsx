@@ -158,6 +158,7 @@ export interface PlaylistControlsContextValue {
   // Automatic scroll
   setAutomaticScroll: (enabled: boolean) => void;
   setScrollContainer: (element: HTMLDivElement | null) => void;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 
   // Annotation controls
   setContinuousPlay: (enabled: boolean) => void;
@@ -815,6 +816,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsAutomaticScroll(enabled);
     },
     setScrollContainer,
+    scrollContainerRef,
 
     // Annotation controls
     setContinuousPlay,
