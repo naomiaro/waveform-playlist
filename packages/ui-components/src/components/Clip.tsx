@@ -136,7 +136,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
   // Apply transform for dragging
   const style = transform ? {
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 1000 : undefined,
+    zIndex: isDragging ? 100 : undefined, // Below controls (z-index: 999) but above other clips
   } : undefined;
 
   return (
