@@ -284,7 +284,7 @@ const FlexibleApiContent: React.FC = () => {
           <Flex gap="2">
             <RewindButton />
             <SkipBackwardButton />
-            <Button onClick={play} variant="solid" color="green">
+            <Button onClick={() => play()} variant="solid" color="green">
               <PlayIcon width="16" height="16" />
               Play
             </Button>

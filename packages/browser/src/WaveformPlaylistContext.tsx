@@ -3,7 +3,7 @@ import { ThemeProvider } from 'styled-components';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
 import { type Track, type ClipTrack, type AudioClip } from '@waveform-playlist/core';
 import { type TimeFormat, type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
-import * as Tone from 'tone';
+import { start as toneStart, getContext } from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData } from '@waveform-playlist/webaudio-peaks';
 import { parseAeneas, type AnnotationData } from '@waveform-playlist/annotations';
@@ -261,7 +261,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const playStartPositionRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
-  const playbackStartTimeRef = useRef<number>(0); // Tone.now() when playback started
+  const playbackStartTimeRef = useRef<number>(0); // context.currentTime when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
   const playbackEndTimeRef = useRef<number | null>(null); // Audio position where playback should stop (for selections)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -480,8 +480,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Animation loop
   const startAnimationLoop = useCallback(() => {
     const updateTime = () => {
-      // Calculate current position based on Tone.now() timing
-      const elapsed = Tone.now() - playbackStartTimeRef.current;
+      // Calculate current position based on context.currentTime timing
+      const elapsed = getContext().currentTime - playbackStartTimeRef.current;
       const time = audioStartPositionRef.current + elapsed;
       currentTimeRef.current = time;
       setCurrentTime(time);
@@ -607,12 +607,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           // Clear any existing playback complete callback
           playoutRef.current.setOnPlaybackComplete(() => {});
 
-          const now = Tone.now();
-          playbackStartTimeRef.current = now;
+          const context = getContext();
+          const timeNow = context.currentTime;
+          playbackStartTimeRef.current = timeNow;
           audioStartPositionRef.current = currentPos;
 
           // Play without duration - will play to end of track
-          playoutRef.current.play(now, currentPos);
+          playoutRef.current.play(timeNow, currentPos);
           startAnimationLoop();
         } else {
           // Just restart animation loop for continuous play OFF
@@ -631,6 +632,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     await playoutRef.current.init();
 
+    // Resume Tone.js context if needed (required for Safari and user interaction)
+    await toneStart();
+
     const actualStartTime = startTime ?? currentTimeRef.current;
     playStartPositionRef.current = actualStartTime;
 
@@ -642,9 +646,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     playoutRef.current.stop();
     stopAnimationLoop();
 
-    // Record timing for accurate position tracking
-    const now = Tone.now();
-    playbackStartTimeRef.current = now;
+    // Record timing for accurate position tracking using Tone.js context
+    const context = getContext();
+    // Tone.js context wraps Web Audio - need to use .currentTime from wrapped context
+    const startTimeNow = context.currentTime;
+    playbackStartTimeRef.current = startTimeNow;
     audioStartPositionRef.current = actualStartTime;
 
     // Set playback end time if playing with duration (e.g., selection playback)
@@ -654,7 +660,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // The animation loop handles stopping at annotation boundaries
     // This avoids callback timing issues when switching between annotations
 
-    playoutRef.current.play(now, actualStartTime, playDuration);
+    playoutRef.current.play(startTimeNow, actualStartTime, playDuration);
     setIsPlaying(true);
     startAnimationLoop();
   }, [audioBuffers.length, startAnimationLoop, stopAnimationLoop]);
@@ -662,8 +668,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const pause = useCallback(() => {
     if (!playoutRef.current) return;
 
-    // Calculate exact pause position using Tone.now() timing
-    const elapsed = Tone.now() - playbackStartTimeRef.current;
+    // Calculate exact pause position using context.currentTime timing
+    const elapsed = getContext().currentTime - playbackStartTimeRef.current;
     const pauseTime = audioStartPositionRef.current + elapsed;
 
     playoutRef.current.pause();
@@ -747,7 +753,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     if (isPlaying && playoutRef.current) {
       playoutRef.current.stop();
-      playoutRef.current.play(Tone.now(), start);
+      playoutRef.current.play(getContext().currentTime, start);
     }
   }, [isPlaying]);
 

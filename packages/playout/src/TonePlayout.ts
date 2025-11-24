@@ -91,12 +91,14 @@ export class TonePlayout {
     return this.tracks.get(trackId);
   }
 
-  play(when: number = now(), offset?: number, duration?: number): void {
+  play(when?: number, offset?: number, duration?: number): void {
     if (!this.isInitialized) {
       console.warn('TonePlayout not initialized. Call init() first.');
       return;
     }
 
+    // Use now() as default, but call it here after init check (not in function signature)
+    const startTime = when ?? now();
     const playbackPosition = offset ?? 0;
 
     // Increment session ID to invalidate old callbacks
@@ -127,7 +129,7 @@ export class TonePlayout {
           });
         }
 
-        toneTrack.play(when, bufferOffset, duration);
+        toneTrack.play(startTime, bufferOffset, duration);
       } else {
         // Track should start later - schedule it to start when playback reaches its start time
         const delay = trackStartTime - playbackPosition;
@@ -145,17 +147,17 @@ export class TonePlayout {
           });
         }
 
-        toneTrack.play(when + delay, 0, duration);
+        toneTrack.play(startTime + delay, 0, duration);
       }
     });
 
     // Start transport
     if (offset !== undefined) {
       // Explicit offset provided - seek to that position
-      getTransport().start(when, offset);
+      getTransport().start(startTime, offset);
     } else {
       // No offset - resume from pause (Transport resumes from current position)
-      getTransport().start(when);
+      getTransport().start(startTime);
     }
   }
 

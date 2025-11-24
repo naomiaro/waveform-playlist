@@ -81,6 +81,11 @@ export function useAudioTracks(configs: AudioTrackConfig[]) {
           const arrayBuffer = await response.arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
+          // Validate audioBuffer
+          if (!audioBuffer || !audioBuffer.sampleRate || !audioBuffer.duration) {
+            throw new Error(`Invalid audio buffer for ${config.src}`);
+          }
+
           // Create a single clip for this track (using createClipFromSeconds for backwards compatibility)
           const clip = createClipFromSeconds({
             audioBuffer,
@@ -89,6 +94,12 @@ export function useAudioTracks(configs: AudioTrackConfig[]) {
             offset: config.offset ?? 0,  // Use config or no trim
             name: config.name || `Track ${index + 1}`,
           });
+
+          // Validate clip values
+          if (isNaN(clip.startSample) || isNaN(clip.durationSamples) || isNaN(clip.offsetSamples)) {
+            console.error('Invalid clip values:', clip);
+            throw new Error(`Invalid clip values for ${config.src}`);
+          }
 
           // Create the track with the single clip
           const track: ClipTrack = {

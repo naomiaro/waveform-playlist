@@ -9,6 +9,41 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-24: Master Volume API Standardization & Tone.js Fix
+
+**Goal:** Standardize master volume to Web Audio API convention (0-1.0 gain) and fix playback initialization
+
+**Achievement:** ✅ Fixed volume display bug (was showing 10000%), standardized API, fixed NaN playback error
+
+**What Was Done:**
+- ✅ Changed master volume API from 0-100 percentage to 0-1.0 linear gain (Web Audio standard)
+- ✅ Updated `useMasterVolume` hook: initialVolume default changed from 100 to 1.0
+- ✅ Updated `MasterVolumeControl` component: accepts 0-1.0, converts to/from percentage for display
+- ✅ Updated `WaveformPlaylistContext`: initialVolume changed from 100 to 1.0
+- ✅ Fixed Tone.js initialization error in play function: Added `await Tone.start()` before `Tone.now()`
+- ✅ Added validation in `useAudioTracks`: checks audioBuffer and clip values for NaN
+- ✅ Added debug logging in `ToneTrack.play()`: detects NaN parameters early
+- ✅ Fixed FlexibleApiExample: correct hook usage, Mute/Solo buttons show "M" and "S" text
+- ✅ All volume controls now use consistent 0-1.0 range throughout system
+- **Root Cause:** `Tone.now()` returns null when AudioContext not started (requires user interaction)
+- **Pattern:** Always call `await Tone.start()` before using Tone.js timing functions
+
+**Files Modified:**
+- `packages/browser/src/hooks/useMasterVolume.ts` (0-1.0 range)
+- `packages/ui-components/src/components/MasterVolumeControl.tsx` (percentage conversion)
+- `packages/browser/src/WaveformPlaylistContext.tsx` (Tone.start() fix, initialVolume)
+- `website/src/components/examples/FlexibleApiExample.tsx` (hook usage, buttons)
+- `packages/browser/src/hooks/useAudioTracks.ts` (validation)
+- `packages/playout/src/ToneTrack.ts` (debug logging)
+
+**Technical Details:**
+- Master volume now consistent with Web Audio API: `GainNode.gain.value` accepts 0-1.0
+- Display layer converts to percentage: `Math.round(volume * 100)%`
+- Tone.js requires explicit context start: `await Tone.start()` must be called after user interaction
+- Without `Tone.start()`, `Tone.now()` returns null causing RangeError in player scheduling
+
+---
+
 ### 2025-11-24: Docusaurus Migration - Completed with Radix Themes
 
 **Goal:** Migrate all 8 examples from Jekyll + bundle builds to Docusaurus-native React components

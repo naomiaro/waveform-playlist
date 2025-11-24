@@ -346,6 +346,33 @@ source.connect(analyser);
 
 **Note:** `latency: 0` is supported in modern browsers but not yet in TypeScript types. Use type extension: `MediaTrackConstraints & { latency?: number }`
 
+### Tone.js Initialization Pattern (2025-11-24)
+
+**Critical:** Tone.js AudioContext must be explicitly started before using timing functions.
+
+**Problem:** `Tone.now()` returns `null` if context hasn't been started, causing RangeError in audio scheduling.
+
+**Solution:** Always call `await Tone.start()` after user interaction and before using Tone timing.
+
+```typescript
+// ✅ CORRECT - Start context before timing functions
+await playoutRef.current.init();
+await Tone.start();  // Required!
+const now = Tone.now();  // Now returns valid time
+playbackStartTimeRef.current = now;
+
+// ❌ WRONG - Timing functions without start
+await playoutRef.current.init();
+const now = Tone.now();  // Returns null!
+// → RangeError: Value must be within [0, Infinity], got: NaN
+```
+
+**Why:** Browser security requires AudioContext to be started by user gesture. Tone.js `start()` resumes the context.
+
+**Location:** WaveformPlaylistContext.tsx play() function (line 635)
+
+**Related:** Master volume now uses Web Audio standard 0-1.0 range instead of 0-100 percentage.
+
 ---
 
 ## Important Patterns
@@ -370,4 +397,4 @@ source.connect(analyser);
 
 ---
 
-**Last Updated:** 2025-11-23
+**Last Updated:** 2025-11-24

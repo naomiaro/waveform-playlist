@@ -153,7 +153,10 @@ export class ToneTrack {
     this.track.soloed = soloed;
   }
 
-  play(when: number = now(), offset: number = 0, duration?: number): void {
+  play(when?: number, offset: number = 0, duration?: number): void {
+    // Evaluate now() inside function body, not in parameter default (which is evaluated at module load time)
+    const startWhen = when ?? now();
+
     // Don't start if already playing
     if (this.isPlaying) return;
 
@@ -182,7 +185,7 @@ export class ToneTrack {
           const clipDuration = duration ? Math.min(duration, remainingDuration) : remainingDuration;
 
           clipPlayer.pausedPosition = clipOffset;
-          player.start(when, clipOffset, clipDuration);
+          player.start(startWhen, clipOffset, clipDuration);
         } else {
           // This clip starts later - schedule it
           const delay = clipStart - playbackPosition;
@@ -190,7 +193,7 @@ export class ToneTrack {
 
           if (delay < (duration ?? Infinity)) {
             clipPlayer.pausedPosition = clipInfo.offset;
-            player.start(when + delay, clipInfo.offset, clipDuration);
+            player.start(startWhen + delay, clipInfo.offset, clipDuration);
           } else {
             this.activePlayers--;
           }
@@ -214,9 +217,11 @@ export class ToneTrack {
     this.activePlayers = 0;
   }
 
-  stop(when: number = now()): void {
+  stop(when?: number): void {
+    // Evaluate now() inside function body, not in parameter default (which is evaluated at module load time)
+    const stopWhen = when ?? now();
     this.clips.forEach(clipPlayer => {
-      clipPlayer.player.stop(when);
+      clipPlayer.player.stop(stopWhen);
       clipPlayer.pausedPosition = 0;
     });
     this.activePlayers = 0;
@@ -266,8 +271,9 @@ export class ToneTrack {
   }
 
   get startTime(): number {
-    // Return the track's absolute start time on the timeline
-    return this.track.startTime;
+    // For ClipTracks, return the start time of the first clip (or 0 if no clips)
+    if (this.clips.length === 0) return 0;
+    return Math.min(...this.clips.map(clip => clip.clipInfo.startTime));
   }
 
   setOnStopCallback(callback: () => void): void {
