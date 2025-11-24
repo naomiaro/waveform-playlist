@@ -19,3 +19,6 @@ ghpages/js/waveform-playlist.js.map
 
 # Source maps
 *.js.map
+
+*storybook.log
+storybook-static

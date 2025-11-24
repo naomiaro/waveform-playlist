@@ -15,7 +15,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "keywords": [
     "waveform",
@@ -26,12 +28,12 @@
   "author": "Naomi Aro",
   "license": "MIT",
   "peerDependencies": {
+    "@dnd-kit/core": "^6.0.0",
+    "@dnd-kit/modifiers": "^6.0.0",
+    "@dnd-kit/utilities": "^3.0.0",
     "react": ">=17.0.0",
     "react-dom": ">=17.0.0",
-    "styled-components": ">=5.0.0",
-    "@dnd-kit/core": "^6.0.0",
-    "@dnd-kit/utilities": "^3.0.0",
-    "@dnd-kit/modifiers": "^6.0.0"
+    "styled-components": ">=5.0.0"
   },
   "peerDependenciesMeta": {
     "@dnd-kit/core": {
@@ -46,13 +48,18 @@
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/utilities": "^3.2.2",
     "@dnd-kit/modifiers": "^6.0.1",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@storybook/addon-essentials": "^8.6.14",
+    "@storybook/addon-webpack5-compiler-swc": "^1.0.0",
+    "@storybook/react": "^8.6.14",
+    "@storybook/react-webpack5": "^8.6.14",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@types/styled-components": "^5.1.26",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "storybook": "^8.6.14",
     "styled-components": "^6.1.8",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
