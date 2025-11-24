@@ -9,9 +9,9 @@
  * - Full theming customization
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch } from '@radix-ui/themes';
+import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
 import {
   PlayIcon,
   PauseIcon,
@@ -190,6 +190,61 @@ const formatTime = (seconds: number, format: TimeFormat): string => {
   return seconds.toFixed(3);
 };
 
+// Custom Selection Time Inputs using Radix UI
+const CustomSelectionInputs: React.FC = () => {
+  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { setSelection } = usePlaylistControls();
+  const { timeFormat } = usePlaylistData();
+
+  const parseTimeString = (timeStr: string): number => {
+    if (timeFormat === 'seconds') {
+      return parseFloat(timeStr) || 0;
+    }
+
+    // Parse hh:mm:ss or hh:mm:ss.u/uu/uuu format
+    const parts = timeStr.split(':');
+    if (parts.length !== 3) return 0;
+
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    const secondsParts = parts[2].split('.');
+    const seconds = parseInt(secondsParts[0]) || 0;
+    const ms = secondsParts[1] ? parseFloat('0.' + secondsParts[1]) : 0;
+
+    return hours * 3600 + minutes * 60 + seconds + ms;
+  };
+
+  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStart = parseTimeString(e.target.value);
+    setSelection(newStart, selectionEnd);
+  };
+
+  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEnd = parseTimeString(e.target.value);
+    setSelection(selectionStart, newEnd);
+  };
+
+  return (
+    <Flex gap="2" align="center">
+      <TextField.Root
+        value={formatTime(selectionStart, timeFormat)}
+        onChange={handleStartChange}
+        placeholder="Start"
+        size="2"
+        style={{ width: '140px' }}
+      />
+      <Text size="2" color="gray">to</Text>
+      <TextField.Root
+        value={formatTime(selectionEnd, timeFormat)}
+        onChange={handleEndChange}
+        placeholder="End"
+        size="2"
+        style={{ width: '140px' }}
+      />
+    </Flex>
+  );
+};
+
 // Main Example Content Component - Using individual hooks with Radix UI
 const FlexibleApiContent: React.FC = () => {
   const { play, pause, stop, setMasterVolume, setTimeFormat, setAutomaticScroll, zoomIn, zoomOut, setCurrentTime } = usePlaylistControls();
@@ -271,26 +326,6 @@ const FlexibleApiContent: React.FC = () => {
               Fast Forward
             </Button>
           </Flex>
-
-          <Separator orientation="vertical" />
-
-          <TimeDisplay>{formattedTime} / {formattedDuration}</TimeDisplay>
-
-          <Separator orientation="vertical" />
-
-          <Flex gap="2" align="center">
-            <Text size="2" color="gray">Format:</Text>
-            <Select.Root value={timeFormat} onValueChange={(v) => setTimeFormat(v as TimeFormat)}>
-              <Select.Trigger />
-              <Select.Content>
-                <Select.Item value="seconds">Seconds</Select.Item>
-                <Select.Item value="hh:mm:ss">hh:mm:ss</Select.Item>
-                <Select.Item value="hh:mm:ss.u">hh:mm:ss.u</Select.Item>
-                <Select.Item value="hh:mm:ss.uu">hh:mm:ss.uu</Select.Item>
-                <Select.Item value="hh:mm:ss.uuu">hh:mm:ss.uuu</Select.Item>
-              </Select.Content>
-            </Select.Root>
-          </Flex>
         </Flex>
       </Card>
 
@@ -343,6 +378,36 @@ const FlexibleApiContent: React.FC = () => {
         )}
         showClipHeaders={true}
       />
+
+      {/* Time Controls Bar */}
+      <Card>
+        <Flex gap="3" align="center" justify="center" wrap="wrap">
+          <TimeDisplay>{formattedTime} / {formattedDuration}</TimeDisplay>
+
+          <Separator orientation="vertical" />
+
+          <Flex gap="2" align="center">
+            <Text size="2" color="gray">Time Format:</Text>
+            <Select.Root value={timeFormat} onValueChange={(v) => setTimeFormat(v as TimeFormat)}>
+              <Select.Trigger />
+              <Select.Content>
+                <Select.Item value="seconds">Seconds</Select.Item>
+                <Select.Item value="hh:mm:ss">hh:mm:ss</Select.Item>
+                <Select.Item value="hh:mm:ss.u">hh:mm:ss.u</Select.Item>
+                <Select.Item value="hh:mm:ss.uu">hh:mm:ss.uu</Select.Item>
+                <Select.Item value="hh:mm:ss.uuu">hh:mm:ss.uuu</Select.Item>
+              </Select.Content>
+            </Select.Root>
+          </Flex>
+
+          <Separator orientation="vertical" />
+
+          <Flex gap="2" align="center">
+            <Text size="2" color="gray">Selection Range:</Text>
+            <CustomSelectionInputs />
+          </Flex>
+        </Flex>
+      </Card>
     </Flex>
   );
 };
