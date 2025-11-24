@@ -2,8 +2,9 @@
  * MicrophoneSelector - Dropdown for selecting microphone input device
  */
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import styled from 'styled-components';
+import { BaseSelect, BaseLabel } from '@waveform-playlist/ui-components';
 import { MicrophoneDevice } from '../types';
 
 export interface MicrophoneSelectorProps {
@@ -14,39 +15,14 @@ export interface MicrophoneSelectorProps {
   className?: string;
 }
 
-const Select = styled.select`
-  padding: 0.5rem;
-  font-size: 0.875rem;
-  border: 1px solid #ced4da;
-  border-radius: 0.25rem;
-  background: white;
-  cursor: pointer;
+const Select = styled(BaseSelect)`
   min-width: 200px;
-
-  &:hover:not(:disabled) {
-    border-color: #adb5bd;
-  }
-
-  &:focus {
-    outline: none;
-    border-color: #3498db;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: #f8f9fa;
-  }
 `;
 
-const Label = styled.label`
+const Label = styled(BaseLabel)`
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #495057;
 `;
 
 export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({

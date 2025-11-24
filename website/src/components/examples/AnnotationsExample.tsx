@@ -296,26 +296,12 @@ const AnnotationsAppContent: React.FC = () => {
     linkEndpoints,
   });
 
-  // Debug wrapper
-  const handleDragStart = (event: any) => {
-    console.log('[DndContext] onDragStart', event);
-    onDragStart(event);
-  };
-  const handleDragMove = (event: any) => {
-    console.log('[DndContext] onDragMove', event);
-    onDragMove(event);
-  };
-  const handleDragEnd = (event: any) => {
-    console.log('[DndContext] onDragEnd', event);
-    onDragEnd(event);
-  };
-
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
-      onDragEnd={handleDragEnd}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
       modifiers={[restrictToHorizontalAxis]}
     >
       <Container>

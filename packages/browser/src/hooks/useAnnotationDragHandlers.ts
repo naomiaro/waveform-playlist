@@ -86,10 +86,7 @@ export function useAnnotationDragHandlers({
     (event: { active: any; delta: { x: number; y: number } }) => {
       const { active, delta } = event;
 
-      console.log('[onDragMove] delta:', delta, 'originalState:', originalAnnotationStateRef.current);
-
       if (!originalAnnotationStateRef.current) {
-        console.log('[onDragMove] No original state, returning');
         return;
       }
 
@@ -112,8 +109,6 @@ export function useAnnotationDragHandlers({
         ? originalState.start + timeDelta
         : originalState.end + timeDelta;
 
-      console.log('[onDragMove] edge:', edge, 'timeDelta:', timeDelta, 'newTime:', newTime, 'linkEndpoints:', linkEndpoints);
-
       // Update annotations using the boundary logic
       const updatedAnnotations = updateAnnotationBoundaries({
         annotationIndex,
@@ -123,8 +118,6 @@ export function useAnnotationDragHandlers({
         duration,
         linkEndpoints,
       });
-
-      console.log('[onDragMove] Updated annotation:', updatedAnnotations[annotationIndex]);
 
       onAnnotationsChange(updatedAnnotations);
     },

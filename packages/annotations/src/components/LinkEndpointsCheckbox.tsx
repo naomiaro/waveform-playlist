@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckboxWrapper, StyledCheckbox, CheckboxLabel } from '@waveform-playlist/ui-components';
+import { BaseCheckboxWrapper, BaseCheckbox, BaseCheckboxLabel } from '@waveform-playlist/ui-components';
 
 export interface LinkEndpointsCheckboxProps {
   checked: boolean;
@@ -23,8 +23,8 @@ export const LinkEndpointsCheckbox: React.FC<LinkEndpointsCheckboxProps> = ({
   };
 
   return (
-    <CheckboxWrapper className={className}>
-      <StyledCheckbox
+    <BaseCheckboxWrapper className={className}>
+      <BaseCheckbox
         type="checkbox"
         id="link-endpoints"
         className="link-endpoints"
@@ -32,7 +32,7 @@ export const LinkEndpointsCheckbox: React.FC<LinkEndpointsCheckboxProps> = ({
         onChange={handleChange}
         disabled={disabled}
       />
-      <CheckboxLabel htmlFor="link-endpoints">Link Endpoints</CheckboxLabel>
-    </CheckboxWrapper>
+      <BaseCheckboxLabel htmlFor="link-endpoints">Link Endpoints</BaseCheckboxLabel>
+    </BaseCheckboxWrapper>
   );
 };

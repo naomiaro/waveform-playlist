@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckboxWrapper, StyledCheckbox, CheckboxLabel } from '@waveform-playlist/ui-components';
+import { BaseCheckboxWrapper, BaseCheckbox, BaseCheckboxLabel } from '@waveform-playlist/ui-components';
 
 export interface EditableCheckboxProps {
   checked: boolean;
@@ -13,14 +13,14 @@ export const EditableCheckbox: React.FC<EditableCheckboxProps> = ({
   className,
 }) => {
   return (
-    <CheckboxWrapper className={className}>
-      <StyledCheckbox
+    <BaseCheckboxWrapper className={className}>
+      <BaseCheckbox
         type="checkbox"
         id="editable-annotations"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <CheckboxLabel htmlFor="editable-annotations">Editable Annotations</CheckboxLabel>
-    </CheckboxWrapper>
+      <BaseCheckboxLabel htmlFor="editable-annotations">Editable Annotations</BaseCheckboxLabel>
+    </BaseCheckboxWrapper>
   );
 };

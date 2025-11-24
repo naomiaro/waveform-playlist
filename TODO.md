@@ -9,6 +9,45 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-24: Annotation Keyboard Controls & Resize Handle Polish
+
+**Goal:** Add keyboard-based annotation editing and improve resize handle UX
+
+**Achievement:** ✅ New keyboard controls hook, improved visual appearance of resize handles
+
+**What Was Done:**
+- ✅ Created `useAnnotationKeyboardControls` hook for keyboard-based boundary editing
+  - `[` / `]` keys move start boundary earlier/later by 10ms
+  - `Shift+{` / `Shift+}` keys move end boundary earlier/later by 10ms
+  - Respects `linkEndpoints` setting for linked boundary behavior
+  - Collision detection prevents overlapping annotations
+  - Only active when an annotation is selected
+- ✅ Reduced resize handle size to minimize overlap between adjacent annotations
+  - Width: 30px → 16px
+  - Offset: -15px → -8px
+  - Background: semi-opaque → transparent (visible only on hover/drag)
+  - Visual indicator: 6px → 4px width
+- ✅ Integrated keyboard controls into AnnotationsExample
+
+**Files Created:**
+- `packages/browser/src/hooks/useAnnotationKeyboardControls.ts`
+
+**Files Modified:**
+- `packages/browser/src/hooks/index.ts` (export new hook)
+- `packages/browser/src/index.tsx` (export new hook)
+- `packages/annotations/src/components/AnnotationBox.tsx` (resize handle styling)
+- `website/src/components/examples/AnnotationsExample.tsx` (use keyboard hook)
+
+**Keyboard Shortcuts for Annotations:**
+```
+[ - Move start boundary earlier (left) by 10ms
+] - Move start boundary later (right) by 10ms
+Shift+{ - Move end boundary earlier (left) by 10ms
+Shift+} - Move end boundary later (right) by 10ms
+```
+
+---
+
 ### 2025-11-24: Annotation Boundary Dragging with @dnd-kit
 
 **Goal:** Enable annotation boundary resizing via drag handles

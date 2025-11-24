@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { formatTime, parseTime, type TimeFormat } from '../utils/timeFormat';
+import { BaseInput, ScreenReaderOnly } from '../styled';
 
 export interface TimeInputProps {
   id: string;
@@ -11,12 +12,18 @@ export interface TimeInputProps {
   readOnly?: boolean;
 }
 
+/**
+ * TimeInput - A styled input for time values with format support
+ *
+ * Uses BaseInput for consistent theming. Displays time in the specified
+ * format and parses user input on blur.
+ */
 export const TimeInput: React.FC<TimeInputProps> = ({
   id,
   label,
   value,
   format,
-  className = 'form-control mr-sm-2',
+  className,
   onChange,
   readOnly = false,
 }) => {
@@ -51,10 +58,10 @@ export const TimeInput: React.FC<TimeInputProps> = ({
 
   return (
     <>
-      <label className="sr-only" htmlFor={id}>
+      <ScreenReaderOnly as="label" htmlFor={id}>
         {label}
-      </label>
-      <input
+      </ScreenReaderOnly>
+      <BaseInput
         type="text"
         className={className}
         id={id}

@@ -1,31 +1,12 @@
 import React from 'react';
 import styled from 'styled-components';
 import { type TimeFormat } from '../utils/timeFormat';
+import { BaseSelect } from '../styled';
 
 const SelectWrapper = styled.div`
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-`;
-
-const Select = styled.select`
-  padding: 0.375rem 0.75rem;
-  font-size: 1rem;
-  line-height: 1.5;
-  border: 1px solid #ced4da;
-  border-radius: 0.25rem;
-  cursor: pointer;
-
-  &:focus {
-    border-color: #80bdff;
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-  }
-
-  &:disabled {
-    background-color: #e9ecef;
-    cursor: not-allowed;
-  }
 `;
 
 export interface TimeFormatSelectProps {
@@ -59,7 +40,7 @@ export const TimeFormatSelect: React.FC<TimeFormatSelectProps> = ({
 
   return (
     <SelectWrapper className={className}>
-      <Select
+      <BaseSelect
         className="time-format"
         value={value}
         onChange={handleChange}
@@ -71,7 +52,7 @@ export const TimeFormatSelect: React.FC<TimeFormatSelectProps> = ({
             {option.label}
           </option>
         ))}
-      </Select>
+      </BaseSelect>
     </SelectWrapper>
   );
 };
