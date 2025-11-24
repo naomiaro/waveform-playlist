@@ -273,12 +273,16 @@ These features expand core functionality and should be implemented first.
   - Support both input (load existing waveform-data) and output (export peaks in this format)
   - **Completed:** Created waveformDataLoader utilities, demo app, and documentation
 
-- [ ] **Integrated multi-track recording (Audacity-style)**
-  - Add hook to create new tracks (`useTrackManagement` or similar)
-  - Record directly into selected track (not separate recording app)
-  - Recording position options: Start at time 0 or append after last clip
-  - Progressive waveform rendering (peaks render left-to-right as clip grows)
-  - New clip automatically added to selected track on recording stop
+- [x] **Integrated multi-track recording (Audacity-style)** ✅
+  - ✅ Add hook to create new tracks - Implemented in `recording-app.tsx` with `handleAddTrack`
+  - ✅ Record directly into selected track - `useIntegratedRecording` hook handles this
+  - ✅ Recording position options: Start at max(cursor position, last clip end) - Implemented in `stopRecording`
+  - ✅ Progressive waveform rendering - Live `recordingPeaks` update during recording
+  - ✅ New clip automatically added to selected track on recording stop - Automatic clip creation in `stopRecording`
+  - ✅ Recording-optimized audio constraints (echo cancellation off, low latency)
+  - ✅ Auto-select first microphone device after permission granted
+  - **Location:** `recording-app.tsx`, `useIntegratedRecording.ts`, `useMicrophoneAccess.ts`, `MicrophoneSelector.tsx`
+  - **Demo:** `ghpages/_examples/17recording.html`
 
 - [ ] **Complete Tone.js effects library integration**
   - Expose all Tone.js effects (currently have: Reverb, AutoWah, Analyser)

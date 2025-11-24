@@ -178,8 +178,13 @@ const RecordingControlsInner: React.FC<{
   // Get current time from playlist context
   const { currentTime } = usePlaybackAnimation();
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
-  const { scrollContainerRef } = usePlaylistControls();
+  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId } = usePlaylistControls();
   const { isAutomaticScroll } = usePlaylistState();
+
+  // Sync provider's selectedTrackId with local state whenever it changes
+  useEffect(() => {
+    setProviderSelectedTrackId(selectedTrackId);
+  }, [selectedTrackId, setProviderSelectedTrackId]);
 
   // Configure sensors and drag handlers
   const sensors = useDragSensors();

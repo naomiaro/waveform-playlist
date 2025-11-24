@@ -485,7 +485,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                           samplesPerPixel={samplesPerPixel}
                           showHeader={showClipHeaders}
                           disableHeaderDrag={true}
-                          isSelected={false}
+                          isSelected={tracks[trackIndex].id === selectedTrackId}
                           trackId={tracks[trackIndex].id}
                         >
                           <SmartChannel
@@ -495,7 +495,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                             bits={16}
                             length={Math.floor(recordingState.peaks.length / 2)}
                             progress={0}
-                            isSelected={false}
+                            isSelected={tracks[trackIndex].id === selectedTrackId}
                           />
                         </Clip>
                       )}
