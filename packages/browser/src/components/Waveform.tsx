@@ -89,6 +89,7 @@ export const Waveform: React.FC<WaveformProps> = ({
     annotationsEditable,
     linkEndpoints,
     continuousPlay,
+    selectedTrackId,
   } = usePlaylistState();
   const {
     setAnnotations,
@@ -423,6 +424,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                       width={tracksFullWidth}
                       hasClipHeaders={showClipHeaders}
                       trackId={tracks[trackIndex].id}
+                      isSelected={tracks[trackIndex].id === selectedTrackId}
                     >
                       {trackClipPeaks.map((clip, clipIndex) => {
                         const peaksData = clip.peaks;

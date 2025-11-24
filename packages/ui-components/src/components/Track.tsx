@@ -29,6 +29,7 @@ interface ChannelContainerProps {
   readonly $controlWidth: number;
   readonly $backgroundColor?: string;
   readonly $offset?: number;
+  readonly $isSelected?: boolean;
 }
 const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   style: {
@@ -38,6 +39,11 @@ const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
   flex: 1;
+
+  /* Highlight selected track with a subtle border */
+  ${(props) => props.$isSelected && `
+    box-shadow: inset 0 0 0 2px rgba(0, 123, 255, 0.5);
+  `}
 `;
 
 export interface ControlsWrapperProps {
@@ -67,6 +73,7 @@ export interface TrackProps {
   hasClipHeaders?: boolean; // Whether clips have headers (for multi-clip editing)
   onClick?: () => void; // Called when track is clicked (for track selection)
   trackId?: string; // Track ID for identifying which track was clicked
+  isSelected?: boolean; // Whether this track is currently selected (for visual feedback)
 }
 
 export const Track: FunctionComponent<TrackProps> = ({
@@ -79,6 +86,7 @@ export const Track: FunctionComponent<TrackProps> = ({
   hasClipHeaders = false,
   onClick,
   trackId,
+  isSelected = false,
 }) => {
   const {
     waveHeight,
@@ -101,6 +109,7 @@ export const Track: FunctionComponent<TrackProps> = ({
         $controlWidth={show ? controlWidth : 0}
         $backgroundColor={backgroundColor}
         $offset={offset}
+        $isSelected={isSelected}
         onClick={onClick}
         data-track-id={trackId}
       >

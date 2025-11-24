@@ -341,7 +341,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         let maxDuration = 0;
         tracks.forEach((track) => {
           track.clips.forEach((clip) => {
-            const clipEnd = clip.startTime + clip.duration;
+            const sampleRate = clip.audioBuffer.sampleRate;
+            const clipEndSample = clip.startSample + clip.durationSamples;
+            const clipEnd = clipEndSample / sampleRate;
             maxDuration = Math.max(maxDuration, clipEnd);
           });
         });
@@ -383,15 +385,18 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
             // Convert ClipTrack clips to ToneTrack ClipInfo format
             // Note: ClipInfo.startTime is relative to track start, not absolute timeline
-            const clipInfos = track.clips.map(clip => ({
-              buffer: clip.audioBuffer,
-              startTime: clip.startTime - startTime, // Make relative to track start
-              duration: clip.duration,
-              offset: clip.offset,
-              fadeIn: clip.fadeIn,
-              fadeOut: clip.fadeOut,
-              gain: clip.gain,
-            }));
+            const clipInfos = track.clips.map(clip => {
+              const sampleRate = clip.audioBuffer.sampleRate;
+              return {
+                buffer: clip.audioBuffer,
+                startTime: (clip.startSample / sampleRate) - startTime, // Make relative to track start
+                duration: clip.durationSamples / sampleRate,
+                offset: clip.offsetSamples / sampleRate,
+                fadeIn: clip.fadeIn,
+                fadeOut: clip.fadeOut,
+                gain: clip.gain,
+              };
+            });
 
             playout.addTrack({
               clips: clipInfos,
@@ -430,13 +435,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     const allTrackPeaks: TrackClipPeaks[] = tracks.map((track) => {
       const clipPeaks: ClipPeaks[] = track.clips.map((clip) => {
         // Generate peaks with trimming based on clip's offset and duration
+        const sampleRate = clip.audioBuffer.sampleRate;
         const peaks = generatePeaks(
           clip.audioBuffer,
           samplesPerPixel,
           mono,
           bits,
-          clip.offset || 0,        // Time offset into the audio file
-          clip.duration            // Duration of the clip
+          clip.offsetSamples / sampleRate,        // Time offset into the audio file (in seconds)
+          clip.durationSamples / sampleRate       // Duration of the clip (in seconds)
         );
 
         return {

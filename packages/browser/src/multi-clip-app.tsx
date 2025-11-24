@@ -214,15 +214,13 @@ const MultiClipExample: React.FC = () => {
               throw new Error(`Audio file not found for ID: ${clipConfig.fileId}`);
             }
 
-            const clip = createClipFromSeconds({
+            return createClipFromSeconds({
               audioBuffer,
               startTime: clipConfig.startTime,
               duration: clipConfig.duration,
               offset: clipConfig.offset,
               name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
             });
-            console.log(`[CLIP CREATE] ${trackConfig.name}: startSample=${clip.startSample}, durationSamples=${clip.durationSamples}, sampleRate=${audioBuffer.sampleRate}`);
-            return clip;
           });
 
           // Create the track with multiple clips

@@ -96,12 +96,10 @@ export const Clip: FunctionComponent<ClipProps> = ({
   // Use Math.floor to always snap to pixel boundaries
   const left = Math.floor(startSample / samplesPerPixel);
 
-  // Calculate width based on duration samples
-  // Use Math.floor for consistent pixel snapping (Math.ceil only for final waveform edge)
-  const width = Math.floor(durationSamples / samplesPerPixel);
-
-  // Debug logging
-  console.log(`[CLIP RENDER] ${trackName}: startSample=${startSample}, durationSamples=${durationSamples}, samplesPerPixel=${samplesPerPixel}, left=${left}, width=${width}`);
+  // Calculate width as the difference between end and start pixel positions
+  // This ensures clips are perfectly adjacent with no gaps
+  const endPixel = Math.floor((startSample + durationSamples) / samplesPerPixel);
+  const width = endPixel - left;
 
   // Use draggable only if header is shown and drag is enabled
   const enableDrag = showHeader && !disableHeaderDrag && !isOverlay;

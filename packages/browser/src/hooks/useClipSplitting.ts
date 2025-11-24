@@ -52,6 +52,11 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
    */
   const splitClipAt = useCallback(
     (trackIndex: number, clipIndex: number, splitTime: number): boolean => {
+      // Work with samples and pixels (all integers!) to avoid floating-point precision issues
+      // Key insight: A pixel represents a RANGE of samples (samplesPerPixel samples)
+      // By working in samples, we eliminate all floating-point errors
+      const { sampleRate, samplesPerPixel } = options;
+
       const track = tracks[trackIndex];
       if (!track) return false;
 
@@ -67,11 +72,6 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
         console.warn('Split time is outside clip bounds');
         return false;
       }
-
-      // Work with samples and pixels (all integers!) to avoid floating-point precision issues
-      // Key insight: A pixel represents a RANGE of samples (samplesPerPixel samples)
-      // By working in samples, we eliminate all floating-point errors
-      const { sampleRate, samplesPerPixel } = options;
 
       // Convert split time from seconds to samples (round to nearest sample)
       const splitSample = Math.round(splitTime * sampleRate);
@@ -100,15 +100,6 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
 
       // Calculate offset increment for second clip (in samples)
       const offsetIncrement = snappedSplitSample - clip.startSample;
-
-      // Debug: log sample/pixel calculations
-      console.error(`[SNAP DEBUG] Original: startSample=${clip.startSample}, splitSample=${splitSample}, endSample=${clipEndSample}`);
-      console.error(`[SNAP DEBUG] Pixel positions: start=${clipStartPixel}, split=${splitPixel}, end=${clipEndPixel}`);
-      console.error(`[SNAP DEBUG] Pixel widths: first=${firstClipPixelWidth}, second=${secondClipPixelWidth}`);
-      console.error(`[SNAP DEBUG] Snapped split sample: ${snappedSplitSample}`);
-      console.error(`[SNAP DEBUG] First clip: startSample=${firstClipStartSample}, durationSamples=${firstClipDurationSamples}`);
-      console.error(`[SNAP DEBUG] Second clip: startSample=${secondClipStartSample}, durationSamples=${secondClipDurationSamples}`);
-      console.error(`[SNAP DEBUG] Offset increment (samples): ${offsetIncrement}`);
 
       // Create first clip (from start to split point)
       const firstClip = createClip({
@@ -176,24 +167,20 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
     const track = tracks[trackIndex];
 
     // Find clip at current time on the selected track
-    console.error(`[DEBUG] Searching for clip at currentTime=${currentTime} on track "${track.name}" (${track.clips.length} clips)`);
     for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
       const clip = track.clips[clipIndex];
       const clipStartTime = clip.startSample / sampleRate;
       const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
-      console.error(`[DEBUG] Clip ${clipIndex}: startSample=${clip.startSample}, durationSamples=${clip.durationSamples}, endSample=${clip.startSample + clip.durationSamples}`);
-      console.error(`[DEBUG] In seconds: startTime=${clipStartTime}, endTime=${clipEndTime}`);
-      console.error(`[DEBUG] Check: ${currentTime} > ${clipStartTime} = ${currentTime > clipStartTime}, ${currentTime} < ${clipEndTime} = ${currentTime < clipEndTime}`);
 
       // Check if currentTime is within this clip (not at boundaries)
       if (currentTime > clipStartTime && currentTime < clipEndTime) {
         // Found a clip! Split it
-        console.error(`Splitting clip on track "${track.name}" at ${currentTime}s`);
+        console.log(`Splitting clip on track "${track.name}" at ${currentTime}s`);
         return splitClipAt(trackIndex, clipIndex, currentTime);
       }
     }
 
-    console.error(`No clip found at playhead position on track "${track.name}"`);
+    console.log(`No clip found at playhead position on track "${track.name}"`);
     return false;
   }, [tracks, currentTime, selectedTrackId, splitClipAt, sampleRate]);
 
