@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipTrack, createTrack, createClip } from '@waveform-playlist/core';
+import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 import * as Tone from 'tone';
 
 /**
@@ -81,8 +81,8 @@ export function useAudioTracks(configs: AudioTrackConfig[]) {
           const arrayBuffer = await response.arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-          // Create a single clip for this track
-          const clip = createClip({
+          // Create a single clip for this track (using createClipFromSeconds for backwards compatibility)
+          const clip = createClipFromSeconds({
             audioBuffer,
             startTime: config.startTime ?? 0,  // Use config or default to 0
             duration: config.duration ?? audioBuffer.duration,  // Use config or full duration

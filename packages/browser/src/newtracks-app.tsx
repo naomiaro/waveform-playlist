@@ -23,7 +23,7 @@ import {
   AutomaticScrollCheckbox,
 } from './components';
 import { TrackControlsWithDelete } from '@waveform-playlist/ui-components';
-import { ClipTrack, createTrack, createClip } from '@waveform-playlist/core';
+import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -134,7 +134,7 @@ function NewTracksApp() {
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
           // Create clip with the audio buffer
-          const clip = createClip({
+          const clip = createClipFromSeconds({
             audioBuffer,
             startTime: 0,
             duration: audioBuffer.duration,

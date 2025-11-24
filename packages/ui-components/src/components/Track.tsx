@@ -9,6 +9,7 @@ interface ContainerProps {
   readonly $waveHeight: number;
   readonly $controlWidth: number;
   readonly $width?: number;
+  readonly $isSelected?: boolean;
 }
 
 interface ContainerWithHeaderProps extends ContainerProps {
@@ -23,13 +24,19 @@ const Container = styled.div.attrs<ContainerWithHeaderProps>((props) => ({
   position: relative;
   display: flex;
   ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
+
+  /* Audacity-style selection: box around entire track */
+  ${(props) => props.$isSelected && `
+    box-shadow:
+      inset 0 0 0 2px #0066cc,
+      0 0 0 1px #0066cc;
+  `}
 `;
 
 interface ChannelContainerProps {
   readonly $controlWidth: number;
   readonly $backgroundColor?: string;
   readonly $offset?: number;
-  readonly $isSelected?: boolean;
 }
 const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   style: {
@@ -39,15 +46,11 @@ const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
   flex: 1;
-
-  /* Highlight selected track with a subtle border */
-  ${(props) => props.$isSelected && `
-    box-shadow: inset 0 0 0 2px rgba(0, 123, 255, 0.5);
-  `}
 `;
 
 export interface ControlsWrapperProps {
   readonly $controlWidth: number;
+  readonly $isSelected?: boolean;
 }
 const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
   style: {
@@ -61,6 +64,12 @@ const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
   flex-shrink: 0;
   pointer-events: auto;
   background: #fff;
+
+  /* Audacity-style: highlighted background when selected */
+  ${(props) => props.$isSelected && `
+    background: #cce5ff;
+    transition: background 0.15s ease-in-out;
+  `}
 `;
 
 export interface TrackProps {
@@ -101,15 +110,18 @@ export const Track: FunctionComponent<TrackProps> = ({
       $controlWidth={show ? controlWidth : 0}
       $width={width}
       $hasClipHeaders={hasClipHeaders}
+      $isSelected={isSelected}
     >
-      <ControlsWrapper $controlWidth={show ? controlWidth : 0}>
+      <ControlsWrapper
+        $controlWidth={show ? controlWidth : 0}
+        $isSelected={isSelected}
+      >
         {controls}
       </ControlsWrapper>
       <ChannelContainer
         $controlWidth={show ? controlWidth : 0}
         $backgroundColor={backgroundColor}
         $offset={offset}
-        $isSelected={isSelected}
         onClick={onClick}
         data-track-id={trackId}
       >

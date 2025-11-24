@@ -27,7 +27,7 @@ import {
   ZoomOutButton,
   AutomaticScrollCheckbox,
 } from './components';
-import { ClipTrack, createTrack, createClip } from '@waveform-playlist/core';
+import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
 
 const Container = styled.div`
@@ -290,7 +290,7 @@ function RecordingApp() {
       const buffer = await stopRecording();
       if (buffer) {
         // Create clip from recorded buffer
-        const clip = createClip({
+        const clip = createClipFromSeconds({
           audioBuffer: buffer,
           startTime: 0,
           duration: buffer.duration,

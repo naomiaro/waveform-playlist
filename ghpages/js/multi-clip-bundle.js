@@ -945,15 +945,17 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   position: relative;
   display: flex;
   ${t=>t.$width!==void 0&&`width: ${t.$width}px;`}
+
+  /* Audacity-style selection: box around entire track */
+  ${t=>t.$isSelected&&`
+    box-shadow:
+      inset 0 0 0 2px #0066cc,
+      0 0 0 1px #0066cc;
+  `}
 `,PO=fe.div.attrs(t=>({style:{paddingLeft:`${t.$offset||0}px`}}))`
   position: relative;
   background: ${t=>t.$backgroundColor||"transparent"};
   flex: 1;
-
-  /* Highlight selected track with a subtle border */
-  ${t=>t.$isSelected&&`
-    box-shadow: inset 0 0 0 2px rgba(0, 123, 255, 0.5);
-  `}
 `,MO=fe.div.attrs(t=>({style:{width:`${t.$controlWidth}px`}}))`
   position: sticky;
   z-index: 200;
@@ -962,7 +964,13 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   flex-shrink: 0;
   pointer-events: auto;
   background: #fff;
-`,IO=({numChannels:t,children:e,className:n,backgroundColor:i,offset:o=0,width:l,hasClipHeaders:u=!1,onClick:f,trackId:d,isSelected:h=!1})=>{const{waveHeight:m,controls:{show:v,width:y}}=Wd(),_=gO();return Y.jsxs(OO,{$numChannels:t,className:n,$waveHeight:m,$controlWidth:v?y:0,$width:l,$hasClipHeaders:u,children:[Y.jsx(MO,{$controlWidth:v?y:0,children:_}),Y.jsx(PO,{$controlWidth:v?y:0,$backgroundColor:i,$offset:o,$isSelected:h,onClick:f,"data-track-id":d,children:e})]})};fe.div`
+
+  /* Audacity-style: highlighted background when selected */
+  ${t=>t.$isSelected&&`
+    background: #cce5ff;
+    transition: background 0.15s ease-in-out;
+  `}
+`,IO=({numChannels:t,children:e,className:n,backgroundColor:i,offset:o=0,width:l,hasClipHeaders:u=!1,onClick:f,trackId:d,isSelected:h=!1})=>{const{waveHeight:m,controls:{show:v,width:y}}=Wd(),_=gO();return Y.jsxs(OO,{$numChannels:t,className:n,$waveHeight:m,$controlWidth:v?y:0,$width:l,$hasClipHeaders:u,$isSelected:h,children:[Y.jsx(MO,{$controlWidth:v?y:0,$isSelected:h,children:_}),Y.jsx(PO,{$controlWidth:v?y:0,$backgroundColor:i,$offset:o,onClick:f,"data-track-id":d,children:e})]})};fe.div`
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
