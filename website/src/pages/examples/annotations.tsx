@@ -1,21 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Layout from '@theme/Layout';
-import useBaseUrl from '@docusaurus/useBaseUrl';
+import { AnnotationsExample } from '../../components/examples/AnnotationsExample';
 
-export default function AnnotationsExample(): React.ReactElement {
-  const bundleSrc = useBaseUrl('/js/annotations-bundle.js');
-
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = bundleSrc;
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, [bundleSrc]);
-
+export default function AnnotationsExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Annotations Example"
@@ -28,17 +15,9 @@ export default function AnnotationsExample(): React.ReactElement {
           important sections, segments, or timestamps.
         </p>
 
-        <div
-          id="playlist"
-          style={{
-            marginTop: '2rem',
-            padding: '2rem',
-            background: 'var(--ifm-background-surface-color)',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            border: '1px solid var(--ifm-color-emphasis-300)'
-          }}
-        ></div>
+        <div style={{ marginTop: '2rem' }}>
+          <AnnotationsExample />
+        </div>
 
         <div style={{ marginTop: '2rem' }}>
           <h2>About This Example</h2>
