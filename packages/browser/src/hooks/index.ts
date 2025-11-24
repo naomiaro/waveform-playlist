@@ -23,6 +23,8 @@ export type { AudioTrackConfig } from './useAudioTracks';
 
 export { useClipDragHandlers } from './useClipDragHandlers';
 
+export { useDragSensors } from './useDragSensors';
+
 export { useClipSplitting } from './useClipSplitting';
 export type { UseClipSplittingOptions, UseClipSplittingResult } from './useClipSplitting';
 

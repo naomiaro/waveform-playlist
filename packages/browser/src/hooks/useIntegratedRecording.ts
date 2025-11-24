@@ -90,7 +90,7 @@ export function useIntegratedRecording(
   // Start recording handler
   const startRecording = useCallback(async () => {
     if (!selectedTrackId) {
-      console.warn('No track selected for recording');
+      // No track selected - UI should handle creating/selecting track before calling this
       return;
     }
 

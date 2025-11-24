@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
 import { createTrack, type ClipTrack } from '@waveform-playlist/core';
+import { DndContext, type DragEndEvent } from '@dnd-kit/core';
+import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -17,6 +19,8 @@ import {
   usePlaylistData,
   usePlaylistControls,
   usePlaylistState,
+  useClipDragHandlers,
+  useDragSensors,
 } from './index';
 import { useIntegratedRecording } from './hooks/useIntegratedRecording';
 import {
@@ -122,6 +126,47 @@ const ErrorMessage = styled.div`
   margin-bottom: 15px;
 `;
 
+const RecordingControlsRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 15px;
+  align-items: center;
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  border: 2px solid #e0e0e0;
+`;
+
+const PlaybackControlsRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  align-items: center;
+`;
+
+const DropZone = styled.div<{ $isDragging: boolean }>`
+  padding: 30px;
+  margin-bottom: 20px;
+  border: 2px dashed ${props => props.$isDragging ? '#2196F3' : '#ccc'};
+  border-radius: 8px;
+  background: ${props => props.$isDragging ? '#e3f2fd' : '#fafafa'};
+  text-align: center;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #2196F3;
+    background: #f5f5f5;
+  }
+`;
+
+const DropZoneText = styled.p`
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+`;
+
 // Inner component that uses playlist context
 const RecordingControlsInner: React.FC<{
   tracks: ClipTrack[];
@@ -135,6 +180,21 @@ const RecordingControlsInner: React.FC<{
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
   const { scrollContainerRef } = usePlaylistControls();
   const { isAutomaticScroll } = usePlaylistState();
+
+  // Configure sensors and drag handlers
+  const sensors = useDragSensors();
+  const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
+    tracks,
+    onTracksChange: setTracks,
+    samplesPerPixel,
+    sampleRate,
+  });
+
+  // Drop zone state
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Flag to auto-start recording after creating a new track
+  const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false);
 
   // Integrated recording hook
   const {
@@ -153,31 +213,29 @@ const RecordingControlsInner: React.FC<{
     recordingPeaks,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
 
-  const handleRecordClick = () => {
-    // If no track selected and we have tracks, select the last one
-    if (!selectedTrackId && tracks.length > 0) {
-      setSelectedTrackId(tracks[tracks.length - 1].id);
+  // Auto-start recording when a new track is created and selected
+  useEffect(() => {
+    if (shouldAutoStartRecording && selectedTrackId) {
+      setShouldAutoStartRecording(false);
+      startRecording();
     }
-    // If no tracks at all, create one
-    if (tracks.length === 0) {
-      onAddTrack();
-      // The track will be selected in onAddTrack
-      // Need to wait a tick for state to update before starting recording
-      setTimeout(() => {
-        if (isRecording) {
-          stopRecording();
-        } else {
-          startRecording();
-        }
-      }, 0);
+  }, [shouldAutoStartRecording, selectedTrackId, startRecording]);
+
+  const handleRecordClick = () => {
+    if (isRecording) {
+      stopRecording();
       return;
     }
 
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
+    // Auto-create track if none selected
+    if (!selectedTrackId) {
+      setShouldAutoStartRecording(true);
+      onAddTrack();
+      return;
     }
+
+    // Track is selected, start recording immediately
+    startRecording();
   };
 
   // Calculate recording start position for live preview
@@ -222,6 +280,56 @@ const RecordingControlsInner: React.FC<{
     }
   }, [isRecording, isAutomaticScroll, duration, recordingStartSample, sampleRate, samplesPerPixel, controls]);
 
+  // File drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const audioFiles = files.filter(file => file.type.startsWith('audio/'));
+
+    if (audioFiles.length === 0) {
+      return;
+    }
+
+    // Create tracks from dropped files
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    for (const file of audioFiles) {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      const newTrack = createTrack({
+        name: file.name,
+        clips: [{
+          id: `clip-${Date.now()}`,
+          audioBuffer,
+          startSample: 0,
+          durationSamples: audioBuffer.length,
+          offsetSamples: 0,
+          gain: 1.0,
+          name: file.name,
+        }],
+        muted: false,
+        soloed: false,
+        volume: 1.0,
+        pan: 0,
+      });
+
+      setTracks([...tracks, newTrack]);
+    }
+  };
+
   return (
     <>
       {error && (
@@ -230,74 +338,71 @@ const RecordingControlsInner: React.FC<{
         </ErrorMessage>
       )}
 
-      <Controls>
-        {/* Playback Controls */}
+      {/* Recording Controls Row - Top */}
+      <RecordingControlsRow>
+        {!hasPermission ? (
+          <EnableButton onClick={requestMicAccess}>
+            🎤 Enable Microphone
+          </EnableButton>
+        ) : (
+          <>
+            <MicrophoneSelector
+              devices={devices}
+              selectedDeviceId={selectedDevice || undefined}
+              onDeviceChange={changeDevice}
+              disabled={isRecording}
+            />
+            <RecordButton
+              isRecording={isRecording}
+              onClick={handleRecordClick}
+              disabled={false}
+            />
+            {isRecording && (
+              <RecordingIndicator
+                isRecording={isRecording}
+                duration={duration}
+              />
+            )}
+            <VUMeterWrapper>
+              <Label>Input:</Label>
+              <VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
+            </VUMeterWrapper>
+          </>
+        )}
+      </RecordingControlsRow>
+
+      {/* Drop Zone */}
+      <DropZone
+        $isDragging={isDragging}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <DropZoneText>
+          Drop audio files here to create tracks, or click "+ New Track" to record on an empty track
+        </DropZoneText>
+        <NewTrackButton onClick={onAddTrack} style={{ marginTop: '10px' }}>
+          + New Track
+        </NewTrackButton>
+      </DropZone>
+
+      {/* Playback Controls Row - Bottom */}
+      <PlaybackControlsRow>
         <ControlGroup>
           <PlayButton />
           <PauseButton />
           <StopButton />
         </ControlGroup>
 
-        {/* Track Management */}
         <ControlGroup>
-          <NewTrackButton onClick={onAddTrack}>
-            + New Track
-          </NewTrackButton>
+          <ZoomInButton disabled={isRecording} />
+          <ZoomOutButton disabled={isRecording} />
         </ControlGroup>
 
-        {/* Recording Controls */}
-        {!hasPermission ? (
-          <ControlGroup>
-            <EnableButton onClick={requestMicAccess}>
-              🎤 Enable Microphone
-            </EnableButton>
-          </ControlGroup>
-        ) : (
-          <>
-            <ControlGroup>
-              <MicrophoneSelector
-                devices={devices}
-                selectedDeviceId={selectedDevice || undefined}
-                onDeviceChange={changeDevice}
-                disabled={isRecording}
-              />
-            </ControlGroup>
-
-            <ControlGroup>
-              <RecordButton
-                isRecording={isRecording}
-                onClick={handleRecordClick}
-                disabled={false}
-              />
-              {isRecording && (
-                <RecordingIndicator
-                  isRecording={isRecording}
-                  duration={duration}
-                />
-              )}
-            </ControlGroup>
-
-            <ControlGroup>
-              <VUMeterWrapper>
-                <Label>Input:</Label>
-                <VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
-              </VUMeterWrapper>
-            </ControlGroup>
-          </>
-        )}
-
-        {/* Zoom Controls */}
-        <ControlGroup>
-          <ZoomInButton />
-          <ZoomOutButton />
-        </ControlGroup>
-
-        {/* Position Display */}
         <ControlGroup>
           <AudioPosition />
         </ControlGroup>
 
-        {/* Other Controls */}
         <ControlGroup>
           <AutomaticScrollCheckbox />
         </ControlGroup>
@@ -305,22 +410,30 @@ const RecordingControlsInner: React.FC<{
         <ControlGroup>
           <MasterVolumeControl />
         </ControlGroup>
-      </Controls>
+      </PlaybackControlsRow>
 
-      <Waveform
-        showClipHeaders={true}
-        recordingState={
-          isRecording && selectedTrackId
-            ? {
-                isRecording: true,
-                trackId: selectedTrackId,
-                startSample: recordingStartSample,
-                durationSamples: Math.floor(duration * sampleRate),
-                peaks: recordingPeaks,
-              }
-            : undefined
-        }
-      />
+      <DndContext
+        sensors={sensors}
+        onDragStart={onDragStart}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        modifiers={[restrictToHorizontalAxis, collisionModifier]}
+      >
+        <Waveform
+          showClipHeaders={true}
+          recordingState={
+            isRecording && selectedTrackId
+              ? {
+                  isRecording: true,
+                  trackId: selectedTrackId,
+                  startSample: recordingStartSample,
+                  durationSamples: Math.floor(duration * sampleRate),
+                  peaks: recordingPeaks,
+                }
+              : undefined
+          }
+        />
+      </DndContext>
     </>
   );
 };
@@ -349,7 +462,7 @@ const IntegratedRecordingExample: React.FC = () => {
       <Header>
         <Title>🎙️ Integrated Multi-Track Recording</Title>
         <Description>
-          Recording starts from max(cursor position, last clip end). Click "+ New Track" to add a track, then hit record!
+          Recording starts from max(cursor position, last clip end). Drag clips to reposition them!
         </Description>
       </Header>
 

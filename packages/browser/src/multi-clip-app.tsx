@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
@@ -10,6 +10,7 @@ import {
   usePlaylistData,
   usePlaylistControls,
   useClipDragHandlers,
+  useDragSensors,
   useClipSplitting,
   useKeyboardShortcuts,
   Waveform,
@@ -104,16 +105,8 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
   const { samplesPerPixel, sampleRate } = usePlaylistData();
   const { setSelectedTrackId } = usePlaylistControls();
 
-  // Configure sensors for @dnd-kit to detect mouse/touch events
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 1, // Require 1px movement before drag starts (immediate feedback)
-      },
-    })
-  );
-
-  // Use the clip drag handlers hook for all drag operations
+  // Configure sensors and drag handlers
+  const sensors = useDragSensors();
   const { onDragStart: handleDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
     tracks,
     onTracksChange,
