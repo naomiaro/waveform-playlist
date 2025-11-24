@@ -1345,6 +1345,7 @@ export {
   AutomaticScrollCheckbox,
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
+  EditableCheckbox,
   DownloadAnnotationsButton,
   Waveform,
 } from './components';

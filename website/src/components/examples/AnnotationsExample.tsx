@@ -16,11 +16,11 @@ import {
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
   DownloadAnnotationsButton,
+  EditableCheckbox,
   AudioPosition,
   Waveform,
   useAudioTracks,
 } from '@waveform-playlist/browser';
-import { EditableCheckbox } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Annotation data - Shakespeare's Sonnet 1
