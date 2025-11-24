@@ -69,6 +69,7 @@ const config: Config = {
                     /packages[\\/]core[\\/]src/,
                     /packages[\\/]playout[\\/]src/,
                     /packages[\\/]ui-components[\\/]src/,
+                    /packages[\\/]annotations[\\/]src/,
                   ],
                   use: [
                     {
@@ -93,7 +94,15 @@ const config: Config = {
                 '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
                 '@waveform-playlist/playout': path.resolve(__dirname, '../packages/playout/src'),
                 '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
-                // annotations, recording, loaders, and webaudio-peaks use their built dist versions via node_modules
+                '@waveform-playlist/annotations': path.resolve(__dirname, '../packages/annotations/src'),
+                // recording, loaders, and webaudio-peaks use their built dist versions via node_modules
+
+                // Force single instance of styled-components to avoid "several instances" warning
+                // and ensure styles work correctly across all packages
+                'styled-components': path.resolve(__dirname, 'node_modules/styled-components'),
+                // Force single instance of @dnd-kit/core so DndContext works across packages
+                '@dnd-kit/core': path.resolve(__dirname, 'node_modules/@dnd-kit/core'),
+                '@dnd-kit/modifiers': path.resolve(__dirname, 'node_modules/@dnd-kit/modifiers'),
               },
             },
           };

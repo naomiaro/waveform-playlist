@@ -25,7 +25,6 @@ import {
   AnnotationBoxesWrapper,
   AnnotationBox,
   AnnotationText,
-  useAnnotationControls,
 } from '@waveform-playlist/annotations';
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
@@ -108,20 +107,7 @@ export const Waveform: React.FC<WaveformProps> = ({
     playoutRef,
   } = usePlaylistData();
 
-  // Use annotation controls hook for boundary update logic
-  const { updateAnnotationBoundaries } = useAnnotationControls({
-    initialContinuousPlay: continuousPlay,
-    initialLinkEndpoints: linkEndpoints,
-  });
-
   const [isSelecting, setIsSelecting] = useState(false);
-  const [draggingAnnotation, setDraggingAnnotation] = useState<{
-    id: string;
-    edge: 'start' | 'end';
-    originalStart: number;
-    originalEnd: number;
-    startX: number;
-  } | null>(null);
 
   // Local ref for scroll container to use in drag handlers
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -151,55 +137,12 @@ export const Waveform: React.FC<WaveformProps> = ({
   const estimatedMaxTimestampChars = displayDuration >= 3600 ? 8 : displayDuration >= 600 ? 6 : 5;
   const timescalePadding = estimatedMaxTimestampChars * 8 + 10; // chars * px/char + buffer
 
-  // Annotation handlers
+  // Annotation click handler
   const handleAnnotationClick = async (annotation: any) => {
     console.log('Annotation clicked:', annotation.id);
     setActiveAnnotationId(annotation.id);
     const playDuration = !continuousPlay ? annotation.end - annotation.start : undefined;
     await play(annotation.start, playDuration);
-  };
-
-  const handleAnnotationDragStart = (annotationId: string, edge: 'start' | 'end', e: React.DragEvent) => {
-    const annotation = annotations.find(a => a.id === annotationId);
-    if (!annotation) return;
-
-    setDraggingAnnotation({
-      id: annotationId,
-      edge,
-      originalStart: annotation.start,
-      originalEnd: annotation.end,
-      startX: e.clientX,
-    });
-  };
-
-  const handleAnnotationDrag = (e: React.DragEvent) => {
-    if (!draggingAnnotation || e.clientX === 0) return; // clientX is 0 on dragend
-
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    // Calculate absolute position accounting for scroll
-    const rect = scrollContainer.getBoundingClientRect();
-    const x = e.clientX - rect.left + scrollContainer.scrollLeft;
-    const newTime = (x * samplesPerPixel) / sampleRate;
-
-    const annotationIndex = annotations.findIndex(a => a.id === draggingAnnotation.id);
-
-    if (annotationIndex !== -1) {
-      const updatedAnnotations = updateAnnotationBoundaries({
-        annotationIndex,
-        newTime,
-        isDraggingStart: draggingAnnotation.edge === 'start',
-        annotations,
-        duration,
-      });
-
-      setAnnotations(updatedAnnotations);
-    }
-  };
-
-  const handleAnnotationDragEnd = () => {
-    setDraggingAnnotation(null);
   };
 
   // Shared function for track selection
@@ -501,21 +444,21 @@ export const Waveform: React.FC<WaveformProps> = ({
               })}
               {annotations.length > 0 && (
                 <AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
-                  {annotations.map((annotation) => {
+                  {annotations.map((annotation, index) => {
                     const startPosition = (annotation.start * sampleRate) / samplesPerPixel;
                     const endPosition = (annotation.end * sampleRate) / samplesPerPixel;
                     return (
                       <AnnotationBox
                         key={annotation.id}
+                        annotationId={annotation.id}
+                        annotationIndex={index}
                         startPosition={startPosition}
                         endPosition={endPosition}
                         label={annotation.id}
                         color="#ff9800"
                         isActive={annotation.id === activeAnnotationId}
                         onClick={() => handleAnnotationClick(annotation)}
-                        onDragStart={(edge, e) => handleAnnotationDragStart(annotation.id, edge, e)}
-                        onDrag={handleAnnotationDrag}
-                        onDragEnd={handleAnnotationDragEnd}
+                        editable={annotationsEditable}
                       />
                     );
                   })}

@@ -14,6 +14,8 @@ export type { AudioTrackConfig } from './useAudioTracks';
 
 export { useClipDragHandlers } from './useClipDragHandlers';
 
+export { useAnnotationDragHandlers } from './useAnnotationDragHandlers';
+
 export { useDragSensors } from './useDragSensors';
 
 export { useClipSplitting } from './useClipSplitting';

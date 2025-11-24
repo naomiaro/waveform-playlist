@@ -1,5 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
+import { DndContext } from '@dnd-kit/core';
+import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -20,6 +22,11 @@ import {
   AudioPosition,
   Waveform,
   useAudioTracks,
+  usePlaylistData,
+  usePlaylistState,
+  usePlaylistControls,
+  useAnnotationDragHandlers,
+  useDragSensors,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -264,66 +271,88 @@ const TimeControlsBar = styled.div`
 `;
 
 const AnnotationsAppContent: React.FC = () => {
+  const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
+  const { annotations, linkEndpoints } = usePlaylistState();
+  const { setAnnotations } = usePlaylistControls();
+
+  const sensors = useDragSensors();
+  const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
+    annotations,
+    onAnnotationsChange: setAnnotations,
+    samplesPerPixel,
+    sampleRate,
+    duration,
+    linkEndpoints,
+  });
+
   return (
-    <Container>
-      <TopBar>
-        <ControlGroup>
-          <PlayButton />
-          <PauseButton />
-          <StopButton />
-          <RewindButton />
-          <FastForwardButton />
-        </ControlGroup>
+    <DndContext
+      sensors={sensors}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+      modifiers={[restrictToHorizontalAxis]}
+    >
+      <Container>
+        <TopBar>
+          <ControlGroup>
+            <PlayButton />
+            <PauseButton />
+            <StopButton />
+            <RewindButton />
+            <FastForwardButton />
+          </ControlGroup>
 
-        <Separator />
+          <Separator />
 
-        <ControlGroup>
-          <ZoomInButton />
-          <ZoomOutButton />
-        </ControlGroup>
+          <ControlGroup>
+            <ZoomInButton />
+            <ZoomOutButton />
+          </ControlGroup>
 
-        <Separator />
+          <Separator />
 
-        <ControlGroup>
-          <DownloadAnnotationsButton />
-        </ControlGroup>
+          <ControlGroup>
+            <DownloadAnnotationsButton />
+          </ControlGroup>
 
-        <Separator />
+          <Separator />
 
-        <ControlGroup>
-          <AutomaticScrollCheckbox />
-          <ContinuousPlayCheckbox />
-          <LinkEndpointsCheckbox />
-          <EditableCheckbox />
-        </ControlGroup>
+          <ControlGroup>
+            <AutomaticScrollCheckbox />
+            <ContinuousPlayCheckbox />
+            <LinkEndpointsCheckbox />
+            <EditableCheckbox />
+          </ControlGroup>
 
-        <Separator />
+          <Separator />
 
-        <ControlGroup>
-          <MasterVolumeControl />
-        </ControlGroup>
-      </TopBar>
+          <ControlGroup>
+            <MasterVolumeControl />
+          </ControlGroup>
+        </TopBar>
 
-      <Waveform annotationControls={annotationActions} />
+        <Waveform annotationControls={annotationActions} />
 
-      <TimeControlsBar>
-        <ControlGroup>
-          <TimeFormatSelect />
-        </ControlGroup>
+        <TimeControlsBar>
+          <ControlGroup>
+            <TimeFormatSelect />
+          </ControlGroup>
 
-        <Separator />
+          <Separator />
 
-        <ControlGroup>
-          <SelectionTimeInputs />
-        </ControlGroup>
+          <ControlGroup>
+            <SelectionTimeInputs />
+          </ControlGroup>
 
-        <Separator />
+          <Separator />
 
-        <ControlGroup>
-          <AudioPosition />
-        </ControlGroup>
-      </TimeControlsBar>
-    </Container>
+          <ControlGroup>
+            <AudioPosition />
+          </ControlGroup>
+        </TimeControlsBar>
+      </Container>
+    </DndContext>
   );
 };
 

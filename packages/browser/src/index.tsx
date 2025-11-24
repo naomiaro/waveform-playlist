@@ -616,18 +616,21 @@ class WaveformPlaylistClass {
                       height={30}
                       width={tracksFullWidth}
                     >
-                      {this.annotations.map((annotation) => {
+                      {this.annotations.map((annotation, index) => {
                         const startPx = secondsToPixels(annotation.start, samplesPerPixel, this.playout!.sampleRate);
                         const endPx = secondsToPixels(annotation.end, samplesPerPixel, this.playout!.sampleRate);
 
                         return (
                           <AnnotationBox
                             key={annotation.id}
+                            annotationId={annotation.id}
+                            annotationIndex={index}
                             startPosition={startPx}
                             endPosition={endPx}
                             label={annotation.id}
                             color="#ff9800"
                             isActive={annotation.id === this.activeAnnotationId}
+                            editable={false} // Class-based API doesn't support DndContext
                             onClick={async () => {
                               this.activeAnnotationId = annotation.id;
                               this.lastScrolledAnnotationId = annotation.id; // Mark that we're scrolling to this annotation
@@ -1307,6 +1310,7 @@ export {
 export type { WaveformPlaylistContextValue, WaveformTrack, TrackState } from './WaveformPlaylistContext';
 export {
   useClipDragHandlers,
+  useAnnotationDragHandlers,
   useDragSensors,
   useClipSplitting,
   useKeyboardShortcuts,

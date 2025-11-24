@@ -1,21 +1,37 @@
 import React, { FunctionComponent } from 'react';
 import styled from 'styled-components';
+import { useDraggable } from '@dnd-kit/core';
+import type { DraggableAttributes } from '@dnd-kit/core';
+import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 
-interface AnnotationBoxProps {
+interface WrapperProps {
   readonly $left: number;
   readonly $width: number;
-  readonly $color: string;
-  readonly $isActive?: boolean;
 }
 
-const Box = styled.div.attrs<AnnotationBoxProps>((props) => ({
+// Wrapper positions the annotation and contains both Box and ResizeHandles as siblings
+const Wrapper = styled.div.attrs<WrapperProps>((props) => ({
   style: {
     left: `${props.$left}px`,
     width: `${props.$width}px`,
   },
-}))<AnnotationBoxProps>`
+}))<WrapperProps>`
   position: absolute;
   top: 0;
+  height: 100%;
+  pointer-events: none; /* Let events pass through to children */
+`;
+
+interface BoxProps {
+  readonly $color: string;
+  readonly $isActive?: boolean;
+}
+
+const Box = styled.div<BoxProps>`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 100%;
   background: ${(props) => props.$isActive ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.85)'};
   border: 2px solid ${(props) => props.$isActive ? '#d67600' : props.$color};
@@ -49,16 +65,24 @@ const Label = styled.span`
   user-select: none;
 `;
 
-const ResizeHandle = styled.div<{ $position: 'left' | 'right' }>`
+interface ResizeHandleStyledProps {
+  $position: 'left' | 'right';
+  $isDragging?: boolean;
+}
+
+// ResizeHandles are now siblings of Box, positioned relative to Wrapper
+const ResizeHandle = styled.div<ResizeHandleStyledProps>`
   position: absolute;
   top: 0;
-  ${(props) => props.$position}: -15px;
+  ${(props) => props.$position === 'left' ? 'left: -15px' : 'right: -15px'};
   width: 30px;
   height: 100%;
   cursor: ew-resize;
-  z-index: 2;
-  background: rgba(0, 0, 0, 0.1);
+  z-index: 120; /* Above ClickOverlay (z-index: 100) and AnnotationBoxesWrapper (z-index: 110) */
+  background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.1)'};
   border-radius: 4px;
+  touch-action: none; /* Important for @dnd-kit on touch devices */
+  pointer-events: auto;
 
   &::before {
     content: '';
@@ -68,9 +92,9 @@ const ResizeHandle = styled.div<{ $position: 'left' | 'right' }>`
     transform: translate(-50%, -50%);
     width: 6px;
     height: 70%;
-    background: rgba(0, 0, 0, 0.5);
+    background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.5)'};
     border-radius: 3px;
-    opacity: 0.7;
+    opacity: ${(props) => props.$isDragging ? 1 : 0.7};
     transition: opacity 0.2s, background 0.2s;
   }
 
@@ -84,56 +108,75 @@ const ResizeHandle = styled.div<{ $position: 'left' | 'right' }>`
   }
 `;
 
+export interface DragHandleProps {
+  attributes: DraggableAttributes;
+  listeners: SyntheticListenerMap | undefined;
+  setActivatorNodeRef: (element: HTMLElement | null) => void;
+  isDragging: boolean;
+}
+
 export interface AnnotationBoxComponentProps {
+  annotationId: string;
+  annotationIndex: number;
   startPosition: number;
   endPosition: number;
   label?: string;
   color?: string;
   isActive?: boolean;
   onClick?: () => void;
-  onDragStart?: (edge: 'start' | 'end', e: React.DragEvent) => void;
-  onDrag?: (e: React.DragEvent) => void;
-  onDragEnd?: (e: React.DragEvent) => void;
+  editable?: boolean; // Whether to show drag handles
 }
 
 export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
+  annotationId,
+  annotationIndex,
   startPosition,
   endPosition,
   label,
   color = '#ff9800',
   isActive = false,
   onClick,
-  onDragStart,
-  onDrag,
-  onDragEnd,
+  editable = true,
 }) => {
   const width = Math.max(0, endPosition - startPosition);
+
+  // Left (start) boundary draggable
+  const leftBoundaryId = `annotation-boundary-start-${annotationIndex}`;
+  const {
+    attributes: leftAttributes,
+    listeners: leftListeners,
+    setActivatorNodeRef: setLeftActivatorRef,
+    isDragging: isLeftDragging,
+  } = useDraggable({
+    id: leftBoundaryId,
+    data: { annotationId, annotationIndex, edge: 'start' as const },
+    disabled: !editable,
+  });
+
+  // Right (end) boundary draggable
+  const rightBoundaryId = `annotation-boundary-end-${annotationIndex}`;
+  const {
+    attributes: rightAttributes,
+    listeners: rightListeners,
+    setActivatorNodeRef: setRightActivatorRef,
+    isDragging: isRightDragging,
+  } = useDraggable({
+    id: rightBoundaryId,
+    data: { annotationId, annotationIndex, edge: 'end' as const },
+    disabled: !editable,
+  });
 
   if (width <= 0) {
     return null;
   }
 
-  const handleDragStart = (edge: 'start' | 'end') => (e: React.DragEvent) => {
-    // Create a transparent div element to use as drag image
-    const dragImage = document.createElement('div');
-    dragImage.style.position = 'absolute';
-    dragImage.style.top = '-9999px';
-    dragImage.style.width = '1px';
-    dragImage.style.height = '1px';
-    dragImage.style.opacity = '0';
-    document.body.appendChild(dragImage);
-
-    e.dataTransfer.setDragImage(dragImage, 0, 0);
-    e.dataTransfer.effectAllowed = 'move';
-
-    // Clean up the drag image element after a short delay
-    setTimeout(() => {
-      document.body.removeChild(dragImage);
-    }, 0);
-
-    if (onDragStart) {
-      onDragStart(edge, e);
-    }
+  // Wrap @dnd-kit pointer handlers to also stop propagation
+  // This prevents the ClickOverlay from capturing the event
+  const createPointerDownHandler = (dndKitHandler?: (e: React.PointerEvent) => void) => {
+    return (e: React.PointerEvent) => {
+      e.stopPropagation();
+      dndKitHandler?.(e);
+    };
   };
 
   const handleHandleClick = (e: React.MouseEvent) => {
@@ -142,30 +185,36 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
   };
 
   return (
-    <Box
-      $left={startPosition}
-      $width={width}
-      $color={color}
-      $isActive={isActive}
-      onClick={onClick}
-    >
-      <ResizeHandle
-        $position="left"
-        draggable="true"
-        onDragStart={handleDragStart('start')}
-        onDrag={onDrag}
-        onDragEnd={onDragEnd}
-        onClick={handleHandleClick}
-      />
-      {label && <Label>{label}</Label>}
-      <ResizeHandle
-        $position="right"
-        draggable="true"
-        onDragStart={handleDragStart('end')}
-        onDrag={onDrag}
-        onDragEnd={onDragEnd}
-        onClick={handleHandleClick}
-      />
-    </Box>
+    <Wrapper $left={startPosition} $width={width}>
+      <Box
+        $color={color}
+        $isActive={isActive}
+        onClick={onClick}
+      >
+        {label && <Label>{label}</Label>}
+      </Box>
+      {editable && (
+        <ResizeHandle
+          ref={setLeftActivatorRef}
+          $position="left"
+          $isDragging={isLeftDragging}
+          onClick={handleHandleClick}
+          {...leftListeners}
+          onPointerDown={createPointerDownHandler(leftListeners?.onPointerDown as ((e: React.PointerEvent) => void) | undefined)}
+          {...leftAttributes}
+        />
+      )}
+      {editable && (
+        <ResizeHandle
+          ref={setRightActivatorRef}
+          $position="right"
+          $isDragging={isRightDragging}
+          onClick={handleHandleClick}
+          {...rightListeners}
+          onPointerDown={createPointerDownHandler(rightListeners?.onPointerDown as ((e: React.PointerEvent) => void) | undefined)}
+          {...rightAttributes}
+        />
+      )}
+    </Wrapper>
   );
 };

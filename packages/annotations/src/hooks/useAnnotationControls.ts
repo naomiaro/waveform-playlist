@@ -14,6 +14,7 @@ export interface AnnotationUpdateParams {
   isDraggingStart: boolean;
   annotations: Annotation[];
   duration: number;
+  linkEndpoints: boolean;
 }
 
 export interface UseAnnotationControlsReturn {
@@ -42,6 +43,7 @@ export const useAnnotationControls = (
   /**
    * Updates annotation boundaries based on drag operations.
    * Handles linked endpoints and collision detection.
+   * Note: linkEndpoints is passed as a parameter to ensure it uses the current value from context.
    */
   const updateAnnotationBoundaries = useCallback(
     ({
@@ -50,6 +52,7 @@ export const useAnnotationControls = (
       isDraggingStart,
       annotations,
       duration,
+      linkEndpoints: shouldLinkEndpoints,
     }: AnnotationUpdateParams): Annotation[] => {
       const updatedAnnotations = [...annotations];
       const annotation = annotations[annotationIndex];
@@ -64,16 +67,24 @@ export const useAnnotationControls = (
           start: constrainedStart,
         };
 
-        if (linkEndpoints && annotationIndex > 0) {
-          // Link Endpoints: if previous annotation's end is touching this start, move it together
+        if (shouldLinkEndpoints && annotationIndex > 0) {
+          // Link Endpoints mode: handle both already-linked and collision scenarios
           const prevAnnotation = updatedAnnotations[annotationIndex - 1];
+
           if (Math.abs(prevAnnotation.end - annotation.start) < LINK_THRESHOLD) {
+            // Already linked: move previous annotation's end together with this start
             updatedAnnotations[annotationIndex - 1] = {
               ...prevAnnotation,
               end: Math.max(prevAnnotation.start + 0.1, prevAnnotation.end + delta),
             };
+          } else if (constrainedStart <= prevAnnotation.end) {
+            // Dragged past previous annotation: snap to link them together
+            updatedAnnotations[annotationIndex] = {
+              ...updatedAnnotations[annotationIndex],
+              start: prevAnnotation.end,
+            };
           }
-        } else if (!linkEndpoints && annotationIndex > 0 && constrainedStart < updatedAnnotations[annotationIndex - 1].end) {
+        } else if (!shouldLinkEndpoints && annotationIndex > 0 && constrainedStart < updatedAnnotations[annotationIndex - 1].end) {
           // Collision detection: push previous annotation's end back
           updatedAnnotations[annotationIndex - 1] = {
             ...updatedAnnotations[annotationIndex - 1],
@@ -90,10 +101,12 @@ export const useAnnotationControls = (
           end: constrainedEnd,
         };
 
-        if (linkEndpoints && annotationIndex < updatedAnnotations.length - 1) {
-          // Link Endpoints: if next annotation's start is touching this end, move it together
+        if (shouldLinkEndpoints && annotationIndex < updatedAnnotations.length - 1) {
+          // Link Endpoints mode: handle both already-linked and collision scenarios
           const nextAnnotation = updatedAnnotations[annotationIndex + 1];
+
           if (Math.abs(nextAnnotation.start - annotation.end) < LINK_THRESHOLD) {
+            // Already linked: move next annotation's start together with this end
             const newStart = nextAnnotation.start + delta;
             updatedAnnotations[annotationIndex + 1] = {
               ...nextAnnotation,
@@ -117,8 +130,14 @@ export const useAnnotationControls = (
                 break; // No more linked endpoints
               }
             }
+          } else if (constrainedEnd >= nextAnnotation.start) {
+            // Dragged past next annotation: snap to link them together
+            updatedAnnotations[annotationIndex] = {
+              ...updatedAnnotations[annotationIndex],
+              end: nextAnnotation.start,
+            };
           }
-        } else if (!linkEndpoints && annotationIndex < updatedAnnotations.length - 1 && constrainedEnd > updatedAnnotations[annotationIndex + 1].start) {
+        } else if (!shouldLinkEndpoints && annotationIndex < updatedAnnotations.length - 1 && constrainedEnd > updatedAnnotations[annotationIndex + 1].start) {
           // Collision detection: push next annotation's start forward
           const nextAnnotation = updatedAnnotations[annotationIndex + 1];
 
@@ -148,7 +167,7 @@ export const useAnnotationControls = (
 
       return updatedAnnotations;
     },
-    [linkEndpoints]
+    []
   );
 
   return {
