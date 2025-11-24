@@ -1328,5 +1328,14 @@ export {
 } from './components';
 export type { WaveformProps } from './components/Waveform';
 
+// Export waveform-data.js utilities
+export {
+  loadWaveformData,
+  waveformDataToPeaks,
+  loadPeaksFromWaveformData,
+  getWaveformDataMetadata,
+} from './waveformDataLoader';
+export type { WaveformDataFile } from './waveformDataLoader';
+
 // Default export for UMD
 export default WaveformPlaylistAPI;

@@ -40,7 +40,8 @@ export interface WaveformProps {
   annotationControls?: any[];
   annotationListConfig?: any;
   className?: string;
-  showClipHeaders?: boolean; // Show draggable headers on clips for multi-clip editing (requires @dnd-kit)
+  showClipHeaders?: boolean; // Show headers on clips for visual organization
+  interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (requires @dnd-kit setup)
 }
 
 /**
@@ -55,6 +56,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   annotationListConfig,
   className,
   showClipHeaders = false,
+  interactiveClips = true, // Default to true for backwards compatibility
 }) => {
   // Split context usage for performance
   const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
@@ -418,6 +420,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                             durationSamples={clip.durationSamples}
                             samplesPerPixel={samplesPerPixel}
                             showHeader={showClipHeaders}
+                            disableHeaderDrag={!interactiveClips}
                             isSelected={tracks[trackIndex].id === selectedTrackId}
                             trackId={tracks[trackIndex].id}
                             onMouseDown={(e) => {

@@ -16,6 +16,7 @@ const entryPoints: Record<string, string> = {
   effects: resolve(__dirname, 'src/effects-app.tsx'),
   recording: resolve(__dirname, 'src/recording-app.tsx'),
   'multi-clip': resolve(__dirname, 'src/multi-clip-app.tsx'),
+  'waveform-data': resolve(__dirname, 'src/waveform-data-app.tsx'),
 };
 
 const outputNames: Record<string, string> = {
@@ -28,6 +29,7 @@ const outputNames: Record<string, string> = {
   effects: 'effects-bundle',
   recording: 'recording-bundle',
   'multi-clip': 'multi-clip-bundle',
+  'waveform-data': 'waveform-data-bundle',
 };
 
 export default defineConfig({

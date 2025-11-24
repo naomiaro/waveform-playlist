@@ -1,6 +1,5 @@
 export * from './AudioPosition';
 export * from './AutomaticScrollCheckbox';
-export * from './BBCExtractPeaks';
 export * from './Channel';
 export * from './Clip';
 export * from './ClipBoundary';
@@ -12,7 +11,6 @@ export * from './Selection';
 export * from './SelectionTimeInputs';
 export * from './SmartChannel';
 export * from './SmartScale';
-export * from './SmartTrack';
 export * from './TimeFormatSelect';
 export * from './TimeInput';
 export * from './TimeScale';

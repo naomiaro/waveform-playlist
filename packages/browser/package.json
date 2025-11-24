@@ -41,6 +41,6 @@
     "styled-components": "^6.1.8",
     "tone": "15.1.22",
     "uuid": "^13.0.0",
-    "waveform-data": "^4.4.0"
+    "waveform-data": "^4.5.2"
   }
 }
