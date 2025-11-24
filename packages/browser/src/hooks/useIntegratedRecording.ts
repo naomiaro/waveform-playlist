@@ -3,7 +3,7 @@
  * Combines recording functionality with track management
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   useRecording,
   useMicrophoneAccess,
@@ -14,12 +14,30 @@ import {
 import { type ClipTrack, type AudioClip } from '@waveform-playlist/core';
 import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
 
-export interface IntegratedRecordingOptions extends RecordingOptions {
+export interface IntegratedRecordingOptions {
   /**
    * Current playback/cursor position in seconds
    * Recording will start from max(currentTime, lastClipEndTime)
    */
   currentTime?: number;
+
+  /**
+   * MediaTrackConstraints for audio recording
+   * These will override the recording-optimized defaults (echo cancellation off, low latency)
+   */
+  audioConstraints?: MediaTrackConstraints;
+
+  /**
+   * Number of channels to record (1 = mono, 2 = stereo)
+   * Default: 1 (mono)
+   */
+  channelCount?: number;
+
+  /**
+   * Samples per pixel for peak generation
+   * Default: 1024
+   */
+  samplesPerPixel?: number;
 }
 
 export interface UseIntegratedRecordingReturn {
@@ -55,7 +73,7 @@ export function useIntegratedRecording(
   selectedTrackId: string | null,
   options: IntegratedRecordingOptions = {}
 ): UseIntegratedRecordingReturn {
-  const { currentTime = 0, ...recordingOptions } = options;
+  const { currentTime = 0, audioConstraints, ...recordingOptions } = options;
 
   // Track if we're currently monitoring (for auto-resume audio context)
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -155,20 +173,28 @@ export function useIntegratedRecording(
     }
   }, [selectedTrackId, tracks, setTracks, currentTime, stopRec]);
 
+  // Auto-select the first device when devices become available
+  useEffect(() => {
+    // Only auto-select if we have permission, devices are available, and nothing is selected yet
+    if (hasPermission && devices.length > 0 && selectedDevice === null) {
+      setSelectedDevice(devices[0].deviceId);
+    }
+  }, [hasPermission, devices.length]); // Intentionally not including selectedDevice to avoid re-triggering
+
   // Request microphone access
   const requestMicAccess = useCallback(async () => {
-    await requestAccess();
+    await requestAccess(undefined, audioConstraints);
     await resumeGlobalAudioContext();
     setIsMonitoring(true);
-  }, [requestAccess]);
+  }, [requestAccess, audioConstraints]);
 
   // Change device
   const changeDevice = useCallback(async (deviceId: string) => {
     setSelectedDevice(deviceId);
-    await requestAccess(deviceId);
+    await requestAccess(deviceId, audioConstraints);
     await resumeGlobalAudioContext();
     setIsMonitoring(true);
-  }, [requestAccess]);
+  }, [requestAccess, audioConstraints]);
 
   return {
     // Recording state

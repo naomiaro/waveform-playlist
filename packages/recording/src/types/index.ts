@@ -39,6 +39,13 @@ export interface RecordingOptions {
    * Specific device ID to use for recording
    */
   deviceId?: string;
+
+  /**
+   * MediaTrackConstraints for audio recording
+   * Use this to customize echo cancellation, noise suppression, auto gain control, latency, etc.
+   * Default: Recording-optimized settings (all processing disabled, latency: 0 for low latency)
+   */
+  audioConstraints?: MediaTrackConstraints;
 }
 
 export interface UseRecordingReturn {
@@ -69,7 +76,7 @@ export interface UseMicrophoneAccessReturn {
   isLoading: boolean;
 
   // Controls
-  requestAccess: (deviceId?: string) => Promise<void>;
+  requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>;
   stopStream: () => void;
 
   // Error handling

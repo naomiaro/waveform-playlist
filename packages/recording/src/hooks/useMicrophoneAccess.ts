@@ -32,7 +32,7 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   }, []);
 
   // Request microphone access
-  const requestAccess = useCallback(async (deviceId?: string) => {
+  const requestAccess = useCallback(async (deviceId?: string, audioConstraints?: MediaTrackConstraints) => {
     setIsLoading(true);
     setError(null);
 
@@ -42,9 +42,21 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         stream.getTracks().forEach((track) => track.stop());
       }
 
-      // Request access
+      // Build audio constraints
+      const audio: MediaTrackConstraints & { latency?: number } = {
+        // Recording-optimized defaults: prioritize raw audio quality and low latency
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        latency: 0, // Low latency mode (not in TS types yet, but supported in modern browsers)
+        // User-provided constraints override defaults
+        ...audioConstraints,
+        // Device ID override (if specified)
+        ...(deviceId && { deviceId: { exact: deviceId } }),
+      };
+
       const constraints: MediaStreamConstraints = {
-        audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio,
         video: false,
       };
 
