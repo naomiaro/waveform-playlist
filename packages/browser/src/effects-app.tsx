@@ -200,14 +200,13 @@ const EffectsApp: React.FC = () => {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={100}
-      colors={{
+      theme={{
         waveOutlineColor: '#005BBB',
         waveFillColor: '#FFD500',
       }}
       controls={{ show: true, width: 150 }}
-      isAutomaticScroll={true}
+      automaticScroll={true}
       timescale={true}
-      zoomLevels={[500, 1000, 3000, 5000]}
       effects={masterEffects}
     >
       <Container>

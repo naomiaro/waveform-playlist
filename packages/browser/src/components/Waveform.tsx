@@ -509,7 +509,7 @@ export const Waveform: React.FC<WaveformProps> = ({
           {annotations.length > 0 && (
             <AnnotationText
               annotations={annotations}
-              activeAnnotationId={activeAnnotationId}
+              activeAnnotationId={activeAnnotationId ?? undefined}
               shouldScrollToActive={true}
               editable={annotationsEditable}
               controls={annotationsEditable ? annotationControls : undefined}

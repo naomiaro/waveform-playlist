@@ -93,7 +93,7 @@ export const useTrackAutoWah = (options: {
  * const chainedEffect = useEffectsChain([reverbEffect, delayEffect]);
  */
 export const useEffectsChain = (effects: TrackEffectsFunction[]) => {
-  const chainedEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline, ToneLib) => {
+  const chainedEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline) => {
     if (effects.length === 0) {
       // No effects, connect directly
       graphEnd.connect(masterGainNode);
@@ -102,7 +102,7 @@ export const useEffectsChain = (effects: TrackEffectsFunction[]) => {
 
     if (effects.length === 1) {
       // Single effect, use it directly
-      return effects[0](graphEnd, masterGainNode, isOffline, ToneLib);
+      return effects[0](graphEnd, masterGainNode, isOffline);
     }
 
     // Multiple effects - chain them together
@@ -113,14 +113,13 @@ export const useEffectsChain = (effects: TrackEffectsFunction[]) => {
     effects.forEach((effectFn, index) => {
       // For each effect, we need to intercept its connection
       // We'll create a temporary destination node for effects to connect to
-      const tempDestination = new ToneLib.Gain(1, graphEnd.context);
+      const tempDestination = new Analyser('waveform', 1024); // Use any Tone.js node as temp destination
       effectNodes.push(tempDestination);
 
       const cleanup = effectFn(
         index === 0 ? graphEnd : effectNodes[index - 1],
         tempDestination,
-        isOffline,
-        ToneLib
+        isOffline
       );
 
       if (cleanup) {

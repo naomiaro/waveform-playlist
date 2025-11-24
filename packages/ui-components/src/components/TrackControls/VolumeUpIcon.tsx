@@ -1,10 +1,8 @@
 import styled from 'styled-components';
-import { library } from '@fortawesome/fontawesome-svg-core';
 import { faVolumeUp } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { FontAwesomeIcon, type FontAwesomeIconProps } from '@fortawesome/react-fontawesome';
+import type React from 'react';
 
-library.add(faVolumeUp);
-
-export const VolumeUpIcon = styled(FontAwesomeIcon).attrs({
-  icon: 'volume-up',
+export const VolumeUpIcon: React.FC<Omit<FontAwesomeIconProps, 'icon'>> = styled(FontAwesomeIcon).attrs({
+  icon: faVolumeUp,
 })``;

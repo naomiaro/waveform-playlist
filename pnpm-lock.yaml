@@ -93,6 +93,9 @@ importers:
       tone:
         specifier: 15.1.22
         version: 15.1.22
+      uuid:
+        specifier: ^13.0.0
+        version: 13.0.0
       waveform-data:
         specifier: ^4.4.0
         version: 4.5.2
@@ -2246,6 +2249,11 @@ packages:
       escalade: 3.2.0
       picocolors: 1.1.1
     dev: true
+
+  /uuid@13.0.0:
+    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
+    hasBin: true
+    dev: false
 
   /vite@7.2.4(@types/node@20.19.25):
     resolution: {integrity: sha512-NL8jTlbo0Tn4dUEXEsUg8KeyG/Lkmc4Fnzb8JXN/Ykm9G4HNImjtABMJgkQoVjOBN/j2WAwDTRytdqJbZsah7w==}

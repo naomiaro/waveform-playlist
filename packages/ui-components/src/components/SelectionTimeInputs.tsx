@@ -6,12 +6,14 @@ export interface SelectionTimeInputsProps {
   selectionStart: number; // Time in seconds
   selectionEnd: number; // Time in seconds
   onSelectionChange?: (start: number, end: number) => void;
+  className?: string;
 }
 
 export const SelectionTimeInputs: React.FC<SelectionTimeInputsProps> = ({
   selectionStart,
   selectionEnd,
   onSelectionChange,
+  className,
 }) => {
   const [timeFormat, setTimeFormat] = useState<TimeFormat>('hh:mm:ss.uuu');
 

@@ -132,7 +132,6 @@ export const TrackControlsWithDelete: React.FC<TrackControlsWithDeleteProps> = (
         </Button>
       </ButtonGroup>
       <SliderWrapper>
-        {/* @ts-expect-error - VolumeDownIcon has icon prop set via attrs */}
         <VolumeDownIcon />
         <Slider
           min="0"
@@ -141,7 +140,6 @@ export const TrackControlsWithDelete: React.FC<TrackControlsWithDeleteProps> = (
           value={volume}
           onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
         />
-        {/* @ts-expect-error - VolumeUpIcon has icon prop set via attrs */}
         <VolumeUpIcon />
       </SliderWrapper>
       <SliderWrapper>

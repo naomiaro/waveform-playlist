@@ -54,7 +54,7 @@ export function useClipDragHandlers({
     (args: { transform: { x: number; y: number }; active: any }) => {
       const { transform, active } = args;
 
-      if (!active?.data?.current) return transform;
+      if (!active?.data?.current) return { ...transform, scaleX: 1, scaleY: 1 };
 
       const { trackIndex, clipIndex, boundary } = active.data.current as {
         clipId: string;

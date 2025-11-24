@@ -802,6 +802,23 @@ class WaveformPlaylistClass {
     }
   }
 
+  seek(time: number): void {
+    // Seek to a specific time without starting playback
+    this.currentTime = Math.max(0, time);
+    this.hasSeeked = true;
+
+    if (this.setProgressFn) {
+      this.setProgressFn(this.currentTime);
+    }
+
+    // Emit timeupdate event for external listeners
+    if (this.eventEmitter) {
+      this.eventEmitter.emit('timeupdate', this.currentTime);
+    }
+
+    this.render();
+  }
+
   private startAnimation(): void {
     if (this.animationFrameId !== null) {
       return; // Already running
