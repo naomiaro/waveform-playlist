@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import { BaseSlider, BaseLabel } from '../styled';
 
 const VolumeContainer = styled.div`
   display: inline-flex;
@@ -7,18 +8,13 @@ const VolumeContainer = styled.div`
   gap: 0.5rem;
 `;
 
-const VolumeLabel = styled.label`
+const VolumeLabel = styled(BaseLabel)`
   margin: 0;
   white-space: nowrap;
 `;
 
-const VolumeSlider = styled.input`
-  cursor: pointer;
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
+const VolumeSlider = styled(BaseSlider)`
+  width: 120px;
 `;
 
 export interface MasterVolumeControlProps {
@@ -47,14 +43,12 @@ export const MasterVolumeControl: React.FC<MasterVolumeControlProps> = ({
     <VolumeContainer className={className}>
       <VolumeLabel htmlFor="master-gain">Master Volume</VolumeLabel>
       <VolumeSlider
-        type="range"
         min="0"
         max="100"
         value={volume * 100}
         onChange={handleChange}
         disabled={disabled}
         id="master-gain"
-        className="master-gain form-control"
       />
     </VolumeContainer>
   );

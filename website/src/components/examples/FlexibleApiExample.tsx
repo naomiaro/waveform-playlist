@@ -9,7 +9,7 @@
  * - Full theming customization
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
 import {
@@ -437,14 +437,6 @@ export function FlexibleApiExample() {
   ], []);
 
   const { tracks, loading, error } = useAudioTracks(audioConfigs);
-  const [localTracks, setLocalTracks] = useState(tracks);
-
-  // Update local tracks when loaded
-  React.useEffect(() => {
-    if (tracks.length > 0) {
-      setLocalTracks(tracks);
-    }
-  }, [tracks]);
 
   if (loading) {
     return (
@@ -478,7 +470,7 @@ export function FlexibleApiExample() {
     <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
       <Container>
         <WaveformPlaylistProvider
-          tracks={localTracks}
+          tracks={tracks}
           samplesPerPixel={1024}
           mono={true}
           waveHeight={100}

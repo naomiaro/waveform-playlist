@@ -5,3 +5,4 @@ export * from './BaseControlButton';
 export * from './BaseInput';
 export * from './BaseLabel';
 export * from './BaseSelect';
+export * from './BaseSlider';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { DndContext, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
