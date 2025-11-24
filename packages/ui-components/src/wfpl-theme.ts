@@ -10,6 +10,10 @@ export interface WaveformPlaylistTheme {
   waveFillColor: string;
   waveProgressColor: string;
 
+  // Selected track colors
+  selectedWaveOutlineColor: string;
+  selectedTrackControlsBackground: string;
+
   // Timescale colors
   timeColor: string;
   timescaleBackgroundColor: string;
@@ -22,12 +26,17 @@ export interface WaveformPlaylistTheme {
   clipHeaderBackgroundColor: string;
   clipHeaderBorderColor: string;
   clipHeaderTextColor: string;
+
+  // Selected clip header colors
+  selectedClipHeaderBackgroundColor: string;
 }
 
 export const defaultTheme: WaveformPlaylistTheme = {
   waveOutlineColor: '#005BBB',
   waveFillColor: '#FFD500',
   waveProgressColor: '#ff0000',
+  selectedWaveOutlineColor: '#0099ff', // Brighter blue for selected track waveforms
+  selectedTrackControlsBackground: '#d9e9ff', // Light blue background for selected track controls
   timeColor: '#000',
   timescaleBackgroundColor: '#fff',
   playheadColor: '#f00',
@@ -35,4 +44,5 @@ export const defaultTheme: WaveformPlaylistTheme = {
   clipHeaderBackgroundColor: 'rgba(0, 0, 0, 0.1)',
   clipHeaderBorderColor: 'rgba(0, 0, 0, 0.2)',
   clipHeaderTextColor: '#333',
+  selectedClipHeaderBackgroundColor: '#b3d9ff', // Brighter blue for selected track clip headers
 };

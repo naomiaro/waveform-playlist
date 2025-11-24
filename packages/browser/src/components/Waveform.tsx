@@ -33,18 +33,7 @@ import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylis
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 
 export interface WaveformProps {
-  theme?: {
-    waveOutlineColor?: string;
-    waveFillColor?: string;
-    waveProgressColor?: string;
-    timeColor?: string;
-    timescaleBackgroundColor?: string;
-    playheadColor?: string;
-    selectionColor?: string;
-    clipHeaderBackgroundColor?: string;
-    clipHeaderBorderColor?: string;
-    clipHeaderTextColor?: string;
-  };
+  theme?: Partial<WaveformPlaylistTheme>;
   timescale?: boolean;
   renderTrackControls?: (trackIndex: number) => ReactNode;
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
@@ -429,6 +418,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                             durationSamples={clip.durationSamples}
                             samplesPerPixel={samplesPerPixel}
                             showHeader={showClipHeaders}
+                            isSelected={tracks[trackIndex].id === selectedTrackId}
                             trackId={tracks[trackIndex].id}
                             onMouseDown={(e) => {
                               // Only select track if clicking on the waveform, not on draggable elements
@@ -451,6 +441,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                                 bits={peaksData.bits}
                                 length={width}
                                 progress={0}
+                                isSelected={tracks[trackIndex].id === selectedTrackId}
                               />
                             ))}
                           </Clip>

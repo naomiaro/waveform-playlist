@@ -24,13 +24,6 @@ const Container = styled.div.attrs<ContainerWithHeaderProps>((props) => ({
   position: relative;
   display: flex;
   ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
-
-  /* Audacity-style selection: box around entire track */
-  ${(props) => props.$isSelected && `
-    box-shadow:
-      inset 0 0 0 2px #0066cc,
-      0 0 0 1px #0066cc;
-  `}
 `;
 
 interface ChannelContainerProps {
@@ -58,16 +51,16 @@ const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
   },
 }))<ControlsWrapperProps>`
   position: sticky;
-  z-index: 200;
+  z-index: 999;
   left: 0;
   height: 100%;
   flex-shrink: 0;
   pointer-events: auto;
   background: #fff;
 
-  /* Audacity-style: highlighted background when selected */
+  /* Selected track: highlighted background */
   ${(props) => props.$isSelected && `
-    background: #cce5ff;
+    background: ${props.theme.selectedTrackControlsBackground};
     transition: background 0.15s ease-in-out;
   `}
 `;

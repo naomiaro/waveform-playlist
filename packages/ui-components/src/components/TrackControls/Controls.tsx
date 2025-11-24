@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 
 export const Controls = styled.div`
-  background: #fff;
+  background: transparent;
   width: 100%;
   height: 100%;
   display: flex;

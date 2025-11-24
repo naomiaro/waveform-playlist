@@ -57,6 +57,7 @@ export interface ClipProps {
   disableHeaderDrag?: boolean; // Disable drag on header (for presentation-only rendering)
   isOverlay?: boolean; // Rendering in DragOverlay (disables absolute positioning)
   // Track selection
+  isSelected?: boolean; // Whether the track is selected
   onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void; // Called when clip is pressed (for track selection - fires before drag)
   trackId?: string; // Track ID for identifying which track this clip belongs to
 }
@@ -82,6 +83,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
   showHeader = false,
   disableHeaderDrag = false,
   isOverlay = false,
+  isSelected = false,
   onMouseDown,
   trackId,
 }) => {
@@ -155,6 +157,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
           trackIndex={trackIndex}
           clipIndex={clipIndex}
           trackName={trackName}
+          isSelected={isSelected}
           disableDrag={disableHeaderDrag}
           dragHandleProps={enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined}
         />

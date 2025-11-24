@@ -140,7 +140,29 @@ interface AudioClip {
 4. Components access theme via `props.theme.propertyName` in styled components
 5. No color/styling props passed through component interfaces
 
+**Type Safety Pattern (2025-11-23):**
+- Use `Partial<WaveformPlaylistTheme>` for theme props in component interfaces
+- Single source of truth - theme shape defined once in `wfpl-theme.ts`
+- Automatic propagation - new theme properties available everywhere without manual updates
+- Applied in: `WaveformProps` and `WaveformPlaylistProviderProps`
+
 **Location:** Theme types in `ui-components/src/wfpl-theme.ts`, type augmentation in `ui-components/src/styled.d.ts`
+
+### Track Selection Styling (2025-11-23)
+
+**Visual Feedback for Selected Track:**
+- `selectedWaveOutlineColor` - Brighter waveform outline (#0099ff vs #005BBB)
+- `selectedTrackControlsBackground` - Light blue controls background (#d9e9ff)
+- `selectedClipHeaderBackgroundColor` - Brighter clip headers (#b3d9ff)
+
+**Implementation:**
+- Track: `isSelected` prop passed to all track components
+- SmartChannel: Conditionally uses `selectedWaveOutlineColor` when `isSelected`
+- Track ControlsWrapper: Applies `selectedTrackControlsBackground` with transition
+- ClipHeader: Applies `selectedClipHeaderBackgroundColor` when track selected
+- No borders - selection shown via background colors only
+
+**Pattern:** `isSelected` prop flows: Waveform → Track → Clip → ClipHeader and SmartChannel
 
 ### Custom Hooks Architecture
 

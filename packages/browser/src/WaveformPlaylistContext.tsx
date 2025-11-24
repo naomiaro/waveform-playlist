@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
 import { type Track, type ClipTrack, type AudioClip } from '@waveform-playlist/core';
-import { type TimeFormat } from '@waveform-playlist/ui-components';
+import { type TimeFormat, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData } from '@waveform-playlist/webaudio-peaks';
@@ -203,12 +203,7 @@ export interface WaveformPlaylistProviderProps {
   samplesPerPixel?: number;
   zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
   automaticScroll?: boolean;
-  theme?: {
-    waveOutlineColor?: string;
-    waveFillColor?: string;
-    waveProgressColor?: string;
-    timeColor?: string;
-  };
+  theme?: Partial<WaveformPlaylistTheme>;
   controls?: {
     show: boolean;
     width: number;

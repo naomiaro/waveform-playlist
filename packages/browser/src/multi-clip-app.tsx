@@ -293,6 +293,9 @@ const MultiClipExample: React.FC = () => {
         waveOutlineColor: '#005BBB',
         waveFillColor: '#FFD500',
         waveProgressColor: '#ff0000',
+        selectedWaveOutlineColor: '#0099ff',
+        selectedTrackControlsBackground: '#d9e9ff',
+        selectedClipHeaderBackgroundColor: '#b3d9ff',
       }}
     >
       <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />

@@ -8,12 +8,15 @@ export const CLIP_HEADER_HEIGHT = 22; // Height of the clip header in pixels
 interface HeaderContainerProps {
   readonly $isDragging?: boolean;
   readonly $interactive?: boolean; // Whether it's draggable or just presentational
+  readonly $isSelected?: boolean; // Whether the track is selected
 }
 
 const HeaderContainer = styled.div<HeaderContainerProps>`
   position: relative;
   height: ${CLIP_HEADER_HEIGHT}px;
-  background: ${props => props.theme.clipHeaderBackgroundColor};
+  background: ${props => props.$isSelected
+    ? props.theme.selectedClipHeaderBackgroundColor
+    : props.theme.clipHeaderBackgroundColor};
   border-bottom: 1px solid ${props => props.theme.clipHeaderBorderColor};
   display: flex;
   align-items: center;
@@ -46,15 +49,18 @@ const TrackName = styled.span`
 // Presentational-only header (no drag behavior)
 export interface ClipHeaderPresentationalProps {
   trackName: string;
+  isSelected?: boolean; // Whether the track is selected
 }
 
 export const ClipHeaderPresentational: FunctionComponent<ClipHeaderPresentationalProps> = ({
   trackName,
+  isSelected = false,
 }) => {
   return (
     <HeaderContainer
       $isDragging={false}
       $interactive={false}
+      $isSelected={isSelected}
     >
       <TrackName>{trackName}</TrackName>
     </HeaderContainer>
@@ -72,6 +78,7 @@ export interface ClipHeaderProps {
   trackIndex: number;
   clipIndex: number;
   trackName: string;
+  isSelected?: boolean; // Whether the track is selected
   disableDrag?: boolean; // Disable drag behavior (for presentation-only rendering in overlays)
   dragHandleProps?: DragHandleProps; // Props for drag handle functionality
 }
@@ -84,7 +91,7 @@ export interface ClipHeaderProps {
  * Shows the track name (not clip-specific info).
  *
  * Theme colors (from useTheme):
- * - clipHeaderBackgroundColor
+ * - clipHeaderBackgroundColor / selectedClipHeaderBackgroundColor
  * - clipHeaderBorderColor
  * - clipHeaderTextColor
  */
@@ -93,6 +100,7 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
   trackIndex,
   clipIndex,
   trackName,
+  isSelected = false,
   disableDrag = false,
   dragHandleProps,
 }) => {
@@ -101,6 +109,7 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
     return (
       <ClipHeaderPresentational
         trackName={trackName}
+        isSelected={isSelected}
       />
     );
   }
@@ -112,6 +121,7 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
       ref={setActivatorNodeRef}
       data-clip-id={clipId}
       $interactive={true}
+      $isSelected={isSelected}
       {...listeners}
       {...attributes}
     >
