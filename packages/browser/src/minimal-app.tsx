@@ -19,6 +19,7 @@ import {
   AudioPosition,
 } from './components';
 import { useAudioTracks } from './hooks';
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 const Controls = styled.div`
   display: flex;
@@ -36,10 +37,31 @@ const Container = styled.div`
 `;
 
 function MinimalApp() {
+  // Detect Docusaurus theme via data-theme attribute
+  const [isDark, setIsDark] = React.useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDark ? darkTheme : defaultTheme;
+
   // Define your track configuration - use useMemo to prevent re-creating on every render
   const audioConfigs = React.useMemo(() => [
     {
-      src: 'media/audio/Vocals30.mp3',
+      src: '/waveform-playlist/media/audio/Vocals30.mp3',
       name: 'Vocals',
     },
   ], []);
@@ -68,7 +90,7 @@ function MinimalApp() {
   }
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024} theme={theme}>
       <Controls>
         <PlayButton />
         <PauseButton />

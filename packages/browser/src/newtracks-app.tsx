@@ -24,6 +24,7 @@ import {
 } from './components';
 import { TrackControlsWithDelete } from '@waveform-playlist/ui-components';
 import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -90,6 +91,27 @@ function NewTracksApp() {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Detect Docusaurus theme via data-theme attribute
+  const [isDarkTheme, setIsDarkTheme] = React.useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDarkTheme(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDarkTheme ? darkTheme : defaultTheme;
 
   // Handle file drop
   const handleDrop = useCallback(
@@ -226,6 +248,7 @@ function NewTracksApp() {
           waveHeight={120}
           automaticScroll={true}
           controls={{ show: true, width: 200 }}
+          theme={theme}
         >
           <Controls>
             <ControlGroup>

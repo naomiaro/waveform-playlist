@@ -159,6 +159,36 @@ interface AudioClip {
 
 **Location:** Theme types in `ui-components/src/wfpl-theme.ts`, type augmentation in `ui-components/src/styled.d.ts`
 
+### Theme Provider Pattern (2025-11-24)
+
+**Decision:** Use styled-components `ThemeProvider` at the `WaveformPlaylistProvider` level.
+
+**Implementation:**
+1. `WaveformPlaylistProvider` accepts `theme?: Partial<WaveformPlaylistTheme>`
+2. Provider merges user theme with `defaultTheme`: `{ ...defaultTheme, ...userTheme }`
+3. Provider wraps children with styled-components `<ThemeProvider theme={mergedTheme}>`
+4. All child components access theme via `useTheme()` hook from `ui-components`
+5. `Waveform` component does NOT accept its own theme prop - gets from context
+
+**Usage Pattern:**
+```typescript
+// Application level
+<WaveformPlaylistProvider tracks={tracks} theme={darkTheme}>
+  <Waveform />  {/* Gets theme from context */}
+</WaveformPlaylistProvider>
+```
+
+**Why NOT pass theme to Waveform:**
+- Single source of truth - theme set once at provider level
+- Automatic propagation to all styled components
+- Prevents theme conflicts from multiple ThemeProviders
+- Follows React context pattern
+
+**Docusaurus Integration:**
+- Use MutationObserver to detect `data-theme` attribute changes
+- Switch between `defaultTheme` and `darkTheme` based on Docusaurus mode
+- Example: `minimal-app.tsx` detects and responds to theme toggle
+
 ### Track Selection Styling (2025-11-23)
 
 **Visual Feedback for Selected Track:**

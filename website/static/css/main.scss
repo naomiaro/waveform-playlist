@@ -1,0 +1,35 @@
+---
+# YAML front matter required for Jekyll to process this file
+---
+
+@charset 'UTF-8';
+
+// Import partials from _sass directory with overridden variables
+@use 'playlist' as * with (
+  $wp-channel-color: #FFD500,
+  $wp-tracks-container-background-color: #005BBB
+);
+@use 'base' as *;
+
+.playlist .vocals {
+  background-color: #c0dce0;
+}
+
+.track-drop {
+  border: 2px dashed blue;
+  height: 100px;
+  width: 200px;
+  margin: 1em 0;
+
+  &::before {
+    content: "Drop audio file(s) here!";
+  }
+
+  &.drag-enter {
+    border: 2px solid orange;
+  }
+}
+
+footer {
+  margin-top: 2em;
+}

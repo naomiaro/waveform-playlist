@@ -1,5 +1,4 @@
 import React, { useRef, useState, ReactNode, useCallback } from 'react';
-import { ThemeProvider } from 'styled-components';
 import {
   Playlist,
   Track as TrackComponent,
@@ -20,8 +19,7 @@ import {
   SliderWrapper,
   VolumeDownIcon,
   VolumeUpIcon,
-  defaultTheme,
-  type WaveformPlaylistTheme,
+  useTheme,
 } from '@waveform-playlist/ui-components';
 import {
   AnnotationBoxesWrapper,
@@ -36,7 +34,6 @@ import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
 
 export interface WaveformProps {
-  theme?: Partial<WaveformPlaylistTheme>;
   timescale?: boolean;
   renderTrackControls?: (trackIndex: number) => ReactNode;
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
@@ -59,7 +56,6 @@ export interface WaveformProps {
  * Waveform visualization component that uses the playlist context
  */
 export const Waveform: React.FC<WaveformProps> = ({
-  theme: userTheme,
   timescale = true,
   renderTrackControls,
   renderTimestamp,
@@ -70,6 +66,9 @@ export const Waveform: React.FC<WaveformProps> = ({
   interactiveClips = true, // Default to true for backwards compatibility
   recordingState,
 }) => {
+  // Get theme from context (typed as WaveformPlaylistTheme)
+  const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
+
   // Split context usage for performance
   const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
   const {
@@ -132,8 +131,6 @@ export const Waveform: React.FC<WaveformProps> = ({
     scrollContainerRef.current = element;
     setScrollContainer(element);
   }, [setScrollContainer]);
-
-  const theme = { ...defaultTheme, ...userTheme };
 
   // Calculate dimensions
   // If there are no clips, provide a reasonable default width for recording
@@ -311,18 +308,17 @@ export const Waveform: React.FC<WaveformProps> = ({
 
   return (
     <DevicePixelRatioProvider>
-      <ThemeProvider theme={theme}>
-        <PlaylistInfoContext.Provider
-          value={{
-            samplesPerPixel,
-            sampleRate,
-            zoomLevels: [samplesPerPixel],
-            waveHeight,
-            timeScaleHeight,
-            duration: displayDuration,
-            controls,
-          }}
-        >
+      <PlaylistInfoContext.Provider
+        value={{
+          samplesPerPixel,
+          sampleRate,
+          zoomLevels: [samplesPerPixel],
+          waveHeight,
+          timeScaleHeight,
+          duration: displayDuration,
+          controls,
+        }}
+      >
           <Playlist
             theme={theme}
             backgroundColor={theme.waveOutlineColor}
@@ -563,7 +559,6 @@ export const Waveform: React.FC<WaveformProps> = ({
             />
           )}
         </PlaylistInfoContext.Provider>
-      </ThemeProvider>
     </DevicePixelRatioProvider>
   );
 };

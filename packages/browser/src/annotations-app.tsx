@@ -190,7 +190,7 @@ const AnnotationsAppContent: React.FC = () => {
         </ControlGroup>
       </TopBar>
 
-      <Waveform theme={theme} annotationControls={annotationActions} />
+      <Waveform annotationControls={annotationActions} />
 
       <TimeControlsBar>
         <ControlGroup>
@@ -217,7 +217,7 @@ const AnnotationsAppContent: React.FC = () => {
 const AnnotationsAppWithAudio: React.FC = () => {
   // Use useMemo to prevent re-creating audioConfigs on every render
   const audioConfigs = React.useMemo(() => [
-    { src: 'media/audio/sonnet.mp3', name: 'Sonnet' }
+    { src: '/waveform-playlist/media/audio/sonnet.mp3', name: 'Sonnet' }
   ], []);
 
   const { tracks, loading, error } = useAudioTracks(audioConfigs);

@@ -23,6 +23,7 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
 } from './index';
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 const Controls = styled.div`
   display: flex;
@@ -48,10 +49,10 @@ const ControlGroup = styled.div`
 // Audio files - each file is loaded and decoded once
 // Files can be referenced by multiple clips across different tracks
 const audioFiles = [
-  { id: 'vocals', src: 'media/audio/Vocals30.mp3' },
-  { id: 'guitar', src: 'media/audio/Guitar30.mp3' },
-  { id: 'piano', src: 'media/audio/PianoSynth30.mp3' },
-  { id: 'bass', src: 'media/audio/BassDrums30.mp3' },
+  { id: 'vocals', src: '/waveform-playlist/media/audio/Vocals30.mp3' },
+  { id: 'guitar', src: '/waveform-playlist/media/audio/Guitar30.mp3' },
+  { id: 'piano', src: '/waveform-playlist/media/audio/PianoSynth30.mp3' },
+  { id: 'bass', src: '/waveform-playlist/media/audio/BassDrums30.mp3' },
 ];
 
 // Track configuration - organized by instrument track
@@ -182,6 +183,27 @@ const MultiClipExample: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  // Detect Docusaurus theme via data-theme attribute
+  const [isDark, setIsDark] = React.useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDark ? darkTheme : defaultTheme;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -282,15 +304,7 @@ const MultiClipExample: React.FC = () => {
       waveHeight={100}
       automaticScroll={true}
       controls={{ show: true, width: 200 }}
-      theme={{
-        waveOutlineColor: '#005BBB',
-        waveFillColor: '#FFD500',
-        waveProgressColor: '#ff0000',
-        selectedWaveOutlineColor: '#0099ff',
-        selectedWaveFillColor: '#FFD500', // Keep same fill color on selection
-        selectedTrackControlsBackground: '#d9e9ff',
-        selectedClipHeaderBackgroundColor: '#b3d9ff',
-      }}
+      theme={theme}
     >
       <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />
     </WaveformPlaylistProvider>

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import { ThemeProvider } from 'styled-components';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
 import { type Track, type ClipTrack, type AudioClip } from '@waveform-playlist/core';
-import { type TimeFormat, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
+import { type TimeFormat, type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
 import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData } from '@waveform-playlist/webaudio-peaks';
@@ -853,18 +854,23 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     ...dataValue,
   };
 
+  // Merge user theme with default theme
+  const mergedTheme = { ...defaultTheme, ...userTheme };
+
   return (
-    <PlaybackAnimationContext.Provider value={animationValue}>
-      <PlaylistStateContext.Provider value={stateValue}>
-        <PlaylistControlsContext.Provider value={controlsValue}>
-          <PlaylistDataContext.Provider value={dataValue}>
-            <WaveformPlaylistContext.Provider value={value}>
-              {children}
-            </WaveformPlaylistContext.Provider>
-          </PlaylistDataContext.Provider>
-        </PlaylistControlsContext.Provider>
-      </PlaylistStateContext.Provider>
-    </PlaybackAnimationContext.Provider>
+    <ThemeProvider theme={mergedTheme}>
+      <PlaybackAnimationContext.Provider value={animationValue}>
+        <PlaylistStateContext.Provider value={stateValue}>
+          <PlaylistControlsContext.Provider value={controlsValue}>
+            <PlaylistDataContext.Provider value={dataValue}>
+              <WaveformPlaylistContext.Provider value={value}>
+                {children}
+              </WaveformPlaylistContext.Provider>
+            </PlaylistDataContext.Provider>
+          </PlaylistControlsContext.Provider>
+        </PlaylistStateContext.Provider>
+      </PlaybackAnimationContext.Provider>
+    </ThemeProvider>
   );
 };
 

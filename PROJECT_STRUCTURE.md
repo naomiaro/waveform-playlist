@@ -126,7 +126,7 @@ const clip = createClipFromSeconds({
     - Separate from `TrackControls/Button` (compact UI button)
   - **Benefits:** DRY principle, consistent styling, easier maintenance
 - **Theming System:**
-  - **Architecture:** Centralized theme defined in `wfpl-theme.ts`, consumed via styled-components ThemeProvider
+  - **Architecture:** Centralized theme defined in `wfpl-theme.ts`, provided via `WaveformPlaylistProvider` → styled-components `ThemeProvider` → `useTheme()` hook
   - **Theme Interface:** `WaveformPlaylistTheme` defines all visual properties
     - Waveform colors: `waveOutlineColor`, `waveFillColor`, `waveProgressColor`
     - Timescale: `timeColor`, `timescaleBackgroundColor`

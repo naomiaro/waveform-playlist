@@ -55,6 +55,7 @@ const TimeStamp = styled.div.attrs<TimeStamp>((props) => ({
   position: absolute;
   font-size: 0.75rem; /* Smaller font to prevent overflow */
   white-space: nowrap; /* Prevent text wrapping */
+  color: ${props => props.theme.timeColor}; /* Use theme color instead of inheriting */
 `;
 
 export interface TimeScaleProps {

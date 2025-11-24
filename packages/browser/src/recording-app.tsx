@@ -29,6 +29,7 @@ import {
   VUMeter,
   RecordingIndicator,
 } from '@waveform-playlist/recording';
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 const Container = styled.div`
   padding: 20px;
@@ -448,6 +449,27 @@ const IntegratedRecordingExample: React.FC = () => {
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
+  // Detect Docusaurus theme via data-theme attribute
+  const [isDark, setIsDark] = React.useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDark ? darkTheme : defaultTheme;
+
   const handleAddTrack = () => {
     const newTrack = createTrack({
       name: `Track ${tracks.length + 1}`,
@@ -479,15 +501,7 @@ const IntegratedRecordingExample: React.FC = () => {
         waveHeight={100}
         automaticScroll={true}
         controls={{ show: true, width: 200 }}
-        theme={{
-          waveOutlineColor: '#4CAF50',
-          waveFillColor: '#81C784',
-          waveProgressColor: '#2196F3',
-          selectedWaveOutlineColor: '#2196F3',
-          selectedWaveFillColor: '#64B5F6',
-          selectedTrackControlsBackground: '#e3f2fd',
-          selectedClipHeaderBackgroundColor: '#bbdefb',
-        }}
+        theme={theme}
       >
         <RecordingControlsInner
           tracks={tracks}

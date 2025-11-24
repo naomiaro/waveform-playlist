@@ -18,6 +18,7 @@ import {
 } from './components';
 import { useMasterAnalyser, useTrackAutoWah, useTrackReverb } from './hooks/useAudioEffects';
 import { useAudioTracks } from './hooks';
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 const Container = styled.div`
   display: flex;
@@ -150,6 +151,27 @@ const FrequencyVisualizer: React.FC<{ analyserRef: React.RefObject<any> }> = ({ 
 };
 
 const EffectsApp: React.FC = () => {
+  // Detect Docusaurus theme via data-theme attribute
+  const [isDark, setIsDark] = React.useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDark ? darkTheme : defaultTheme;
+
   // Use custom hooks for effects
   const { analyserRef, masterEffects } = useMasterAnalyser(256);
   const autoWahEffect = useTrackAutoWah({ baseFrequency: 50, octaves: 6, sensitivity: -30 });
@@ -164,21 +186,21 @@ const EffectsApp: React.FC = () => {
   // Track configurations with effects - useMemo to prevent re-creating on every render
   const audioConfigs = React.useMemo(() => [
     {
-      src: 'media/audio/Vocals30.mp3',
+      src: '/waveform-playlist/media/audio/Vocals30.mp3',
       name: 'Vocals',
       effects: autoWahEffect,
     },
     {
-      src: 'media/audio/Guitar30.mp3',
+      src: '/waveform-playlist/media/audio/Guitar30.mp3',
       name: 'Guitar',
       effects: guitarReverbEffect,
     },
     {
-      src: 'media/audio/PianoSynth30.mp3',
+      src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
       name: 'Pianos & Synth',
     },
     {
-      src: 'media/audio/BassDrums30.mp3',
+      src: '/waveform-playlist/media/audio/BassDrums30.mp3',
       name: 'Drums',
       effects: drumsReverbEffect,
     },
@@ -200,10 +222,7 @@ const EffectsApp: React.FC = () => {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={100}
-      theme={{
-        waveOutlineColor: '#005BBB',
-        waveFillColor: '#FFD500',
-      }}
+      theme={theme}
       controls={{ show: true, width: 150 }}
       automaticScroll={true}
       timescale={true}

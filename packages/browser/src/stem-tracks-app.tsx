@@ -14,31 +14,24 @@ import {
   MasterVolumeControl,
 } from './components';
 import { useAudioTracks } from './hooks';
-
-// Theme for waveform colors
-const theme = {
-  waveOutlineColor: '#005BBB',
-  waveFillColor: '#FFD500',
-  waveProgressColor: '#ff0000',
-  timeColor: '#000',
-};
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 // Stem tracks configuration
 const audioConfigs = [
   {
-    src: 'media/audio/Vocals30.mp3',
+    src: '/waveform-playlist/media/audio/Vocals30.mp3',
     name: 'Vocals',
   },
   {
-    src: 'media/audio/Guitar30.mp3',
+    src: '/waveform-playlist/media/audio/Guitar30.mp3',
     name: 'Guitar',
   },
   {
-    src: 'media/audio/PianoSynth30.mp3',
+    src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
     name: 'Pianos & Synth',
   },
   {
-    src: 'media/audio/BassDrums30.mp3',
+    src: '/waveform-playlist/media/audio/BassDrums30.mp3',
     name: 'Drums',
   },
 ];
@@ -72,6 +65,27 @@ const ControlGroup = styled.div`
 `;
 
 function StemTracksApp() {
+  // Detect Docusaurus theme via data-theme attribute
+  const [isDark, setIsDark] = React.useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDark ? darkTheme : defaultTheme;
+
   // Load audio tracks and convert to ClipTrack format
   const { tracks, loading, error } = useAudioTracks(audioConfigs);
 
@@ -104,6 +118,7 @@ function StemTracksApp() {
         waveHeight={100}
         automaticScroll={true}
         controls={{ show: true, width: 200 }}
+        theme={theme}
       >
         <Controls>
           <ControlGroup>
@@ -130,7 +145,7 @@ function StemTracksApp() {
           </ControlGroup>
         </Controls>
 
-        <Waveform theme={theme} />
+        <Waveform />
       </WaveformPlaylistProvider>
     </Container>
   );

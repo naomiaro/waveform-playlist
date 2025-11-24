@@ -55,10 +55,10 @@ const LoadingMessage = styled.div`
 
 // Audio files with corresponding pre-generated waveform data
 const audioFiles = [
-  { id: 'vocals', audioSrc: 'media/audio/Vocals30.mp3', datSrc: 'media/audio/Vocals30.dat' },
-  { id: 'guitar', audioSrc: 'media/audio/Guitar30.mp3', datSrc: 'media/audio/Guitar30.dat' },
-  { id: 'piano', audioSrc: 'media/audio/PianoSynth30.mp3', datSrc: 'media/audio/PianoSynth30.dat' },
-  { id: 'bass', audioSrc: 'media/audio/BassDrums30.mp3', datSrc: 'media/audio/BassDrums30.dat' },
+  { id: 'vocals', audioSrc: '/waveform-playlist/media/audio/Vocals30.mp3', datSrc: '/waveform-playlist/media/audio/Vocals30.dat' },
+  { id: 'guitar', audioSrc: '/waveform-playlist/media/audio/Guitar30.mp3', datSrc: '/waveform-playlist/media/audio/Guitar30.dat' },
+  { id: 'piano', audioSrc: '/waveform-playlist/media/audio/PianoSynth30.mp3', datSrc: '/waveform-playlist/media/audio/PianoSynth30.dat' },
+  { id: 'bass', audioSrc: '/waveform-playlist/media/audio/BassDrums30.mp3', datSrc: '/waveform-playlist/media/audio/BassDrums30.dat' },
 ];
 
 // Track configuration - same as multi-clip example

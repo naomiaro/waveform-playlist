@@ -710,7 +710,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
           modifiers={[restrictToHorizontalAxis, collisionModifier]}
         >
           <Waveform
-            theme={theme}
             renderTrackControls={(trackIndex) => (
               <CustomTrackControls trackIndex={trackIndex} />
             )}
@@ -776,19 +775,19 @@ const theme = {
 // Audio configs - will be loaded with useAudioTracks hook
 const audioConfigs = [
   {
-    src: 'media/audio/Vocals30.mp3',
+    src: '/waveform-playlist/media/audio/Vocals30.mp3',
     name: 'Vocals',
   },
   {
-    src: 'media/audio/Guitar30.mp3',
+    src: '/waveform-playlist/media/audio/Guitar30.mp3',
     name: 'Guitar',
   },
   {
-    src: 'media/audio/PianoSynth30.mp3',
+    src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
     name: 'Pianos & Synth',
   },
   {
-    src: 'media/audio/BassDrums30.mp3',
+    src: '/waveform-playlist/media/audio/BassDrums30.mp3',
     name: 'Drums',
   },
 ];
