@@ -72,8 +72,8 @@ export class ToneTrack {
     // Create clips array - support both legacy single buffer and modern clips array
     const clipInfos: ClipInfo[] = options.clips || (options.buffer ? [{
       buffer: options.buffer,
-      startTime: options.track.startTime,
-      duration: options.track.endTime ? options.track.endTime - options.track.startTime : options.buffer.duration,
+      startTime: 0, // Legacy: single buffer starts at timeline position 0
+      duration: options.buffer.duration, // Legacy: play full buffer duration
       offset: 0,
       fadeIn: options.track.fadeIn,
       fadeOut: options.track.fadeOut,

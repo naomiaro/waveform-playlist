@@ -368,9 +368,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // For each track, create a ToneTrack with all clips
         tracks.forEach((track, index) => {
           if (track.clips.length > 0) {
-            // Calculate track start and end times from clips
-            const startTime = Math.min(...track.clips.map(c => c.startTime));
-            const endTime = Math.max(...track.clips.map(c => c.startTime + c.duration));
+            // Calculate track start and end times from clips (converting samples to seconds)
+            const sampleRate = track.clips[0].audioBuffer.sampleRate;
+            const startTime = Math.min(...track.clips.map(c => c.startSample / sampleRate));
+            const endTime = Math.max(...track.clips.map(c => (c.startSample + c.durationSamples) / sampleRate));
 
             const trackObj: Track = {
               id: `track-${index}`, // Use consistent index-based ID for track controls
