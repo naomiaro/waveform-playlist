@@ -28,3 +28,6 @@ export type { UseClipSplittingOptions, UseClipSplittingResult } from './useClipS
 
 export { useKeyboardShortcuts, getShortcutLabel } from './useKeyboardShortcuts';
 export type { KeyboardShortcut, UseKeyboardShortcutsOptions } from './useKeyboardShortcuts';
+
+export { useIntegratedRecording } from './useIntegratedRecording';
+export type { UseIntegratedRecordingReturn, IntegratedRecordingOptions } from './useIntegratedRecording';

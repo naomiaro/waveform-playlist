@@ -32,6 +32,9 @@ import {
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 
+// Default duration in seconds for empty tracks (used for recording workflow)
+const DEFAULT_EMPTY_TRACK_DURATION = 60;
+
 export interface WaveformProps {
   theme?: Partial<WaveformPlaylistTheme>;
   timescale?: boolean;
@@ -124,14 +127,16 @@ export const Waveform: React.FC<WaveformProps> = ({
   const theme = { ...defaultTheme, ...userTheme };
 
   // Calculate dimensions
+  // If there are no clips, provide a reasonable default width for recording
+  const displayDuration = audioBuffers.length > 0 ? duration : DEFAULT_EMPTY_TRACK_DURATION;
   const tracksFullWidth = audioBuffers.length > 0
     ? Math.floor((duration * sampleRate) / samplesPerPixel)
-    : 0;
+    : Math.floor((DEFAULT_EMPTY_TRACK_DURATION * sampleRate) / samplesPerPixel);
 
   // Calculate padding for timescale text overflow based on duration
   // Estimate character width at 0.75rem (~8px/char) for timestamps like "1:00:00" (7 chars)
   // Longer durations need more padding for wider timestamp text
-  const estimatedMaxTimestampChars = duration >= 3600 ? 8 : duration >= 600 ? 6 : 5;
+  const estimatedMaxTimestampChars = displayDuration >= 3600 ? 8 : displayDuration >= 600 ? 6 : 5;
   const timescalePadding = estimatedMaxTimestampChars * 8 + 10; // chars * px/char + buffer
 
   // Annotation handlers
@@ -215,10 +220,11 @@ export const Waveform: React.FC<WaveformProps> = ({
 
     for (let i = 0; i < peaksDataArray.length; i++) {
       const trackClipPeaks = peaksDataArray[i];
-      if (trackClipPeaks.length === 0) continue;
 
-      // Calculate track height
-      const maxChannels = Math.max(...trackClipPeaks.map(clip => clip.peaks.data.length));
+      // Calculate track height (1 channel for empty tracks, max channels for tracks with clips)
+      const maxChannels = trackClipPeaks.length > 0
+        ? Math.max(...trackClipPeaks.map(clip => clip.peaks.data.length))
+        : 1;
       const trackHeight = maxChannels * waveHeight + (showClipHeaders ? 22 : 0); // CLIP_HEADER_HEIGHT = 22
 
       if (trackY >= cumulativeHeight && trackY < cumulativeHeight + trackHeight) {
@@ -281,7 +287,10 @@ export const Waveform: React.FC<WaveformProps> = ({
     }
   };
 
-  if (audioBuffers.length === 0 || peaksDataArray.length === 0) {
+  // Only show loading if we have tracks WITH clips but haven't loaded their data yet
+  // If tracks are empty or all tracks have no clips, render the empty playlist
+  const hasClips = tracks.some(track => track.clips.length > 0);
+  if (hasClips && (audioBuffers.length === 0 || peaksDataArray.length === 0)) {
     return <div className={className}>Loading waveform...</div>;
   }
 
@@ -295,7 +304,7 @@ export const Waveform: React.FC<WaveformProps> = ({
             zoomLevels: [samplesPerPixel],
             waveHeight,
             timeScaleHeight,
-            duration,
+            duration: displayDuration,
             controls,
           }}
         >
@@ -314,7 +323,7 @@ export const Waveform: React.FC<WaveformProps> = ({
             timescale={
               timescale ? (
                 <StyledTimeScale
-                  duration={duration * 1000}
+                  duration={displayDuration * 1000}
                   marker={10000}
                   bigStep={5000}
                   secondStep={1000}
@@ -384,15 +393,11 @@ export const Waveform: React.FC<WaveformProps> = ({
                   </Controls>
                 );
 
-                // Render all clips for this track
-                if (trackClipPeaks.length === 0) {
-                  return null; // Skip tracks with no clips
-                }
-
                 // Determine max number of channels across all clips
-                const maxChannels = Math.max(
-                  ...trackClipPeaks.map(clip => clip.peaks.data.length)
-                );
+                // Default to 1 channel (mono) for empty tracks
+                const maxChannels = trackClipPeaks.length > 0
+                  ? Math.max(...trackClipPeaks.map(clip => clip.peaks.data.length))
+                  : 1;
 
                 return (
                   <TrackControlsContext.Provider key={trackIndex} value={trackControls}>

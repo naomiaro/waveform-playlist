@@ -1,458 +1,340 @@
-/**
- * Recording Example App
- *
- * Demonstrates the AudioWorklet-based recording functionality
- */
-
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
-import {
-  useRecording,
-  useMicrophoneAccess,
-  useMicrophoneLevel,
-  RecordButton,
-  MicrophoneSelector,
-  RecordingIndicator,
-  VUMeter,
-} from '@waveform-playlist/recording';
+import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   Waveform,
   PlayButton,
   PauseButton,
   StopButton,
-  AudioPosition,
   ZoomInButton,
   ZoomOutButton,
+  AudioPosition,
   AutomaticScrollCheckbox,
-} from './components';
-import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
-import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
+  MasterVolumeControl,
+  usePlaybackAnimation,
+} from './index';
+import { useIntegratedRecording } from './hooks/useIntegratedRecording';
+import {
+  RecordButton,
+  MicrophoneSelector,
+  VUMeter,
+  RecordingIndicator,
+} from '@waveform-playlist/recording';
 
 const Container = styled.div`
-  max-width: 1200px;
+  padding: 20px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
 `;
 
-const ControlPanel = styled.div`
+const Header = styled.div`
+  margin-bottom: 20px;
+`;
+
+const Title = styled.h2`
+  margin: 0 0 10px 0;
+  color: #333;
+`;
+
+const Description = styled.p`
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+`;
+
+const Controls = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 0.5rem;
-  margin-bottom: 1.5rem;
+  gap: 10px;
+  margin-bottom: 20px;
   align-items: center;
 `;
 
 const ControlGroup = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: 5px;
   align-items: center;
-  padding-right: 1rem;
-  border-right: 1px solid #dee2e6;
+  padding-right: 15px;
+  border-right: 1px solid #ddd;
 
   &:last-child {
     border-right: none;
   }
 `;
 
-const VUMeterContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 300px;
-`;
-
-const Label = styled.label`
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #495057;
-`;
-
-const Section = styled.section`
-  margin-bottom: 2rem;
-`;
-
-const Subtitle = styled.h3`
-  font-size: 1.25rem;
-  font-weight: 500;
-  margin-bottom: 0.75rem;
-  color: #34495e;
-`;
-
-const TrackList = styled.div`
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  min-height: 100px;
-`;
-
-const TrackItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  border-bottom: 1px solid #e9ecef;
-
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const TrackInfo = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-`;
-
-const TrackName = styled.span`
-  font-weight: 500;
-  color: #2c3e50;
-`;
-
-const TrackDuration = styled.span`
-  font-size: 0.875rem;
-  color: #6c757d;
-`;
-
-const DeleteButton = styled.button`
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  border: 1px solid #dc3545;
-  border-radius: 0.25rem;
-  background: white;
-  color: #dc3545;
+const NewTrackButton = styled.button`
+  padding: 8px 16px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
 
   &:hover {
-    background: #dc3545;
-    color: white;
+    background: #45a049;
   }
 `;
 
-const InfoBox = styled.div`
-  padding: 1rem;
-  background: #d1ecf1;
-  border: 1px solid #bee5eb;
-  border-radius: 0.25rem;
-  color: #0c5460;
-  margin-bottom: 1rem;
-`;
-
-const PlaybackControls = styled.div`
+const VUMeterWrapper = styled.div`
   display: flex;
-  gap: 0.5rem;
   align-items: center;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
 `;
 
-const LiveWaveformCanvas = styled.canvas`
-  width: 100%;
-  height: 100px;
-  background: #2c3e50;
-  border-radius: 0.25rem;
-`;
-
-const LiveWaveformContainer = styled.div`
-  margin-top: 1rem;
-  padding: 1rem;
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 0.5rem;
-`;
-
-const TestButton = styled.button`
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+const Label = styled.span`
+  font-size: 12px;
+  color: #666;
   font-weight: 500;
-  border: 1px solid #17a2b8;
-  border-radius: 0.25rem;
-  background: white;
-  color: #17a2b8;
+`;
+
+const EnableButton = styled.button`
+  padding: 8px 16px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  font-size: 14px;
+  font-weight: 500;
 
-  &:hover:not(:disabled) {
-    background: #17a2b8;
-    color: white;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  &:hover {
+    background: #1976D2;
   }
 `;
 
-function RecordingApp() {
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>();
-  const [isMonitoring, setIsMonitoring] = useState(false);
-  const recordingCountRef = useRef(1);
-  const liveWaveformRef = useRef<HTMLCanvasElement>(null);
+const ErrorMessage = styled.div`
+  padding: 10px 15px;
+  background: #ffebee;
+  border: 1px solid #ef5350;
+  border-radius: 4px;
+  color: #c62828;
+  font-size: 14px;
+  margin-bottom: 15px;
+`;
 
-  // Microphone access
-  const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
+// Inner component that uses playlist context
+const RecordingControlsInner: React.FC<{
+  tracks: ClipTrack[];
+  setTracks: (tracks: ClipTrack[]) => void;
+  selectedTrackId: string | null;
+  setSelectedTrackId: (id: string | null) => void;
+  onAddTrack: () => void;
+}> = ({ tracks, setTracks, selectedTrackId, setSelectedTrackId, onAddTrack }) => {
+  // Get current time from playlist context
+  const { currentTime } = usePlaybackAnimation();
 
-  // Recording (includes level monitoring via fanout from AudioWorklet during recording)
+  // Integrated recording hook
   const {
     isRecording,
     duration,
-    peaks,
-    audioBuffer,
-    level: recordingLevel,
-    peakLevel: recordingPeakLevel,
+    level,
+    peakLevel,
+    devices,
+    hasPermission,
+    selectedDevice,
     startRecording,
     stopRecording,
-    error: recordError,
-  } = useRecording(stream, {
-    samplesPerPixel: 1024,
-  });
+    requestMicAccess,
+    changeDevice,
+    error,
+  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
 
-  // Microphone level monitoring (for VU meter - works during monitoring AND recording)
-  // AnalyserNode provides smooth, stable updates with no additional gain needed
-  const { level, peakLevel, resetPeak } = useMicrophoneLevel(stream);
-
-  // Draw live waveform as recording progresses
-  // Matches the Channel component's rendering approach
-  React.useEffect(() => {
-    if (!liveWaveformRef.current || peaks.length === 0) return;
-
-    const canvas = liveWaveformRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-
-    // Set canvas size accounting for device pixel ratio
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-
-    ctx.scale(dpr, dpr);
-
-    const width = rect.width;
-    const height = rect.height;
-    const h2 = Math.floor(height / 2);
-
-    // 16-bit peaks (matches the final waveform)
-    const bits = 16;
-    const maxValue = 2 ** (bits - 1);
-
-    // Clear canvas
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(0, 0, width, height);
-
-    // Draw waveform (matches Channel component approach)
-    ctx.fillStyle = '#3498db';
-
-    const numPeaks = peaks.length / 2; // Each peak is a min/max pair
-
-    for (let x = 0; x < width; x++) {
-      const peakIndex = Math.floor((x / width) * numPeaks);
-
-      if (peakIndex * 2 + 1 < peaks.length) {
-        const minPeak = peaks[peakIndex * 2] / maxValue;
-        const maxPeak = peaks[peakIndex * 2 + 1] / maxValue;
-
-        const min = Math.abs(minPeak * h2);
-        const max = Math.abs(maxPeak * h2);
-
-        // Draw max (from top toward center)
-        ctx.fillRect(x, 0, 1, h2 - max);
-        // Draw min (from center toward bottom)
-        ctx.fillRect(x, h2 + min, 1, h2 - min);
-      }
+  const handleRecordClick = () => {
+    // If no track selected and we have tracks, select the last one
+    if (!selectedTrackId && tracks.length > 0) {
+      setSelectedTrackId(tracks[tracks.length - 1].id);
     }
-  }, [peaks]);
+    // If no tracks at all, create one
+    if (tracks.length === 0) {
+      onAddTrack();
+      // The track will be selected in onAddTrack
+      // Need to wait a tick for state to update before starting recording
+      setTimeout(() => {
+        if (isRecording) {
+          stopRecording();
+        } else {
+          startRecording();
+        }
+      }, 0);
+      return;
+    }
 
-  // Handle device selection
-  const handleDeviceChange = async (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    await requestAccess(deviceId);
-  };
-
-  // Handle test microphone (resume AudioContext to enable monitoring)
-  const handleTestMicrophone = async () => {
-    await resumeGlobalAudioContext();
-    setIsMonitoring(true);
-  };
-
-  // Handle recording start/stop
-  const handleRecordToggle = async () => {
     if (isRecording) {
-      const buffer = await stopRecording();
-      if (buffer) {
-        // Create clip from recorded buffer
-        const clip = createClipFromSeconds({
-          audioBuffer: buffer,
-          startTime: 0,
-          duration: buffer.duration,
-          offset: 0,
-          name: `Recording ${recordingCountRef.current}`,
-        });
-
-        // Create track with single clip
-        const newTrack = createTrack({
-          name: `Recording ${recordingCountRef.current}`,
-          clips: [clip],
-          muted: false,
-          soloed: false,
-          volume: 1,
-          pan: 0,
-        });
-
-        setTracks([...tracks, newTrack]);
-        recordingCountRef.current += 1;
-      }
+      stopRecording();
     } else {
-      // Resume global AudioContext on first user interaction
-      // This ensures VU meter, recording, and playback all work
-      await resumeGlobalAudioContext();
-      setIsMonitoring(true); // Recording also enables monitoring
-
-      if (!hasPermission) {
-        await requestAccess(selectedDevice);
-      }
-      await startRecording();
+      startRecording();
     }
   };
 
-  // Handle track deletion
-  const handleDeleteTrack = (index: number) => {
-    setTracks(tracks.filter((_, i) => i !== index));
-  };
+  return (
+    <>
+      {error && (
+        <ErrorMessage>
+          Error: {error.message}
+        </ErrorMessage>
+      )}
 
-  // Format duration
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+      <Controls>
+        {/* Playback Controls */}
+        <ControlGroup>
+          <PlayButton />
+          <PauseButton />
+          <StopButton />
+        </ControlGroup>
 
-  const error = micError || recordError;
+        {/* Track Management */}
+        <ControlGroup>
+          <NewTrackButton onClick={onAddTrack}>
+            + New Track
+          </NewTrackButton>
+        </ControlGroup>
+
+        {/* Recording Controls */}
+        {!hasPermission ? (
+          <ControlGroup>
+            <EnableButton onClick={requestMicAccess}>
+              🎤 Enable Microphone
+            </EnableButton>
+          </ControlGroup>
+        ) : (
+          <>
+            <ControlGroup>
+              <MicrophoneSelector
+                devices={devices}
+                selectedDeviceId={selectedDevice || undefined}
+                onDeviceChange={changeDevice}
+                disabled={isRecording}
+              />
+            </ControlGroup>
+
+            <ControlGroup>
+              <RecordButton
+                isRecording={isRecording}
+                onClick={handleRecordClick}
+                disabled={false}
+              />
+              {isRecording && (
+                <RecordingIndicator
+                  isRecording={isRecording}
+                  duration={duration}
+                />
+              )}
+            </ControlGroup>
+
+            <ControlGroup>
+              <VUMeterWrapper>
+                <Label>Input:</Label>
+                <VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
+              </VUMeterWrapper>
+            </ControlGroup>
+          </>
+        )}
+
+        {/* Zoom Controls */}
+        <ControlGroup>
+          <ZoomInButton />
+          <ZoomOutButton />
+        </ControlGroup>
+
+        {/* Position Display */}
+        <ControlGroup>
+          <AudioPosition />
+        </ControlGroup>
+
+        {/* Other Controls */}
+        <ControlGroup>
+          <AutomaticScrollCheckbox />
+        </ControlGroup>
+
+        <ControlGroup>
+          <MasterVolumeControl />
+        </ControlGroup>
+      </Controls>
+
+      <Waveform showClipHeaders={true} />
+    </>
+  );
+};
+
+// Main component
+const IntegratedRecordingExample: React.FC = () => {
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+
+  const handleAddTrack = () => {
+    const newTrack = createTrack({
+      name: `Track ${tracks.length + 1}`,
+      clips: [],
+      muted: false,
+      soloed: false,
+      volume: 1.0,
+      pan: 0,
+    });
+    setTracks([...tracks, newTrack]);
+    // Auto-select the new track for recording
+    setSelectedTrackId(newTrack.id);
+  };
 
   return (
     <Container>
-      <Section>
-        {error && (
-          <InfoBox style={{ background: '#f8d7da', borderColor: '#f5c6cb', color: '#721c24' }}>
-            <strong>Error:</strong> {error.message}
-          </InfoBox>
-        )}
+      <Header>
+        <Title>🎙️ Integrated Multi-Track Recording</Title>
+        <Description>
+          Recording starts from max(cursor position, last clip end). Click "+ New Track" to add a track, then hit record!
+        </Description>
+      </Header>
 
-        <ControlPanel>
-          <MicrophoneSelector
-            devices={devices}
-            selectedDeviceId={selectedDevice}
-            onDeviceChange={handleDeviceChange}
-            disabled={isRecording}
-          />
+      <WaveformPlaylistProvider
+        tracks={tracks}
+        samplesPerPixel={1024}
+        zoomLevels={[256, 512, 1024, 2048, 4096]}
+        mono={true}
+        waveHeight={100}
+        automaticScroll={true}
+        controls={{ show: true, width: 200 }}
+        theme={{
+          waveOutlineColor: '#4CAF50',
+          waveFillColor: '#81C784',
+          waveProgressColor: '#2196F3',
+          selectedWaveOutlineColor: '#2196F3',
+          selectedWaveFillColor: '#64B5F6',
+          selectedTrackControlsBackground: '#e3f2fd',
+          selectedClipHeaderBackgroundColor: '#bbdefb',
+        }}
+      >
+        <RecordingControlsInner
+          tracks={tracks}
+          setTracks={setTracks}
+          selectedTrackId={selectedTrackId}
+          setSelectedTrackId={setSelectedTrackId}
+          onAddTrack={handleAddTrack}
+        />
+      </WaveformPlaylistProvider>
 
-          {stream && !isRecording && !isMonitoring && (
-            <TestButton onClick={handleTestMicrophone}>
-              Test Microphone
-            </TestButton>
-          )}
-
-          <RecordButton
-            isRecording={isRecording}
-            onClick={handleRecordToggle}
-            disabled={!hasPermission && !stream && devices.length === 0}
-          />
-
-          <RecordingIndicator isRecording={isRecording} duration={duration} />
-
-          {stream && (isMonitoring || isRecording) && (
-            <VUMeterContainer>
-              <Label>Input Level</Label>
-              <VUMeter level={level} peakLevel={peakLevel} width={300} height={24} />
-            </VUMeterContainer>
-          )}
-        </ControlPanel>
-
-        {isRecording && (
-          <LiveWaveformContainer>
-            <Label>Live Recording</Label>
-            <LiveWaveformCanvas ref={liveWaveformRef} />
-          </LiveWaveformContainer>
-        )}
-      </Section>
-
-      <Section>
-        <Subtitle>Recorded Tracks ({tracks.length})</Subtitle>
-        <TrackList>
-          {tracks.length === 0 ? (
-            <p style={{ color: '#6c757d', textAlign: 'center', margin: '2rem 0' }}>
-              No recordings yet. Click the Record button to start recording.
-            </p>
-          ) : (
-            tracks.map((track, index) => {
-              const firstClip = track.clips[0];
-              const duration = firstClip ? firstClip.audioBuffer.duration : 0;
-
-              return (
-                <TrackItem key={index}>
-                  <TrackInfo>
-                    <TrackName>{track.name || 'Untitled'}</TrackName>
-                    <TrackDuration>{formatDuration(duration)}</TrackDuration>
-                  </TrackInfo>
-                  <DeleteButton onClick={() => handleDeleteTrack(index)}>Delete</DeleteButton>
-                </TrackItem>
-              );
-            })
-          )}
-        </TrackList>
-      </Section>
-
-      {tracks.length > 0 && (
-        <Section>
-          <Subtitle>Playback</Subtitle>
-          <WaveformPlaylistProvider
-            tracks={tracks}
-            samplesPerPixel={1024}
-            mono={true}
-            waveHeight={100}
-            automaticScroll={true}
-            controls={{ show: true, width: 200 }}
-          >
-            <PlaybackControls>
-              <ControlGroup>
-                <PlayButton />
-                <PauseButton />
-                <StopButton />
-              </ControlGroup>
-
-              <ControlGroup>
-                <ZoomInButton />
-                <ZoomOutButton />
-              </ControlGroup>
-
-              <ControlGroup>
-                <AudioPosition />
-              </ControlGroup>
-
-              <ControlGroup>
-                <AutomaticScrollCheckbox />
-              </ControlGroup>
-            </PlaybackControls>
-            <Waveform />
-          </WaveformPlaylistProvider>
-        </Section>
+      {tracks.length === 0 && (
+        <div style={{
+          textAlign: 'center',
+          padding: '40px',
+          color: '#999',
+          fontSize: '14px'
+        }}>
+          Click "+ New Track" to add a track, then start recording!
+        </div>
       )}
     </Container>
   );
-}
+};
 
 // Mount the app
 const container = document.getElementById('playlist');
 if (container) {
   const root = createRoot(container);
-  root.render(<RecordingApp />);
+  root.render(<IntegratedRecordingExample />);
 }
