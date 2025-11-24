@@ -312,7 +312,8 @@ const clip = createClipFromSeconds({
   - **Global AudioContext** - Uses shared global context (same as Tone.js playback)
   - **Live waveform visualization** - Real-time Int16Array peaks (min/max pairs) during recording
   - **AudioBuffer support** - WaveformTrack accepts both URLs and AudioBuffer objects
-  - **Microphone selection** - Enumerate and switch between input devices
+  - **Microphone selection** - Enumerate and switch between input devices with auto-select first device
+  - **Recording-optimized constraints** - Default audio constraints prioritize raw quality and low latency (no echo cancellation, noise suppression, or auto gain; latency: 0)
   - **VU meter** - Real-time RMS level display with peak hold
   - **Test Microphone** - Pre-recording level monitoring before committing to record
 

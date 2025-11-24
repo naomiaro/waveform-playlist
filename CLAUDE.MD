@@ -226,6 +226,23 @@ source.connect(analyser);
 
 **See:** `DEBUGGING.md` for complete worklet debugging guide.
 
+### Recording-Optimized Audio Constraints
+
+**Default Constraints:** Prioritize raw audio quality and low latency for recording.
+
+```typescript
+{
+  echoCancellation: false,      // Preserve raw audio
+  noiseSuppression: false,      // No processing
+  autoGainControl: false,       // Manual control
+  latency: 0                    // Low latency mode
+}
+```
+
+**Pattern:** These are defaults in `useMicrophoneAccess`. Users can override via `audioConstraints` parameter.
+
+**Note:** `latency: 0` is supported in modern browsers but not yet in TypeScript types. Use type extension: `MediaTrackConstraints & { latency?: number }`
+
 ---
 
 ## Important Patterns

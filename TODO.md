@@ -1100,6 +1100,16 @@ Infrastructure needed to actually publish the alpha.
 
 ### 2025-11-23
 
+- [x] **Recording UX Improvements - Auto-Select & Audio Constraints** ✅
+  - Added recording-optimized audio constraints: `echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`, `latency: 0`
+  - User-provided constraints can override defaults via `audioConstraints` parameter
+  - Added TypeScript support for `latency` property (not yet in official types but supported in modern browsers)
+  - Auto-select first microphone device after permission granted (removed confusing "Select a microphone" placeholder)
+  - MicrophoneSelector now automatically uses first device as default value when no explicit selection
+  - Improved UX: users can immediately start recording after granting permission without manual device selection
+  - **Files modified:** `useMicrophoneAccess.ts` (constraints), `MicrophoneSelector.tsx` (auto-select), `useIntegratedRecording.ts` (cleanup)
+  - Bundle: 578KB / 171KB gzipped
+
 - [x] **waveform-data.js Support - Pre-Launch Phase 1** ✅
   - Created `waveformDataLoader.ts` utility with BBC waveform-data.js integration
   - Functions: `loadWaveformData()`, `waveformDataToPeaks()`, `loadPeaksFromWaveformData()`, `getWaveformDataMetadata()`
