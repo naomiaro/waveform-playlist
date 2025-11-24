@@ -254,11 +254,11 @@ const FlexibleApiContent: React.FC = () => {
               <PlayIcon width="16" height="16" />
               Play
             </Button>
-            <Button onClick={() => pause()} variant="soft" size="2">
+            <Button onClick={() => pause()} variant="soft" color="amber" size="2">
               <PauseIcon width="16" height="16" />
               Pause
             </Button>
-            <Button onClick={() => stop()} variant="soft" size="2">
+            <Button onClick={() => stop()} variant="soft" color="red" size="2">
               <StopIcon width="16" height="16" />
               Stop
             </Button>
