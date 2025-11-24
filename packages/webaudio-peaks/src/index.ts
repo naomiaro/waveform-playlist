@@ -1,12 +1,12 @@
 /**
  * Peaks type - represents a typed array of peak data
  */
-export type Peaks = Int8Array | Int16Array | Int32Array;
+export type Peaks = Int8Array | Int16Array;
 
 /**
  * Bits type - number of bits for peak data
  */
-export type Bits = 8 | 16 | 32;
+export type Bits = 8 | 16;
 
 /**
  * PeakData - result of peak extraction
@@ -58,8 +58,6 @@ function makeTypedArray(bits: Bits, length: number): Peaks {
       return new Int8Array(length);
     case 16:
       return new Int16Array(length);
-    case 32:
-      return new Int32Array(length);
   }
 }
 
@@ -127,7 +125,7 @@ function makeMono(channelPeaks: Peaks[], bits: Bits): Peaks[] {
  * @param isMono - Whether to merge channels to mono (default: true)
  * @param cueIn - Start index for peak extraction (default: 0)
  * @param cueOut - End index for peak extraction (default: source.length)
- * @param bits - Bit depth for peak data: 8, 16, or 32 (default: 16)
+ * @param bits - Bit depth for peak data: 8 or 16 (default: 16)
  * @returns PeakData object containing peak arrays for each channel
  */
 export default function extractPeaksFromBuffer(
@@ -138,8 +136,8 @@ export default function extractPeaksFromBuffer(
   cueOut?: number,
   bits: Bits = 16
 ): PeakData {
-  if (bits !== 8 && bits !== 16 && bits !== 32) {
-    throw new Error('Invalid number of bits specified for peaks.');
+  if (bits !== 8 && bits !== 16) {
+    throw new Error('Invalid number of bits specified for peaks. Must be 8 or 16.');
   }
 
   let peaks: Peaks[] = [];

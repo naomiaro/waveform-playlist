@@ -48,8 +48,6 @@ function makeTypedArray(bits, length) {
       return new Int8Array(length);
     case 16:
       return new Int16Array(length);
-    case 32:
-      return new Int32Array(length);
   }
 }
 function extractPeaks(channel, samplesPerPixel, bits) {
@@ -86,8 +84,8 @@ function makeMono(channelPeaks, bits) {
   return [peaks];
 }
 function extractPeaksFromBuffer(source, samplesPerPixel = 1e3, isMono = true, cueIn = 0, cueOut, bits = 16) {
-  if (bits !== 8 && bits !== 16 && bits !== 32) {
-    throw new Error("Invalid number of bits specified for peaks.");
+  if (bits !== 8 && bits !== 16) {
+    throw new Error("Invalid number of bits specified for peaks. Must be 8 or 16.");
   }
   let peaks = [];
   if ("getChannelData" in source) {

@@ -1,11 +1,11 @@
 /**
  * Peaks type - represents a typed array of peak data
  */
-type Peaks = Int8Array | Int16Array | Int32Array;
+type Peaks = Int8Array | Int16Array;
 /**
  * Bits type - number of bits for peak data
  */
-type Bits = 8 | 16 | 32;
+type Bits = 8 | 16;
 /**
  * PeakData - result of peak extraction
  */
@@ -25,7 +25,7 @@ interface PeakData {
  * @param isMono - Whether to merge channels to mono (default: true)
  * @param cueIn - Start index for peak extraction (default: 0)
  * @param cueOut - End index for peak extraction (default: source.length)
- * @param bits - Bit depth for peak data: 8, 16, or 32 (default: 16)
+ * @param bits - Bit depth for peak data: 8 or 16 (default: 16)
  * @returns PeakData object containing peak arrays for each channel
  */
 declare function extractPeaksFromBuffer(source: AudioBuffer | Float32Array, samplesPerPixel?: number, isMono?: boolean, cueIn?: number, cueOut?: number, bits?: Bits): PeakData;
