@@ -41,9 +41,44 @@ waveform-playlist/
 #### `@waveform-playlist/core`
 
 - **Purpose:** Core TypeScript interfaces and types
-- **Exports:** Track interface, common types
+- **Exports:** AudioClip, ClipTrack, Timeline interfaces, factory functions
 - **Dependencies:** None (pure types)
 - **Used by:** All other packages
+
+**Important Architectural Decision: Sample-Based Representation**
+
+All clip positions and durations are stored as **integer sample counts** (not floating-point seconds):
+
+```typescript
+interface AudioClip {
+  id: string;
+  audioBuffer: AudioBuffer;
+  startSample: number;        // Position on timeline (samples)
+  durationSamples: number;    // Clip duration (samples)
+  offsetSamples: number;      // Trim start position (samples)
+  // ...
+}
+```
+
+**Why samples instead of seconds?**
+- ✅ Eliminates floating-point precision errors
+- ✅ Perfect pixel alignment in rendering (no 1-pixel gaps)
+- ✅ Mathematically exact calculations (all integers)
+- ✅ No precision loss when converting between time/samples/pixels
+
+**User-Facing API:**
+Users can still create clips using seconds via `createClipFromSeconds()` helper:
+```typescript
+const clip = createClipFromSeconds({
+  audioBuffer,
+  startTime: 5.0,    // Converted to samples internally
+  duration: 10.0,
+  offset: 2.5,
+});
+// Internally stored as: startSample, durationSamples, offsetSamples
+```
+
+**Location:** `packages/core/src/types/clip.ts`
 
 #### `@waveform-playlist/webaudio-peaks`
 

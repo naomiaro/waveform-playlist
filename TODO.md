@@ -3,7 +3,7 @@
 Multi-track audio editor roadmap for waveform-playlist.
 
 **Branch:** `tonejs-overhaul` (React migration)
-**Last Updated:** 2025-11-22
+**Last Updated:** 2025-11-23
 
 ---
 
@@ -395,23 +395,32 @@ See `multi-clip-app.tsx` for complete implementation example.
 - `packages/browser/src/index.tsx` (exports useClipDragHandlers)
 - `packages/browser/src/hooks/index.ts` (exports useClipDragHandlers)
 
-### 3.3 Splitting Clips ✅
+### 3.3 Splitting Clips ✅ COMPLETE
 
 **User Story:** As a user, I want to click a clip and press 'S' to split it at the playhead position.
 
-**Status:** COMPLETE - Core split functionality working! Press 'S' during playback to split clips.
+**Status:** COMPLETE - Pixel-perfect splitting with sample-based architecture!
 
 #### Tasks
 
 - [x] **Implement split logic** ✅
   - Location: `packages/browser/src/hooks/useClipSplitting.ts`
-  - Find clip under playhead/cursor
+  - **Sample-based architecture:** All calculations use integer samples (not floating-point seconds)
+  - Find clip under playhead on selected track
   - Create two new clips:
-    - Clip A: `startTime` to split point
-    - Clip B: split point to `startTime + duration`
-  - Adjust `offset` and `duration` for each
+    - Clip A: Original start → split pixel boundary
+    - Clip B: Split pixel boundary → original end
+  - Snaps to pixel boundaries to ensure perfect adjacency (no gaps)
+  - Adjusts `offsetSamples` and `durationSamples` for each clip
   - Replace original clip with two new clips
   - Returns boolean indicating success/failure
+
+- [x] **Track selection system** ✅
+  - Location: `packages/browser/src/WaveformPlaylistContext.tsx`
+  - Tracks `selectedTrackId` in playlist state
+  - Split only affects the currently selected track
+  - Click any clip to select its track
+  - Visual feedback shows which track is selected
 
 - [x] **Keyboard shortcut** ✅
   - Location: `packages/browser/src/hooks/useKeyboardShortcuts.ts`
@@ -420,22 +429,41 @@ See `multi-clip-app.tsx` for complete implementation example.
   - Input field detection (doesn't trigger in text inputs)
   - Prevent default browser behavior
 
-- [ ] **Visual feedback** (In Progress)
-  - Show scissors cursor when hovering over clip
-  - Flash split indicator at cursor position
-  - Animate new clips fading in
+- [x] **Visual feedback for selected track** ✅
+  - Location: `packages/ui-components/src/components/Track.tsx`
+  - Selected track shows blue border: `box-shadow: inset 0 0 0 2px rgba(0, 123, 255, 0.5)`
+  - Clear indication of which track will be split
+  - Selection persists across drag operations
+
+- [x] **Sample-based architecture refactor** ✅
+  - **Core types** (`packages/core/src/types/clip.ts`):
+    - Changed `AudioClip` from time-based to sample-based properties
+    - `startSample`, `durationSamples`, `offsetSamples` (all integers)
+    - Added `createClipFromSeconds()` for backwards compatibility
+  - **Rendering** (`packages/ui-components/src/components/Clip.tsx`):
+    - Fixed width calculation: `width = endPixel - startPixel`
+    - Ensures clips share exact pixel boundaries (no gaps)
+  - **Benefits:**
+    - Eliminates floating-point precision errors
+    - Perfect pixel alignment for all clip operations
+    - No 1-pixel gaps between split clips
 
 - [x] **Example: Multi-clip demo** ✅
   - Location: `packages/browser/src/multi-clip-app.tsx`
   - Instructions added to HTML template
-  - Press 'S' during playback to split
-  - Console logging confirms splits
+  - Click clip to select track, press 'S' to split
+  - Verified: No pixel gaps after splitting
 
 **Files Created:**
 - `packages/browser/src/hooks/useClipSplitting.ts` ✅
 - `packages/browser/src/hooks/useKeyboardShortcuts.ts` ✅
 
 **Files Modified:**
+- `packages/core/src/types/clip.ts` (sample-based architecture) ✅
+- `packages/ui-components/src/components/Clip.tsx` (pixel-perfect width calculation) ✅
+- `packages/ui-components/src/components/Track.tsx` (selection visual feedback) ✅
+- `packages/browser/src/components/Waveform.tsx` (pass isSelected prop) ✅
+- `packages/browser/src/WaveformPlaylistContext.tsx` (track selection, sample-based ClipPeaks) ✅
 - `packages/browser/src/multi-clip-app.tsx` ✅
 - `packages/browser/src/hooks/index.ts` (exports new hooks) ✅
 - `packages/browser/src/index.tsx` (exports new hooks) ✅
