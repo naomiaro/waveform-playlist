@@ -1,4 +1,4 @@
-import type { Preview } from '@storybook/react';
+import type { Preview } from '@storybook/react-webpack5';
 import React from 'react';
 import { ThemeProvider } from 'styled-components';
 import { defaultTheme, darkTheme } from '../src/wfpl-theme';
@@ -12,13 +12,13 @@ const preview: Preview = {
       },
     },
     backgrounds: {
-      default: 'light',
-      values: [
-        { name: 'light', value: '#ffffff' },
-        { name: 'dark', value: '#1e1e1e' },
-      ],
+      options: {
+        light: { name: 'light', value: '#ffffff' },
+        dark: { name: 'dark', value: '#1e1e1e' }
+      }
     },
   },
+
   globalTypes: {
     theme: {
       name: 'Theme',
@@ -34,6 +34,7 @@ const preview: Preview = {
       },
     },
   },
+
   decorators: [
     (Story, context) => {
       const theme = context.globals.theme === 'dark' ? darkTheme : defaultTheme;
@@ -50,6 +51,12 @@ const preview: Preview = {
       );
     },
   ],
+
+  initialGlobals: {
+    backgrounds: {
+      value: 'light'
+    }
+  }
 };
 
 export default preview;
