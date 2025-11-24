@@ -9,6 +9,46 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-24: BBC Waveform Data Docusaurus Example
+
+**Goal:** Create Docusaurus-native example demonstrating BBC pre-computed peaks for fast waveform loading
+
+**Achievement:** ✅ Full example with file size comparison, preview while audio loads, Storybook stereo support
+
+**What Was Done:**
+- ✅ Created `WaveformDataExample.tsx` - Docusaurus-native component
+  - Loads 8-bit BBC peaks (~11KB each) for instant waveform preview
+  - Audio loads in background (~469KB MP3s)
+  - Shows file size stats: 44KB peaks vs 1.9MB audio (42x smaller)
+  - Progressive loading: waveform visible before audio ready
+- ✅ Created `waveform-data.tsx` page with documentation
+  - audiowaveform CLI examples
+  - Code examples for loading and using BBC peaks
+- ✅ Generated missing 8-bit peak files:
+  - `PianoSynth30-8bit.dat` (11KB)
+  - `BassDrums30-8bit.dat` (11KB)
+- ✅ Updated Storybook `StereoVersion2` story to render both L/R channels
+  - `StereoWaveformDemo` component loads both channels from v2 files
+  - Left channel: blue/yellow, Right channel: orange/teal
+  - Labels show L/R on each channel
+
+**Files Created:**
+- `website/src/components/examples/WaveformDataExample.tsx`
+- `website/src/pages/examples/waveform-data.tsx`
+- `website/static/media/audio/PianoSynth30-8bit.dat`
+- `website/static/media/audio/BassDrums30-8bit.dat`
+
+**Files Modified:**
+- `packages/ui-components/src/stories/WaveformData.stories.tsx` (stereo rendering)
+
+**Key Technical Details:**
+- Uses `loadWaveformData()`, `waveformDataToPeaks()`, `getWaveformDataMetadata()` from browser package
+- File size display more meaningful than timing on localhost
+- 8-bit peaks are half the size of 16-bit (~11KB vs ~22KB)
+- Demonstrates progressive loading UX pattern
+
+---
+
 ### 2025-11-24: Annotation Keyboard Controls & Resize Handle Polish
 
 **Goal:** Add keyboard-based annotation editing and improve resize handle UX

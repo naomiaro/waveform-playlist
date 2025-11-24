@@ -43,6 +43,11 @@ const examples = [
     description: 'Advanced API usage and customization',
     path: 'flexible-api',
   },
+  {
+    title: 'BBC Waveform Data',
+    description: 'Fast waveform loading with pre-computed BBC peaks',
+    path: 'waveform-data',
+  },
 ];
 
 export default function Examples(): React.ReactElement {

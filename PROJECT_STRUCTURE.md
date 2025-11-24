@@ -23,7 +23,29 @@ waveform-playlist/
 │   ├── ui-components/     # Reusable React UI components
 │   └── webaudio-peaks/    # Waveform peak generation
 │
-├── ghpages/               # Jekyll static site for examples
+├── website/               # Docusaurus documentation site
+│   ├── src/
+│   │   ├── components/examples/  # React example components
+│   │   │   ├── MinimalExample.tsx
+│   │   │   ├── StemTracksExample.tsx
+│   │   │   ├── EffectsExample.tsx
+│   │   │   ├── NewTracksExample.tsx
+│   │   │   ├── MultiClipExample.tsx
+│   │   │   ├── AnnotationsExample.tsx
+│   │   │   ├── RecordingExample.tsx
+│   │   │   ├── FlexibleApiExample.tsx
+│   │   │   └── WaveformDataExample.tsx  # BBC peaks demo
+│   │   ├── pages/examples/       # Example page wrappers
+│   │   ├── hooks/                # Docusaurus-specific hooks
+│   │   │   └── useDocusaurusTheme.ts
+│   │   └── theme/                # Theme customizations
+│   │       └── Root.tsx          # Radix Themes provider
+│   ├── static/media/audio/       # Audio and peaks files
+│   │   ├── *.mp3                 # Audio files
+│   │   └── *-8bit.dat            # BBC pre-computed peaks
+│   └── docusaurus.config.ts      # Webpack aliases for workspace packages
+│
+├── ghpages/               # Jekyll static site (legacy)
 │   ├── _examples/         # Example page templates
 │   ├── _includes/         # Reusable HTML includes (forms, buttons)
 │   ├── js/                # Pre-built JavaScript bundles
@@ -222,6 +244,37 @@ const clip = createClipFromSeconds({
 - **Purpose:** Load audio files from various sources
 - **Exports:** Audio loading utilities
 - **Dependencies:** Core
+
+### 📊 BBC Waveform Data Support
+
+The browser package includes utilities for loading pre-computed waveform data in BBC's `waveform-data.js` format:
+
+**Location:** `packages/browser/src/waveformDataLoader.ts`
+
+**Functions:**
+- `loadWaveformData(src)` - Load .dat or .json waveform file, returns WaveformData instance
+- `waveformDataToPeaks(waveformData, channelIndex)` - Convert to our Peaks format (Int8Array/Int16Array)
+- `loadPeaksFromWaveformData(src, channelIndex)` - Combined load + convert
+- `getWaveformDataMetadata(src)` - Get metadata without full conversion
+
+**Generating BBC Peaks:**
+```bash
+# Install audiowaveform (macOS)
+brew install audiowaveform
+
+# Generate 8-bit peaks (smaller files, ~11KB for 30s audio)
+audiowaveform -i audio.mp3 -o peaks-8bit.dat -z 256 -b 8
+
+# Generate 16-bit peaks (higher precision, ~22KB)
+audiowaveform -i audio.mp3 -o peaks-16bit.dat -z 256 -b 16
+
+# Generate stereo/multi-channel (Version 2 format)
+audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
+```
+
+**Use Case:** Progressive loading - show waveforms instantly (~44KB for 4 tracks) while audio loads in background (~1.9MB)
+
+**Example:** `website/src/components/examples/WaveformDataExample.tsx`
 
 ### 📦 Optional Packages
 
