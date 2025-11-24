@@ -266,11 +266,12 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 These features expand core functionality and should be implemented first.
 
-- [ ] **Add waveform-data.js support**
+- [x] **Add waveform-data.js support** ✅
   - Integrate https://codeberg.org/chrisn/waveform-data.js
   - BBC's standard format for storing/retrieving waveform data
   - Benefits: Interoperability with other audio tools, efficient storage, industry standard
   - Support both input (load existing waveform-data) and output (export peaks in this format)
+  - **Completed:** Created waveformDataLoader utilities, demo app, and documentation
 
 - [ ] **Integrated multi-track recording (Audacity-style)**
   - Add hook to create new tracks (`useTrackManagement` or similar)
@@ -1098,6 +1099,35 @@ Infrastructure needed to actually publish the alpha.
 ## ✅ Recently Completed
 
 ### 2025-11-23
+
+- [x] **waveform-data.js Support - Pre-Launch Phase 1** ✅
+  - Created `waveformDataLoader.ts` utility with BBC waveform-data.js integration
+  - Functions: `loadWaveformData()`, `waveformDataToPeaks()`, `loadPeaksFromWaveformData()`, `getWaveformDataMetadata()`
+  - Loads pre-computed .dat files for 10-50x faster waveform display vs computing peaks from audio
+  - Created `waveform-data-app.tsx` demo showing performance comparison with console logging
+  - Added to vite.config.ts and created Jekyll page with comprehensive documentation
+  - Bundle: 547KB / 161KB gzipped
+  - Demo: Shows all 4 .dat files loading in ~50ms vs audio decoding in ~500ms
+  - Updated code examples to properly demonstrate `Promise.all` for parallel loading
+  - **Files created:** `waveformDataLoader.ts`, `waveform-data-app.tsx`, `19waveform-data.html`
+
+- [x] **interactiveClips Prop - UX Improvement**
+  - Added `interactiveClips` prop to WaveformProps (defaults to true for backwards compatibility)
+  - Controls whether clip headers show drag cursors and trim boundaries are rendered
+  - Allows showing clip headers for visual organization without implying interactivity
+  - When false: headers visible but no grab cursor, no boundaries, not draggable
+  - Updated waveform-data example: `showClipHeaders={true} interactiveClips={false}`
+  - **Files modified:** `Waveform.tsx` (added prop and logic)
+  - **Pattern:** Separates visual organization (headers) from interaction (dragging/trimming)
+
+- [x] **Code Cleanup - Removed Unused Components**
+  - Deleted `BBCExtractPeaks.tsx` and `SmartTrack.tsx` (unused in codebase)
+  - Removed exports from `ui-components/src/components/index.tsx`
+  - Bundle size reduction: CJS -2.67KB, ESM -2.32KB, Types -1.19KB
+  - Replaced by modern `waveformDataLoader` utility functions
+  - **Files deleted:** `BBCExtractPeaks.tsx`, `SmartTrack.tsx`
+
+###
 
 - [x] **Track Selection Theme Enhancement - selectedWaveFillColor**
   - Added `selectedWaveFillColor` to theme for independent control over waveform background on selection

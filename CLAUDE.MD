@@ -32,6 +32,12 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 3. Update PROJECT_STRUCTURE.md only if structure/architecture changed
 4. Never add progress/changelog to PROJECT_STRUCTURE.md
 
+**TODO.md Writing Style:**
+- **Keep concise** - Brief task descriptions, avoid verbose explanations
+- Save detailed implementation notes for CLAUDE.md or PROJECT_STRUCTURE.md
+- Recently Completed: Summary with key metrics (e.g., "547KB / 161KB gzipped")
+- Focus on what was done, not how (the code is the "how")
+
 ---
 
 ## Code Conventions
