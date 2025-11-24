@@ -8,82 +8,23 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 ## Project Roadmap
 
-**Source of Truth:** `TODO.md` contains the complete multi-track editing roadmap.
+**Source of Truth:** `TODO.md` contains the complete multi-track editing roadmap and recently completed work.
 
-### Current Phase: Phase 3.4 - Copy/Paste Clips 🚧
+**Current Phase:** Phase 3.4 - Copy/Paste Clips
 
-**Completed Phases:**
-- ✅ **Phase 1: Foundation** - All core features implemented
-- ✅ **Phase 1.5: Bundle Optimization** - Tree-shaking complete (23KB savings)
-- ✅ **Phase 2: Clip-Based Model** - Multi-clip support fully implemented
-- ✅ **Phase 3.1a: Drag to Move** - Clip headers with drag-to-reposition
-- ✅ **Phase 3.1b: Drag to Trim** - Clip boundaries with bidirectional trimming
-- ✅ **Phase 3.3: Splitting Clips** - Sample-based architecture, pixel-perfect splits
+**Key Milestones Completed:**
+- ✅ Phase 1: Foundation (React refactor, provider pattern, all core features)
+- ✅ Phase 1.5: Bundle Optimization (tree-shaking, 23KB gzipped savings)
+- ✅ Phase 2: Clip-Based Model (multiple clips per track)
+- ✅ Phase 3.1a/b: Drag & Trim (real-time collision detection, bidirectional trimming)
+- ✅ Phase 3.3: Splitting Clips (sample-based architecture, keyboard shortcuts)
 
-**Bundle Size Results:**
-- Core library: 523KB / **137KB gzipped** (optimized)
-- Stem-tracks: 522KB / **153KB gzipped**
-- Effects: 543KB / **158KB gzipped**
+**Progress Tracking:**
+- Check TODO.md "Recently Completed" section for detailed work history
+- Update TODO.md when completing tasks
+- Keep session notes in TODO.md, not here
 
-**What was optimized:**
-- Changed from `import * as Tone` to named imports
-- Removed all unused Tone.js synthesizers
-- Effects hooks import only what they need (Analyser, Reverb, AutoWah)
-- Removed ToneLib parameter from effects functions (breaking change)
-
-**Phase 3.3 Achievements (Splitting Clips):**
-- **Sample-based architecture:** Integer samples eliminate floating-point precision errors
-- **Pixel-perfect splits:** Width calculation using pixel boundaries ensures no gaps
-- **Track selection system:** Click clip to select track, visual feedback with blue border
-- **Keyboard shortcuts:** 'S' key to split at playhead (flexible hook supports modifiers)
-- **Core types refactored:** `startSample`, `durationSamples`, `offsetSamples`
-- **Backwards compatibility:** `createClipFromSeconds()` helper for existing code
-
-**Next Phase: Phase 3.4 - Copy/Paste Clips**
-- Implement clipboard management for clips
-- Keyboard shortcuts (Cmd+C, Cmd+V)
-- Visual feedback for copied clips
-- Paste at playhead position
-
-### Tracking Progress
-
-**When completing tasks:**
-1. Check off task in TODO.md: `- [x] Task description`
-2. Move to "Recently Completed" section with date
-3. Update "Current Work" section in this file (CLAUDE.md)
-4. Update session notes at bottom of this file
-
-**When planning work:**
-1. Review TODO.md roadmap phases
-2. Check "Next Immediate Steps" section
-3. Consider bundle size goals and performance targets
-4. Follow architectural decisions (Hybrid Canvas + DOM, no canvas libraries)
-
-**Important:** Always check TODO.md at the start of significant work sessions to understand current phase and next steps.
-
-## Recent Architectural Decisions
-
-### UI Library Strategy (2025-01-19)
-
-**Decision:** Do NOT add a full UI library (Material-UI, Chakra, etc.) as a peer dependency.
-
-**Reasoning:** Keep bundle size small (~1.5MB), maximize user flexibility, avoid forcing design system on users.
-
-**Approved Approach:**
-
-1. Continue using **styled-components**
-2. Use **Radix UI** or **React Aria** selectively for complex components (headless only)
-3. Build simple components ourselves
-4. Create internal design system with shared theme tokens
-
-### Shared Styled Components (2025-01-19)
-
-**Pattern:** Extract commonly duplicated styled components into shared definitions in `ui-components/styled/`
-
-1. **CheckboxStyles** - `CheckboxWrapper`, `StyledCheckbox`, `CheckboxLabel`
-2. **ButtonStyles** - `ControlButton` with variants (primary, success, info)
-
-Benefits: ~60% code reduction, consistent styling, easier maintenance.
+---
 
 ## Code Conventions
 
@@ -102,7 +43,9 @@ Benefits: ~60% code reduction, consistent styling, easier maintenance.
 ### Building and Testing
 
 - Build: `pnpm build`
-- Jekyll: `jekyll build -s ghpages -d _site`
+- Build single entry: `env VITE_ENTRY=multi-clip pnpm vite build`
+- TypeScript check: `pnpm typecheck` (enforced in build scripts)
+- Jekyll: `jekyll serve -s ghpages --skip-initial-build`
 - Dev server: `http://localhost:4000/waveform-playlist/`
 - Always hard refresh (Cmd+Shift+R) after builds
 
@@ -110,179 +53,105 @@ Benefits: ~60% code reduction, consistent styling, easier maintenance.
 
 **File naming pattern:** `ghpages/_examples/##name.html`
 
-- **Use numbered prefixes** (e.g., `01minimal.html`, `18multi-clip.html`) to control ordering in Jekyll listings
-- **Keep `flexible-api.html` last** by not numbering it
-- **Always add `permalink:` attribute** in front matter for clean, permanent URLs:
-  ```yaml
-  ---
-  layout: example
-  javascript: multi-clip-bundle.js
-  title: Multi-Clip Playback
-  permalink: /examples/multi-clip.html
-  ---
-  ```
+- Use numbered prefixes (e.g., `01minimal.html`, `18multi-clip.html`) to control ordering
+- Keep `flexible-api.html` last by not numbering it
+- Always add `permalink:` in front matter for clean, permanent URLs
 
-**Why:** Numbered filenames control display order, but permalinks provide clean, permanent URLs that won't break if file ordering changes.
+---
 
-## Chrome Remote Debugging
+## Architectural Decisions
 
-```bash
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 \
-  --user-data-dir=/tmp/chrome-debug-profile \
-  --remote-allow-origins='*'
+### Sample-Based Architecture (Phase 3.3)
+
+**Decision:** Store all timing as integer sample counts, not floating-point seconds.
+
+**Why:** Eliminates floating-point precision errors that cause pixel gaps between clips.
+
+**Types:**
+```typescript
+interface AudioClip {
+  startSample: number;      // Position on timeline (samples)
+  durationSamples: number;  // Clip duration (samples)
+  offsetSamples: number;    // Start within audio file (samples)
+  // ... other properties
+}
 ```
 
-## MCP Chrome DevTools Usage
+**Helper:** Use `createClipFromSeconds()` for backwards compatibility with time-based APIs.
 
-**Known Bug:** PNG screenshots cause media type mismatch. Use JPEG or WebP format.
+### Hybrid Canvas + DOM (Phase 3)
 
-**Best Practices:**
+**Decision:** Canvas for waveform rendering, DOM/React for interactions.
 
-- Prefer `take_snapshot` (text-based) over `take_screenshot`
-- Use JPEG/WebP when screenshots needed
-- Use `list_pages` → `select_page` → `take_snapshot`
+**Why NOT canvas libraries (Konva, Fabric, PixiJS):**
+- Bundle size: 200-500KB vs our 13KB @dnd-kit
+- Unnecessary for waveform-specific rendering
+- Performance overhead for scene graph
 
-## Custom Hooks Architecture (2025-01-19)
+**Technology Stack:**
+- Rendering: Canvas API (optimized waveform code)
+- Interactions: @dnd-kit (13KB) for drag-and-drop
+- State: React Context + useReducer for undo/redo
 
-**Decision:** Extract playlist logic into reusable custom hooks for maximum flexibility.
+### TypeScript Build Integration
 
-**Created Hooks:**
+**Decision:** Enforce TypeScript type checking in all build scripts.
 
-- `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, `useAudioPosition`, `useWaveformPlaylist`
-- `useMasterAnalyser`, `useTrackReverb`, `useTrackAutoWah`, `useEffectsChain`
+**Implementation:** `"build:single": "pnpm typecheck && vite build"`
 
-**Location:** `packages/browser/src/hooks/`
+**Why:** Vite doesn't fail builds on TS errors by default. Prevents silent runtime failures.
 
-## Flexible/Headless API Architecture (2025-01-19)
+### UI Library Strategy
 
-**Pattern:** Provider + Primitive Components
+**Decision:** Do NOT add a full UI library (Material-UI, Chakra, etc.) as peer dependency.
 
-**Key Components:**
+**Reasoning:** Keep bundle small (~132KB gzipped), maximize user flexibility.
 
-- `WaveformPlaylistProvider` - Context provider
-- Primitives: `PlayButton`, `PauseButton`, `StopButton`, `ZoomInButton`, `ZoomOutButton`, etc.
-- `Waveform` - Visualization with render prop for custom track controls
+**Approved Approach:**
+1. Continue using **styled-components**
+2. Use **Radix UI** or **React Aria** selectively for complex components (headless only)
+3. Build simple components ourselves
+4. Create internal design system with shared theme tokens
 
-**Benefits:** Maximum flexibility, controls anywhere in layout, access to state via hooks.
+### Theming System
 
-## Theming System (2025-01-19)
-
-All theme properties optional on `Waveform` component:
-
-- `waveOutlineColor`, `waveFillColor`, `waveProgressColor`
-- `timeColor`, `timescaleBackgroundColor`, `playheadColor`, `selectionColor`
-- `clipHeaderBackgroundColor`, `clipHeaderBorderColor`, `clipHeaderTextColor`
-- `renderTimestamp` - Custom React components for timescale timestamps
-
-### Theme vs Props: Design Guidelines (2025-01-22)
-
-**When to add to the `theme` object:**
+**When to add to `theme` object:**
 - Visual/styling properties (colors, backgrounds, borders)
-- Properties that users typically want to customize for aesthetic consistency
-- Properties that don't affect functionality/behavior
-- Examples: `waveOutlineColor`, `playheadColor`, `clipHeaderBackgroundColor`
+- Properties users want to customize for aesthetic consistency
 
 **When to use separate props:**
 - Functional/behavioral properties (callbacks, data, configuration)
 - Properties that control what is rendered or how it behaves
-- Properties that are frequently changed at runtime
-- Examples: `timescale` (boolean), `renderTrackControls` (function), `showClipHeaders` (boolean)
 
-**Benefits of theme-based approach:**
-- Single prop for all visual customization
-- Consistent styling across all visual elements
-- Easier to apply design systems
-- Reduces prop sprawl on components
-- TypeScript autocomplete for all theme properties in one place
+**Example:** All clip header colors in `theme`, but `showClipHeaders` as boolean prop.
 
-**Pattern established:** All color/styling properties go in `theme` object, not as separate props.
+### Custom Hooks Architecture
 
-## Optional Packages Architecture (2025-01-19)
+**Pattern:** Extract complex logic into reusable custom hooks.
 
-**Decision:** Annotations as optional package (`@waveform-playlist/annotations`)
+**Key Hooks:**
+- `useClipDragHandlers` - Drag-to-move and boundary trimming (300+ lines)
+- `useClipSplitting` - Split clips at playhead (150+ lines)
+- `useKeyboardShortcuts` - Flexible keyboard shortcut system (120+ lines)
+- `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, etc.
 
-**Rationale:** ~50KB bundle size, used by minority of users.
+**Location:** `packages/browser/src/hooks/`
 
-### useAnnotationControls Hook
+---
 
-Manages `continuousPlay`, `linkEndpoints`, and `updateAnnotationBoundaries()` logic. Extracted ~110 lines of complex logic from main component.
-
-### Continuous Play Toggle Fix (2025-01-21)
-
-**Problem:** Toggling during playback didn't work correctly.
-
-**Root Causes:**
-
-1. Stale closures in animation loop
-2. Scheduled audio callbacks
-3. Monolithic context causing constant re-renders
-
-**Solution:**
-
-1. **Context Splitting** - 4 separate contexts by update frequency
-2. **Animation Loop Restart** - Restart when `continuousPlay` changes
-3. **Playout Rescheduling** - Clear callbacks, reschedule without duration limits
-
-**Key Pattern:** `playoutRef.current.setOnPlaybackComplete(() => {})` to clear old callbacks.
-
-## Component Design Decisions
-
-### AudioPosition Component (2025-01-20)
-
-**Decision:** Plain monospace text, not button-like.
-
-**Reasoning:** Read-only display shouldn't look interactive.
-
-## Performance Optimizations (2025-11-20)
-
-### Playhead Animation
-
-**Solution:** Use `transform: translate3d()` instead of `left` positioning for GPU acceleration.
-
-### Zoom Performance
-
-**Issue 1:** Zooming broke playback.
-**Solution:** Separate peak generation from audio loading in separate useEffects.
-
-**Issue 2:** Zooming caused jarring scroll jumps.
-**Solution:** Proportional scroll adjustment maintaining visual center using refs.
-
-## Example Migrations (2025-11-20)
-
-**Converted:** newtracks, stem-tracks, recording examples to provider pattern.
-
-**New Component:** `TrackControlsWithDelete` - Compact layout with trash icon, mute/solo, volume/pan.
-
-## Codebase Cleanup (2025-11-20)
-
-**Removed:**
-
-- `WaveformPlaylistComponent.tsx` - obsolete
-- All old Jekyll includes (`buttons/`, `forms/`, `checkboxes/`, `sliders/`, `timeformat.html`)
-
-**Current API Patterns:**
-
-1. Old class-based API (backward compatibility)
-2. New provider pattern (recommended)
-
-## Recording Architecture (2025-11-21)
+## Recording Architecture
 
 ### Global AudioContext Pattern
 
-**Implementation:**
+**Implementation:** Recording uses global shared AudioContext (same as Tone.js).
 
-- Recording uses **global shared AudioContext** (same as Tone.js and playback)
-- Uses `getGlobalAudioContext()` from `@waveform-playlist/playout`
-- Context must be resumed on user interaction via `resumeGlobalAudioContext()`
+**Location:** `getGlobalAudioContext()` from `@waveform-playlist/playout`
 
-**Location:** `packages/recording/src/hooks/useRecording.ts`, `useMicrophoneLevel.ts`
+**Critical:** Context must be resumed on user interaction via `resumeGlobalAudioContext()`
 
 ### Shared MediaStreamSource Pattern
 
-**Critical Pattern:** Both `useRecording` and `useMicrophoneLevel` connect to the same shared `MediaStreamAudioSourceNode`.
-
-**Key Rule:** Always use **targeted disconnect** when reconnecting:
+**Rule:** Always use **targeted disconnect** when reconnecting:
 
 ```typescript
 // ✅ CORRECT - Only disconnects specific connection
@@ -294,206 +163,41 @@ source.disconnect();
 source.connect(analyser);
 ```
 
-**Why This Matters:**
-
-- `disconnect()` without arguments disconnects **all connections** from the node
-- Breaks connections from other consumers (worklet, analyser, etc.)
-- Causes VU meter to go flat, recording to fail silently
-
-**Fixed in:** `packages/recording/src/hooks/useMicrophoneLevel.ts` line 134
-
-### Two-System Monitoring
-
-1. **Pre-recording** (`useMicrophoneLevel`) - AnalyserNode, shows level before recording
-2. **During recording** (`useRecording`) - AudioWorklet, calculates RMS in worklet thread
-
-### VU Meter During Recording
-
-- Recording hook sends RMS level via worklet `postMessage()`
-- VU meter switches between monitoring level (pre-recording) and recording level (during recording)
-- Both hooks run simultaneously, sharing the MediaStreamSource
-
-### Test Microphone Button
-
-**Purpose:** Resume AudioContext before recording to enable monitoring.
-
-**Implementation:** `handleTestMicrophone()` calls `resumeGlobalAudioContext()`, sets `isMonitoring` state.
-
-**Location:** `packages/browser/src/recording-app.tsx`
-
-### Duration Timer with Refs
-
-**Problem:** Duration timer stuck at 00:00 during recording.
-
-**Root Cause:** Animation loop checked `isRecording` state (asynchronous), which was still false when loop started.
-
-**Solution:** Use refs for synchronous checks in `requestAnimationFrame` loops:
-
-```typescript
-const isRecordingRef = useRef(false);
-const isPausedRef = useRef(false);
-
-// Set ref BEFORE starting loop (synchronous)
-isRecordingRef.current = true;
-setIsRecording(true); // State update (asynchronous)
-
-// Animation loop checks ref
-const updateDuration = () => {
-  if (isRecordingRef.current && !isPausedRef.current) {
-    // ... update
-  }
-};
-```
-
-**Location:** `packages/recording/src/hooks/useRecording.ts` lines 43-44, 137-151
-
-### Try-Catch for Cleanup
-
-**Pattern:** Wrap disconnect calls in try-catch for device switching:
-
-```typescript
-try {
-  source.disconnect(destination);
-} catch (e) {
-  // Source may already be disconnected - ignore
-}
-```
-
-**Location:** Both `useRecording.ts` and `useMicrophoneLevel.ts` cleanup functions.
-
-### WaveformTrack Source Flexibility
-
-`WaveformTrack.src` supports both URL strings and AudioBuffer objects:
-
-- **newtracks** uses blob URLs from dropped files
-- **recording** passes AudioBuffer directly (more efficient)
-
-### Live Recording Peaks Format
-
-**Format:** `Int16Array` min/max pairs, 16-bit depth (-32768 to 32767)
-
-**Why:** Matches final waveform rendering exactly - identical appearance during and after recording.
+**Why:** Both `useRecording` and `useMicrophoneLevel` share the same MediaStreamSource.
 
 ### Debugging AudioWorklets
 
 **Critical Note:** `console.log()` in AudioWorklet **DOES NOT** appear in browser console!
 
 **Solutions:**
-
 1. Send debug data via `postMessage()` to main thread
 2. Update React state/UI to display values
 3. Use live waveform visualization
 
 **See:** `DEBUGGING.md` for complete worklet debugging guide.
 
-### Important Patterns
+---
 
-1. **Targeted Disconnect** - Always specify destination on shared nodes
+## Important Patterns
+
+1. **Targeted Disconnect** - Always specify destination on shared audio nodes
 2. **Refs in Animation Loops** - Use refs for synchronous checks in `requestAnimationFrame`
 3. **AudioWorklet Debugging** - Use postMessage, not console.log
-4. **Worklet Deployment** - Manual copy + Jekyll restart required
-5. **Try-Catch Cleanup** - Wrap disconnects for device switching
-
-**Documentation:** See `DEBUGGING.md` and `PROJECT_STRUCTURE.md` for complete details.
-
-## Current Work (Tone.js Overhaul Branch)
-
-### Status
-
-**Completed Phases:**
-- ✅ **Phase 1: Foundation** - All core features implemented
-- ✅ **Phase 1.5: Bundle Optimization** - Tree-shaking complete (23KB gzipped savings)
-- ✅ **Phase 2: Clip-Based Model** - Multi-clip support fully implemented
-- ✅ **Phase 3.1a: Drag to Move** - Clip headers with drag-to-reposition (TypeScript build integration complete!)
-- ✅ **Phase 3.1b: Drag to Trim** - Clip boundaries with bidirectional trimming (TypeScript build integration complete!)
-- ✅ **Phase 3.3: Splitting Clips** - Split at playhead with 'S' keyboard shortcut
-
-**Key Achievements:**
-- React refactor complete with provider pattern
-- Performance optimizations completed (GPU playhead, smooth zoom, 60fps)
-- Recording architecture implemented (global AudioContext, shared MediaStreamSource)
-- VU meter during recording fixed (AnalyserNode-only, no worklet RMS)
-- Selection inputs, custom hooks, flexible API, theming all implemented
-- Annotations as optional package with useAnnotationControls hook
-- Audio effects hooks (analyser, reverb, auto-wah, effects chain)
-- **Sample-based architecture** - Integer samples eliminate floating-point precision errors
-- **Clip-based editing working:** Multiple clips per track with proper playback and gaps
-- **Professional drag operations:** Real-time collision detection, smooth visual feedback, state updates on drop
-- **Reusable hooks:** `useClipDragHandlers` (300+ lines), `useClipSplitting` (150+ lines), `useKeyboardShortcuts` (120+ lines)
-- **TypeScript type checking** - Enforced in build scripts, preventing silent runtime failures
-- **Track selection visual feedback** - Audacity-style blue border on selected tracks
-
-**Bundle Sizes (Optimized):**
-- Core library: 507KB / **132KB gzipped** (from 620KB/172KB)
-- Multi-clip demo: 565KB / **167KB gzipped**
-- Stem-tracks: 509KB / **150KB gzipped**
-- Effects: 530KB / **154KB gzipped**
-
-### Next Steps
-
-**See `TODO.md` for complete roadmap. Next immediate steps:**
-
-**Phase 3.4 - Copy/Paste Clips:**
-1. Create `useClipboard` hook (Cmd+C / Cmd+V)
-2. Copy clip metadata (not audio data)
-3. Paste at playhead or mouse position
-4. Handle cross-track pasting
-5. Update multi-clip demo
-
-**Phase 3.5 - Multi-Select:**
-1. Create `useClipSelection` hook
-2. Cmd+Click to add/remove from selection
-3. Shift+Click for range selection
-4. Bulk drag, delete operations
-5. Selection toolbar UI
-
-**Future Phases:**
-- Phase 4: Performance & virtual scrolling (unlimited timeline, 12+ tracks)
-- Phase 5: Polish (undo/redo, snap to grid, accessibility)
-
-## Important Notes
-
-- **Bundle size matters** - This is a library, not an app
-- **Users need flexibility** - Don't lock into specific UI patterns
-- **Performance is critical** - Use GPU acceleration (transform not left/top)
-- **Separation of concerns** - Audio ops separate from visualization
-- **Global AudioContext** - Shared across recording, monitoring, and playback
-- **Targeted Disconnect** - Always specify destination on shared nodes
-- **Refs for Animation** - Synchronous checks in requestAnimationFrame loops
-- **Single Source of Truth** - AnalyserNode for VU meter, worklet only for samples/peaks
-- **Avoid State Conflicts** - Don't update same state from multiple 60fps sources
-
-## References
-
-- Main branch: `main`
-- Current work: `tonejs-overhaul`
-- Dev server: `http://localhost:4000/waveform-playlist/`
-- Debugging: See `DEBUGGING.md`
-- Architecture: See `PROJECT_STRUCTURE.md`
+4. **Try-Catch Cleanup** - Wrap audio node disconnects for device switching
+5. **Sample-Based Math** - Use integer samples for all timing calculations
+6. **TypeScript Enforcement** - Build scripts run `pnpm typecheck &&` before bundling
 
 ---
 
-**Last Updated:** 2025-11-23 (Evening)
+## References
 
-**Session Notes:**
-1. Fixed VU meter jittery/flat issue during recording. Root cause: Worklet was sending RMS values at 60fps (180 state updates/sec) conflicting with AnalyserNode also updating at 60fps (120 state updates/sec) = 300 total state updates causing rendering bottleneck. Solution: Removed all RMS calculation from worklet - it now only captures samples and generates peaks for live waveform. AnalyserNode is single source of truth for VU meter levels (smoothingTimeConstant=0.8). No gain boost needed. Also automated worklet copy in build-all.sh script, fixed TypeScript errors (AudioParamDescriptor type, Track.src union type), and removed debug logging. Updated DEBUGGING.md with architecture decision and troubleshooting steps.
+- **Roadmap & Progress:** `TODO.md`
+- **Architecture Details:** `PROJECT_STRUCTURE.md`
+- **Debugging Guide:** `DEBUGGING.md`
+- **Main branch:** `main`
+- **Current work:** `tonejs-overhaul`
+- **Dev server:** `http://localhost:4000/waveform-playlist/`
 
-2. Created comprehensive multi-track editing roadmap in TODO.md. Documented complete plan for clip-based model (Phase 2), advanced editing features (Phase 3: drag, trim, split, copy/paste), performance optimizations (Phase 4: virtual scrolling), and polish (Phase 5: undo/redo, keyboard shortcuts, accessibility). Architectural decision: Hybrid Canvas + DOM approach (like Ableton Live) - NOT canvas libraries (Konva, Fabric, PixiJS) due to bundle size. Will use @dnd-kit (13KB) for interactions. Bundle size goal: <1MB total. Performance target: 60fps with 12+ tracks, 2+ hour timelines. Added "Project Roadmap" section to CLAUDE.md with guidance on tracking progress in TODO.md.
+---
 
-3. Analyzed bundle size with rollup-plugin-visualizer. Discovered actual size is **620KB uncompressed / 172KB gzipped** (NOT 1.5MB as previously stated). Tone.js is the largest contributor (~120KB gzipped). Currently using `import * as Tone from 'tone'` which imports entire library including synthesizers and unused effects. Created Phase 1.5 (Bundle Optimization) with tree-shaking task: change to named imports (Player, Volume, Gain, Panner, getContext, etc.) to save ~70KB gzipped. Target: 100KB gzipped core bundle. Added bundle analyzer to vite.config.ts and detailed optimization tasks to TODO.md. Updated bundle size figures throughout documentation.
-
-4. **Completed Phase 1.5: Tree-shake Tone.js imports.** Changed all imports in playout package from `import * as Tone` to named imports. Updated three files: `index.ts`, `TonePlayout.ts`, `ToneTrack.ts`. Removed ToneLib parameter from `EffectsFunction` and `TrackEffectsFunction` types (breaking change). Updated effects hooks in browser package to import Tone.js classes directly (`Analyser`, `Reverb`, `AutoWah`). Rebuilt all bundles. **Results: 111KB uncompressed / 23KB gzipped savings (13% reduction).** New sizes: core 507KB/132KB, stem-tracks 509KB/150KB, effects 530KB/154KB gzipped. All unused Tone.js synthesizers and effects removed from bundles. Tree-shaking working correctly. Marked Phase 1.5 complete in TODO.md and CLAUDE.md. Ready to start Phase 2 (Clip-Based Model).
-
-5. **Recording Example UI Polish** - Moved static content (Features list, Note section) from React component (`recording-app.tsx`) to Jekyll template (`17recording.html`) using Bootstrap alert styling. Used `alert-info` for feature list and `alert-warning` for note section. Benefits: Reduces bundle size, consistent styling across examples, easier to update without rebuilding. Removed InfoBox component duplication from React code.
-
-6. **Multi-Clip Data Model Refactor** - Restructured multi-clip demo to use **file-reference architecture**. Created separate `audioFiles` array (id + src) and `trackConfigs` array (clips with `fileId` references). Implemented two-phase loading: (1) load all audio files once into Map by ID, (2) create tracks by looking up buffers via `fileId`. Benefits: Each audio file loaded only once, multiple clips can reference same file without reloading, easy to copy/paste clip configurations, efficient memory usage. All 4 tracks render correctly with clips and gaps: Vocals (2 clips with 10s gap), Guitar (continuous 30s), Piano (2 clips at different positions), Bass (3 clips with gaps). File-reference architecture verified working - all audio files loaded successfully (200 status), waveforms render correctly with proper timing and gaps. Location: `packages/browser/src/multi-clip-app.tsx`. Updated PROJECT_STRUCTURE.md with multi-clip architecture details and Bootstrap styling convention.
-
-7. **Clip Header Theming & Design Guidelines** - Added full theming support for clip headers by integrating `clipHeaderBackgroundColor`, `clipHeaderBorderColor`, and `clipHeaderTextColor` into the main theme object. Updated `Waveform.tsx` to include these properties in defaultTheme and WaveformProps interface, and modified Clip rendering to pass theme values. Updated `flexible-example-app.tsx` to use custom clip header colors matching the dark blue/teal aesthetic. **Established design guidelines** for theme vs props: All visual/styling properties (colors, backgrounds, borders) go in the `theme` object; functional/behavioral properties (callbacks, data, configuration) remain as separate props. Benefits: Consistent API, single prop for all visual customization, easier design system integration, reduced prop sprawl. Documented guidelines in CLAUDE.md "Theming System" section with clear examples and rationale.
-
-8. **Real-Time Collision Detection (Audacity-style)** - Implemented Audacity-style real-time collision detection where drag preview is constrained during dragging, not just on drop. Created custom @dnd-kit modifier function that runs during drag and constrains clip position in real-time based on: (1) Cannot go before time 0, (2) Cannot overlap previous clip (startTime >= prevClip.endTime), (3) Cannot overlap next clip (endTime <= nextClip.startTime). Applied modifier to both `multi-clip-app.tsx` and `flexible-example-app.tsx`. User experience: Drag preview "hits a wall" when reaching boundaries, clips can be adjacent but not overlapping. Also kept collision detection in handleDragEnd for final validation. Moved occasional flicker investigation to "Future Considerations > Polish & Nice to Have" section in TODO.md as it's likely a @dnd-kit library limitation and not blocking core functionality. Updated TODO.md Phase 3.1a to mark collision detection complete.
-
-9. **Phase 3.3: Splitting Clips - COMPLETE!** - Created `useClipSplitting` hook for splitting clips at playhead position. Hook finds clip at currentTime, validates split is within bounds (not at boundaries), creates two new clips with proper timing: first clip maintains original offset with duration = relativeTime; second clip has adjusted startTime (split point) and offset (original + relativeTime), with remaining duration. Both clips get (1) and (2) name suffixes. Returns boolean for success/failure. Created `useKeyboardShortcuts` hook - flexible keyboard shortcut system supporting modifier keys (Ctrl, Shift, Meta, Alt), input field detection (doesn't trigger in text inputs), and preventDefault control. Reusable for future shortcuts (copy/paste, undo/redo, etc.). Integrated into multi-clip demo with 'S' key to split at playhead. Added user instructions to HTML template with green alert box showing all interactive features. Tested successfully: pressed 'S' during playback, Guitar clip split at 10.645s position, console confirmed split. Files created: `useClipSplitting.ts` (150+ lines), `useKeyboardShortcuts.ts` (120+ lines). Files modified: `multi-clip-app.tsx`, `hooks/index.ts`, `index.tsx`, `18multi-clip.html`. Updated TODO.md and roadmap. Visual feedback (scissors cursor, split indicator) - next step.
-
-10. **Sample-Based Architecture Refactor & Visual Track Selection** - Fixed persistent 1-pixel gap issue by refactoring from floating-point seconds to integer samples throughout the codebase. **Root cause:** Floating-point arithmetic accumulates precision errors when converting between time/samples/pixels repeatedly. **Solution:** Changed `AudioClip` interface in `packages/core/src/types/clip.ts` from `startTime`, `duration`, `offset` (seconds) to `startSample`, `durationSamples`, `offsetSamples` (integer sample counts). Added `createClipFromSeconds()` helper for backwards compatibility. Updated rendering in `Clip.tsx` to calculate width using pixel boundaries: `width = endPixel - startPixel` instead of `Math.floor(durationSamples / samplesPerPixel)`. This ensures adjacent clips share exact pixel boundaries with no gaps. Updated `useClipSplitting.ts` to work entirely with integer samples, snapping split points to pixel boundaries. Updated `WaveformPlaylistContext.tsx` ClipPeaks interface to use sample-based properties. **Added visual feedback for selected track:** Modified `Track.tsx` to accept `isSelected` prop and show blue border (`box-shadow: inset 0 0 0 2px rgba(0, 123, 255, 0.5)`) when selected. Updated `Waveform.tsx` to get `selectedTrackId` from context and pass to Track component. Users now see clear visual indication of which track will be affected by split operation. **Removed all debug console logs** from Clip.tsx, multi-clip-app.tsx, and useClipSplitting.ts after verification. **Files modified:** `clip.ts`, `Clip.tsx`, `Track.tsx`, `Waveform.tsx`, `WaveformPlaylistContext.tsx`, `useClipSplitting.ts`, `multi-clip-app.tsx`. Benefits: Eliminates all floating-point precision errors, ensures pixel-perfect rendering, provides clear visual feedback for editing operations. Phase 3.3 now fully complete with professional-grade quality.
-
-11. **TypeScript Build Integration & Full Drag/Trim Functionality Working** - **Problem:** After sample-based architecture refactor, drag visual feedback worked but state didn't update on drop; trim boundary handles weren't draggable at all. **Root cause:** Multiple TypeScript errors were silently breaking runtime code because Vite doesn't fail builds on TypeScript errors (for speed). **Solution:** Added `pnpm typecheck &&` to all build scripts (`build` and `build:single`) for type-safe builds. **Fixed Critical TypeScript Errors:** (1) Clip `onMouseDown` handler - Updated type signature to accept `React.MouseEvent<HTMLDivElement>` parameter instead of `() => void` for track selection logic that checks drag targets; (2) collisionModifier return type - Added `scaleX: 1, scaleY: 1` to ALL return paths (required by @dnd-kit Transform type, was returning union type); (3) PlaybackControls null handling - Fixed `currentTimeRef.current` access with `?? 0` nullish coalescing operator; (4) Waveform ref assignments - Changed `currentTimeRef.current =` direct assignments to `setCurrentTime()` calls (readonly property); (5) Export issues - Exported `EffectsFunction` and `TrackEffectsFunction` types from playout package index; (6) Import issues - Fixed `AnnotationData` to import from annotations package (not ui-components), imported `TimeFormat` type from ui-components for proper type checking. **Package rebuilds:** Rebuilt playout, ui-components, and browser packages with all type changes to make types available. Rebuilt multi-clip bundle with `env VITE_ENTRY=multi-clip pnpm vite build`. **Result:** Full drag-and-drop functionality now working perfectly! ✅ Drag clip headers to move clips horizontally with real-time collision detection (Audacity-style constraints). ✅ State updates on drop - clips stay in new position. ✅ Boundary trimming works - drag left/right edges to adjust clip start/duration. ✅ Track selection on drag/click. **Files modified:** `packages/ui-components/src/components/Clip.tsx`, `packages/browser/src/hooks/useClipDragHandlers.ts`, `packages/browser/src/components/PlaybackControls.tsx`, `packages/browser/src/components/Waveform.tsx`, `packages/browser/src/WaveformPlaylistContext.tsx`, `packages/playout/src/index.ts`, `packages/browser/package.json`. **Build enforcement:** TypeScript type checking now enforced in all build scripts, preventing silent runtime failures. Phase 3.1a (Drag & Drop) and Phase 3.1b (Trim/Resize) now 100% COMPLETE!
+**Last Updated:** 2025-11-23
