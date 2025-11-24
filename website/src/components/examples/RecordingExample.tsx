@@ -43,6 +43,7 @@ import {
   RecordingIndicator,
 } from '@waveform-playlist/recording';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { darkTheme } from '@waveform-playlist/ui-components';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -435,27 +436,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 // Main component
 export function RecordingExample() {
   const theme = useDocusaurusTheme();
+  // Derive isDark from theme object (no need for duplicate MutationObserver)
+  const isDark = theme === darkTheme;
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-
-  // Detect Docusaurus theme for Radix
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.getAttribute('data-theme') === 'dark';
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    return () => observer.disconnect();
-  }, []);
 
   const handleAddTrack = () => {
     const newTrack = createTrack({

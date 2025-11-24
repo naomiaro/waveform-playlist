@@ -11,8 +11,19 @@
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Theme, Button, Flex, Card, Text, Separator, IconButton, Slider, Select, Switch, Badge } from '@radix-ui/themes';
-import { PlayIcon, PauseIcon, StopIcon, ZoomInIcon, ZoomOutIcon, SpeakerLoudIcon, SpeakerOffIcon, StarFilledIcon, StarIcon } from '@radix-ui/react-icons';
+import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch } from '@radix-ui/themes';
+import {
+  PlayIcon,
+  PauseIcon,
+  StopIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+  SpeakerLoudIcon,
+  TrackPreviousIcon,
+  TrackNextIcon,
+  DoubleArrowLeftIcon,
+  DoubleArrowRightIcon
+} from '@radix-ui/react-icons';
 import '@radix-ui/themes/styles.css';
 import {
   WaveformPlaylistProvider,
@@ -23,14 +34,11 @@ import {
   usePlaylistData,
   usePlaylistState,
   useWaveformPlaylist,
-  RewindButton,
-  FastForwardButton,
-  SkipBackwardButton,
-  SkipForwardButton,
   type TimeFormat,
 } from '@waveform-playlist/browser';
 import { CLIP_HEADER_HEIGHT } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { darkTheme } from '@waveform-playlist/ui-components';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -90,31 +98,6 @@ const TrackButtonsRow = styled.div`
   gap: 0.3rem;
 `;
 
-const TrackButton = styled.button<{ $active?: boolean; $type?: 'mute' | 'solo' }>`
-  padding: 0.25rem 0.4rem;
-  font-size: 0.625rem;
-  background: ${props => {
-    if (props.$active) {
-      return props.$type === 'mute' ? '#e74c3c' : '#3498db';
-    }
-    return '#455a64';
-  }};
-  color: white;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  flex: 1;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  min-width: 0;
-
-  &:hover:not(:disabled) {
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  }
-`;
-
 const VolumeContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -129,64 +112,6 @@ const VolumeLabel = styled.label`
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-align: center;
-`;
-
-const StyledRangeInput = styled.input.attrs({ type: 'range' })<{ $value: number }>`
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(
-    to right,
-    #5dade2 0%,
-    #5dade2 ${props => props.$value * 100}%,
-    #1a252f ${props => props.$value * 100}%,
-    #1a252f 100%
-  );
-  outline: none;
-  cursor: pointer;
-
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #5dade2;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
-    &:hover {
-      transform: scale(1.3);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(93, 173, 226, 0.5);
-    }
-
-    &:active {
-      transform: scale(1.15);
-    }
-  }
-
-  &::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #5dade2;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    border: none;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
-    &:hover {
-      transform: scale(1.3);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(93, 173, 226, 0.5);
-    }
-
-    &:active {
-      transform: scale(1.15);
-    }
-  }
 `;
 
 // Custom Track Controls Component
@@ -267,10 +192,45 @@ const formatTime = (seconds: number, format: TimeFormat): string => {
 
 // Main Example Content Component - Using individual hooks with Radix UI
 const FlexibleApiContent: React.FC = () => {
-  const { play, pause, stop, setMasterVolume, setTimeFormat, setAutomaticScroll, zoomIn, zoomOut } = usePlaylistControls();
-  const { currentTime } = usePlaybackAnimation();
-  const { duration, sampleRate, masterVolume, timeFormat } = usePlaylistData();
+  const { play, pause, stop, setMasterVolume, setTimeFormat, setAutomaticScroll, zoomIn, zoomOut, setCurrentTime } = usePlaylistControls();
+  const { currentTime, currentTimeRef, isPlaying } = usePlaybackAnimation();
+  const { duration, masterVolume, timeFormat, playoutRef } = usePlaylistData();
   const { isAutomaticScroll } = usePlaylistState();
+
+  // Custom navigation handlers
+  const handleRewind = () => {
+    setCurrentTime(0);
+    if (isPlaying && playoutRef.current) {
+      playoutRef.current.stop();
+      play(0);
+    }
+  };
+
+  const handleFastForward = () => {
+    setCurrentTime(duration);
+    if (isPlaying && playoutRef.current) {
+      playoutRef.current.stop();
+      play(duration);
+    }
+  };
+
+  const handleSkipBackward = () => {
+    const newTime = Math.max(0, (currentTimeRef.current ?? 0) - 5);
+    setCurrentTime(newTime);
+    if (isPlaying && playoutRef.current) {
+      playoutRef.current.stop();
+      play(newTime);
+    }
+  };
+
+  const handleSkipForward = () => {
+    const newTime = Math.min(duration, (currentTimeRef.current ?? 0) + 5);
+    setCurrentTime(newTime);
+    if (isPlaying && playoutRef.current) {
+      playoutRef.current.stop();
+      play(newTime);
+    }
+  };
 
   // Format current time based on selected format
   const formattedTime = formatTime(currentTime, timeFormat);
@@ -282,22 +242,34 @@ const FlexibleApiContent: React.FC = () => {
       <Card>
         <Flex gap="3" align="center" wrap="wrap">
           <Flex gap="2">
-            <RewindButton />
-            <SkipBackwardButton />
-            <Button onClick={() => play()} variant="solid" color="green">
+            <Button onClick={handleRewind} variant="soft" size="2">
+              <DoubleArrowLeftIcon width="16" height="16" />
+              Rewind
+            </Button>
+            <Button onClick={handleSkipBackward} variant="soft" size="2">
+              <TrackPreviousIcon width="16" height="16" />
+              Skip -5s
+            </Button>
+            <Button onClick={() => play()} variant="solid" color="green" size="2">
               <PlayIcon width="16" height="16" />
               Play
             </Button>
-            <Button onClick={pause} variant="soft">
+            <Button onClick={() => pause()} variant="soft" size="2">
               <PauseIcon width="16" height="16" />
               Pause
             </Button>
-            <Button onClick={stop} variant="soft">
+            <Button onClick={() => stop()} variant="soft" size="2">
               <StopIcon width="16" height="16" />
               Stop
             </Button>
-            <SkipForwardButton />
-            <FastForwardButton />
+            <Button onClick={handleSkipForward} variant="soft" size="2">
+              <TrackNextIcon width="16" height="16" />
+              Skip +5s
+            </Button>
+            <Button onClick={handleFastForward} variant="soft" size="2">
+              <DoubleArrowRightIcon width="16" height="16" />
+              Fast Forward
+            </Button>
           </Flex>
 
           <Separator orientation="vertical" />
@@ -378,25 +350,8 @@ const FlexibleApiContent: React.FC = () => {
 // Main Example Component
 export function FlexibleApiExample() {
   const theme = useDocusaurusTheme();
-
-  // Detect Docusaurus theme for Radix
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.getAttribute('data-theme') === 'dark';
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    return () => observer.disconnect();
-  }, []);
+  // Derive isDark from theme object (no need for duplicate MutationObserver)
+  const isDark = theme === darkTheme;
 
   // Custom theme with dark blue/teal aesthetic (matching old flexible-api example)
   const customTheme = {
