@@ -294,6 +294,7 @@ const MultiClipExample: React.FC = () => {
         waveFillColor: '#FFD500',
         waveProgressColor: '#ff0000',
         selectedWaveOutlineColor: '#0099ff',
+        selectedWaveFillColor: '#FFD500', // Keep same fill color on selection
         selectedTrackControlsBackground: '#d9e9ff',
         selectedClipHeaderBackgroundColor: '#b3d9ff',
       }}

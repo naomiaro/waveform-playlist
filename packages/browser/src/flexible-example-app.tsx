@@ -760,6 +760,10 @@ const theme = {
   waveOutlineColor: '#1e3a5f',
   waveFillColor: '#5dade2',
   waveProgressColor: '#e74c3c',
+  selectedWaveOutlineColor: '#3a5a8f', // Brighter blue for selected waveforms
+  selectedWaveFillColor: '#5dade2', // '#2c5f7f', // Darker fill to balance the brighter outline
+  selectedTrackControlsBackground: 'rgba(52, 152, 219, 0.2)', // Subtle blue tint for selected controls
+  selectedClipHeaderBackgroundColor: 'rgba(52, 152, 219, 0.4)', // Brighter blue for selected clip headers
   timeColor: '#ecf0f1', // Light text for dark background
   timescaleBackgroundColor: '#2c3e50', // Dark background to match the overall theme
   playheadColor: '#8b0000', // Dark red playhead for contrast with blue waveforms

@@ -12,6 +12,7 @@ export interface WaveformPlaylistTheme {
 
   // Selected track colors
   selectedWaveOutlineColor: string;
+  selectedWaveFillColor: string;
   selectedTrackControlsBackground: string;
 
   // Timescale colors
@@ -36,6 +37,7 @@ export const defaultTheme: WaveformPlaylistTheme = {
   waveFillColor: '#FFD500',
   waveProgressColor: '#ff0000',
   selectedWaveOutlineColor: '#0099ff', // Brighter blue for selected track waveforms
+  selectedWaveFillColor: '#FFD500', // Same as waveFillColor - keep consistent on selection
   selectedTrackControlsBackground: '#d9e9ff', // Light blue background for selected track controls
   timeColor: '#000',
   timescaleBackgroundColor: '#fff',

@@ -17,16 +17,21 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected,
   const { waveHeight } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
 
-  // Use selected outline color if track is selected
+  // Use selected colors if track is selected
   const waveOutlineColor = isSelected && theme
     ? theme.selectedWaveOutlineColor
     : theme?.waveOutlineColor;
+
+  const waveFillColor = isSelected && theme
+    ? theme.selectedWaveFillColor
+    : theme?.waveFillColor;
 
   return (
     <Channel
       {...props}
       {...theme}
       waveOutlineColor={waveOutlineColor}
+      waveFillColor={waveFillColor}
       waveHeight={waveHeight}
       devicePixelRatio={devicePixelRatio}
     ></Channel>

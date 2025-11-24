@@ -50,12 +50,17 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 ### Building and Testing
 
-- Build: `pnpm build`
-- Build single entry: `env VITE_ENTRY=multi-clip pnpm vite build`
-- TypeScript check: `pnpm typecheck` (enforced in build scripts)
-- Jekyll: `jekyll serve -s ghpages --skip-initial-build`
-- Dev server: `http://localhost:4000/waveform-playlist/`
-- Always hard refresh (Cmd+Shift+R) after builds
+- **Build all bundles**: `pnpm build` - Runs `./build-all.sh` to build all 9 example bundles
+- **Build single entry**: `env VITE_ENTRY=multi-clip pnpm build:single` - Build one specific bundle
+- **TypeScript check**: `pnpm typecheck` (enforced in build scripts)
+- **Jekyll**: `jekyll serve -s ghpages --skip-initial-build`
+- **Dev server**: `http://localhost:4000/waveform-playlist/`
+- **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
+
+**When to rebuild all bundles:**
+- After changes to `ui-components` package (affects all examples)
+- After changes to shared theme, controls, or base components
+- Use `pnpm build` to rebuild all 9 bundles at once
 
 ### Jekyll Example Pages Convention
 
