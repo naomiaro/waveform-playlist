@@ -72,7 +72,7 @@ export const defaultTheme: WaveformPlaylistTheme = {
   timeColor: '#000',
   timescaleBackgroundColor: '#fff',
   playheadColor: '#f00',
-  selectionColor: 'rgba(0, 255, 0, 0.3)',
+  selectionColor: 'rgba(255, 105, 180, 0.7)', // hot pink - high contrast on light backgrounds
   clipHeaderBackgroundColor: 'rgba(0, 0, 0, 0.1)',
   clipHeaderBorderColor: 'rgba(0, 0, 0, 0.2)',
   clipHeaderTextColor: '#333',
@@ -119,7 +119,7 @@ export const darkTheme: WaveformPlaylistTheme = {
   timeColor: '#e0e0e0', // Light gray for text on dark background
   timescaleBackgroundColor: '#1e1e1e', // Dark background
   playheadColor: '#ff4444',
-  selectionColor: 'rgba(0, 255, 0, 0.2)', // Slightly less opaque for dark mode
+  selectionColor: 'rgba(255, 105, 180, 0.7)', // hot pink - high contrast on dark backgrounds
   clipHeaderBackgroundColor: 'rgba(255, 255, 255, 0.1)', // Light overlay for dark mode
   clipHeaderBorderColor: 'rgba(255, 255, 255, 0.2)',
   clipHeaderTextColor: '#e0e0e0', // Light text
