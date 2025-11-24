@@ -9,6 +9,56 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-24: FlexibleApi & Annotations Example Polish + Docusaurus Cache Fix
+
+**Goal:** Polish FlexibleApi example with better UX and fix annotations example
+
+**Achievement:** ✅ Custom Radix UI controls, improved layout, annotations working in Docusaurus
+
+**What Was Done:**
+- ✅ FlexibleApiExample improvements:
+  - Button color styling: Pause = amber, Stop = red for better visual feedback
+  - Moved time controls to dedicated bottom bar (matches old flexible-api layout)
+  - Created CustomSelectionInputs component with Radix UI TextField components
+  - Custom time parsing/formatting for editable cue in/out controls
+  - Clean integration with existing time format selector
+- ✅ Annotations example migration:
+  - Fixed "notes is not defined" error by embedding data directly in component
+  - Converted from bundle loading to Docusaurus-native component
+  - Updated page to use AnnotationsExample component instead of script loading
+  - Fixed `annotationList` prop (was using wrong `annotationOptions`)
+  - Switched audio file to sonnet.mp3 (matches Shakespeare's Sonnet 1 annotations)
+- ✅ Docusaurus configuration:
+  - Updated website/package.json start script to always clear cache: `docusaurus clear && docusaurus start`
+  - Prevents frustrating cache issues during development
+
+**Files Modified:**
+- `website/src/components/examples/FlexibleApiExample.tsx` (custom selection inputs, layout)
+- `website/src/components/examples/AnnotationsExample.tsx` (embedded notes data, fixed props)
+- `website/src/pages/examples/annotations.tsx` (use component instead of bundle)
+- `packages/browser/src/annotations-app.tsx` (embedded notes data for bundle builds)
+- `website/package.json` (cache clearing)
+
+**Pattern: Custom Radix UI Form Components**
+```typescript
+// Use Radix UI TextField for editable time inputs
+const CustomSelectionInputs: React.FC = () => {
+  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { setSelection } = usePlaylistControls();
+  const { timeFormat } = usePlaylistData();
+
+  return (
+    <Flex gap="2" align="center">
+      <TextField.Root value={formatTime(start, timeFormat)} onChange={handleChange} />
+      <Text>to</Text>
+      <TextField.Root value={formatTime(end, timeFormat)} onChange={handleChange} />
+    </Flex>
+  );
+};
+```
+
+---
+
 ### 2025-11-24: Master Volume API Standardization & Tone.js Fix
 
 **Goal:** Standardize master volume to Web Audio API convention (0-1.0 gain) and fix playback initialization
