@@ -51,6 +51,10 @@ export interface WaveformPlaylistTheme {
   buttonBorder: string;
   buttonHoverBackground: string;
 
+  // Slider colors
+  sliderTrackColor: string;
+  sliderThumbColor: string;
+
   // Spacing and sizing
   borderRadius: string;
   fontFamily: string;
@@ -94,6 +98,10 @@ export const defaultTheme: WaveformPlaylistTheme = {
   buttonBorder: '#ccc',
   buttonHoverBackground: '#e0e0e0',
 
+  // Slider colors
+  sliderTrackColor: '#ddd',
+  sliderThumbColor: '#daa520', // goldenrod
+
   // Spacing and sizing
   borderRadius: '4px',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
@@ -136,6 +144,10 @@ export const darkTheme: WaveformPlaylistTheme = {
   buttonText: '#e0e0e0',
   buttonBorder: '#555',
   buttonHoverBackground: '#4d4d4d',
+
+  // Slider colors
+  sliderTrackColor: '#555',
+  sliderThumbColor: '#f0c040', // brighter goldenrod for dark mode
 
   // Spacing and sizing
   borderRadius: '4px',

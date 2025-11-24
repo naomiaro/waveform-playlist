@@ -11,7 +11,7 @@ export const BaseSlider = styled.input.attrs({ type: 'range' })`
   appearance: none;
   width: 100%;
   height: 6px;
-  background: ${(props) => props.theme.inputBorder};
+  background: ${(props) => props.theme.sliderTrackColor};
   border-radius: 3px;
   cursor: pointer;
   outline: none;
@@ -22,7 +22,7 @@ export const BaseSlider = styled.input.attrs({ type: 'range' })`
     appearance: none;
     width: 16px;
     height: 16px;
-    background: ${(props) => props.theme.inputFocusBorder};
+    background: ${(props) => props.theme.sliderThumbColor};
     border: 2px solid ${(props) => props.theme.inputBackground};
     border-radius: 50%;
     cursor: pointer;
@@ -39,7 +39,7 @@ export const BaseSlider = styled.input.attrs({ type: 'range' })`
   &::-moz-range-thumb {
     width: 16px;
     height: 16px;
-    background: ${(props) => props.theme.inputFocusBorder};
+    background: ${(props) => props.theme.sliderThumbColor};
     border: 2px solid ${(props) => props.theme.inputBackground};
     border-radius: 50%;
     cursor: pointer;
@@ -53,7 +53,7 @@ export const BaseSlider = styled.input.attrs({ type: 'range' })`
   }
 
   &::-moz-range-track {
-    background: ${(props) => props.theme.inputBorder};
+    background: ${(props) => props.theme.sliderTrackColor};
     border-radius: 3px;
     height: 6px;
   }

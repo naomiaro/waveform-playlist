@@ -11,6 +11,6 @@ export const Controls = styled.div`
   overflow: hidden;
   box-sizing: border-box;
   text-align: center;
-  border: 1px solid #000;
-  border-radius: 0.2rem;
+  border: 1px solid ${(props) => props.theme.borderColor};
+  border-radius: ${(props) => props.theme.borderRadius};
 `;

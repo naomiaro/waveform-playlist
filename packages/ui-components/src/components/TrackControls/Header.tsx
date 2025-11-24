@@ -8,7 +8,7 @@ export const Header = styled.header`
   align-items: center;
   justify-content: space-between;
   padding: 0 0.2rem;
-  font-size: 0.75rem;
-  color: #000;
+  font-size: ${(props) => props.theme.fontSizeSmall};
+  color: ${(props) => props.theme.textColor};
   background-color: transparent;
 `;

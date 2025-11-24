@@ -1,67 +1,60 @@
 import styled from 'styled-components';
+import { BaseSlider } from '../../styled';
 
-export const Slider = styled.input.attrs({
-  type: 'range',
-})`
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  display: inline-block;
+/**
+ * TrackControls Slider - Compact slider for volume/pan controls
+ *
+ * Extends BaseSlider with track-specific styling:
+ * - Smaller thumb and track for compact layout
+ * - Uses theme's sliderThumbColor (goldenrod by default)
+ */
+export const Slider = styled(BaseSlider)`
   width: 75%;
+  height: 5px;
+  background: ${(props) => props.theme.sliderTrackColor};
+
+  &::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+    background: ${(props) => props.theme.sliderThumbColor};
+    border: none;
+    margin-top: -4px;
+    cursor: ew-resize;
+  }
+
+  &::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: ${(props) => props.theme.sliderThumbColor};
+    border: none;
+    cursor: ew-resize;
+  }
 
   &::-webkit-slider-runnable-track {
     height: 5px;
-    background: #ddd;
-    border: none;
+    background: ${(props) => props.theme.sliderTrackColor};
     border-radius: 3px;
   }
 
   &::-moz-range-track {
     height: 5px;
-    background: #ddd;
-    border: none;
+    background: ${(props) => props.theme.sliderTrackColor};
     border-radius: 3px;
   }
 
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    border: none;
-    height: 12px;
-    width: 12px;
-    border-radius: 50%;
-    background: goldenrod;
-    margin-top: -5px;
-    cursor: ew-resize;
-  }
-
-  &::-moz-range-thumb {
-    border: none;
-    height: 12px;
-    width: 12px;
-    border-radius: 50%;
-    background: goldenrod;
-    cursor: ew-resize;
-  }
-
-  &:focus {
-    outline: none;
-  }
-
   &:focus::-webkit-slider-runnable-track {
-    background: #bbb;
+    background: ${(props) => props.theme.inputBorder};
   }
 
   &:focus::-moz-range-track {
-    background: #bbb;
+    background: ${(props) => props.theme.inputBorder};
   }
 
   &:focus::-webkit-slider-thumb {
-    border: 2px solid black;
+    border: 2px solid ${(props) => props.theme.textColor};
   }
 
   &:focus::-moz-range-thumb {
-    border: 2px solid black;
+    border: 2px solid ${(props) => props.theme.textColor};
   }
 `;
