@@ -1,21 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Layout from '@theme/Layout';
-import useBaseUrl from '@docusaurus/useBaseUrl';
+import { NewTracksExample } from '../../components/examples/NewTracksExample';
 
-export default function NewTracksExample(): React.ReactElement {
-  const bundleSrc = useBaseUrl('/js/newtracks-bundle.js');
-
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = bundleSrc;
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, [bundleSrc]);
-
+export default function NewTracksExamplePage(): React.ReactElement {
   return (
     <Layout
       title="New Tracks Example"
@@ -28,17 +15,7 @@ export default function NewTracksExample(): React.ReactElement {
           multiple tracks in real-time.
         </p>
 
-        <div
-          id="playlist"
-          style={{
-            marginTop: '2rem',
-            padding: '2rem',
-            background: 'var(--ifm-background-surface-color)',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            border: '1px solid var(--ifm-color-emphasis-300)'
-          }}
-        ></div>
+        <NewTracksExample />
 
         <div style={{ marginTop: '2rem' }}>
           <h2>About This Example</h2>

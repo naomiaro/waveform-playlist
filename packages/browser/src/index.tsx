@@ -1317,6 +1317,10 @@ export {
   useAudioPosition,
   useTimeFormat,
   useMasterVolume,
+  useMasterAnalyser,
+  useTrackReverb,
+  useTrackAutoWah,
+  useEffectsChain,
 } from './hooks';
 export type {
   AudioTrackConfig,

@@ -1,21 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Layout from '@theme/Layout';
-import useBaseUrl from '@docusaurus/useBaseUrl';
+import { EffectsExample } from '../../components/examples/EffectsExample';
 
-export default function EffectsExample(): React.ReactElement {
-  const bundleSrc = useBaseUrl('/js/effects-bundle.js');
-
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = bundleSrc;
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, [bundleSrc]);
-
+export default function EffectsExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Effects Example"
@@ -28,17 +15,7 @@ export default function EffectsExample(): React.ReactElement {
           auto-wah, and other effects.
         </p>
 
-        <div
-          id="playlist"
-          style={{
-            marginTop: '2rem',
-            padding: '2rem',
-            background: 'var(--ifm-background-surface-color)',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            border: '1px solid var(--ifm-color-emphasis-300)'
-          }}
-        ></div>
+        <EffectsExample />
 
         <div style={{ marginTop: '2rem' }}>
           <h2>About This Example</h2>

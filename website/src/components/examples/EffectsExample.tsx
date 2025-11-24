@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
-  useWaveformPlaylist,
   Waveform,
   PlayButton,
   PauseButton,
@@ -80,26 +79,12 @@ const Separator = styled.div`
   background: var(--ifm-color-emphasis-300, #ddd);
 `;
 
-const EffectButton = styled.button<{ $active: boolean }>`
-  padding: 0.5rem 1rem;
-  background: ${props => props.$active ? '#007bff' : '#6c757d'};
-  color: white;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-
-  &:hover {
-    background: ${props => props.$active ? '#0056b3' : '#5a6268'};
-  }
-`;
-
-// Frequency visualizer component
+// Frequency visualizer component that polls for Tone.js analyser
 const FrequencyVisualizer: React.FC<{ analyserRef: React.RefObject<any> }> = ({ analyserRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasAnalyser, setHasAnalyser] = useState(false);
 
+  // Poll for analyser availability
   useEffect(() => {
     const checkAnalyser = setInterval(() => {
       if (analyserRef.current && !hasAnalyser) {
@@ -111,36 +96,44 @@ const FrequencyVisualizer: React.FC<{ analyserRef: React.RefObject<any> }> = ({ 
   }, [analyserRef, hasAnalyser]);
 
   useEffect(() => {
-    if (!hasAnalyser || !canvasRef.current || !analyserRef.current) return;
+    if (!canvasRef.current || !hasAnalyser || !analyserRef.current) return;
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const canvasCtx = canvas.getContext('2d');
+    if (!canvasCtx) return;
 
-    const analyser = analyserRef.current;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    const WIDTH = canvas.width;
+    const HEIGHT = canvas.height;
+    const scale = Math.floor(window.devicePixelRatio);
+
+    canvasCtx.scale(scale, scale);
 
     let animationId: number;
 
     const draw = () => {
       animationId = requestAnimationFrame(draw);
 
-      analyser.getByteFrequencyData(dataArray);
+      if (!analyserRef.current) return;
 
-      ctx.fillStyle = 'rgb(240, 240, 240)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Tone.js Analyser uses getValue() which returns Float32Array of dB values
+      const dataArray = analyserRef.current.getValue();
+      const bufferLength = dataArray.length;
 
-      const barWidth = (canvas.width / bufferLength) * 2.5;
-      let barHeight;
+      canvasCtx.fillStyle = 'rgb(255, 255, 255)';
+      canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      const barWidth = WIDTH / scale / bufferLength - 1;
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
-        barHeight = (dataArray[i] / 255) * canvas.height;
+        // Tone.Analyser FFT mode returns dB values (typically -100 to 0)
+        // Normalize to 0-255 range
+        const dbValue = dataArray[i];
+        const normalized = Math.max(0, Math.min(255, (dbValue + 100) * 2.55));
+        const barHeight = normalized / 2 / scale;
 
-        const hue = (i / bufferLength) * 360;
-        ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
-        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        canvasCtx.fillStyle = `rgb(${barHeight + 100},50,50)`;
+        canvasCtx.fillRect(x, HEIGHT / scale - barHeight / 2, barWidth, barHeight);
 
         x += barWidth + 1;
       }
@@ -149,68 +142,27 @@ const FrequencyVisualizer: React.FC<{ analyserRef: React.RefObject<any> }> = ({ 
     draw();
 
     return () => {
-      if (animationId) cancelAnimationFrame(animationId);
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
     };
-  }, [hasAnalyser, analyserRef]);
+  }, [analyserRef, hasAnalyser]);
 
-  return (
-    <VisualizerCanvas ref={canvasRef} width={800} height={100} />
-  );
+  return <VisualizerCanvas ref={canvasRef} width={1000} height={100} />;
 };
 
-// Inner component with access to playlist context
-const EffectsControls: React.FC = () => {
-  const { tracks, updateTrackEffect } = useWaveformPlaylist();
-  const analyserRef = useMasterAnalyser();
-
-  const track0Id = tracks[0]?.id;
-  const track1Id = tracks[1]?.id;
-
-  const [track0AutoWahEnabled, setTrack0AutoWahEnabled] = useState(false);
-  const [track1ReverbEnabled, setTrack1ReverbEnabled] = useState(false);
-
-  useTrackAutoWah(track0Id, track0AutoWahEnabled);
-  useTrackReverb(track1Id, track1ReverbEnabled);
-
+// Inner component that renders controls and waveform
+const EffectsControls: React.FC<{ analyserRef: React.RefObject<any> }> = ({ analyserRef }) => {
   return (
     <Container>
       <TopBar>
         <ControlsRow>
-          <ControlGroup>
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-          </ControlGroup>
-
-          <ControlGroup>
-            <MasterVolumeControl />
-          </ControlGroup>
-
-          <ControlGroup>
-            <TimeFormatSelect />
-          </ControlGroup>
-
-          <ControlGroup>
-            <AutomaticScrollCheckbox />
-          </ControlGroup>
+          <PlayButton />
+          <PauseButton />
+          <StopButton />
+          <MasterVolumeControl />
+          <AutomaticScrollCheckbox />
         </ControlsRow>
-
-        <ControlsRow>
-          <EffectButton
-            $active={track0AutoWahEnabled}
-            onClick={() => setTrack0AutoWahEnabled(!track0AutoWahEnabled)}
-          >
-            Guitar AutoWah
-          </EffectButton>
-
-          <EffectButton
-            $active={track1ReverbEnabled}
-            onClick={() => setTrack1ReverbEnabled(!track1ReverbEnabled)}
-          >
-            Piano Reverb
-          </EffectButton>
-        </ControlsRow>
-
         <VisualizerWrapper>
           <FrequencyVisualizer analyserRef={analyserRef} />
         </VisualizerWrapper>
@@ -220,12 +172,20 @@ const EffectsControls: React.FC = () => {
 
       <TimeControlsBar>
         <ControlGroup>
-          <AudioPosition />
+          <TimeFormatSelect />
         </ControlGroup>
 
         <Separator />
 
-        <SelectionTimeInputs />
+        <ControlGroup>
+          <SelectionTimeInputs />
+        </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <AudioPosition />
+        </ControlGroup>
       </TimeControlsBar>
     </Container>
   );
@@ -234,32 +194,57 @@ const EffectsControls: React.FC = () => {
 export function EffectsExample() {
   const theme = useDocusaurusTheme();
 
+  // Create master effects with frequency analyzer
+  const { analyserRef, masterEffects } = useMasterAnalyser(256);
+
+  // Create per-track effects
+  const autoWahEffect = useTrackAutoWah({ baseFrequency: 50, octaves: 6, sensitivity: -30 });
+  const guitarReverbEffect = useTrackReverb(1.2);
+  const drumsReverbEffect = useTrackReverb(5);
+
+  // Track configurations with effects
   const audioConfigs = React.useMemo(() => [
+    {
+      src: '/waveform-playlist/media/audio/Vocals30.mp3',
+      name: 'Vocals',
+      effects: autoWahEffect,
+    },
     {
       src: '/waveform-playlist/media/audio/Guitar30.mp3',
       name: 'Guitar',
+      effects: guitarReverbEffect,
     },
     {
       src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
-      name: 'Piano',
+      name: 'Pianos & Synth',
     },
-  ], []);
+    {
+      src: '/waveform-playlist/media/audio/BassDrums30.mp3',
+      name: 'Drums',
+      effects: drumsReverbEffect,
+    },
+  ], [autoWahEffect, guitarReverbEffect, drumsReverbEffect]);
 
+  // Load audio tracks
   const { tracks, loading, error } = useAudioTracks(audioConfigs);
 
   if (loading) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        Loading audio tracks...
-      </div>
+      <Container>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          Loading audio tracks...
+        </div>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        Error loading audio: {error}
-      </div>
+      <Container>
+        <div style={{ padding: '2rem', color: 'red' }}>
+          Error loading audio: {error}
+        </div>
+      </Container>
     );
   }
 
@@ -267,13 +252,14 @@ export function EffectsExample() {
     <WaveformPlaylistProvider
       tracks={tracks}
       samplesPerPixel={1024}
-      mono={true}
       waveHeight={100}
-      automaticScroll={true}
-      controls={{ show: true, width: 200 }}
       theme={theme}
+      controls={{ show: true, width: 150 }}
+      automaticScroll={true}
+      timescale={true}
+      effects={masterEffects}
     >
-      <EffectsControls />
+      <EffectsControls analyserRef={analyserRef} />
     </WaveformPlaylistProvider>
   );
 }
