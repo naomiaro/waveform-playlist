@@ -4,8 +4,8 @@
   "description": "Browser bundle for waveform-playlist with React",
   "main": "./dist/waveform-playlist.js",
   "scripts": {
-    "build": "./build-all.sh",
-    "build:single": "vite build",
+    "build": "pnpm typecheck && ./build-all.sh",
+    "build:single": "pnpm typecheck && vite build",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit"
   },

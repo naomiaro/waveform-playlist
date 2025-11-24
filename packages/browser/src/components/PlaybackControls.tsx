@@ -15,7 +15,7 @@ export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
       await play(selectionStart, duration);
     } else {
       // Play from current position to the end
-      await play(currentTimeRef.current);
+      await play(currentTimeRef.current ?? 0);
     }
   };
 
@@ -99,7 +99,7 @@ export const SkipBackwardButton: React.FC<{ skipAmount?: number; className?: str
   const { playoutRef } = usePlaylistData();
 
   const handleClick = () => {
-    const newTime = Math.max(0, currentTimeRef.current - skipAmount);
+    const newTime = Math.max(0, (currentTimeRef.current ?? 0) - skipAmount);
     setCurrentTime(newTime);
 
     if (isPlaying && playoutRef.current) {
@@ -124,7 +124,7 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
   const { duration, playoutRef } = usePlaylistData();
 
   const handleClick = () => {
-    const newTime = Math.min(duration, currentTimeRef.current + skipAmount);
+    const newTime = Math.min(duration, (currentTimeRef.current ?? 0) + skipAmount);
     setCurrentTime(newTime);
 
     if (isPlaying && playoutRef.current) {

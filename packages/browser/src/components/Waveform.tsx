@@ -102,6 +102,7 @@ export const Waveform: React.FC<WaveformProps> = ({
     play,
     setScrollContainer,
     setSelectedTrackId,
+    setCurrentTime,
   } = usePlaylistControls();
   const {
     audioBuffers,
@@ -255,7 +256,7 @@ export const Waveform: React.FC<WaveformProps> = ({
     }
 
     setIsSelecting(true);
-    currentTimeRef.current = clickTime;
+    setCurrentTime(clickTime);
     setSelection(clickTime, clickTime);
   };
 
@@ -287,7 +288,7 @@ export const Waveform: React.FC<WaveformProps> = ({
 
     // If it's just a click (not a drag), seek to that position
     if (Math.abs(end - start) < 0.1) {
-      currentTimeRef.current = start;
+      setCurrentTime(start);
 
       if (isPlaying && playoutRef.current) {
         playoutRef.current.stop();
@@ -342,7 +343,6 @@ export const Waveform: React.FC<WaveformProps> = ({
                 />
               ) : undefined
             }
-            className={className}
           >
             <>
               {peaksDataArray.map((trackClipPeaks, trackIndex) => {
@@ -445,7 +445,18 @@ export const Waveform: React.FC<WaveformProps> = ({
                             clipHeaderBackgroundColor={theme.clipHeaderBackgroundColor}
                             clipHeaderBorderColor={theme.clipHeaderBorderColor}
                             clipHeaderTextColor={theme.clipHeaderTextColor}
-                            onMouseDown={() => selectTrack(trackIndex, 'Clicked clip')}
+                            onMouseDown={(e) => {
+                              // Only select track if clicking on the waveform, not on draggable elements
+                              const target = e.target as HTMLElement;
+                              // Check if click is on a draggable element (header or boundary)
+                              // @dnd-kit sets role="button" and aria-roledescription="draggable" on drag handles
+                              const isDraggable = target.closest('[role="button"][aria-roledescription="draggable"]');
+                              if (isDraggable) {
+                                // Don't select track - let drag event handler take over
+                                return;
+                              }
+                              selectTrack(trackIndex, 'Clicked clip');
+                            }}
                           >
                             {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
                               <SmartChannel

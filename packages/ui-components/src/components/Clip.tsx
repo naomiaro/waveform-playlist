@@ -61,7 +61,7 @@ export interface ClipProps {
   clipHeaderBorderColor?: string;
   clipHeaderTextColor?: string;
   // Track selection
-  onMouseDown?: () => void; // Called when clip is pressed (for track selection - fires before drag)
+  onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void; // Called when clip is pressed (for track selection - fires before drag)
   trackId?: string; // Track ID for identifying which track this clip belongs to
 }
 

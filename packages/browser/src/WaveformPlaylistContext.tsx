@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
 import { type Track, type ClipTrack, type AudioClip } from '@waveform-playlist/core';
+import { type TimeFormat } from '@waveform-playlist/ui-components';
 import * as Tone from 'tone';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData } from '@waveform-playlist/webaudio-peaks';
-import { type AnnotationData } from '@waveform-playlist/ui-components';
-import { parseAeneas } from '@waveform-playlist/annotations';
+import { parseAeneas, type AnnotationData } from '@waveform-playlist/annotations';
 import { useTimeFormat, useZoomControls, useMasterVolume } from './hooks';
 
 // Types
@@ -69,7 +69,7 @@ export interface WaveformPlaylistContextValue {
 
   // Time format
   timeFormat: string;
-  setTimeFormat: (format: string) => void;
+  setTimeFormat: (format: TimeFormat) => void;
   formatTime: (seconds: number) => string;
 
   // Zoom
@@ -145,7 +145,7 @@ export interface PlaylistControlsContextValue {
   setSelectedTrackId: (trackId: string | null) => void;
 
   // Time format
-  setTimeFormat: (format: string) => void;
+  setTimeFormat: (format: TimeFormat) => void;
   formatTime: (seconds: number) => string;
 
   // Zoom
