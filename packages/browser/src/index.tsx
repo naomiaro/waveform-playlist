@@ -1311,6 +1311,7 @@ export type { WaveformPlaylistContextValue, WaveformTrack, TrackState } from './
 export {
   useClipDragHandlers,
   useAnnotationDragHandlers,
+  useAnnotationKeyboardControls,
   useDragSensors,
   useClipSplitting,
   useKeyboardShortcuts,

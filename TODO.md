@@ -9,6 +9,29 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-24: Annotation Boundary Dragging with @dnd-kit
+
+**Goal:** Enable annotation boundary resizing via drag handles
+
+**Achievement:** ✅ Fixed @dnd-kit integration for annotations package in Docusaurus
+
+**What Was Done:**
+- ✅ Added annotations package to webpack transpilation (source instead of dist)
+- ✅ Added webpack alias: `@waveform-playlist/annotations` → source path
+- ✅ Ensures single @dnd-kit/core instance shared between DndContext and useDraggable hooks
+- ✅ Annotation resize handles now work correctly with pointer events
+- ✅ Linked endpoints update when dragging boundaries (when enabled)
+- ✅ Removed debug console.log statements from `useAnnotationDragHandlers.ts` and `AnnotationBox.tsx`
+
+**Root Cause:** The annotations package was loaded from its pre-built `dist/` version which bundled its own copy of @dnd-kit/core. This caused the DndContext (from browser package) and useDraggable hooks (from annotations) to use different React contexts.
+
+**Files Modified:**
+- `website/docusaurus.config.ts` (added annotations to transpilation and alias)
+- `packages/browser/src/hooks/useAnnotationDragHandlers.ts` (removed debug logging)
+- `packages/annotations/src/components/AnnotationBox.tsx` (removed debug logging)
+
+---
+
 ### 2025-11-24: FlexibleApi & Annotations Example Polish + Docusaurus Cache Fix
 
 **Goal:** Polish FlexibleApi example with better UX and fix annotations example

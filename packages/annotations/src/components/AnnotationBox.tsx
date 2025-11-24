@@ -71,15 +71,16 @@ interface ResizeHandleStyledProps {
 }
 
 // ResizeHandles are now siblings of Box, positioned relative to Wrapper
+// Reduced from 30px/-15px to 16px/-8px to minimize overlap between adjacent annotations
 const ResizeHandle = styled.div<ResizeHandleStyledProps>`
   position: absolute;
   top: 0;
-  ${(props) => props.$position === 'left' ? 'left: -15px' : 'right: -15px'};
-  width: 30px;
+  ${(props) => props.$position === 'left' ? 'left: -8px' : 'right: -8px'};
+  width: 16px;
   height: 100%;
   cursor: ew-resize;
   z-index: 120; /* Above ClickOverlay (z-index: 100) and AnnotationBoxesWrapper (z-index: 110) */
-  background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.1)'};
+  background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.2)' : 'transparent'};
   border-radius: 4px;
   touch-action: none; /* Important for @dnd-kit on touch devices */
   pointer-events: auto;
@@ -90,21 +91,21 @@ const ResizeHandle = styled.div<ResizeHandleStyledProps>`
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 6px;
-    height: 70%;
-    background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.5)'};
-    border-radius: 3px;
-    opacity: ${(props) => props.$isDragging ? 1 : 0.7};
+    width: 4px;
+    height: 60%;
+    background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.4)'};
+    border-radius: 2px;
+    opacity: ${(props) => props.$isDragging ? 1 : 0.6};
     transition: opacity 0.2s, background 0.2s;
   }
 
   &:hover {
-    background: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.1);
   }
 
   &:hover::before {
     opacity: 1;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.7);
   }
 `;
 

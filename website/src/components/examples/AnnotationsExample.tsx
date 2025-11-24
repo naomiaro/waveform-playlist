@@ -26,6 +26,7 @@ import {
   usePlaylistState,
   usePlaylistControls,
   useAnnotationDragHandlers,
+  useAnnotationKeyboardControls,
   useDragSensors,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -272,7 +273,7 @@ const TimeControlsBar = styled.div`
 
 const AnnotationsAppContent: React.FC = () => {
   const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
-  const { annotations, linkEndpoints } = usePlaylistState();
+  const { annotations, linkEndpoints, activeAnnotationId } = usePlaylistState();
   const { setAnnotations } = usePlaylistControls();
 
   const sensors = useDragSensors();
@@ -285,12 +286,36 @@ const AnnotationsAppContent: React.FC = () => {
     linkEndpoints,
   });
 
+  // Keyboard controls for annotation boundaries
+  // [ / ] = move start boundary, Shift+[ / Shift+] = move end boundary
+  useAnnotationKeyboardControls({
+    annotations,
+    activeAnnotationId,
+    onAnnotationsChange: setAnnotations,
+    duration,
+    linkEndpoints,
+  });
+
+  // Debug wrapper
+  const handleDragStart = (event: any) => {
+    console.log('[DndContext] onDragStart', event);
+    onDragStart(event);
+  };
+  const handleDragMove = (event: any) => {
+    console.log('[DndContext] onDragMove', event);
+    onDragMove(event);
+  };
+  const handleDragEnd = (event: any) => {
+    console.log('[DndContext] onDragEnd', event);
+    onDragEnd(event);
+  };
+
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragEnd={handleDragEnd}
       modifiers={[restrictToHorizontalAxis]}
     >
       <Container>
