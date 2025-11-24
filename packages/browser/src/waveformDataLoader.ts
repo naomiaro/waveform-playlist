@@ -39,37 +39,40 @@ export async function loadWaveformData(src: string): Promise<WaveformData> {
 }
 
 /**
- * Convert WaveformData to our internal Peaks format (Int16Array with min/max pairs)
+ * Convert WaveformData to our internal Peaks format
  *
  * @param waveformData - WaveformData instance from waveform-data.js
  * @param channelIndex - Channel index (0 for mono/left, 1 for right)
- * @returns Peaks data as Int16Array with alternating min/max values
+ * @returns Peaks data with alternating min/max values, preserving original bit depth
  */
 export function waveformDataToPeaks(
   waveformData: WaveformData,
   channelIndex: number = 0
-): { data: Int16Array; bits: 16; length: number; sampleRate: number } {
+): { data: Int8Array | Int16Array; bits: 8 | 16; length: number; sampleRate: number } {
   const channel = waveformData.channel(channelIndex);
+  const bits = waveformData.bits as 8 | 16;
 
   // Get the min/max arrays to determine length
   const minArray = channel.min_array();
   const maxArray = channel.max_array();
   const length = minArray.length;
 
-  // WaveformData stores 8-bit values (-128 to 127)
-  // We'll convert to 16-bit (-32768 to 32767) for better precision
-  const peaks = new Int16Array(length * 2);
+  // Use appropriate typed array based on source file bit depth
+  // 8-bit: values range from -128 to 127
+  // 16-bit: values range from -32768 to 32767
+  const peaks = bits === 8
+    ? new Int8Array(length * 2)
+    : new Int16Array(length * 2);
 
-  // Convert min/max pairs to Int16Array
+  // Interleave min/max pairs
   for (let i = 0; i < length; i++) {
-    // Scale from 8-bit (-128 to 127) to 16-bit (-32768 to 32767)
-    peaks[i * 2] = minArray[i] * 256;      // min value
-    peaks[i * 2 + 1] = maxArray[i] * 256;  // max value
+    peaks[i * 2] = minArray[i];
+    peaks[i * 2 + 1] = maxArray[i];
   }
 
   return {
     data: peaks,
-    bits: 16,
+    bits,
     length,
     sampleRate: waveformData.sample_rate,
   };
@@ -85,7 +88,7 @@ export function waveformDataToPeaks(
 export async function loadPeaksFromWaveformData(
   src: string,
   channelIndex: number = 0
-): Promise<{ data: Int16Array; bits: 16; length: number; sampleRate: number }> {
+): Promise<{ data: Int8Array | Int16Array; bits: 8 | 16; length: number; sampleRate: number }> {
   const waveformData = await loadWaveformData(src);
   return waveformDataToPeaks(waveformData, channelIndex);
 }
@@ -94,7 +97,7 @@ export async function loadPeaksFromWaveformData(
  * Get metadata from waveform data file without converting to peaks
  *
  * @param src - URL to waveform data file
- * @returns Metadata (sample rate, channels, duration, etc.)
+ * @returns Metadata (sample rate, channels, duration, bits, etc.)
  */
 export async function getWaveformDataMetadata(src: string): Promise<{
   sampleRate: number;
@@ -102,6 +105,7 @@ export async function getWaveformDataMetadata(src: string): Promise<{
   duration: number;
   samplesPerPixel: number;
   length: number;
+  bits: 8 | 16;
 }> {
   const waveformData = await loadWaveformData(src);
 
@@ -111,5 +115,6 @@ export async function getWaveformDataMetadata(src: string): Promise<{
     duration: waveformData.duration,
     samplesPerPixel: waveformData.scale,
     length: waveformData.length,
+    bits: waveformData.bits as 8 | 16,
   };
 }

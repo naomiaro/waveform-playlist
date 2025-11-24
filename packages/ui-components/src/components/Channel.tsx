@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useEffect, useCallback } from 'react';
+import React, { FunctionComponent, useLayoutEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { Peaks, Bits } from '@waveform-playlist/webaudio-peaks';
 
@@ -80,19 +80,20 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveOutlineColor = '#E0EFF1',
     waveFillColor = 'grey',
   } = props;
-  const canvases: HTMLCanvasElement[] = [];
+  const canvasesRef = useRef<HTMLCanvasElement[]>([]);
 
   const canvasRef = useCallback(
     (canvas: HTMLCanvasElement | null) => {
       if (canvas !== null) {
         const index: number = parseInt(canvas.dataset.index!, 10);
-        canvases[index] = canvas;
+        canvasesRef.current[index] = canvas;
       }
     },
-    [canvases]
+    []
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const canvases = canvasesRef.current;
     let offset = 0;
     for (let i = 0; i < canvases.length; i++) {
       const canvas = canvases[i];
@@ -131,7 +132,6 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveOutlineColor,
     devicePixelRatio,
     length,
-    canvases,
   ]);
 
   let totalWidth = length;
