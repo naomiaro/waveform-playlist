@@ -274,7 +274,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
   const zoom = useZoomControls({ initialSamplesPerPixel, zoomLevels });
   const samplesPerPixel = zoom.samplesPerPixel;
-  const { masterVolume, setMasterVolume } = useMasterVolume({ playoutRef, initialVolume: 100 });
+  const { masterVolume, setMasterVolume } = useMasterVolume({ playoutRef, initialVolume: 1.0 });
 
   // Custom setter for continuousPlay that updates BOTH state and ref synchronously
   // This ensures the ref is updated immediately, before the animation loop can read it

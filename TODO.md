@@ -9,32 +9,35 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
-### 2025-11-24: Docusaurus Migration (In Progress)
+### 2025-11-24: Docusaurus Migration - Completed with Radix Themes
 
-**Goal:** Migrate from Jekyll + separate bundle builds to Docusaurus-native examples
+**Goal:** Migrate all 8 examples from Jekyll + bundle builds to Docusaurus-native React components
 
-**Completed:**
+**Achievement:** ✅ Successfully migrated all examples, integrated Radix Themes, server compiling without errors
+
+**What Was Done:**
 - ✅ Set up webpack aliases to transpile workspace packages from source
-- ✅ Added `useAudioTracks` export to browser package
-- ✅ Fixed recording package tsup config to output worklet to correct directory structure
-- ✅ Created Docusaurus-native example components:
-  - MinimalExample.tsx
-  - StemTracksExample.tsx
-  - EffectsExample.tsx (with frequency visualizer, audio effects)
-  - NewTracksExample.tsx (drag-drop file upload)
-  - MultiClipExample.tsx (multiple clips per track, drag/trim, split with 's' key)
-- ✅ Updated example pages to import components directly (no bundle scripts)
-- ✅ Docusaurus compiling successfully with all workspace packages
+- ✅ Added hook exports to browser package: `useAudioTracks`, `useIntegratedRecording`, `usePlaybackControls`, `useZoomControls`, `useAudioPosition`, `useTimeFormat`, `useMasterVolume`
+- ✅ Fixed recording package tsup config for worklet output path
+- ✅ Installed Radix Themes v3 for website UI components
+- ✅ Created Root.tsx theme provider wrapper
+- ✅ Migrated all 8 example components to Docusaurus-native:
+  - MinimalExample.tsx - Basic playback
+  - StemTracksExample.tsx - Multi-track with controls
+  - EffectsExample.tsx - Audio effects with frequency visualizer
+  - NewTracksExample.tsx - Drag-drop file upload
+  - MultiClipExample.tsx - Multiple clips, drag/trim, split with 's' key
+  - AnnotationsExample.tsx - Annotation editing with controls
+  - RecordingExample.tsx - Live recording with VU meter (using Radix Themes)
+  - FlexibleApiExample.tsx - Hooks-based API showcase (using Radix Themes)
+- ✅ Updated all example page files to use new components
+- ✅ Added dependencies: @dnd-kit/core, @dnd-kit/modifiers, @waveform-playlist/recording, @waveform-playlist/annotations
+- ✅ Server compiling successfully (no errors or warnings)
 
 **Remaining Work:**
-- ⏳ Create 3 more example components:
-  - RecordingExample.tsx (complex - 534 lines with integrated recording)
-  - AnnotationsExample.tsx
-  - FlexibleApiExample.tsx
-- ⏳ Update corresponding page files
 - ⏳ Remove old bundle build scripts from package.json
-- ⏳ Clean up old bundle files in ghpages/js/
-- ⏳ Test all examples work in Docusaurus
+- ⏳ Clean up old bundle files in packages/browser/src/*-app.tsx
+- ⏳ Test all 8 examples in browser for functionality
 
 **Key Technical Details:**
 
@@ -59,17 +62,23 @@ Multi-track audio editor roadmap for waveform-playlist.
    - All styled components use Docusaurus CSS variables
 
 **Files Created:**
+- website/src/theme/Root.tsx (Radix Themes provider wrapper)
 - website/src/components/examples/MinimalExample.tsx
 - website/src/components/examples/StemTracksExample.tsx
 - website/src/components/examples/EffectsExample.tsx
 - website/src/components/examples/NewTracksExample.tsx
 - website/src/components/examples/MultiClipExample.tsx
+- website/src/components/examples/AnnotationsExample.tsx
+- website/src/components/examples/RecordingExample.tsx (with Radix Themes)
+- website/src/components/examples/FlexibleApiExample.tsx (with Radix Themes)
 
 **Files Modified:**
-- packages/browser/src/index.tsx (added useAudioTracks export)
+- packages/browser/src/index.tsx (added 7 hook exports)
 - packages/recording/tsup.config.ts (fixed worklet output path)
 - website/docusaurus.config.ts (added webpack configuration)
-- website/package.json (already had workspace dependencies)
+- website/package.json (added @radix-ui/themes, @dnd-kit/*, recording, annotations)
+- website/src/pages/examples/recording.tsx (use RecordingExample component)
+- website/src/pages/examples/flexible-api.tsx (use FlexibleApiExample component)
 
 ---
 

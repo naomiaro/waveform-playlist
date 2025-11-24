@@ -3,7 +3,7 @@ import { TonePlayout } from '@waveform-playlist/playout';
 
 export interface UseMasterVolumeProps {
   playoutRef: RefObject<TonePlayout | null>;
-  initialVolume?: number; // 0-100
+  initialVolume?: number; // 0-1.0 (linear gain, consistent with Web Audio API)
   onVolumeChange?: (volume: number) => void;
 }
 
@@ -19,7 +19,7 @@ export interface MasterVolumeControls {
  * ```tsx
  * const { masterVolume, setMasterVolume } = useMasterVolume({
  *   playoutRef,
- *   initialVolume: 100,
+ *   initialVolume: 1.0,
  * });
  *
  * <MasterVolumeControl
@@ -30,7 +30,7 @@ export interface MasterVolumeControls {
  */
 export function useMasterVolume({
   playoutRef,
-  initialVolume = 100,
+  initialVolume = 1.0,
   onVolumeChange,
 }: UseMasterVolumeProps): MasterVolumeControls {
   const [masterVolume, setMasterVolumeState] = useState(initialVolume);
@@ -38,10 +38,9 @@ export function useMasterVolume({
   const setMasterVolume = useCallback((volume: number) => {
     setMasterVolumeState(volume);
 
-    // Update the playout - convert 0-100 to 0-1 linear gain
+    // Update the playout with linear gain (0-1.0 range)
     if (playoutRef.current) {
-      const linearGain = volume / 100;
-      playoutRef.current.setMasterGain(linearGain);
+      playoutRef.current.setMasterGain(volume);
     }
 
     // Call optional callback

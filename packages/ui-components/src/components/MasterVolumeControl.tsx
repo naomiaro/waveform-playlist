@@ -22,7 +22,7 @@ const VolumeSlider = styled.input`
 `;
 
 export interface MasterVolumeControlProps {
-  volume: number; // 0-100
+  volume: number; // 0-1.0 (linear gain, consistent with Web Audio API)
   onChange: (volume: number) => void;
   disabled?: boolean;
   className?: string;
@@ -30,6 +30,7 @@ export interface MasterVolumeControlProps {
 
 /**
  * Master volume control slider component
+ * Accepts volume as 0-1.0 range (linear gain) and displays as percentage
  */
 export const MasterVolumeControl: React.FC<MasterVolumeControlProps> = ({
   volume,
@@ -38,7 +39,8 @@ export const MasterVolumeControl: React.FC<MasterVolumeControlProps> = ({
   className,
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(parseFloat(e.target.value));
+    // Convert percentage (0-100) to linear gain (0-1.0)
+    onChange(parseFloat(e.target.value) / 100);
   };
 
   return (
@@ -48,7 +50,7 @@ export const MasterVolumeControl: React.FC<MasterVolumeControlProps> = ({
         type="range"
         min="0"
         max="100"
-        value={volume}
+        value={volume * 100}
         onChange={handleChange}
         disabled={disabled}
         id="master-gain"
