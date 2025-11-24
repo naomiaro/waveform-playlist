@@ -264,6 +264,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const animationFrameRef = useRef<number | null>(null);
   const playbackStartTimeRef = useRef<number>(0); // Tone.now() when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
+  const playbackEndTimeRef = useRef<number | null>(null); // Audio position where playback should stop (for selections)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isAutomaticScrollRef = useRef<boolean>(false);
   const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
@@ -550,6 +551,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         container.scrollLeft = targetScrollLeft;
       }
 
+      // Check if we've reached the playback end time (for selection playback)
+      if (playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current) {
+        // Stop playback at selection end
+        if (playoutRef.current) {
+          playoutRef.current.stop();
+        }
+        setIsPlaying(false);
+        currentTimeRef.current = playbackEndTimeRef.current;
+        setCurrentTime(playbackEndTimeRef.current);
+        playbackEndTimeRef.current = null; // Clear the end time
+        return;
+      }
+
       if (time >= duration) {
         // Stop playback - inline to avoid circular dependency
         if (playoutRef.current) {
@@ -633,6 +647,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     const now = Tone.now();
     playbackStartTimeRef.current = now;
     audioStartPositionRef.current = actualStartTime;
+
+    // Set playback end time if playing with duration (e.g., selection playback)
+    playbackEndTimeRef.current = playDuration !== undefined ? actualStartTime + playDuration : null;
 
     // Don't set up playback complete callback for annotations
     // The animation loop handles stopping at annotation boundaries
