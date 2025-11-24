@@ -949,7 +949,13 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 ## ✅ Recently Completed
 
-### 2025-11-23 (Evening)
+### 2025-11-23
+
+- [x] **Track Selection Theme Enhancement - selectedWaveFillColor**
+  - Added `selectedWaveFillColor` to theme for independent control over waveform background on selection
+  - Outline and fill colors render separately (canvas peaks + div background) but appear combined
+  - Allows balancing appearance when outline brightens (darker fill prevents washed-out look)
+  - Files: `wfpl-theme.ts`, `SmartChannel.tsx`, `flexible-example-app.tsx`, `multi-clip-app.tsx`
 
 - [x] **Theming System Refactor - Centralized Theme Architecture**
   - Created `WaveformPlaylistTheme` interface in `ui-components/src/wfpl-theme.ts`
@@ -986,8 +992,6 @@ See `multi-clip-app.tsx` for complete implementation example.
   - Removed progress/changelog from PROJECT_STRUCTURE.md (moved to TODO.md)
   - **Pattern:** Progress updates only in TODO.md, architectural decisions in CLAUDE.md, structure/organization in PROJECT_STRUCTURE.md
 
-### 2025-11-23 (Afternoon)
-
 - [x] **TypeScript Build Integration & Drag/Trim Bug Fixes - ALL WORKING!** 🎉
   - **Problem:** Drag visual feedback worked but state didn't update on drop; trim handles not draggable at all
   - **Root Causes:** Multiple TypeScript errors silently breaking runtime code (Vite doesn't fail builds on TS errors)
@@ -1008,8 +1012,6 @@ See `multi-clip-app.tsx` for complete implementation example.
     - ✅ Track selection on drag/click
   - **Files modified:** `Clip.tsx`, `useClipDragHandlers.ts`, `PlaybackControls.tsx`, `Waveform.tsx`, `WaveformPlaylistContext.tsx`, `playout/src/index.ts`
   - **Build enforcement:** TypeScript type checking now enforced in all build scripts
-
-### 2025-11-23 (Morning)
 
 - [x] **Phase 3.3: Splitting Clips - COMPLETE!** 🎉
   - Created `useClipSplitting` hook for splitting clips at playhead position
