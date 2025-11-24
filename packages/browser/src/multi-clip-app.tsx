@@ -284,6 +284,7 @@ const MultiClipExample: React.FC = () => {
     <WaveformPlaylistProvider
       tracks={tracks}
       samplesPerPixel={1024}
+      zoomLevels={[512, 1024, 2048, 4096, 8192]}
       mono={true}
       waveHeight={100}
       automaticScroll={true}

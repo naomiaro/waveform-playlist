@@ -201,6 +201,7 @@ export interface WaveformPlaylistProviderProps {
   mono?: boolean;
   waveHeight?: number;
   samplesPerPixel?: number;
+  zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
   automaticScroll?: boolean;
   theme?: {
     waveOutlineColor?: string;
@@ -231,6 +232,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   mono = true,
   waveHeight = 80,
   samplesPerPixel: initialSamplesPerPixel = 1024,
+  zoomLevels,
   automaticScroll = false,
   theme: userTheme,
   controls = { show: false, width: 0 },
@@ -273,7 +275,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Custom hooks
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
-  const zoom = useZoomControls({ initialSamplesPerPixel });
+  const zoom = useZoomControls({ initialSamplesPerPixel, zoomLevels });
   const samplesPerPixel = zoom.samplesPerPixel;
   const { masterVolume, setMasterVolume } = useMasterVolume({ playoutRef, initialVolume: 100 });
 
