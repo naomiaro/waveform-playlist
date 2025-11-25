@@ -425,6 +425,75 @@ function useMicrophoneLevel(): {
 
 ---
 
+## Export Hooks
+
+### useExportWav
+
+Export the playlist to WAV format using offline rendering.
+
+```typescript
+function useExportWav(): {
+  exportWav: (tracks: ClipTrack[], trackStates: TrackState[], options?: ExportOptions) => Promise<ExportResult>;
+  isExporting: boolean;
+  progress: number;
+  error: string | null;
+};
+```
+
+### ExportOptions
+
+```typescript
+interface ExportOptions {
+  filename?: string;      // Filename for download (default: 'export')
+  mode?: 'master' | 'individual';  // Export all tracks mixed or single track
+  trackIndex?: number;    // Track index for individual export
+  bitDepth?: 16 | 32;     // WAV bit depth (default: 16)
+  applyEffects?: boolean; // Apply fades and effects (default: true)
+  autoDownload?: boolean; // Trigger automatic download (default: true)
+  onProgress?: (progress: number) => void;
+}
+```
+
+### ExportResult
+
+```typescript
+interface ExportResult {
+  audioBuffer: AudioBuffer;  // Rendered audio buffer
+  blob: Blob;               // WAV file as Blob
+  duration: number;         // Duration in seconds
+}
+```
+
+### Example
+
+```tsx
+function ExportButton() {
+  const { tracks, trackStates } = usePlaylistData();
+  const { exportWav, isExporting, progress } = useExportWav();
+
+  const handleExport = async () => {
+    try {
+      const result = await exportWav(tracks, trackStates, {
+        filename: 'my-mix',
+        mode: 'master',
+        bitDepth: 16,
+      });
+      console.log('Exported:', result.duration, 'seconds');
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  return (
+    <button onClick={handleExport} disabled={isExporting}>
+      {isExporting ? `Exporting ${Math.round(progress * 100)}%` : 'Export WAV'}
+    </button>
+  );
+}
+```
+
+---
+
 ## Annotations Hooks
 
 From `@waveform-playlist/annotations`:

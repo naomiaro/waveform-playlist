@@ -1325,6 +1325,7 @@ export {
   useEffectsChain,
   useDynamicEffects,
   useTrackDynamicEffects,
+  useExportWav,
 } from './hooks';
 export type {
   AudioTrackConfig,
@@ -1338,6 +1339,9 @@ export type {
   UseTrackDynamicEffectsReturn,
   TrackActiveEffect,
   TrackEffectsState,
+  ExportOptions,
+  ExportResult,
+  UseExportWavReturn,
 } from './hooks';
 
 // Export effect definitions and factory
@@ -1376,8 +1380,10 @@ export {
   LinkEndpointsCheckbox,
   EditableCheckbox,
   DownloadAnnotationsButton,
+  ExportWavButton,
   Waveform,
 } from './components';
+export type { ExportWavButtonProps } from './components/ExportControls';
 export type { WaveformProps } from './components/Waveform';
 
 // Export waveform-data.js utilities

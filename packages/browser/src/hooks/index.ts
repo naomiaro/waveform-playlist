@@ -34,3 +34,6 @@ export type { UseDynamicEffectsReturn, ActiveEffect } from './useDynamicEffects'
 
 export { useTrackDynamicEffects } from './useTrackDynamicEffects';
 export type { UseTrackDynamicEffectsReturn, TrackActiveEffect, TrackEffectsState } from './useTrackDynamicEffects';
+
+export { useExportWav } from './useExportWav';
+export type { ExportOptions, ExportResult, UseExportWavReturn } from './useExportWav';

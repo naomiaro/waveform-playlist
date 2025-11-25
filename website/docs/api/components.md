@@ -244,6 +244,69 @@ TrackControls with a delete button.
 
 ---
 
+## Export Controls
+
+### ExportWavButton
+
+Export the playlist to a WAV file.
+
+```tsx
+<ExportWavButton />
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `label` | `string` | `'Export WAV'` | Button label |
+| `filename` | `string` | `'export'` | Downloaded file name (without extension) |
+| `mode` | `'master' \| 'individual'` | `'master'` | Export all tracks mixed or single track |
+| `trackIndex` | `number` | - | Track index for individual export |
+| `bitDepth` | `16 \| 32` | `16` | WAV bit depth (16-bit PCM or 32-bit float) |
+| `applyEffects` | `boolean` | `true` | Apply fades and other clip effects |
+| `className` | `string` | - | CSS class name |
+| `onExportComplete` | `(blob: Blob) => void` | - | Callback when export succeeds |
+| `onExportError` | `(error: Error) => void` | - | Callback when export fails |
+
+**Behavior:**
+- Shows progress percentage during export
+- Disabled when no tracks loaded
+- Automatically triggers download when complete
+
+**Example:**
+
+```tsx
+<ExportWavButton
+  filename="my-mix"
+  mode="master"
+  bitDepth={16}
+  onExportComplete={(blob) => console.log('Exported:', blob.size, 'bytes')}
+/>
+```
+
+**Individual Track Export:**
+
+```tsx
+<ExportWavButton
+  label="Export Track 1"
+  filename="track-1"
+  mode="individual"
+  trackIndex={0}
+/>
+```
+
+**Export Without Effects (Raw Audio):**
+
+```tsx
+<ExportWavButton
+  label="Export Raw"
+  filename="raw-export"
+  applyEffects={false}
+/>
+```
+
+---
+
 ## Complete Example
 
 ```tsx
@@ -262,6 +325,7 @@ import {
   TimeFormatSelect,
   ContinuousPlayCheckbox,
   AutomaticScrollCheckbox,
+  ExportWavButton,
   useAudioTracks,
 } from '@waveform-playlist/browser';
 
@@ -308,6 +372,11 @@ function FullFeaturedPlaylist() {
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
         <ContinuousPlayCheckbox />
         <AutomaticScrollCheckbox />
+      </div>
+
+      {/* Export */}
+      <div style={{ marginBottom: '1rem' }}>
+        <ExportWavButton filename="my-mix" />
       </div>
 
       {/* Waveform */}
