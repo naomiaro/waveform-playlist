@@ -15,6 +15,7 @@ import {
   AudioPosition,
   ZoomInButton,
   ZoomOutButton,
+  ExportWavButton,
   useDynamicEffects,
   useTrackDynamicEffects,
   useAudioTracks,
@@ -402,6 +403,7 @@ interface EffectsControlsProps {
   isDarkMode: boolean;
   onDeleteTrack: (trackIndex: number) => void;
   onAddTracks: (newTracks: ClipTrack[]) => void;
+  masterEffectsFunction: any;
 }
 
 const EffectsControls: React.FC<EffectsControlsProps> = ({
@@ -410,6 +412,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   isDarkMode,
   onDeleteTrack,
   onAddTracks,
+  masterEffectsFunction,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -559,6 +562,16 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         <ControlGroup>
           <AudioPosition />
         </ControlGroup>
+
+        <Separator />
+
+        <ControlGroup>
+          <ExportWavButton
+            label="Export with Effects"
+            filename="effects-mix"
+            effectsFunction={masterEffectsFunction}
+          />
+        </ControlGroup>
       </TimeControlsBar>
 
       <DropZone
@@ -602,7 +615,7 @@ export function EffectsExample() {
 
   // Create track effects manager
   const trackEffectsManager = useTrackDynamicEffects();
-  const { addEffectToTrack, clearTrackEffects } = trackEffectsManager;
+  const { addEffectToTrack, clearTrackEffects, getTrackEffectsFunction, trackEffectsState } = trackEffectsManager;
 
   // Track configurations
   const audioConfigs = React.useMemo(() => [
@@ -677,6 +690,22 @@ export function EffectsExample() {
     setTracks(prevTracks => [...prevTracks, ...newTracks]);
   }, []);
 
+  // Create tracks with effects functions attached for export
+  const tracksWithEffects = React.useMemo(() => {
+    return tracks.map(track => {
+      const trackEffects = trackEffectsState.get(track.id);
+      // Only attach effects if the track has non-bypassed effects
+      const hasActiveEffects = trackEffects && trackEffects.some(e => !e.bypassed);
+      if (hasActiveEffects) {
+        return {
+          ...track,
+          effects: getTrackEffectsFunction(track.id),
+        };
+      }
+      return track;
+    });
+  }, [tracks, trackEffectsState, getTrackEffectsFunction]);
+
   if (isLoading) {
     return (
       <Container>
@@ -702,7 +731,7 @@ export function EffectsExample() {
       <EffectRack effectsManager={effectsManager} />
 
       <WaveformPlaylistProvider
-        tracks={tracks}
+        tracks={tracksWithEffects}
         samplesPerPixel={1024}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         waveHeight={100}
@@ -718,6 +747,7 @@ export function EffectsExample() {
           isDarkMode={isDarkMode}
           onDeleteTrack={handleDeleteTrack}
           onAddTracks={handleAddTracks}
+          masterEffectsFunction={masterEffects}
         />
       </WaveformPlaylistProvider>
     </Container>

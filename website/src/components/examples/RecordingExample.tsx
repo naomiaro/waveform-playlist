@@ -28,6 +28,7 @@ import {
   AudioPosition,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
+  ExportWavButton,
   usePlaybackAnimation,
   usePlaylistData,
   usePlaylistControls,
@@ -408,6 +409,13 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           <Separator orientation="vertical" />
 
           <MasterVolumeControl />
+
+          <Separator orientation="vertical" />
+
+          <ExportWavButton
+            label="Export Recording"
+            filename="recording"
+          />
         </Flex>
       </Card>
 
