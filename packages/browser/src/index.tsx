@@ -16,7 +16,6 @@ import {
   VolumeUpIcon,
   Slider,
   SliderWrapper,
-  Knob,
   StyledTimeScale,
   Playlist,
   Playhead,

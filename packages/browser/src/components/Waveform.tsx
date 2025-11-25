@@ -38,6 +38,7 @@ export interface WaveformProps {
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   annotationControls?: any[];
   annotationListConfig?: any;
+  annotationTextHeight?: number; // Height in pixels for the annotation text list
   className?: string;
   showClipHeaders?: boolean; // Show headers on clips for visual organization
   interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (requires @dnd-kit setup)
@@ -60,6 +61,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   renderTimestamp,
   annotationControls,
   annotationListConfig,
+  annotationTextHeight,
   className,
   showClipHeaders = false,
   interactiveClips = false,
@@ -496,6 +498,7 @@ export const Waveform: React.FC<WaveformProps> = ({
               editable={annotationsEditable}
               controls={annotationsEditable ? annotationControls : undefined}
               annotationListConfig={{ linkEndpoints, continuousPlay }}
+              height={annotationTextHeight}
               onAnnotationUpdate={(updatedAnnotations) => {
                 setAnnotations(updatedAnnotations);
               }}

@@ -2,9 +2,13 @@ import React, { FunctionComponent, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import type { AnnotationData, AnnotationAction } from './Annotation';
 
-const Container = styled.div`
+interface ContainerProps {
+  $height?: number;
+}
+
+const Container = styled.div<ContainerProps>`
   background: ${(props) => props.theme?.backgroundColor || '#fff'};
-  max-height: 200px;
+  ${(props) => props.$height ? `height: ${props.$height}px;` : 'max-height: 200px;'}
   overflow-y: auto;
   padding: 8px;
 `;
@@ -30,6 +34,28 @@ const AnnotationHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 6px;
+`;
+
+const AnnotationInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const AnnotationIdLabel = styled.span<{ $isEditable?: boolean }>`
+  font-size: 11px;
+  font-weight: 600;
+  color: ${(props) => props.theme?.textColor || '#333'};
+  background: ${(props) => props.theme?.surfaceColor || '#e8e8e8'};
+  padding: 2px 6px;
+  border-radius: 3px;
+  min-width: 20px;
+  outline: ${(props) => (props.$isEditable ? `1px dashed ${props.theme?.borderColor || '#ddd'}` : 'none')};
+
+  &[contenteditable='true']:focus {
+    outline: 2px solid #ff9800;
+    background: rgba(255, 152, 0, 0.1);
+  }
 `;
 
 const TimeRange = styled.span`
@@ -90,6 +116,7 @@ export interface AnnotationTextProps {
   editable?: boolean;
   controls?: AnnotationAction[];
   annotationListConfig?: any;
+  height?: number;
   onAnnotationClick?: (annotation: AnnotationData) => void;
   onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;
 }
@@ -101,6 +128,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   editable = false,
   controls = [],
   annotationListConfig,
+  height,
   onAnnotationClick,
   onAnnotationUpdate,
 }) => {
@@ -159,6 +187,20 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
     onAnnotationUpdate(updatedAnnotations);
   };
 
+  const handleIdEdit = (index: number, newId: string) => {
+    if (!editable || !onAnnotationUpdate) return;
+
+    const trimmedId = newId.trim();
+    if (!trimmedId) return; // Don't allow empty IDs
+
+    const updatedAnnotations = [...annotations];
+    updatedAnnotations[index] = {
+      ...updatedAnnotations[index],
+      id: trimmedId,
+    };
+    onAnnotationUpdate(updatedAnnotations);
+  };
+
   const handleControlClick = (control: AnnotationAction, annotation: AnnotationData, index: number) => {
     if (!onAnnotationUpdate) return;
 
@@ -172,7 +214,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   };
 
   return (
-    <Container ref={containerRef}>
+    <Container ref={containerRef} $height={height}>
       {annotations.map((annotation, index) => {
         const isActive = annotation.id === activeAnnotationId;
         return (
@@ -182,9 +224,19 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
           $isActive={isActive}
         >
           <AnnotationHeader>
-            <TimeRange>
-              {formatTime(annotation.start)} - {formatTime(annotation.end)}
-            </TimeRange>
+            <AnnotationInfo>
+              <AnnotationIdLabel
+                $isEditable={editable}
+                contentEditable={editable}
+                suppressContentEditableWarning
+                onBlur={(e) => handleIdEdit(index, e.currentTarget.textContent || '')}
+              >
+                {annotation.id}
+              </AnnotationIdLabel>
+              <TimeRange>
+                {formatTime(annotation.start)} - {formatTime(annotation.end)}
+              </TimeRange>
+            </AnnotationInfo>
             {controls.length > 0 && (
               <AnnotationControls onClick={(e) => e.stopPropagation()}>
                 {controls.map((control, idx) => (
