@@ -546,6 +546,33 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 These features expand core functionality and should be implemented first.
 
+- [ ] **Track/project export (WAV)**
+  - Render multi-track timeline to single audio file (master mix)
+  - Individual track export option (export selected track only)
+  - Toggle to include/exclude audio effects in export
+  - WAV format (lossless)
+  - Offline rendering using OfflineAudioContext
+  - Progress callback during export
+  - Download or return as Blob/ArrayBuffer
+
+- [ ] **Add fades to one of the examples**
+  - Demonstrate fade in/out functionality in stem-tracks or effects example
+  - Show visual fade curves on waveform
+  - Allow interactive fade adjustment (drag fade handles)
+
+- [ ] **Add new annotation support in annotations example**
+  - Button or keyboard shortcut to create new annotation at current playhead position
+  - New annotation spans from playhead to next annotation (or end of track)
+  - Default placeholder text (editable)
+  - Integrate with existing annotation editing workflow
+
+- [ ] **Custom playhead component support**
+  - Allow users to provide their own playhead component via prop
+  - Showcase in flexible-api example with polished design
+  - Default playhead: simple vertical line
+  - Custom playhead example: line with triangle/arrow on top
+  - Pass current position and styling props to custom component
+
 - [x] **Add waveform-data.js support** ✅
   - Integrate https://codeberg.org/chrisn/waveform-data.js
   - BBC's standard format for storing/retrieving waveform data
