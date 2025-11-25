@@ -162,7 +162,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
 };
 
 export function MultiClipExample() {
-  const theme = useDocusaurusTheme();
+  const { theme } = useDocusaurusTheme();
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

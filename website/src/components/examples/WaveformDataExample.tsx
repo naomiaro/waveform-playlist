@@ -173,7 +173,7 @@ interface BBCPeaksData {
  * buffers load in the background (~3MB files).
  */
 export function WaveformDataExample() {
-  const theme = useDocusaurusTheme();
+  const { theme } = useDocusaurusTheme();
   const [bbcPeaks, setBbcPeaks] = useState<Map<string, BBCPeaksData>>(new Map());
   const [peaksLoaded, setPeaksLoaded] = useState(false);
 

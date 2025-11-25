@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
 import { defaultTheme, darkTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 
+interface DocusaurusThemeResult {
+  theme: WaveformPlaylistTheme;
+  isDarkMode: boolean;
+}
+
 /**
  * Hook to detect and respond to Docusaurus theme changes
  *
  * Watches the data-theme attribute on the document element and returns
- * the appropriate theme (defaultTheme or darkTheme).
+ * the appropriate theme (defaultTheme or darkTheme) along with isDarkMode boolean.
  *
- * @returns The current theme based on Docusaurus's theme setting
+ * @returns Object containing the current theme and isDarkMode boolean
  */
-export function useDocusaurusTheme(): WaveformPlaylistTheme {
+export function useDocusaurusTheme(): DocusaurusThemeResult {
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
       return document.documentElement.getAttribute('data-theme') === 'dark';
@@ -30,5 +35,8 @@ export function useDocusaurusTheme(): WaveformPlaylistTheme {
     return () => observer.disconnect();
   }, []);
 
-  return isDark ? darkTheme : defaultTheme;
+  return {
+    theme: isDark ? darkTheme : defaultTheme,
+    isDarkMode: isDark,
+  };
 }

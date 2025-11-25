@@ -87,7 +87,7 @@ const HiddenFileInput = styled.input`
 `;
 
 export function NewTracksExample() {
-  const theme = useDocusaurusTheme();
+  const { theme } = useDocusaurusTheme();
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

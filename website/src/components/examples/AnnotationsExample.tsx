@@ -368,7 +368,7 @@ const AnnotationsAppContent: React.FC = () => {
 };
 
 export function AnnotationsExample() {
-  const theme = useDocusaurusTheme();
+  const { theme } = useDocusaurusTheme();
 
   const audioConfigs = React.useMemo(() => [
     {

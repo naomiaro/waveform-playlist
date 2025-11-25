@@ -449,9 +449,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
 // Main component
 export function RecordingExample() {
-  const theme = useDocusaurusTheme();
-  // Derive isDark from theme object (no need for duplicate MutationObserver)
-  const isDark = theme === darkTheme;
+  const { theme, isDarkMode: isDark } = useDocusaurusTheme();
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 

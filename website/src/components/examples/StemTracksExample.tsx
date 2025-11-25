@@ -65,7 +65,7 @@ const ControlGroup = styled.div`
 `;
 
 export function StemTracksExample() {
-  const theme = useDocusaurusTheme();
+  const { theme } = useDocusaurusTheme();
 
   // Load audio tracks and convert to ClipTrack format
   const { tracks, loading, error } = useAudioTracks(audioConfigs);

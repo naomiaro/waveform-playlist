@@ -386,9 +386,7 @@ const FlexibleApiContent: React.FC = () => {
 
 // Main Example Component
 export function FlexibleApiExample() {
-  const theme = useDocusaurusTheme();
-  // Derive isDark from theme object (no need for duplicate MutationObserver)
-  const isDark = theme === darkTheme;
+  const { theme, isDarkMode: isDark } = useDocusaurusTheme();
 
   // Custom theme with dark blue/teal aesthetic (matching old flexible-api example)
   const customTheme = {

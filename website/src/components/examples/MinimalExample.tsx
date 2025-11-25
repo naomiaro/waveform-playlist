@@ -37,7 +37,7 @@ const Container = styled.div`
 `;
 
 export function MinimalExample() {
-  const theme = useDocusaurusTheme();
+  const { theme } = useDocusaurusTheme();
 
   // Define your track configuration - use useMemo to prevent re-creating on every render
   const audioConfigs = React.useMemo(() => [
