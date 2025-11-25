@@ -478,6 +478,7 @@ export function RecordingExample() {
           automaticScroll={true}
           controls={{ show: true, width: 200 }}
           theme={theme}
+          timescale
         >
           <RecordingControlsInner
             tracks={tracks}

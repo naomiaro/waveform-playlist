@@ -404,6 +404,7 @@ export function AnnotationsExample() {
       automaticScroll={true}
       controls={{ show: true, width: 200 }}
       theme={theme}
+      timescale
       annotationList={{
         annotations: notes,
         editable: true,

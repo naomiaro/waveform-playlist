@@ -323,6 +323,7 @@ export function WaveformDataExample() {
         automaticScroll={true}
         controls={{ show: true, width: 200 }}
         theme={theme}
+        timescale
       >
         <Controls>
           <ControlGroup>

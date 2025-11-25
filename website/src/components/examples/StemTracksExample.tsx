@@ -100,6 +100,7 @@ export function StemTracksExample() {
         automaticScroll={true}
         controls={{ show: true, width: 200 }}
         theme={theme}
+        timescale
       >
         <Controls>
           <ControlGroup>

@@ -265,6 +265,7 @@ export function MultiClipExample() {
       automaticScroll={true}
       controls={{ show: true, width: 200 }}
       theme={theme}
+      timescale
     >
       <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />
     </WaveformPlaylistProvider>

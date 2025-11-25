@@ -476,6 +476,7 @@ export function FlexibleApiExample() {
           automaticScroll={false}
           controls={{ show: true, width: 120 }}
           theme={customTheme}
+          timescale
         >
           <FlexibleApiContent />
         </WaveformPlaylistProvider>
