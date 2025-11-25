@@ -62,7 +62,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   annotationListConfig,
   className,
   showClipHeaders = false,
-  interactiveClips = true, // Default to true for backwards compatibility
+  interactiveClips = false,
   recordingState,
 }) => {
   // Get theme from context (typed as WaveformPlaylistTheme)

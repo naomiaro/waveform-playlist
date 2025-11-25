@@ -226,8 +226,8 @@ export interface WaveformPlaylistProviderProps {
 
 export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = ({
   tracks,
-  timescale = true,
-  mono = true,
+  timescale = false,
+  mono = false,
   waveHeight = 80,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,

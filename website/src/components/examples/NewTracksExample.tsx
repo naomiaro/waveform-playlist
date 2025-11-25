@@ -224,7 +224,7 @@ export function NewTracksExample() {
         <WaveformPlaylistProvider
           tracks={tracks}
           samplesPerPixel={2048}
-          mono={true}
+          mono
           waveHeight={120}
           automaticScroll={true}
           controls={{ show: true, width: 200 }}

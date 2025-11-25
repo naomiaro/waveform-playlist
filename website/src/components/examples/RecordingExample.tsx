@@ -421,6 +421,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <Waveform
           timescale
           showClipHeaders
+          interactiveClips
           recordingState={
             isRecording && selectedTrackId
               ? {
@@ -474,7 +475,7 @@ export function RecordingExample() {
           tracks={tracks}
           samplesPerPixel={1024}
           zoomLevels={[256, 512, 1024, 2048, 4096]}
-          mono={true}
+          mono
           waveHeight={100}
           automaticScroll={true}
           controls={{ show: true, width: 200 }}

@@ -156,7 +156,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
         </ControlGroup>
       </Controls>
 
-      <Waveform timescale showClipHeaders />
+      <Waveform timescale showClipHeaders interactiveClips />
     </DndContext>
   );
 };
@@ -260,7 +260,7 @@ export function MultiClipExample() {
     <WaveformPlaylistProvider
       tracks={tracks}
       samplesPerPixel={1024}
-      mono={true}
+      mono
       waveHeight={100}
       automaticScroll={true}
       controls={{ show: true, width: 200 }}

@@ -399,7 +399,7 @@ export function AnnotationsExample() {
     <WaveformPlaylistProvider
       tracks={tracks}
       samplesPerPixel={1024}
-      mono={true}
+      mono
       waveHeight={128}
       automaticScroll={true}
       controls={{ show: true, width: 200 }}

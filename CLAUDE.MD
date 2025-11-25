@@ -12,6 +12,8 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Current Phase:** Pre Launch - Alpha Release Preparation
 
+**Breaking Changes OK:** No backwards compatibility requirements until after launch. Feel free to change defaults, rename props, or restructure APIs to get them right before the initial release.
+
 **Key Milestones Completed:**
 - ✅ Phase 1: Foundation (React refactor, provider pattern, all core features)
 - ✅ Phase 1.5: Bundle Optimization (tree-shaking, 23KB gzipped savings)
