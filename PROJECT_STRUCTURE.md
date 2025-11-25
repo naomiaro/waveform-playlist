@@ -23,37 +23,27 @@ waveform-playlist/
 │   ├── ui-components/     # Reusable React UI components
 │   └── webaudio-peaks/    # Waveform peak generation
 │
-├── website/               # Docusaurus documentation site
-│   ├── src/
-│   │   ├── components/examples/  # React example components
-│   │   │   ├── MinimalExample.tsx
-│   │   │   ├── StemTracksExample.tsx
-│   │   │   ├── EffectsExample.tsx
-│   │   │   ├── NewTracksExample.tsx
-│   │   │   ├── MultiClipExample.tsx
-│   │   │   ├── AnnotationsExample.tsx
-│   │   │   ├── RecordingExample.tsx
-│   │   │   ├── FlexibleApiExample.tsx
-│   │   │   └── WaveformDataExample.tsx  # BBC peaks demo
-│   │   ├── pages/examples/       # Example page wrappers
-│   │   ├── hooks/                # Docusaurus-specific hooks
-│   │   │   └── useDocusaurusTheme.ts
-│   │   └── theme/                # Theme customizations
-│   │       └── Root.tsx          # Radix Themes provider
-│   ├── static/media/audio/       # Audio and peaks files
-│   │   ├── *.mp3                 # Audio files
-│   │   └── *-8bit.dat            # BBC pre-computed peaks
-│   └── docusaurus.config.ts      # Webpack aliases for workspace packages
-│
-├── ghpages/               # Jekyll static site (legacy)
-│   ├── _examples/         # Example page templates
-│   ├── _includes/         # Reusable HTML includes (forms, buttons)
-│   ├── js/                # Pre-built JavaScript bundles
-│   └── media/             # Audio files for demos
-│
-├── _site/                 # Jekyll output (local dev)
-├── dist/                  # Production build output
-└── experiments/           # Experimental features/prototypes
+└── website/               # Docusaurus documentation site
+    ├── src/
+    │   ├── components/examples/  # React example components
+    │   │   ├── MinimalExample.tsx
+    │   │   ├── StemTracksExample.tsx
+    │   │   ├── EffectsExample.tsx
+    │   │   ├── NewTracksExample.tsx
+    │   │   ├── MultiClipExample.tsx
+    │   │   ├── AnnotationsExample.tsx
+    │   │   ├── RecordingExample.tsx
+    │   │   ├── FlexibleApiExample.tsx
+    │   │   └── WaveformDataExample.tsx  # BBC peaks demo
+    │   ├── pages/examples/       # Example page wrappers
+    │   ├── hooks/                # Docusaurus-specific hooks
+    │   │   └── useDocusaurusTheme.ts
+    │   └── theme/                # Theme customizations
+    │       └── Root.tsx          # Radix Themes provider
+    ├── static/media/audio/       # Audio and peaks files
+    │   ├── *.mp3                 # Audio files
+    │   └── *-8bit.dat            # BBC pre-computed peaks
+    └── docusaurus.config.ts      # Webpack aliases for workspace packages
 ```
 
 ## Package Descriptions

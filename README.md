@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://moises.ai/" target="_blank">
-    <img width="222px" src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/ghpages/img/logos/moises-ai.svg">
+    <img width="222px" src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/logos/moises-ai.svg">
   </a>
 </p>
 
@@ -18,13 +18,6 @@ Load tracks and set cues (track cue in, cue out), fades (track fade in, fade out
 I've written up some demos on github for the different [audio fade types](https://github.com/naomiaro/Web-Audio-Fades) in the project.
 
 - [See examples in action](http://naomiaro.github.io/waveform-playlist)
-- [Try out the waveform editor!](http://naomiaro.github.io/waveform-playlist/web-audio-editor.html)
-
-![Screenshot](img/stemtracks.png?raw=true "stem tracks mute solo volume control")
-(code for picture shown can be found in ghpages/\_examples/04stemtracks.html)
-
-![Screenshot](img/annotations.png?raw=true "Aeneas annotations adjust alignment json export")
-(code for picture shown can be found in ghpages/\_examples/13annotations.html)
 
 ## Browser Support
 
@@ -35,8 +28,6 @@ Waveform Playlist requires webaudio in the browser to function correctly: [Can I
 `npm install waveform-playlist --save`
 
 Hate npm? Check Unpkg: https://unpkg.com/browse/waveform-playlist/
-
-- If you want to download and run the already compiled website, navigate to folder `/dist` and run `python -m SimpleHTTPServer 8000`. The website will be available at `localhost:8000/waveform-playlist`.
 
 ## Basic Usage
 
@@ -426,21 +417,13 @@ An example of using the event emitter to control the playlist can be found in [/
 
 `npm test`
 
-## Development without example changes
+## Development
 
-`npm install && npm start`
+`pnpm install && pnpm start`
 
-This will install dependencies and start the webpack server.
+This will install dependencies and start the Docusaurus dev server.
 
-## Development with example changes
-
-`gem install jekyll`
-
-Jekyll is needed if changes to the example pages will be done.
-
-`npm install && npm run dev`
-
-This will build and watch the jekyll site and startup the webpack dev server.
+Visit http://localhost:3000/waveform-playlist to see the examples.
 
 ## Credits
 

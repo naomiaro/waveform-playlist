@@ -1,0 +1,21 @@
+.sponsors {
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.sponsorLogos {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.sponsorLogo {
+  transition: opacity 0.2s ease;
+}
+
+.sponsorLogo:hover {
+  opacity: 0.8;
+}

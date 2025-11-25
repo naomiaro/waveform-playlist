@@ -6,19 +6,10 @@ node_modules/
 /styles
 lib
 .DS_Store
-test/.DS_Store
-
-# Jekyll
-ghpages/.jekyll-cache/
-_site/
-
-# Build outputs
-dist/
-ghpages/js/waveform-playlist.js
-ghpages/js/waveform-playlist.js.map
 
 # Source maps
 *.js.map
 
+# Storybook
 *storybook.log
 storybook-static

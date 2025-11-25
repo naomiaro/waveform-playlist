@@ -1,0 +1,24 @@
+.bookSection {
+  padding: 2rem 0;
+  background: var(--ifm-background-surface-color);
+}
+
+.bookContent {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.bookCover {
+  padding: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.bookCover:hover {
+  transform: scale(1.05);
+}
+
+.bookDescription {
+  margin-top: 1rem;
+  line-height: 1.6;
+}
