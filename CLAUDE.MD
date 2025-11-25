@@ -171,15 +171,11 @@ interface AudioClip {
 4. Components access theme via `props.theme.propertyName` in styled components
 5. No color/styling props passed through component interfaces
 
-**Type Safety Pattern (2025-11-23):**
-- Use `Partial<WaveformPlaylistTheme>` for theme props in component interfaces
-- Single source of truth - theme shape defined once in `wfpl-theme.ts`
-- Automatic propagation - new theme properties available everywhere without manual updates
-- Applied in: `WaveformProps` and `WaveformPlaylistProviderProps`
+**Type Safety:** Use `Partial<WaveformPlaylistTheme>` for theme props. Single source of truth in `wfpl-theme.ts`.
 
-**Location:** Theme types in `ui-components/src/wfpl-theme.ts`, type augmentation in `ui-components/src/styled.d.ts`
+**Location:** `ui-components/src/wfpl-theme.ts`, `ui-components/src/styled.d.ts`
 
-### Theme Provider Pattern (2025-11-24)
+### Theme Provider Pattern
 
 **Decision:** Use styled-components `ThemeProvider` at the `WaveformPlaylistProvider` level.
 
@@ -209,95 +205,28 @@ interface AudioClip {
 - Switch between `defaultTheme` and `darkTheme` based on Docusaurus mode
 - Example: `minimal-app.tsx` detects and responds to theme toggle
 
-### Docusaurus Native Examples (2025-11-24)
+### Docusaurus Native Examples
 
-**Decision:** Migrate from Jekyll + separate bundle builds to Docusaurus-native React components.
+**Decision:** Docusaurus-native React components instead of Jekyll + separate bundles.
 
-**Why:**
-- Simpler build process (one system instead of Jekyll + Vite)
-- Better code-splitting and smaller bundles per page
-- Hot module reloading for faster development
-- Direct use of `useDocusaurusTheme()` hook without MutationObserver
-- Eliminates need to maintain separate bundle entry points
+**Webpack Aliases:** In `website/docusaurus.config.ts`, packages transpiled from source:
+- `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source
+- `annotations`, `recording` → dist/ (have build artifacts like worklets)
 
-**Webpack Configuration:**
-```typescript
-// website/docusaurus.config.ts
-resolve: {
-  symlinks: true,
-  extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
-  alias: {
-    // Transpile these packages from source
-    '@waveform-playlist/browser': path.resolve(__dirname, '../packages/browser/src'),
-    '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
-    '@waveform-playlist/playout': path.resolve(__dirname, '../packages/playout/src'),
-    '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
-    // annotations, recording use built dist/ versions (have build artifacts like worklets)
-  },
-}
-```
+**Pattern:**
+- Use `useDocusaurusTheme()` hook for automatic light/dark theme
+- Export components as functions (no `createRoot()`)
+- Styled components use CSS variables: `var(--ifm-background-surface-color, #fallback)`
 
-**Example Component Pattern:**
-```typescript
-// website/src/components/examples/MinimalExample.tsx
-import { WaveformPlaylistProvider, Waveform, PlayButton, useAudioTracks } from '@waveform-playlist/browser';
-import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+**Rebuild requirement:** When ui-components changes affect recording, rebuild both packages.
 
-export function MinimalExample() {
-  const theme = useDocusaurusTheme();
-  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+**Location:** `website/src/components/examples/`
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+### Track Selection Styling
 
-  return (
-    <WaveformPlaylistProvider tracks={tracks} theme={theme}>
-      <PlayButton />
-      <Waveform />
-    </WaveformPlaylistProvider>
-  );
-}
-```
+**Theme Properties:** `selectedWaveOutlineColor`, `selectedTrackControlsBackground`, `selectedClipHeaderBackgroundColor`
 
-**Page Pattern:**
-```typescript
-// website/src/pages/examples/minimal.tsx
-import { MinimalExample } from '../../components/examples/MinimalExample';
-
-export default function MinimalExamplePage() {
-  return (
-    <Layout title="Minimal Example">
-      <MinimalExample />
-    </Layout>
-  );
-}
-```
-
-**Key Points:**
-- Export components as functions (no `createRoot()` / DOM mounting)
-- Use `useDocusaurusTheme()` for automatic light/dark theme
-- Styled components use Docusaurus CSS variables: `var(--ifm-background-surface-color, #fallback)`
-- No need for MutationObserver - theme changes automatically
-- Built packages (annotations, recording) still use dist/ for build artifacts
-- **Rebuild requirement:** When ui-components changes affect recording (e.g., BaseSelect theming), rebuild both packages: `cd packages/ui-components && pnpm build`, then `cd packages/recording && pnpm build`
-
-**Location:** Example components in `website/src/components/examples/`
-
-### Track Selection Styling (2025-11-23)
-
-**Visual Feedback for Selected Track:**
-- `selectedWaveOutlineColor` - Brighter waveform outline (#0099ff vs #005BBB)
-- `selectedTrackControlsBackground` - Light blue controls background (#d9e9ff)
-- `selectedClipHeaderBackgroundColor` - Brighter clip headers (#b3d9ff)
-
-**Implementation:**
-- Track: `isSelected` prop passed to all track components
-- SmartChannel: Conditionally uses `selectedWaveOutlineColor` when `isSelected`
-- Track ControlsWrapper: Applies `selectedTrackControlsBackground` with transition
-- ClipHeader: Applies `selectedClipHeaderBackgroundColor` when track selected
-- No borders - selection shown via background colors only
-
-**Pattern:** `isSelected` prop flows: Waveform → Track → Clip → ClipHeader and SmartChannel
+**Pattern:** `isSelected` prop flows: Waveform → Track → Clip → ClipHeader and SmartChannel. Selection shown via background colors, no borders.
 
 ### Custom Hooks Architecture
 
@@ -352,47 +281,17 @@ source.connect(analyser);
 
 ### Recording-Optimized Audio Constraints
 
-**Default Constraints:** Prioritize raw audio quality and low latency for recording.
+**Defaults in `useMicrophoneAccess`:** `echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`, `latency: 0`
 
-```typescript
-{
-  echoCancellation: false,      // Preserve raw audio
-  noiseSuppression: false,      // No processing
-  autoGainControl: false,       // Manual control
-  latency: 0                    // Low latency mode
-}
-```
+Users can override via `audioConstraints` parameter.
 
-**Pattern:** These are defaults in `useMicrophoneAccess`. Users can override via `audioConstraints` parameter.
+### Tone.js Initialization
 
-**Note:** `latency: 0` is supported in modern browsers but not yet in TypeScript types. Use type extension: `MediaTrackConstraints & { latency?: number }`
+**Critical:** Call `await Tone.start()` after user interaction and before `Tone.now()`.
 
-### Tone.js Initialization Pattern (2025-11-24)
+Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
-**Critical:** Tone.js AudioContext must be explicitly started before using timing functions.
-
-**Problem:** `Tone.now()` returns `null` if context hasn't been started, causing RangeError in audio scheduling.
-
-**Solution:** Always call `await Tone.start()` after user interaction and before using Tone timing.
-
-```typescript
-// ✅ CORRECT - Start context before timing functions
-await playoutRef.current.init();
-await Tone.start();  // Required!
-const now = Tone.now();  // Now returns valid time
-playbackStartTimeRef.current = now;
-
-// ❌ WRONG - Timing functions without start
-await playoutRef.current.init();
-const now = Tone.now();  // Returns null!
-// → RangeError: Value must be within [0, Infinity], got: NaN
-```
-
-**Why:** Browser security requires AudioContext to be started by user gesture. Tone.js `start()` resumes the context.
-
-**Location:** WaveformPlaylistContext.tsx play() function (line 635)
-
-**Related:** Master volume now uses Web Audio standard 0-1.0 range instead of 0-100 percentage.
+**Master volume:** Uses Web Audio standard 0-1.0 range (not 0-100).
 
 ---
 
@@ -404,6 +303,24 @@ const now = Tone.now();  // Returns null!
 4. **Try-Catch Cleanup** - Wrap audio node disconnects for device switching
 5. **Sample-Based Math** - Use integer samples for all timing calculations
 6. **TypeScript Enforcement** - Build scripts run `pnpm typecheck &&` before bundling
+7. **Refs for Dynamic Audio Callbacks** - When useCallback needs fresh state for audio graph rebuilding, store state in a ref and read from ref inside callback (avoids stale closures)
+
+### Refs for Dynamic Audio Callbacks
+
+**Problem:** useCallback with state dependencies creates stale closures when callbacks are stored and called later.
+
+**Solution:** Store current state in a ref, read from ref inside callback:
+
+```typescript
+const activeEffectsRef = useRef(activeEffects);
+activeEffectsRef.current = activeEffects; // Update on every render
+
+const rebuildChain = useCallback(() => {
+  const currentEffects = activeEffectsRef.current; // Fresh state
+}, []); // Stable function - no dependencies
+```
+
+**Applied in:** `useDynamicEffects`, `useTrackDynamicEffects`
 
 ---
 

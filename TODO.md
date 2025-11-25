@@ -9,281 +9,21 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
-### 2025-11-24: MicrophoneSelector Dark Mode & Recording Example Styling
+### 2025-11-24: Export with Effects & Dynamic Effects Fixes
+- ✅ WAV export with master + per-track effects via Tone.Offline
+- ✅ Fixed stale closure issues in `useDynamicEffects` and `useTrackDynamicEffects`
+- ✅ Fixed bypass toggle to restore original wet value (not always 1)
+- ✅ Bypassed effects excluded from export
 
-**Goal:** Fix unreadable select dropdown in dark mode and improve recording example UI layout
-
-**What Was Done:**
-- ✅ Fixed MicrophoneSelector dark mode - native `<option>` elements now styled with theme colors
-- ✅ Added `option` element styling to `BaseSelect.tsx` using theme.inputText and theme.inputBackground
-- ✅ Improved DropZone layout in RecordingExample - flexbox column with proper gaps and centering
-- ✅ Created `RecordingControlsRow` styled component with `align-items: flex-end` for consistent vertical alignment
-
-**Files Modified:**
-- `packages/ui-components/src/styled/BaseSelect.tsx` (added option element styling)
-- `website/src/components/examples/RecordingExample.tsx` (improved layout styling)
-
-**Technical Note:** The recording package uses built dist/ versions (not transpiled from source) due to worklet file dependencies. Changes to ui-components require rebuilding both ui-components and recording packages.
-
----
-
-### 2025-11-24: BBC Waveform Data Docusaurus Example
-
-**Goal:** Create Docusaurus-native example demonstrating BBC pre-computed peaks for fast waveform loading
-
-**Achievement:** ✅ Full example with file size comparison, preview while audio loads, Storybook stereo support
-
-**What Was Done:**
-- ✅ Created `WaveformDataExample.tsx` - Docusaurus-native component
-  - Loads 8-bit BBC peaks (~11KB each) for instant waveform preview
-  - Audio loads in background (~469KB MP3s)
-  - Shows file size stats: 44KB peaks vs 1.9MB audio (42x smaller)
-  - Progressive loading: waveform visible before audio ready
-- ✅ Created `waveform-data.tsx` page with documentation
-  - audiowaveform CLI examples
-  - Code examples for loading and using BBC peaks
-- ✅ Generated missing 8-bit peak files:
-  - `PianoSynth30-8bit.dat` (11KB)
-  - `BassDrums30-8bit.dat` (11KB)
-- ✅ Updated Storybook `StereoVersion2` story to render both L/R channels
-  - `StereoWaveformDemo` component loads both channels from v2 files
-  - Left channel: blue/yellow, Right channel: orange/teal
-  - Labels show L/R on each channel
-
-**Files Created:**
-- `website/src/components/examples/WaveformDataExample.tsx`
-- `website/src/pages/examples/waveform-data.tsx`
-- `website/static/media/audio/PianoSynth30-8bit.dat`
-- `website/static/media/audio/BassDrums30-8bit.dat`
-
-**Files Modified:**
-- `packages/ui-components/src/stories/WaveformData.stories.tsx` (stereo rendering)
-
-**Key Technical Details:**
-- Uses `loadWaveformData()`, `waveformDataToPeaks()`, `getWaveformDataMetadata()` from browser package
-- File size display more meaningful than timing on localhost
-- 8-bit peaks are half the size of 16-bit (~11KB vs ~22KB)
-- Demonstrates progressive loading UX pattern
-
----
-
-### 2025-11-24: Annotation Keyboard Controls & Resize Handle Polish
-
-**Goal:** Add keyboard-based annotation editing and improve resize handle UX
-
-**Achievement:** ✅ New keyboard controls hook, improved visual appearance of resize handles
-
-**What Was Done:**
-- ✅ Created `useAnnotationKeyboardControls` hook for keyboard-based boundary editing
-  - `[` / `]` keys move start boundary earlier/later by 10ms
-  - `Shift+{` / `Shift+}` keys move end boundary earlier/later by 10ms
-  - Respects `linkEndpoints` setting for linked boundary behavior
-  - Collision detection prevents overlapping annotations
-  - Only active when an annotation is selected
-- ✅ Reduced resize handle size to minimize overlap between adjacent annotations
-  - Width: 30px → 16px
-  - Offset: -15px → -8px
-  - Background: semi-opaque → transparent (visible only on hover/drag)
-  - Visual indicator: 6px → 4px width
-- ✅ Integrated keyboard controls into AnnotationsExample
-
-**Files Created:**
-- `packages/browser/src/hooks/useAnnotationKeyboardControls.ts`
-
-**Files Modified:**
-- `packages/browser/src/hooks/index.ts` (export new hook)
-- `packages/browser/src/index.tsx` (export new hook)
-- `packages/annotations/src/components/AnnotationBox.tsx` (resize handle styling)
-- `website/src/components/examples/AnnotationsExample.tsx` (use keyboard hook)
-
-**Keyboard Shortcuts for Annotations:**
-```
-[ - Move start boundary earlier (left) by 10ms
-] - Move start boundary later (right) by 10ms
-Shift+{ - Move end boundary earlier (left) by 10ms
-Shift+} - Move end boundary later (right) by 10ms
-```
-
----
-
-### 2025-11-24: Annotation Boundary Dragging with @dnd-kit
-
-**Goal:** Enable annotation boundary resizing via drag handles
-
-**Achievement:** ✅ Fixed @dnd-kit integration for annotations package in Docusaurus
-
-**What Was Done:**
-- ✅ Added annotations package to webpack transpilation (source instead of dist)
-- ✅ Added webpack alias: `@waveform-playlist/annotations` → source path
-- ✅ Ensures single @dnd-kit/core instance shared between DndContext and useDraggable hooks
-- ✅ Annotation resize handles now work correctly with pointer events
-- ✅ Linked endpoints update when dragging boundaries (when enabled)
-- ✅ Removed debug console.log statements from `useAnnotationDragHandlers.ts` and `AnnotationBox.tsx`
-
-**Root Cause:** The annotations package was loaded from its pre-built `dist/` version which bundled its own copy of @dnd-kit/core. This caused the DndContext (from browser package) and useDraggable hooks (from annotations) to use different React contexts.
-
-**Files Modified:**
-- `website/docusaurus.config.ts` (added annotations to transpilation and alias)
-- `packages/browser/src/hooks/useAnnotationDragHandlers.ts` (removed debug logging)
-- `packages/annotations/src/components/AnnotationBox.tsx` (removed debug logging)
-
----
-
-### 2025-11-24: FlexibleApi & Annotations Example Polish + Docusaurus Cache Fix
-
-**Goal:** Polish FlexibleApi example with better UX and fix annotations example
-
-**Achievement:** ✅ Custom Radix UI controls, improved layout, annotations working in Docusaurus
-
-**What Was Done:**
-- ✅ FlexibleApiExample improvements:
-  - Button color styling: Pause = amber, Stop = red for better visual feedback
-  - Moved time controls to dedicated bottom bar (matches old flexible-api layout)
-  - Created CustomSelectionInputs component with Radix UI TextField components
-  - Custom time parsing/formatting for editable cue in/out controls
-  - Clean integration with existing time format selector
-- ✅ Annotations example migration:
-  - Fixed "notes is not defined" error by embedding data directly in component
-  - Converted from bundle loading to Docusaurus-native component
-  - Updated page to use AnnotationsExample component instead of script loading
-  - Fixed `annotationList` prop (was using wrong `annotationOptions`)
-  - Switched audio file to sonnet.mp3 (matches Shakespeare's Sonnet 1 annotations)
-- ✅ Docusaurus configuration:
-  - Updated website/package.json start script to always clear cache: `docusaurus clear && docusaurus start`
-  - Prevents frustrating cache issues during development
-
-**Files Modified:**
-- `website/src/components/examples/FlexibleApiExample.tsx` (custom selection inputs, layout)
-- `website/src/components/examples/AnnotationsExample.tsx` (embedded notes data, fixed props)
-- `website/src/pages/examples/annotations.tsx` (use component instead of bundle)
-- `packages/browser/src/annotations-app.tsx` (embedded notes data for bundle builds)
-- `website/package.json` (cache clearing)
-
-**Pattern: Custom Radix UI Form Components**
-```typescript
-// Use Radix UI TextField for editable time inputs
-const CustomSelectionInputs: React.FC = () => {
-  const { selectionStart, selectionEnd } = usePlaylistState();
-  const { setSelection } = usePlaylistControls();
-  const { timeFormat } = usePlaylistData();
-
-  return (
-    <Flex gap="2" align="center">
-      <TextField.Root value={formatTime(start, timeFormat)} onChange={handleChange} />
-      <Text>to</Text>
-      <TextField.Root value={formatTime(end, timeFormat)} onChange={handleChange} />
-    </Flex>
-  );
-};
-```
-
----
-
-### 2025-11-24: Master Volume API Standardization & Tone.js Fix
-
-**Goal:** Standardize master volume to Web Audio API convention (0-1.0 gain) and fix playback initialization
-
-**Achievement:** ✅ Fixed volume display bug (was showing 10000%), standardized API, fixed NaN playback error
-
-**What Was Done:**
-- ✅ Changed master volume API from 0-100 percentage to 0-1.0 linear gain (Web Audio standard)
-- ✅ Updated `useMasterVolume` hook: initialVolume default changed from 100 to 1.0
-- ✅ Updated `MasterVolumeControl` component: accepts 0-1.0, converts to/from percentage for display
-- ✅ Updated `WaveformPlaylistContext`: initialVolume changed from 100 to 1.0
-- ✅ Fixed Tone.js initialization error in play function: Added `await Tone.start()` before `Tone.now()`
-- ✅ Added validation in `useAudioTracks`: checks audioBuffer and clip values for NaN
-- ✅ Added debug logging in `ToneTrack.play()`: detects NaN parameters early
-- ✅ Fixed FlexibleApiExample: correct hook usage, Mute/Solo buttons show "M" and "S" text
-- ✅ All volume controls now use consistent 0-1.0 range throughout system
-- **Root Cause:** `Tone.now()` returns null when AudioContext not started (requires user interaction)
-- **Pattern:** Always call `await Tone.start()` before using Tone.js timing functions
-
-**Files Modified:**
-- `packages/browser/src/hooks/useMasterVolume.ts` (0-1.0 range)
-- `packages/ui-components/src/components/MasterVolumeControl.tsx` (percentage conversion)
-- `packages/browser/src/WaveformPlaylistContext.tsx` (Tone.start() fix, initialVolume)
-- `website/src/components/examples/FlexibleApiExample.tsx` (hook usage, buttons)
-- `packages/browser/src/hooks/useAudioTracks.ts` (validation)
-- `packages/playout/src/ToneTrack.ts` (debug logging)
-
-**Technical Details:**
-- Master volume now consistent with Web Audio API: `GainNode.gain.value` accepts 0-1.0
-- Display layer converts to percentage: `Math.round(volume * 100)%`
-- Tone.js requires explicit context start: `await Tone.start()` must be called after user interaction
-- Without `Tone.start()`, `Tone.now()` returns null causing RangeError in player scheduling
-
----
-
-### 2025-11-24: Docusaurus Migration - Completed with Radix Themes
-
-**Goal:** Migrate all 8 examples from Jekyll + bundle builds to Docusaurus-native React components
-
-**Achievement:** ✅ Successfully migrated all examples, integrated Radix Themes, server compiling without errors
-
-**What Was Done:**
-- ✅ Set up webpack aliases to transpile workspace packages from source
-- ✅ Added hook exports to browser package: `useAudioTracks`, `useIntegratedRecording`, `usePlaybackControls`, `useZoomControls`, `useAudioPosition`, `useTimeFormat`, `useMasterVolume`
-- ✅ Fixed recording package tsup config for worklet output path
-- ✅ Installed Radix Themes v3 for website UI components
-- ✅ Created Root.tsx theme provider wrapper
-- ✅ Migrated all 8 example components to Docusaurus-native:
-  - MinimalExample.tsx - Basic playback
-  - StemTracksExample.tsx - Multi-track with controls
-  - EffectsExample.tsx - Audio effects with frequency visualizer
-  - NewTracksExample.tsx - Drag-drop file upload
-  - MultiClipExample.tsx - Multiple clips, drag/trim, split with 's' key
-  - AnnotationsExample.tsx - Annotation editing with controls
-  - RecordingExample.tsx - Live recording with VU meter (using Radix Themes)
-  - FlexibleApiExample.tsx - Hooks-based API showcase (using Radix Themes)
-- ✅ Updated all example page files to use new components
-- ✅ Added dependencies: @dnd-kit/core, @dnd-kit/modifiers, @waveform-playlist/recording, @waveform-playlist/annotations
-- ✅ Server compiling successfully (no errors or warnings)
-
-**Remaining Work:**
-- ⏳ Remove old bundle build scripts from package.json
-- ⏳ Clean up old bundle files in packages/browser/src/*-app.tsx
-- ⏳ Test all 8 examples in browser for functionality
-
-**Key Technical Details:**
-
-1. **Webpack Configuration** (website/docusaurus.config.ts):
-   ```typescript
-   // Aliases point to source for transpilation
-   '@waveform-playlist/browser': path.resolve(__dirname, '../packages/browser/src'),
-   '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
-   '@waveform-playlist/playout': path.resolve(__dirname, '../packages/playout/src'),
-   '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
-   // annotations, recording, loaders, webaudio-peaks use built dist/ versions
-   ```
-
-2. **Recording Package Fix:**
-   - Updated tsup.config.ts to output worklet to `worklet/recording-processor.worklet.js`
-   - Matches import path in useRecording hook
-
-3. **Pattern for Examples:**
-   - Import from '@waveform-playlist/browser' (transpiled from source)
-   - Use `useDocusaurusTheme()` hook for theme integration
-   - Export as function component (no createRoot/DOM mounting)
-   - All styled components use Docusaurus CSS variables
-
-**Files Created:**
-- website/src/theme/Root.tsx (Radix Themes provider wrapper)
-- website/src/components/examples/MinimalExample.tsx
-- website/src/components/examples/StemTracksExample.tsx
-- website/src/components/examples/EffectsExample.tsx
-- website/src/components/examples/NewTracksExample.tsx
-- website/src/components/examples/MultiClipExample.tsx
-- website/src/components/examples/AnnotationsExample.tsx
-- website/src/components/examples/RecordingExample.tsx (with Radix Themes)
-- website/src/components/examples/FlexibleApiExample.tsx (with Radix Themes)
-
-**Files Modified:**
-- packages/browser/src/index.tsx (added 7 hook exports)
-- packages/recording/tsup.config.ts (fixed worklet output path)
-- website/docusaurus.config.ts (added webpack configuration)
-- website/package.json (added @radix-ui/themes, @dnd-kit/*, recording, annotations)
-- website/src/pages/examples/recording.tsx (use RecordingExample component)
-- website/src/pages/examples/flexible-api.tsx (use FlexibleApiExample component)
+### 2025-11-24: Docusaurus Examples & UI Polish
+- ✅ Migrated all 8 examples to Docusaurus-native React components
+- ✅ BBC Waveform Data example with progressive loading (44KB peaks vs 1.9MB audio)
+- ✅ Annotation keyboard controls (`[` `]` for boundaries) and smaller resize handles
+- ✅ Fixed @dnd-kit context issue for annotation dragging
+- ✅ Master volume API: 0-100 → 0-1.0 (Web Audio standard)
+- ✅ Fixed Tone.js init: `await Tone.start()` before `Tone.now()`
+- ✅ MicrophoneSelector dark mode fix
+- ✅ Radix Themes integration for Recording/FlexibleApi examples
 
 ---
 
@@ -1407,225 +1147,35 @@ Infrastructure needed to actually publish the alpha.
 
 ---
 
-## ✅ Recently Completed
+## ✅ Older Completed Work
 
 ### 2025-11-23
-
-- [x] **Recording UX Improvements - Auto-Select & Audio Constraints** ✅
-  - Added recording-optimized audio constraints: `echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`, `latency: 0`
-  - User-provided constraints can override defaults via `audioConstraints` parameter
-  - Added TypeScript support for `latency` property (not yet in official types but supported in modern browsers)
-  - Auto-select first microphone device after permission granted (removed confusing "Select a microphone" placeholder)
-  - MicrophoneSelector now automatically uses first device as default value when no explicit selection
-  - Improved UX: users can immediately start recording after granting permission without manual device selection
-  - **Files modified:** `useMicrophoneAccess.ts` (constraints), `MicrophoneSelector.tsx` (auto-select), `useIntegratedRecording.ts` (cleanup)
-  - Bundle: 578KB / 171KB gzipped
-
-- [x] **waveform-data.js Support - Pre-Launch Phase 1** ✅
-  - Created `waveformDataLoader.ts` utility with BBC waveform-data.js integration
-  - Functions: `loadWaveformData()`, `waveformDataToPeaks()`, `loadPeaksFromWaveformData()`, `getWaveformDataMetadata()`
-  - Loads pre-computed .dat files for 10-50x faster waveform display vs computing peaks from audio
-  - Created `waveform-data-app.tsx` demo showing performance comparison with console logging
-  - Added to vite.config.ts and created Jekyll page with comprehensive documentation
-  - Bundle: 547KB / 161KB gzipped
-  - Demo: Shows all 4 .dat files loading in ~50ms vs audio decoding in ~500ms
-  - Updated code examples to properly demonstrate `Promise.all` for parallel loading
-  - **Files created:** `waveformDataLoader.ts`, `waveform-data-app.tsx`, `19waveform-data.html`
-
-- [x] **interactiveClips Prop - UX Improvement**
-  - Added `interactiveClips` prop to WaveformProps (defaults to true for backwards compatibility)
-  - Controls whether clip headers show drag cursors and trim boundaries are rendered
-  - Allows showing clip headers for visual organization without implying interactivity
-  - When false: headers visible but no grab cursor, no boundaries, not draggable
-  - Updated waveform-data example: `showClipHeaders={true} interactiveClips={false}`
-  - **Files modified:** `Waveform.tsx` (added prop and logic)
-  - **Pattern:** Separates visual organization (headers) from interaction (dragging/trimming)
-
-- [x] **Code Cleanup - Removed Unused Components**
-  - Deleted `BBCExtractPeaks.tsx` and `SmartTrack.tsx` (unused in codebase)
-  - Removed exports from `ui-components/src/components/index.tsx`
-  - Bundle size reduction: CJS -2.67KB, ESM -2.32KB, Types -1.19KB
-  - Replaced by modern `waveformDataLoader` utility functions
-  - **Files deleted:** `BBCExtractPeaks.tsx`, `SmartTrack.tsx`
-
-###
-
-- [x] **Track Selection Theme Enhancement - selectedWaveFillColor**
-  - Added `selectedWaveFillColor` to theme for independent control over waveform background on selection
-  - Outline and fill colors render separately (canvas peaks + div background) but appear combined
-  - Allows balancing appearance when outline brightens (darker fill prevents washed-out look)
-  - Files: `wfpl-theme.ts`, `SmartChannel.tsx`, `flexible-example-app.tsx`, `multi-clip-app.tsx`
-
-- [x] **Theming System Refactor - Centralized Theme Architecture**
-  - Created `WaveformPlaylistTheme` interface in `ui-components/src/wfpl-theme.ts`
-  - Defined all visual properties: waveform colors, timescale, playback UI, clip headers
-  - Exported `defaultTheme` object with sensible defaults
-  - Created `styled.d.ts` to extend styled-components' `DefaultTheme` for TypeScript autocomplete
-  - Refactored `ClipHeader` component to use theme instead of color props
-  - Removed `clipHeaderBackgroundColor`, `clipHeaderBorderColor`, `clipHeaderTextColor` props from component interfaces
-  - Components now access theme via `props.theme.propertyName` in styled components
-  - Updated `Waveform.tsx` to import and use exported `defaultTheme` from ui-components
-  - Exported theme types from `ui-components/src/index.tsx` for public API
-  - **Benefits:** Single source of truth, TypeScript autocomplete, no prop drilling, consistent theming
-  - **Files created:** `wfpl-theme.ts`, `styled.d.ts`
-  - **Files modified:** `ClipHeader.tsx`, `Clip.tsx`, `Waveform.tsx`, `ui-components/index.tsx`
-  - **Pattern established:** All visual/styling properties go in theme object, functional/behavioral properties as separate props
-
-- [x] **webaudio-peaks Package Simplification - 8-bit & 16-bit Only**
-  - Removed 32-bit peak support (Int32Array) from webaudio-peaks package
-  - Updated `Peaks` type: `Int8Array | Int16Array` (was: `Int8Array | Int16Array | Int32Array`)
-  - Updated `Bits` type: `8 | 16` (was: `8 | 16 | 32`)
-  - Removed `case 32` from `makeTypedArray()` function
-  - Updated validation error message: "Must be 8 or 16"
-  - Updated JSDoc comments to reflect supported bit depths
-  - Updated `peaksUtil.ts` to remove 32 from bits type union
-  - **No breaking changes:** Default is 8-bit, no existing code was using 32-bit peaks
-  - **Files modified:** `webaudio-peaks/src/index.ts`, `browser/src/peaksUtil.ts`
-
-- [x] **Documentation Updates - Pattern Separation**
-  - Updated CLAUDE.md with theming implementation pattern (5 steps)
-  - Updated PROJECT_STRUCTURE.md with detailed theming system documentation
-  - Added `WaveformPlaylistTheme` interface details and code examples
-  - Established documentation pattern: TODO.md for progress, CLAUDE.md for patterns, PROJECT_STRUCTURE.md for architecture
-  - Added "Documentation Guidelines" section to CLAUDE.md
-  - Removed progress/changelog from PROJECT_STRUCTURE.md (moved to TODO.md)
-  - **Pattern:** Progress updates only in TODO.md, architectural decisions in CLAUDE.md, structure/organization in PROJECT_STRUCTURE.md
-
-- [x] **TypeScript Build Integration & Drag/Trim Bug Fixes - ALL WORKING!** 🎉
-  - **Problem:** Drag visual feedback worked but state didn't update on drop; trim handles not draggable at all
-  - **Root Causes:** Multiple TypeScript errors silently breaking runtime code (Vite doesn't fail builds on TS errors)
-  - **Solution:** Added `pnpm typecheck &&` to all build scripts for type-safe builds
-  - **Fixed TypeScript Errors:**
-    - Clip `onMouseDown` handler - Updated to accept `React.MouseEvent<HTMLDivElement>` parameter for track selection logic
-    - collisionModifier return type - Added `scaleX: 1, scaleY: 1` to all return paths (required by @dnd-kit Transform type)
-    - PlaybackControls null handling - Fixed `currentTimeRef.current` access with `?? 0` operator
-    - Waveform ref assignments - Changed `currentTimeRef.current =` to `setCurrentTime()` calls (readonly property)
-    - Export issues - Exported `EffectsFunction` and `TrackEffectsFunction` from playout package index
-    - Import issues - Fixed `AnnotationData` to import from annotations package, imported `TimeFormat` type from ui-components
-  - **Package Rebuilds:** Rebuilt playout, ui-components, and browser packages with all type changes
-  - **Result:** Full drag-and-drop functionality now working perfectly!
-    - ✅ Drag clip headers to move clips horizontally
-    - ✅ Real-time collision detection (Audacity-style constraints)
-    - ✅ State updates on drop (clips stay in new position)
-    - ✅ Boundary trimming works (drag left/right edges)
-    - ✅ Track selection on drag/click
-  - **Files modified:** `Clip.tsx`, `useClipDragHandlers.ts`, `PlaybackControls.tsx`, `Waveform.tsx`, `WaveformPlaylistContext.tsx`, `playout/src/index.ts`
-  - **Build enforcement:** TypeScript type checking now enforced in all build scripts
-
-- [x] **Phase 3.3: Splitting Clips - COMPLETE!** 🎉
-  - Created `useClipSplitting` hook for splitting clips at playhead position
-  - Implements split logic: finds clip at currentTime, creates two new clips with proper timing
-  - First clip: from original start to split point (maintains original offset)
-  - Second clip: from split point to original end (adjusted offset and startTime)
-  - Full validation: checks clip bounds, prevents splits at boundaries
-  - Adds (1) and (2) name suffixes to split clips
-  - Created `useKeyboardShortcuts` hook - Flexible keyboard shortcut system
-  - Supports modifier keys (Ctrl, Shift, Meta, Alt) and key combinations
-  - Input field detection (doesn't trigger in text inputs)
-  - Prevents default browser behavior
-  - Reusable for future shortcuts (copy/paste, undo/redo, etc.)
-  - Integrated into multi-clip demo with 'S' key
-  - Added user instructions to HTML template
-  - Console logging confirms successful splits
-  - **Files created:** `useClipSplitting.ts`, `useKeyboardShortcuts.ts`
-  - **Files modified:** `multi-clip-app.tsx`, `hooks/index.ts`, `index.tsx`, `18multi-clip.html`
-  - Visual feedback (scissors cursor, split indicator) - in progress
+- Recording UX: auto-select first mic, optimized audio constraints
+- waveform-data.js support with BBC pre-computed peaks
+- `interactiveClips` prop to separate visual headers from interaction
+- Theming system refactor: centralized `WaveformPlaylistTheme` interface
+- TypeScript build enforcement (`pnpm typecheck &&` in build scripts)
+- Phase 3.3: `useClipSplitting` and `useKeyboardShortcuts` hooks
 
 ### 2025-11-22
-
-- [x] **Phase 3.1b: Clip Boundaries & Drag to Trim - COMPLETE!** 🎉
-  - Created ClipBoundary component with 8px hit area and col-resize cursor
-  - Integrated into Clip component with separate draggable instances for left/right edges
-  - Implemented bidirectional trimming (left boundary: adjust offset, duration, startTime; right: adjust duration only)
-  - Full constraint enforcement: min duration 0.1s, buffer bounds, no overlaps, no negative values
-  - **Critical bug fix:** Cumulative delta issue resolved by storing original clip state on drag start
-  - Real-time visual feedback during drag with onDragMove handler
-  - **Created `useClipDragHandlers` hook** - Reusable 300+ line hook for all drag operations
-  - Hook handles: clip movement, boundary trimming, collision detection, real-time updates
-  - Clean API exported from browser package for user applications
-  - Both multi-clip and flexible-example demos updated to use hook
-  - Zero code duplication - complex drag logic centralized in one place
-  - Location: `packages/browser/src/hooks/useClipDragHandlers.ts`
-  - Fully working boundary trimming with smooth cursor following!
+- Phase 3.1b: Drag-to-trim with `useClipDragHandlers` hook
+- Bidirectional boundary trimming with collision detection
 
 ### 2025-11-21
-
-- [x] **Phase 2: Clip-Based Model - COMPLETE!** 🎉
-  - All clip-based types already implemented in `packages/core/src/types/clip.ts`
-  - WaveformPlaylistContext accepts `ClipTrack[]` and generates peaks per clip
-  - Waveform component renders multiple clips per track with gaps
-  - ToneTrack playback engine schedules clips with proper timing
-  - Multi-clip demo working perfectly (4 tracks, multiple clips, gaps)
-  - File-reference loading pattern documented
-  - Foundation ready for Phase 3 (drag, trim, split, copy/paste)
-
-- [x] **Tree-shake Tone.js imports** - Bundle optimization (Phase 1.5 complete!)
-  - Changed to named imports in playout package
-  - Effects hooks import Tone.js directly (Analyser, Reverb, AutoWah)
-  - Removed ToneLib parameter from effects functions
-  - **Result:** 111KB/23KB savings (13% reduction)
-  - Bundle sizes: 507KB/132KB (core), 509KB/150KB (stem-tracks)
-
-- [x] **Multi-clip demo file-reference architecture**
-  - Separated `audioFiles` (id + src) from `trackConfigs` (clips with fileId references)
-  - Two-phase loading: load files once → create tracks with clip references
-  - Benefits: Each file loaded once, clips can reference same file, efficient memory
-  - All 4 tracks render correctly with gaps: Vocals (2 clips), Guitar (continuous), Piano (2 clips), Bass (3 clips)
-  - Location: `packages/browser/src/multi-clip-app.tsx`
-
-- [x] **Recording example UI polish**
-  - Moved Features list and Note from React to Jekyll template
-  - Bootstrap alert styling (alert-info, alert-warning)
-  - Reduced bundle size by removing static content from JS
-  - Location: `ghpages/_examples/17recording.html`, `recording-app.tsx`
-
-- [x] **Documentation updates**
-  - Added multi-clip architecture to PROJECT_STRUCTURE.md
-  - Added Bootstrap styling convention to PROJECT_STRUCTURE.md
-  - Added session notes to CLAUDE.md
-  - Updated TODO.md to reflect Phase 2 completion
-- [x] Bundle analyzer added (rollup-plugin-visualizer)
-- [x] VU meter fix (AnalyserNode single source of truth)
-- [x] Worklet RMS calculation removed
-- [x] Worklet copy automated in build script
-- [x] Debug logs cleanup
-- [x] TypeScript errors fixed (WaveformTrack type)
-- [x] No gain boost needed for VU meter
-- [x] DEBUGGING.md updated with VU meter solution
-- [x] CLAUDE.md updated with architectural notes
-- [x] TODO.md replaced with multi-track editing roadmap
+- Phase 2: Clip-based model complete
+- Tone.js tree-shaking: 23KB gzipped savings
+- Multi-clip demo with file-reference loading pattern
 
 ### 2025-11-20
-
-- [x] Recording example migrated to provider pattern
-- [x] Independent AudioContext for recording
-- [x] WaveformTrack.src supports AudioBuffer and string URLs
-- [x] Live waveform visualization during recording
-- [x] Recording peaks match final format (Int16Array)
-- [x] GPU-accelerated playhead animation
-- [x] Smooth zoom performance fixes
-- [x] Automatic scroll proportional adjustment
-- [x] TrackControlsWithDelete component
-- [x] All examples migrated to provider pattern
-- [x] Obsolete code cleanup (WaveformPlaylistComponent, Jekyll includes)
+- Recording example with live waveform
+- GPU-accelerated playhead animation
+- All examples migrated to provider pattern
 
 ### 2025-11-19
-
-- [x] Selection time inputs (React components)
-- [x] Time formatting utilities
-- [x] Fixed click clearing selection bug
-- [x] Fixed playback beyond selection bug
-- [x] Flexible/headless API architecture
-- [x] Complete theming system
-- [x] Custom timestamp rendering
-- [x] Annotations as optional package
-- [x] useAnnotationControls hook
-- [x] Audio effects hooks (reverb, auto-wah, analyser)
-- [x] Continuous Play toggle fix with context splitting
-- [x] AudioPosition component styling (text-only)
-- [x] CLAUDE.md created
-- [x] PROJECT_STRUCTURE.md created
-- [x] UI library decision documented (no full UI lib)
+- Flexible/headless API architecture
+- Complete theming system
+- Annotations as optional package
+- Audio effects hooks
 
 ---
 
