@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { ThemeProvider } from 'styled-components';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
-import { type Track, type ClipTrack, type AudioClip } from '@waveform-playlist/core';
+import { type Track, type ClipTrack } from '@waveform-playlist/core';
 import { type TimeFormat, type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
 import { start as toneStart, getContext } from 'tone';
 import { generatePeaks } from './peaksUtil';
@@ -237,7 +237,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   annotationList,
   effects,
   onReady,
-  onAnnotationUpdate,
+  onAnnotationUpdate: _onAnnotationUpdate,
   children,
 }) => {
   // State

@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
 import type { EffectsFunction, TrackEffectsFunction } from '@waveform-playlist/playout';
 // Import Tone.js classes directly for tree-shaking
 import { Analyser, Reverb, AutoWah } from 'tone';
@@ -10,7 +10,7 @@ import { Analyser, Reverb, AutoWah } from 'tone';
 export const useMasterAnalyser = (fftSize: number = 256) => {
   const analyserRef = useRef<any>(null);
 
-  const masterEffects: EffectsFunction = useCallback((masterGainNode, destination, isOffline) => {
+  const masterEffects: EffectsFunction = useCallback((masterGainNode, destination, _isOffline) => {
     // Create analyser and connect it in parallel to monitor the output
     const analyserNode = new Analyser('fft', fftSize);
     masterGainNode.connect(analyserNode);
@@ -35,7 +35,7 @@ export const useMasterAnalyser = (fftSize: number = 256) => {
  * Hook for creating a reverb effect on a track
  */
 export const useTrackReverb = (decay: number = 1.2) => {
-  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline) => {
+  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, _isOffline) => {
     const reverb = new Reverb({
       context: graphEnd.context,
       decay,
@@ -63,7 +63,7 @@ export const useTrackAutoWah = (options: {
 } = {}) => {
   const { baseFrequency = 50, octaves = 6, sensitivity = -30 } = options;
 
-  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, isOffline) => {
+  const trackEffects: TrackEffectsFunction = useCallback((graphEnd, masterGainNode, _isOffline) => {
     const autoWah = new AutoWah({
       context: graphEnd.context,
       baseFrequency,

@@ -8,7 +8,6 @@ import {
   useRecording,
   useMicrophoneAccess,
   useMicrophoneLevel,
-  type RecordingOptions,
   type MicrophoneDevice,
 } from '@waveform-playlist/recording';
 import { type ClipTrack, type AudioClip } from '@waveform-playlist/core';
@@ -97,7 +96,7 @@ export function useIntegratedRecording(
     isPaused,
     duration,
     peaks,
-    audioBuffer,
+    audioBuffer: _audioBuffer,
     startRecording: startRec,
     stopRecording: stopRec,
     pauseRecording,

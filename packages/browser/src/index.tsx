@@ -9,13 +9,10 @@ import type { ToneAudioNode } from 'tone';
 import {
   SmartChannel,
   Button,
-  ButtonGroup,
   Controls,
-  Header,
   VolumeDownIcon,
   VolumeUpIcon,
   Slider,
-  SliderWrapper,
   StyledTimeScale,
   Playlist,
   Playhead,
@@ -30,11 +27,9 @@ import {
   secondsToPixels,
 } from '@waveform-playlist/ui-components';
 import {
-  Annotation as AnnotationComponent,
   AnnotationBox,
   AnnotationBoxesWrapper,
   AnnotationText,
-  AnnotationsTrack,
 } from '@waveform-playlist/annotations';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
@@ -144,7 +139,6 @@ class WaveformPlaylistClass {
   private dragStartTime: number = 0;
   private annotations: Annotation[] = [];
   private activeAnnotationId: string | null = null;
-  private setAnnotationsFn: ((annotations: Annotation[]) => void) | null = null;
   private lastScrolledAnnotationId: string | null = null;
   private isPlayingTimedSegment: boolean = false;
 
@@ -362,7 +356,6 @@ class WaveformPlaylistClass {
     const PlaylistContent: React.FC = () => {
       const { progress: currentTime, selectionStart, selectionEnd, isPlaying } = usePlayoutStatus();
       const { setProgress, setSelection, setIsPlaying } = usePlayoutStatusUpdate();
-      const animationRef = React.useRef<number | null>(null);
 
       // Store setProgress, setSelection, and setIsPlaying references
       React.useEffect(() => {
@@ -1394,7 +1387,6 @@ export {
   loadPeaksFromWaveformData,
   getWaveformDataMetadata,
 } from './waveformDataLoader';
-export type { WaveformDataFile } from './waveformDataLoader';
 
 // Default export for UMD
 export default WaveformPlaylistAPI;

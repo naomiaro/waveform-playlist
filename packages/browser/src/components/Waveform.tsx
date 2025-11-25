@@ -10,7 +10,6 @@ import {
   TrackControlsContext,
   DevicePixelRatioProvider,
   StyledTimeScale,
-  secondsToPixels,
   Controls,
   Header,
   Button,
@@ -58,7 +57,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   renderTrackControls,
   renderTimestamp,
   annotationControls,
-  annotationListConfig,
+  annotationListConfig: _annotationListConfig,
   annotationTextHeight,
   className,
   showClipHeaders = false,
@@ -69,7 +68,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
   // Split context usage for performance
-  const { isPlaying, currentTime, currentTimeRef } = usePlaybackAnimation();
+  const { isPlaying, currentTime } = usePlaybackAnimation();
   const {
     selectionStart,
     selectionEnd,

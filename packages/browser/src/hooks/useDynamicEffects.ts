@@ -230,7 +230,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   // The effects function that gets passed to WaveformPlaylistProvider
   // This function is stable - it reads from refs at call time to avoid stale closures
   const masterEffects: EffectsFunction = useCallback(
-    (masterGainNode, destination, isOffline) => {
+    (masterGainNode, destination, _isOffline) => {
       // Create analyser for visualization
       const analyserNode = new Analyser('fft', fftSize);
       analyserRef.current = analyserNode;
@@ -297,7 +297,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     }
 
     // Return a function that creates fresh effect instances
-    return (masterGainNode: any, destination: any, isOffline: boolean) => {
+    return (masterGainNode: any, destination: any, _isOffline: boolean) => {
       // Create fresh effect instances for offline context
       const offlineInstances: EffectInstance[] = [];
 

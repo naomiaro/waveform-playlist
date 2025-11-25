@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { type ClipTrack, type AudioClip, createClip } from '@waveform-playlist/core';
+import { type ClipTrack, createClip } from '@waveform-playlist/core';
 import { usePlaybackAnimation, usePlaylistState } from '../WaveformPlaylistContext';
 
 export interface UseClipSplittingOptions {
@@ -77,14 +76,8 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       const splitSample = Math.round(splitTime * sampleRate);
 
       // Calculate pixel positions from sample positions using integer division
-      const clipStartPixel = Math.floor(clip.startSample / samplesPerPixel);
       const splitPixel = Math.floor(splitSample / samplesPerPixel);
       const clipEndSample = clip.startSample + clip.durationSamples;
-      const clipEndPixel = Math.floor(clipEndSample / samplesPerPixel);
-
-      // Calculate pixel widths (ensuring clips are adjacent)
-      const firstClipPixelWidth = splitPixel - clipStartPixel;
-      const secondClipPixelWidth = clipEndPixel - splitPixel;
 
       // Calculate sample positions from exact pixel boundaries
       // Both clips share the same boundary: the start of the split pixel

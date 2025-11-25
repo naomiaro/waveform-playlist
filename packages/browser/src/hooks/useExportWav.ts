@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { ClipTrack, AudioClip, Fade, FadeType } from '@waveform-playlist/core';
+import type { ClipTrack, AudioClip, FadeType } from '@waveform-playlist/core';
 import type { EffectsFunction } from '@waveform-playlist/playout';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
 
@@ -219,7 +219,7 @@ export function useExportWav(): UseExportWavReturn {
  */
 async function renderWithToneEffects(
   tracksToRender: { track: ClipTrack; state: TrackState; index: number }[],
-  trackStates: TrackState[],
+  _trackStates: TrackState[],
   hasSolo: boolean,
   duration: number,
   sampleRate: number,
@@ -228,7 +228,7 @@ async function renderWithToneEffects(
   onProgress: (progress: number) => void
 ): Promise<AudioBuffer> {
   // Dynamically import Tone.js modules
-  const { Offline, Volume, Gain, Panner, Player, ToneAudioBuffer, getDestination } = await import('tone');
+  const { Offline, Volume, Gain, Panner, Player, ToneAudioBuffer } = await import('tone');
 
   onProgress(0.1);
 

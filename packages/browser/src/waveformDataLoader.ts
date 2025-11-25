@@ -6,12 +6,6 @@
  */
 
 import WaveformData from 'waveform-data';
-import type { Peaks } from '@waveform-playlist/webaudio-peaks';
-
-export interface WaveformDataFile {
-  src: string;           // URL to .dat or .json file
-  sampleRate?: number;   // Override sample rate if needed
-}
 
 /**
  * Load waveform data from a .dat or .json file

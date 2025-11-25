@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { TrackEffectsFunction } from '../index';
 import {
   effectDefinitions,
@@ -263,7 +263,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   const getTrackEffectsFunction = useCallback(
     (trackId: string): TrackEffectsFunction | undefined => {
       // Return a function that connects effects when the track is loaded
-      return (graphEnd, masterGainNode, isOffline) => {
+      return (graphEnd, masterGainNode, _isOffline) => {
         // Store references for rebuilding chain
         trackGraphNodesRef.current.set(trackId, {
           graphEnd,
@@ -337,7 +337,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       }
 
       // Return a function that creates fresh effect instances
-      return (graphEnd: any, masterGainNode: any, isOffline: boolean) => {
+      return (graphEnd: any, masterGainNode: any, _isOffline: boolean) => {
         // Create fresh effect instances for offline context
         const offlineInstances: EffectInstance[] = [];
 
