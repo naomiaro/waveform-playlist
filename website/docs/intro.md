@@ -1,47 +1,85 @@
 ---
 sidebar_position: 1
+slug: /
 ---
 
-# Tutorial Intro
+# Introduction
 
-Let's discover **Docusaurus in less than 5 minutes**.
+Waveform Playlist is a multitrack Web Audio editor and player with canvas waveform visualization. Built with React and [Tone.js](https://tonejs.github.io/), it provides a complete solution for audio editing in the browser.
 
-## Getting Started
+## Features
 
-Get started by **creating a new site**.
+- **Multi-track editing** - Load, arrange, and mix multiple audio tracks
+- **Waveform visualization** - High-performance canvas rendering with zoom support
+- **Playback controls** - Play, pause, stop, seek, and loop
+- **Track controls** - Mute, solo, volume, and pan per track
+- **Audio effects** - Comprehensive effect library powered by Tone.js
+- **Annotations** - Time-synchronized text annotations with drag-to-edit
+- **Recording** - Record directly from microphone with level monitoring
+- **Theming** - Light and dark themes with full customization
+- **BBC Peaks support** - Pre-computed waveform data for large files
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+## Packages
 
-### What you'll need
+The library is organized into focused packages:
 
-- [Node.js](https://nodejs.org/en/download/) version 20.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+| Package | Description |
+|---------|-------------|
+| `@waveform-playlist/browser` | Main React components and hooks |
+| `@waveform-playlist/core` | Core data types and utilities |
+| `@waveform-playlist/playout` | Tone.js audio engine |
+| `@waveform-playlist/ui-components` | Styled UI components |
+| `@waveform-playlist/annotations` | Annotation system |
+| `@waveform-playlist/recording` | Recording functionality |
 
-## Generate a new site
+## Quick Example
 
-Generate a new Docusaurus site using the **classic template**.
+```tsx
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  PlayButton,
+  PauseButton,
+  StopButton,
+  useAudioTracks,
+} from '@waveform-playlist/browser';
 
-The classic template will automatically be added to your project after you run the command:
+function MyPlaylist() {
+  const { tracks, loading, error } = useAudioTracks([
+    { src: '/audio/vocals.mp3', name: 'Vocals' },
+    { src: '/audio/guitar.mp3', name: 'Guitar' },
+  ]);
 
-```bash
-npm init docusaurus@latest my-website classic
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <WaveformPlaylistProvider
+      tracks={tracks}
+      samplesPerPixel={1024}
+      waveHeight={128}
+      timescale
+    >
+      <div>
+        <PlayButton />
+        <PauseButton />
+        <StopButton />
+      </div>
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
 ```
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+## Browser Support
 
-The command also installs all necessary dependencies you need to run Docusaurus.
+Waveform Playlist works in all modern browsers that support:
+- Web Audio API
+- Canvas API
+- ES2020+
 
-## Start your site
+## Next Steps
 
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+- [Installation](/getting-started/installation) - Install the packages
+- [Basic Usage](/getting-started/basic-usage) - Build your first playlist
+- [Examples](/examples) - See live demos
