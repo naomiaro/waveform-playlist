@@ -541,7 +541,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         </VisualizerWrapper>
       </TopBar>
 
-      <Waveform timescale renderTrackControls={renderTrackControls} />
+      <Waveform renderTrackControls={renderTrackControls} />
 
       <TimeControlsBar>
         <ControlGroup>

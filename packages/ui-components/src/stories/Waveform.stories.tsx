@@ -124,6 +124,7 @@ export const WithoutTimescale: Story = {
     <WaveformPlaylistProvider
       tracks={createEmptyTracks(2)}
       samplesPerPixel={1024}
+      // Note: timescale is not set, so no timescale will be displayed
     >
       <div style={{ padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -131,14 +132,14 @@ export const WithoutTimescale: Story = {
           <PauseButton />
           <StopButton />
         </div>
-        <Waveform timescale={false} />
+        <Waveform />
       </div>
     </WaveformPlaylistProvider>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Waveform without the timescale ruler - useful for compact layouts.',
+        story: 'Waveform without the timescale ruler - controlled via the `timescale` prop on WaveformPlaylistProvider. Useful for compact layouts.',
       },
     },
   },

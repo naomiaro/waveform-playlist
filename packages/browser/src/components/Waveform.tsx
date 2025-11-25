@@ -33,7 +33,6 @@ import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
 
 export interface WaveformProps {
-  timescale?: boolean;
   renderTrackControls?: (trackIndex: number) => ReactNode;
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   annotationControls?: any[];
@@ -56,7 +55,6 @@ export interface WaveformProps {
  * Waveform visualization component that uses the playlist context
  */
 export const Waveform: React.FC<WaveformProps> = ({
-  timescale = false,
   renderTrackControls,
   renderTimestamp,
   annotationControls,
@@ -167,9 +165,8 @@ export const Waveform: React.FC<WaveformProps> = ({
     // The click overlay covers all tracks, so we need to calculate from Y position
     const y = e.clientY - rect.top;
 
-    // Account for timescale height if present
-    const timescaleOffset = timescale ? timeScaleHeight : 0;
-    const trackY = y - timescaleOffset;
+    // Account for timescale height if present (timeScaleHeight is 0 when disabled)
+    const trackY = y - timeScaleHeight;
 
     // Calculate track index based on cumulative heights
     let cumulativeHeight = 0;
@@ -277,7 +274,7 @@ export const Waveform: React.FC<WaveformProps> = ({
             onTracksMouseUp={handleMouseUp}
             scrollContainerRef={handleScrollContainerRef}
             timescale={
-              timescale ? (
+              timeScaleHeight > 0 ? (
                 <StyledTimeScale
                   duration={displayDuration * 1000}
                   marker={10000}

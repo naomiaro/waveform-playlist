@@ -156,7 +156,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
         </ControlGroup>
       </Controls>
 
-      <Waveform timescale showClipHeaders interactiveClips />
+      <Waveform showClipHeaders interactiveClips />
     </DndContext>
   );
 };
