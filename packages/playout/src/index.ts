@@ -23,3 +23,11 @@ export {
   releaseMediaStreamSource,
   hasMediaStreamSource,
 } from './mediaStreamSourceManager';
+
+// Export fade utilities
+export {
+  applyFadeIn,
+  applyFadeOut,
+  type FadeConfig,
+  type FadeType,
+} from './fades';

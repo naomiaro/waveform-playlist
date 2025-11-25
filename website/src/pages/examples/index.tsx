@@ -24,6 +24,11 @@ const examples = [
     path: 'stem-tracks',
   },
   {
+    title: 'Fades',
+    description: 'Fade in and fade out with different curve types',
+    path: 'fades',
+  },
+  {
     title: 'Effects',
     description: 'Audio effects and processing',
     path: 'effects',

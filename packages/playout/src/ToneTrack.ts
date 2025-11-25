@@ -8,8 +8,8 @@ import {
   getDestination,
   now,
 } from 'tone';
-import { Track, FadeType } from '@waveform-playlist/core';
-import { createFadeIn, createFadeOut } from 'fade-maker';
+import { Track, type Fade } from '@waveform-playlist/core';
+import { applyFadeIn, applyFadeOut } from './fades';
 
 // Effects function no longer receives ToneLib - effects should import Tone themselves
 export type TrackEffectsFunction = (graphEnd: Gain, masterGainNode: ToneAudioNode, isOffline: boolean) => void | (() => void);
@@ -19,8 +19,8 @@ export interface ClipInfo {
   startTime: number; // When this clip starts in the track timeline (seconds)
   duration: number; // How long this clip plays (seconds)
   offset: number; // Where to start playing within the buffer (seconds)
-  fadeIn?: { start: number; end: number; type: FadeType };
-  fadeOut?: { start: number; end: number; type: FadeType };
+  fadeIn?: Fade;
+  fadeOut?: Fade;
   gain: number; // Clip-level gain
 }
 
@@ -99,26 +99,8 @@ export class ToneTrack {
       player.connect(fadeGain);
       fadeGain.chain(this.volumeNode, this.panNode, this.muteGain);
 
-      // Apply fades if they exist for this clip
-      if (clipInfo.fadeIn) {
-        const audioParam = (fadeGain.gain as any)._param as AudioParam;
-        createFadeIn(
-          audioParam,
-          clipInfo.fadeIn.type,
-          clipInfo.fadeIn.start,
-          clipInfo.fadeIn.end - clipInfo.fadeIn.start
-        );
-      }
-
-      if (clipInfo.fadeOut) {
-        const audioParam = (fadeGain.gain as any)._param as AudioParam;
-        createFadeOut(
-          audioParam,
-          clipInfo.fadeOut.type,
-          clipInfo.fadeOut.start,
-          clipInfo.fadeOut.end - clipInfo.fadeOut.start
-        );
-      }
+      // Note: Fades are scheduled in play() method, not here in constructor,
+      // because AudioParam automation requires absolute AudioContext time
 
       return {
         player,
@@ -128,6 +110,87 @@ export class ToneTrack {
         playStartTime: 0,
       };
     });
+  }
+
+  /**
+   * Schedule fade envelopes for a clip at the given start time
+   */
+  private scheduleFades(clipPlayer: ClipPlayer, clipStartTime: number, clipOffset: number = 0): void {
+    const { clipInfo, fadeGain } = clipPlayer;
+    const audioParam = (fadeGain.gain as any)._param as AudioParam;
+
+    // Cancel any previous automation
+    audioParam.cancelScheduledValues(0);
+
+    // Calculate how much of the clip we're skipping (for seeking)
+    const skipTime = clipOffset - clipInfo.offset;
+
+    // Apply fade in if it exists and we haven't skipped past it
+    if (clipInfo.fadeIn && skipTime < clipInfo.fadeIn.duration) {
+      const fadeInDuration = clipInfo.fadeIn.duration;
+
+      if (skipTime <= 0) {
+        // Starting from the beginning - full fade in
+        applyFadeIn(
+          audioParam,
+          clipStartTime,
+          fadeInDuration,
+          clipInfo.fadeIn.type || 'linear',
+          0,
+          clipInfo.gain
+        );
+      } else {
+        // Starting partway through fade in - calculate partial fade
+        const remainingFadeDuration = fadeInDuration - skipTime;
+        const fadeProgress = skipTime / fadeInDuration;
+        const startValue = clipInfo.gain * fadeProgress; // Approximate current fade value
+        applyFadeIn(
+          audioParam,
+          clipStartTime,
+          remainingFadeDuration,
+          clipInfo.fadeIn.type || 'linear',
+          startValue,
+          clipInfo.gain
+        );
+      }
+    } else {
+      // No fade in or skipped past it - set to full gain
+      audioParam.setValueAtTime(clipInfo.gain, clipStartTime);
+    }
+
+    // Apply fade out if it exists
+    if (clipInfo.fadeOut) {
+      const fadeOutStart = clipInfo.duration - clipInfo.fadeOut.duration;
+      const fadeOutStartInClip = fadeOutStart - skipTime; // Relative to where we're starting
+
+      if (fadeOutStartInClip > 0) {
+        // Fade out hasn't started yet
+        const absoluteFadeOutStart = clipStartTime + fadeOutStartInClip;
+        applyFadeOut(
+          audioParam,
+          absoluteFadeOutStart,
+          clipInfo.fadeOut.duration,
+          clipInfo.fadeOut.type || 'linear',
+          clipInfo.gain,
+          0
+        );
+      } else if (fadeOutStartInClip > -clipInfo.fadeOut.duration) {
+        // We're starting partway through the fade out
+        const elapsedFadeOut = -fadeOutStartInClip;
+        const remainingFadeDuration = clipInfo.fadeOut.duration - elapsedFadeOut;
+        const fadeProgress = elapsedFadeOut / clipInfo.fadeOut.duration;
+        const startValue = clipInfo.gain * (1 - fadeProgress); // Approximate current fade value
+        applyFadeOut(
+          audioParam,
+          clipStartTime,
+          remainingFadeDuration,
+          clipInfo.fadeOut.type || 'linear',
+          startValue,
+          0
+        );
+      }
+      // If fadeOutStartInClip <= -duration, we've skipped past the entire fade out
+    }
   }
 
   private gainToDb(gain: number): number {
@@ -185,6 +248,8 @@ export class ToneTrack {
           const clipDuration = duration ? Math.min(duration, remainingDuration) : remainingDuration;
 
           clipPlayer.pausedPosition = clipOffset;
+          // Schedule fades at the actual playback start time
+          this.scheduleFades(clipPlayer, startWhen, clipOffset);
           player.start(startWhen, clipOffset, clipDuration);
         } else {
           // This clip starts later - schedule it
@@ -193,6 +258,8 @@ export class ToneTrack {
 
           if (delay < (duration ?? Infinity)) {
             clipPlayer.pausedPosition = clipInfo.offset;
+            // Schedule fades at the delayed start time
+            this.scheduleFades(clipPlayer, startWhen + delay, clipInfo.offset);
             player.start(startWhen + delay, clipInfo.offset, clipDuration);
           } else {
             this.activePlayers--;

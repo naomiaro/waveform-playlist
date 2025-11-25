@@ -299,9 +299,10 @@ async function renderWithToneEffects(
           fadeGain.connect(trackVolume);
 
           // Apply fades using gain automation
+          // New simple API: fadeIn starts at clip start, fadeOut ends at clip end
           if (fadeIn) {
-            const fadeInStart = startTime + fadeIn.start;
-            const fadeInEnd = startTime + fadeIn.end;
+            const fadeInStart = startTime;
+            const fadeInEnd = startTime + fadeIn.duration;
             const audioParam = (fadeGain.gain as any)._param as AudioParam;
             // Set initial value to 0
             audioParam.setValueAtTime(0, fadeInStart);
@@ -309,8 +310,8 @@ async function renderWithToneEffects(
           }
 
           if (fadeOut) {
-            const fadeOutStart = startTime + fadeOut.start;
-            const fadeOutEnd = startTime + fadeOut.end;
+            const fadeOutStart = startTime + clipDuration - fadeOut.duration;
+            const fadeOutEnd = startTime + clipDuration;
             const audioParam = (fadeGain.gain as any)._param as AudioParam;
             audioParam.setValueAtTime(clipGain, fadeOutStart);
             audioParam.linearRampToValueAtTime(0, fadeOutEnd);
@@ -390,9 +391,10 @@ async function scheduleClip(
   pannerNode.connect(ctx.destination);
 
   // Apply effects (fades) if enabled
+  // New simple API: fadeIn starts at clip start, fadeOut ends at clip end
   if (applyEffects) {
-    // Set initial gain (may be 0 if fade in starts at 0)
-    if (fadeIn && fadeIn.start === 0) {
+    // Set initial gain (may be 0 if fade in exists)
+    if (fadeIn) {
       gainNode.gain.setValueAtTime(0, startTime);
     } else {
       gainNode.gain.setValueAtTime(baseGain, startTime);
@@ -400,20 +402,20 @@ async function scheduleClip(
 
     // Apply fade in
     if (fadeIn) {
-      const fadeInStart = startTime + fadeIn.start;
-      const fadeInEnd = startTime + fadeIn.end;
-      applyFadeEnvelope(gainNode.gain, fadeInStart, fadeInEnd, 0, baseGain, fadeIn.type);
+      const fadeInStart = startTime;
+      const fadeInEnd = startTime + fadeIn.duration;
+      applyFadeEnvelope(gainNode.gain, fadeInStart, fadeInEnd, 0, baseGain, fadeIn.type || 'linear');
     }
 
     // Apply fade out
     if (fadeOut) {
-      const fadeOutStart = startTime + fadeOut.start;
-      const fadeOutEnd = startTime + fadeOut.end;
+      const fadeOutStart = startTime + duration - fadeOut.duration;
+      const fadeOutEnd = startTime + duration;
       // Ensure we're at baseGain before fade out starts
-      if (!fadeIn || fadeIn.end < fadeOut.start) {
+      if (!fadeIn || fadeIn.duration < (duration - fadeOut.duration)) {
         gainNode.gain.setValueAtTime(baseGain, fadeOutStart);
       }
-      applyFadeEnvelope(gainNode.gain, fadeOutStart, fadeOutEnd, baseGain, 0, fadeOut.type);
+      applyFadeEnvelope(gainNode.gain, fadeOutStart, fadeOutEnd, baseGain, 0, fadeOut.type || 'linear');
     }
   } else {
     // No effects - just set constant gain

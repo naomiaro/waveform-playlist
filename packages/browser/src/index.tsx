@@ -204,13 +204,11 @@ class WaveformPlaylistClass {
           stereoPan: config.stereoPan ?? 0,
           startTime: config.start ?? 0,
           fadeIn: config.fadeIn ? {
-            start: config.start ?? 0,
-            end: (config.start ?? 0) + config.fadeIn.duration,
+            duration: config.fadeIn.duration,
             type: config.fadeIn.shape ?? 'logarithmic',
           } : undefined,
           fadeOut: config.fadeOut ? {
-            start: audioBuffer.duration - config.fadeOut.duration,
-            end: audioBuffer.duration,
+            duration: config.fadeOut.duration,
             type: config.fadeOut.shape ?? 'logarithmic',
           } : undefined,
         };
@@ -301,13 +299,11 @@ class WaveformPlaylistClass {
         stereoPan: trackConfig.stereoPan ?? 0,
         startTime: trackConfig.start ?? 0,
         fadeIn: trackConfig.fadeIn ? {
-          start: trackConfig.start ?? 0,
-          end: (trackConfig.start ?? 0) + trackConfig.fadeIn.duration,
+          duration: trackConfig.fadeIn.duration,
           type: trackConfig.fadeIn.shape ?? 'logarithmic',
         } : undefined,
         fadeOut: trackConfig.fadeOut ? {
-          start: audioBuffer.duration - trackConfig.fadeOut.duration,
-          end: audioBuffer.duration,
+          duration: trackConfig.fadeOut.duration,
           type: trackConfig.fadeOut.shape ?? 'logarithmic',
         } : undefined,
       };

@@ -31,10 +31,14 @@ export interface Track {
   cueOut?: number;
 }
 
+/**
+ * Simple fade configuration
+ */
 export interface Fade {
-  start: number;
-  end: number;
-  type: FadeType;
+  /** Duration of the fade in seconds */
+  duration: number;
+  /** Type of fade curve (default: 'linear') */
+  type?: FadeType;
 }
 
 export type FadeType = 'logarithmic' | 'linear' | 'sCurve' | 'exponential';

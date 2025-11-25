@@ -17,7 +17,12 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["waveform", "audio", "webaudio", "tonejs"],
+  "keywords": [
+    "waveform",
+    "audio",
+    "webaudio",
+    "tonejs"
+  ],
   "author": "Naomi Aro",
   "license": "MIT",
   "devDependencies": {
@@ -26,7 +31,6 @@
   },
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
-    "fade-maker": "^1.0.3",
     "tone": "15.1.22"
   }
 }

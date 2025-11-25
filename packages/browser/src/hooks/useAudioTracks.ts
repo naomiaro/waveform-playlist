@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
+import { ClipTrack, createTrack, createClipFromSeconds, type Fade } from '@waveform-playlist/core';
 import * as Tone from 'tone';
 
 /**
@@ -18,6 +18,9 @@ export interface AudioTrackConfig {
   startTime?: number;  // When the clip starts on the timeline (default: 0)
   duration?: number;   // Duration of the clip (default: full audio duration)
   offset?: number;     // Offset into the source audio file (default: 0)
+  // Fade support
+  fadeIn?: Fade;       // Fade in configuration
+  fadeOut?: Fade;      // Fade out configuration
 }
 
 /**
@@ -86,13 +89,19 @@ export function useAudioTracks(configs: AudioTrackConfig[]) {
             throw new Error(`Invalid audio buffer for ${config.src}`);
           }
 
+          // Calculate clip duration
+          const clipDuration = config.duration ?? audioBuffer.duration;
+
           // Create a single clip for this track (using createClipFromSeconds for backwards compatibility)
+          // Fades now use simple duration-based API: { duration: number, type?: FadeType }
           const clip = createClipFromSeconds({
             audioBuffer,
             startTime: config.startTime ?? 0,  // Use config or default to 0
-            duration: config.duration ?? audioBuffer.duration,  // Use config or full duration
+            duration: clipDuration,
             offset: config.offset ?? 0,  // Use config or no trim
             name: config.name || `Track ${index + 1}`,
+            fadeIn: config.fadeIn,
+            fadeOut: config.fadeOut,
           });
 
           // Validate clip values
