@@ -50,6 +50,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^6.0.1",
     "@dnd-kit/utilities": "^3.2.2",
+    "@storybook/addon-actions": "^9.0.8",
+    "@storybook/addon-docs": "^10.0.8",
     "@storybook/addon-webpack5-compiler-swc": "^4.0.2",
     "@storybook/react-webpack5": "^10.0.8",
     "@types/react": "^18.2.45",
@@ -60,8 +62,7 @@
     "storybook": "^10.0.8",
     "styled-components": "^6.1.8",
     "tsup": "^8.0.1",
-    "typescript": "^5.3.3",
-    "@storybook/addon-docs": "^10.0.8"
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.5.1",

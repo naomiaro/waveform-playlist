@@ -239,6 +239,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@18.3.1)
+      '@storybook/addon-actions':
+        specifier: ^9.0.8
+        version: 9.0.8
       '@storybook/addon-docs':
         specifier: ^10.0.8
         version: 10.0.8(@types/react@18.3.26)(esbuild@0.27.0)(storybook@10.0.8)(webpack@5.103.0)
@@ -5693,6 +5696,10 @@ packages:
   /@standard-schema/spec@1.0.0:
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
     dev: false
+
+  /@storybook/addon-actions@9.0.8:
+    resolution: {integrity: sha512-LFePu7PPnWN0Il/uoUpmA5T0J0C7d6haJIbg0pXrjxW2MQVSYXE4S4LSUz8fOImltBDV3xAl6tLPYHFj6VcrOA==}
+    dev: true
 
   /@storybook/addon-docs@10.0.8(@types/react@18.3.26)(esbuild@0.27.0)(storybook@10.0.8)(webpack@5.103.0):
     resolution: {integrity: sha512-PYuaGXGycsamK/7OrFoE4syHGy22mdqqArl67cfosRwmRxZEI9ManQK0jTjNQM9ZX14NpThMOSWNGoWLckkxog==}

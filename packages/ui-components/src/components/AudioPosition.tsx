@@ -5,7 +5,7 @@ const PositionDisplay = styled.span`
   font-family: 'Courier New', Monaco, monospace;
   font-size: 1rem;
   font-weight: 600;
-  color: #333;
+  color: ${props => props.theme?.textColor || '#333'};
   user-select: none;
 `;
 
