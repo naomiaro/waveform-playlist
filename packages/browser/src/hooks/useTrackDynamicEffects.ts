@@ -201,22 +201,24 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     []
   );
 
-  // Toggle bypass for an effect (uses wet parameter - 0 = bypass, 1 = active)
+  // Toggle bypass for an effect (uses wet parameter - 0 = bypass, restore original for active)
   const toggleBypass = useCallback(
     (trackId: string, instanceId: string) => {
-      // Get current state to determine new bypassed value
-      const trackEffects = trackEffectsState.get(trackId) || [];
+      // Get current state from ref to determine new bypassed value (avoids stale closure)
+      const trackEffects = trackEffectsStateRef.current.get(trackId) || [];
       const effect = trackEffects.find((e) => e.instanceId === instanceId);
       if (!effect) return;
 
       const newBypassed = !effect.bypassed;
 
-      // Update the actual effect instance - set wet to 0 for bypass, restore original for active
+      // Update the actual effect instance
+      // When bypassing: set wet to 0
+      // When un-bypassing: restore the original wet value from params
       const instancesMap = trackEffectInstancesRef.current.get(trackId);
       const instance = instancesMap?.get(instanceId);
       if (instance) {
-        // Set wet to 0 for bypass, or 1 for full effect
-        instance.setParameter('wet', newBypassed ? 0 : 1);
+        const originalWet = effect.params.wet as number ?? 1;
+        instance.setParameter('wet', newBypassed ? 0 : originalWet);
       }
 
       // Update state for UI
@@ -232,7 +234,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
         return newState;
       });
     },
-    [trackEffectsState]
+    []
   );
 
   // Clear all effects from a track

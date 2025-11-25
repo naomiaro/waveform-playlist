@@ -23,14 +23,14 @@ var wi = {};
 var $l;
 function Wp() {
   return $l || ($l = 1, process.env.NODE_ENV !== "production" && (function() {
-    var e = Lt, t = Symbol.for("react.element"), n = Symbol.for("react.portal"), s = Symbol.for("react.fragment"), i = Symbol.for("react.strict_mode"), r = Symbol.for("react.profiler"), o = Symbol.for("react.provider"), a = Symbol.for("react.context"), c = Symbol.for("react.forward_ref"), l = Symbol.for("react.suspense"), u = Symbol.for("react.suspense_list"), h = Symbol.for("react.memo"), d = Symbol.for("react.lazy"), f = Symbol.for("react.offscreen"), p = Symbol.iterator, g = "@@iterator";
+    var e = Lt, t = Symbol.for("react.element"), n = Symbol.for("react.portal"), s = Symbol.for("react.fragment"), i = Symbol.for("react.strict_mode"), r = Symbol.for("react.profiler"), o = Symbol.for("react.provider"), a = Symbol.for("react.context"), c = Symbol.for("react.forward_ref"), l = Symbol.for("react.suspense"), u = Symbol.for("react.suspense_list"), h = Symbol.for("react.memo"), d = Symbol.for("react.lazy"), f = Symbol.for("react.offscreen"), p = Symbol.iterator, _ = "@@iterator";
     function m(T) {
       if (T === null || typeof T != "object")
         return null;
-      var j = p && T[p] || T[g];
+      var j = p && T[p] || T[_];
       return typeof j == "function" ? j : null;
     }
-    var _ = e.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+    var g = e.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
     function v(T) {
       {
         for (var j = arguments.length, Q = new Array(j > 1 ? j - 1 : 0), pt = 1; pt < j; pt++)
@@ -40,7 +40,7 @@ function Wp() {
     }
     function b(T, j, Q) {
       {
-        var pt = _.ReactDebugCurrentFrame, vt = pt.getStackAddendum();
+        var pt = g.ReactDebugCurrentFrame, vt = pt.getStackAddendum();
         vt !== "" && (j += "%s", Q = Q.concat([vt]));
         var Ot = Q.map(function(Dt) {
           return String(Dt);
@@ -174,7 +174,7 @@ function Wp() {
         V < 0 && v("disabledDepth fell below zero. This is a bug in React. Please file an issue.");
       }
     }
-    var U = _.ReactCurrentDispatcher, nt;
+    var U = g.ReactCurrentDispatcher, nt;
     function M(T, j, Q) {
       {
         if (nt === void 0)
@@ -300,7 +300,7 @@ function Wp() {
         }
       return "";
     }
-    var rt = Object.prototype.hasOwnProperty, Vt = {}, Et = _.ReactDebugCurrentFrame;
+    var rt = Object.prototype.hasOwnProperty, Vt = {}, Et = g.ReactDebugCurrentFrame;
     function xt(T) {
       if (T) {
         var j = T._owner, Q = X(T.type, T._source, j ? j.type : null);
@@ -351,7 +351,7 @@ function Wp() {
       if ($t(T))
         return v("The provided key is an unsupported type %s. This value must be coerced to a string before before using it here.", At(T)), le(T);
     }
-    var qt = _.ReactCurrentOwner, we = {
+    var qt = g.ReactCurrentOwner, we = {
       key: !0,
       ref: !0,
       __self: !0,
@@ -445,7 +445,7 @@ function Wp() {
         return ta(T, kt, Ee, vt, pt, qt.current, Dt);
       }
     }
-    var _i = _.ReactCurrentOwner, gr = _.ReactDebugCurrentFrame;
+    var _i = g.ReactCurrentOwner, gr = g.ReactDebugCurrentFrame;
     function Bn(T) {
       if (T) {
         var j = T._owner, Q = X(T.type, T._source, j ? j.type : null);
@@ -776,17 +776,17 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
     throw new TypeError("The given value for processorCtor should have a prototype.");
 }, em = (e, t, n, s, i, r, o, a, c, l, u, h, d) => {
   let f = 0;
-  return (p, g, m = { credentials: "omit" }) => {
-    const _ = u.get(p);
-    if (_ !== void 0 && _.has(g))
+  return (p, _, m = { credentials: "omit" }) => {
+    const g = u.get(p);
+    if (g !== void 0 && g.has(_))
       return Promise.resolve();
     const v = l.get(p);
     if (v !== void 0) {
-      const y = v.get(g);
+      const y = v.get(_);
       if (y !== void 0)
         return y;
     }
-    const b = r(p), x = b.audioWorklet === void 0 ? i(g).then(([y, w]) => {
+    const b = r(p), x = b.audioWorklet === void 0 ? i(_).then(([y, w]) => {
       const [S, C] = Kl(y, w), E = `${S};((a,b)=>{(a[b]=a[b]||[]).push((AudioWorkletProcessor,global,registerProcessor,sampleRate,self,window)=>{${C}
 })})(window,'_AWGS')`;
       return n(E);
@@ -807,7 +807,7 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
           Jl(S), Ql(S.parameterDescriptors), Oa.set(b, /* @__PURE__ */ new Map([[w, S]]));
       }, b.sampleRate, void 0, void 0));
     }) : Promise.all([
-      i(g),
+      i(_),
       Promise.resolve(e(h, h))
     ]).then(([[y, w], S]) => {
       const C = f + 1;
@@ -829,12 +829,12 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
         }
       }).finally(() => URL.revokeObjectURL(L));
     });
-    return v === void 0 ? l.set(p, /* @__PURE__ */ new Map([[g, x]])) : v.set(g, x), x.then(() => {
+    return v === void 0 ? l.set(p, /* @__PURE__ */ new Map([[_, x]])) : v.set(_, x), x.then(() => {
       const y = u.get(p);
-      y === void 0 ? u.set(p, /* @__PURE__ */ new Set([g])) : y.add(g);
+      y === void 0 ? u.set(p, /* @__PURE__ */ new Set([_])) : y.add(_);
     }).finally(() => {
       const y = l.get(p);
-      y !== void 0 && y.delete(g);
+      y !== void 0 && y.delete(_);
     }), x;
   };
 }, on = (e, t) => {
@@ -865,27 +865,27 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
   !td(e) && t.every((n) => n.size === 0) && qi(e);
 }, nm = (e, t, n, s, i, r, o, a, c, l, u, h, d) => {
   const f = /* @__PURE__ */ new WeakMap();
-  return (p, g, m, _, v) => {
-    const { activeInputs: b, passiveInputs: x } = r(g), { outputs: y } = r(p), w = a(p), S = (C) => {
-      const E = c(g), R = c(p);
+  return (p, _, m, g, v) => {
+    const { activeInputs: b, passiveInputs: x } = r(_), { outputs: y } = r(p), w = a(p), S = (C) => {
+      const E = c(_), R = c(p);
       if (C) {
-        const A = Jh(x, p, m, _);
-        e(b, p, A, !1), !v && !h(p) && n(R, E, m, _), d(g) && Bs(g);
+        const A = Jh(x, p, m, g);
+        e(b, p, A, !1), !v && !h(p) && n(R, E, m, g), d(_) && Bs(_);
       } else {
-        const A = s(b, p, m, _);
-        t(x, _, A, !1), !v && !h(p) && i(R, E, m, _);
-        const I = o(g);
+        const A = s(b, p, m, g);
+        t(x, g, A, !1), !v && !h(p) && i(R, E, m, g);
+        const I = o(_);
         if (I === 0)
-          u(g) && Fa(g, b);
+          u(_) && Fa(_, b);
         else {
-          const F = f.get(g);
-          F !== void 0 && clearTimeout(F), f.set(g, setTimeout(() => {
-            u(g) && Fa(g, b);
+          const F = f.get(_);
+          F !== void 0 && clearTimeout(F), f.set(_, setTimeout(() => {
+            u(_) && Fa(_, b);
           }, I * 1e3));
         }
       }
     };
-    return l(y, [g, m, _], (C) => C[0] === g && C[1] === m && C[2] === _, !0) ? (w.add(S), u(p) ? e(b, p, [m, _, S], !0) : t(x, _, [p, m, S], !0), !0) : !1;
+    return l(y, [_, m, g], (C) => C[0] === _ && C[1] === m && C[2] === g, !0) ? (w.add(S), u(p) ? e(b, p, [m, g, S], !0) : t(x, g, [p, m, S], !0), !0) : !1;
   };
 }, sm = (e) => (t, n, [s, i, r], o) => {
   const a = t.get(s);
@@ -1029,8 +1029,8 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
   playbackRate: 1
 }, dm = (e, t, n, s, i, r, o, a) => class extends e {
   constructor(l, u) {
-    const h = r(l), d = { ...hm, ...u }, f = i(h, d), p = o(h), g = p ? t() : null;
-    super(l, !1, f, g), this._audioBufferSourceNodeRenderer = g, this._isBufferNullified = !1, this._isBufferSet = d.buffer !== null, this._nativeAudioBufferSourceNode = f, this._onended = null, this._playbackRate = n(this, p, f.playbackRate, De, We);
+    const h = r(l), d = { ...hm, ...u }, f = i(h, d), p = o(h), _ = p ? t() : null;
+    super(l, !1, f, _), this._audioBufferSourceNodeRenderer = _, this._isBufferNullified = !1, this._isBufferSet = d.buffer !== null, this._nativeAudioBufferSourceNode = f, this._onended = null, this._playbackRate = n(this, p, f.playbackRate, De, We);
   }
   get buffer() {
     return this._isBufferNullified ? null : this._nativeAudioBufferSourceNode.buffer;
@@ -1347,7 +1347,7 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
       upY: N(4, 1, I(4)),
       upZ: N(5, 0, I(5))
     };
-  }, { forwardX: d, forwardY: f, forwardZ: p, positionX: g, positionY: m, positionZ: _, upX: v, upY: b, upZ: x } = u.forwardX === void 0 ? h() : u;
+  }, { forwardX: d, forwardY: f, forwardZ: p, positionX: _, positionY: m, positionZ: g, upX: v, upY: b, upZ: x } = u.forwardX === void 0 ? h() : u;
   return {
     get forwardX() {
       return d;
@@ -1359,13 +1359,13 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
       return p;
     },
     get positionX() {
-      return g;
+      return _;
     },
     get positionY() {
       return m;
     },
     get positionZ() {
-      return _;
+      return g;
     },
     get upX() {
       return v;
@@ -1497,29 +1497,29 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
 }, Om = (e, t, n, s, i) => {
   const r = Oe(e);
   return Array.from(r.outputs).filter((o) => o[0] === n && (s === void 0 || o[1] === s) && (i === void 0 || o[2] === i)).map((o) => (Gi(o) ? wc(e, t, ...o) : Cc(e, t, ...o), r.outputs.delete(o), o[0]));
-}, Mm = (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, g) => class extends l {
-  constructor(_, v, b, x) {
-    super(b), this._context = _, this._nativeAudioNode = b;
-    const y = u(_);
-    h(y) && n(nu, () => nu(y, g)) !== !0 && Am(b), vc.set(this, b), Kh.set(this, /* @__PURE__ */ new Set()), _.state !== "closed" && v && Bs(this), e(this, x, b);
+}, Mm = (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, _) => class extends l {
+  constructor(g, v, b, x) {
+    super(b), this._context = g, this._nativeAudioNode = b;
+    const y = u(g);
+    h(y) && n(nu, () => nu(y, _)) !== !0 && Am(b), vc.set(this, b), Kh.set(this, /* @__PURE__ */ new Set()), g.state !== "closed" && v && Bs(this), e(this, x, b);
   }
   get channelCount() {
     return this._nativeAudioNode.channelCount;
   }
-  set channelCount(_) {
-    this._nativeAudioNode.channelCount = _;
+  set channelCount(g) {
+    this._nativeAudioNode.channelCount = g;
   }
   get channelCountMode() {
     return this._nativeAudioNode.channelCountMode;
   }
-  set channelCountMode(_) {
-    this._nativeAudioNode.channelCountMode = _;
+  set channelCountMode(g) {
+    this._nativeAudioNode.channelCountMode = g;
   }
   get channelInterpretation() {
     return this._nativeAudioNode.channelInterpretation;
   }
-  set channelInterpretation(_) {
-    this._nativeAudioNode.channelInterpretation = _;
+  set channelInterpretation(g) {
+    this._nativeAudioNode.channelInterpretation = g;
   }
   get context() {
     return this._context;
@@ -1531,27 +1531,27 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
     return this._nativeAudioNode.numberOfOutputs;
   }
   // tslint:disable-next-line:invalid-void
-  connect(_, v = 0, b = 0) {
+  connect(g, v = 0, b = 0) {
     if (v < 0 || v >= this._nativeAudioNode.numberOfOutputs)
       throw i();
     const x = u(this._context), y = p(x);
-    if (d(_) || f(_))
+    if (d(g) || f(g))
       throw r();
-    if (Br(_)) {
-      const C = Gt(_);
+    if (Br(g)) {
+      const C = Gt(g);
       try {
         const R = $r(this._nativeAudioNode, C, v, b), A = Or(this);
-        (y || A) && this._nativeAudioNode.disconnect(...R), this.context.state !== "closed" && !A && Or(_) && Bs(_);
+        (y || A) && this._nativeAudioNode.disconnect(...R), this.context.state !== "closed" && !A && Or(g) && Bs(g);
       } catch (R) {
         throw R.code === 12 ? r() : R;
       }
-      if (t(this, _, v, b, y)) {
-        const R = c([this], _);
+      if (t(this, g, v, b, y)) {
+        const R = c([this], g);
         ia(R, s(y));
       }
-      return _;
+      return g;
     }
-    const w = Oi(_);
+    const w = Oi(g);
     if (w.name === "playbackRate" && w.maxValue === 1024)
       throw o();
     try {
@@ -1559,24 +1559,24 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
     } catch (C) {
       throw C.code === 12 ? r() : C;
     }
-    if (km(this, _, v, y)) {
-      const C = c([this], _);
+    if (km(this, g, v, y)) {
+      const C = c([this], g);
       ia(C, s(y));
     }
   }
-  disconnect(_, v, b) {
+  disconnect(g, v, b) {
     let x;
     const y = u(this._context), w = p(y);
-    if (_ === void 0)
+    if (g === void 0)
       x = Dm(this, w);
-    else if (typeof _ == "number") {
-      if (_ < 0 || _ >= this.numberOfOutputs)
+    else if (typeof g == "number") {
+      if (g < 0 || g >= this.numberOfOutputs)
         throw i();
-      x = Rm(this, w, _);
+      x = Rm(this, w, g);
     } else {
-      if (v !== void 0 && (v < 0 || v >= this.numberOfOutputs) || Br(_) && b !== void 0 && (b < 0 || b >= _.numberOfInputs))
+      if (v !== void 0 && (v < 0 || v >= this.numberOfOutputs) || Br(g) && b !== void 0 && (b < 0 || b >= g.numberOfInputs))
         throw i();
-      if (x = Om(this, w, _, v, b), x.length === 0)
+      if (x = Om(this, w, g, v, b), x.length === 0)
         throw r();
     }
     for (const S of x) {
@@ -1584,36 +1584,36 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
       ia(C, a);
     }
   }
-}, Fm = (e, t, n, s, i, r, o, a, c, l, u, h, d) => (f, p, g, m = null, _ = null) => {
-  const v = g.value, b = new zp(v), x = p ? s(b) : null, y = {
+}, Fm = (e, t, n, s, i, r, o, a, c, l, u, h, d) => (f, p, _, m = null, g = null) => {
+  const v = _.value, b = new zp(v), x = p ? s(b) : null, y = {
     get defaultValue() {
       return v;
     },
     get maxValue() {
-      return m === null ? g.maxValue : m;
+      return m === null ? _.maxValue : m;
     },
     get minValue() {
-      return _ === null ? g.minValue : _;
+      return g === null ? _.minValue : g;
     },
     get value() {
-      return g.value;
+      return _.value;
     },
     set value(w) {
-      g.value = w, y.setValueAtTime(w, f.context.currentTime);
+      _.value = w, y.setValueAtTime(w, f.context.currentTime);
     },
     cancelAndHoldAtTime(w) {
-      if (typeof g.cancelAndHoldAtTime == "function")
-        x === null && b.flush(f.context.currentTime), b.add(i(w)), g.cancelAndHoldAtTime(w);
+      if (typeof _.cancelAndHoldAtTime == "function")
+        x === null && b.flush(f.context.currentTime), b.add(i(w)), _.cancelAndHoldAtTime(w);
       else {
         const S = Array.from(b).pop();
         x === null && b.flush(f.context.currentTime), b.add(i(w));
         const C = Array.from(b).pop();
-        g.cancelScheduledValues(w), S !== C && C !== void 0 && (C.type === "exponentialRampToValue" ? g.exponentialRampToValueAtTime(C.value, C.endTime) : C.type === "linearRampToValue" ? g.linearRampToValueAtTime(C.value, C.endTime) : C.type === "setValue" ? g.setValueAtTime(C.value, C.startTime) : C.type === "setValueCurve" && g.setValueCurveAtTime(C.values, C.startTime, C.duration));
+        _.cancelScheduledValues(w), S !== C && C !== void 0 && (C.type === "exponentialRampToValue" ? _.exponentialRampToValueAtTime(C.value, C.endTime) : C.type === "linearRampToValue" ? _.linearRampToValueAtTime(C.value, C.endTime) : C.type === "setValue" ? _.setValueAtTime(C.value, C.startTime) : C.type === "setValueCurve" && _.setValueCurveAtTime(C.values, C.startTime, C.duration));
       }
       return y;
     },
     cancelScheduledValues(w) {
-      return x === null && b.flush(f.context.currentTime), b.add(r(w)), g.cancelScheduledValues(w), y;
+      return x === null && b.flush(f.context.currentTime), b.add(r(w)), _.cancelScheduledValues(w), y;
     },
     exponentialRampToValueAtTime(w, S) {
       if (w === 0)
@@ -1621,17 +1621,17 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
       if (!Number.isFinite(S) || S < 0)
         throw new RangeError();
       const C = f.context.currentTime;
-      return x === null && b.flush(C), Array.from(b).length === 0 && (b.add(l(v, C)), g.setValueAtTime(v, C)), b.add(o(w, S)), g.exponentialRampToValueAtTime(w, S), y;
+      return x === null && b.flush(C), Array.from(b).length === 0 && (b.add(l(v, C)), _.setValueAtTime(v, C)), b.add(o(w, S)), _.exponentialRampToValueAtTime(w, S), y;
     },
     linearRampToValueAtTime(w, S) {
       const C = f.context.currentTime;
-      return x === null && b.flush(C), Array.from(b).length === 0 && (b.add(l(v, C)), g.setValueAtTime(v, C)), b.add(a(w, S)), g.linearRampToValueAtTime(w, S), y;
+      return x === null && b.flush(C), Array.from(b).length === 0 && (b.add(l(v, C)), _.setValueAtTime(v, C)), b.add(a(w, S)), _.linearRampToValueAtTime(w, S), y;
     },
     setTargetAtTime(w, S, C) {
-      return x === null && b.flush(f.context.currentTime), b.add(c(w, S, C)), g.setTargetAtTime(w, S, C), y;
+      return x === null && b.flush(f.context.currentTime), b.add(c(w, S, C)), _.setTargetAtTime(w, S, C), y;
     },
     setValueAtTime(w, S) {
-      return x === null && b.flush(f.context.currentTime), b.add(l(w, S)), g.setValueAtTime(w, S), y;
+      return x === null && b.flush(f.context.currentTime), b.add(l(w, S)), _.setValueAtTime(w, S), y;
     },
     setValueCurveAtTime(w, S, C) {
       const E = w instanceof Float32Array ? w : new Float32Array(w);
@@ -1641,15 +1641,15 @@ const Gp = (e) => ({ cancelTime: e, type: "cancelAndHold" }), Zp = (e) => ({ can
           const J = (E.length - 1) / C * ((I + W) / A - S), z = Math.floor(J), D = Math.ceil(J);
           V[W] = z === D ? E[z] : (1 - (J - z)) * E[z] + (1 - (D - J)) * E[D];
         }
-        x === null && b.flush(f.context.currentTime), b.add(u(V, S, C)), g.setValueCurveAtTime(V, S, C);
+        x === null && b.flush(f.context.currentTime), b.add(u(V, S, C)), _.setValueCurveAtTime(V, S, C);
         const L = F / A;
         L < R && d(y, V[V.length - 1], L), d(y, E[E.length - 1], R);
       } else
-        x === null && b.flush(f.context.currentTime), b.add(u(E, S, C)), g.setValueCurveAtTime(E, S, C);
+        x === null && b.flush(f.context.currentTime), b.add(u(E, S, C)), _.setValueCurveAtTime(E, S, C);
       return y;
     }
   };
-  return n.set(y, g), t.set(y, f), e(y, x), y;
+  return n.set(y, _), t.set(y, f), e(y, x), y;
 }, Pm = (e) => ({
   replay(t) {
     for (const n of e)
@@ -1708,12 +1708,12 @@ const Nm = {
   parameterData: {},
   processorOptions: {}
 }, Vm = (e, t, n, s, i, r, o, a, c, l, u, h, d, f) => class extends t {
-  constructor(g, m, _) {
+  constructor(_, m, g) {
     var v;
-    const b = a(g), x = c(b), y = u({ ...Nm, ..._ });
+    const b = a(_), x = c(b), y = u({ ...Nm, ...g });
     d(y);
-    const w = Oa.get(b), S = w?.get(m), C = x || b.state !== "closed" ? b : (v = o(b)) !== null && v !== void 0 ? v : b, E = i(C, x ? null : g.baseLatency, l, m, S, y), R = x ? s(m, y, S) : null;
-    super(g, !0, E, R);
+    const w = Oa.get(b), S = w?.get(m), C = x || b.state !== "closed" ? b : (v = o(b)) !== null && v !== void 0 ? v : b, E = i(C, x ? null : _.baseLatency, l, m, S, y), R = x ? s(m, y, S) : null;
+    super(_, !0, E, R);
     const A = [];
     E.parameters.forEach((F, N) => {
       const V = n(this, x, F);
@@ -1725,11 +1725,11 @@ const Nm = {
   get onprocessorerror() {
     return this._onprocessorerror;
   }
-  set onprocessorerror(g) {
-    const m = typeof g == "function" ? f(this, g) : null;
+  set onprocessorerror(_) {
+    const m = typeof _ == "function" ? f(this, _) : null;
     this._nativeAudioWorkletNode.onprocessorerror = m;
-    const _ = this._nativeAudioWorkletNode.onprocessorerror;
-    this._onprocessorerror = _ !== null && _ === m ? g : _;
+    const g = this._nativeAudioWorkletNode.onprocessorerror;
+    this._onprocessorerror = g !== null && g === m ? _ : g;
   }
   get parameters() {
     return this._parameters === null ? this._nativeAudioWorkletNode.parameters : this._parameters;
@@ -1766,23 +1766,23 @@ const ad = (e, t, n, s, i) => {
   const n = on(Ma, e), s = Gt(t);
   return on(n, s);
 }, jm = async (e, t, n, s, i, r, o) => {
-  const a = t === null ? Math.ceil(e.context.length / 128) * 128 : t.length, c = s.channelCount * s.numberOfInputs, l = i.reduce((m, _) => m + _, 0), u = l === 0 ? null : n.createBuffer(l, a, n.sampleRate);
+  const a = t === null ? Math.ceil(e.context.length / 128) * 128 : t.length, c = s.channelCount * s.numberOfInputs, l = i.reduce((m, g) => m + g, 0), u = l === 0 ? null : n.createBuffer(l, a, n.sampleRate);
   if (r === void 0)
     throw new Error("Missing the processor constructor.");
-  const h = Oe(e), d = await Wm(n, e), f = Zr(s.numberOfInputs, s.channelCount), p = Zr(s.numberOfOutputs, i), g = Array.from(e.parameters.keys()).reduce((m, _) => ({ ...m, [_]: new Float32Array(128) }), {});
+  const h = Oe(e), d = await Wm(n, e), f = Zr(s.numberOfInputs, s.channelCount), p = Zr(s.numberOfOutputs, i), _ = Array.from(e.parameters.keys()).reduce((m, g) => ({ ...m, [g]: new Float32Array(128) }), {});
   for (let m = 0; m < a; m += 128) {
     if (s.numberOfInputs > 0 && t !== null)
-      for (let _ = 0; _ < s.numberOfInputs; _ += 1)
+      for (let g = 0; g < s.numberOfInputs; g += 1)
         for (let v = 0; v < s.channelCount; v += 1)
-          Gr(t, f[_], v, v, m);
-    r.parameterDescriptors !== void 0 && t !== null && r.parameterDescriptors.forEach(({ name: _ }, v) => {
-      Gr(t, g, _, c + v, m);
+          Gr(t, f[g], v, v, m);
+    r.parameterDescriptors !== void 0 && t !== null && r.parameterDescriptors.forEach(({ name: g }, v) => {
+      Gr(t, _, g, c + v, m);
     });
-    for (let _ = 0; _ < s.numberOfInputs; _ += 1)
-      for (let v = 0; v < i[_]; v += 1)
-        p[_][v].byteLength === 0 && (p[_][v] = new Float32Array(128));
+    for (let g = 0; g < s.numberOfInputs; g += 1)
+      for (let v = 0; v < i[g]; v += 1)
+        p[g][v].byteLength === 0 && (p[g][v] = new Float32Array(128));
     try {
-      const _ = f.map((b, x) => h.activeInputs[x].size === 0 ? [] : b), v = o(m / n.sampleRate, n.sampleRate, () => d.process(_, p, g));
+      const g = f.map((b, x) => h.activeInputs[x].size === 0 ? [] : b), v = o(m / n.sampleRate, n.sampleRate, () => d.process(g, p, _));
       if (u !== null)
         for (let b = 0, x = 0; b < s.numberOfOutputs; b += 1) {
           for (let y = 0; y < i[b]; y += 1)
@@ -1791,23 +1791,23 @@ const ad = (e, t, n, s, i) => {
         }
       if (!v)
         break;
-    } catch (_) {
+    } catch (g) {
       e.dispatchEvent(new ErrorEvent("processorerror", {
-        colno: _.colno,
-        filename: _.filename,
-        lineno: _.lineno,
-        message: _.message
+        colno: g.colno,
+        filename: g.filename,
+        lineno: g.lineno,
+        message: g.message
       }));
       break;
     }
   }
   return u;
-}, Lm = (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, g) => (m, _, v) => {
+}, Lm = (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, _) => (m, g, v) => {
   const b = /* @__PURE__ */ new WeakMap();
   let x = null;
   const y = async (w, S) => {
     let C = u(w), E = null;
-    const R = ke(C, S), A = Array.isArray(_.outputChannelCount) ? _.outputChannelCount : Array.from(_.outputChannelCount);
+    const R = ke(C, S), A = Array.isArray(g.outputChannelCount) ? g.outputChannelCount : Array.from(g.outputChannelCount);
     if (h === null) {
       const I = A.reduce((L, W) => L + W, 0), F = i(S, {
         channelCount: Math.max(1, I),
@@ -1823,9 +1823,9 @@ const ad = (e, t, n, s, i) => {
           numberOfInputs: A[L]
         }));
       const V = o(S, {
-        channelCount: _.channelCount,
-        channelCountMode: _.channelCountMode,
-        channelInterpretation: _.channelInterpretation,
+        channelCount: g.channelCount,
+        channelCountMode: g.channelCountMode,
+        channelInterpretation: g.channelInterpretation,
         gain: 1
       });
       V.connect = t.bind(null, N), V.disconnect = c.bind(null, N), E = [F, N, V];
@@ -1845,17 +1845,17 @@ const ad = (e, t, n, s, i) => {
             Math.ceil(w.context.length / 128) * 128,
             S.sampleRate
           ), q = [], K = [];
-          for (let U = 0; U < _.numberOfInputs; U += 1)
+          for (let U = 0; U < g.numberOfInputs; U += 1)
             q.push(o(O, {
-              channelCount: _.channelCount,
-              channelCountMode: _.channelCountMode,
-              channelInterpretation: _.channelInterpretation,
+              channelCount: g.channelCount,
+              channelCountMode: g.channelCountMode,
+              channelInterpretation: g.channelInterpretation,
               gain: 1
             })), K.push(i(O, {
-              channelCount: _.channelCount,
+              channelCount: g.channelCount,
               channelCountMode: "explicit",
               channelInterpretation: "discrete",
-              numberOfOutputs: _.channelCount
+              numberOfOutputs: g.channelCount
             }));
           const H = await Promise.all(Array.from(w.parameters.values()).map(async (U) => {
             const nt = r(O, {
@@ -1871,15 +1871,15 @@ const ad = (e, t, n, s, i) => {
             channelInterpretation: "speakers",
             numberOfInputs: Math.max(1, W + J)
           });
-          for (let U = 0; U < _.numberOfInputs; U += 1) {
+          for (let U = 0; U < g.numberOfInputs; U += 1) {
             q[U].connect(K[U]);
-            for (let nt = 0; nt < _.channelCount; nt += 1)
-              K[U].connect($, nt, U * _.channelCount + nt);
+            for (let nt = 0; nt < g.channelCount; nt += 1)
+              K[U].connect($, nt, U * g.channelCount + nt);
           }
           for (const [U, nt] of H.entries())
             nt.connect($, 0, W + U), nt.start(0);
-          return $.connect(O.destination), await Promise.all(q.map((U) => p(w, O, U))), g(O);
-        })(), S, _, A, v, l);
+          return $.connect(O.destination), await Promise.all(q.map((U) => p(w, O, U))), _(O);
+        })(), S, g, A, v, l);
       }
       const I = await x, F = n(S, {
         buffer: null,
@@ -1925,7 +1925,7 @@ const ad = (e, t, n, s, i) => {
       return C !== void 0 ? Promise.resolve(C) : y(w, S);
     }
   };
-}, Bm = (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, g, m, _, v, b) => class extends p {
+}, Bm = (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, _, m, g, v, b) => class extends p {
   constructor(y, w) {
     super(y, w), this._nativeContext = y, this._audioWorklet = e === void 0 ? void 0 : {
       addModule: (S, C) => e(this, S, C)
@@ -1971,13 +1971,13 @@ const ad = (e, t, n, s, i) => {
     return new f(this, { feedback: w, feedforward: y });
   }
   createOscillator() {
-    return new g(this);
+    return new _(this);
   }
   createPanner() {
     return new m(this);
   }
   createPeriodicWave(y, w, S = { disableNormalization: !1 }) {
-    return new _(this, { ...S, imag: w, real: y });
+    return new g(this, { ...S, imag: w, real: y });
   }
   createStereoPanner() {
     return new v(this);
@@ -2001,8 +2001,8 @@ const ad = (e, t, n, s, i) => {
   type: "lowpass"
 }, qm = (e, t, n, s, i, r, o, a) => class extends e {
   constructor(l, u) {
-    const h = r(l), d = { ...$m, ...u }, f = i(h, d), p = o(h), g = p ? n() : null;
-    super(l, !1, f, g), this._Q = t(this, p, f.Q, De, We), this._detune = t(this, p, f.detune, 1200 * Math.log2(De), -1200 * Math.log2(De)), this._frequency = t(this, p, f.frequency, l.sampleRate / 2, 0), this._gain = t(this, p, f.gain, 40 * Math.log10(De), We), this._nativeBiquadFilterNode = f, a(this, 1);
+    const h = r(l), d = { ...$m, ...u }, f = i(h, d), p = o(h), _ = p ? n() : null;
+    super(l, !1, f, _), this._Q = t(this, p, f.Q, De, We), this._detune = t(this, p, f.detune, 1200 * Math.log2(De), -1200 * Math.log2(De)), this._frequency = t(this, p, f.frequency, l.sampleRate / 2, 0), this._gain = t(this, p, f.gain, 40 * Math.log10(De), We), this._nativeBiquadFilterNode = f, a(this, 1);
   }
   get detune() {
     return this._detune;
@@ -2292,23 +2292,23 @@ const ad = (e, t, n, s, i) => {
   } catch {
   }
   return t(c, () => c(f)) ? f.decodeAudioData(d).then((p) => (su(d).catch(() => {
-  }), t(a, () => a(p)) || u(p), e.add(p), p)) : new Promise((p, g) => {
+  }), t(a, () => a(p)) || u(p), e.add(p), p)) : new Promise((p, _) => {
     const m = async () => {
       try {
         await su(d);
       } catch {
       }
-    }, _ = (v) => {
-      g(v), m();
+    }, g = (v) => {
+      _(v), m();
     };
     try {
       f.decodeAudioData(d, (v) => {
         typeof v.copyFromChannel != "function" && (l(v), xc(v)), e.add(v), m().then(() => p(v));
       }, (v) => {
-        _(v === null ? s() : v);
+        g(v === null ? s() : v);
       });
     } catch (v) {
-      _(v);
+      g(v);
     }
   });
 }, hg = (e, t, n, s, i, r, o, a) => (c, l) => {
@@ -2319,13 +2319,13 @@ const ad = (e, t, n, s, i) => {
   if (u === l) {
     if (t.delete(c), !d && o(c)) {
       const f = s(c), { outputs: p } = n(c);
-      for (const g of p)
-        if (Gi(g)) {
-          const m = s(g[0]);
-          e(f, m, g[1], g[2]);
+      for (const _ of p)
+        if (Gi(_)) {
+          const m = s(_[0]);
+          e(f, m, _[1], _[2]);
         } else {
-          const m = i(g[0]);
-          f.connect(m, g[1]);
+          const m = i(_[0]);
+          f.connect(m, _[1]);
         }
     }
   } else
@@ -2394,8 +2394,8 @@ const ad = (e, t, n, s, i) => {
   threshold: -24
 }, xg = (e, t, n, s, i, r, o, a) => class extends e {
   constructor(l, u) {
-    const h = r(l), d = { ...bg, ...u }, f = s(h, d), p = o(h), g = p ? n() : null;
-    super(l, !1, f, g), this._attack = t(this, p, f.attack), this._knee = t(this, p, f.knee), this._nativeDynamicsCompressorNode = f, this._ratio = t(this, p, f.ratio), this._release = t(this, p, f.release), this._threshold = t(this, p, f.threshold), a(this, 6e-3);
+    const h = r(l), d = { ...bg, ...u }, f = s(h, d), p = o(h), _ = p ? n() : null;
+    super(l, !1, f, _), this._attack = t(this, p, f.attack), this._knee = t(this, p, f.knee), this._nativeDynamicsCompressorNode = f, this._ratio = t(this, p, f.ratio), this._release = t(this, p, f.release), this._threshold = t(this, p, f.threshold), a(this, 6e-3);
   }
   get attack() {
     return this._attack;
@@ -2616,14 +2616,14 @@ const ad = (e, t, n, s, i) => {
   let d = a;
   for (let f = 0; f < h; f += 1) {
     let p = n[0] * l[f];
-    for (let g = 1; g < i; g += 1) {
-      const m = d - g & c - 1;
-      p += n[g] * r[m], p -= e[g] * o[m];
+    for (let _ = 1; _ < i; _ += 1) {
+      const m = d - _ & c - 1;
+      p += n[_] * r[m], p -= e[_] * o[m];
     }
-    for (let g = i; g < s; g += 1)
-      p += n[g] * r[d - g & c - 1];
-    for (let g = i; g < t; g += 1)
-      p -= e[g] * o[d - g & c - 1];
+    for (let _ = i; _ < s; _ += 1)
+      p += n[_] * r[d - _ & c - 1];
+    for (let _ = i; _ < t; _ += 1)
+      p -= e[_] * o[d - _ & c - 1];
     r[d] = l[f], o[d] = p, d = d + 1 & c - 1, u[f] = p;
   }
   return d;
@@ -2637,8 +2637,8 @@ const ad = (e, t, n, s, i) => {
   }
   const l = 32, u = new Float32Array(l), h = new Float32Array(l), d = t.createBuffer(e.numberOfChannels, e.length, e.sampleRate), f = e.numberOfChannels;
   for (let p = 0; p < f; p += 1) {
-    const g = e.getChannelData(p), m = d.getChannelData(p);
-    u.fill(0), h.fill(0), cd(i, o, r, a, c, u, h, 0, l, g, m);
+    const _ = e.getChannelData(p), m = d.getChannelData(p);
+    u.fill(0), h.fill(0), cd(i, o, r, a, c, u, h, 0, l, _, m);
   }
   return d;
 }, qg = (e, t, n, s, i) => (r, o) => {
@@ -2669,12 +2669,12 @@ const ad = (e, t, n, s, i) => {
         );
         c = (async () => {
           await s(u, m, m.destination);
-          const _ = await i(m);
-          return $g(_, h, r, o);
+          const g = await i(m);
+          return $g(g, h, r, o);
         })();
       }
-      const g = await c;
-      return d.buffer = g, d.start(0), d;
+      const _ = await c;
+      return d.buffer = _, d.start(0), d;
     }
     return await s(u, h, f), f;
   };
@@ -2707,12 +2707,12 @@ const ad = (e, t, n, s, i) => {
 }, Zg = (e, t) => (n) => e.has(n) || t(n), Yg = (e, t) => (n) => e.has(n) || t(n), Xg = (e, t) => (n) => {
   const s = e.get(n);
   return t(s) || t(n);
-}, Ug = (e) => (t) => e !== null && t instanceof e, Hg = (e) => (t) => e !== null && typeof e.AudioNode == "function" && t instanceof e.AudioNode, Kg = (e) => (t) => e !== null && typeof e.AudioParam == "function" && t instanceof e.AudioParam, Qg = (e, t) => (n) => e(n) || t(n), Jg = (e) => (t) => e !== null && t instanceof e, t_ = (e) => e !== null && e.isSecureContext, e_ = async (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, g) => e(t, t) && e(n, n) && e(i, i) && e(r, r) && e(a, a) && e(c, c) && e(l, l) && e(u, u) && e(h, h) && e(d, d) && e(f, f) ? (await Promise.all([
+}, Ug = (e) => (t) => e !== null && t instanceof e, Hg = (e) => (t) => e !== null && typeof e.AudioNode == "function" && t instanceof e.AudioNode, Kg = (e) => (t) => e !== null && typeof e.AudioParam == "function" && t instanceof e.AudioParam, Qg = (e, t) => (n) => e(n) || t(n), Jg = (e) => (t) => e !== null && t instanceof e, t_ = (e) => e !== null && e.isSecureContext, e_ = async (e, t, n, s, i, r, o, a, c, l, u, h, d, f, p, _) => e(t, t) && e(n, n) && e(i, i) && e(r, r) && e(a, a) && e(c, c) && e(l, l) && e(u, u) && e(h, h) && e(d, d) && e(f, f) ? (await Promise.all([
   e(s, s),
   e(o, o),
   e(p, p),
-  e(g, g)
-])).every((_) => _) : !1, n_ = (e, t, n, s) => class extends e {
+  e(_, _)
+])).every((g) => g) : !1, n_ = (e, t, n, s) => class extends e {
   constructor(r, o) {
     const a = n(r), c = t(a, o);
     if (s(a))
@@ -2926,25 +2926,25 @@ const ad = (e, t, n, s, i) => {
             typeof f == "function" && h.removeEventListener("processorerror", f), f = typeof p == "function" ? p : null, typeof f == "function" && h.addEventListener("processorerror", f);
           }
         }
-      }), h.addEventListener = /* @__PURE__ */ ((p) => (...g) => {
-        if (g[0] === "processorerror") {
-          const m = typeof g[1] == "function" ? g[1] : typeof g[1] == "object" && g[1] !== null && typeof g[1].handleEvent == "function" ? g[1].handleEvent : null;
+      }), h.addEventListener = /* @__PURE__ */ ((p) => (..._) => {
+        if (_[0] === "processorerror") {
+          const m = typeof _[1] == "function" ? _[1] : typeof _[1] == "object" && _[1] !== null && typeof _[1].handleEvent == "function" ? _[1].handleEvent : null;
           if (m !== null) {
-            const _ = d.get(g[1]);
-            _ !== void 0 ? g[1] = _ : (g[1] = (v) => {
+            const g = d.get(_[1]);
+            g !== void 0 ? _[1] = g : (_[1] = (v) => {
               v.type === "error" ? (Object.defineProperties(v, {
                 type: { value: "processorerror" }
-              }), m(v)) : m(new ErrorEvent(g[0], { ...v }));
-            }, d.set(m, g[1]));
+              }), m(v)) : m(new ErrorEvent(_[0], { ...v }));
+            }, d.set(m, _[1]));
           }
         }
-        return p.call(h, "error", g[1], g[2]), p.call(h, ...g);
-      })(h.addEventListener), h.removeEventListener = /* @__PURE__ */ ((p) => (...g) => {
-        if (g[0] === "processorerror") {
-          const m = d.get(g[1]);
-          m !== void 0 && (d.delete(g[1]), g[1] = m);
+        return p.call(h, "error", _[1], _[2]), p.call(h, ..._);
+      })(h.addEventListener), h.removeEventListener = /* @__PURE__ */ ((p) => (..._) => {
+        if (_[0] === "processorerror") {
+          const m = d.get(_[1]);
+          m !== void 0 && (d.delete(_[1]), _[1] = m);
         }
-        return p.call(h, "error", g[1], g[2]), p.call(h, g[0], g[1], g[2]);
+        return p.call(h, "error", _[1], _[2]), p.call(h, _[0], _[1], _[2]);
       })(h.removeEventListener), u.numberOfOutputs !== 0) {
         const p = n(r, {
           channelCount: 1,
@@ -2976,17 +2976,17 @@ const ad = (e, t, n, s, i) => {
   i === void 0 && (i = /* @__PURE__ */ new WeakMap(), Ma.set(e, i));
   const r = b_(n, s);
   return i.set(t, r), r;
-}, w_ = (e, t, n, s, i, r, o, a, c, l, u, h, d) => (f, p, g, m) => {
+}, w_ = (e, t, n, s, i, r, o, a, c, l, u, h, d) => (f, p, _, m) => {
   if (m.numberOfInputs === 0 && m.numberOfOutputs === 0)
     throw c();
-  const _ = Array.isArray(m.outputChannelCount) ? m.outputChannelCount : Array.from(m.outputChannelCount);
-  if (_.some((X) => X < 1))
+  const g = Array.isArray(m.outputChannelCount) ? m.outputChannelCount : Array.from(m.outputChannelCount);
+  if (g.some((X) => X < 1))
     throw c();
-  if (_.length !== m.numberOfOutputs)
+  if (g.length !== m.numberOfOutputs)
     throw t();
   if (m.channelCountMode !== "explicit")
     throw c();
-  const v = m.channelCount * m.numberOfInputs, b = _.reduce((X, rt) => X + rt, 0), x = g.parameterDescriptors === void 0 ? 0 : g.parameterDescriptors.length;
+  const v = m.channelCount * m.numberOfInputs, b = g.reduce((X, rt) => X + rt, 0), x = _.parameterDescriptors === void 0 ? 0 : _.parameterDescriptors.length;
   if (v + x > 6 || b > 6)
     throw c();
   const y = new MessageChannel(), w = [], S = [];
@@ -3003,8 +3003,8 @@ const ad = (e, t, n, s, i) => {
       numberOfOutputs: m.channelCount
     }));
   const C = [];
-  if (g.parameterDescriptors !== void 0)
-    for (const { defaultValue: X, maxValue: rt, minValue: Vt, name: Et } of g.parameterDescriptors) {
+  if (_.parameterDescriptors !== void 0)
+    for (const { defaultValue: X, maxValue: rt, minValue: Vt, name: Et } of _.parameterDescriptors) {
       const xt = r(f, {
         channelCount: 1,
         channelCountMode: "explicit",
@@ -3045,14 +3045,14 @@ const ad = (e, t, n, s, i) => {
       channelCount: 1,
       channelCountMode: "explicit",
       channelInterpretation: "speakers",
-      numberOfInputs: _[X]
+      numberOfInputs: g[X]
     }));
   for (let X = 0; X < m.numberOfInputs; X += 1) {
     w[X].connect(S[X]);
     for (let rt = 0; rt < m.channelCount; rt += 1)
       S[X].connect(E, rt, X * m.channelCount + rt);
   }
-  const N = new od(g.parameterDescriptors === void 0 ? [] : g.parameterDescriptors.map(({ name: X }, rt) => {
+  const N = new od(_.parameterDescriptors === void 0 ? [] : _.parameterDescriptors.map(({ name: X }, rt) => {
     const Vt = C[rt];
     return Vt.connect(E, 0, v + rt), Vt.start(0), [X, Vt.offset];
   }));
@@ -3142,18 +3142,18 @@ const ad = (e, t, n, s, i) => {
     set: (X) => {
       typeof D == "function" && y.port1.removeEventListener("message", D), D = typeof X == "function" ? X : null, typeof D == "function" && (y.port1.addEventListener("message", D), y.port1.start());
     }
-  }), g.prototype.port = y.port1;
+  }), _.prototype.port = y.port1;
   let O = null;
-  x_(f, J, g, m).then((X) => O = X);
-  const K = Zr(m.numberOfInputs, m.channelCount), H = Zr(m.numberOfOutputs, _), $ = g.parameterDescriptors === void 0 ? [] : g.parameterDescriptors.reduce((X, { name: rt }) => ({ ...X, [rt]: new Float32Array(128) }), {});
+  x_(f, J, _, m).then((X) => O = X);
+  const K = Zr(m.numberOfInputs, m.channelCount), H = Zr(m.numberOfOutputs, g), $ = _.parameterDescriptors === void 0 ? [] : _.parameterDescriptors.reduce((X, { name: rt }) => ({ ...X, [rt]: new Float32Array(128) }), {});
   let U = !0;
   const nt = () => {
     m.numberOfOutputs > 0 && A.disconnect(I);
     for (let X = 0, rt = 0; X < m.numberOfOutputs; X += 1) {
       const Vt = F[X];
-      for (let Et = 0; Et < _[X]; Et += 1)
+      for (let Et = 0; Et < g[X]; Et += 1)
         I.disconnect(Vt, rt + Et, Et);
-      rt += _[X];
+      rt += g[X];
     }
   }, M = /* @__PURE__ */ new Map();
   A.onaudioprocess = ({ inputBuffer: X, outputBuffer: rt }) => {
@@ -3163,11 +3163,11 @@ const ad = (e, t, n, s, i) => {
         for (let xt = 0; xt < m.numberOfInputs; xt += 1)
           for (let Wt = 0; Wt < m.channelCount; Wt += 1)
             Gr(X, K[xt], Wt, Wt, Et);
-        g.parameterDescriptors !== void 0 && g.parameterDescriptors.forEach(({ name: xt }, Wt) => {
+        _.parameterDescriptors !== void 0 && _.parameterDescriptors.forEach(({ name: xt }, Wt) => {
           Gr(X, $, xt, v + Wt, Et);
         });
         for (let xt = 0; xt < m.numberOfInputs; xt += 1)
-          for (let Wt = 0; Wt < _[xt]; Wt += 1)
+          for (let Wt = 0; Wt < g[xt]; Wt += 1)
             H[xt][Wt].byteLength === 0 && (H[xt][Wt] = new Float32Array(128));
         try {
           const xt = K.map((at, gt) => {
@@ -3178,9 +3178,9 @@ const ad = (e, t, n, s, i) => {
           });
           U = u(f.currentTime + Et / f.sampleRate, f.sampleRate, () => O.process(xt, H, $));
           for (let at = 0, gt = 0; at < m.numberOfOutputs; at += 1) {
-            for (let At = 0; At < _[at]; At += 1)
+            for (let At = 0; At < g[at]; At += 1)
               ad(rt, H[at], At, gt + At, Et);
-            gt += _[at];
+            gt += g[at];
           }
         } catch (xt) {
           U = !1, J.dispatchEvent(new ErrorEvent("processorerror", {
@@ -3196,8 +3196,8 @@ const ad = (e, t, n, s, i) => {
             for (let Wt = 0; Wt < m.channelCount; Wt += 1)
               S[Et].disconnect(E, Wt, xt * m.channelCount + Wt);
           }
-          if (g.parameterDescriptors !== void 0) {
-            const xt = g.parameterDescriptors.length;
+          if (_.parameterDescriptors !== void 0) {
+            const xt = _.parameterDescriptors.length;
             for (let Wt = 0; Wt < xt; Wt += 1) {
               const at = C[Wt];
               at.disconnect(E, 0, v + Wt), at.stop();
@@ -3222,9 +3222,9 @@ const ad = (e, t, n, s, i) => {
       Y(), m.numberOfOutputs > 0 && A.connect(I);
       for (let X = 0, rt = 0; X < m.numberOfOutputs; X += 1) {
         const Vt = F[X];
-        for (let Et = 0; Et < _[X]; Et += 1)
+        for (let Et = 0; Et < g[X]; Et += 1)
           I.connect(Vt, rt + Et, Et);
-        rt += _[X];
+        rt += g[X];
       }
     }
     ht = !0;
@@ -3382,34 +3382,34 @@ function ru(e, t) {
   return n;
 }
 const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channelInterpretation: c, feedback: l, feedforward: u }) => {
-  const h = ld(r, i.sampleRate), d = l instanceof Float64Array ? l : new Float64Array(l), f = u instanceof Float64Array ? u : new Float64Array(u), p = d.length, g = f.length, m = Math.min(p, g);
+  const h = ld(r, i.sampleRate), d = l instanceof Float64Array ? l : new Float64Array(l), f = u instanceof Float64Array ? u : new Float64Array(u), p = d.length, _ = f.length, m = Math.min(p, _);
   if (p === 0 || p > 20)
     throw s();
   if (d[0] === 0)
     throw t();
-  if (g === 0 || g > 20)
+  if (_ === 0 || _ > 20)
     throw s();
   if (f[0] === 0)
     throw t();
   if (d[0] !== 1) {
-    for (let C = 0; C < g; C += 1)
+    for (let C = 0; C < _; C += 1)
       f[C] /= d[0];
     for (let C = 1; C < p; C += 1)
       d[C] /= d[0];
   }
-  const _ = n(i, h, o, o);
-  _.channelCount = o, _.channelCountMode = a, _.channelInterpretation = c;
+  const g = n(i, h, o, o);
+  g.channelCount = o, g.channelCountMode = a, g.channelInterpretation = c;
   const v = 32, b = [], x = [], y = [];
   for (let C = 0; C < o; C += 1) {
     b.push(0);
     const E = new Float32Array(v), R = new Float32Array(v);
     E.fill(0), R.fill(0), x.push(E), y.push(R);
   }
-  _.onaudioprocess = (C) => {
+  g.onaudioprocess = (C) => {
     const E = C.inputBuffer, R = C.outputBuffer, A = E.numberOfChannels;
     for (let I = 0; I < A; I += 1) {
       const F = E.getChannelData(I), N = R.getChannelData(I);
-      b[I] = cd(d, p, f, g, m, x[I], y[I], b[I], v, F, N);
+      b[I] = cd(d, p, f, _, m, x[I], y[I], b[I], v, F, N);
     }
   };
   const w = i.sampleRate / 2;
@@ -3418,40 +3418,40 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
       return h;
     },
     get channelCount() {
-      return _.channelCount;
+      return g.channelCount;
     },
     set channelCount(C) {
-      _.channelCount = C;
+      g.channelCount = C;
     },
     get channelCountMode() {
-      return _.channelCountMode;
+      return g.channelCountMode;
     },
     set channelCountMode(C) {
-      _.channelCountMode = C;
+      g.channelCountMode = C;
     },
     get channelInterpretation() {
-      return _.channelInterpretation;
+      return g.channelInterpretation;
     },
     set channelInterpretation(C) {
-      _.channelInterpretation = C;
+      g.channelInterpretation = C;
     },
     get context() {
-      return _.context;
+      return g.context;
     },
     get inputs() {
-      return [_];
+      return [g];
     },
     get numberOfInputs() {
-      return _.numberOfInputs;
+      return g.numberOfInputs;
     },
     get numberOfOutputs() {
-      return _.numberOfOutputs;
+      return g.numberOfOutputs;
     },
     addEventListener(...C) {
-      return _.addEventListener(C[0], C[1], C[2]);
+      return g.addEventListener(C[0], C[1], C[2]);
     },
     dispatchEvent(...C) {
-      return _.dispatchEvent(C[0]);
+      return g.dispatchEvent(C[0]);
     },
     getFrequencyResponse(C, E, R) {
       if (C.length !== E.length || E.length !== R.length)
@@ -3463,9 +3463,9 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
       }
     },
     removeEventListener(...C) {
-      return _.removeEventListener(C[0], C[1], C[2]);
+      return g.removeEventListener(C[0], C[1], C[2]);
     }
-  }, _);
+  }, g);
 }, M_ = (e, t) => e.createMediaElementSource(t.mediaElement), F_ = (e, t) => {
   const n = e.createMediaStreamDestination();
   return ae(n, t), n.numberOfOutputs === 1 && Object.defineProperty(n, "numberOfOutputs", { get: () => 0 }), n;
@@ -3489,7 +3489,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
 }, j_ = (e) => (t, n) => {
   const s = t.createPanner();
   return s.orientationX === void 0 ? e(t, n) : (ae(s, n), Kt(s, n, "orientationX"), Kt(s, n, "orientationY"), Kt(s, n, "orientationZ"), Kt(s, n, "positionX"), Kt(s, n, "positionY"), Kt(s, n, "positionZ"), Zt(s, n, "coneInnerAngle"), Zt(s, n, "coneOuterAngle"), Zt(s, n, "coneOuterGain"), Zt(s, n, "distanceModel"), Zt(s, n, "maxDistance"), Zt(s, n, "panningModel"), Zt(s, n, "refDistance"), Zt(s, n, "rolloffFactor"), s);
-}, L_ = (e, t, n, s, i, r, o, a, c, l) => (u, { coneInnerAngle: h, coneOuterAngle: d, coneOuterGain: f, distanceModel: p, maxDistance: g, orientationX: m, orientationY: _, orientationZ: v, panningModel: b, positionX: x, positionY: y, positionZ: w, refDistance: S, rolloffFactor: C, ...E }) => {
+}, L_ = (e, t, n, s, i, r, o, a, c, l) => (u, { coneInnerAngle: h, coneOuterAngle: d, coneOuterGain: f, distanceModel: p, maxDistance: _, orientationX: m, orientationY: g, orientationZ: v, panningModel: b, positionX: x, positionY: y, positionZ: w, refDistance: S, rolloffFactor: C, ...E }) => {
   const R = u.createPanner();
   if (E.channelCount > 2 || E.channelCountMode === "max")
     throw o();
@@ -3507,7 +3507,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
     curve: new Float32Array([1, 1]),
     oversample: "none"
   });
-  let q = [m, _, v], K = [x, y, w];
+  let q = [m, g, v], K = [x, y, w];
   const H = new Float32Array(1);
   D.onaudioprocess = ({ inputBuffer: M }) => {
     const ht = [
@@ -3644,7 +3644,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
       return F.removeEventListener(M[0], M[1], M[2]);
     }
   };
-  h !== $.coneInnerAngle && ($.coneInnerAngle = h), d !== $.coneOuterAngle && ($.coneOuterAngle = d), f !== $.coneOuterGain && ($.coneOuterGain = f), p !== $.distanceModel && ($.distanceModel = p), g !== $.maxDistance && ($.maxDistance = g), m !== $.orientationX.value && ($.orientationX.value = m), _ !== $.orientationY.value && ($.orientationY.value = _), v !== $.orientationZ.value && ($.orientationZ.value = v), b !== $.panningModel && ($.panningModel = b), x !== $.positionX.value && ($.positionX.value = x), y !== $.positionY.value && ($.positionY.value = y), w !== $.positionZ.value && ($.positionZ.value = w), S !== $.refDistance && ($.refDistance = S), C !== $.rolloffFactor && ($.rolloffFactor = C), (q[0] !== 1 || q[1] !== 0 || q[2] !== 0) && R.setOrientation(...q), (K[0] !== 0 || K[1] !== 0 || K[2] !== 0) && R.setPosition(...K);
+  h !== $.coneInnerAngle && ($.coneInnerAngle = h), d !== $.coneOuterAngle && ($.coneOuterAngle = d), f !== $.coneOuterGain && ($.coneOuterGain = f), p !== $.distanceModel && ($.distanceModel = p), _ !== $.maxDistance && ($.maxDistance = _), m !== $.orientationX.value && ($.orientationX.value = m), g !== $.orientationY.value && ($.orientationY.value = g), v !== $.orientationZ.value && ($.orientationZ.value = v), b !== $.panningModel && ($.panningModel = b), x !== $.positionX.value && ($.positionX.value = x), y !== $.positionY.value && ($.positionY.value = y), w !== $.positionZ.value && ($.positionZ.value = w), S !== $.refDistance && ($.refDistance = S), C !== $.rolloffFactor && ($.rolloffFactor = C), (q[0] !== 1 || q[1] !== 0 || q[2] !== 0) && R.setOrientation(...q), (K[0] !== 0 || K[1] !== 0 || K[2] !== 0) && R.setPosition(...K);
   const U = () => {
     F.connect(R), e(F, O, 0, 0), O.connect(N).connect(I, 0, 0), O.connect(V).connect(I, 0, 1), O.connect(L).connect(I, 0, 2), O.connect(W).connect(I, 0, 3), O.connect(J).connect(I, 0, 4), O.connect(z).connect(I, 0, 5), I.connect(D).connect(u.destination);
   }, nt = () => {
@@ -3671,7 +3671,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
     }
   }), r;
 }, q_ = (e, t, n, s, i, r) => {
-  const a = new Float32Array([1, 1]), c = Math.PI / 2, l = { channelCount: 1, channelCountMode: "explicit", channelInterpretation: "discrete" }, u = { ...l, oversample: "none" }, h = (p, g, m, _) => {
+  const a = new Float32Array([1, 1]), c = Math.PI / 2, l = { channelCount: 1, channelCountMode: "explicit", channelInterpretation: "discrete" }, u = { ...l, oversample: "none" }, h = (p, _, m, g) => {
     const v = new Float32Array(16385), b = new Float32Array(16385);
     for (let E = 0; E < 16385; E += 1) {
       const R = E / 16384 * c;
@@ -3680,13 +3680,13 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
     const x = n(p, { ...l, gain: 0 }), y = s(p, { ...u, curve: v }), w = s(p, { ...u, curve: a }), S = n(p, { ...l, gain: 0 }), C = s(p, { ...u, curve: b });
     return {
       connectGraph() {
-        g.connect(x), g.connect(w.inputs === void 0 ? w : w.inputs[0]), g.connect(S), w.connect(m), m.connect(y.inputs === void 0 ? y : y.inputs[0]), m.connect(C.inputs === void 0 ? C : C.inputs[0]), y.connect(x.gain), C.connect(S.gain), x.connect(_, 0, 0), S.connect(_, 0, 1);
+        _.connect(x), _.connect(w.inputs === void 0 ? w : w.inputs[0]), _.connect(S), w.connect(m), m.connect(y.inputs === void 0 ? y : y.inputs[0]), m.connect(C.inputs === void 0 ? C : C.inputs[0]), y.connect(x.gain), C.connect(S.gain), x.connect(g, 0, 0), S.connect(g, 0, 1);
       },
       disconnectGraph() {
-        g.disconnect(x), g.disconnect(w.inputs === void 0 ? w : w.inputs[0]), g.disconnect(S), w.disconnect(m), m.disconnect(y.inputs === void 0 ? y : y.inputs[0]), m.disconnect(C.inputs === void 0 ? C : C.inputs[0]), y.disconnect(x.gain), C.disconnect(S.gain), x.disconnect(_, 0, 0), S.disconnect(_, 0, 1);
+        _.disconnect(x), _.disconnect(w.inputs === void 0 ? w : w.inputs[0]), _.disconnect(S), w.disconnect(m), m.disconnect(y.inputs === void 0 ? y : y.inputs[0]), m.disconnect(C.inputs === void 0 ? C : C.inputs[0]), y.disconnect(x.gain), C.disconnect(S.gain), x.disconnect(g, 0, 0), S.disconnect(g, 0, 1);
       }
     };
-  }, d = (p, g, m, _) => {
+  }, d = (p, _, m, g) => {
     const v = new Float32Array(16385), b = new Float32Array(16385), x = new Float32Array(16385), y = new Float32Array(16385), w = Math.floor(16385 / 2);
     for (let W = 0; W < 16385; W += 1)
       if (W > w) {
@@ -3716,20 +3716,20 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
     });
     return {
       connectGraph() {
-        g.connect(S), g.connect(I.inputs === void 0 ? I : I.inputs[0]), S.connect(C, 0), S.connect(R, 0), S.connect(F, 1), S.connect(V, 1), I.connect(m), m.connect(E.inputs === void 0 ? E : E.inputs[0]), m.connect(A.inputs === void 0 ? A : A.inputs[0]), m.connect(N.inputs === void 0 ? N : N.inputs[0]), m.connect(L.inputs === void 0 ? L : L.inputs[0]), E.connect(C.gain), A.connect(R.gain), N.connect(F.gain), L.connect(V.gain), C.connect(_, 0, 0), F.connect(_, 0, 0), R.connect(_, 0, 1), V.connect(_, 0, 1);
+        _.connect(S), _.connect(I.inputs === void 0 ? I : I.inputs[0]), S.connect(C, 0), S.connect(R, 0), S.connect(F, 1), S.connect(V, 1), I.connect(m), m.connect(E.inputs === void 0 ? E : E.inputs[0]), m.connect(A.inputs === void 0 ? A : A.inputs[0]), m.connect(N.inputs === void 0 ? N : N.inputs[0]), m.connect(L.inputs === void 0 ? L : L.inputs[0]), E.connect(C.gain), A.connect(R.gain), N.connect(F.gain), L.connect(V.gain), C.connect(g, 0, 0), F.connect(g, 0, 0), R.connect(g, 0, 1), V.connect(g, 0, 1);
       },
       disconnectGraph() {
-        g.disconnect(S), g.disconnect(I.inputs === void 0 ? I : I.inputs[0]), S.disconnect(C, 0), S.disconnect(R, 0), S.disconnect(F, 1), S.disconnect(V, 1), I.disconnect(m), m.disconnect(E.inputs === void 0 ? E : E.inputs[0]), m.disconnect(A.inputs === void 0 ? A : A.inputs[0]), m.disconnect(N.inputs === void 0 ? N : N.inputs[0]), m.disconnect(L.inputs === void 0 ? L : L.inputs[0]), E.disconnect(C.gain), A.disconnect(R.gain), N.disconnect(F.gain), L.disconnect(V.gain), C.disconnect(_, 0, 0), F.disconnect(_, 0, 0), R.disconnect(_, 0, 1), V.disconnect(_, 0, 1);
+        _.disconnect(S), _.disconnect(I.inputs === void 0 ? I : I.inputs[0]), S.disconnect(C, 0), S.disconnect(R, 0), S.disconnect(F, 1), S.disconnect(V, 1), I.disconnect(m), m.disconnect(E.inputs === void 0 ? E : E.inputs[0]), m.disconnect(A.inputs === void 0 ? A : A.inputs[0]), m.disconnect(N.inputs === void 0 ? N : N.inputs[0]), m.disconnect(L.inputs === void 0 ? L : L.inputs[0]), E.disconnect(C.gain), A.disconnect(R.gain), N.disconnect(F.gain), L.disconnect(V.gain), C.disconnect(g, 0, 0), F.disconnect(g, 0, 0), R.disconnect(g, 0, 1), V.disconnect(g, 0, 1);
       }
     };
-  }, f = (p, g, m, _, v) => {
-    if (g === 1)
-      return h(p, m, _, v);
-    if (g === 2)
-      return d(p, m, _, v);
+  }, f = (p, _, m, g, v) => {
+    if (_ === 1)
+      return h(p, m, g, v);
+    if (_ === 2)
+      return d(p, m, g, v);
     throw i();
   };
-  return (p, { channelCount: g, channelCountMode: m, pan: _, ...v }) => {
+  return (p, { channelCount: _, channelCountMode: m, pan: g, ...v }) => {
     if (m === "max")
       throw i();
     const b = e(p, {
@@ -3737,13 +3737,13 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
       channelCount: 1,
       channelCountMode: m,
       numberOfInputs: 2
-    }), x = n(p, { ...v, channelCount: g, channelCountMode: m, gain: 1 }), y = n(p, {
+    }), x = n(p, { ...v, channelCount: _, channelCountMode: m, gain: 1 }), y = n(p, {
       channelCount: 1,
       channelCountMode: "explicit",
       channelInterpretation: "discrete",
-      gain: _
+      gain: g
     });
-    let { connectGraph: w, disconnectGraph: S } = f(p, g, x, y, b);
+    let { connectGraph: w, disconnectGraph: S } = f(p, _, x, y, b);
     Object.defineProperty(y.gain, "defaultValue", { get: () => 0 }), Object.defineProperty(y.gain, "maxValue", { get: () => 1 }), Object.defineProperty(y.gain, "minValue", { get: () => -1 });
     const C = {
       get bufferSize() {
@@ -3811,7 +3811,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
     throw t();
   Zt(l, { curve: u }, "curve"), Zt(l, c, "oversample");
   let h = null, d = !1;
-  return o(l, "curve", (g) => () => g.call(l), (g) => (m) => (g.call(l, m), d && (s(m) && h === null ? h = e(a, l) : !s(m) && h !== null && (h(), h = null)), m)), i(l, () => {
+  return o(l, "curve", (_) => () => _.call(l), (_) => (m) => (_.call(l, m), d && (s(m) && h === null ? h = e(a, l) : !s(m) && h !== null && (h(), h = null)), m)), i(l, () => {
     d = !0, s(l.curve) && (h = e(a, l));
   }, () => {
     d = !1, h !== null && (h(), h = null);
@@ -3820,7 +3820,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
   const l = r.createWaveShaper(), u = r.createWaveShaper();
   ae(l, c), ae(u, c);
   const h = n(r, { ...c, gain: 1 }), d = n(r, { ...c, gain: -1 }), f = n(r, { ...c, gain: 1 }), p = n(r, { ...c, gain: -1 });
-  let g = null, m = !1, _ = null;
+  let _ = null, m = !1, g = null;
   const v = {
     get bufferSize() {
     },
@@ -3846,7 +3846,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
       return l.context;
     },
     get curve() {
-      return _;
+      return g;
     },
     set curve(y) {
       if (y !== null && y.length < 2)
@@ -3863,7 +3863,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
         }
         S[E] = w % 2 === 1 ? y[E - 1] : (y[E - 2] + y[E - 1]) / 2, l.curve = S, u.curve = C;
       }
-      _ = y, m && (s(_) && g === null ? g = e(r, h) : g !== null && (g(), g = null));
+      g = y, m && (s(g) && _ === null ? _ = e(r, h) : _ !== null && (_(), _ = null));
     },
     get inputs() {
       return [h];
@@ -3892,9 +3892,9 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
   };
   o !== null && (v.curve = o instanceof Float32Array ? o : new Float32Array(o)), a !== v.oversample && (v.oversample = a);
   const b = () => {
-    h.connect(l).connect(f), h.connect(d).connect(u).connect(p).connect(f), m = !0, s(_) && (g = e(r, h));
+    h.connect(l).connect(f), h.connect(d).connect(u).connect(p).connect(f), m = !0, s(g) && (_ = e(r, h));
   }, x = () => {
-    h.disconnect(l), l.disconnect(f), h.disconnect(d), d.disconnect(u), u.disconnect(p), p.disconnect(f), m = !1, g !== null && (g(), g = null);
+    h.disconnect(l), l.disconnect(f), h.disconnect(d), d.disconnect(u), u.disconnect(p), p.disconnect(f), m = !1, _ !== null && (_(), _ = null);
   };
   return i(Ks(v, f), b, x);
 }, Ne = () => new DOMException("", "NotSupportedError"), Z_ = {
@@ -3911,10 +3911,10 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
     const { length: u, numberOfChannels: h, sampleRate: d } = { ...Z_, ...l }, f = s(h, u, d);
     t(Mi, () => Mi(f)) || f.addEventListener("statechange", /* @__PURE__ */ (() => {
       let p = 0;
-      const g = (m) => {
-        this._state === "running" && (p > 0 ? (f.removeEventListener("statechange", g), m.stopImmediatePropagation(), this._waitForThePromiseToSettle(m)) : p += 1);
+      const _ = (m) => {
+        this._state === "running" && (p > 0 ? (f.removeEventListener("statechange", _), m.stopImmediatePropagation(), this._waitForThePromiseToSettle(m)) : p += 1);
       };
-      return g;
+      return _;
     })()), super(f, h), this._length = u, this._nativeOfflineAudioContext = f, this._state = null;
   }
   get length() {
@@ -3943,8 +3943,8 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
   type: "sine"
 }, U_ = (e, t, n, s, i, r, o) => class extends e {
   constructor(c, l) {
-    const u = i(c), h = { ...X_, ...l }, d = n(u, h), f = r(u), p = f ? s() : null, g = c.sampleRate / 2;
-    super(c, !1, d, p), this._detune = t(this, f, d.detune, 153600, -153600), this._frequency = t(this, f, d.frequency, g, -g), this._nativeOscillatorNode = d, this._onended = null, this._oscillatorNodeRenderer = p, this._oscillatorNodeRenderer !== null && h.periodicWave !== void 0 && (this._oscillatorNodeRenderer.periodicWave = h.periodicWave);
+    const u = i(c), h = { ...X_, ...l }, d = n(u, h), f = r(u), p = f ? s() : null, _ = c.sampleRate / 2;
+    super(c, !1, d, p), this._detune = t(this, f, d.detune, 153600, -153600), this._frequency = t(this, f, d.frequency, _, -_), this._nativeOscillatorNode = d, this._onended = null, this._oscillatorNodeRenderer = p, this._oscillatorNodeRenderer !== null && h.periodicWave !== void 0 && (this._oscillatorNodeRenderer.periodicWave = h.periodicWave);
   }
   get detune() {
     return this._detune;
@@ -4110,13 +4110,13 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
   const u = /* @__PURE__ */ new WeakMap();
   let h = null;
   const d = async (f, p) => {
-    let g = null, m = r(f);
-    const _ = {
+    let _ = null, m = r(f);
+    const g = {
       channelCount: m.channelCount,
       channelCountMode: m.channelCountMode,
       channelInterpretation: m.channelInterpretation
     }, v = {
-      ..._,
+      ...g,
       coneInnerAngle: m.coneInnerAngle,
       coneOuterAngle: m.coneOuterAngle,
       coneOuterGain: m.coneOuterGain,
@@ -4127,7 +4127,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
       rolloffFactor: m.rolloffFactor
     }, b = ke(m, p);
     if ("bufferSize" in m)
-      g = s(p, { ..._, gain: 1 });
+      _ = s(p, { ...g, gain: 1 });
     else if (!b) {
       const x = {
         ...v,
@@ -4140,7 +4140,7 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
       };
       m = i(p, x);
     }
-    if (u.set(p, g === null ? m : g), g !== null) {
+    if (u.set(p, _ === null ? m : _), _ !== null) {
       if (h === null) {
         if (o === null)
           throw new Error("Missing the native OfflineAudioContext constructor.");
@@ -4177,12 +4177,12 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
           return l(A);
         })();
       }
-      const x = await h, y = s(p, { ..._, gain: 1 });
+      const x = await h, y = s(p, { ...g, gain: 1 });
       await c(f, p, y);
       const w = [];
       for (let A = 0; A < x.numberOfChannels; A += 1)
         w.push(x.getChannelData(A));
-      let S = [w[0][0], w[1][0], w[2][0]], C = [w[3][0], w[4][0], w[5][0]], E = s(p, { ..._, gain: 1 }), R = i(p, {
+      let S = [w[0][0], w[1][0], w[2][0]], C = [w[3][0], w[4][0], w[5][0]], E = s(p, { ...g, gain: 1 }), R = i(p, {
         ...v,
         orientationX: S[0],
         orientationY: S[1],
@@ -4191,13 +4191,13 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
         positionY: C[1],
         positionZ: C[2]
       });
-      y.connect(E).connect(R.inputs[0]), R.connect(g);
+      y.connect(E).connect(R.inputs[0]), R.connect(_);
       for (let A = 128; A < x.length; A += 128) {
         const I = [w[0][A], w[1][A], w[2][A]], F = [w[3][A], w[4][A], w[5][A]];
         if (I.some((N, V) => N !== S[V]) || F.some((N, V) => N !== C[V])) {
           S = I, C = F;
           const N = A / p.sampleRate;
-          E.gain.setValueAtTime(0, N), E = s(p, { ..._, gain: 0 }), R = i(p, {
+          E.gain.setValueAtTime(0, N), E = s(p, { ...g, gain: 0 }), R = i(p, {
             ...v,
             orientationX: S[0],
             orientationY: S[1],
@@ -4205,17 +4205,17 @@ const O_ = (e, t, n, s) => (i, r, { channelCount: o, channelCountMode: a, channe
             positionX: C[0],
             positionY: C[1],
             positionZ: C[2]
-          }), E.gain.setValueAtTime(1, N), y.connect(E).connect(R.inputs[0]), R.connect(g);
+          }), E.gain.setValueAtTime(1, N), y.connect(E).connect(R.inputs[0]), R.connect(_);
         }
       }
-      return g;
+      return _;
     }
     return b ? (await e(p, f.orientationX, m.orientationX), await e(p, f.orientationY, m.orientationY), await e(p, f.orientationZ, m.orientationZ), await e(p, f.positionX, m.positionX), await e(p, f.positionY, m.positionY), await e(p, f.positionZ, m.positionZ)) : (await a(p, f.orientationX, m.orientationX), await a(p, f.orientationY, m.orientationY), await a(p, f.orientationZ, m.orientationZ), await a(p, f.positionX, m.positionX), await a(p, f.positionY, m.positionY), await a(p, f.positionZ, m.positionZ)), Hs(m) ? await c(f, p, m.inputs[0]) : await c(f, p, m), m;
   };
   return {
     render(f, p) {
-      const g = u.get(p);
-      return g !== void 0 ? Promise.resolve(g) : d(f, p);
+      const _ = u.get(p);
+      return _ !== void 0 ? Promise.resolve(_) : d(f, p);
     }
   };
 }, ty = {
@@ -17270,65 +17270,65 @@ function vb() {
   }), me.FADEOUT = me.FADEIN = me.LOGARITHMIC = me.EXPONENTIAL = me.LINEAR = me.SCURVE = void 0, me.createFadeIn = f, me.createFadeOut = p;
   var e = yb(), t = me.SCURVE = "sCurve", n = me.LINEAR = "linear", s = me.EXPONENTIAL = "exponential", i = me.LOGARITHMIC = "logarithmic";
   me.FADEIN = "FadeIn", me.FADEOUT = "FadeOut";
-  function r(g, m) {
-    var _ = (0, e.sCurve)(1e4, 1);
-    this.setValueCurveAtTime(_, g, m);
+  function r(_, m) {
+    var g = (0, e.sCurve)(1e4, 1);
+    this.setValueCurveAtTime(g, _, m);
   }
-  function o(g, m) {
-    var _ = (0, e.sCurve)(1e4, -1);
-    this.setValueCurveAtTime(_, g, m);
+  function o(_, m) {
+    var g = (0, e.sCurve)(1e4, -1);
+    this.setValueCurveAtTime(g, _, m);
   }
-  function a(g, m) {
-    this.linearRampToValueAtTime(0, g), this.linearRampToValueAtTime(1, g + m);
+  function a(_, m) {
+    this.linearRampToValueAtTime(0, _), this.linearRampToValueAtTime(1, _ + m);
   }
-  function c(g, m) {
-    this.linearRampToValueAtTime(1, g), this.linearRampToValueAtTime(0, g + m);
+  function c(_, m) {
+    this.linearRampToValueAtTime(1, _), this.linearRampToValueAtTime(0, _ + m);
   }
-  function l(g, m) {
-    this.exponentialRampToValueAtTime(0.01, g), this.exponentialRampToValueAtTime(1, g + m);
+  function l(_, m) {
+    this.exponentialRampToValueAtTime(0.01, _), this.exponentialRampToValueAtTime(1, _ + m);
   }
-  function u(g, m) {
-    this.exponentialRampToValueAtTime(1, g), this.exponentialRampToValueAtTime(0.01, g + m);
+  function u(_, m) {
+    this.exponentialRampToValueAtTime(1, _), this.exponentialRampToValueAtTime(0.01, _ + m);
   }
-  function h(g, m) {
-    var _ = (0, e.logarithmic)(1e4, 10, 1);
-    this.setValueCurveAtTime(_, g, m);
+  function h(_, m) {
+    var g = (0, e.logarithmic)(1e4, 10, 1);
+    this.setValueCurveAtTime(g, _, m);
   }
-  function d(g, m) {
-    var _ = (0, e.logarithmic)(1e4, 10, -1);
-    this.setValueCurveAtTime(_, g, m);
+  function d(_, m) {
+    var g = (0, e.logarithmic)(1e4, 10, -1);
+    this.setValueCurveAtTime(g, _, m);
   }
-  function f(g, m, _, v) {
+  function f(_, m, g, v) {
     switch (m) {
       case t:
-        r.call(g, _, v);
+        r.call(_, g, v);
         break;
       case n:
-        a.call(g, _, v);
+        a.call(_, g, v);
         break;
       case s:
-        l.call(g, _, v);
+        l.call(_, g, v);
         break;
       case i:
-        h.call(g, _, v);
+        h.call(_, g, v);
         break;
       default:
         throw new Error("Unsupported Fade type");
     }
   }
-  function p(g, m, _, v) {
+  function p(_, m, g, v) {
     switch (m) {
       case t:
-        o.call(g, _, v);
+        o.call(_, g, v);
         break;
       case n:
-        c.call(g, _, v);
+        c.call(_, g, v);
         break;
       case s:
-        u.call(g, _, v);
+        u.call(_, g, v);
         break;
       case i:
-        d.call(g, _, v);
+        d.call(_, g, v);
         break;
       default:
         throw new Error("Unsupported Fade type");
@@ -17639,11 +17639,11 @@ function xb() {
       var u = n ? n + l : l, h = this._events[u];
       return h ? h.fn ? 1 : h.length : 0;
     }, a.prototype.emit = function(l, u, h, d, f, p) {
-      var g = n ? n + l : l;
-      if (!this._events[g]) return !1;
-      var m = this._events[g], _ = arguments.length, v, b;
+      var _ = n ? n + l : l;
+      if (!this._events[_]) return !1;
+      var m = this._events[_], g = arguments.length, v, b;
       if (m.fn) {
-        switch (m.once && this.removeListener(l, m.fn, void 0, !0), _) {
+        switch (m.once && this.removeListener(l, m.fn, void 0, !0), g) {
           case 1:
             return m.fn.call(m.context), !0;
           case 2:
@@ -17657,13 +17657,13 @@ function xb() {
           case 6:
             return m.fn.call(m.context, u, h, d, f, p), !0;
         }
-        for (b = 1, v = new Array(_ - 1); b < _; b++)
+        for (b = 1, v = new Array(g - 1); b < g; b++)
           v[b - 1] = arguments[b];
         m.fn.apply(m.context, v);
       } else {
         var x = m.length, y;
         for (b = 0; b < x; b++)
-          switch (m[b].once && this.removeListener(l, m[b].fn, void 0, !0), _) {
+          switch (m[b].once && this.removeListener(l, m[b].fn, void 0, !0), g) {
             case 1:
               m[b].fn.call(m[b].context);
               break;
@@ -17677,7 +17677,7 @@ function xb() {
               m[b].fn.call(m[b].context, u, h, d);
               break;
             default:
-              if (!v) for (y = 1, v = new Array(_ - 1); y < _; y++)
+              if (!v) for (y = 1, v = new Array(g - 1); y < g; y++)
                 v[y - 1] = arguments[y];
               m[b].fn.apply(m[b].context, v);
           }
@@ -17696,8 +17696,8 @@ function xb() {
       if (p.fn)
         p.fn === u && (!d || p.once) && (!h || p.context === h) && o(this, f);
       else {
-        for (var g = 0, m = [], _ = p.length; g < _; g++)
-          (p[g].fn !== u || d && !p[g].once || h && p[g].context !== h) && m.push(p[g]);
+        for (var _ = 0, m = [], g = p.length; _ < g; _++)
+          (p[_].fn !== u || d && !p[_].once || h && p[_].context !== h) && m.push(p[_]);
         m.length ? this._events[f] = m.length === 1 ? m[0] : m : o(this, f);
       }
       return this;
@@ -18338,8 +18338,8 @@ function da(e) {
   } = Se(Gb), {
     role: f = Fu,
     roleDescription: p = "draggable",
-    tabIndex: g = 0
-  } = i ?? {}, m = c?.id === t, _ = Se(m ? Zb : Yb), [v, b] = Kr(), [x, y] = Kr(), w = qb(o, t), S = cf(n);
+    tabIndex: _ = 0
+  } = i ?? {}, m = c?.id === t, g = Se(m ? Zb : Yb), [v, b] = Kr(), [x, y] = Kr(), w = qb(o, t), S = cf(n);
   Bo(
     () => (h.set(t, {
       id: t,
@@ -18356,12 +18356,12 @@ function da(e) {
   );
   const C = Rn(() => ({
     role: f,
-    tabIndex: g,
+    tabIndex: _,
     "aria-disabled": s,
     "aria-pressed": m && f === Fu ? !0 : void 0,
     "aria-roledescription": p,
     "aria-describedby": u.draggable
-  }), [s, f, g, m, p, u.draggable]);
+  }), [s, f, _, m, p, u.draggable]);
   return {
     active: c,
     activatorEvent: a,
@@ -18373,7 +18373,7 @@ function da(e) {
     over: d,
     setNodeRef: b,
     setActivatorNodeRef: y,
-    transform: _
+    transform: g
   };
 }
 const Ub = {
@@ -19949,19 +19949,19 @@ function Ol(e) {
   } = e, {
     width: d,
     height: f
-  } = n.found ? n : t, p = gx.includes(s), g = [ot.replacementClass, i ? "".concat(ot.cssPrefix, "-").concat(i) : ""].filter((y) => u.classes.indexOf(y) === -1).filter((y) => y !== "" || !!y).concat(u.classes).join(" ");
+  } = n.found ? n : t, p = gx.includes(s), _ = [ot.replacementClass, i ? "".concat(ot.cssPrefix, "-").concat(i) : ""].filter((y) => u.classes.indexOf(y) === -1).filter((y) => y !== "" || !!y).concat(u.classes).join(" ");
   let m = {
     children: [],
     attributes: G(G({}, u.attributes), {}, {
       "data-prefix": s,
       "data-icon": i,
-      class: g,
+      class: _,
       role: u.attributes.role || "img",
       xmlns: "http://www.w3.org/2000/svg",
       viewBox: "0 0 ".concat(d, " ").concat(f)
     })
   };
-  const _ = p && !~u.classes.indexOf("fa-fw") ? {
+  const g = p && !~u.classes.indexOf("fa-fw") ? {
     width: "".concat(d / f * 16 * 0.0625, "em")
   } : {};
   h && (m.attributes[ys] = ""), a && (m.children.push({
@@ -19979,7 +19979,7 @@ function Ol(e) {
     maskId: c,
     transform: r,
     symbol: o,
-    styles: G(G({}, _), u.styles)
+    styles: G(G({}, g), u.styles)
   }), {
     children: b,
     attributes: x
@@ -20474,10 +20474,10 @@ var Vw = {
           height: 512,
           icon: {}
         })]).then((p) => {
-          let [g, m] = p;
+          let [_, m] = p;
           d([t, Ol({
             icons: {
-              main: g,
+              main: _,
               mask: m
             },
             prefix: o,
@@ -20662,19 +20662,19 @@ function sh(e, t) {
       let f = zw(c, u);
       const {
         value: p,
-        isSecondary: g
+        isSecondary: _
       } = qw(d), m = l[0].startsWith("FontAwesome");
-      let _ = Rl(f, p), v = _;
+      let g = Rl(f, p), v = g;
       if (m) {
         const b = ew(p);
-        b.iconName && b.prefix && (_ = b.iconName, f = b.prefix);
+        b.iconName && b.prefix && (g = b.iconName, f = b.prefix);
       }
-      if (_ && !g && (!o || o.getAttribute(Tl) !== f || o.getAttribute(Al) !== v)) {
+      if (g && !_ && (!o || o.getAttribute(Tl) !== f || o.getAttribute(Al) !== v)) {
         e.setAttribute(n, v), o && e.removeChild(o);
         const b = Rw(), {
           extra: x
         } = b;
-        x.attributes[Xa] = t, sc(_, f).then((y) => {
+        x.attributes[Xa] = t, sc(g, f).then((y) => {
           const w = Ol(G(G({}, b), {}, {
             icons: {
               main: y,
@@ -20902,7 +20902,7 @@ var Kw = {
         })
       }, p = l.children ? {
         children: l.children.map(ah)
-      } : {}, g = {
+      } : {}, _ = {
         tag: "g",
         attributes: G({}, d.inner),
         children: [ah(G({
@@ -20912,11 +20912,11 @@ var Kw = {
       }, m = {
         tag: "g",
         attributes: G({}, d.outer),
-        children: [g]
-      }, _ = "mask-".concat(o || Li()), v = "clip-".concat(o || Li()), b = {
+        children: [_]
+      }, g = "mask-".concat(o || Li()), v = "clip-".concat(o || Li()), b = {
         tag: "mask",
         attributes: G(G({}, _a), {}, {
-          id: _,
+          id: g,
           maskUnits: "userSpaceOnUse",
           maskContentUnits: "userSpaceOnUse"
         }),
@@ -20936,7 +20936,7 @@ var Kw = {
         attributes: G({
           fill: "currentColor",
           "clip-path": "url(#".concat(v, ")"),
-          mask: "url(#".concat(_, ")")
+          mask: "url(#".concat(g, ")")
         }, _a)
       }), {
         children: n,
@@ -21045,7 +21045,7 @@ var ch;
 function s1() {
   if (ch) return Ft;
   ch = 1;
-  var e = typeof Symbol == "function" && Symbol.for, t = e ? Symbol.for("react.element") : 60103, n = e ? Symbol.for("react.portal") : 60106, s = e ? Symbol.for("react.fragment") : 60107, i = e ? Symbol.for("react.strict_mode") : 60108, r = e ? Symbol.for("react.profiler") : 60114, o = e ? Symbol.for("react.provider") : 60109, a = e ? Symbol.for("react.context") : 60110, c = e ? Symbol.for("react.async_mode") : 60111, l = e ? Symbol.for("react.concurrent_mode") : 60111, u = e ? Symbol.for("react.forward_ref") : 60112, h = e ? Symbol.for("react.suspense") : 60113, d = e ? Symbol.for("react.suspense_list") : 60120, f = e ? Symbol.for("react.memo") : 60115, p = e ? Symbol.for("react.lazy") : 60116, g = e ? Symbol.for("react.block") : 60121, m = e ? Symbol.for("react.fundamental") : 60117, _ = e ? Symbol.for("react.responder") : 60118, v = e ? Symbol.for("react.scope") : 60119;
+  var e = typeof Symbol == "function" && Symbol.for, t = e ? Symbol.for("react.element") : 60103, n = e ? Symbol.for("react.portal") : 60106, s = e ? Symbol.for("react.fragment") : 60107, i = e ? Symbol.for("react.strict_mode") : 60108, r = e ? Symbol.for("react.profiler") : 60114, o = e ? Symbol.for("react.provider") : 60109, a = e ? Symbol.for("react.context") : 60110, c = e ? Symbol.for("react.async_mode") : 60111, l = e ? Symbol.for("react.concurrent_mode") : 60111, u = e ? Symbol.for("react.forward_ref") : 60112, h = e ? Symbol.for("react.suspense") : 60113, d = e ? Symbol.for("react.suspense_list") : 60120, f = e ? Symbol.for("react.memo") : 60115, p = e ? Symbol.for("react.lazy") : 60116, _ = e ? Symbol.for("react.block") : 60121, m = e ? Symbol.for("react.fundamental") : 60117, g = e ? Symbol.for("react.responder") : 60118, v = e ? Symbol.for("react.scope") : 60119;
   function b(y) {
     if (typeof y == "object" && y !== null) {
       var w = y.$$typeof;
@@ -21104,17 +21104,17 @@ function s1() {
   }, Ft.isSuspense = function(y) {
     return b(y) === h;
   }, Ft.isValidElementType = function(y) {
-    return typeof y == "string" || typeof y == "function" || y === s || y === l || y === r || y === i || y === h || y === d || typeof y == "object" && y !== null && (y.$$typeof === p || y.$$typeof === f || y.$$typeof === o || y.$$typeof === a || y.$$typeof === u || y.$$typeof === m || y.$$typeof === _ || y.$$typeof === v || y.$$typeof === g);
+    return typeof y == "string" || typeof y == "function" || y === s || y === l || y === r || y === i || y === h || y === d || typeof y == "object" && y !== null && (y.$$typeof === p || y.$$typeof === f || y.$$typeof === o || y.$$typeof === a || y.$$typeof === u || y.$$typeof === m || y.$$typeof === g || y.$$typeof === v || y.$$typeof === _);
   }, Ft.typeOf = b, Ft;
 }
 var Pt = {};
 var lh;
 function i1() {
   return lh || (lh = 1, process.env.NODE_ENV !== "production" && (function() {
-    var e = typeof Symbol == "function" && Symbol.for, t = e ? Symbol.for("react.element") : 60103, n = e ? Symbol.for("react.portal") : 60106, s = e ? Symbol.for("react.fragment") : 60107, i = e ? Symbol.for("react.strict_mode") : 60108, r = e ? Symbol.for("react.profiler") : 60114, o = e ? Symbol.for("react.provider") : 60109, a = e ? Symbol.for("react.context") : 60110, c = e ? Symbol.for("react.async_mode") : 60111, l = e ? Symbol.for("react.concurrent_mode") : 60111, u = e ? Symbol.for("react.forward_ref") : 60112, h = e ? Symbol.for("react.suspense") : 60113, d = e ? Symbol.for("react.suspense_list") : 60120, f = e ? Symbol.for("react.memo") : 60115, p = e ? Symbol.for("react.lazy") : 60116, g = e ? Symbol.for("react.block") : 60121, m = e ? Symbol.for("react.fundamental") : 60117, _ = e ? Symbol.for("react.responder") : 60118, v = e ? Symbol.for("react.scope") : 60119;
+    var e = typeof Symbol == "function" && Symbol.for, t = e ? Symbol.for("react.element") : 60103, n = e ? Symbol.for("react.portal") : 60106, s = e ? Symbol.for("react.fragment") : 60107, i = e ? Symbol.for("react.strict_mode") : 60108, r = e ? Symbol.for("react.profiler") : 60114, o = e ? Symbol.for("react.provider") : 60109, a = e ? Symbol.for("react.context") : 60110, c = e ? Symbol.for("react.async_mode") : 60111, l = e ? Symbol.for("react.concurrent_mode") : 60111, u = e ? Symbol.for("react.forward_ref") : 60112, h = e ? Symbol.for("react.suspense") : 60113, d = e ? Symbol.for("react.suspense_list") : 60120, f = e ? Symbol.for("react.memo") : 60115, p = e ? Symbol.for("react.lazy") : 60116, _ = e ? Symbol.for("react.block") : 60121, m = e ? Symbol.for("react.fundamental") : 60117, g = e ? Symbol.for("react.responder") : 60118, v = e ? Symbol.for("react.scope") : 60119;
     function b(Y) {
       return typeof Y == "string" || typeof Y == "function" || // Note: its typeof might be other than 'symbol' or 'number' if it's a polyfill.
-      Y === s || Y === l || Y === r || Y === i || Y === h || Y === d || typeof Y == "object" && Y !== null && (Y.$$typeof === p || Y.$$typeof === f || Y.$$typeof === o || Y.$$typeof === a || Y.$$typeof === u || Y.$$typeof === m || Y.$$typeof === _ || Y.$$typeof === v || Y.$$typeof === g);
+      Y === s || Y === l || Y === r || Y === i || Y === h || Y === d || typeof Y == "object" && Y !== null && (Y.$$typeof === p || Y.$$typeof === f || Y.$$typeof === o || Y.$$typeof === a || Y.$$typeof === u || Y.$$typeof === m || Y.$$typeof === g || Y.$$typeof === v || Y.$$typeof === _);
     }
     function x(Y) {
       if (typeof Y == "object" && Y !== null) {
@@ -21326,14 +21326,14 @@ function a1() {
         return O;
     }
     var d = "<<anonymous>>", f = {
-      array: _("array"),
-      bigint: _("bigint"),
-      bool: _("boolean"),
-      func: _("function"),
-      number: _("number"),
-      object: _("object"),
-      string: _("string"),
-      symbol: _("symbol"),
+      array: g("array"),
+      bigint: g("bigint"),
+      bool: g("boolean"),
+      func: g("function"),
+      number: g("number"),
+      object: g("object"),
+      string: g("string"),
+      symbol: g("symbol"),
       any: v(),
       arrayOf: b,
       element: x(),
@@ -21349,10 +21349,10 @@ function a1() {
     function p(D, O) {
       return D === O ? D !== 0 || 1 / D === 1 / O : D !== D && O !== O;
     }
-    function g(D, O) {
+    function _(D, O) {
       this.message = D, this.data = O && typeof O == "object" ? O : {}, this.stack = "";
     }
-    g.prototype = Error.prototype;
+    _.prototype = Error.prototype;
     function m(D) {
       if (process.env.NODE_ENV !== "production")
         var O = {}, q = 0;
@@ -21371,17 +21371,17 @@ function a1() {
             ), O[se] = !0, q++);
           }
         }
-        return U[nt] == null ? $ ? U[nt] === null ? new g("The " + ht + " `" + st + "` is marked as required " + ("in `" + M + "`, but its value is `null`.")) : new g("The " + ht + " `" + st + "` is marked as required in " + ("`" + M + "`, but its value is `undefined`.")) : null : D(U, nt, M, ht, st);
+        return U[nt] == null ? $ ? U[nt] === null ? new _("The " + ht + " `" + st + "` is marked as required " + ("in `" + M + "`, but its value is `null`.")) : new _("The " + ht + " `" + st + "` is marked as required in " + ("`" + M + "`, but its value is `undefined`.")) : null : D(U, nt, M, ht, st);
       }
       var H = K.bind(null, !1);
       return H.isRequired = K.bind(null, !0), H;
     }
-    function _(D) {
+    function g(D) {
       function O(q, K, H, $, U, nt) {
         var M = q[K], ht = L(M);
         if (ht !== D) {
           var st = W(M);
-          return new g(
+          return new _(
             "Invalid " + $ + " `" + U + "` of type " + ("`" + st + "` supplied to `" + H + "`, expected ") + ("`" + D + "`."),
             { expectedType: D }
           );
@@ -21396,11 +21396,11 @@ function a1() {
     function b(D) {
       function O(q, K, H, $, U) {
         if (typeof D != "function")
-          return new g("Property `" + U + "` of component `" + H + "` has invalid PropType notation inside arrayOf.");
+          return new _("Property `" + U + "` of component `" + H + "` has invalid PropType notation inside arrayOf.");
         var nt = q[K];
         if (!Array.isArray(nt)) {
           var M = L(nt);
-          return new g("Invalid " + $ + " `" + U + "` of type " + ("`" + M + "` supplied to `" + H + "`, expected an array."));
+          return new _("Invalid " + $ + " `" + U + "` of type " + ("`" + M + "` supplied to `" + H + "`, expected an array."));
         }
         for (var ht = 0; ht < nt.length; ht++) {
           var st = D(nt, ht, H, $, U + "[" + ht + "]", n);
@@ -21416,7 +21416,7 @@ function a1() {
         var U = O[q];
         if (!a(U)) {
           var nt = L(U);
-          return new g("Invalid " + H + " `" + $ + "` of type " + ("`" + nt + "` supplied to `" + K + "`, expected a single ReactElement."));
+          return new _("Invalid " + H + " `" + $ + "` of type " + ("`" + nt + "` supplied to `" + K + "`, expected a single ReactElement."));
         }
         return null;
       }
@@ -21427,7 +21427,7 @@ function a1() {
         var U = O[q];
         if (!e.isValidElementType(U)) {
           var nt = L(U);
-          return new g("Invalid " + H + " `" + $ + "` of type " + ("`" + nt + "` supplied to `" + K + "`, expected a single ReactElement type."));
+          return new _("Invalid " + H + " `" + $ + "` of type " + ("`" + nt + "` supplied to `" + K + "`, expected a single ReactElement type."));
         }
         return null;
       }
@@ -21437,7 +21437,7 @@ function a1() {
       function O(q, K, H, $, U) {
         if (!(q[K] instanceof D)) {
           var nt = D.name || d, M = z(q[K]);
-          return new g("Invalid " + $ + " `" + U + "` of type " + ("`" + M + "` supplied to `" + H + "`, expected ") + ("instance of `" + nt + "`."));
+          return new _("Invalid " + $ + " `" + U + "` of type " + ("`" + M + "` supplied to `" + H + "`, expected ") + ("instance of `" + nt + "`."));
         }
         return null;
       }
@@ -21456,17 +21456,17 @@ function a1() {
           var se = W(Y);
           return se === "symbol" ? String(Y) : Y;
         });
-        return new g("Invalid " + $ + " `" + U + "` of value `" + String(nt) + "` " + ("supplied to `" + H + "`, expected one of " + ht + "."));
+        return new _("Invalid " + $ + " `" + U + "` of value `" + String(nt) + "` " + ("supplied to `" + H + "`, expected one of " + ht + "."));
       }
       return m(O);
     }
     function C(D) {
       function O(q, K, H, $, U) {
         if (typeof D != "function")
-          return new g("Property `" + U + "` of component `" + H + "` has invalid PropType notation inside objectOf.");
+          return new _("Property `" + U + "` of component `" + H + "` has invalid PropType notation inside objectOf.");
         var nt = q[K], M = L(nt);
         if (M !== "object")
-          return new g("Invalid " + $ + " `" + U + "` of type " + ("`" + M + "` supplied to `" + H + "`, expected an object."));
+          return new _("Invalid " + $ + " `" + U + "` of type " + ("`" + M + "` supplied to `" + H + "`, expected an object."));
         for (var ht in nt)
           if (s(nt, ht)) {
             var st = D(nt, ht, H, $, U + "." + ht, n);
@@ -21495,18 +21495,18 @@ function a1() {
           Y.data && s(Y.data, "expectedType") && ht.push(Y.data.expectedType);
         }
         var se = ht.length > 0 ? ", expected one of type [" + ht.join(", ") + "]" : "";
-        return new g("Invalid " + nt + " `" + M + "` supplied to " + ("`" + U + "`" + se + "."));
+        return new _("Invalid " + nt + " `" + M + "` supplied to " + ("`" + U + "`" + se + "."));
       }
       return m(K);
     }
     function R() {
       function D(O, q, K, H, $) {
-        return N(O[q]) ? null : new g("Invalid " + H + " `" + $ + "` supplied to " + ("`" + K + "`, expected a ReactNode."));
+        return N(O[q]) ? null : new _("Invalid " + H + " `" + $ + "` supplied to " + ("`" + K + "`, expected a ReactNode."));
       }
       return m(D);
     }
     function A(D, O, q, K, H) {
-      return new g(
+      return new _(
         (D || "React class") + ": " + O + " type `" + q + "." + K + "` is invalid; it must be a function, usually from the `prop-types` package, but received `" + H + "`."
       );
     }
@@ -21514,7 +21514,7 @@ function a1() {
       function O(q, K, H, $, U) {
         var nt = q[K], M = L(nt);
         if (M !== "object")
-          return new g("Invalid " + $ + " `" + U + "` of type `" + M + "` " + ("supplied to `" + H + "`, expected `object`."));
+          return new _("Invalid " + $ + " `" + U + "` of type `" + M + "` " + ("supplied to `" + H + "`, expected `object`."));
         for (var ht in D) {
           var st = D[ht];
           if (typeof st != "function")
@@ -21531,14 +21531,14 @@ function a1() {
       function O(q, K, H, $, U) {
         var nt = q[K], M = L(nt);
         if (M !== "object")
-          return new g("Invalid " + $ + " `" + U + "` of type `" + M + "` " + ("supplied to `" + H + "`, expected `object`."));
+          return new _("Invalid " + $ + " `" + U + "` of type `" + M + "` " + ("supplied to `" + H + "`, expected `object`."));
         var ht = t({}, q[K], D);
         for (var st in ht) {
           var Ct = D[st];
           if (s(D, st) && typeof Ct != "function")
             return A(H, $, U, st, W(Ct));
           if (!Ct)
-            return new g(
+            return new _(
               "Invalid " + $ + " `" + U + "` key `" + st + "` supplied to `" + H + "`.\nBad object: " + JSON.stringify(q[K], null, "  ") + `
 Valid keys: ` + JSON.stringify(Object.keys(D), null, "  ")
             );
@@ -21812,7 +21812,7 @@ try {
   uc = typeof process < "u" && process.env.FA_VERSION || "7.0.0";
 }
 function C1(e) {
-  var t = e.beat, n = e.fade, s = e.beatFade, i = e.bounce, r = e.shake, o = e.flash, a = e.spin, c = e.spinPulse, l = e.spinReverse, u = e.pulse, h = e.fixedWidth, d = e.inverse, f = e.border, p = e.listItem, g = e.flip, m = e.size, _ = e.rotation, v = e.pull, b = e.swapOpacity, x = e.rotateBy, y = e.widthAuto, w = S1(uc, x1), S = Gn(Gn(Gn(Gn(Gn(Gn({
+  var t = e.beat, n = e.fade, s = e.beatFade, i = e.bounce, r = e.shake, o = e.flash, a = e.spin, c = e.spinPulse, l = e.spinReverse, u = e.pulse, h = e.fixedWidth, d = e.inverse, f = e.border, p = e.listItem, _ = e.flip, m = e.size, g = e.rotation, v = e.pull, b = e.swapOpacity, x = e.rotateBy, y = e.widthAuto, w = S1(uc, x1), S = Gn(Gn(Gn(Gn(Gn(Gn({
     "fa-beat": t,
     "fa-fade": n,
     "fa-beat-fade": s,
@@ -21827,10 +21827,10 @@ function C1(e) {
     "fa-inverse": d,
     "fa-border": f,
     "fa-li": p,
-    "fa-flip": g === !0,
-    "fa-flip-horizontal": g === "horizontal" || g === "both",
-    "fa-flip-vertical": g === "vertical" || g === "both"
-  }, "fa-".concat(m), typeof m < "u" && m !== null), "fa-rotate-".concat(_), typeof _ < "u" && _ !== null && _ !== 0), "fa-pull-".concat(v), typeof v < "u" && v !== null), "fa-swap-opacity", b), "fa-rotate-by", w && x), "fa-width-auto", w && y);
+    "fa-flip": _ === !0,
+    "fa-flip-horizontal": _ === "horizontal" || _ === "both",
+    "fa-flip-vertical": _ === "vertical" || _ === "both"
+  }, "fa-".concat(m), typeof m < "u" && m !== null), "fa-rotate-".concat(g), typeof g < "u" && g !== null && g !== 0), "fa-pull-".concat(v), typeof v < "u" && v !== null), "fa-swap-opacity", b), "fa-rotate-by", w && x), "fa-width-auto", w && y);
   return Object.keys(S).map(function(C) {
     return S[C] ? C : null;
   }).filter(function(C) {
@@ -21839,12 +21839,12 @@ function C1(e) {
 }
 function S1(e, t) {
   for (var n = e.split("-"), s = vh(n, 2), i = s[0], r = s[1], o = t.split("-"), a = vh(o, 2), c = a[0], l = a[1], u = i.split("."), h = c.split("."), d = 0; d < Math.max(u.length, h.length); d++) {
-    var f = u[d] || "0", p = h[d] || "0", g = parseInt(f, 10), m = parseInt(p, 10);
-    if (g !== m)
-      return g > m;
+    var f = u[d] || "0", p = h[d] || "0", _ = parseInt(f, 10), m = parseInt(p, 10);
+    if (_ !== m)
+      return _ > m;
   }
-  for (var _ = 0; _ < Math.max(u.length, h.length); _++) {
-    var v = u[_] || "0", b = h[_] || "0";
+  for (var g = 0; g < Math.max(u.length, h.length); g++) {
+    var v = u[g] || "0", b = h[g] || "0";
     if (v !== b && v.length !== b.length)
       return v.length < b.length;
   }
@@ -21969,12 +21969,12 @@ var xh = {
   }));
   if (!p)
     return E1("Could not find icon", u), null;
-  var g = p.abstract, m = {
+  var _ = p.abstract, m = {
     ref: t
   };
-  return Object.keys(n).forEach(function(_) {
-    xh.hasOwnProperty(_) || (m[_] = n[_]);
-  }), D1(g[0], m);
+  return Object.keys(n).forEach(function(g) {
+    xh.hasOwnProperty(g) || (m[g] = n[g]);
+  }), D1(_[0], m);
 });
 mr.displayName = "FontAwesomeIcon";
 mr.propTypes = {
@@ -22350,19 +22350,19 @@ var Qf = Z.input.attrs({ type: "range" })`
     waveOutlineColor: u = "#E0EFF1",
     waveFillColor: h = "grey"
   } = e, d = wt([]), f = it(
-    (_) => {
-      if (_ !== null) {
-        const v = parseInt(_.dataset.index, 10);
-        d.current[v] = _;
+    (g) => {
+      if (g !== null) {
+        const v = parseInt(g.dataset.index, 10);
+        d.current[v] = g;
       }
     },
     []
   );
   qh(() => {
-    const _ = d.current;
+    const g = d.current;
     let v = 0;
-    for (let b = 0; b < _.length; b++) {
-      const x = _[b], y = x.getContext("2d"), w = Math.floor(c / 2), S = 2 ** (n - 1);
+    for (let b = 0; b < g.length; b++) {
+      const x = g[b], y = x.getContext("2d"), w = Math.floor(c / 2), S = 2 ** (n - 1);
       if (y) {
         y.resetTransform(), y.clearRect(0, 0, x.width, x.height), y.imageSmoothingEnabled = !1, y.fillStyle = u, y.scale(a, a);
         const C = x.width / a;
@@ -22381,22 +22381,22 @@ var Qf = Z.input.attrs({ type: "range" })`
     a,
     s
   ]);
-  let p = s, g = 0;
+  let p = s, _ = 0;
   const m = [];
   for (; p > 0; ) {
-    const _ = Math.min(p, wh), v = /* @__PURE__ */ k.jsx(
+    const g = Math.min(p, wh), v = /* @__PURE__ */ k.jsx(
       N1,
       {
-        $cssWidth: _,
-        width: _ * a,
+        $cssWidth: g,
+        width: g * a,
         height: c * a,
         $waveHeight: c,
-        "data-index": g,
+        "data-index": _,
         ref: f
       },
-      `${s}-${g}`
+      `${s}-${_}`
     );
-    m.push(v), p -= _, g += 1;
+    m.push(v), p -= g, _ += 1;
   }
   return /* @__PURE__ */ k.jsxs(
     V1,
@@ -22580,7 +22580,7 @@ var Qf = Z.input.attrs({ type: "range" })`
   onMouseDown: f,
   trackId: p
 }) => {
-  const g = Math.floor(o / c), _ = Math.floor((o + a) / c) - g, v = l && !u && !h, b = `clip-${s}-${i}`, { attributes: x, listeners: y, setNodeRef: w, setActivatorNodeRef: S, transform: C, isDragging: E } = da({
+  const _ = Math.floor(o / c), g = Math.floor((o + a) / c) - _, v = l && !u && !h, b = `clip-${s}-${i}`, { attributes: x, listeners: y, setNodeRef: w, setActivatorNodeRef: S, transform: C, isDragging: E } = da({
     id: b,
     data: { clipId: n, trackIndex: s, clipIndex: i },
     disabled: !v
@@ -22613,8 +22613,8 @@ var Qf = Z.input.attrs({ type: "range" })`
       ref: w,
       style: D,
       className: t,
-      $left: g,
-      $width: _,
+      $left: _,
+      $width: g,
       $isOverlay: h,
       "data-clip-container": "true",
       "data-track-id": p,
@@ -23032,12 +23032,12 @@ var uC = Z.div.attrs((e) => ({
     samplesPerPixel: h,
     timeScaleHeight: d,
     controls: { show: f, width: p }
-  } = Se(Ho), g = op();
+  } = Se(Ho), _ = op();
   Ht(() => {
     if (l.current !== null) {
       const b = l.current, x = b.getContext("2d");
       if (x) {
-        x.resetTransform(), x.clearRect(0, 0, b.width, b.height), x.imageSmoothingEnabled = !1, x.fillStyle = t, x.scale(g, g);
+        x.resetTransform(), x.clearRect(0, 0, b.width, b.height), x.imageSmoothingEnabled = !1, x.fillStyle = t, x.scale(_, _);
         for (const [y, w] of a.entries()) {
           const S = d - w;
           x.fillRect(y, S, 1, w);
@@ -23046,7 +23046,7 @@ var uC = Z.div.attrs((e) => ({
     }
   }, [
     n,
-    g,
+    _,
     t,
     d,
     i,
@@ -23054,9 +23054,9 @@ var uC = Z.div.attrs((e) => ({
     s,
     a
   ]);
-  const m = sn(n / 1e3, h, u), _ = u / h;
+  const m = sn(n / 1e3, h, u), g = u / h;
   let v = 0;
-  for (let b = 0; b < m; b += _ * r / 1e3) {
+  for (let b = 0; b < m; b += g * r / 1e3) {
     const x = Math.floor(b);
     if (v % s === 0) {
       const y = v, w = lC(y), S = o ? /* @__PURE__ */ k.jsx(Lt.Fragment, { children: o(y, x) }, `timestamp-${v}`) : /* @__PURE__ */ k.jsx(dC, { $left: x, children: w }, w);
@@ -23077,8 +23077,8 @@ var uC = Z.div.attrs((e) => ({
           {
             $cssWidth: m,
             $timeScaleHeight: d,
-            width: m * g,
-            height: d * g,
+            width: m * _,
+            height: d * _,
             ref: l
           }
         )
@@ -23556,8 +23556,8 @@ function Ph(e) {
   } = Se(AC), {
     role: f = Fh,
     roleDescription: p = "draggable",
-    tabIndex: g = 0
-  } = i ?? {}, m = c?.id === t, _ = Se(m ? kC : IC), [v, b] = Kr(), [x, y] = Kr(), w = SC(o, t), S = cf(n);
+    tabIndex: _ = 0
+  } = i ?? {}, m = c?.id === t, g = Se(m ? kC : IC), [v, b] = Kr(), [x, y] = Kr(), w = SC(o, t), S = cf(n);
   Bo(
     () => (h.set(t, {
       id: t,
@@ -23574,12 +23574,12 @@ function Ph(e) {
   );
   const C = Rn(() => ({
     role: f,
-    tabIndex: g,
+    tabIndex: _,
     "aria-disabled": s,
     "aria-pressed": m && f === Fh ? !0 : void 0,
     "aria-roledescription": p,
     "aria-describedby": u.draggable
-  }), [s, f, g, m, p, u.draggable]);
+  }), [s, f, _, m, p, u.draggable]);
   return {
     active: c,
     activatorEvent: a,
@@ -23591,7 +23591,7 @@ function Ph(e) {
     over: d,
     setNodeRef: b,
     setActivatorNodeRef: y,
-    transform: _
+    transform: g
   };
 }
 function DC(e) {
@@ -23806,13 +23806,13 @@ var OC = Z.div.attrs((e) => ({
     id: u,
     data: { annotationId: e, annotationIndex: t, edge: "start" },
     disabled: !c
-  }), g = `annotation-boundary-end-${t}`, {
+  }), _ = `annotation-boundary-end-${t}`, {
     attributes: m,
-    listeners: _,
+    listeners: g,
     setActivatorNodeRef: v,
     isDragging: b
   } = Ph({
-    id: g,
+    id: _,
     data: { annotationId: e, annotationIndex: t, edge: "end" },
     disabled: !c
   });
@@ -23852,8 +23852,8 @@ var OC = Z.div.attrs((e) => ({
         $position: "right",
         $isDragging: b,
         onClick: y,
-        ..._,
-        onPointerDown: x(_?.onPointerDown),
+        ...g,
+        onPointerDown: x(g?.onPointerDown),
         ...m
       }
     )
@@ -24033,46 +24033,46 @@ var WC = Z.div`
   const l = wt(null), u = wt(null), h = wt(void 0);
   Ht(() => {
   }), Ht(() => {
-    const _ = u.current;
-    if (!_) return;
+    const g = u.current;
+    if (!g) return;
     const v = () => {
     };
-    return _.addEventListener("scroll", v), () => _.removeEventListener("scroll", v);
+    return g.addEventListener("scroll", v), () => g.removeEventListener("scroll", v);
   }, []), Ht(() => {
     t && l.current && n && l.current.scrollIntoView({
       behavior: "smooth",
       block: "nearest"
     }), h.current = t;
   }, [t, n]);
-  const d = (_) => {
-    if (isNaN(_) || !isFinite(_))
+  const d = (g) => {
+    if (isNaN(g) || !isFinite(g))
       return "0:00.000";
-    const v = Math.floor(_ / 60), b = (_ % 60).toFixed(3);
+    const v = Math.floor(g / 60), b = (g % 60).toFixed(3);
     return `${v}:${b.padStart(6, "0")}`;
-  }, f = (_, v) => {
+  }, f = (g, v) => {
     if (!s || !c) return;
     const b = [...e];
-    b[_] = {
-      ...b[_],
+    b[g] = {
+      ...b[g],
       lines: v.split(`
 `)
     }, c(b);
-  }, p = (_, v) => {
+  }, p = (g, v) => {
     if (!s || !c) return;
     const b = v.trim();
     if (!b) return;
     const x = [...e];
-    x[_] = {
-      ...x[_],
+    x[g] = {
+      ...x[g],
       id: b
     }, c(x);
-  }, g = (_, v, b) => {
+  }, _ = (g, v, b) => {
     if (!c) return;
     const x = [...e];
-    _.action(x[b], b, x, r || {}), c(x);
-  }, m = (_) => _.replace(/\./g, " ");
-  return /* @__PURE__ */ k.jsx(WC, { ref: u, $height: o, children: e.map((_, v) => {
-    const b = _.id === t;
+    g.action(x[b], b, x, r || {}), c(x);
+  }, m = (g) => g.replace(/\./g, " ");
+  return /* @__PURE__ */ k.jsx(WC, { ref: u, $height: o, children: e.map((g, v) => {
+    const b = g.id === t;
     return /* @__PURE__ */ k.jsxs(
       jC,
       {
@@ -24088,20 +24088,20 @@ var WC = Z.div`
                   contentEditable: s,
                   suppressContentEditableWarning: !0,
                   onBlur: (x) => p(v, x.currentTarget.textContent || ""),
-                  children: _.id
+                  children: g.id
                 }
               ),
               /* @__PURE__ */ k.jsxs(qC, { children: [
-                d(_.start),
+                d(g.start),
                 " - ",
-                d(_.end)
+                d(g.end)
               ] })
             ] }),
             i.length > 0 && /* @__PURE__ */ k.jsx(zC, { onClick: (x) => x.stopPropagation(), children: i.map((x, y) => /* @__PURE__ */ k.jsx(
               GC,
               {
                 title: x.title,
-                onClick: () => g(x, _, v),
+                onClick: () => _(x, g, v),
                 children: x.text ? x.text : /* @__PURE__ */ k.jsx("i", { className: m(x.class || "") })
               },
               y
@@ -24114,13 +24114,13 @@ var WC = Z.div`
               contentEditable: s,
               suppressContentEditableWarning: !0,
               onBlur: (x) => f(v, x.currentTarget.textContent || ""),
-              children: _.lines.join(`
+              children: g.lines.join(`
 `)
             }
           )
         ]
       },
-      _.id
+      g.id
     );
   }) });
 }, xp = Lt.memo(YC), XC = ({
@@ -24454,10 +24454,10 @@ function OT(e) {
           const p = await fetch(d.src);
           if (!p.ok)
             throw new Error(`Failed to fetch ${d.src}: ${p.statusText}`);
-          const g = await p.arrayBuffer(), m = await l.decodeAudioData(g);
+          const _ = await p.arrayBuffer(), m = await l.decodeAudioData(_);
           if (!m || !m.sampleRate || !m.duration)
             throw new Error(`Invalid audio buffer for ${d.src}`);
-          const _ = rS({
+          const g = rS({
             audioBuffer: m,
             startTime: d.startTime ?? 0,
             // Use config or default to 0
@@ -24467,12 +24467,12 @@ function OT(e) {
             // Use config or no trim
             name: d.name || `Track ${f + 1}`
           });
-          if (isNaN(_.startSample) || isNaN(_.durationSamples) || isNaN(_.offsetSamples))
-            throw console.error("Invalid clip values:", _), new Error(`Invalid clip values for ${d.src}`);
+          if (isNaN(g.startSample) || isNaN(g.durationSamples) || isNaN(g.offsetSamples))
+            throw console.error("Invalid clip values:", g), new Error(`Invalid clip values for ${d.src}`);
           return {
             ...oS({
               name: d.name || `Track ${f + 1}`,
-              clips: [_],
+              clips: [g],
               muted: d.muted ?? !1,
               soloed: d.soloed ?? !1,
               volume: d.volume ?? 1,
@@ -24508,13 +24508,13 @@ function MT({
       const { trackIndex: d, clipIndex: f, boundary: p } = h.data.current;
       if (p)
         return { ...u, scaleX: 1, scaleY: 1 };
-      const g = e[d];
-      if (!g) return { ...u, scaleX: 1, scaleY: 1 };
-      const m = g.clips[f];
+      const _ = e[d];
+      if (!_) return { ...u, scaleX: 1, scaleY: 1 };
+      const m = _.clips[f];
       if (!m) return { ...u, scaleX: 1, scaleY: 1 };
-      const _ = m.startSample / s, v = m.durationSamples / s, b = u.x * n / s;
-      let x = _ + b;
-      const y = [...g.clips].sort((A, I) => A.startSample - I.startSample), w = y.findIndex((A) => A === m);
+      const g = m.startSample / s, v = m.durationSamples / s, b = u.x * n / s;
+      let x = g + b;
+      const y = [..._.clips].sort((A, I) => A.startSample - I.startSample), w = y.findIndex((A) => A === m);
       x = Math.max(0, x);
       const S = w > 0 ? y[w - 1] : null;
       if (S) {
@@ -24526,7 +24526,7 @@ function MT({
         const A = x + v, I = C.startSample / s;
         A > I && (x = I - v);
       }
-      const R = (x - _) * s / n;
+      const R = (x - g) * s / n;
       return {
         ...u,
         x: R,
@@ -24542,11 +24542,11 @@ function MT({
         i.current = null;
         return;
       }
-      const { trackIndex: d, clipIndex: f } = u.data.current, g = e[d]?.clips[f];
-      g && (i.current = {
-        offsetSamples: g.offsetSamples,
-        durationSamples: g.durationSamples,
-        startSample: g.startSample
+      const { trackIndex: d, clipIndex: f } = u.data.current, _ = e[d]?.clips[f];
+      _ && (i.current = {
+        offsetSamples: _.offsetSamples,
+        durationSamples: _.durationSamples,
+        startSample: _.startSample
       });
     },
     [e]
@@ -24554,13 +24554,13 @@ function MT({
     (l) => {
       const { active: u, delta: h } = l, { boundary: d } = u.data.current;
       if (!d || !i.current) return;
-      const { trackIndex: f, clipIndex: p } = u.data.current, g = h.x * n, m = Math.floor(0.1 * s), _ = i.current, v = e.map((b, x) => {
+      const { trackIndex: f, clipIndex: p } = u.data.current, _ = h.x * n, m = Math.floor(0.1 * s), g = i.current, v = e.map((b, x) => {
         if (x !== f) return b;
         const y = [...b.clips].sort((C, E) => C.startSample - E.startSample), w = y.findIndex((C) => C === b.clips[p]), S = b.clips.map((C, E) => {
           if (E !== p) return C;
           const R = Math.floor(C.audioBuffer.duration * s);
           if (d === "left") {
-            let A = Math.floor(_.offsetSamples + g), I = Math.floor(_.durationSamples - g), F = Math.floor(_.startSample + g);
+            let A = Math.floor(g.offsetSamples + _), I = Math.floor(g.durationSamples - _), F = Math.floor(g.startSample + _);
             if (F < 0) {
               const V = -F;
               F = 0, A += V, I -= V;
@@ -24589,10 +24589,10 @@ function MT({
               startSample: F
             };
           } else {
-            let A = Math.floor(_.durationSamples + g);
-            A = Math.max(m, A), _.offsetSamples + A > R && (A = R - _.offsetSamples);
+            let A = Math.floor(g.durationSamples + _);
+            A = Math.max(m, A), g.offsetSamples + A > R && (A = R - g.offsetSamples);
             const I = w < y.length - 1 ? y[w + 1] : null;
-            return I && _.startSample + A > I.startSample && (A = I.startSample - _.startSample, A = Math.max(m, A)), { ...C, durationSamples: A };
+            return I && g.startSample + A > I.startSample && (A = I.startSample - g.startSample, A = Math.max(m, A)), { ...C, durationSamples: A };
           }
         });
         return { ...b, clips: S };
@@ -24602,16 +24602,16 @@ function MT({
     [e, t, n, s]
   ), c = Lt.useCallback(
     (l) => {
-      const { active: u, delta: h } = l, { trackIndex: d, clipIndex: f, boundary: p } = u.data.current, g = h.x * n;
+      const { active: u, delta: h } = l, { trackIndex: d, clipIndex: f, boundary: p } = u.data.current, _ = h.x * n;
       if (p) {
         i.current = null;
         return;
       }
-      const m = e.map((_, v) => {
-        if (v !== d) return _;
-        const b = [..._.clips].sort((w, S) => w.startSample - S.startSample), x = b.findIndex((w) => w === _.clips[f]), y = _.clips.map((w, S) => {
+      const m = e.map((g, v) => {
+        if (v !== d) return g;
+        const b = [...g.clips].sort((w, S) => w.startSample - S.startSample), x = b.findIndex((w) => w === g.clips[f]), y = g.clips.map((w, S) => {
           if (S !== f) return w;
-          let C = Math.floor(w.startSample + g);
+          let C = Math.floor(w.startSample + _);
           C = Math.max(0, C);
           const E = x > 0 ? b[x - 1] : null;
           if (E) {
@@ -24625,7 +24625,7 @@ function MT({
           };
         });
         return {
-          ..._,
+          ...g,
           clips: y
         };
       });
@@ -24671,8 +24671,8 @@ function FT({
         return;
       const f = h.data.current;
       if (!f) return;
-      const { edge: p, annotationIndex: g } = f, m = o.current, _ = d.x * n / s, v = p === "start" ? m.start + _ : m.end + _, b = aS({
-        annotationIndex: g,
+      const { edge: p, annotationIndex: _ } = f, m = o.current, g = d.x * n / s, v = p === "start" ? m.start + g : m.end + g, b = aS({
+        annotationIndex: _,
         newTime: v,
         isDraggingStart: p === "start",
         annotations: e,
@@ -24735,10 +24735,10 @@ function aS({
         for (; d < o.length - 1; ) {
           const f = o[d], p = o[d + 1];
           if (Math.abs(p.start - f.end) < Aa) {
-            const g = f.end - s[d].end;
+            const _ = f.end - s[d].end;
             o[d + 1] = {
               ...p,
-              start: Math.min(p.end - 0.1, p.start + g)
+              start: Math.min(p.end - 0.1, p.start + _)
             }, d++;
           } else
             break;
@@ -24785,12 +24785,12 @@ const NT = (e) => {
       if (!f) return !1;
       const p = f.clips[l];
       if (!p) return !1;
-      const g = p.startSample / h, m = (p.startSample + p.durationSamples) / h;
-      if (u <= g || u >= m)
+      const _ = p.startSample / h, m = (p.startSample + p.durationSamples) / h;
+      if (u <= _ || u >= m)
         return console.warn("Split time is outside clip bounds"), !1;
-      const _ = Math.round(u * h);
+      const g = Math.round(u * h);
       Math.floor(p.startSample / d);
-      const v = Math.floor(_ / d), b = p.startSample + p.durationSamples, x = v * d, y = p.startSample, w = x - y, S = x, C = b - S, E = x - p.startSample, R = gc({
+      const v = Math.floor(g / d), b = p.startSample + p.durationSamples, x = v * d, y = p.startSample, w = x - y, S = x, C = b - S, E = x - p.startSample, R = gc({
         audioBuffer: p.audioBuffer,
         startSample: y,
         durationSamples: w,
@@ -24875,15 +24875,15 @@ function VT({
         ...h,
         start: d
       }, i && o > 0) {
-        const g = p[o - 1];
-        Math.abs(g.end - h.start) < ka && (p[o - 1] = {
-          ...g,
-          end: Math.max(g.start + 0.1, g.end + f)
+        const _ = p[o - 1];
+        Math.abs(_.end - h.start) < ka && (p[o - 1] = {
+          ..._,
+          end: Math.max(_.start + 0.1, _.end + f)
         });
       } else if (!i && o > 0) {
-        const g = p[o - 1];
-        d < g.end && (p[o - 1] = {
-          ...g,
+        const _ = p[o - 1];
+        d < _.end && (p[o - 1] = {
+          ..._,
           end: d
         });
       }
@@ -24898,40 +24898,40 @@ function VT({
         ...h,
         end: d
       }, i && o < e.length - 1) {
-        const g = p[o + 1];
-        if (Math.abs(g.start - h.end) < ka) {
-          const m = Math.min(g.end - 0.1, g.start + f);
+        const _ = p[o + 1];
+        if (Math.abs(_.start - h.end) < ka) {
+          const m = Math.min(_.end - 0.1, _.start + f);
           p[o + 1] = {
-            ...g,
+            ..._,
             start: m
           };
-          let _ = o + 1;
-          for (; _ < p.length - 1; ) {
-            const v = p[_], b = p[_ + 1];
-            if (Math.abs(b.start - e[_].end) < ka) {
-              const x = v.end - e[_].end;
-              p[_ + 1] = {
+          let g = o + 1;
+          for (; g < p.length - 1; ) {
+            const v = p[g], b = p[g + 1];
+            if (Math.abs(b.start - e[g].end) < ka) {
+              const x = v.end - e[g].end;
+              p[g + 1] = {
                 ...b,
                 start: Math.min(b.end - 0.1, b.start + x)
-              }, _++;
+              }, g++;
             } else
               break;
           }
         }
       } else if (!i && o < e.length - 1) {
-        const g = p[o + 1];
-        if (d > g.start) {
+        const _ = p[o + 1];
+        if (d > _.start) {
           p[o + 1] = {
-            ...g,
+            ..._,
             start: d
           };
           let m = o + 1;
           for (; m < p.length - 1; ) {
-            const _ = p[m], v = p[m + 1];
-            if (_.end > v.start)
+            const g = p[m], v = p[m + 1];
+            if (g.end > v.start)
               p[m + 1] = {
                 ...v,
-                start: _.end
+                start: g.end
               }, m++;
             else
               break;
@@ -25014,14 +25014,14 @@ function hS(e, t, n, s, i = 16) {
   if (o > 0 && e.length > 0) {
     const u = n - o, h = Math.min(u, t.length);
     let d = e[e.length - 2] / r, f = e[e.length - 1] / r;
-    for (let _ = 0; _ < h; _++) {
-      const v = t[_];
+    for (let g = 0; g < h; g++) {
+      const v = t[g];
       v < d && (d = v), v > f && (f = v);
     }
     const p = new (i === 8 ? Int8Array : Int16Array)(e.length);
     p.set(e), p[e.length - 2] = Math.floor(d * r), p[e.length - 1] = Math.floor(f * r), a = h;
-    const g = jh(t.slice(a), n, i), m = new (i === 8 ? Int8Array : Int16Array)(p.length + g.length);
-    return m.set(p), m.set(g, p.length), m;
+    const _ = jh(t.slice(a), n, i), m = new (i === 8 ? Int8Array : Int16Array)(p.length + _.length);
+    return m.set(p), m.set(_, p.length), m;
   }
   const c = jh(t.slice(a), n, i), l = new (i === 8 ? Int8Array : Int16Array)(e.length + c.length);
   return l.set(e), l.set(c, e.length), l;
@@ -25030,7 +25030,7 @@ function dS(e, t = {}) {
   const {
     channelCount: n = 1,
     samplesPerPixel: s = 1024
-  } = t, [i, r] = ft(!1), [o, a] = ft(!1), [c, l] = ft(0), [u, h] = ft(new Int16Array(0)), [d, f] = ft(null), [p, g] = ft(null), [m, _] = ft(0), [v, b] = ft(0), x = 16, y = wt(!1), w = wt(null), S = wt(null), C = wt([]), E = wt(0), R = wt(null), A = wt(0), I = wt(!1), F = wt(!1), N = it(async (z) => {
+  } = t, [i, r] = ft(!1), [o, a] = ft(!1), [c, l] = ft(0), [u, h] = ft(new Int16Array(0)), [d, f] = ft(null), [p, _] = ft(null), [m, g] = ft(0), [v, b] = ft(0), x = 16, y = wt(!1), w = wt(null), S = wt(null), C = wt([]), E = wt(0), R = wt(null), A = wt(0), I = wt(!1), F = wt(!1), N = it(async (z) => {
     if (!y.current)
       try {
         const D = new URL("data:text/javascript;base64,InVzZSBzdHJpY3QiOwoKLy8gc3JjL3dvcmtsZXQvcmVjb3JkaW5nLXByb2Nlc3Nvci53b3JrbGV0LnRzCnZhciBSZWNvcmRpbmdQcm9jZXNzb3IgPSBjbGFzcyBleHRlbmRzIEF1ZGlvV29ya2xldFByb2Nlc3NvciB7CiAgY29uc3RydWN0b3IoKSB7CiAgICBzdXBlcigpOwogICAgdGhpcy5idWZmZXJTaXplID0gMDsKICAgIHRoaXMuYnVmZmVycyA9IFtdOwogICAgdGhpcy5zYW1wbGVzQ29sbGVjdGVkID0gMDsKICAgIHRoaXMuaXNSZWNvcmRpbmcgPSBmYWxzZTsKICAgIHRoaXMuY2hhbm5lbENvdW50ID0gMTsKICAgIHRoaXMucG9ydC5vbm1lc3NhZ2UgPSAoZXZlbnQpID0+IHsKICAgICAgY29uc3QgeyBjb21tYW5kLCBzYW1wbGVSYXRlOiBzYW1wbGVSYXRlMiwgY2hhbm5lbENvdW50IH0gPSBldmVudC5kYXRhOwogICAgICBpZiAoY29tbWFuZCA9PT0gInN0YXJ0IikgewogICAgICAgIHRoaXMuaXNSZWNvcmRpbmcgPSB0cnVlOwogICAgICAgIHRoaXMuY2hhbm5lbENvdW50ID0gY2hhbm5lbENvdW50IHx8IDE7CiAgICAgICAgdGhpcy5idWZmZXJTaXplID0gTWF0aC5mbG9vcigoc2FtcGxlUmF0ZTIgfHwgNDhlMykgKiAwLjAxNik7CiAgICAgICAgdGhpcy5idWZmZXJzID0gW107CiAgICAgICAgZm9yIChsZXQgaSA9IDA7IGkgPCB0aGlzLmNoYW5uZWxDb3VudDsgaSsrKSB7CiAgICAgICAgICB0aGlzLmJ1ZmZlcnNbaV0gPSBuZXcgRmxvYXQzMkFycmF5KHRoaXMuYnVmZmVyU2l6ZSk7CiAgICAgICAgfQogICAgICAgIHRoaXMuc2FtcGxlc0NvbGxlY3RlZCA9IDA7CiAgICAgIH0gZWxzZSBpZiAoY29tbWFuZCA9PT0gInN0b3AiKSB7CiAgICAgICAgdGhpcy5pc1JlY29yZGluZyA9IGZhbHNlOwogICAgICAgIGlmICh0aGlzLnNhbXBsZXNDb2xsZWN0ZWQgPiAwKSB7CiAgICAgICAgICB0aGlzLmZsdXNoQnVmZmVycygpOwogICAgICAgIH0KICAgICAgfQogICAgfTsKICB9CiAgcHJvY2VzcyhpbnB1dHMsIG91dHB1dHMsIHBhcmFtZXRlcnMpIHsKICAgIGlmICghdGhpcy5pc1JlY29yZGluZykgewogICAgICByZXR1cm4gdHJ1ZTsKICAgIH0KICAgIGNvbnN0IGlucHV0ID0gaW5wdXRzWzBdOwogICAgaWYgKCFpbnB1dCB8fCBpbnB1dC5sZW5ndGggPT09IDApIHsKICAgICAgcmV0dXJuIHRydWU7CiAgICB9CiAgICBjb25zdCBmcmFtZUNvdW50ID0gaW5wdXRbMF0ubGVuZ3RoOwogICAgZm9yIChsZXQgY2hhbm5lbCA9IDA7IGNoYW5uZWwgPCBNYXRoLm1pbihpbnB1dC5sZW5ndGgsIHRoaXMuY2hhbm5lbENvdW50KTsgY2hhbm5lbCsrKSB7CiAgICAgIGNvbnN0IGlucHV0Q2hhbm5lbCA9IGlucHV0W2NoYW5uZWxdOwogICAgICBjb25zdCBidWZmZXIgPSB0aGlzLmJ1ZmZlcnNbY2hhbm5lbF07CiAgICAgIGZvciAobGV0IGkgPSAwOyBpIDwgZnJhbWVDb3VudDsgaSsrKSB7CiAgICAgICAgYnVmZmVyW3RoaXMuc2FtcGxlc0NvbGxlY3RlZCArIGldID0gaW5wdXRDaGFubmVsW2ldOwogICAgICB9CiAgICB9CiAgICB0aGlzLnNhbXBsZXNDb2xsZWN0ZWQgKz0gZnJhbWVDb3VudDsKICAgIGlmICh0aGlzLnNhbXBsZXNDb2xsZWN0ZWQgPj0gdGhpcy5idWZmZXJTaXplKSB7CiAgICAgIHRoaXMuZmx1c2hCdWZmZXJzKCk7CiAgICB9CiAgICByZXR1cm4gdHJ1ZTsKICB9CiAgZmx1c2hCdWZmZXJzKCkgewogICAgY29uc3Qgc2FtcGxlcyA9IHRoaXMuYnVmZmVyc1swXS5zbGljZSgwLCB0aGlzLnNhbXBsZXNDb2xsZWN0ZWQpOwogICAgdGhpcy5wb3J0LnBvc3RNZXNzYWdlKHsKICAgICAgc2FtcGxlcywKICAgICAgc2FtcGxlUmF0ZSwKICAgICAgY2hhbm5lbENvdW50OiB0aGlzLmNoYW5uZWxDb3VudAogICAgfSk7CiAgICB0aGlzLnNhbXBsZXNDb2xsZWN0ZWQgPSAwOwogIH0KfTsKcmVnaXN0ZXJQcm9jZXNzb3IoInJlY29yZGluZy1wcm9jZXNzb3IiLCBSZWNvcmRpbmdQcm9jZXNzb3IpOwovLyMgc291cmNlTWFwcGluZ1VSTD1yZWNvcmRpbmctcHJvY2Vzc29yLndvcmtsZXQuanMubWFw", import.meta.url).href;
@@ -25040,11 +25040,11 @@ function dS(e, t = {}) {
       }
   }, []), V = it(async () => {
     if (!e) {
-      g(new Error("No microphone stream available"));
+      _(new Error("No microphone stream available"));
       return;
     }
     try {
-      g(null);
+      _(null);
       const z = Xs();
       await Fr(), await N(z);
       const D = rf(e);
@@ -25065,7 +25065,7 @@ function dS(e, t = {}) {
         command: "start",
         sampleRate: z.sampleRate,
         channelCount: n
-      }), C.current = [], E.current = 0, h(new Int16Array(0)), f(null), _(0), b(0), I.current = !0, F.current = !1, r(!0), a(!1), A.current = performance.now();
+      }), C.current = [], E.current = 0, h(new Int16Array(0)), f(null), g(0), b(0), I.current = !0, F.current = !1, r(!0), a(!1), A.current = performance.now();
       const q = () => {
         if (I.current && !F.current) {
           const K = (performance.now() - A.current) / 1e3;
@@ -25074,7 +25074,7 @@ function dS(e, t = {}) {
       };
       q();
     } catch (z) {
-      console.error("Failed to start recording:", z), g(z instanceof Error ? z : new Error("Failed to start recording"));
+      console.error("Failed to start recording:", z), _(z instanceof Error ? z : new Error("Failed to start recording"));
     }
   }, [e, n, s, N, i, o]), L = it(async () => {
     if (!i)
@@ -25095,9 +25095,9 @@ function dS(e, t = {}) {
         D.sampleRate,
         n
       );
-      return f(O), l(O.duration), I.current = !1, F.current = !1, r(!1), a(!1), _(0), O;
+      return f(O), l(O.duration), I.current = !1, F.current = !1, r(!1), a(!1), g(0), O;
     } catch (z) {
-      return console.error("Failed to stop recording:", z), g(z instanceof Error ? z : new Error("Failed to stop recording")), null;
+      return console.error("Failed to stop recording:", z), _(z instanceof Error ? z : new Error("Failed to stop recording")), null;
     }
   }, [i, n]), W = it(() => {
     i && !o && (R.current !== null && (cancelAnimationFrame(R.current), R.current = null), F.current = !0, a(!0));
@@ -25141,10 +25141,10 @@ function dS(e, t = {}) {
 function fS() {
   const [e, t] = ft(null), [n, s] = ft([]), [i, r] = ft(!1), [o, a] = ft(!1), [c, l] = ft(null), u = it(async () => {
     try {
-      const p = (await navigator.mediaDevices.enumerateDevices()).filter((g) => g.kind === "audioinput").map((g) => ({
-        deviceId: g.deviceId,
-        label: g.label || `Microphone ${g.deviceId.slice(0, 8)}`,
-        groupId: g.groupId
+      const p = (await navigator.mediaDevices.enumerateDevices()).filter((_) => _.kind === "audioinput").map((_) => ({
+        deviceId: _.deviceId,
+        label: _.label || `Microphone ${_.deviceId.slice(0, 8)}`,
+        groupId: _.groupId
       }));
       s(p);
     } catch (f) {
@@ -25168,11 +25168,11 @@ function fS() {
           ...f && { deviceId: { exact: f } }
         },
         video: !1
-      }, _ = await navigator.mediaDevices.getUserMedia(m);
-      t(_), r(!0), await u();
-    } catch (g) {
-      console.error("Failed to access microphone:", g), l(
-        g instanceof Error ? g : new Error("Failed to access microphone")
+      }, g = await navigator.mediaDevices.getUserMedia(m);
+      t(g), r(!0), await u();
+    } catch (_) {
+      console.error("Failed to access microphone:", _), l(
+        _ instanceof Error ? _ : new Error("Failed to access microphone")
       ), r(!1);
     } finally {
       a(!1);
@@ -25207,17 +25207,17 @@ function pS(e, t = {}) {
     return (async () => {
       const m = Xs();
       if (!p) return;
-      const _ = m.createAnalyser();
-      _.fftSize = s, _.smoothingTimeConstant = i, l.current = _;
-      const v = _.frequencyBinCount, b = new Uint8Array(v);
+      const g = m.createAnalyser();
+      g.fftSize = s, g.smoothingTimeConstant = i, l.current = g;
+      const v = g.frequencyBinCount, b = new Uint8Array(v);
       d.current = b;
       const x = rf(e);
-      x.connect(_), u.current = x;
+      x.connect(g), u.current = x;
       const y = 1e3 / n;
       let w = 0;
       const S = (C) => {
         if (C - w >= y) {
-          w = C, _.getByteTimeDomainData(b);
+          w = C, g.getByteTimeDomainData(b);
           let E = 0;
           for (let A = 0; A < v; A++) {
             const I = (b[A] - 128) / 128;
@@ -25408,8 +25408,8 @@ function WT(e, t, n, s = {}) {
     devices: d,
     hasPermission: f,
     requestAccess: p,
-    error: g
-  } = fS(), { level: m, peakLevel: _ } = pS(h), {
+    error: _
+  } = fS(), { level: m, peakLevel: g } = pS(h), {
     isRecording: v,
     isPaused: b,
     duration: x,
@@ -25463,8 +25463,8 @@ function WT(e, t, n, s = {}) {
     isPaused: b,
     duration: x,
     level: m,
-    peakLevel: _,
-    error: g || R,
+    peakLevel: g,
+    error: _ || R,
     // Microphone state
     stream: h,
     devices: d,
@@ -25795,159 +25795,166 @@ function BT(e) {
   };
 }
 function $T(e = 256) {
-  const [t, n] = ft([]), s = wt(/* @__PURE__ */ new Map()), i = wt(null), r = wt(null), o = it(() => {
-    const g = r.current;
+  const [t, n] = ft([]), s = wt(t);
+  s.current = t;
+  const i = wt(/* @__PURE__ */ new Map()), r = wt(null), o = wt(null), a = it((m) => {
+    const g = o.current;
     if (!g) return;
-    const { masterGainNode: m, destination: _, analyserNode: v } = g;
+    const { masterGainNode: v, destination: b, analyserNode: x } = g;
     try {
-      m.disconnect();
+      v.disconnect();
     } catch {
     }
-    const b = t.map((x) => s.current.get(x.instanceId)).filter((x) => x !== void 0);
-    if (b.length === 0)
-      m.connect(v), v.connect(_);
+    const y = m.map((w) => i.current.get(w.instanceId)).filter((w) => w !== void 0);
+    if (y.length === 0)
+      v.connect(x), x.connect(b);
     else {
-      let x = m;
-      b.forEach((y) => {
+      let w = v;
+      y.forEach((S) => {
         try {
-          y.disconnect();
+          S.disconnect();
         } catch {
         }
-        x.connect(y.effect), x = y.effect;
-      }), x.connect(v), v.connect(_);
+        w.connect(S.effect), w = S.effect;
+      }), w.connect(x), x.connect(b);
     }
-  }, [t]), a = it((g) => {
-    const m = Sp(g);
-    if (!m) {
-      console.error(`Unknown effect: ${g}`);
+  }, []), c = it((m) => {
+    const g = Sp(m);
+    if (!g) {
+      console.error(`Unknown effect: ${m}`);
       return;
     }
-    const _ = {};
-    m.parameters.forEach((x) => {
-      _[x.name] = x.default;
+    const v = {};
+    g.parameters.forEach((y) => {
+      v[y.name] = y.default;
     });
-    const v = so(m, _);
-    s.current.set(v.instanceId, v);
-    const b = {
-      instanceId: v.instanceId,
-      effectId: m.id,
-      definition: m,
-      params: _,
+    const b = so(g, v);
+    i.current.set(b.instanceId, b);
+    const x = {
+      instanceId: b.instanceId,
+      effectId: g.id,
+      definition: g,
+      params: v,
       bypassed: !1
     };
-    n((x) => [...x, b]);
-  }, []), c = it((g) => {
-    const m = s.current.get(g);
-    m && (m.dispose(), s.current.delete(g)), n((_) => _.filter((v) => v.instanceId !== g));
-  }, []), l = it(
-    (g, m, _) => {
-      const v = s.current.get(g);
-      v && v.setParameter(m, _), n(
-        (b) => b.map(
-          (x) => x.instanceId === g ? { ...x, params: { ...x.params, [m]: _ } } : x
+    n((y) => [...y, x]);
+  }, []), l = it((m) => {
+    const g = i.current.get(m);
+    g && (g.dispose(), i.current.delete(m)), n((v) => v.filter((b) => b.instanceId !== m));
+  }, []), u = it(
+    (m, g, v) => {
+      const b = i.current.get(m);
+      b && b.setParameter(g, v), n(
+        (x) => x.map(
+          (y) => y.instanceId === m ? { ...y, params: { ...y.params, [g]: v } } : y
         )
       );
     },
     []
-  ), u = it(
-    (g) => {
-      const m = t.find((b) => b.instanceId === g);
-      if (!m) return;
-      const _ = !m.bypassed, v = s.current.get(g);
-      v && v.setParameter("wet", _ ? 0 : 1), n(
-        (b) => b.map(
-          (x) => x.instanceId === g ? { ...x, bypassed: _ } : x
+  ), h = it(
+    (m) => {
+      const g = s.current.find((x) => x.instanceId === m);
+      if (!g) return;
+      const v = !g.bypassed, b = i.current.get(m);
+      if (b) {
+        const x = g.params.wet ?? 1;
+        b.setParameter("wet", v ? 0 : x);
+      }
+      n(
+        (x) => x.map(
+          (y) => y.instanceId === m ? { ...y, bypassed: v } : y
         )
       );
     },
-    [t]
-  ), h = it((g, m) => {
-    n((_) => {
-      const v = [..._], [b] = v.splice(g, 1);
-      return v.splice(m, 0, b), v;
+    []
+  ), d = it((m, g) => {
+    n((v) => {
+      const b = [...v], [x] = b.splice(m, 1);
+      return b.splice(g, 0, x), b;
     });
-  }, []), d = it(() => {
-    s.current.forEach((g) => g.dispose()), s.current.clear(), n([]);
+  }, []), f = it(() => {
+    i.current.forEach((m) => m.dispose()), i.current.clear(), n([]);
   }, []);
   Ht(() => {
-    o();
-  }, [t, o]);
-  const f = it(
-    (g, m, _) => {
-      const v = new as("fft", e);
-      i.current = v, r.current = {
-        masterGainNode: g,
-        destination: m,
-        analyserNode: v
+    a(t);
+  }, [t, a]);
+  const p = it(
+    (m, g, v) => {
+      const b = new as("fft", e);
+      r.current = b, o.current = {
+        masterGainNode: m,
+        destination: g,
+        analyserNode: b
       };
-      const b = t.map((x) => s.current.get(x.instanceId)).filter((x) => x !== void 0);
-      if (b.length === 0)
-        g.connect(v), v.connect(m);
+      const y = s.current.map((w) => i.current.get(w.instanceId)).filter((w) => w !== void 0);
+      if (y.length === 0)
+        m.connect(b), b.connect(g);
       else {
-        let x = g;
-        b.forEach((y) => {
-          x.connect(y.effect), x = y.effect;
-        }), x.connect(v), v.connect(m);
+        let w = m;
+        y.forEach((S) => {
+          w.connect(S.effect), w = S.effect;
+        }), w.connect(b), b.connect(g);
       }
       return function() {
-        v.dispose(), i.current = null, r.current = null;
+        b.dispose(), r.current = null, o.current = null;
       };
     },
-    [e, t]
+    [e]
+    // Only fftSize - reads effects from ref
   );
   Ht(() => () => {
-    s.current.forEach((g) => g.dispose()), s.current.clear();
+    i.current.forEach((m) => m.dispose()), i.current.clear();
   }, []);
-  const p = it(() => {
-    const g = t.filter((m) => !m.bypassed);
-    if (g.length !== 0)
-      return (m, _, v) => {
-        const b = [];
-        for (const x of g) {
-          const y = so(x.definition, x.params);
-          b.push(y);
+  const _ = it(() => {
+    const m = t.filter((g) => !g.bypassed);
+    if (m.length !== 0)
+      return (g, v, b) => {
+        const x = [];
+        for (const y of m) {
+          const w = so(y.definition, y.params);
+          x.push(w);
         }
-        if (b.length === 0)
-          m.connect(_);
+        if (x.length === 0)
+          g.connect(v);
         else {
-          let x = m;
-          b.forEach((y) => {
-            x.connect(y.effect), x = y.effect;
-          }), x.connect(_);
+          let y = g;
+          x.forEach((w) => {
+            y.connect(w.effect), y = w.effect;
+          }), y.connect(v);
         }
         return function() {
-          b.forEach((y) => y.dispose());
+          x.forEach((w) => w.dispose());
         };
       };
   }, [t]);
   return {
     activeEffects: t,
     availableEffects: Ko,
-    addEffect: a,
-    removeEffect: c,
-    updateParameter: l,
-    toggleBypass: u,
-    reorderEffects: h,
-    clearAllEffects: d,
-    masterEffects: f,
-    createOfflineEffectsFunction: p,
-    analyserRef: i
+    addEffect: c,
+    removeEffect: l,
+    updateParameter: u,
+    toggleBypass: h,
+    reorderEffects: d,
+    clearAllEffects: f,
+    masterEffects: p,
+    createOfflineEffectsFunction: _,
+    analyserRef: r
   };
 }
 function qT() {
   const [e, t] = ft(
     /* @__PURE__ */ new Map()
   ), n = wt(/* @__PURE__ */ new Map()), s = wt(/* @__PURE__ */ new Map()), i = it((f, p) => {
-    const g = s.current.get(f);
-    if (!g) return;
-    const { graphEnd: m, masterGainNode: _ } = g, v = n.current.get(f);
+    const _ = s.current.get(f);
+    if (!_) return;
+    const { graphEnd: m, masterGainNode: g } = _, v = n.current.get(f);
     try {
       m.disconnect();
     } catch {
     }
     const b = p.map((x) => v?.get(x.instanceId)).filter((x) => x !== void 0);
     if (b.length === 0)
-      m.connect(_);
+      m.connect(g);
     else {
       let x = m;
       b.forEach((y) => {
@@ -25956,24 +25963,24 @@ function qT() {
         } catch {
         }
         x.connect(y.effect), x = y.effect;
-      }), x.connect(_);
+      }), x.connect(g);
     }
   }, []), r = it((f, p) => {
-    const g = Sp(p);
-    if (!g) {
+    const _ = Sp(p);
+    if (!_) {
       console.error(`Unknown effect: ${p}`);
       return;
     }
     const m = {};
-    g.parameters.forEach((b) => {
+    _.parameters.forEach((b) => {
       m[b.name] = b.default;
     });
-    const _ = so(g, m);
-    n.current.has(f) || n.current.set(f, /* @__PURE__ */ new Map()), n.current.get(f).set(_.instanceId, _);
+    const g = so(_, m);
+    n.current.has(f) || n.current.set(f, /* @__PURE__ */ new Map()), n.current.get(f).set(g.instanceId, g);
     const v = {
-      instanceId: _.instanceId,
-      effectId: g.id,
-      definition: g,
+      instanceId: g.instanceId,
+      effectId: _.id,
+      definition: _,
       params: m,
       bypassed: !1
     };
@@ -25982,20 +25989,20 @@ function qT() {
       return x.set(f, [...y, v]), x;
     });
   }, []), o = it((f, p) => {
-    const g = n.current.get(f), m = g?.get(p);
-    m && (m.dispose(), g?.delete(p)), t((_) => {
-      const v = new Map(_), b = v.get(f) || [];
+    const _ = n.current.get(f), m = _?.get(p);
+    m && (m.dispose(), _?.delete(p)), t((g) => {
+      const v = new Map(g), b = v.get(f) || [];
       return v.set(f, b.filter((x) => x.instanceId !== p)), v;
     });
   }, []), a = it(
-    (f, p, g, m) => {
+    (f, p, _, m) => {
       const v = n.current.get(f)?.get(p);
-      v && v.setParameter(g, m), t((b) => {
+      v && v.setParameter(_, m), t((b) => {
         const x = new Map(b), y = x.get(f) || [];
         return x.set(
           f,
           y.map(
-            (w) => w.instanceId === p ? { ...w, params: { ...w.params, [g]: m } } : w
+            (w) => w.instanceId === p ? { ...w, params: { ...w.params, [_]: m } } : w
           )
         ), x;
       });
@@ -26003,42 +26010,46 @@ function qT() {
     []
   ), c = it(
     (f, p) => {
-      const m = (e.get(f) || []).find((x) => x.instanceId === p);
+      const m = (u.current.get(f) || []).find((x) => x.instanceId === p);
       if (!m) return;
-      const _ = !m.bypassed, b = n.current.get(f)?.get(p);
-      b && b.setParameter("wet", _ ? 0 : 1), t((x) => {
+      const g = !m.bypassed, b = n.current.get(f)?.get(p);
+      if (b) {
+        const x = m.params.wet ?? 1;
+        b.setParameter("wet", g ? 0 : x);
+      }
+      t((x) => {
         const y = new Map(x), w = y.get(f) || [];
         return y.set(
           f,
           w.map(
-            (S) => S.instanceId === p ? { ...S, bypassed: _ } : S
+            (S) => S.instanceId === p ? { ...S, bypassed: g } : S
           )
         ), y;
       });
     },
-    [e]
+    []
   ), l = it((f) => {
     const p = n.current.get(f);
-    p && (p.forEach((g) => g.dispose()), p.clear()), t((g) => {
-      const m = new Map(g);
+    p && (p.forEach((_) => _.dispose()), p.clear()), t((_) => {
+      const m = new Map(_);
       return m.set(f, []), m;
     });
   }, []), u = wt(e);
   u.current = e;
   const h = it(
-    (f) => (p, g, m) => {
+    (f) => (p, _, m) => {
       s.current.set(f, {
         graphEnd: p,
-        masterGainNode: g
+        masterGainNode: _
       });
-      const _ = u.current.get(f) || [], v = n.current.get(f), b = _.map((x) => v?.get(x.instanceId)).filter((x) => x !== void 0);
+      const g = u.current.get(f) || [], v = n.current.get(f), b = g.map((x) => v?.get(x.instanceId)).filter((x) => x !== void 0);
       if (b.length === 0)
-        p.connect(g);
+        p.connect(_);
       else {
         let x = p;
         b.forEach((y) => {
           x.connect(y.effect), x = y.effect;
-        }), x.connect(g);
+        }), x.connect(_);
       }
       return function() {
         s.current.delete(f);
@@ -26058,21 +26069,21 @@ function qT() {
   }, []);
   const d = it(
     (f) => {
-      const g = (e.get(f) || []).filter((m) => !m.bypassed);
-      if (g.length !== 0)
-        return (m, _, v) => {
+      const _ = (e.get(f) || []).filter((m) => !m.bypassed);
+      if (_.length !== 0)
+        return (m, g, v) => {
           const b = [];
-          for (const x of g) {
+          for (const x of _) {
             const y = so(x.definition, x.params);
             b.push(y);
           }
           if (b.length === 0)
-            m.connect(_);
+            m.connect(g);
           else {
             let x = m;
             b.forEach((y) => {
               x.connect(y.effect), x = y.effect;
-            }), x.connect(_);
+            }), x.connect(g);
           }
           return function() {
             b.forEach((y) => y.dispose());
@@ -26099,17 +26110,17 @@ function CS(e, t = {}) {
   const p = [];
   for (let m = 0; m < s; m++)
     p.push(e.getChannelData(m));
-  let g = u;
+  let _ = u;
   if (n === 16)
     for (let m = 0; m < r; m++)
-      for (let _ = 0; _ < s; _++) {
-        const v = p[_][m], b = Math.max(-1, Math.min(1, v)), x = b < 0 ? b * 32768 : b * 32767;
-        f.setInt16(g, x, !0), g += 2;
+      for (let g = 0; g < s; g++) {
+        const v = p[g][m], b = Math.max(-1, Math.min(1, v)), x = b < 0 ? b * 32768 : b * 32767;
+        f.setInt16(_, x, !0), _ += 2;
       }
   else
     for (let m = 0; m < r; m++)
-      for (let _ = 0; _ < s; _++)
-        f.setFloat32(g, p[_][m], !0), g += 4;
+      for (let g = 0; g < s; g++)
+        f.setFloat32(_, p[g][m], !0), _ += 4;
   return new Blob([d], { type: "audio/wav" });
 }
 function Rr(e, t, n) {
@@ -26130,9 +26141,9 @@ function TS() {
         trackIndex: d,
         autoDownload: f = !0,
         applyEffects: p = !0,
-        effectsFunction: g,
+        effectsFunction: _,
         createOfflineTrackEffects: m,
-        bitDepth: _ = 16,
+        bitDepth: g = 16,
         onProgress: v
       } = l;
       t(!0), s(0), r(null);
@@ -26151,14 +26162,14 @@ function TS() {
         x += Math.round(b * 0.1);
         const y = x / b, w = h === "individual" ? [{ track: a[d], state: c[d], index: d }] : a.map((A, I) => ({ track: A, state: c[I], index: I })), S = c.some((A) => A.soloed), C = !!m;
         let E;
-        if ((g || C) && p)
+        if ((_ || C) && p)
           E = await AS(
             w,
             c,
             S,
             y,
             b,
-            g,
+            _,
             m,
             (A) => {
               s(A), v?.(A);
@@ -26178,7 +26189,7 @@ function TS() {
           s(0.5), v?.(0.5), E = await A.startRendering();
         }
         s(0.9), v?.(0.9);
-        const R = CS(E, { bitDepth: _ });
+        const R = CS(E, { bitDepth: g });
         if (s(1), v?.(1), f) {
           const A = h === "individual" ? `${u}_${a[d].name}` : u;
           SS(R, `${A}.wav`);
@@ -26203,13 +26214,13 @@ function TS() {
 async function AS(e, t, n, s, i, r, o, a) {
   const { Offline: c, Volume: l, Gain: u, Panner: h, Player: d, ToneAudioBuffer: f, getDestination: p } = await Promise.resolve().then(() => nf);
   a(0.1);
-  let g;
+  let _;
   try {
-    g = await c(
-      async ({ transport: m, destination: _ }) => {
+    _ = await c(
+      async ({ transport: m, destination: g }) => {
         const v = new l(0);
         let b;
-        r ? b = r(v, _, !0) : v.connect(_);
+        r ? b = r(v, g, !0) : v.connect(g);
         for (const { track: x, state: y } of e) {
           if (y.muted && !y.soloed || n && !y.soloed) continue;
           const w = new l(kS(y.volume)), S = new h(y.pan), C = new u(y.muted ? 0 : 1), E = o?.(x.id);
@@ -26237,27 +26248,27 @@ async function AS(e, t, n, s, i, r, o, a) {
   } catch (m) {
     throw m instanceof Error ? m : new Error(`Tone.Offline rendering failed: ${String(m)}`);
   }
-  return a(0.9), g.get();
+  return a(0.9), _.get();
 }
 function kS(e) {
   return 20 * Math.log10(Math.max(e, 1e-4));
 }
 async function IS(e, t, n, s, i) {
-  const { audioBuffer: r, startSample: o, durationSamples: a, offsetSamples: c, gain: l, fadeIn: u, fadeOut: h } = t, d = o / s, f = a / s, p = c / s, g = e.createBufferSource();
-  g.buffer = r;
-  const m = e.createGain(), _ = l * n.volume, v = e.createStereoPanner();
-  if (v.pan.value = n.pan, g.connect(m), m.connect(v), v.connect(e.destination), i) {
-    if (u && u.start === 0 ? m.gain.setValueAtTime(0, d) : m.gain.setValueAtTime(_, d), u) {
+  const { audioBuffer: r, startSample: o, durationSamples: a, offsetSamples: c, gain: l, fadeIn: u, fadeOut: h } = t, d = o / s, f = a / s, p = c / s, _ = e.createBufferSource();
+  _.buffer = r;
+  const m = e.createGain(), g = l * n.volume, v = e.createStereoPanner();
+  if (v.pan.value = n.pan, _.connect(m), m.connect(v), v.connect(e.destination), i) {
+    if (u && u.start === 0 ? m.gain.setValueAtTime(0, d) : m.gain.setValueAtTime(g, d), u) {
       const b = d + u.start, x = d + u.end;
-      Bh(m.gain, b, x, 0, _, u.type);
+      Bh(m.gain, b, x, 0, g, u.type);
     }
     if (h) {
       const b = d + h.start, x = d + h.end;
-      (!u || u.end < h.start) && m.gain.setValueAtTime(_, b), Bh(m.gain, b, x, _, 0, h.type);
+      (!u || u.end < h.start) && m.gain.setValueAtTime(g, b), Bh(m.gain, b, x, g, 0, h.type);
     }
   } else
-    m.gain.setValueAtTime(_, d);
-  g.start(d, p, f);
+    m.gain.setValueAtTime(g, d);
+  _.start(d, p, f);
 }
 function Bh(e, t, n, s, i, r) {
   const o = n - t;
@@ -26307,10 +26318,10 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
   onAnnotationUpdate: d,
   children: f
 }) => {
-  const [p, g] = ft([]), [m, _] = ft(null), [v, b] = ft(!1), [x, y] = ft(0), [w, S] = ft(0), [C, E] = ft([]), [R, A] = ft([]), [I, F] = ft([]), [N, V] = ft(0), [L, W] = ft(0), [J, z] = ft(null), [D, O] = ft(o), [q, K] = ft(l?.isContinuousPlay ?? !1), [H, $] = ft(l?.linkEndpoints ?? !0), [U, nt] = ft(l?.editable ?? !1), M = wt(null), ht = wt(0), st = wt(0), Ct = wt(null), Y = wt(0), se = wt(0), pe = wt(null), X = wt(null), rt = wt(!1), Vt = wt(l?.isContinuousPlay ?? !1), Et = wt(null), xt = wt(i), { timeFormat: Wt, setTimeFormat: at, formatTime: gt } = eS(), At = sS({ initialSamplesPerPixel: i, zoomLevels: r }), $t = At.samplesPerPixel, { masterVolume: le, setMasterVolume: xe } = iS({ playoutRef: M, initialVolume: 1 }), qt = it((lt) => {
+  const [p, _] = ft([]), [m, g] = ft(null), [v, b] = ft(!1), [x, y] = ft(0), [w, S] = ft(0), [C, E] = ft([]), [R, A] = ft([]), [I, F] = ft([]), [N, V] = ft(0), [L, W] = ft(0), [J, z] = ft(null), [D, O] = ft(o), [q, K] = ft(l?.isContinuousPlay ?? !1), [H, $] = ft(l?.linkEndpoints ?? !0), [U, nt] = ft(l?.editable ?? !1), M = wt(null), ht = wt(0), st = wt(0), Ct = wt(null), Y = wt(0), se = wt(0), pe = wt(null), X = wt(null), rt = wt(!1), Vt = wt(l?.isContinuousPlay ?? !1), Et = wt(null), xt = wt(i), { timeFormat: Wt, setTimeFormat: at, formatTime: gt } = eS(), At = sS({ initialSamplesPerPixel: i, zoomLevels: r }), $t = At.samplesPerPixel, { masterVolume: le, setMasterVolume: xe } = iS({ playoutRef: M, initialVolume: 1 }), qt = it((lt) => {
     Vt.current = lt, K(lt);
   }, []), we = it((lt) => {
-    Et.current = lt, _(lt);
+    Et.current = lt, g(lt);
   }, []);
   Ht(() => {
     rt.current = D;
@@ -26406,7 +26417,7 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
   }, [e, $t, n]), Ht(() => {
     if (l?.annotations) {
       const lt = l.annotations.map((_t) => typeof _t.start == "number" ? _t : DC(_t));
-      g(lt);
+      _(lt);
     }
   }, [l]);
   const Ce = it(() => {
@@ -26560,7 +26571,7 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
     setContinuousPlay: qt,
     setLinkEndpoints: $,
     setAnnotationsEditable: nt,
-    setAnnotations: g,
+    setAnnotations: _,
     setActiveAnnotationId: we
   }, bi = {
     duration: w,
@@ -26766,7 +26777,7 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
   onExportComplete: l,
   onExportError: u
 }) => {
-  const { tracks: h, trackStates: d } = Sn(), { exportWav: f, isExporting: p, progress: g } = TS(), m = async () => {
+  const { tracks: h, trackStates: d } = Sn(), { exportWav: f, isExporting: p, progress: _ } = TS(), m = async () => {
     try {
       const v = await f(h, d, {
         filename: t,
@@ -26782,14 +26793,14 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
     } catch (v) {
       u?.(v instanceof Error ? v : new Error("Export failed"));
     }
-  }, _ = p ? `Exporting ${Math.round(g * 100)}%` : e;
+  }, g = p ? `Exporting ${Math.round(_ * 100)}%` : e;
   return /* @__PURE__ */ k.jsx(
     fn,
     {
       onClick: m,
       disabled: p || h.length === 0,
       className: c,
-      children: _
+      children: g
     }
   );
 }, ES = 60, hA = ({
@@ -26806,9 +26817,9 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
   const l = ap(), { isPlaying: u, currentTime: h, currentTimeRef: d } = Cn(), {
     selectionStart: f,
     selectionEnd: p,
-    annotations: g,
+    annotations: _,
     activeAnnotationId: m,
-    annotationsEditable: _,
+    annotationsEditable: g,
     linkEndpoints: v,
     continuousPlay: b,
     selectedTrackId: x
@@ -27050,7 +27061,7 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
                   }
                 ) }, At.id);
               }),
-              g.length > 0 && /* @__PURE__ */ k.jsx(bp, { height: 30, width: Y, children: g.map((at, gt) => {
+              _.length > 0 && /* @__PURE__ */ k.jsx(bp, { height: 30, width: Y, children: _.map((at, gt) => {
                 const At = at.start * q / O, $t = at.end * q / O;
                 return /* @__PURE__ */ k.jsx(
                   vp,
@@ -27063,7 +27074,7 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
                     color: "#ff9800",
                     isActive: at.id === m,
                     onClick: () => X(at),
-                    editable: _
+                    editable: g
                   },
                   at.id
                 );
@@ -27086,14 +27097,14 @@ const Tp = Ae(null), Ap = Ae(null), kp = Ae(null), Ip = Ae(null), Ep = Ae(null),
             ] })
           }
         ),
-        g.length > 0 && /* @__PURE__ */ k.jsx(
+        _.length > 0 && /* @__PURE__ */ k.jsx(
           xp,
           {
-            annotations: g,
+            annotations: _,
             activeAnnotationId: m ?? void 0,
             shouldScrollToActive: !0,
-            editable: _,
-            controls: _ ? n : void 0,
+            editable: g,
+            controls: g ? n : void 0,
             annotationListConfig: { linkEndpoints: v, continuousPlay: b },
             height: i,
             onAnnotationUpdate: (at) => {
@@ -27142,8 +27153,8 @@ function FS(e, t) {
 function PS(e) {
   for (var t = e.scale, n = e.amplitude_scale, s = e.split_channels, i = e.length, r = e.sample_rate, o = e.channels.map(function(A) {
     return new Float32Array(A);
-  }), a = s ? o.length : 1, c = 24, l = FS(i, t), u = e.bits === 8 ? 1 : 2, h = c + l * 2 * u * a, d = new ArrayBuffer(h), f = new DataView(d), p = 0, g = c, m = new Array(a), _ = new Array(a), v = 0; v < a; v++)
-    m[v] = 1 / 0, _[v] = -1 / 0;
+  }), a = s ? o.length : 1, c = 24, l = FS(i, t), u = e.bits === 8 ? 1 : 2, h = c + l * 2 * u * a, d = new ArrayBuffer(h), f = new DataView(d), p = 0, _ = c, m = new Array(a), g = new Array(a), v = 0; v < a; v++)
+    m[v] = 1 / 0, g[v] = -1 / 0;
   var b = e.bits === 8 ? RS : MS, x = e.bits === 8 ? DS : OS;
   f.setInt32(0, 2, !0), f.setUint32(4, e.bits === 8, !0), f.setInt32(8, r, !0), f.setInt32(12, t, !0), f.setInt32(16, l, !0), f.setInt32(20, a, !0);
   for (var y = 0; y < i; y++) {
@@ -27151,19 +27162,19 @@ function PS(e) {
     if (a === 1) {
       for (var S = 0; S < o.length; ++S)
         w += o[S][y];
-      w = Math.floor(x * w * n / o.length), w < m[0] && (m[0] = w, m[0] < b && (m[0] = b)), w > _[0] && (_[0] = w, _[0] > x && (_[0] = x));
+      w = Math.floor(x * w * n / o.length), w < m[0] && (m[0] = w, m[0] < b && (m[0] = b)), w > g[0] && (g[0] = w, g[0] > x && (g[0] = x));
     } else
       for (var C = 0; C < a; ++C)
-        w = Math.floor(x * o[C][y] * n), w < m[C] && (m[C] = w, m[C] < b && (m[C] = b)), w > _[C] && (_[C] = w, _[C] > x && (_[C] = x));
+        w = Math.floor(x * o[C][y] * n), w < m[C] && (m[C] = w, m[C] < b && (m[C] = b)), w > g[C] && (g[C] = w, g[C] > x && (g[C] = x));
     if (++p === t) {
       for (var E = 0; E < a; E++)
-        e.bits === 8 ? (f.setInt8(g++, m[E]), f.setInt8(g++, _[E])) : (f.setInt16(g, m[E], !0), f.setInt16(g + 2, _[E], !0), g += 4), m[E] = 1 / 0, _[E] = -1 / 0;
+        e.bits === 8 ? (f.setInt8(_++, m[E]), f.setInt8(_++, g[E])) : (f.setInt16(_, m[E], !0), f.setInt16(_ + 2, g[E], !0), _ += 4), m[E] = 1 / 0, g[E] = -1 / 0;
       p = 0;
     }
   }
   if (p > 0)
     for (var R = 0; R < a; R++)
-      e.bits === 8 ? (f.setInt8(g++, m[R]), f.setInt8(g++, _[R])) : (f.setInt16(g, m[R], !0), f.setInt16(g + 2, _[R], !0));
+      e.bits === 8 ? (f.setInt8(_++, m[R]), f.setInt8(_++, g[R])) : (f.setInt16(_, m[R], !0), f.setInt16(_ + 2, g[R], !0));
   return d;
 }
 function io(e) {
@@ -27381,8 +27392,8 @@ Qe.prototype = {
    * All waveforms must have identical metadata (version, channels, etc)
    */
   _concatBuffers: function() {
-    for (var t = Array.prototype.slice.call(arguments), n = this._offset, s = n, i = 0, r = [this].concat(t).map(function(_) {
-      return _._data.buffer;
+    for (var t = Array.prototype.slice.call(arguments), n = this._offset, s = n, i = 0, r = [this].concat(t).map(function(g) {
+      return g._data.buffer;
     }), o = 0; o < r.length; o++) {
       var a = r[o], c = new DataView(a).getInt32(16, !0);
       s += a.byteLength - n, i += c;
@@ -27390,8 +27401,8 @@ Qe.prototype = {
     for (var l = new ArrayBuffer(s), u = new DataView(r[0]), h = new DataView(l), d = 0; d < n; d++)
       h.setUint8(d, u.getUint8(d));
     h.setInt32(16, i, !0);
-    for (var f = 0, p = new Uint8Array(l, n), g = 0; g < r.length; g++) {
-      var m = r[g];
+    for (var f = 0, p = new Uint8Array(l, n), _ = 0; _ < r.length; _++) {
+      var m = r[_];
       p.set(new Uint8Array(m, n), f), f += m.byteLength - n;
     }
     return l;
@@ -27702,7 +27713,7 @@ class XS {
       Lt.useRef(null), Lt.useEffect(() => (this.setProgressFn = u, this.setSelectionFn = h, this.setIsPlayingFn = d, () => {
         this.setProgressFn = null, this.setSelectionFn = null, this.setIsPlayingFn = null;
       }), [u, h, d]);
-      const f = this.config.controls?.show !== !1, p = this.config.controls?.width || 200, g = this.config.timescale !== !1;
+      const f = this.config.controls?.show !== !1, p = this.config.controls?.width || 200, _ = this.config.timescale !== !1;
       let m = 0;
       this.playout && this.tracks.forEach((S) => {
         const C = this.playout?.getTrack(S.id);
@@ -27711,7 +27722,7 @@ class XS {
           m = Math.max(m, E);
         }
       });
-      const _ = {
+      const g = {
         sampleRate: this.playout?.sampleRate || 44100,
         samplesPerPixel: s,
         zoomLevels: this.config.zoomLevels || [512, 1024, 2048, 4096],
@@ -27820,7 +27831,7 @@ class XS {
           ] })
         ] });
       }, []), w = (this.playout ? sn(m, s, this.playout.sampleRate) : 0) + (f ? p : 0);
-      return /* @__PURE__ */ k.jsx(rp, { children: /* @__PURE__ */ k.jsx(Ho.Provider, { value: _, children: /* @__PURE__ */ k.jsx(Gh, { theme: t, children: /* @__PURE__ */ k.jsxs("div", { style: { fontFamily: "Arial, sans-serif" }, children: [
+      return /* @__PURE__ */ k.jsx(rp, { children: /* @__PURE__ */ k.jsx(Ho.Provider, { value: g, children: /* @__PURE__ */ k.jsx(Gh, { theme: t, children: /* @__PURE__ */ k.jsxs("div", { style: { fontFamily: "Arial, sans-serif" }, children: [
         /* @__PURE__ */ k.jsx(
           Wl,
           {
@@ -27836,7 +27847,7 @@ class XS {
             scrollContainerRef: (S) => {
               this.scrollContainer = S;
             },
-            timescale: g ? /* @__PURE__ */ k.jsx(
+            timescale: _ ? /* @__PURE__ */ k.jsx(
               pp,
               {
                 duration: m * 1e3,

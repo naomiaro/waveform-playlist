@@ -52,6 +52,10 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   // Track active effects in state (for UI)
   const [activeEffects, setActiveEffects] = useState<ActiveEffect[]>([]);
 
+  // Ref to store current activeEffects for reading in callbacks (avoids stale closures)
+  const activeEffectsRef = useRef<ActiveEffect[]>(activeEffects);
+  activeEffectsRef.current = activeEffects;
+
   // Track effect instances (for audio processing)
   const effectInstancesRef = useRef<Map<string, EffectInstance>>(new Map());
 
@@ -66,7 +70,8 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   } | null>(null);
 
   // Rebuild the effect chain when effects change
-  const rebuildChain = useCallback(() => {
+  // Note: effects is passed as parameter to avoid stale closure issues
+  const rebuildChain = useCallback((effects: ActiveEffect[]) => {
     const nodes = graphNodesRef.current;
     if (!nodes) return;
 
@@ -80,7 +85,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     }
 
     // Get effect instances in order
-    const instances = activeEffects
+    const instances = effects
       .map((ae) => effectInstancesRef.current.get(ae.instanceId))
       .filter((inst): inst is EffectInstance => inst !== undefined);
 
@@ -106,7 +111,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
       currentNode.connect(analyserNode);
       analyserNode.connect(destination);
     }
-  }, [activeEffects]);
+  }, []);
 
   // Add a new effect
   const addEffect = useCallback((effectId: string) => {
@@ -170,19 +175,22 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     []
   );
 
-  // Toggle bypass for an effect (uses wet parameter - 0 = bypass, 1 = active)
+  // Toggle bypass for an effect (uses wet parameter - 0 = bypass, restore original for active)
   const toggleBypass = useCallback(
     (instanceId: string) => {
-      // Get current state to determine new bypassed value
-      const effect = activeEffects.find((e) => e.instanceId === instanceId);
+      // Get current state from ref to determine new bypassed value (avoids stale closure)
+      const effect = activeEffectsRef.current.find((e) => e.instanceId === instanceId);
       if (!effect) return;
 
       const newBypassed = !effect.bypassed;
 
-      // Update the actual effect instance - set wet to 0 for bypass, 1 for active
+      // Update the actual effect instance
+      // When bypassing: set wet to 0
+      // When un-bypassing: restore the original wet value from params
       const instance = effectInstancesRef.current.get(instanceId);
       if (instance) {
-        instance.setParameter('wet', newBypassed ? 0 : 1);
+        const originalWet = effect.params.wet as number ?? 1;
+        instance.setParameter('wet', newBypassed ? 0 : originalWet);
       }
 
       // Update state for UI
@@ -192,7 +200,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
         )
       );
     },
-    [activeEffects]
+    []
   );
 
   // Reorder effects in the chain
@@ -216,10 +224,11 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
 
   // Rebuild chain when effects change
   useEffect(() => {
-    rebuildChain();
+    rebuildChain(activeEffects);
   }, [activeEffects, rebuildChain]);
 
   // The effects function that gets passed to WaveformPlaylistProvider
+  // This function is stable - it reads from refs at call time to avoid stale closures
   const masterEffects: EffectsFunction = useCallback(
     (masterGainNode, destination, isOffline) => {
       // Create analyser for visualization
@@ -233,9 +242,9 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
         analyserNode,
       };
 
-      // Build initial chain
-      // Get effect instances in order
-      const instances = activeEffects
+      // Build initial chain - read from ref to get current state
+      const effects = activeEffectsRef.current;
+      const instances = effects
         .map((ae) => effectInstancesRef.current.get(ae.instanceId))
         .filter((inst): inst is EffectInstance => inst !== undefined);
 
@@ -263,7 +272,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
         graphNodesRef.current = null;
       };
     },
-    [fftSize, activeEffects]
+    [fftSize] // Only fftSize - reads effects from ref
   );
 
   // Cleanup on unmount
