@@ -13,3 +13,6 @@ lib
 # Storybook
 *storybook.log
 storybook-static
+
+# Package build output
+packages/*/dist/

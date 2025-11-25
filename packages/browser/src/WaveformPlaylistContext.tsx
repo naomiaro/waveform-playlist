@@ -323,7 +323,18 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Load audio from clips (only when tracks change)
   useEffect(() => {
-    if (tracks.length === 0) return;
+    if (tracks.length === 0) {
+      // Clear state when all tracks are removed
+      setAudioBuffers([]);
+      setDuration(0);
+      setTrackStates([]);
+      setPeaksDataArray([]);
+      if (playoutRef.current) {
+        playoutRef.current.dispose();
+        playoutRef.current = null;
+      }
+      return;
+    }
 
     const loadAudio = async () => {
       try {
