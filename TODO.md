@@ -9,6 +9,16 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-24: Fades API Simplification & Example
+- ✅ Simplified Fade API from confusing `{start, end, type}` to simple `{duration, type?}`
+- ✅ Created new inline fade utilities replacing 10-year-old `fade-maker` package
+- ✅ Removed `fade-maker` dependency from playout package
+- ✅ Fixed fade scheduling bug: fades now scheduled at play() time, not constructor
+- ✅ New Fades Example page with 4 individual mini players (Linear, Logarithmic, Exponential, S-Curve)
+- ✅ Each player demonstrates same 5.85s vocal clip with 1.5s fades for easy comparison
+- ✅ Created comprehensive fades documentation guide
+- ✅ Updated all fade-related code across packages (core types, ToneTrack, useExportWav, useAudioTracks)
+
 ### 2025-11-24: Export with Effects & Dynamic Effects Fixes
 - ✅ WAV export with master + per-track effects via Tone.Offline
 - ✅ Fixed stale closure issues in `useDynamicEffects` and `useTrackDynamicEffects`
@@ -286,19 +296,23 @@ See `multi-clip-app.tsx` for complete implementation example.
 
 These features expand core functionality and should be implemented first.
 
-- [ ] **Track/project export (WAV)**
+- [x] **Track/project export (WAV)** ✅
   - Render multi-track timeline to single audio file (master mix)
-  - Individual track export option (export selected track only)
   - Toggle to include/exclude audio effects in export
   - WAV format (lossless)
-  - Offline rendering using OfflineAudioContext
+  - Offline rendering using Tone.Offline (OfflineAudioContext)
   - Progress callback during export
-  - Download or return as Blob/ArrayBuffer
+  - Download as WAV file
+  - Bypassed effects excluded from export
+  - **Location:** `packages/browser/src/hooks/useExportWav.ts`
 
-- [ ] **Add fades to one of the examples**
-  - Demonstrate fade in/out functionality in stem-tracks or effects example
-  - Show visual fade curves on waveform
-  - Allow interactive fade adjustment (drag fade handles)
+- [x] **Add fades to one of the examples** ✅
+  - Created dedicated Fades Example page with 4 mini players
+  - Each player demonstrates a different fade curve type (Linear, Logarithmic, Exponential, S-Curve)
+  - Same audio clip with 1.5s fades for easy comparison
+  - Simplified Fade API: `{duration, type?}` instead of `{start, end, type}`
+  - Created comprehensive documentation guide
+  - **Location:** `website/src/components/examples/FadesExample.tsx`, `website/docs/guides/fades.md`
 
 - [ ] **Add new annotation support in annotations example**
   - Button or keyboard shortcut to create new annotation at current playhead position
