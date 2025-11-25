@@ -55,7 +55,7 @@ export interface WaveformProps {
  * Waveform visualization component that uses the playlist context
  */
 export const Waveform: React.FC<WaveformProps> = ({
-  timescale = true,
+  timescale = false,
   renderTrackControls,
   renderTimestamp,
   annotationControls,

@@ -49,6 +49,21 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - Use `React.FC<Props>` for component types
 - Prefer `const` over `let`
 
+### Boolean Props Convention
+
+**Rule:** Boolean props should default to `false` so they can be enabled with shorthand syntax.
+
+```typescript
+// ✅ GOOD - Default to false, enable with shorthand
+<Waveform timescale />           // Enables timescale
+<Waveform showClipHeaders />     // Enables clip headers
+
+// ❌ AVOID - Default to true requires explicit false
+<Waveform timescale={false} />   // Awkward to disable
+```
+
+**Why:** JSX shorthand `<Component prop />` is equivalent to `<Component prop={true} />`. Defaulting to `false` enables this clean opt-in pattern.
+
 ### Styled Components
 
 - Use transient props (prefix with `$`) for props that shouldn't pass to DOM
@@ -259,6 +274,7 @@ export default function MinimalExamplePage() {
 - Styled components use Docusaurus CSS variables: `var(--ifm-background-surface-color, #fallback)`
 - No need for MutationObserver - theme changes automatically
 - Built packages (annotations, recording) still use dist/ for build artifacts
+- **Rebuild requirement:** When ui-components changes affect recording (e.g., BaseSelect theming), rebuild both packages: `cd packages/ui-components && pnpm build`, then `cd packages/recording && pnpm build`
 
 **Location:** Example components in `website/src/components/examples/`
 

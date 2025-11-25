@@ -343,7 +343,7 @@ const AnnotationsAppContent: React.FC = () => {
           </ControlGroup>
         </TopBar>
 
-        <Waveform annotationControls={annotationActions} />
+        <Waveform timescale annotationControls={annotationActions} />
 
         <TimeControlsBar>
           <ControlGroup>

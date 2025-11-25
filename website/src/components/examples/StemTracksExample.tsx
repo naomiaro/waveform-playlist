@@ -126,7 +126,7 @@ export function StemTracksExample() {
           </ControlGroup>
         </Controls>
 
-        <Waveform />
+        <Waveform timescale />
       </WaveformPlaylistProvider>
     </Container>
   );

@@ -349,7 +349,7 @@ export function WaveformDataExample() {
           </ControlGroup>
         </Controls>
 
-        <Waveform />
+        <Waveform timescale />
       </WaveformPlaylistProvider>
     </Container>
   );

@@ -252,6 +252,7 @@ export function NewTracksExample() {
           </Controls>
 
           <Waveform
+            timescale
             renderTrackControls={(trackIndex) => {
               const track = tracks[trackIndex];
               if (!track) return null;

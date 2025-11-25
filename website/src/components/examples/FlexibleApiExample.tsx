@@ -344,10 +344,11 @@ const FlexibleApiContent: React.FC = () => {
       </Card>
 
       <Waveform
+        timescale
         renderTrackControls={(trackIndex) => (
           <CustomTrackControls trackIndex={trackIndex} />
         )}
-        showClipHeaders={true}
+        showClipHeaders
       />
 
       {/* Time Controls Bar */}

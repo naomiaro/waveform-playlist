@@ -51,7 +51,12 @@ const Container = styled.div`
 `;
 
 const DropZone = styled.div<{ $isDragging: boolean }>`
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 2rem;
   border: 2px dashed ${props => props.$isDragging ? 'var(--accent-9)' : 'var(--gray-6)'};
   border-radius: var(--radius-3);
   background: ${props => props.$isDragging ? 'var(--accent-3)' : 'var(--gray-2)'};
@@ -73,6 +78,13 @@ const VUMeterWrapper = styled.div`
   padding: 0.5rem 1rem;
   background: var(--gray-3);
   border-radius: var(--radius-2);
+`;
+
+const RecordingControlsRow = styled.div`
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
 `;
 
 const Label = styled.span`
@@ -312,7 +324,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               🎤 Enable Microphone
             </Button>
           ) : (
-            <Flex gap="3" align="center" wrap="wrap">
+            <RecordingControlsRow>
               <MicrophoneSelector
                 devices={devices}
                 selectedDeviceId={selectedDevice || undefined}
@@ -334,7 +346,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                 <Label>Input:</Label>
                 <VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
               </VUMeterWrapper>
-            </Flex>
+            </RecordingControlsRow>
           )}
         </Flex>
       </Card>
@@ -350,10 +362,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <Text size="3" weight="medium">
           {isDragging ? '📂 Drop audio files here' : '🎵 Drop audio files or click to browse'}
         </Text>
-        <Text size="2" color="gray" style={{ marginTop: '0.5rem' }}>
+        <Text size="2" color="gray">
           Supports MP3, WAV, OGG, and more
         </Text>
-        <Button size="2" style={{ marginTop: '1rem' }} onClick={(e) => {
+        <Button size="2" style={{ marginTop: '0.5rem' }} onClick={(e) => {
           e.stopPropagation();
           onAddTrack();
         }}>
@@ -407,7 +419,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         modifiers={[restrictToHorizontalAxis, collisionModifier]}
       >
         <Waveform
-          showClipHeaders={true}
+          timescale
+          showClipHeaders
           recordingState={
             isRecording && selectedTrackId
               ? {

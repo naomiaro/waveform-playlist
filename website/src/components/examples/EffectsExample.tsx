@@ -168,7 +168,7 @@ const EffectsControls: React.FC<{ analyserRef: React.RefObject<any> }> = ({ anal
         </VisualizerWrapper>
       </TopBar>
 
-      <Waveform />
+      <Waveform timescale />
 
       <TimeControlsBar>
         <ControlGroup>
@@ -256,7 +256,6 @@ export function EffectsExample() {
       theme={theme}
       controls={{ show: true, width: 150 }}
       automaticScroll={true}
-      timescale={true}
       effects={masterEffects}
     >
       <EffectsControls analyserRef={analyserRef} />

@@ -9,6 +9,24 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-24: MicrophoneSelector Dark Mode & Recording Example Styling
+
+**Goal:** Fix unreadable select dropdown in dark mode and improve recording example UI layout
+
+**What Was Done:**
+- ✅ Fixed MicrophoneSelector dark mode - native `<option>` elements now styled with theme colors
+- ✅ Added `option` element styling to `BaseSelect.tsx` using theme.inputText and theme.inputBackground
+- ✅ Improved DropZone layout in RecordingExample - flexbox column with proper gaps and centering
+- ✅ Created `RecordingControlsRow` styled component with `align-items: flex-end` for consistent vertical alignment
+
+**Files Modified:**
+- `packages/ui-components/src/styled/BaseSelect.tsx` (added option element styling)
+- `website/src/components/examples/RecordingExample.tsx` (improved layout styling)
+
+**Technical Note:** The recording package uses built dist/ versions (not transpiled from source) due to worklet file dependencies. Changes to ui-components require rebuilding both ui-components and recording packages.
+
+---
+
 ### 2025-11-24: BBC Waveform Data Docusaurus Example
 
 **Goal:** Create Docusaurus-native example demonstrating BBC pre-computed peaks for fast waveform loading
