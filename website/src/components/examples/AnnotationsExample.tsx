@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { DndContext } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import * as Tone from 'tone';
+import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -21,7 +23,6 @@ import {
   EditableCheckbox,
   AudioPosition,
   Waveform,
-  useAudioTracks,
   usePlaylistData,
   usePlaylistState,
   usePlaylistControls,
@@ -32,7 +33,7 @@ import {
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Annotation data - Shakespeare's Sonnet 1
-const notes = [
+const defaultNotes = [
   {
     "begin": "0.000",
     "children": [],
@@ -156,10 +157,9 @@ const notes = [
 ];
 
 // Annotation actions for the UI
-// Using text labels instead of Bootstrap icons for Docusaurus compatibility
 const annotationActions = [
   {
-    text: '−',  // minus sign
+    text: '−',
     title: 'Reduce annotation end by 0.010s',
     action: (annotation: any, i: number, annotations: any[], opts: any) => {
       const delta = 0.010;
@@ -201,7 +201,7 @@ const annotationActions = [
     }
   },
   {
-    text: '✂',  // scissors
+    text: '✂',
     title: 'Split annotation in half',
     action: (annotation: any, i: number, annotations: any[]) => {
       const halfDuration = (annotation.end - annotation.start) / 2;
@@ -222,7 +222,7 @@ const annotationActions = [
     }
   },
   {
-    text: '🗑',  // trash
+    text: '🗑',
     title: 'Delete annotation',
     action: (annotation: any, i: number, annotations: any[]) => {
       annotations.splice(i, 1);
@@ -271,10 +271,80 @@ const TimeControlsBar = styled.div`
   flex-wrap: wrap;
 `;
 
-const AnnotationsAppContent: React.FC = () => {
+const DropZone = styled.div<{ $isDragging: boolean }>`
+  padding: 1.5rem;
+  border: 2px dashed ${(props) => (props.$isDragging ? '#3498db' : 'var(--ifm-color-emphasis-400, #ced4da)')};
+  border-radius: 0.5rem;
+  text-align: center;
+  background: ${(props) => (props.$isDragging ? 'rgba(52, 152, 219, 0.1)' : 'var(--ifm-background-surface-color, #f8f9fa)')};
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #3498db;
+    background: var(--ifm-color-emphasis-100, #e3f2fd);
+  }
+`;
+
+const DropZoneText = styled.p`
+  margin: 0;
+  color: var(--ifm-font-color-base, #495057);
+  font-size: 0.9rem;
+`;
+
+const HiddenFileInput = styled.input`
+  display: none;
+`;
+
+const ActionButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: var(--ifm-color-primary, #3578e5);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--ifm-color-primary-dark, #2d6cd4);
+  }
+
+  &:disabled {
+    background: var(--ifm-color-emphasis-400, #ced4da);
+    cursor: not-allowed;
+  }
+`;
+
+const DangerButton = styled(ActionButton)`
+  background: var(--ifm-color-danger, #dc3545);
+
+  &:hover {
+    background: var(--ifm-color-danger-dark, #c82333);
+  }
+`;
+
+interface AnnotationsAppContentProps {
+  tracks: ClipTrack[];
+  onTracksChange: (tracks: ClipTrack[]) => void;
+  onAnnotationsLoaded: (annotations: any[]) => void;
+  onClearAll: () => void;
+}
+
+const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
+  tracks,
+  onTracksChange,
+  onAnnotationsLoaded,
+  onClearAll,
+}) => {
   const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
   const { annotations, linkEndpoints, activeAnnotationId } = usePlaylistState();
   const { setAnnotations } = usePlaylistControls();
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useDragSensors();
   const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
@@ -286,8 +356,6 @@ const AnnotationsAppContent: React.FC = () => {
     linkEndpoints,
   });
 
-  // Keyboard controls for annotation boundaries
-  // [ / ] = move start boundary, Shift+[ / Shift+] = move end boundary
   useAnnotationKeyboardControls({
     annotations,
     activeAnnotationId,
@@ -295,6 +363,110 @@ const AnnotationsAppContent: React.FC = () => {
     duration,
     linkEndpoints,
   });
+
+  // Load audio files
+  const loadAudioFiles = async (files: File[]) => {
+    setIsLoadingAudio(true);
+    try {
+      const audioContext = Tone.getContext().rawContext as AudioContext;
+      const audioFiles = Array.from(files).filter((file) =>
+        file.type.startsWith('audio/')
+      );
+
+      const newTracks: ClipTrack[] = await Promise.all(
+        audioFiles.map(async (file) => {
+          const arrayBuffer = await file.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+          const clip = createClipFromSeconds({
+            audioBuffer,
+            startTime: 0,
+            duration: audioBuffer.duration,
+            offset: 0,
+            name: file.name.replace(/\.[^/.]+$/, ''),
+          });
+
+          return createTrack({
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            clips: [clip],
+            muted: false,
+            soloed: false,
+            volume: 1,
+            pan: 0,
+          });
+        })
+      );
+
+      onTracksChange([...tracks, ...newTracks]);
+    } catch (error) {
+      console.error('Error loading audio files:', error);
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  };
+
+  // Handle file drop
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        loadAudioFiles(files);
+      }
+    },
+    [tracks]
+  );
+
+  // Handle file input change
+  const handleAudioInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        loadAudioFiles(Array.from(files));
+      }
+    },
+    [tracks]
+  );
+
+  // Handle JSON upload
+  const handleJsonUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const jsonData = JSON.parse(event.target?.result as string);
+          // Support both array format and object with annotations property
+          const annotationsArray = Array.isArray(jsonData) ? jsonData : jsonData.annotations;
+          if (Array.isArray(annotationsArray)) {
+            onAnnotationsLoaded(annotationsArray);
+          } else {
+            console.error('Invalid annotations format');
+          }
+        } catch (error) {
+          console.error('Error parsing JSON:', error);
+        }
+      };
+      reader.readAsText(file);
+      // Reset input so same file can be selected again
+      e.target.value = '';
+    },
+    [onAnnotationsLoaded]
+  );
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
 
   return (
     <DndContext
@@ -305,6 +477,31 @@ const AnnotationsAppContent: React.FC = () => {
       modifiers={[restrictToHorizontalAxis]}
     >
       <Container>
+        {/* Drop Zone for Audio */}
+        <DropZone
+          $isDragging={isDragging}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={() => audioInputRef.current?.click()}
+        >
+          <DropZoneText>
+            {isLoadingAudio
+              ? 'Loading audio...'
+              : isDragging
+              ? 'Drop audio files here'
+              : 'Drop audio files here or click to browse'}
+          </DropZoneText>
+        </DropZone>
+
+        <HiddenFileInput
+          ref={audioInputRef}
+          type="file"
+          accept="audio/*"
+          multiple
+          onChange={handleAudioInput}
+        />
+
         <TopBar>
           <ControlGroup>
             <PlayButton />
@@ -325,6 +522,18 @@ const AnnotationsAppContent: React.FC = () => {
 
           <ControlGroup>
             <DownloadAnnotationsButton />
+            <ActionButton onClick={() => jsonInputRef.current?.click()}>
+              Upload JSON
+            </ActionButton>
+            <DangerButton onClick={onClearAll}>
+              Clear All
+            </DangerButton>
+            <HiddenFileInput
+              ref={jsonInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleJsonUpload}
+            />
           </ControlGroup>
 
           <Separator />
@@ -343,7 +552,10 @@ const AnnotationsAppContent: React.FC = () => {
           </ControlGroup>
         </TopBar>
 
-        <Waveform annotationControls={annotationActions} annotationTextHeight={300} />
+        <Waveform
+          annotationControls={annotationActions}
+          annotationTextHeight={300}
+        />
 
         <TimeControlsBar>
           <ControlGroup>
@@ -369,17 +581,62 @@ const AnnotationsAppContent: React.FC = () => {
 
 export function AnnotationsExample() {
   const { theme } = useDocusaurusTheme();
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const [annotations, setAnnotations] = useState<any[]>(defaultNotes);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/sonnet.mp3',
-      name: 'Sonnet',
-    },
-  ], []);
+  // Load default audio track on mount
+  React.useEffect(() => {
+    const loadDefaultTrack = async () => {
+      try {
+        const audioContext = Tone.getContext().rawContext as AudioContext;
+        const response = await fetch('/waveform-playlist/media/audio/sonnet.mp3');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch audio: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+        const clip = createClipFromSeconds({
+          audioBuffer,
+          startTime: 0,
+          duration: audioBuffer.duration,
+          offset: 0,
+          name: 'Sonnet',
+        });
 
-  if (loading) {
+        const track = createTrack({
+          name: 'Sonnet',
+          clips: [clip],
+          muted: false,
+          soloed: false,
+          volume: 1,
+          pan: 0,
+        });
+
+        setTracks([track]);
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error loading default track:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setIsLoading(false);
+      }
+    };
+
+    loadDefaultTrack();
+  }, []);
+
+  const handleAnnotationsLoaded = useCallback((newAnnotations: any[]) => {
+    setAnnotations(newAnnotations);
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    setTracks([]);
+    setAnnotations([]);
+  }, []);
+
+  if (isLoading) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         Loading audio track with annotations...
@@ -406,13 +663,18 @@ export function AnnotationsExample() {
       theme={theme}
       timescale
       annotationList={{
-        annotations: notes,
+        annotations: annotations,
         editable: true,
         linkEndpoints: true,
         isContinuousPlay: false,
       }}
     >
-      <AnnotationsAppContent />
+      <AnnotationsAppContent
+        tracks={tracks}
+        onTracksChange={setTracks}
+        onAnnotationsLoaded={handleAnnotationsLoaded}
+        onClearAll={handleClearAll}
+      />
     </WaveformPlaylistProvider>
   );
 }
