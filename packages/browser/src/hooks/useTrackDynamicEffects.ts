@@ -40,6 +40,12 @@ export interface UseTrackDynamicEffectsReturn {
   clearTrackEffects: (trackId: string) => void;
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
 
+  /**
+   * Creates a fresh effects function for a track for offline rendering.
+   * This creates new effect instances that work in the offline AudioContext.
+   */
+  createOfflineTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
+
   // Available effects
   availableEffects: EffectDefinition[];
 }
@@ -68,12 +74,12 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   >(new Map());
 
   // Rebuild the effect chain for a specific track
-  const rebuildTrackChain = useCallback((trackId: string) => {
+  // Note: trackEffects is passed as parameter to avoid stale closure issues
+  const rebuildTrackChain = useCallback((trackId: string, trackEffects: TrackActiveEffect[]) => {
     const nodes = trackGraphNodesRef.current.get(trackId);
     if (!nodes) return;
 
     const { graphEnd, masterGainNode } = nodes;
-    const trackEffects = trackEffectsState.get(trackId) || [];
     const instancesMap = trackEffectInstancesRef.current.get(trackId);
 
     // Disconnect everything first
@@ -108,7 +114,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       // Connect last effect to master
       currentNode.connect(masterGainNode);
     }
-  }, [trackEffectsState]);
+  }, []);
 
   // Add a new effect to a track
   const addEffectToTrack = useCallback((trackId: string, effectId: string) => {
@@ -245,7 +251,13 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     });
   }, []);
 
+  // Ref to store the current trackEffectsState for reading in effects function
+  // This avoids stale closure issues when the effects function is called later
+  const trackEffectsStateRef = useRef<Map<string, TrackActiveEffect[]>>(trackEffectsState);
+  trackEffectsStateRef.current = trackEffectsState;
+
   // Get the effects function for a track to pass to useAudioTracks
+  // This function is stable (no dependencies) - it reads from refs at call time
   const getTrackEffectsFunction = useCallback(
     (trackId: string): TrackEffectsFunction | undefined => {
       // Return a function that connects effects when the track is loaded
@@ -256,8 +268,8 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
           masterGainNode,
         });
 
-        // Build initial chain
-        const trackEffects = trackEffectsState.get(trackId) || [];
+        // Read current state from ref (not stale closure)
+        const trackEffects = trackEffectsStateRef.current.get(trackId) || [];
         const instancesMap = trackEffectInstancesRef.current.get(trackId);
 
         // Get effect instances in order
@@ -286,13 +298,13 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
         };
       };
     },
-    [trackEffectsState]
+    [] // No dependencies - stable function that reads from refs
   );
 
   // Rebuild chains when effects change
   useEffect(() => {
-    trackEffectsState.forEach((_, trackId) => {
-      rebuildTrackChain(trackId);
+    trackEffectsState.forEach((effects, trackId) => {
+      rebuildTrackChain(trackId, effects);
     });
   }, [trackEffectsState, rebuildTrackChain]);
 
@@ -307,6 +319,55 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     };
   }, []);
 
+  /**
+   * Creates a fresh effects function for a track for offline rendering.
+   * This creates new effect instances in the offline context, avoiding the
+   * AudioContext mismatch issue that occurs when reusing real-time effects.
+   */
+  const createOfflineTrackEffectsFunction = useCallback(
+    (trackId: string): TrackEffectsFunction | undefined => {
+      const trackEffects = trackEffectsState.get(trackId) || [];
+      // Get non-bypassed effects
+      const nonBypassedEffects = trackEffects.filter((e) => !e.bypassed);
+
+      if (nonBypassedEffects.length === 0) {
+        return undefined;
+      }
+
+      // Return a function that creates fresh effect instances
+      return (graphEnd: any, masterGainNode: any, isOffline: boolean) => {
+        // Create fresh effect instances for offline context
+        const offlineInstances: EffectInstance[] = [];
+
+        for (const activeEffect of nonBypassedEffects) {
+          const instance = createEffectInstance(activeEffect.definition, activeEffect.params);
+          offlineInstances.push(instance);
+        }
+
+        if (offlineInstances.length === 0) {
+          // No effects - connect directly
+          graphEnd.connect(masterGainNode);
+        } else {
+          // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
+          let currentNode: any = graphEnd;
+
+          offlineInstances.forEach((inst) => {
+            currentNode.connect(inst.effect);
+            currentNode = inst.effect;
+          });
+
+          // Connect last effect to master
+          currentNode.connect(masterGainNode);
+        }
+
+        return function cleanup() {
+          offlineInstances.forEach((inst) => inst.dispose());
+        };
+      };
+    },
+    [trackEffectsState]
+  );
+
   return {
     trackEffectsState,
     addEffectToTrack,
@@ -315,6 +376,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     toggleBypass,
     clearTrackEffects,
     getTrackEffectsFunction,
+    createOfflineTrackEffectsFunction,
     availableEffects: effectDefinitions,
   };
 }

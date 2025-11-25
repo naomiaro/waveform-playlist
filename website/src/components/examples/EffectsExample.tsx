@@ -93,6 +93,38 @@ const ControlGroup = styled.div`
   align-items: center;
 `;
 
+const ExportOptionsWrapper = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+`;
+
+const ExportSelect = styled.select`
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300, #ddd);
+  border-radius: 0.25rem;
+  background: var(--ifm-background-color, #fff);
+  color: var(--ifm-color-content, #333);
+  font-size: 0.875rem;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: var(--ifm-color-primary, #3578e5);
+  }
+`;
+
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--ifm-color-content, #333);
+  cursor: pointer;
+  white-space: nowrap;
+`;
+
 const Separator = styled.div`
   width: 1px;
   height: 2rem;
@@ -404,6 +436,9 @@ interface EffectsControlsProps {
   onDeleteTrack: (trackIndex: number) => void;
   onAddTracks: (newTracks: ClipTrack[]) => void;
   masterEffectsFunction: any;
+  trackCount: number;
+  createOfflineMasterEffects: () => any;
+  tracks: ClipTrack[];
 }
 
 const EffectsControls: React.FC<EffectsControlsProps> = ({
@@ -413,9 +448,24 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   onDeleteTrack,
   onAddTracks,
   masterEffectsFunction,
+  trackCount,
+  createOfflineMasterEffects,
+  tracks,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Export options state
+  const [exportMode, setExportMode] = useState<'master' | 'individual'>('master');
+  const [selectedTrackIndex, setSelectedTrackIndex] = useState<number>(0);
+  const [applyEffectsToExport, setApplyEffectsToExport] = useState(true);
+  const { trackStates } = usePlaylistData();
+
+  // Get the offline effects functions when needed
+  const offlineEffectsFunction = applyEffectsToExport ? createOfflineMasterEffects() : undefined;
+  const createOfflineTrackEffects = applyEffectsToExport
+    ? trackEffectsManager.createOfflineTrackEffectsFunction
+    : undefined;
 
   // Render custom track controls using the track effects manager
   const renderTrackControls = (trackIndex: number) => (
@@ -565,13 +615,47 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 
         <Separator />
 
-        <ControlGroup>
+        <ExportOptionsWrapper>
+          <ExportSelect
+            value={exportMode}
+            onChange={(e) => setExportMode(e.target.value as 'master' | 'individual')}
+          >
+            <option value="master">Full Mix</option>
+            <option value="individual">Individual Track</option>
+          </ExportSelect>
+
+          {exportMode === 'individual' && (
+            <ExportSelect
+              value={selectedTrackIndex}
+              onChange={(e) => setSelectedTrackIndex(parseInt(e.target.value, 10))}
+            >
+              {trackStates.map((state, index) => (
+                <option key={index} value={index}>
+                  {state.name || `Track ${index + 1}`}
+                </option>
+              ))}
+            </ExportSelect>
+          )}
+
+          <CheckboxLabel>
+            <input
+              type="checkbox"
+              checked={applyEffectsToExport}
+              onChange={(e) => setApplyEffectsToExport(e.target.checked)}
+            />
+            Apply Effects
+          </CheckboxLabel>
+
           <ExportWavButton
-            label="Export with Effects"
-            filename="effects-mix"
-            effectsFunction={masterEffectsFunction}
+            label={exportMode === 'master' ? 'Export Mix' : 'Export Track'}
+            filename={exportMode === 'master' ? 'mix' : `${trackStates[selectedTrackIndex]?.name || `track-${selectedTrackIndex + 1}`}`}
+            mode={exportMode}
+            trackIndex={exportMode === 'individual' ? selectedTrackIndex : undefined}
+            applyEffects={applyEffectsToExport}
+            effectsFunction={offlineEffectsFunction}
+            createOfflineTrackEffects={createOfflineTrackEffects}
           />
-        </ControlGroup>
+        </ExportOptionsWrapper>
       </TimeControlsBar>
 
       <DropZone
@@ -611,7 +695,7 @@ export function EffectsExample() {
 
   // Create dynamic effects manager for master effects
   const effectsManager = useDynamicEffects(256);
-  const { analyserRef, masterEffects, addEffect: addMasterEffect } = effectsManager;
+  const { analyserRef, masterEffects, addEffect: addMasterEffect, createOfflineEffectsFunction } = effectsManager;
 
   // Create track effects manager
   const trackEffectsManager = useTrackDynamicEffects();
@@ -690,21 +774,14 @@ export function EffectsExample() {
     setTracks(prevTracks => [...prevTracks, ...newTracks]);
   }, []);
 
-  // Create tracks with effects functions attached for export
+  // Create tracks with effects functions attached
+  // Always attach effects function to allow dynamic effect addition during playback
   const tracksWithEffects = React.useMemo(() => {
-    return tracks.map(track => {
-      const trackEffects = trackEffectsState.get(track.id);
-      // Only attach effects if the track has non-bypassed effects
-      const hasActiveEffects = trackEffects && trackEffects.some(e => !e.bypassed);
-      if (hasActiveEffects) {
-        return {
-          ...track,
-          effects: getTrackEffectsFunction(track.id),
-        };
-      }
-      return track;
-    });
-  }, [tracks, trackEffectsState, getTrackEffectsFunction]);
+    return tracks.map(track => ({
+      ...track,
+      effects: getTrackEffectsFunction(track.id),
+    }));
+  }, [tracks, getTrackEffectsFunction]);
 
   if (isLoading) {
     return (
@@ -748,6 +825,9 @@ export function EffectsExample() {
           onDeleteTrack={handleDeleteTrack}
           onAddTracks={handleAddTracks}
           masterEffectsFunction={masterEffects}
+          trackCount={tracks.length}
+          createOfflineMasterEffects={createOfflineEffectsFunction}
+          tracks={tracks}
         />
       </WaveformPlaylistProvider>
     </Container>

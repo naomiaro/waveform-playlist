@@ -35,6 +35,12 @@ export interface UseDynamicEffectsReturn {
   // For connecting to audio graph
   masterEffects: EffectsFunction;
 
+  /**
+   * Creates a fresh effects function for offline rendering.
+   * This creates new effect instances that work in the offline AudioContext.
+   */
+  createOfflineEffectsFunction: () => EffectsFunction | undefined;
+
   // Analyser for visualization
   analyserRef: React.RefObject<any>;
 }
@@ -268,6 +274,51 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     };
   }, []);
 
+  /**
+   * Creates a fresh effects function for offline rendering.
+   * This creates new effect instances in the offline context, avoiding the
+   * AudioContext mismatch issue that occurs when reusing real-time effects.
+   */
+  const createOfflineEffectsFunction = useCallback((): EffectsFunction | undefined => {
+    // Get non-bypassed effects
+    const nonBypassedEffects = activeEffects.filter((e) => !e.bypassed);
+
+    if (nonBypassedEffects.length === 0) {
+      return undefined;
+    }
+
+    // Return a function that creates fresh effect instances
+    return (masterGainNode: any, destination: any, isOffline: boolean) => {
+      // Create fresh effect instances for offline context
+      const offlineInstances: EffectInstance[] = [];
+
+      for (const activeEffect of nonBypassedEffects) {
+        const instance = createEffectInstance(activeEffect.definition, activeEffect.params);
+        offlineInstances.push(instance);
+      }
+
+      if (offlineInstances.length === 0) {
+        // No effects - connect directly
+        masterGainNode.connect(destination);
+      } else {
+        // Connect: masterGain -> effect1 -> effect2 -> ... -> destination
+        let currentNode: any = masterGainNode;
+
+        offlineInstances.forEach((inst) => {
+          currentNode.connect(inst.effect);
+          currentNode = inst.effect;
+        });
+
+        // Connect last effect to destination
+        currentNode.connect(destination);
+      }
+
+      return function cleanup() {
+        offlineInstances.forEach((inst) => inst.dispose());
+      };
+    };
+  }, [activeEffects]);
+
   return {
     activeEffects,
     availableEffects: effectDefinitions,
@@ -278,6 +329,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     reorderEffects,
     clearAllEffects,
     masterEffects,
+    createOfflineEffectsFunction,
     analyserRef,
   };
 }

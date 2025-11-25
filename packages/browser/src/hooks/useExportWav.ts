@@ -3,6 +3,9 @@ import type { ClipTrack, AudioClip, Fade, FadeType } from '@waveform-playlist/co
 import type { EffectsFunction } from '@waveform-playlist/playout';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
 
+/** Function type for per-track effects */
+export type TrackEffectsFunction = (graphEnd: any, destination: any, isOffline: boolean) => void | (() => void);
+
 export interface ExportOptions extends WavEncoderOptions {
   /** Filename for download (without extension) */
   filename?: string;
@@ -15,10 +18,16 @@ export interface ExportOptions extends WavEncoderOptions {
   /** Whether to apply effects (fades, etc.) - defaults to true */
   applyEffects?: boolean;
   /**
-   * Optional Tone.js effects function. When provided, export will use Tone.Offline
+   * Optional Tone.js effects function for master effects. When provided, export will use Tone.Offline
    * to render through the effects chain. The function receives isOffline=true.
    */
   effectsFunction?: EffectsFunction;
+  /**
+   * Optional function to create offline track effects.
+   * Takes a trackId and returns a TrackEffectsFunction for offline rendering.
+   * This is used instead of track.effects to avoid AudioContext mismatch issues.
+   */
+  createOfflineTrackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   /** Progress callback (0-1) */
   onProgress?: (progress: number) => void;
 }
@@ -71,6 +80,7 @@ export function useExportWav(): UseExportWavReturn {
       autoDownload = true,
       applyEffects = true,
       effectsFunction,
+      createOfflineTrackEffects,
       bitDepth = 16,
       onProgress,
     } = options;
@@ -114,12 +124,13 @@ export function useExportWav(): UseExportWavReturn {
       // Check for solo - if any track is soloed, only play soloed tracks
       const hasSolo = trackStates.some(state => state.soloed);
 
-      // Check if any track has per-track effects
-      const hasTrackEffects = tracksToRender.some(({ track }) => track.effects);
+      // Check if per-track effects are provided via the offline creator function
+      // Note: We don't use track.effects directly for offline rendering to avoid AudioContext mismatch
+      const hasOfflineTrackEffects = !!createOfflineTrackEffects;
 
       let renderedBuffer: AudioBuffer;
 
-      if ((effectsFunction || hasTrackEffects) && applyEffects) {
+      if ((effectsFunction || hasOfflineTrackEffects) && applyEffects) {
         // Use Tone.Offline for rendering with effects (master and/or per-track)
         renderedBuffer = await renderWithToneEffects(
           tracksToRender,
@@ -128,6 +139,7 @@ export function useExportWav(): UseExportWavReturn {
           duration,
           sampleRate,
           effectsFunction,
+          createOfflineTrackEffects,
           (p) => {
             setProgress(p);
             onProgress?.(p);
@@ -212,6 +224,7 @@ async function renderWithToneEffects(
   duration: number,
   sampleRate: number,
   effectsFunction: EffectsFunction | undefined,
+  createOfflineTrackEffects: ((trackId: string) => TrackEffectsFunction | undefined) | undefined,
   onProgress: (progress: number) => void
 ): Promise<AudioBuffer> {
   // Dynamically import Tone.js modules
@@ -220,18 +233,20 @@ async function renderWithToneEffects(
   onProgress(0.1);
 
   // Use Tone.Offline to render with effects
-  const buffer = await Offline(
-    async ({ transport, destination }) => {
-      // Create master volume node
-      const masterVolume = new Volume(0); // 0 dB = unity gain
+  let buffer;
+  try {
+    buffer = await Offline(
+      async ({ transport, destination }) => {
+        // Create master volume node
+        const masterVolume = new Volume(0); // 0 dB = unity gain
 
-      // Apply master effects chain if provided, otherwise connect directly to destination
-      let cleanup: void | (() => void) = undefined;
-      if (effectsFunction) {
-        cleanup = effectsFunction(masterVolume, destination, true);
-      } else {
-        masterVolume.connect(destination);
-      }
+        // Apply master effects chain if provided, otherwise connect directly to destination
+        let cleanup: void | (() => void) = undefined;
+        if (effectsFunction) {
+          cleanup = effectsFunction(masterVolume, destination, true);
+        } else {
+          masterVolume.connect(destination);
+        }
 
       // Schedule all clips
       for (const { track, state } of tracksToRender) {
@@ -245,8 +260,9 @@ async function renderWithToneEffects(
         const trackPan = new Panner(state.pan);
         const trackMute = new Gain(state.muted ? 0 : 1);
 
-        // Check if track has per-track effects
-        const trackEffects = track.effects as ((graphEnd: any, destination: any, isOffline: boolean) => void | (() => void)) | undefined;
+        // Get offline track effects using the creator function
+        // Note: We use createOfflineTrackEffects instead of track.effects to avoid AudioContext mismatch
+        const trackEffects = createOfflineTrackEffects?.(track.id);
 
         if (trackEffects) {
           // Apply per-track effects chain: trackMute -> effects -> masterVolume
@@ -312,11 +328,19 @@ async function renderWithToneEffects(
       if (cleanup) {
         // Note: cleanup will be called after rendering completes
       }
-    },
-    duration,
-    2, // stereo
-    sampleRate
-  );
+      },
+      duration,
+      2, // stereo
+      sampleRate
+    );
+  } catch (err) {
+    // Re-throw with a proper Error object if needed
+    if (err instanceof Error) {
+      throw err;
+    } else {
+      throw new Error(`Tone.Offline rendering failed: ${String(err)}`);
+    }
+  }
 
   onProgress(0.9);
 
