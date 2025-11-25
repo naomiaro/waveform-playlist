@@ -290,6 +290,10 @@ export const Waveform: React.FC<WaveformProps> = ({
           >
             <>
               {peaksDataArray.map((trackClipPeaks, trackIndex) => {
+                // Skip if track doesn't exist (can happen during track deletion transition)
+                const track = tracks[trackIndex];
+                if (!track) return null;
+
                 const trackState = trackStates[trackIndex] || {
                   name: `Track ${trackIndex + 1}`,
                   muted: false,
@@ -356,15 +360,15 @@ export const Waveform: React.FC<WaveformProps> = ({
                   : 1;
 
                 return (
-                  <TrackControlsContext.Provider key={trackIndex} value={trackControls}>
+                  <TrackControlsContext.Provider key={track.id} value={trackControls}>
                     <TrackComponent
                       numChannels={maxChannels}
                       backgroundColor={theme.waveOutlineColor}
                       offset={0}
                       width={tracksFullWidth}
                       hasClipHeaders={showClipHeaders}
-                      trackId={tracks[trackIndex].id}
-                      isSelected={tracks[trackIndex].id === selectedTrackId}
+                      trackId={track.id}
+                      isSelected={track.id === selectedTrackId}
                     >
                       {trackClipPeaks.map((clip, clipIndex) => {
                         const peaksData = clip.peaks;
@@ -382,8 +386,8 @@ export const Waveform: React.FC<WaveformProps> = ({
                             samplesPerPixel={samplesPerPixel}
                             showHeader={showClipHeaders}
                             disableHeaderDrag={!interactiveClips}
-                            isSelected={tracks[trackIndex].id === selectedTrackId}
-                            trackId={tracks[trackIndex].id}
+                            isSelected={track.id === selectedTrackId}
+                            trackId={track.id}
                             onMouseDown={(e) => {
                               // Only select track if clicking on the waveform, not on draggable elements
                               const target = e.target as HTMLElement;
@@ -405,7 +409,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                                 bits={peaksData.bits}
                                 length={width}
                                 progress={0}
-                                isSelected={tracks[trackIndex].id === selectedTrackId}
+                                isSelected={track.id === selectedTrackId}
                               />
                             ))}
                           </Clip>
@@ -413,7 +417,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                       })}
                       {/* Render live recording preview if this track is being recorded */}
                       {recordingState?.isRecording &&
-                       recordingState.trackId === tracks[trackIndex].id &&
+                       recordingState.trackId === track.id &&
                        recordingState.peaks.length > 0 && (
                         <Clip
                           key={`${trackIndex}-recording`}
@@ -426,8 +430,8 @@ export const Waveform: React.FC<WaveformProps> = ({
                           samplesPerPixel={samplesPerPixel}
                           showHeader={showClipHeaders}
                           disableHeaderDrag={true}
-                          isSelected={tracks[trackIndex].id === selectedTrackId}
-                          trackId={tracks[trackIndex].id}
+                          isSelected={track.id === selectedTrackId}
+                          trackId={track.id}
                         >
                           <SmartChannel
                             key={`${trackIndex}-recording-0`}
@@ -436,7 +440,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                             bits={16}
                             length={Math.floor(recordingState.peaks.length / 2)}
                             progress={0}
-                            isSelected={tracks[trackIndex].id === selectedTrackId}
+                            isSelected={track.id === selectedTrackId}
                           />
                         </Clip>
                       )}

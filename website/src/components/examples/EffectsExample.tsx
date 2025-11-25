@@ -1,5 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
+import { Cross2Icon } from '@radix-ui/react-icons';
+import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -11,6 +13,8 @@ import {
   SelectionTimeInputs,
   AutomaticScrollCheckbox,
   AudioPosition,
+  ZoomInButton,
+  ZoomOutButton,
   useDynamicEffects,
   useTrackDynamicEffects,
   useAudioTracks,
@@ -92,6 +96,72 @@ const Separator = styled.div`
   width: 1px;
   height: 2rem;
   background: var(--ifm-color-emphasis-300, #ddd);
+`;
+
+const DropZone = styled.div<{ $isDragging: boolean }>`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 2rem;
+  border: 2px dashed ${props => props.$isDragging ? 'var(--ifm-color-primary, #3578e5)' : 'var(--ifm-color-emphasis-300, #ddd)'};
+  border-radius: 0.5rem;
+  background: ${props => props.$isDragging ? 'var(--ifm-color-primary-lightest, #e6f0ff)' : 'var(--ifm-background-surface-color, #f5f5f5)'};
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  margin-top: 1rem;
+
+  &:hover {
+    border-color: var(--ifm-color-primary, #3578e5);
+    background: var(--ifm-color-emphasis-100, #f0f0f0);
+  }
+`;
+
+const DropZoneText = styled.span`
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ifm-color-content, #333);
+`;
+
+const DropZoneHint = styled.span`
+  font-size: 0.875rem;
+  color: var(--ifm-color-content-secondary, #666);
+`;
+
+const HiddenFileInput = styled.input`
+  display: none;
+`;
+
+const DeleteButton = styled.button`
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: var(--ifm-color-danger, #dc3545);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.2s, background 0.2s;
+
+  &:hover {
+    opacity: 1;
+    background: var(--ifm-color-danger-dark, #c82333);
+  }
+`;
+
+const ControlsWrapper = styled.div`
+  position: relative;
 `;
 
 // Frequency visualizer component that polls for Tone.js analyser
@@ -259,14 +329,16 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({ analyserRef, 
 interface CustomTrackControlsProps {
   trackIndex: number;
   trackEffectsManager: UseTrackDynamicEffectsReturn;
+  onDeleteTrack: (trackIndex: number) => void;
 }
 
 const CustomTrackControls: React.FC<CustomTrackControlsProps> = ({
   trackIndex,
   trackEffectsManager,
+  onDeleteTrack,
 }) => {
   const { tracks, trackStates } = usePlaylistData();
-  const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } = usePlaylistControls();
+  const { setTrackMute, setTrackSolo, setTrackVolume } = usePlaylistControls();
 
   const trackState = trackStates[trackIndex] || {
     name: `Track ${trackIndex + 1}`,
@@ -280,52 +352,46 @@ const CustomTrackControls: React.FC<CustomTrackControlsProps> = ({
   const trackId = track?.id || `track-${trackIndex}`;
 
   return (
-    <Controls>
-      <Header style={{ justifyContent: 'center' }}>
-        {trackState.name || `Track ${trackIndex + 1}`}
-      </Header>
-      <ButtonGroup>
-        <Button
-          $variant={trackState.muted ? 'danger' : 'outline'}
-          onClick={() => setTrackMute(trackIndex, !trackState.muted)}
-        >
-          Mute
-        </Button>
-        <Button
-          $variant={trackState.soloed ? 'info' : 'outline'}
-          onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
-        >
-          Solo
-        </Button>
-      </ButtonGroup>
-      <SliderWrapper>
-        <VolumeDownIcon />
-        <Slider
-          min="0"
-          max="1"
-          step="0.01"
-          value={trackState.volume}
-          onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
+    <ControlsWrapper>
+      <DeleteButton onClick={() => onDeleteTrack(trackIndex)} title="Delete track">
+        <Cross2Icon width={10} height={10} />
+      </DeleteButton>
+      <Controls>
+        <Header style={{ justifyContent: 'center' }}>
+          {trackState.name || `Track ${trackIndex + 1}`}
+        </Header>
+        <ButtonGroup>
+          <Button
+            $variant={trackState.muted ? 'danger' : 'outline'}
+            onClick={() => setTrackMute(trackIndex, !trackState.muted)}
+          >
+            Mute
+          </Button>
+          <Button
+            $variant={trackState.soloed ? 'info' : 'outline'}
+            onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
+          >
+            Solo
+          </Button>
+        </ButtonGroup>
+        <SliderWrapper>
+          <VolumeDownIcon />
+          <Slider
+            min="0"
+            max="1"
+            step="0.01"
+            value={trackState.volume}
+            onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
+          />
+          <VolumeUpIcon />
+        </SliderWrapper>
+        <TrackEffectControls
+          trackId={trackId}
+          trackName={trackState.name || `Track ${trackIndex + 1}`}
+          effectsManager={trackEffectsManager}
         />
-        <VolumeUpIcon />
-      </SliderWrapper>
-      <SliderWrapper>
-        <span>L</span>
-        <Slider
-          min="-1"
-          max="1"
-          step="0.01"
-          value={trackState.pan}
-          onChange={(e) => setTrackPan(trackIndex, parseFloat(e.target.value))}
-        />
-        <span>R</span>
-      </SliderWrapper>
-      <TrackEffectControls
-        trackId={trackId}
-        trackName={trackState.name || `Track ${trackIndex + 1}`}
-        effectsManager={trackEffectsManager}
-      />
-    </Controls>
+      </Controls>
+    </ControlsWrapper>
   );
 };
 
@@ -334,16 +400,129 @@ interface EffectsControlsProps {
   analyserRef: React.RefObject<any>;
   trackEffectsManager: UseTrackDynamicEffectsReturn;
   isDarkMode: boolean;
+  onDeleteTrack: (trackIndex: number) => void;
+  onAddTracks: (newTracks: ClipTrack[]) => void;
 }
 
-const EffectsControls: React.FC<EffectsControlsProps> = ({ analyserRef, trackEffectsManager, isDarkMode }) => {
+const EffectsControls: React.FC<EffectsControlsProps> = ({
+  analyserRef,
+  trackEffectsManager,
+  isDarkMode,
+  onDeleteTrack,
+  onAddTracks,
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Render custom track controls using the track effects manager
   const renderTrackControls = (trackIndex: number) => (
     <CustomTrackControls
       trackIndex={trackIndex}
       trackEffectsManager={trackEffectsManager}
+      onDeleteTrack={onDeleteTrack}
     />
   );
+
+  // Handle file drop
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const audioFiles = files.filter(file => file.type.startsWith('audio/'));
+
+    if (audioFiles.length === 0) return;
+
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const newTracks: ClipTrack[] = [];
+
+    for (const file of audioFiles) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        const newTrack = createTrack({
+          name: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+          clips: [{
+            id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            audioBuffer,
+            startSample: 0,
+            durationSamples: audioBuffer.length,
+            offsetSamples: 0,
+            gain: 1.0,
+            name: file.name,
+          }],
+          muted: false,
+          soloed: false,
+          volume: 1.0,
+          pan: 0,
+        });
+
+        newTracks.push(newTrack);
+      } catch (error) {
+        console.error('Error loading audio file:', file.name, error);
+      }
+    }
+
+    if (newTracks.length > 0) {
+      onAddTracks(newTracks);
+    }
+  }, [onAddTracks]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  // Handle file input change
+  const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+    const newTracks: ClipTrack[] = [];
+
+    for (const file of audioFiles) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        const newTrack = createTrack({
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          clips: [{
+            id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            audioBuffer,
+            startSample: 0,
+            durationSamples: audioBuffer.length,
+            offsetSamples: 0,
+            gain: 1.0,
+            name: file.name,
+          }],
+          muted: false,
+          soloed: false,
+          volume: 1.0,
+          pan: 0,
+        });
+
+        newTracks.push(newTrack);
+      } catch (error) {
+        console.error('Error loading audio file:', file.name, error);
+      }
+    }
+
+    if (newTracks.length > 0) {
+      onAddTracks(newTracks);
+    }
+
+    // Reset input
+    e.target.value = '';
+  }, [onAddTracks]);
 
   return (
     <>
@@ -352,6 +531,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({ analyserRef, trackEff
           <PlayButton />
           <PauseButton />
           <StopButton />
+          <ZoomInButton />
+          <ZoomOutButton />
           <MasterVolumeControl />
           <AutomaticScrollCheckbox />
         </ControlsRow>
@@ -379,6 +560,29 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({ analyserRef, trackEff
           <AudioPosition />
         </ControlGroup>
       </TimeControlsBar>
+
+      <DropZone
+        $isDragging={isDragging}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <DropZoneText>
+          {isDragging ? 'Drop audio files here' : 'Drop audio files or click to browse'}
+        </DropZoneText>
+        <DropZoneHint>
+          Add your own music to try out the effects! Supports MP3, WAV, OGG, and more.
+        </DropZoneHint>
+      </DropZone>
+
+      <HiddenFileInput
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        multiple
+        onChange={handleFileInput}
+      />
     </>
   );
 };
@@ -387,13 +591,18 @@ export function EffectsExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const defaultsAddedRef = useRef(false);
 
+  // Mutable tracks state
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   // Create dynamic effects manager for master effects
   const effectsManager = useDynamicEffects(256);
   const { analyserRef, masterEffects, addEffect: addMasterEffect } = effectsManager;
 
   // Create track effects manager
   const trackEffectsManager = useTrackDynamicEffects();
-  const { addEffectToTrack } = trackEffectsManager;
+  const { addEffectToTrack, clearTrackEffects } = trackEffectsManager;
 
   // Track configurations
   const audioConfigs = React.useMemo(() => [
@@ -415,12 +624,24 @@ export function EffectsExample() {
     },
   ], []);
 
-  // Load audio tracks
-  const { tracks, loading, error } = useAudioTracks(audioConfigs);
+  // Load initial audio tracks
+  const { tracks: loadedTracks, loading, error } = useAudioTracks(audioConfigs);
+
+  // Update local state when initial tracks load
+  useEffect(() => {
+    if (!loading && loadedTracks.length > 0) {
+      setTracks(loadedTracks);
+      setIsLoading(false);
+    }
+    if (error) {
+      setLoadError(error);
+      setIsLoading(false);
+    }
+  }, [loadedTracks, loading, error]);
 
   // Add default effects on mount (only once)
   useEffect(() => {
-    if (!loading && tracks.length > 0 && !defaultsAddedRef.current) {
+    if (!isLoading && tracks.length > 0 && !defaultsAddedRef.current) {
       defaultsAddedRef.current = true;
 
       // Add a reverb to the master effects chain
@@ -428,20 +649,35 @@ export function EffectsExample() {
 
       // Add effects to individual tracks for demonstration
       // Vocals: Reverb for spaciousness
-      addEffectToTrack(tracks[0].id, 'reverb');
+      if (tracks[0]) addEffectToTrack(tracks[0].id, 'reverb');
 
       // Guitar: Chorus for richness
-      addEffectToTrack(tracks[1].id, 'chorus');
+      if (tracks[1]) addEffectToTrack(tracks[1].id, 'chorus');
 
       // Pianos & Synth: Ping Pong Delay
-      addEffectToTrack(tracks[2].id, 'pingPongDelay');
+      if (tracks[2]) addEffectToTrack(tracks[2].id, 'pingPongDelay');
 
       // Drums: Compressor for punch
-      addEffectToTrack(tracks[3].id, 'compressor');
+      if (tracks[3]) addEffectToTrack(tracks[3].id, 'compressor');
     }
-  }, [loading, tracks, addMasterEffect, addEffectToTrack]);
+  }, [isLoading, tracks, addMasterEffect, addEffectToTrack]);
 
-  if (loading) {
+  // Handle delete track
+  const handleDeleteTrack = useCallback((trackIndex: number) => {
+    const trackToDelete = tracks[trackIndex];
+    if (trackToDelete) {
+      // Clear effects for this track
+      clearTrackEffects(trackToDelete.id);
+    }
+    setTracks(prevTracks => prevTracks.filter((_, index) => index !== trackIndex));
+  }, [tracks, clearTrackEffects]);
+
+  // Handle add tracks
+  const handleAddTracks = useCallback((newTracks: ClipTrack[]) => {
+    setTracks(prevTracks => [...prevTracks, ...newTracks]);
+  }, []);
+
+  if (isLoading) {
     return (
       <Container>
         <div style={{ padding: '2rem', textAlign: 'center' }}>
@@ -451,11 +687,11 @@ export function EffectsExample() {
     );
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <Container>
         <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
+          Error loading audio: {loadError}
         </div>
       </Container>
     );
@@ -468,16 +704,20 @@ export function EffectsExample() {
       <WaveformPlaylistProvider
         tracks={tracks}
         samplesPerPixel={1024}
+        zoomLevels={[256, 512, 1024, 2048, 4096]}
         waveHeight={100}
         theme={theme}
         controls={{ show: true, width: 150 }}
         automaticScroll={true}
         effects={masterEffects}
+        timescale={true}
       >
         <EffectsControls
           analyserRef={analyserRef}
           trackEffectsManager={trackEffectsManager}
           isDarkMode={isDarkMode}
+          onDeleteTrack={handleDeleteTrack}
+          onAddTracks={handleAddTracks}
         />
       </WaveformPlaylistProvider>
     </Container>
