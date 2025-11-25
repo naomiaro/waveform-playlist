@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { ThemeProvider } from 'styled-components';
+import { useTheme } from 'styled-components';
 import { DndContext } from '@dnd-kit/core';
 import { Clip } from '../components/Clip';
 import { Channel } from '../components/Channel';
-import { defaultTheme, darkTheme } from '../wfpl-theme';
+import type { WaveformPlaylistTheme } from '../wfpl-theme';
 
 // Generate sample waveform data for stories
 function generateSamplePeaks(length: number, bits: 8 | 16 = 8): Int8Array | Int16Array {
@@ -23,6 +23,26 @@ function generateSamplePeaks(length: number, bits: 8 | 16 = 8): Int8Array | Int1
 
 const sampleData = generateSamplePeaks(200, 8);
 
+// Wrapper component that uses theme from context for Channel colors
+const ThemedChannel = ({ outlineColor, fillColor, ...props }: {
+  index: number;
+  data: Int8Array | Int16Array;
+  bits: 8 | 16;
+  length: number;
+  waveHeight: number;
+  outlineColor?: string;
+  fillColor?: string;
+}) => {
+  const theme = useTheme() as WaveformPlaylistTheme;
+  return (
+    <Channel
+      {...props}
+      waveOutlineColor={outlineColor || theme.waveOutlineColor}
+      waveFillColor={fillColor || theme.waveFillColor}
+    />
+  );
+};
+
 const meta: Meta<typeof Clip> = {
   title: 'Components/Clip',
   component: Clip,
@@ -33,11 +53,9 @@ const meta: Meta<typeof Clip> = {
   decorators: [
     (Story) => (
       <DndContext>
-        <ThemeProvider theme={defaultTheme}>
-          <div style={{ position: 'relative', height: '120px', width: '600px', background: '#f5f5f5' }}>
-            <Story />
-          </div>
-        </ThemeProvider>
+        <div style={{ position: 'relative', height: '120px', width: '600px' }}>
+          <Story />
+        </div>
       </DndContext>
     ),
   ],
@@ -59,14 +77,12 @@ export const Default: Story = {
   },
   render: (args) => (
     <Clip {...args}>
-      <Channel
+      <ThemedChannel
         index={0}
         data={sampleData}
         bits={8}
         length={200}
         waveHeight={80}
-        waveOutlineColor="#005BBB"
-        waveFillColor="#FFD500"
       />
     </Clip>
   ),
@@ -86,14 +102,12 @@ export const WithHeader: Story = {
   },
   render: (args) => (
     <Clip {...args}>
-      <Channel
+      <ThemedChannel
         index={0}
         data={sampleData}
         bits={8}
         length={200}
         waveHeight={80}
-        waveOutlineColor="#005BBB"
-        waveFillColor="#FFD500"
       />
     </Clip>
   ),
@@ -114,14 +128,12 @@ export const Selected: Story = {
   },
   render: (args) => (
     <Clip {...args}>
-      <Channel
+      <ThemedChannel
         index={0}
         data={sampleData}
         bits={8}
         length={200}
         waveHeight={80}
-        waveOutlineColor="#005BBB"
-        waveFillColor="#FFD500"
       />
     </Clip>
   ),
@@ -141,14 +153,14 @@ export const Offset: Story = {
   },
   render: (args) => (
     <Clip {...args}>
-      <Channel
+      <ThemedChannel
         index={0}
         data={sampleData}
         bits={8}
         length={200}
         waveHeight={80}
-        waveOutlineColor="#4A9EFF"
-        waveFillColor="#1e1e1e"
+        outlineColor="#4A9EFF"
+        fillColor="#1e1e1e"
       />
     </Clip>
   ),
@@ -169,62 +181,20 @@ export const Overlay: Story = {
   decorators: [
     (Story) => (
       <DndContext>
-        <ThemeProvider theme={defaultTheme}>
-          <div style={{ position: 'relative', height: '120px', width: '300px', background: 'rgba(0,0,0,0.1)' }}>
-            <Story />
-          </div>
-        </ThemeProvider>
+        <div style={{ position: 'relative', height: '120px', width: '300px', background: 'rgba(0,0,0,0.1)' }}>
+          <Story />
+        </div>
       </DndContext>
     ),
   ],
   render: (args) => (
     <Clip {...args}>
-      <Channel
+      <ThemedChannel
         index={0}
         data={sampleData}
         bits={8}
         length={200}
         waveHeight={80}
-        waveOutlineColor="#005BBB"
-        waveFillColor="#FFD500"
-      />
-    </Clip>
-  ),
-};
-
-export const DarkTheme: Story = {
-  args: {
-    clipId: 'clip-1',
-    trackIndex: 0,
-    clipIndex: 0,
-    trackName: 'Vocals',
-    startSample: 0,
-    durationSamples: 96000,
-    samplesPerPixel: 500,
-    showHeader: true,
-    disableHeaderDrag: true,
-  },
-  decorators: [
-    (Story) => (
-      <DndContext>
-        <ThemeProvider theme={darkTheme}>
-          <div style={{ position: 'relative', height: '120px', width: '600px', background: darkTheme.backgroundColor }}>
-            <Story />
-          </div>
-        </ThemeProvider>
-      </DndContext>
-    ),
-  ],
-  render: (args) => (
-    <Clip {...args}>
-      <Channel
-        index={0}
-        data={sampleData}
-        bits={8}
-        length={200}
-        waveHeight={80}
-        waveOutlineColor={darkTheme.waveOutlineColor}
-        waveFillColor={darkTheme.waveFillColor}
       />
     </Clip>
   ),

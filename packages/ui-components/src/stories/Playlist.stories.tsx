@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { ThemeProvider } from 'styled-components';
+import { useTheme } from 'styled-components';
 import { Playlist } from '../components/Playlist';
 import { Track } from '../components/Track';
 import { Channel } from '../components/Channel';
 import { PlaylistInfoContext } from '../contexts/PlaylistInfo';
 import { TrackControlsContext } from '../contexts/TrackControls';
-import { defaultTheme, darkTheme } from '../wfpl-theme';
+import type { WaveformPlaylistTheme } from '../wfpl-theme';
 import { action } from '@storybook/addon-actions';
 
 // Generate sample waveform data for stories
@@ -59,6 +59,26 @@ const SimpleTimescale = () => (
   </div>
 );
 
+// Wrapper component that uses theme from context for Channel colors
+const ThemedChannel = ({ outlineColor, fillColor, ...props }: {
+  index: number;
+  data: Int8Array | Int16Array;
+  bits: 8 | 16;
+  length: number;
+  waveHeight: number;
+  outlineColor?: string;
+  fillColor?: string;
+}) => {
+  const theme = useTheme() as WaveformPlaylistTheme;
+  return (
+    <Channel
+      {...props}
+      waveOutlineColor={outlineColor || theme.waveOutlineColor}
+      waveFillColor={fillColor || theme.waveFillColor}
+    />
+  );
+};
+
 const meta: Meta<typeof Playlist> = {
   title: 'Components/Playlist',
   component: Playlist,
@@ -68,13 +88,11 @@ const meta: Meta<typeof Playlist> = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <ThemeProvider theme={defaultTheme}>
-        <PlaylistInfoContext.Provider value={playlistInfo}>
-          <TrackControlsContext.Provider value={null}>
-            <Story />
-          </TrackControlsContext.Provider>
-        </PlaylistInfoContext.Provider>
-      </ThemeProvider>
+      <PlaylistInfoContext.Provider value={playlistInfo}>
+        <TrackControlsContext.Provider value={null}>
+          <Story />
+        </TrackControlsContext.Provider>
+      </PlaylistInfoContext.Provider>
     ),
   ],
 };
@@ -84,20 +102,17 @@ type Story = StoryObj<typeof Playlist>;
 
 export const Default: Story = {
   args: {
-    backgroundColor: '#fff',
     tracksWidth: 600,
   },
   render: (args) => (
     <Playlist {...args}>
       <Track numChannels={1}>
-        <Channel
+        <ThemedChannel
           index={0}
           data={sampleData}
           bits={8}
           length={500}
           waveHeight={80}
-          waveOutlineColor="#005BBB"
-          waveFillColor="#FFD500"
         />
       </Track>
     </Playlist>
@@ -106,23 +121,19 @@ export const Default: Story = {
 
 export const WithTimescale: Story = {
   args: {
-    backgroundColor: '#fff',
     tracksWidth: 600,
     timescaleWidth: 600,
-    timescaleBackgroundColor: '#f0f0f0',
     timescale: <SimpleTimescale />,
   },
   render: (args) => (
     <Playlist {...args}>
       <Track numChannels={1}>
-        <Channel
+        <ThemedChannel
           index={0}
           data={sampleData}
           bits={8}
           length={500}
           waveHeight={80}
-          waveOutlineColor="#005BBB"
-          waveFillColor="#FFD500"
         />
       </Track>
     </Playlist>
@@ -131,45 +142,41 @@ export const WithTimescale: Story = {
 
 export const MultipleTracks: Story = {
   args: {
-    backgroundColor: '#fff',
     tracksWidth: 600,
     timescaleWidth: 600,
-    timescaleBackgroundColor: '#f0f0f0',
     timescale: <SimpleTimescale />,
   },
   render: (args) => (
     <Playlist {...args}>
       <Track numChannels={1} backgroundColor="#e8f4ff">
-        <Channel
+        <ThemedChannel
           index={0}
           data={sampleData}
           bits={8}
           length={500}
           waveHeight={80}
-          waveOutlineColor="#005BBB"
-          waveFillColor="#FFD500"
         />
       </Track>
       <Track numChannels={1} backgroundColor="#fff5e6">
-        <Channel
+        <ThemedChannel
           index={0}
           data={sampleData2}
           bits={8}
           length={400}
           waveHeight={80}
-          waveOutlineColor="#FF6B35"
-          waveFillColor="#1e1e1e"
+          outlineColor="#FF6B35"
+          fillColor="#1e1e1e"
         />
       </Track>
       <Track numChannels={1} backgroundColor="#e8ffe8">
-        <Channel
+        <ThemedChannel
           index={0}
           data={sampleData}
           bits={8}
           length={500}
           waveHeight={80}
-          waveOutlineColor="#2E8B57"
-          waveFillColor="#90EE90"
+          outlineColor="#2E8B57"
+          fillColor="#90EE90"
         />
       </Track>
     </Playlist>
@@ -178,7 +185,6 @@ export const MultipleTracks: Story = {
 
 export const WithClickHandler: Story = {
   args: {
-    backgroundColor: '#fff',
     tracksWidth: 600,
     onTracksClick: action('onTracksClick'),
     onTracksMouseDown: action('onTracksMouseDown'),
@@ -188,14 +194,12 @@ export const WithClickHandler: Story = {
   render: (args) => (
     <Playlist {...args}>
       <Track numChannels={1}>
-        <Channel
+        <ThemedChannel
           index={0}
           data={sampleData}
           bits={8}
           length={500}
           waveHeight={80}
-          waveOutlineColor="#005BBB"
-          waveFillColor="#FFD500"
         />
       </Track>
     </Playlist>
@@ -204,67 +208,29 @@ export const WithClickHandler: Story = {
 
 export const Scrollable: Story = {
   args: {
-    backgroundColor: '#fff',
     tracksWidth: 1200,
     scrollContainerWidth: 1200,
   },
   decorators: [
     (Story) => (
-      <ThemeProvider theme={defaultTheme}>
-        <PlaylistInfoContext.Provider value={playlistInfo}>
-          <TrackControlsContext.Provider value={null}>
-            <div style={{ width: '600px', overflow: 'hidden' }}>
-              <Story />
-            </div>
-          </TrackControlsContext.Provider>
-        </PlaylistInfoContext.Provider>
-      </ThemeProvider>
-    ),
-  ],
-  render: (args) => (
-    <Playlist {...args}>
-      <Track numChannels={1}>
-        <Channel
-          index={0}
-          data={sampleData}
-          bits={8}
-          length={500}
-          waveHeight={80}
-          waveOutlineColor="#005BBB"
-          waveFillColor="#FFD500"
-        />
-      </Track>
-    </Playlist>
-  ),
-};
-
-export const DarkTheme: Story = {
-  args: {
-    backgroundColor: darkTheme.backgroundColor,
-    tracksWidth: 600,
-  },
-  decorators: [
-    (Story) => (
-      <ThemeProvider theme={darkTheme}>
-        <PlaylistInfoContext.Provider value={playlistInfo}>
-          <TrackControlsContext.Provider value={null}>
+      <PlaylistInfoContext.Provider value={playlistInfo}>
+        <TrackControlsContext.Provider value={null}>
+          <div style={{ width: '600px', overflow: 'hidden' }}>
             <Story />
-          </TrackControlsContext.Provider>
-        </PlaylistInfoContext.Provider>
-      </ThemeProvider>
+          </div>
+        </TrackControlsContext.Provider>
+      </PlaylistInfoContext.Provider>
     ),
   ],
   render: (args) => (
     <Playlist {...args}>
       <Track numChannels={1}>
-        <Channel
+        <ThemedChannel
           index={0}
           data={sampleData}
           bits={8}
           length={500}
           waveHeight={80}
-          waveOutlineColor={darkTheme.waveOutlineColor}
-          waveFillColor={darkTheme.waveFillColor}
         />
       </Track>
     </Playlist>

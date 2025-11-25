@@ -3,8 +3,7 @@ import styled from 'styled-components';
 import type { AnnotationData, AnnotationAction } from './Annotation';
 
 const Container = styled.div`
-  background: #fff;
-  border-top: 2px solid #ddd;
+  background: ${(props) => props.theme?.backgroundColor || '#fff'};
   max-height: 200px;
   overflow-y: auto;
   padding: 8px;
@@ -13,15 +12,15 @@ const Container = styled.div`
 const AnnotationItem = styled.div<{ $isActive?: boolean }>`
   padding: 12px;
   margin-bottom: 6px;
-  border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : '#ccc')};
-  background: ${(props) => (props.$isActive ? '#fff3e0' : '#f9f9f9')};
+  border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : props.theme?.borderColor || '#ccc')};
+  background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.15)' : props.theme?.surfaceColor || '#f9f9f9')};
   border-radius: 4px;
   transition: all 0.2s;
   cursor: pointer;
   box-shadow: ${(props) => (props.$isActive ? '0 2px 4px rgba(255, 152, 0, 0.2)' : 'none')};
 
   &:hover {
-    background: ${(props) => (props.$isActive ? '#ffe9cc' : '#f0f0f0')};
+    background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.25)' : props.theme?.buttonHoverBackground || '#f0f0f0')};
     border-left-color: #ff9800;
   }
 `;
@@ -36,7 +35,7 @@ const AnnotationHeader = styled.div`
 const TimeRange = styled.span`
   font-size: 12px;
   font-weight: 500;
-  color: #555;
+  color: ${(props) => props.theme?.textColorMuted || '#555'};
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   letter-spacing: 0.5px;
 `;
@@ -48,7 +47,8 @@ const AnnotationControls = styled.div`
 
 const ControlButton = styled.button`
   background: transparent;
-  border: 1px solid #ccc;
+  border: 1px solid ${(props) => props.theme?.borderColor || '#ccc'};
+  color: ${(props) => props.theme?.textColor || '#333'};
   padding: 4px 8px;
   font-size: 14px;
   cursor: pointer;
@@ -56,8 +56,8 @@ const ControlButton = styled.button`
   transition: all 0.15s ease;
 
   &:hover {
-    background: #e8e8e8;
-    border-color: #999;
+    background: ${(props) => props.theme?.buttonHoverBackground || '#e8e8e8'};
+    border-color: ${(props) => props.theme?.inputFocusBorder || '#999'};
     transform: scale(1.05);
   }
 
@@ -69,17 +69,17 @@ const ControlButton = styled.button`
 const AnnotationTextContent = styled.div<{ $isEditable?: boolean }>`
   font-size: 14px;
   line-height: 1.6;
-  color: #2a2a2a;
+  color: ${(props) => props.theme?.textColor || '#2a2a2a'};
   white-space: pre-wrap;
   word-break: break-word;
-  outline: ${(props) => (props.$isEditable ? '1px dashed #ddd' : 'none')};
+  outline: ${(props) => (props.$isEditable ? `1px dashed ${props.theme?.borderColor || '#ddd'}` : 'none')};
   padding: ${(props) => (props.$isEditable ? '6px' : '0')};
   border-radius: 3px;
   min-height: 20px;
 
   &[contenteditable='true']:focus {
     outline: 2px solid #ff9800;
-    background: #fffef7;
+    background: rgba(255, 152, 0, 0.1);
   }
 `;
 

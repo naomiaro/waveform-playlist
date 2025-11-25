@@ -1,8 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
 import { useState } from 'react';
-import { ThemeProvider } from 'styled-components';
 import { ClipBoundary } from '../components/ClipBoundary';
-import { defaultTheme } from '../wfpl-theme';
 
 const meta: Meta<typeof ClipBoundary> = {
   title: 'Components/ClipBoundary',
@@ -13,17 +11,15 @@ const meta: Meta<typeof ClipBoundary> = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <ThemeProvider theme={defaultTheme}>
-        <div style={{
-          position: 'relative',
-          width: '200px',
-          height: '100px',
-          background: 'rgba(0,0,0,0.1)',
-          border: '1px solid #ccc',
-        }}>
-          <Story />
-        </div>
-      </ThemeProvider>
+      <div style={{
+        position: 'relative',
+        width: '200px',
+        height: '100px',
+        background: 'rgba(0,0,0,0.1)',
+        border: '1px solid #ccc',
+      }}>
+        <Story />
+      </div>
     ),
   ],
 };

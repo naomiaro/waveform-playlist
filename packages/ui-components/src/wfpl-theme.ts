@@ -55,6 +55,16 @@ export interface WaveformPlaylistTheme {
   sliderTrackColor: string;
   sliderThumbColor: string;
 
+  // Annotation colors
+  annotationBoxBackground: string;
+  annotationBoxActiveBackground: string;
+  annotationBoxHoverBackground: string;
+  annotationBoxBorder: string;
+  annotationBoxActiveBorder: string;
+  annotationLabelColor: string;
+  annotationResizeHandleColor: string;
+  annotationResizeHandleActiveColor: string;
+
   // Spacing and sizing
   borderRadius: string;
   fontFamily: string;
@@ -102,6 +112,16 @@ export const defaultTheme: WaveformPlaylistTheme = {
   sliderTrackColor: '#ddd',
   sliderThumbColor: '#daa520', // goldenrod
 
+  // Annotation colors
+  annotationBoxBackground: 'rgba(255, 255, 255, 0.85)',
+  annotationBoxActiveBackground: 'rgba(255, 255, 255, 0.95)',
+  annotationBoxHoverBackground: 'rgba(255, 255, 255, 0.98)',
+  annotationBoxBorder: '#ff9800',
+  annotationBoxActiveBorder: '#d67600',
+  annotationLabelColor: '#2a2a2a',
+  annotationResizeHandleColor: 'rgba(0, 0, 0, 0.4)',
+  annotationResizeHandleActiveColor: 'rgba(0, 0, 0, 0.8)',
+
   // Spacing and sizing
   borderRadius: '4px',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
@@ -148,6 +168,16 @@ export const darkTheme: WaveformPlaylistTheme = {
   // Slider colors
   sliderTrackColor: '#555',
   sliderThumbColor: '#f0c040', // brighter goldenrod for dark mode
+
+  // Annotation colors (dark mode)
+  annotationBoxBackground: 'rgba(45, 45, 45, 0.9)',
+  annotationBoxActiveBackground: 'rgba(55, 55, 55, 0.95)',
+  annotationBoxHoverBackground: 'rgba(65, 65, 65, 0.98)',
+  annotationBoxBorder: '#ffb74d',
+  annotationBoxActiveBorder: '#ffa726',
+  annotationLabelColor: '#e0e0e0',
+  annotationResizeHandleColor: 'rgba(255, 255, 255, 0.4)',
+  annotationResizeHandleActiveColor: 'rgba(255, 255, 255, 0.8)',
 
   // Spacing and sizing
   borderRadius: '4px',

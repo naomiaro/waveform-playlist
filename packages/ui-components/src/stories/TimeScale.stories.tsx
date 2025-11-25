@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { ThemeProvider } from 'styled-components';
+import React from 'react';
+import { useTheme } from 'styled-components';
 import { TimeScale } from '../components/TimeScale';
 import { PlaylistInfoContext } from '../contexts/PlaylistInfo';
 import { DevicePixelRatioProvider } from '../contexts/DevicePixelRatio';
-import { defaultTheme, darkTheme } from '../wfpl-theme';
+import type { WaveformPlaylistTheme } from '../wfpl-theme';
 
 const playlistInfo = {
   sampleRate: 48000,
@@ -26,34 +27,42 @@ const playlistInfoWithControls = {
   },
 };
 
-const meta: Meta<typeof TimeScale> = {
+// Wrapper component that gets theme from context and passes it as prop
+const TimeScaleWithTheme = (props: Omit<React.ComponentProps<typeof TimeScale>, 'theme'>) => {
+  const theme = useTheme() as WaveformPlaylistTheme;
+  return <TimeScale {...props} theme={theme} />;
+};
+
+const meta: Meta<typeof TimeScaleWithTheme> = {
   title: 'Components/TimeScale',
-  component: TimeScale,
+  component: TimeScaleWithTheme,
   parameters: {
     layout: 'padded',
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
-      <DevicePixelRatioProvider>
-        <ThemeProvider theme={defaultTheme}>
+    (Story, context) => {
+      const theme = context.globals.theme === 'dark'
+        ? { backgroundColor: '#1e1e1e' }
+        : { backgroundColor: '#f5f5f5' };
+      return (
+        <DevicePixelRatioProvider>
           <PlaylistInfoContext.Provider value={playlistInfo}>
-            <div style={{ background: '#f5f5f5', padding: '1rem' }}>
+            <div style={{ background: theme.backgroundColor, padding: '1rem' }}>
               <Story />
             </div>
           </PlaylistInfoContext.Provider>
-        </ThemeProvider>
-      </DevicePixelRatioProvider>
-    ),
+        </DevicePixelRatioProvider>
+      );
+    },
   ],
 };
 
 export default meta;
-type Story = StoryObj<typeof TimeScale>;
+type Story = StoryObj<typeof TimeScaleWithTheme>;
 
 export const Default: Story = {
   args: {
-    theme: defaultTheme,
     duration: 60000,
     marker: 10000,
     bigStep: 5000,
@@ -63,7 +72,6 @@ export const Default: Story = {
 
 export const ShortDuration: Story = {
   args: {
-    theme: defaultTheme,
     duration: 15000,
     marker: 5000,
     bigStep: 1000,
@@ -73,7 +81,6 @@ export const ShortDuration: Story = {
 
 export const LongDuration: Story = {
   args: {
-    theme: defaultTheme,
     duration: 180000,
     marker: 30000,
     bigStep: 10000,
@@ -83,7 +90,6 @@ export const LongDuration: Story = {
 
 export const FineTicks: Story = {
   args: {
-    theme: defaultTheme,
     duration: 30000,
     marker: 5000,
     bigStep: 1000,
@@ -93,30 +99,31 @@ export const FineTicks: Story = {
 
 export const WithControlsOffset: Story = {
   args: {
-    theme: defaultTheme,
     duration: 60000,
     marker: 10000,
     bigStep: 5000,
     secondStep: 1000,
   },
   decorators: [
-    (Story) => (
-      <DevicePixelRatioProvider>
-        <ThemeProvider theme={defaultTheme}>
+    (Story, context) => {
+      const theme = context.globals.theme === 'dark'
+        ? { backgroundColor: '#1e1e1e' }
+        : { backgroundColor: '#f5f5f5' };
+      return (
+        <DevicePixelRatioProvider>
           <PlaylistInfoContext.Provider value={playlistInfoWithControls}>
-            <div style={{ background: '#f5f5f5', padding: '1rem' }}>
+            <div style={{ background: theme.backgroundColor, padding: '1rem' }}>
               <Story />
             </div>
           </PlaylistInfoContext.Provider>
-        </ThemeProvider>
-      </DevicePixelRatioProvider>
-    ),
+        </DevicePixelRatioProvider>
+      );
+    },
   ],
 };
 
 export const CustomTimestampRenderer: Story = {
   args: {
-    theme: defaultTheme,
     duration: 60000,
     marker: 10000,
     bigStep: 5000,
@@ -135,27 +142,4 @@ export const CustomTimestampRenderer: Story = {
       </div>
     ),
   },
-};
-
-export const DarkTheme: Story = {
-  args: {
-    theme: darkTheme,
-    duration: 60000,
-    marker: 10000,
-    bigStep: 5000,
-    secondStep: 1000,
-  },
-  decorators: [
-    (Story) => (
-      <DevicePixelRatioProvider>
-        <ThemeProvider theme={darkTheme}>
-          <PlaylistInfoContext.Provider value={playlistInfo}>
-            <div style={{ background: darkTheme.backgroundColor, padding: '1rem' }}>
-              <Story />
-            </div>
-          </PlaylistInfoContext.Provider>
-        </ThemeProvider>
-      </DevicePixelRatioProvider>
-    ),
-  ],
 };

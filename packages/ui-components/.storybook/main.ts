@@ -33,6 +33,8 @@ const config: StorybookConfig = {
       '@waveform-playlist/annotations': path.resolve(__dirname, '../../annotations/src'),
       '@waveform-playlist/webaudio-peaks': path.resolve(__dirname, '../../webaudio-peaks/src'),
       '@waveform-playlist/loaders': path.resolve(__dirname, '../../loaders/src'),
+      // Force single styled-components instance to ensure ThemeProvider context works
+      'styled-components': path.resolve(__dirname, '../node_modules/styled-components'),
     };
 
     // Ensure .ts and .tsx extensions are resolved

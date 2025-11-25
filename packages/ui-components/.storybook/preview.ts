@@ -53,6 +53,7 @@ const preview: Preview = {
   ],
 
   initialGlobals: {
+    theme: 'light',
     backgrounds: {
       value: 'light'
     }

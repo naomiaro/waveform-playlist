@@ -33,8 +33,12 @@ const Box = styled.div<BoxProps>`
   left: 0;
   right: 0;
   height: 100%;
-  background: ${(props) => props.$isActive ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.85)'};
-  border: 2px solid ${(props) => props.$isActive ? '#d67600' : props.$color};
+  background: ${(props) => props.$isActive
+    ? (props.theme?.annotationBoxActiveBackground || 'rgba(255, 255, 255, 0.95)')
+    : (props.theme?.annotationBoxBackground || 'rgba(255, 255, 255, 0.85)')};
+  border: 2px solid ${(props) => props.$isActive
+    ? (props.theme?.annotationBoxActiveBorder || '#d67600')
+    : props.$color};
   border-radius: 4px;
   cursor: pointer;
   pointer-events: auto;
@@ -46,8 +50,8 @@ const Box = styled.div<BoxProps>`
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.98);
-    border-color: #d67600;
+    background: ${(props) => props.theme?.annotationBoxHoverBackground || 'rgba(255, 255, 255, 0.98)'};
+    border-color: ${(props) => props.theme?.annotationBoxActiveBorder || '#d67600'};
     border-width: 3px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   }
@@ -56,7 +60,7 @@ const Box = styled.div<BoxProps>`
 const Label = styled.span`
   font-size: 12px;
   font-weight: 600;
-  color: #2a2a2a;
+  color: ${(props) => props.theme?.annotationLabelColor || '#2a2a2a'};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,7 +84,9 @@ const ResizeHandle = styled.div<ResizeHandleStyledProps>`
   height: 100%;
   cursor: ew-resize;
   z-index: 120; /* Above ClickOverlay (z-index: 100) and AnnotationBoxesWrapper (z-index: 110) */
-  background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.2)' : 'transparent'};
+  background: ${(props) => props.$isDragging
+    ? (props.theme?.annotationResizeHandleColor || 'rgba(0, 0, 0, 0.2)')
+    : 'transparent'};
   border-radius: 4px;
   touch-action: none; /* Important for @dnd-kit on touch devices */
   pointer-events: auto;
@@ -93,19 +99,21 @@ const ResizeHandle = styled.div<ResizeHandleStyledProps>`
     transform: translate(-50%, -50%);
     width: 4px;
     height: 60%;
-    background: ${(props) => props.$isDragging ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.4)'};
+    background: ${(props) => props.$isDragging
+      ? (props.theme?.annotationResizeHandleActiveColor || 'rgba(0, 0, 0, 0.8)')
+      : (props.theme?.annotationResizeHandleColor || 'rgba(0, 0, 0, 0.4)')};
     border-radius: 2px;
     opacity: ${(props) => props.$isDragging ? 1 : 0.6};
     transition: opacity 0.2s, background 0.2s;
   }
 
   &:hover {
-    background: rgba(0, 0, 0, 0.1);
+    background: ${(props) => props.theme?.annotationResizeHandleColor || 'rgba(0, 0, 0, 0.1)'};
   }
 
   &:hover::before {
     opacity: 1;
-    background: rgba(0, 0, 0, 0.7);
+    background: ${(props) => props.theme?.annotationResizeHandleActiveColor || 'rgba(0, 0, 0, 0.7)'};
   }
 `;
 

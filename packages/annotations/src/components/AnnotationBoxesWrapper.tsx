@@ -16,9 +16,7 @@ const Container = styled.div.attrs<ContainerProps>((props) => ({
   position: relative;
   display: flex;
   ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
-  background: #f5f5f5;
-  border-top: 2px solid #ddd;
-  border-bottom: 1px solid #ddd;
+  background: transparent;
   z-index: 110;
 `;
 
@@ -29,8 +27,7 @@ const ControlsPlaceholder = styled.div<{ $controlWidth: number }>`
   height: 100%;
   width: ${(props) => props.$controlWidth}px;
   flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #ddd;
+  background: transparent;
 `;
 
 const BoxesContainer = styled.div<{ $offset?: number }>`

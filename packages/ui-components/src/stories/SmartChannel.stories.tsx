@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { ThemeProvider } from 'styled-components';
 import { SmartChannel } from '../components/SmartChannel';
 import { PlaylistInfoContext } from '../contexts/PlaylistInfo';
 import { DevicePixelRatioProvider } from '../contexts/DevicePixelRatio';
-import { defaultTheme, darkTheme } from '../wfpl-theme';
 
 // Generate sample waveform data for stories
 function generateSamplePeaks(length: number, bits: 8 | 16 = 8): Int8Array | Int16Array {
@@ -47,9 +45,7 @@ const meta: Meta<typeof SmartChannel> = {
     (Story) => (
       <DevicePixelRatioProvider>
         <PlaylistInfoContext.Provider value={playlistInfo}>
-          <ThemeProvider theme={defaultTheme}>
-            <Story />
-          </ThemeProvider>
+          <Story />
         </PlaylistInfoContext.Provider>
       </DevicePixelRatioProvider>
     ),
@@ -86,49 +82,4 @@ export const Selected: Story = {
     length: 500,
     isSelected: true,
   },
-};
-
-export const DarkTheme: Story = {
-  args: {
-    index: 0,
-    data: sampleData8bit,
-    bits: 8,
-    length: 500,
-  },
-  decorators: [
-    (Story) => (
-      <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={playlistInfo}>
-          <ThemeProvider theme={darkTheme}>
-            <div style={{ background: darkTheme.backgroundColor, padding: '1rem' }}>
-              <Story />
-            </div>
-          </ThemeProvider>
-        </PlaylistInfoContext.Provider>
-      </DevicePixelRatioProvider>
-    ),
-  ],
-};
-
-export const SelectedDarkTheme: Story = {
-  args: {
-    index: 0,
-    data: sampleData8bit,
-    bits: 8,
-    length: 500,
-    isSelected: true,
-  },
-  decorators: [
-    (Story) => (
-      <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={playlistInfo}>
-          <ThemeProvider theme={darkTheme}>
-            <div style={{ background: darkTheme.backgroundColor, padding: '1rem' }}>
-              <Story />
-            </div>
-          </ThemeProvider>
-        </PlaylistInfoContext.Provider>
-      </DevicePixelRatioProvider>
-    ),
-  ],
 };
