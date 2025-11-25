@@ -30,8 +30,8 @@ import {
 } from '@waveform-playlist/recording';
 
 function RecordButton() {
-  const { isRecording, startRecording, stopRecording, recordedBlob } = useRecording();
-  const { requestAccess, hasAccess } = useMicrophoneAccess();
+  const { requestAccess, hasAccess, stream } = useMicrophoneAccess();
+  const { isRecording, startRecording, stopRecording } = useRecording(stream);
 
   const handleRecord = async () => {
     if (!hasAccess) {
@@ -133,23 +133,23 @@ Default constraints optimize for recording quality:
 
 ### useRecording Hook
 
-The main hook for recording functionality:
+The main hook for recording functionality. It requires a `MediaStream` from `useMicrophoneAccess`:
 
 ```tsx
-import { useRecording } from '@waveform-playlist/recording';
+import { useRecording, useMicrophoneAccess } from '@waveform-playlist/recording';
 
 function RecordingControls() {
+  const { stream } = useMicrophoneAccess();
   const {
     isRecording,
     isPaused,
     duration,
-    recordedBlob,
+    audioBuffer,
     startRecording,
     stopRecording,
     pauseRecording,
     resumeRecording,
-    clearRecording,
-  } = useRecording();
+  } = useRecording(stream);
 
   return (
     <div>
@@ -167,8 +167,8 @@ function RecordingControls() {
         </>
       )}
 
-      {recordedBlob && (
-        <button onClick={clearRecording}>Clear Recording</button>
+      {audioBuffer && (
+        <p>Recorded {audioBuffer.duration.toFixed(1)}s of audio</p>
       )}
     </div>
   );
@@ -260,34 +260,39 @@ function ClippingIndicator() {
 
 ## Adding Recorded Audio to Playlist
 
-After recording, add the audio as a new track:
+For multi-track recording with automatic track management, use the `useIntegratedRecording` hook from `@waveform-playlist/browser`:
 
 ```tsx
-import { useRecording } from '@waveform-playlist/recording';
-import { usePlaylistControls, useAudioTracks } from '@waveform-playlist/browser';
+import { useIntegratedRecording } from '@waveform-playlist/browser';
+import type { ClipTrack } from '@waveform-playlist/core';
 
 function RecordToPlaylist() {
-  const { recordedBlob, stopRecording, isRecording, startRecording } = useRecording();
-  const { addTrack } = usePlaylistControls();
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
-  const handleStopAndAdd = async () => {
-    stopRecording();
+  const {
+    isRecording,
+    startRecording,
+    stopRecording,
+    requestMicAccess,
+    hasPermission,
+  } = useIntegratedRecording(tracks, setTracks, selectedTrackId);
 
-    // Wait for blob to be available
-    if (recordedBlob) {
-      const blobUrl = URL.createObjectURL(recordedBlob);
-      const { tracks } = await useAudioTracks([
-        { src: blobUrl, name: `Recording ${new Date().toLocaleTimeString()}` },
-      ]);
+  const handleRecord = async () => {
+    if (!hasPermission) {
+      await requestMicAccess();
+    }
 
-      if (tracks.length > 0) {
-        addTrack(tracks[0]);
-      }
+    if (isRecording) {
+      // Stop recording - clip is automatically added to the selected track
+      stopRecording();
+    } else {
+      startRecording();
     }
   };
 
   return (
-    <button onClick={isRecording ? handleStopAndAdd : startRecording}>
+    <button onClick={handleRecord}>
       {isRecording ? 'Stop & Add to Playlist' : 'Start Recording'}
     </button>
   );
@@ -367,6 +372,8 @@ When exporting recordings, you can choose:
 
 ## Complete Example
 
+This example uses `useIntegratedRecording` for automatic track management. Recorded audio is automatically added as a clip to the selected track:
+
 ```tsx
 import { useState } from 'react';
 import {
@@ -375,82 +382,78 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  useAudioTracks,
-  usePlaylistControls,
+  ExportWavButton,
+  useIntegratedRecording,
+  usePlaybackAnimation,
 } from '@waveform-playlist/browser';
-import {
-  RecordingProvider,
-  useRecording,
-  useMicrophoneAccess,
-  useMicrophoneLevel,
-} from '@waveform-playlist/recording';
+import { VUMeter } from '@waveform-playlist/recording';
+import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 
-function LevelMeter() {
-  const { level } = useMicrophoneLevel();
+function RecordingControls({
+  tracks,
+  setTracks,
+  selectedTrackId,
+  setSelectedTrackId,
+}: {
+  tracks: ClipTrack[];
+  setTracks: (tracks: ClipTrack[]) => void;
+  selectedTrackId: string | null;
+  setSelectedTrackId: (id: string | null) => void;
+}) {
+  const { currentTime } = usePlaybackAnimation();
 
-  return (
-    <div style={{ width: '200px', height: '20px', background: '#ddd' }}>
-      <div
-        style={{
-          width: `${level * 100}%`,
-          height: '100%',
-          background: level > 0.9 ? 'red' : 'green',
-        }}
-      />
-    </div>
-  );
-}
+  const {
+    isRecording,
+    duration,
+    level,
+    peakLevel,
+    hasPermission,
+    startRecording,
+    stopRecording,
+    requestMicAccess,
+  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
 
-function RecordingControls() {
-  const { hasAccess, requestAccess } = useMicrophoneAccess();
-  const { isRecording, duration, startRecording, stopRecording, recordedBlob } =
-    useRecording();
-  const { addTrack } = usePlaylistControls();
+  const handleAddTrack = () => {
+    const newTrack = createTrack({
+      name: `Track ${tracks.length + 1}`,
+      clips: [],
+    });
+    setTracks([...tracks, newTrack]);
+    setSelectedTrackId(newTrack.id);
+  };
 
   const handleRecord = async () => {
-    if (!hasAccess) {
-      await requestAccess();
+    if (!hasPermission) {
+      await requestMicAccess();
     }
-    startRecording();
-  };
 
-  const handleStop = async () => {
-    stopRecording();
-  };
-
-  const handleAddToPlaylist = async () => {
-    if (recordedBlob) {
-      const blobUrl = URL.createObjectURL(recordedBlob);
-      const { tracks } = await useAudioTracks([
-        { src: blobUrl, name: `Recording ${new Date().toLocaleTimeString()}` },
-      ]);
-      if (tracks.length > 0) {
-        addTrack(tracks[0]);
+    if (isRecording) {
+      stopRecording();
+    } else {
+      // Create track if none selected
+      if (!selectedTrackId) {
+        handleAddTrack();
       }
+      startRecording();
     }
   };
 
   return (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      {!isRecording ? (
-        <button onClick={handleRecord}>Record</button>
-      ) : (
-        <button onClick={handleStop}>Stop ({duration.toFixed(1)}s)</button>
-      )}
-      {isRecording && <LevelMeter />}
-      {recordedBlob && (
-        <button onClick={handleAddToPlaylist}>Add to Playlist</button>
+      <button onClick={handleRecord}>
+        {isRecording ? `Stop (${duration.toFixed(1)}s)` : 'Record'}
+      </button>
+      <button onClick={handleAddTrack}>+ Add Track</button>
+      {hasPermission && (
+        <VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
       )}
     </div>
   );
 }
 
 function RecordingExample() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/backing-track.mp3', name: 'Backing Track' },
-  ]);
-
-  if (loading) return <div>Loading...</div>;
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   return (
     <WaveformPlaylistProvider
@@ -458,16 +461,21 @@ function RecordingExample() {
       samplesPerPixel={1024}
       waveHeight={100}
       timescale
+      controls={{ show: true, width: 200 }}
     >
-      <RecordingProvider>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          <PlayButton />
-          <PauseButton />
-          <StopButton />
-        </div>
-        <RecordingControls />
-        <Waveform />
-      </RecordingProvider>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <PlayButton />
+        <PauseButton />
+        <StopButton />
+        <ExportWavButton label="Export" filename="recording" />
+      </div>
+      <RecordingControls
+        tracks={tracks}
+        setTracks={setTracks}
+        selectedTrackId={selectedTrackId}
+        setSelectedTrackId={setSelectedTrackId}
+      />
+      <Waveform />
     </WaveformPlaylistProvider>
   );
 }
