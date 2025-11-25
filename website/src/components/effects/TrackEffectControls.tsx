@@ -166,6 +166,27 @@ const EffectName = styled.span`
   color: var(--ifm-color-content, #333);
 `;
 
+const BypassButton = styled.button<{ $bypassed: boolean }>`
+  padding: 4px 8px;
+  font-size: 14px;
+  background: ${({ $bypassed }) =>
+    $bypassed ? 'var(--ifm-color-emphasis-300, #ddd)' : 'var(--ifm-color-success, #28a745)'};
+  color: ${({ $bypassed }) =>
+    $bypassed ? 'var(--ifm-color-content-secondary, #666)' : 'white'};
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  opacity: ${({ $bypassed }) => ($bypassed ? 0.6 : 1)};
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: ${({ $bypassed }) =>
+      $bypassed ? 'var(--ifm-color-emphasis-400, #ccc)' : 'var(--ifm-color-success-dark, #218838)'};
+    opacity: 1;
+  }
+`;
+
 const RemoveButton = styled.button`
   padding: 4px 8px;
   font-size: 12px;
@@ -178,6 +199,12 @@ const RemoveButton = styled.button`
   &:hover {
     background: var(--ifm-color-danger-dark, #bd2130);
   }
+`;
+
+const HeaderButtons = styled.div`
+  display: flex;
+  gap: 6px;
+  align-items: center;
 `;
 
 const ParametersGrid = styled.div`
@@ -252,6 +279,7 @@ export const TrackEffectControls: React.FC<TrackEffectControlsProps> = ({
     addEffectToTrack,
     removeEffectFromTrack,
     updateTrackEffectParameter,
+    toggleBypass,
   } = effectsManager;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -327,12 +355,24 @@ export const TrackEffectControls: React.FC<TrackEffectControlsProps> = ({
                   {activeEffects.map((effect) => (
                     <EffectCard key={effect.instanceId}>
                       <EffectCardHeader>
-                        <EffectName>{effect.definition.name}</EffectName>
-                        <RemoveButton
-                          onClick={() => removeEffectFromTrack(trackId, effect.instanceId)}
-                        >
-                          Remove
-                        </RemoveButton>
+                        <EffectName style={{ opacity: effect.bypassed ? 0.5 : 1 }}>
+                          {effect.definition.name}
+                          {effect.bypassed && ' (bypassed)'}
+                        </EffectName>
+                        <HeaderButtons>
+                          <BypassButton
+                            $bypassed={effect.bypassed}
+                            onClick={() => toggleBypass(trackId, effect.instanceId)}
+                            title={effect.bypassed ? 'Enable effect' : 'Bypass effect'}
+                          >
+                            {'\u23FB'}
+                          </BypassButton>
+                          <RemoveButton
+                            onClick={() => removeEffectFromTrack(trackId, effect.instanceId)}
+                          >
+                            Remove
+                          </RemoveButton>
+                        </HeaderButtons>
                       </EffectCardHeader>
                       <ParametersGrid>
                         {effect.definition.parameters

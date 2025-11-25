@@ -16,6 +16,7 @@ export interface ActiveEffect {
   effectId: string;
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
+  bypassed: boolean;
 }
 
 export interface UseDynamicEffectsReturn {
@@ -27,6 +28,7 @@ export interface UseDynamicEffectsReturn {
   addEffect: (effectId: string) => void;
   removeEffect: (instanceId: string) => void;
   updateParameter: (instanceId: string, paramName: string, value: number | string | boolean) => void;
+  toggleBypass: (instanceId: string) => void;
   reorderEffects: (fromIndex: number, toIndex: number) => void;
   clearAllEffects: () => void;
 
@@ -124,6 +126,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
       effectId: definition.id,
       definition,
       params,
+      bypassed: false,
     };
 
     setActiveEffects((prev) => [...prev, newActiveEffect]);
@@ -159,6 +162,31 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
       );
     },
     []
+  );
+
+  // Toggle bypass for an effect (uses wet parameter - 0 = bypass, 1 = active)
+  const toggleBypass = useCallback(
+    (instanceId: string) => {
+      // Get current state to determine new bypassed value
+      const effect = activeEffects.find((e) => e.instanceId === instanceId);
+      if (!effect) return;
+
+      const newBypassed = !effect.bypassed;
+
+      // Update the actual effect instance - set wet to 0 for bypass, 1 for active
+      const instance = effectInstancesRef.current.get(instanceId);
+      if (instance) {
+        instance.setParameter('wet', newBypassed ? 0 : 1);
+      }
+
+      // Update state for UI
+      setActiveEffects((prev) =>
+        prev.map((e) =>
+          e.instanceId === instanceId ? { ...e, bypassed: newBypassed } : e
+        )
+      );
+    },
+    [activeEffects]
   );
 
   // Reorder effects in the chain
@@ -246,6 +274,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     addEffect,
     removeEffect,
     updateParameter,
+    toggleBypass,
     reorderEffects,
     clearAllEffects,
     masterEffects,

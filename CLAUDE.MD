@@ -6,6 +6,9 @@ This file contains important context, decisions, and conventions for AI-assisted
 
 Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas waveform visualizations. Currently undergoing a React refactor (Tone.js overhaul branch).
 
+**Key Dependencies:**
+- **Tone.js 15.1.22** - Audio engine for playback, scheduling, and effects
+
 ## Project Roadmap
 
 **Source of Truth:** `TODO.md` contains the complete multi-track editing roadmap and recently completed work.

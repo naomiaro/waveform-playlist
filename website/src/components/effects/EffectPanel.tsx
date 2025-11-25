@@ -36,6 +36,27 @@ const CategoryBadge = styled.span`
   font-weight: 500;
 `;
 
+const BypassButton = styled.button<{ $bypassed: boolean }>`
+  padding: 4px 8px;
+  font-size: 14px;
+  background: ${({ $bypassed }) =>
+    $bypassed ? 'var(--ifm-color-emphasis-300, #ddd)' : 'var(--ifm-color-success, #28a745)'};
+  color: ${({ $bypassed }) =>
+    $bypassed ? 'var(--ifm-color-content-secondary, #666)' : 'white'};
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  opacity: ${({ $bypassed }) => ($bypassed ? 0.6 : 1)};
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: ${({ $bypassed }) =>
+      $bypassed ? 'var(--ifm-color-emphasis-400, #ccc)' : 'var(--ifm-color-success-dark, #218838)'};
+    opacity: 1;
+  }
+`;
+
 const RemoveButton = styled.button`
   background: var(--ifm-color-danger, #dc3545);
   color: white;
@@ -49,6 +70,12 @@ const RemoveButton = styled.button`
   &:hover {
     background: var(--ifm-color-danger-dark, #c82333);
   }
+`;
+
+const HeaderButtons = styled.div`
+  display: flex;
+  gap: 6px;
+  align-items: center;
 `;
 
 const ParametersGrid = styled.div`
@@ -115,6 +142,7 @@ const Slider = styled.input`
 interface EffectPanelProps {
   effect: ActiveEffect;
   onParameterChange: (instanceId: string, paramName: string, value: number) => void;
+  onToggleBypass: (instanceId: string) => void;
   onRemove: (instanceId: string) => void;
 }
 
@@ -135,18 +163,31 @@ function formatValue(value: number, param: EffectParameter): string {
 export const EffectPanel: React.FC<EffectPanelProps> = ({
   effect,
   onParameterChange,
+  onToggleBypass,
   onRemove,
 }) => {
   return (
     <PanelContainer>
       <PanelHeader>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <EffectName>{effect.definition.name}</EffectName>
+          <EffectName style={{ opacity: effect.bypassed ? 0.5 : 1 }}>
+            {effect.definition.name}
+            {effect.bypassed && ' (bypassed)'}
+          </EffectName>
           <CategoryBadge>{effect.definition.category}</CategoryBadge>
         </div>
-        <RemoveButton onClick={() => onRemove(effect.instanceId)}>
-          Remove
-        </RemoveButton>
+        <HeaderButtons>
+          <BypassButton
+            $bypassed={effect.bypassed}
+            onClick={() => onToggleBypass(effect.instanceId)}
+            title={effect.bypassed ? 'Enable effect' : 'Bypass effect'}
+          >
+            {'\u23FB'}
+          </BypassButton>
+          <RemoveButton onClick={() => onRemove(effect.instanceId)}>
+            Remove
+          </RemoveButton>
+        </HeaderButtons>
       </PanelHeader>
       <ParametersGrid>
         {effect.definition.parameters.map((param) => {

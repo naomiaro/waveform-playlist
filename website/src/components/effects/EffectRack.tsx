@@ -84,6 +84,7 @@ export const EffectRack: React.FC<EffectRackProps> = ({
     addEffect,
     removeEffect,
     updateParameter,
+    toggleBypass,
     clearAllEffects,
   } = effectsManager;
 
@@ -116,6 +117,7 @@ export const EffectRack: React.FC<EffectRackProps> = ({
                 key={effect.instanceId}
                 effect={effect}
                 onParameterChange={updateParameter}
+                onToggleBypass={toggleBypass}
                 onRemove={removeEffect}
               />
             ))}

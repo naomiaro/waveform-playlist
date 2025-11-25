@@ -15,6 +15,7 @@ export interface TrackActiveEffect {
   effectId: string;
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
+  bypassed: boolean;
 }
 
 export interface TrackEffectsState {
@@ -35,6 +36,7 @@ export interface UseTrackDynamicEffectsReturn {
     paramName: string,
     value: number | string | boolean
   ) => void;
+  toggleBypass: (trackId: string, instanceId: string) => void;
   clearTrackEffects: (trackId: string) => void;
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
 
@@ -137,6 +139,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       effectId: definition.id,
       definition,
       params,
+      bypassed: false,
     };
 
     setTrackEffectsState((prev) => {
@@ -190,6 +193,40 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       });
     },
     []
+  );
+
+  // Toggle bypass for an effect (uses wet parameter - 0 = bypass, 1 = active)
+  const toggleBypass = useCallback(
+    (trackId: string, instanceId: string) => {
+      // Get current state to determine new bypassed value
+      const trackEffects = trackEffectsState.get(trackId) || [];
+      const effect = trackEffects.find((e) => e.instanceId === instanceId);
+      if (!effect) return;
+
+      const newBypassed = !effect.bypassed;
+
+      // Update the actual effect instance - set wet to 0 for bypass, restore original for active
+      const instancesMap = trackEffectInstancesRef.current.get(trackId);
+      const instance = instancesMap?.get(instanceId);
+      if (instance) {
+        // Set wet to 0 for bypass, or 1 for full effect
+        instance.setParameter('wet', newBypassed ? 0 : 1);
+      }
+
+      // Update state for UI
+      setTrackEffectsState((prev) => {
+        const newState = new Map(prev);
+        const existing = newState.get(trackId) || [];
+        newState.set(
+          trackId,
+          existing.map((e) =>
+            e.instanceId === instanceId ? { ...e, bypassed: newBypassed } : e
+          )
+        );
+        return newState;
+      });
+    },
+    [trackEffectsState]
   );
 
   // Clear all effects from a track
@@ -275,6 +312,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     addEffectToTrack,
     removeEffectFromTrack,
     updateTrackEffectParameter,
+    toggleBypass,
     clearTrackEffects,
     getTrackEffectsFunction,
     availableEffects: effectDefinitions,
