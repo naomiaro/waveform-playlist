@@ -16,16 +16,16 @@ const Container = styled.div<ContainerProps>`
 const AnnotationItem = styled.div<{ $isActive?: boolean }>`
   padding: 12px;
   margin-bottom: 6px;
-  border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : props.theme?.borderColor || '#ccc')};
-  background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.15)' : props.theme?.surfaceColor || '#f9f9f9')};
+  border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : 'transparent')};
+  background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.08)' : 'transparent')};
   border-radius: 4px;
   transition: all 0.2s;
   cursor: pointer;
-  box-shadow: ${(props) => (props.$isActive ? '0 2px 4px rgba(255, 152, 0, 0.2)' : 'none')};
+  box-shadow: ${(props) => (props.$isActive ? '0 1px 3px rgba(255, 152, 0, 0.15)' : 'none')};
 
   &:hover {
-    background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.25)' : props.theme?.buttonHoverBackground || '#f0f0f0')};
-    border-left-color: #ff9800;
+    background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.12)' : props.theme?.annotationTextItemHoverBackground || 'rgba(0, 0, 0, 0.03)')};
+    border-left-color: ${(props) => (props.$isActive ? '#ff9800' : props.theme?.borderColor || '#ddd')};
   }
 `;
 
@@ -45,8 +45,8 @@ const AnnotationInfo = styled.div`
 const AnnotationIdLabel = styled.span<{ $isEditable?: boolean }>`
   font-size: 11px;
   font-weight: 600;
-  color: ${(props) => props.theme?.textColor || '#333'};
-  background: ${(props) => props.theme?.surfaceColor || '#e8e8e8'};
+  color: ${(props) => props.theme?.textColorMuted || '#666'};
+  background: transparent;
   padding: 2px 6px;
   border-radius: 3px;
   min-width: 20px;

@@ -513,6 +513,7 @@ interface WaveformPlaylistTheme {
     annotationLabelColor: string;
     annotationResizeHandleColor: string;
     annotationResizeHandleActiveColor: string;
+    annotationTextItemHoverBackground: string;
     borderRadius: string;
     fontFamily: string;
     fontSize: string;

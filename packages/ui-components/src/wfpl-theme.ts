@@ -64,6 +64,7 @@ export interface WaveformPlaylistTheme {
   annotationLabelColor: string;
   annotationResizeHandleColor: string;
   annotationResizeHandleActiveColor: string;
+  annotationTextItemHoverBackground: string;
 
   // Spacing and sizing
   borderRadius: string;
@@ -121,6 +122,7 @@ export const defaultTheme: WaveformPlaylistTheme = {
   annotationLabelColor: '#2a2a2a',
   annotationResizeHandleColor: 'rgba(0, 0, 0, 0.4)',
   annotationResizeHandleActiveColor: 'rgba(0, 0, 0, 0.8)',
+  annotationTextItemHoverBackground: 'rgba(0, 0, 0, 0.03)',
 
   // Spacing and sizing
   borderRadius: '4px',
@@ -178,6 +180,7 @@ export const darkTheme: WaveformPlaylistTheme = {
   annotationLabelColor: '#e0e0e0',
   annotationResizeHandleColor: 'rgba(255, 255, 255, 0.4)',
   annotationResizeHandleActiveColor: 'rgba(255, 255, 255, 0.8)',
+  annotationTextItemHoverBackground: 'rgba(255, 255, 255, 0.05)',
 
   // Spacing and sizing
   borderRadius: '4px',

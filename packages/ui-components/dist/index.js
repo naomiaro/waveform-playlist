@@ -2044,6 +2044,7 @@ var defaultTheme = {
   annotationLabelColor: "#2a2a2a",
   annotationResizeHandleColor: "rgba(0, 0, 0, 0.4)",
   annotationResizeHandleActiveColor: "rgba(0, 0, 0, 0.8)",
+  annotationTextItemHoverBackground: "rgba(0, 0, 0, 0.03)",
   // Spacing and sizing
   borderRadius: "4px",
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
@@ -2106,6 +2107,7 @@ var darkTheme = {
   annotationLabelColor: "#e0e0e0",
   annotationResizeHandleColor: "rgba(255, 255, 255, 0.4)",
   annotationResizeHandleActiveColor: "rgba(255, 255, 255, 0.8)",
+  annotationTextItemHoverBackground: "rgba(255, 255, 255, 0.05)",
   // Spacing and sizing
   borderRadius: "4px",
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
