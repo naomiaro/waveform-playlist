@@ -30,6 +30,12 @@ export const BaseSelect = styled.select`
     opacity: 0.6;
     cursor: not-allowed;
   }
+
+  /* Style native option elements for dark mode support */
+  option {
+    color: ${(props) => props.theme.inputText};
+    background-color: ${(props) => props.theme.inputBackground};
+  }
 `;
 
 /**
