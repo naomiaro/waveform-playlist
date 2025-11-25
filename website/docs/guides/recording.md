@@ -296,26 +296,47 @@ function RecordToPlaylist() {
 
 ## Download Recorded Audio
 
-Save the recording to a file:
+Recordings are captured as raw PCM audio using an AudioWorklet. After recording, the audio is available as an `AudioBuffer` which can be exported to WAV format.
+
+Use the `ExportWavButton` component or the `useExportWav` hook to download recordings:
 
 ```tsx
+import { ExportWavButton } from '@waveform-playlist/browser';
+
+function RecordingWithExport() {
+  return (
+    <WaveformPlaylistProvider tracks={tracks}>
+      {/* Recording controls... */}
+      <ExportWavButton
+        label="Download Recording"
+        filename="my-recording"
+      />
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+```
+
+Or use the hook for more control:
+
+```tsx
+import { useExportWav, usePlaylistData } from '@waveform-playlist/browser';
+
 function DownloadRecording() {
-  const { recordedBlob } = useRecording();
+  const { tracks, trackStates } = usePlaylistData();
+  const { exportWav, isExporting, progress } = useExportWav();
 
-  const handleDownload = () => {
-    if (!recordedBlob) return;
-
-    const url = URL.createObjectURL(recordedBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `recording-${Date.now()}.webm`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = async () => {
+    await exportWav(tracks, trackStates, {
+      filename: `recording-${Date.now()}`,
+      mode: 'master',  // or 'individual' for separate stems
+      bitDepth: 16,
+    });
   };
 
   return (
-    <button onClick={handleDownload} disabled={!recordedBlob}>
-      Download Recording
+    <button onClick={handleDownload} disabled={isExporting || tracks.length === 0}>
+      {isExporting ? `Exporting ${Math.round(progress * 100)}%` : 'Download Recording'}
     </button>
   );
 }
@@ -323,23 +344,26 @@ function DownloadRecording() {
 
 ## Recording Format
 
-Recordings are captured in WebM format with Opus codec by default. This provides:
-- Good compression
-- Wide browser support
-- Low latency encoding
+Recordings are captured using an AudioWorklet that processes raw PCM audio samples directly from the microphone. This approach provides:
 
-For WAV output, convert the blob:
+- **Lossless quality** - No compression artifacts during capture
+- **Sample-accurate timing** - Precise synchronization with other tracks
+- **Real-time waveform** - Live visualization as you record
+- **Seamless integration** - Recorded audio is added directly as playlist tracks
 
-```tsx
-async function convertToWav(blob: Blob): Promise<Blob> {
-  const arrayBuffer = await blob.arrayBuffer();
-  const audioContext = new AudioContext();
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+The AudioWorklet runs in a separate thread to ensure smooth recording without blocking the main UI thread.
 
-  // Encode to WAV...
-  // (Use a library like audiobuffer-to-wav)
-}
-```
+### Export Options
+
+When exporting recordings, you can choose:
+
+| Option | Description |
+|--------|-------------|
+| `mode: 'master'` | Export all tracks mixed to stereo |
+| `mode: 'individual'` | Export a single track as a stem |
+| `bitDepth: 16` | Standard CD quality (16-bit PCM) |
+| `bitDepth: 32` | High resolution (32-bit float) |
+| `applyEffects: true` | Include fades and effects in export |
 
 ## Complete Example
 
@@ -454,16 +478,16 @@ export default RecordingExample;
 ## Browser Compatibility
 
 Recording requires:
-- `getUserMedia` API
-- `MediaRecorder` API
+- `getUserMedia` API for microphone access
+- `AudioWorklet` API for sample-accurate recording
 - Secure context (HTTPS or localhost)
 
 | Browser | Support |
 |---------|---------|
-| Chrome | Full support |
-| Firefox | Full support |
+| Chrome | Full support (66+) |
+| Firefox | Full support (76+) |
 | Safari | Safari 14.1+ |
-| Edge | Full support |
+| Edge | Full support (79+) |
 
 ## Next Steps
 
