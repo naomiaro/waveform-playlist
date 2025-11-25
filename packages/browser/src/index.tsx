@@ -1296,6 +1296,7 @@ const WaveformPlaylistAPI = {
 export const init = WaveformPlaylistAPI.init;
 export type { PlaylistConfig, TrackConfig };
 export { Tone };
+export type { EffectsFunction };
 
 // Export new flexible/headless API
 export {

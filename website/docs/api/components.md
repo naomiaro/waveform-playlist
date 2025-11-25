@@ -264,6 +264,7 @@ Export the playlist to a WAV file.
 | `trackIndex` | `number` | - | Track index for individual export |
 | `bitDepth` | `16 \| 32` | `16` | WAV bit depth (16-bit PCM or 32-bit float) |
 | `applyEffects` | `boolean` | `true` | Apply fades and other clip effects |
+| `effectsFunction` | `EffectsFunction` | - | Tone.js effects chain for export with effects |
 | `className` | `string` | - | CSS class name |
 | `onExportComplete` | `(blob: Blob) => void` | - | Callback when export succeeds |
 | `onExportError` | `(error: Error) => void` | - | Callback when export fails |
@@ -302,6 +303,31 @@ Export the playlist to a WAV file.
   label="Export Raw"
   filename="raw-export"
   applyEffects={false}
+/>
+```
+
+**Export With Tone.js Effects:**
+
+```tsx
+import { Reverb } from 'tone';
+
+// Define effects chain
+const createEffectsChain = (masterVolume, destination, isOffline) => {
+  const reverb = new Reverb({ decay: 2.5, wet: 0.3 });
+  masterVolume.connect(reverb);
+  reverb.connect(destination);
+
+  // Return cleanup function
+  return () => {
+    reverb.dispose();
+  };
+};
+
+// Use in export button
+<ExportWavButton
+  label="Export with Reverb"
+  filename="mix-with-effects"
+  effectsFunction={createEffectsChain}
 />
 ```
 

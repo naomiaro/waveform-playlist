@@ -1,5 +1,6 @@
 import React from 'react';
 import { BaseControlButton } from '@waveform-playlist/ui-components';
+import type { EffectsFunction } from '@waveform-playlist/playout';
 import { usePlaylistData } from '../WaveformPlaylistContext';
 import { useExportWav } from '../hooks/useExportWav';
 
@@ -16,6 +17,11 @@ export interface ExportWavButtonProps {
   bitDepth?: 16 | 32;
   /** Whether to apply effects (fades, etc.) - defaults to true */
   applyEffects?: boolean;
+  /**
+   * Optional Tone.js effects function. When provided, export will use Tone.Offline
+   * to render through the effects chain. The function receives isOffline=true.
+   */
+  effectsFunction?: EffectsFunction;
   /** CSS class name */
   className?: string;
   /** Callback when export completes */
@@ -31,6 +37,7 @@ export const ExportWavButton: React.FC<ExportWavButtonProps> = ({
   trackIndex,
   bitDepth = 16,
   applyEffects = true,
+  effectsFunction,
   className,
   onExportComplete,
   onExportError,
@@ -46,6 +53,7 @@ export const ExportWavButton: React.FC<ExportWavButtonProps> = ({
         trackIndex,
         bitDepth,
         applyEffects,
+        effectsFunction,
         autoDownload: true,
       });
       onExportComplete?.(result.blob);

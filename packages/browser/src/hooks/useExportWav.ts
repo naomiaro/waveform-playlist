@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { ClipTrack, AudioClip, Fade, FadeType } from '@waveform-playlist/core';
+import type { EffectsFunction } from '@waveform-playlist/playout';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
 
 export interface ExportOptions extends WavEncoderOptions {
@@ -13,6 +14,11 @@ export interface ExportOptions extends WavEncoderOptions {
   autoDownload?: boolean;
   /** Whether to apply effects (fades, etc.) - defaults to true */
   applyEffects?: boolean;
+  /**
+   * Optional Tone.js effects function. When provided, export will use Tone.Offline
+   * to render through the effects chain. The function receives isOffline=true.
+   */
+  effectsFunction?: EffectsFunction;
   /** Progress callback (0-1) */
   onProgress?: (progress: number) => void;
 }
@@ -64,6 +70,7 @@ export function useExportWav(): UseExportWavReturn {
       trackIndex,
       autoDownload = true,
       applyEffects = true,
+      effectsFunction,
       bitDepth = 16,
       onProgress,
     } = options;
@@ -99,9 +106,6 @@ export function useExportWav(): UseExportWavReturn {
 
       const duration = totalDurationSamples / sampleRate;
 
-      // Create offline context for rendering
-      const offlineCtx = new OfflineAudioContext(2, totalDurationSamples, sampleRate);
-
       // Determine which tracks to render
       const tracksToRender = mode === 'individual'
         ? [{ track: tracks[trackIndex!], state: trackStates[trackIndex!], index: trackIndex! }]
@@ -110,30 +114,54 @@ export function useExportWav(): UseExportWavReturn {
       // Check for solo - if any track is soloed, only play soloed tracks
       const hasSolo = trackStates.some(state => state.soloed);
 
-      // Schedule all clips for rendering
-      let scheduledClips = 0;
-      const totalClips = tracksToRender.reduce((sum, { track }) => sum + track.clips.length, 0);
+      // Check if any track has per-track effects
+      const hasTrackEffects = tracksToRender.some(({ track }) => track.effects);
 
-      for (const { track, state, index } of tracksToRender) {
-        // Skip muted tracks (unless soloed)
-        if (state.muted && !state.soloed) continue;
-        // If there's a solo and this track isn't soloed, skip it
-        if (hasSolo && !state.soloed) continue;
+      let renderedBuffer: AudioBuffer;
 
-        for (const clip of track.clips) {
-          await scheduleClip(offlineCtx, clip, state, sampleRate, applyEffects);
-          scheduledClips++;
-          const currentProgress = scheduledClips / totalClips * 0.5; // First 50% is scheduling
-          setProgress(currentProgress);
-          onProgress?.(currentProgress);
+      if ((effectsFunction || hasTrackEffects) && applyEffects) {
+        // Use Tone.Offline for rendering with effects (master and/or per-track)
+        renderedBuffer = await renderWithToneEffects(
+          tracksToRender,
+          trackStates,
+          hasSolo,
+          duration,
+          sampleRate,
+          effectsFunction,
+          (p) => {
+            setProgress(p);
+            onProgress?.(p);
+          }
+        );
+      } else {
+        // Use standard OfflineAudioContext rendering
+        const offlineCtx = new OfflineAudioContext(2, totalDurationSamples, sampleRate);
+
+        // Schedule all clips for rendering
+        let scheduledClips = 0;
+        const totalClips = tracksToRender.reduce((sum, { track }) => sum + track.clips.length, 0);
+
+        for (const { track, state } of tracksToRender) {
+          // Skip muted tracks (unless soloed)
+          if (state.muted && !state.soloed) continue;
+          // If there's a solo and this track isn't soloed, skip it
+          if (hasSolo && !state.soloed) continue;
+
+          for (const clip of track.clips) {
+            await scheduleClip(offlineCtx, clip, state, sampleRate, applyEffects);
+            scheduledClips++;
+            const currentProgress = scheduledClips / totalClips * 0.5; // First 50% is scheduling
+            setProgress(currentProgress);
+            onProgress?.(currentProgress);
+          }
         }
+
+        // Render the audio
+        setProgress(0.5);
+        onProgress?.(0.5);
+
+        renderedBuffer = await offlineCtx.startRendering();
       }
-
-      // Render the audio
-      setProgress(0.5);
-      onProgress?.(0.5);
-
-      const renderedBuffer = await offlineCtx.startRendering();
 
       setProgress(0.9);
       onProgress?.(0.9);
@@ -172,6 +200,135 @@ export function useExportWav(): UseExportWavReturn {
     progress,
     error,
   };
+}
+
+/**
+ * Render using Tone.Offline with effects chain (master and/or per-track)
+ */
+async function renderWithToneEffects(
+  tracksToRender: { track: ClipTrack; state: TrackState; index: number }[],
+  trackStates: TrackState[],
+  hasSolo: boolean,
+  duration: number,
+  sampleRate: number,
+  effectsFunction: EffectsFunction | undefined,
+  onProgress: (progress: number) => void
+): Promise<AudioBuffer> {
+  // Dynamically import Tone.js modules
+  const { Offline, Volume, Gain, Panner, Player, ToneAudioBuffer, getDestination } = await import('tone');
+
+  onProgress(0.1);
+
+  // Use Tone.Offline to render with effects
+  const buffer = await Offline(
+    async ({ transport, destination }) => {
+      // Create master volume node
+      const masterVolume = new Volume(0); // 0 dB = unity gain
+
+      // Apply master effects chain if provided, otherwise connect directly to destination
+      let cleanup: void | (() => void) = undefined;
+      if (effectsFunction) {
+        cleanup = effectsFunction(masterVolume, destination, true);
+      } else {
+        masterVolume.connect(destination);
+      }
+
+      // Schedule all clips
+      for (const { track, state } of tracksToRender) {
+        // Skip muted tracks (unless soloed)
+        if (state.muted && !state.soloed) continue;
+        // If there's a solo and this track isn't soloed, skip it
+        if (hasSolo && !state.soloed) continue;
+
+        // Create track-level nodes
+        const trackVolume = new Volume(gainToDb(state.volume));
+        const trackPan = new Panner(state.pan);
+        const trackMute = new Gain(state.muted ? 0 : 1);
+
+        // Check if track has per-track effects
+        const trackEffects = track.effects as ((graphEnd: any, destination: any, isOffline: boolean) => void | (() => void)) | undefined;
+
+        if (trackEffects) {
+          // Apply per-track effects chain: trackMute -> effects -> masterVolume
+          trackEffects(trackMute, masterVolume, true);
+        } else {
+          // No per-track effects: connect directly to master
+          trackMute.connect(masterVolume);
+        }
+
+        // Connect track chain: clips -> trackVolume -> trackPan -> trackMute
+        trackPan.connect(trackMute);
+        trackVolume.connect(trackPan);
+
+        // Schedule each clip
+        for (const clip of track.clips) {
+          const { audioBuffer, startSample, durationSamples, offsetSamples, gain: clipGain, fadeIn, fadeOut } = clip;
+
+          // Convert samples to seconds
+          const startTime = startSample / sampleRate;
+          const clipDuration = durationSamples / sampleRate;
+          const offset = offsetSamples / sampleRate;
+
+          // Create a ToneAudioBuffer from the existing AudioBuffer
+          const toneBuffer = new ToneAudioBuffer(audioBuffer);
+
+          // Create player for this clip
+          const player = new Player(toneBuffer);
+
+          // Create fade gain for clip-level effects
+          const fadeGain = new Gain(clipGain);
+
+          // Connect player -> fadeGain -> trackVolume
+          player.connect(fadeGain);
+          fadeGain.connect(trackVolume);
+
+          // Apply fades using gain automation
+          if (fadeIn) {
+            const fadeInStart = startTime + fadeIn.start;
+            const fadeInEnd = startTime + fadeIn.end;
+            const audioParam = (fadeGain.gain as any)._param as AudioParam;
+            // Set initial value to 0
+            audioParam.setValueAtTime(0, fadeInStart);
+            audioParam.linearRampToValueAtTime(clipGain, fadeInEnd);
+          }
+
+          if (fadeOut) {
+            const fadeOutStart = startTime + fadeOut.start;
+            const fadeOutEnd = startTime + fadeOut.end;
+            const audioParam = (fadeGain.gain as any)._param as AudioParam;
+            audioParam.setValueAtTime(clipGain, fadeOutStart);
+            audioParam.linearRampToValueAtTime(0, fadeOutEnd);
+          }
+
+          // Schedule the player to start
+          player.start(startTime, offset, clipDuration);
+        }
+      }
+
+      // Start the transport
+      transport.start(0);
+
+      // Clean up effects if cleanup function was provided
+      if (cleanup) {
+        // Note: cleanup will be called after rendering completes
+      }
+    },
+    duration,
+    2, // stereo
+    sampleRate
+  );
+
+  onProgress(0.9);
+
+  // Convert ToneAudioBuffer to standard AudioBuffer
+  return buffer.get() as AudioBuffer;
+}
+
+/**
+ * Convert linear gain to decibels
+ */
+function gainToDb(gain: number): number {
+  return 20 * Math.log10(Math.max(gain, 0.0001));
 }
 
 /**

@@ -449,9 +449,22 @@ interface ExportOptions {
   trackIndex?: number;    // Track index for individual export
   bitDepth?: 16 | 32;     // WAV bit depth (default: 16)
   applyEffects?: boolean; // Apply fades and effects (default: true)
+  effectsFunction?: EffectsFunction;  // Tone.js effects chain for export
   autoDownload?: boolean; // Trigger automatic download (default: true)
   onProgress?: (progress: number) => void;
 }
+```
+
+### Effects Function
+
+When an `effectsFunction` is provided and `applyEffects` is true, export uses `Tone.Offline` to render through the effects chain. This allows exporting with reverb, delay, and other Tone.js effects.
+
+```typescript
+type EffectsFunction = (
+  masterVolume: Volume,
+  destination: ToneAudioNode,
+  isOffline: boolean  // true during export
+) => void | (() => void);
 ```
 
 ### ExportResult
