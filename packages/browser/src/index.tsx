@@ -1323,6 +1323,8 @@ export {
   useTrackReverb,
   useTrackAutoWah,
   useEffectsChain,
+  useDynamicEffects,
+  useTrackDynamicEffects,
 } from './hooks';
 export type {
   AudioTrackConfig,
@@ -1331,7 +1333,30 @@ export type {
   ZoomControls,
   TimeFormatControls,
   MasterVolumeControls,
+  UseDynamicEffectsReturn,
+  ActiveEffect,
+  UseTrackDynamicEffectsReturn,
+  TrackActiveEffect,
+  TrackEffectsState,
 } from './hooks';
+
+// Export effect definitions and factory
+export {
+  effectDefinitions,
+  effectCategories,
+  getEffectDefinition,
+  getEffectsByCategory,
+} from './effects';
+export type {
+  EffectDefinition,
+  EffectParameter,
+  ParameterType,
+} from './effects';
+export {
+  createEffectInstance,
+  createEffectChain,
+} from './effects';
+export type { EffectInstance } from './effects';
 export {
   PlayButton,
   PauseButton,

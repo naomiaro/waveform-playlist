@@ -11,12 +11,25 @@ import {
   SelectionTimeInputs,
   AutomaticScrollCheckbox,
   AudioPosition,
-  useMasterAnalyser,
-  useTrackAutoWah,
-  useTrackReverb,
+  useDynamicEffects,
+  useTrackDynamicEffects,
   useAudioTracks,
+  usePlaylistData,
+  usePlaylistControls,
 } from '@waveform-playlist/browser';
+import {
+  Controls,
+  Header,
+  Button,
+  ButtonGroup,
+  Slider,
+  SliderWrapper,
+  VolumeDownIcon,
+  VolumeUpIcon,
+} from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { EffectRack, TrackEffectControls } from '../effects';
+import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser';
 
 const Container = styled.div`
   display: flex;
@@ -151,10 +164,97 @@ const FrequencyVisualizer: React.FC<{ analyserRef: React.RefObject<any> }> = ({ 
   return <VisualizerCanvas ref={canvasRef} width={1000} height={100} />;
 };
 
-// Inner component that renders controls and waveform
-const EffectsControls: React.FC<{ analyserRef: React.RefObject<any> }> = ({ analyserRef }) => {
+// Custom track controls component that includes effects
+interface CustomTrackControlsProps {
+  trackIndex: number;
+  trackEffectsManager: UseTrackDynamicEffectsReturn;
+}
+
+const CustomTrackControls: React.FC<CustomTrackControlsProps> = ({
+  trackIndex,
+  trackEffectsManager,
+}) => {
+  const { tracks, trackStates } = usePlaylistData();
+  const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } = usePlaylistControls();
+
+  const trackState = trackStates[trackIndex] || {
+    name: `Track ${trackIndex + 1}`,
+    muted: false,
+    soloed: false,
+    volume: 1.0,
+    pan: 0,
+  };
+
+  const track = tracks[trackIndex];
+  const trackId = track?.id || `track-${trackIndex}`;
+
   return (
-    <Container>
+    <Controls>
+      <Header style={{ justifyContent: 'center' }}>
+        {trackState.name || `Track ${trackIndex + 1}`}
+      </Header>
+      <ButtonGroup>
+        <Button
+          $variant={trackState.muted ? 'danger' : 'outline'}
+          onClick={() => setTrackMute(trackIndex, !trackState.muted)}
+        >
+          Mute
+        </Button>
+        <Button
+          $variant={trackState.soloed ? 'info' : 'outline'}
+          onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
+        >
+          Solo
+        </Button>
+      </ButtonGroup>
+      <SliderWrapper>
+        <VolumeDownIcon />
+        <Slider
+          min="0"
+          max="1"
+          step="0.01"
+          value={trackState.volume}
+          onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
+        />
+        <VolumeUpIcon />
+      </SliderWrapper>
+      <SliderWrapper>
+        <span>L</span>
+        <Slider
+          min="-1"
+          max="1"
+          step="0.01"
+          value={trackState.pan}
+          onChange={(e) => setTrackPan(trackIndex, parseFloat(e.target.value))}
+        />
+        <span>R</span>
+      </SliderWrapper>
+      <TrackEffectControls
+        trackId={trackId}
+        trackName={trackState.name || `Track ${trackIndex + 1}`}
+        effectsManager={trackEffectsManager}
+      />
+    </Controls>
+  );
+};
+
+// Inner component that renders controls and waveform
+interface EffectsControlsProps {
+  analyserRef: React.RefObject<any>;
+  trackEffectsManager: UseTrackDynamicEffectsReturn;
+}
+
+const EffectsControls: React.FC<EffectsControlsProps> = ({ analyserRef, trackEffectsManager }) => {
+  // Render custom track controls using the track effects manager
+  const renderTrackControls = (trackIndex: number) => (
+    <CustomTrackControls
+      trackIndex={trackIndex}
+      trackEffectsManager={trackEffectsManager}
+    />
+  );
+
+  return (
+    <>
       <TopBar>
         <ControlsRow>
           <PlayButton />
@@ -168,7 +268,7 @@ const EffectsControls: React.FC<{ analyserRef: React.RefObject<any> }> = ({ anal
         </VisualizerWrapper>
       </TopBar>
 
-      <Waveform timescale />
+      <Waveform timescale renderTrackControls={renderTrackControls} />
 
       <TimeControlsBar>
         <ControlGroup>
@@ -187,32 +287,31 @@ const EffectsControls: React.FC<{ analyserRef: React.RefObject<any> }> = ({ anal
           <AudioPosition />
         </ControlGroup>
       </TimeControlsBar>
-    </Container>
+    </>
   );
 };
 
 export function EffectsExample() {
   const theme = useDocusaurusTheme();
+  const defaultsAddedRef = useRef(false);
 
-  // Create master effects with frequency analyzer
-  const { analyserRef, masterEffects } = useMasterAnalyser(256);
+  // Create dynamic effects manager for master effects
+  const effectsManager = useDynamicEffects(256);
+  const { analyserRef, masterEffects, addEffect: addMasterEffect } = effectsManager;
 
-  // Create per-track effects
-  const autoWahEffect = useTrackAutoWah({ baseFrequency: 50, octaves: 6, sensitivity: -30 });
-  const guitarReverbEffect = useTrackReverb(1.2);
-  const drumsReverbEffect = useTrackReverb(5);
+  // Create track effects manager
+  const trackEffectsManager = useTrackDynamicEffects();
+  const { addEffectToTrack } = trackEffectsManager;
 
-  // Track configurations with effects
+  // Track configurations
   const audioConfigs = React.useMemo(() => [
     {
       src: '/waveform-playlist/media/audio/Vocals30.mp3',
       name: 'Vocals',
-      effects: autoWahEffect,
     },
     {
       src: '/waveform-playlist/media/audio/Guitar30.mp3',
       name: 'Guitar',
-      effects: guitarReverbEffect,
     },
     {
       src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
@@ -221,12 +320,34 @@ export function EffectsExample() {
     {
       src: '/waveform-playlist/media/audio/BassDrums30.mp3',
       name: 'Drums',
-      effects: drumsReverbEffect,
     },
-  ], [autoWahEffect, guitarReverbEffect, drumsReverbEffect]);
+  ], []);
 
   // Load audio tracks
   const { tracks, loading, error } = useAudioTracks(audioConfigs);
+
+  // Add default effects on mount (only once)
+  useEffect(() => {
+    if (!loading && tracks.length > 0 && !defaultsAddedRef.current) {
+      defaultsAddedRef.current = true;
+
+      // Add a reverb to the master effects chain
+      addMasterEffect('reverb');
+
+      // Add effects to individual tracks for demonstration
+      // Vocals: Reverb for spaciousness
+      addEffectToTrack(tracks[0].id, 'reverb');
+
+      // Guitar: Chorus for richness
+      addEffectToTrack(tracks[1].id, 'chorus');
+
+      // Pianos & Synth: Ping Pong Delay
+      addEffectToTrack(tracks[2].id, 'pingPongDelay');
+
+      // Drums: Compressor for punch
+      addEffectToTrack(tracks[3].id, 'compressor');
+    }
+  }, [loading, tracks, addMasterEffect, addEffectToTrack]);
 
   if (loading) {
     return (
@@ -249,16 +370,23 @@ export function EffectsExample() {
   }
 
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={100}
-      theme={theme}
-      controls={{ show: true, width: 150 }}
-      automaticScroll={true}
-      effects={masterEffects}
-    >
-      <EffectsControls analyserRef={analyserRef} />
-    </WaveformPlaylistProvider>
+    <Container>
+      <EffectRack effectsManager={effectsManager} />
+
+      <WaveformPlaylistProvider
+        tracks={tracks}
+        samplesPerPixel={1024}
+        waveHeight={100}
+        theme={theme}
+        controls={{ show: true, width: 150 }}
+        automaticScroll={true}
+        effects={masterEffects}
+      >
+        <EffectsControls
+          analyserRef={analyserRef}
+          trackEffectsManager={trackEffectsManager}
+        />
+      </WaveformPlaylistProvider>
+    </Container>
   );
 }

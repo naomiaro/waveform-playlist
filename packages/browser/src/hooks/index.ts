@@ -28,3 +28,9 @@ export { useAnnotationKeyboardControls } from './useAnnotationKeyboardControls';
 
 export { useIntegratedRecording } from './useIntegratedRecording';
 export type { UseIntegratedRecordingReturn, IntegratedRecordingOptions } from './useIntegratedRecording';
+
+export { useDynamicEffects } from './useDynamicEffects';
+export type { UseDynamicEffectsReturn, ActiveEffect } from './useDynamicEffects';
+
+export { useTrackDynamicEffects } from './useTrackDynamicEffects';
+export type { UseTrackDynamicEffectsReturn, TrackActiveEffect, TrackEffectsState } from './useTrackDynamicEffects';
