@@ -30,6 +30,8 @@ import {
 import type { AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/annotations';
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
+import { AnimatedPlayhead } from './AnimatedPlayhead';
+import { AnimatedProgress } from './AnimatedProgress';
 
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
@@ -76,7 +78,10 @@ export const Waveform: React.FC<WaveformProps> = ({
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
   // Split context usage for performance
-  const { isPlaying, currentTime } = usePlaybackAnimation();
+  // NOTE: We intentionally do NOT subscribe to currentTime here to avoid re-renders during playback.
+  // AnimatedPlayhead/AnimatedProgress handle their own positioning via refs for smooth 60fps animation.
+  // We pass refs to custom renderPlayhead for smooth animation support.
+  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
   const {
     selectionStart,
     selectionEnd,
@@ -139,12 +144,6 @@ export const Waveform: React.FC<WaveformProps> = ({
   }
 
   const tracksFullWidth = Math.floor((displayDuration * sampleRate) / samplesPerPixel);
-
-  // Calculate padding for timescale text overflow based on duration
-  // Estimate character width at 0.75rem (~8px/char) for timestamps like "1:00:00" (7 chars)
-  // Longer durations need more padding for wider timestamp text
-  const estimatedMaxTimestampChars = displayDuration >= 3600 ? 8 : displayDuration >= 600 ? 6 : 5;
-  const timescalePadding = estimatedMaxTimestampChars * 8 + 10; // chars * px/char + buffer
 
   // Annotation click handler
   const handleAnnotationClick = async (annotation: any) => {
@@ -277,7 +276,7 @@ export const Waveform: React.FC<WaveformProps> = ({
             theme={theme}
             backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
             timescaleBackgroundColor={theme.timescaleBackgroundColor}
-            scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0) + (timeScaleHeight > 0 ? timescalePadding : 0)}
+            scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0)}
             timescaleWidth={tracksFullWidth}
             tracksWidth={tracksFullWidth}
             controlsWidth={controls.show ? controls.width : 0}
@@ -383,21 +382,6 @@ export const Waveform: React.FC<WaveformProps> = ({
                         const peaksData = clip.peaks;
                         const width = peaksData.length;
 
-                        // Calculate progress in pixels for this clip
-                        // Progress shows how far through the clip the playhead is
-                        const currentSample = currentTime * sampleRate;
-                        const clipEndSample = clip.startSample + clip.durationSamples;
-                        let clipProgress = 0;
-                        if (currentSample >= clip.startSample && currentSample < clipEndSample) {
-                          // Playhead is within this clip
-                          const sampleIntoClip = currentSample - clip.startSample;
-                          clipProgress = sampleIntoClip / samplesPerPixel;
-                        } else if (currentSample >= clipEndSample) {
-                          // Playhead is past this clip - show full progress
-                          clipProgress = width;
-                        }
-                        // else: playhead is before clip, progress = 0
-
                         return (
                           <Clip
                             key={`${trackIndex}-${clipIndex}`}
@@ -436,7 +420,6 @@ export const Waveform: React.FC<WaveformProps> = ({
                                 data={channelPeaks}
                                 bits={peaksData.bits}
                                 length={width}
-                                progress={clipProgress}
                                 isSelected={track.id === selectedTrackId}
                               />
                             ))}
@@ -467,7 +450,6 @@ export const Waveform: React.FC<WaveformProps> = ({
                             data={recordingState.peaks}
                             bits={16}
                             length={Math.floor(recordingState.peaks.length / 2)}
-                            progress={0}
                             isSelected={track.id === selectedTrackId}
                           />
                         </Clip>
@@ -498,6 +480,12 @@ export const Waveform: React.FC<WaveformProps> = ({
                   })}
                 </AnnotationBoxesWrapper>
               )}
+              {/* Animated progress overlay - shows played portion during playback */}
+              {isPlaying && (
+                <AnimatedProgress
+                  controlsOffset={controls.show ? controls.width : 0}
+                />
+              )}
               {selectionStart !== selectionEnd && (
                 <Selection
                   startPosition={
@@ -513,18 +501,23 @@ export const Waveform: React.FC<WaveformProps> = ({
               )}
               {(isPlaying || selectionStart === selectionEnd) && (
                 renderPlayhead ? (
+                  // Custom playhead - pass all animation refs for smooth 60fps animation
                   renderPlayhead({
-                    position: (currentTime * sampleRate) / samplesPerPixel +
+                    position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel +
                       (controls.show ? controls.width : 0),
                     color: theme.playheadColor,
+                    isPlaying,
+                    currentTimeRef,
+                    playbackStartTimeRef,
+                    audioStartPositionRef,
+                    samplesPerPixel,
+                    sampleRate,
+                    controlsOffset: controls.show ? controls.width : 0,
                   })
                 ) : (
-                  <Playhead
-                    position={
-                      (currentTime * sampleRate) / samplesPerPixel +
-                      (controls.show ? controls.width : 0)
-                    }
+                  <AnimatedPlayhead
                     color={theme.playheadColor}
+                    controlsOffset={controls.show ? controls.width : 0}
                   />
                 )
               )}

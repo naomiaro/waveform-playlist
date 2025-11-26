@@ -26,15 +26,30 @@ const PlayheadLine = styled.div.attrs<PlayheadLineProps>((props) => ({
  * Props passed to the default playhead component or custom render function.
  */
 export interface PlayheadProps {
-  /** Position in pixels from left edge */
+  /** Position in pixels from left edge (only valid when not playing) */
   position: number;
   /** Playhead color (default: #ff0000) */
   color?: string;
+  /** Whether audio is currently playing */
+  isPlaying: boolean;
+  /** Ref to current time in seconds - use for smooth animation during playback */
+  currentTimeRef: React.RefObject<number>;
+  /** Audio context start time when playback began - for calculating elapsed time */
+  playbackStartTimeRef: React.RefObject<number>;
+  /** Audio position when playback started - for calculating current position */
+  audioStartPositionRef: React.RefObject<number>;
+  /** Samples per pixel - for converting time to pixels */
+  samplesPerPixel: number;
+  /** Sample rate - for converting time to pixels */
+  sampleRate: number;
+  /** Controls offset in pixels */
+  controlsOffset: number;
 }
 
 /**
  * Type for custom playhead render functions.
- * Receives position and color, should return a positioned element.
+ * Receives position, color, and animation refs for smooth 60fps animation.
+ * Custom playheads should use requestAnimationFrame with the refs during playback.
  */
 export type RenderPlayheadFunction = (props: PlayheadProps) => React.ReactNode;
 

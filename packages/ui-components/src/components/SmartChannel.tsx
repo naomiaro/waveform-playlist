@@ -8,7 +8,6 @@ export interface SmartChannelProps {
   data: Int8Array | Int16Array;
   bits: 8 | 16;
   length: number;
-  progress?: number; // Playback progress (0-1) for showing progress color
   isSelected?: boolean; // Whether this channel's track is selected
 }
 

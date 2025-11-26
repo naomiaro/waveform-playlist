@@ -35,21 +35,6 @@ function createCanvasFillStyle(
   return gradient;
 }
 
-interface ProgressProps {
-  readonly $progress: number;
-  readonly $waveHeight: number;
-  readonly $waveProgressColor: string;
-}
-const Progress = styled.div.attrs<ProgressProps>((props) => ({
-  style: {
-    width: `${props.$progress}px`,
-    height: `${props.$waveHeight}px`,
-  },
-}))<ProgressProps>`
-  position: absolute;
-  background: ${(props) => props.$waveProgressColor};
-`;
-
 interface WaveformProps {
   readonly $cssWidth: number;
   readonly $waveHeight: number;
@@ -89,10 +74,8 @@ export interface ChannelProps {
   data: Peaks;
   bits: Bits;
   length: number;
-  progress?: number;
   devicePixelRatio?: number;
   waveHeight?: number;
-  waveProgressColor?: string;
   /** Waveform bar color - can be a solid color string or gradient config */
   waveOutlineColor?: WaveformColor;
   /** Waveform background color - can be a solid color string or gradient config */
@@ -110,10 +93,8 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     length,
     index,
     className,
-    progress = 0,
     devicePixelRatio = 1,
     waveHeight = 80,
-    waveProgressColor = 'orange',
     waveOutlineColor = '#E0EFF1',
     waveFillColor = 'grey',
     barWidth = 2,
@@ -216,11 +197,6 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
       $waveHeight={waveHeight}
       $waveFillColor={backgroundCss}
     >
-      <Progress
-        $progress={progress}
-        $waveHeight={waveHeight}
-        $waveProgressColor={waveProgressColor}
-      />
       {waveforms}
     </Wrapper>
   );
