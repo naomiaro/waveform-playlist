@@ -568,7 +568,7 @@ Hooks must be used within their providers:
 
 ## See Also
 
-- [WaveformPlaylistProvider](/api/provider)
-- [Components](/api/components)
-- [Recording Guide](/guides/recording)
-- [Annotations Guide](/guides/annotations)
+- [WaveformPlaylistProvider](/docs/api/provider)
+- [Components](/docs/api/components)
+- [Recording Guide](/docs/guides/recording)
+- [Annotations Guide](/docs/guides/annotations)

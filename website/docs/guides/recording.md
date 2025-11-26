@@ -499,5 +499,5 @@ Recording requires:
 
 ## Next Steps
 
-- [Annotations](/guides/annotations) - Add annotations to recordings
-- [Track Management](/guides/track-management) - Manage recorded tracks
+- [Annotations](/docs/guides/annotations) - Add annotations to recordings
+- [Track Management](/docs/guides/track-management) - Manage recorded tracks

@@ -80,6 +80,6 @@ Waveform Playlist works in all modern browsers that support:
 
 ## Next Steps
 
-- [Installation](/getting-started/installation) - Install the packages
-- [Basic Usage](/getting-started/basic-usage) - Build your first playlist
+- [Installation](/docs/getting-started/installation) - Install the packages
+- [Basic Usage](/docs/getting-started/basic-usage) - Build your first playlist
 - [Examples](/examples) - See live demos

@@ -313,5 +313,5 @@ function FullPlaybackExample() {
 
 ## Next Steps
 
-- [Track Management](/guides/track-management) - Control individual tracks
-- [Audio Effects](/effects) - Add effects to playback
+- [Track Management](/docs/guides/track-management) - Control individual tracks
+- [Audio Effects](/docs/guides/effects) - Add effects to playback

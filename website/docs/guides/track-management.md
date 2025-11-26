@@ -349,5 +349,5 @@ function TrackManagementExample() {
 
 ## Next Steps
 
-- [Annotations](/guides/annotations) - Add time-synchronized annotations
-- [Audio Effects](/effects) - Apply effects to tracks
+- [Annotations](/docs/guides/annotations) - Add time-synchronized annotations
+- [Audio Effects](/docs/guides/effects) - Apply effects to tracks

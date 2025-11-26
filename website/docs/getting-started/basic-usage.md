@@ -199,7 +199,7 @@ export default MyPlaylist;
 
 ## Next Steps
 
-- [Loading Audio](/guides/loading-audio) - Advanced audio loading with BBC Peaks
-- [Playback Controls](/guides/playback-controls) - Detailed playback options
-- [Track Management](/guides/track-management) - Mute, solo, volume, pan
-- [Theming](/guides/theming) - Customize colors and appearance
+- [Loading Audio](/docs/guides/loading-audio) - Advanced audio loading with BBC Peaks
+- [Playback Controls](/docs/guides/playback-controls) - Detailed playback options
+- [Track Management](/docs/guides/track-management) - Mute, solo, volume, pan
+- [Theming](/docs/guides/theming) - Customize colors and appearance

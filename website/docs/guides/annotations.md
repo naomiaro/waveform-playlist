@@ -416,5 +416,5 @@ const musicSections = [
 
 ## Next Steps
 
-- [Recording](/guides/recording) - Record audio with annotations
-- [Theming](/guides/theming) - Customize annotation appearance
+- [Recording](/docs/guides/recording) - Record audio with annotations
+- [Theming](/docs/guides/theming) - Customize annotation appearance

@@ -322,6 +322,6 @@ interface AudioTrackConfig {
 
 ## Next Steps
 
-- [Effects](/effects) - Add audio effects like reverb and delay
-- [Playback Controls](/guides/playback-controls) - Control playback with play, pause, and stop
-- [Track Management](/guides/track-management) - Manage tracks dynamically
+- [Effects](/docs/guides/effects) - Add audio effects like reverb and delay
+- [Playback Controls](/docs/guides/playback-controls) - Control playback with play, pause, and stop
+- [Track Management](/docs/guides/track-management) - Manage tracks dynamically

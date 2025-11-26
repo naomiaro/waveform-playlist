@@ -65,4 +65,4 @@ Note: CDN usage is not recommended for production applications.
 
 ## Next Steps
 
-- [Basic Usage](/getting-started/basic-usage) - Create your first playlist
+- [Basic Usage](/docs/getting-started/basic-usage) - Create your first playlist

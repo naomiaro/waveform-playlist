@@ -351,6 +351,6 @@ See the [Styling Example](/examples/styling) for live demonstrations.
 
 ## Next Steps
 
-- [Custom Playhead](/api/components#custom-playhead) - Create a custom playhead component
-- [API Reference: Provider](/api/provider) - Full provider configuration
+- [Custom Playhead](/docs/api/components#custom-playhead) - Create a custom playhead component
+- [API Reference: Provider](/docs/api/provider) - Full provider configuration
 - [Examples](/examples) - See themed examples in action

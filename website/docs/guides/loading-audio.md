@@ -236,5 +236,5 @@ if (error) {
 
 ## Next Steps
 
-- [Playback Controls](/guides/playback-controls) - Control playback
-- [Track Management](/guides/track-management) - Manage loaded tracks
+- [Playback Controls](/docs/guides/playback-controls) - Control playback
+- [Track Management](/docs/guides/track-management) - Manage loaded tracks

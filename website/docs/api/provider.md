@@ -99,7 +99,7 @@ Track controls panel configuration.
 **Type:** `Partial<WaveformPlaylistTheme>`
 **Default:** `defaultTheme`
 
-Custom theme object. See [Theming Guide](/guides/theming).
+Custom theme object. See [Theming Guide](/docs/guides/theming).
 
 ```tsx
 <WaveformPlaylistProvider
@@ -278,6 +278,6 @@ interface WaveformPlaylistProviderProps {
 
 ## See Also
 
-- [Waveform Component](/api/components#waveform)
-- [usePlaylistState Hook](/api/hooks#useplayliststate)
-- [usePlaylistControls Hook](/api/hooks#useplaylistcontrols)
+- [Waveform Component](/docs/api/components#waveform)
+- [usePlaylistState Hook](/docs/api/hooks#useplayliststate)
+- [usePlaylistControls Hook](/docs/api/hooks#useplaylistcontrols)
