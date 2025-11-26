@@ -29,139 +29,6 @@ function ThemedPlaylist() {
 }
 ```
 
-## Theme Properties
-
-### Waveform Colors
-
-```typescript
-interface WaveformTheme {
-  // Outline/stroke color of the waveform
-  waveOutlineColor: string;
-
-  // Fill color of the waveform
-  waveFillColor: string;
-
-  // Color for played portion of waveform
-  waveProgressColor: string;
-
-  // Selected track waveform outline (brighter)
-  selectedWaveOutlineColor: string;
-
-  // Selected track waveform fill
-  selectedWaveFillColor: string;
-}
-```
-
-### Track Controls
-
-```typescript
-interface TrackControlsTheme {
-  // Selected track controls background
-  selectedTrackControlsBackground: string;
-}
-```
-
-### Clip Headers
-
-```typescript
-interface ClipHeaderTheme {
-  // Clip header background
-  clipHeaderBackgroundColor: string;
-
-  // Clip header border
-  clipHeaderBorderColor: string;
-
-  // Clip header text color
-  clipHeaderTextColor: string;
-
-  // Selected clip header background
-  selectedClipHeaderBackgroundColor: string;
-}
-```
-
-### Playhead and Selection
-
-```typescript
-interface PlayheadTheme {
-  // Playhead cursor color
-  playheadColor: string;
-
-  // Selection highlight color
-  selectionColor: string;
-}
-```
-
-### Timeline
-
-```typescript
-interface TimelineTheme {
-  // Timescale text and tick color
-  timeColor: string;
-
-  // Timescale background
-  timescaleBackgroundColor: string;
-}
-```
-
-### UI Components
-
-```typescript
-interface UITheme {
-  // General backgrounds
-  backgroundColor: string;
-  surfaceColor: string;
-  borderColor: string;
-
-  // Text colors
-  textColor: string;
-  textColorMuted: string;
-
-  // Input fields
-  inputBackground: string;
-  inputBorder: string;
-  inputText: string;
-  inputPlaceholder: string;
-  inputFocusBorder: string;
-
-  // Buttons
-  buttonBackground: string;
-  buttonText: string;
-  buttonBorder: string;
-  buttonHoverBackground: string;
-
-  // Sliders
-  sliderTrackColor: string;
-  sliderThumbColor: string;
-}
-```
-
-### Annotations
-
-```typescript
-interface AnnotationTheme {
-  annotationBoxBackground: string;
-  annotationBoxActiveBackground: string;
-  annotationBoxHoverBackground: string;
-  annotationBoxBorder: string;
-  annotationBoxActiveBorder: string;
-  annotationLabelColor: string;
-  annotationResizeHandleColor: string;
-  annotationResizeHandleActiveColor: string;
-  annotationTextItemHoverBackground: string;
-}
-```
-
-### Spacing and Typography
-
-```typescript
-interface TypographyTheme {
-  borderRadius: string;
-  fontFamily: string;
-  fontSize: string;
-  fontSizeSmall: string;
-}
-```
-
 ## Built-in Themes
 
 ### Light Theme (Default)
@@ -269,11 +136,12 @@ function useCustomTheme(isDark: boolean) {
 }
 ```
 
-## CSS Variables Integration
+## CSS Variables Integration (Advanced)
 
-Use CSS variables for dynamic theming:
+The library doesn't provide built-in CSS variables, but you can create your own CSS variable-based theme for dynamic theming without JavaScript:
 
 ```tsx
+// Define a theme that references your CSS variables
 const cssVarTheme = {
   waveOutlineColor: 'var(--wfpl-wave-outline, #005BBB)',
   waveFillColor: 'var(--wfpl-wave-fill, #FFD500)',
@@ -281,16 +149,25 @@ const cssVarTheme = {
   selectionColor: 'var(--wfpl-selection, rgba(255, 105, 180, 0.7))',
 };
 
-// In your CSS
-// :root {
-//   --wfpl-wave-outline: #005BBB;
-//   --wfpl-wave-fill: #FFD500;
-// }
-// :root[data-theme='dark'] {
-//   --wfpl-wave-outline: #4A9EFF;
-//   --wfpl-wave-fill: #FFD500;
-// }
+// Then define the CSS variables in your stylesheet
 ```
+
+```css
+/* In your CSS */
+:root {
+  --wfpl-wave-outline: #005BBB;
+  --wfpl-wave-fill: #FFD500;
+  --wfpl-playhead: #ff0000;
+}
+
+:root[data-theme='dark'] {
+  --wfpl-wave-outline: #4A9EFF;
+  --wfpl-wave-fill: #FFD500;
+  --wfpl-playhead: #ff4444;
+}
+```
+
+This approach allows theme switching without re-rendering the React component tree.
 
 ## Complete Theme Example
 
