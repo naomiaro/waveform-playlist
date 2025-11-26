@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import { Microphone } from '@phosphor-icons/react';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyRecordingExample = createLazyExample(
@@ -13,7 +14,7 @@ export default function RecordingExamplePage(): React.ReactElement {
       description="Multi-track recording with live waveform visualization"
     >
       <main className="container margin-vert--lg">
-        <h1>🎙️ Multi-Track Recording</h1>
+        <h1><Microphone size={32} weight="light" style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} />Multi-Track Recording</h1>
         <p>
           Record multiple audio tracks with live waveform visualization. Drop audio files to create tracks,
           or click "New Track" to record on an empty track.

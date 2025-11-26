@@ -246,8 +246,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   effects,
   onReady,
   onAnnotationUpdate: _onAnnotationUpdate,
-  barWidth = 1,
-  barGap = 0,
+  barWidth = 2,
+  barGap = 1,
   children,
 }) => {
   // State

@@ -394,8 +394,8 @@ class WaveformPlaylistClass {
         show: showControls,
         width: controlsWidth,
       },
-      barWidth: this.config.barWidth ?? 1,
-      barGap: this.config.barGap ?? 0,
+      barWidth: this.config.barWidth ?? 2,
+      barGap: this.config.barGap ?? 1,
     };
 
     // Waveform component using Channel from ui-components - memoize to prevent recreation

@@ -116,8 +116,8 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveProgressColor = 'orange',
     waveOutlineColor = '#E0EFF1',
     waveFillColor = 'grey',
-    barWidth = 1,
-    barGap = 0,
+    barWidth = 2,
+    barGap = 1,
   } = props;
   const canvasesRef = useRef<HTMLCanvasElement[]>([]);
 
