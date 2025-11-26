@@ -9,7 +9,8 @@
  * - Full theming customization
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
+import { getContext } from 'tone';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
 import {
@@ -53,6 +54,68 @@ const TimeDisplay = styled.div`
   min-width: 100px;
   text-align: center;
 `;
+
+/**
+ * Animated time display that updates via requestAnimationFrame for smooth 60fps updates.
+ * Uses direct DOM manipulation instead of React state to avoid throttling.
+ */
+interface AnimatedTimeDisplayProps {
+  duration: number;
+  format: TimeFormat;
+}
+
+const AnimatedTimeDisplayComponent: React.FC<AnimatedTimeDisplayProps> = ({ duration, format }) => {
+  const timeRef = useRef<HTMLSpanElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
+
+  const formattedDuration = formatTime(duration, format);
+
+  useEffect(() => {
+    const updateTime = () => {
+      if (timeRef.current) {
+        let time: number;
+        if (isPlaying) {
+          const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
+          time = (audioStartPositionRef.current ?? 0) + elapsed;
+        } else {
+          time = currentTimeRef.current ?? 0;
+        }
+        timeRef.current.textContent = formatTime(time, format);
+      }
+
+      if (isPlaying) {
+        animationFrameRef.current = requestAnimationFrame(updateTime);
+      }
+    };
+
+    if (isPlaying) {
+      animationFrameRef.current = requestAnimationFrame(updateTime);
+    } else {
+      updateTime();
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [isPlaying, format, currentTimeRef, playbackStartTimeRef, audioStartPositionRef]);
+
+  // Update when stopped (for seeks)
+  useEffect(() => {
+    if (!isPlaying && timeRef.current) {
+      timeRef.current.textContent = formatTime(currentTimeRef.current ?? 0, format);
+    }
+  });
+
+  return (
+    <TimeDisplay>
+      <span ref={timeRef}>{formatTime(currentTimeRef.current ?? 0, format)}</span> / {formattedDuration}
+    </TimeDisplay>
+  );
+};
 
 const VolumeDisplay = styled.div`
   font-size: 0.875rem;
@@ -234,7 +297,7 @@ const CustomSelectionInputs: React.FC = () => {
 // Main Example Content Component - Using individual hooks with Radix UI
 const FlexibleApiContent: React.FC = () => {
   const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, zoomIn, zoomOut } = usePlaylistControls();
-  const { currentTime, currentTimeRef } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackAnimation();
   const { duration, masterVolume, timeFormat } = usePlaylistData();
   const { isAutomaticScroll } = usePlaylistState();
   const format = timeFormat as TimeFormat;
@@ -244,10 +307,6 @@ const FlexibleApiContent: React.FC = () => {
   const handleFastForward = () => seekTo(duration);
   const handleSkipBackward = () => seekTo((currentTimeRef.current ?? 0) - 5);
   const handleSkipForward = () => seekTo((currentTimeRef.current ?? 0) + 5);
-
-  // Format current time based on selected format from context
-  const formattedTime = formatTime(currentTime, format);
-  const formattedDuration = formatTime(duration, format);
 
   return (
     <Flex direction="column" gap="3">
@@ -348,7 +407,7 @@ const FlexibleApiContent: React.FC = () => {
       {/* Time Controls Bar */}
       <Card>
         <Flex gap="3" align="center" justify="center" wrap="wrap">
-          <TimeDisplay>{formattedTime} / {formattedDuration}</TimeDisplay>
+          <AnimatedTimeDisplayComponent duration={duration} format={format} />
 
           <Separator orientation="vertical" />
 
