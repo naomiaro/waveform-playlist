@@ -9,6 +9,13 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-25: Custom Playhead Component Support
+- ✅ `renderPlayhead` prop on Waveform component for custom playhead rendering
+- ✅ `PlayheadWithMarker` component - playhead with triangle marker at top
+- ✅ `RenderPlayheadFunction` type for TypeScript support
+- ✅ Flexible API example updated to showcase custom playhead
+- ✅ Default playhead still works if no custom renderer provided
+
 ### 2025-11-25: Annotation Keyboard Navigation & Playback
 - ✅ Arrow keys (↑↓←→) to navigate between annotations
 - ✅ Home/End keys to jump to first/last annotation
@@ -17,6 +24,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 - ✅ Auto-scroll waveform to keep selected annotation visible during keyboard navigation
 - ✅ Enhanced `useAnnotationKeyboardControls` hook with scroll and playback support
 - ✅ Updated annotations example documentation with all keyboard shortcuts
+- ✅ Smart annotation placement: 'A' key finds next available gap if playhead inside annotation
 
 ### 2025-11-25: Website Build Fix & Add Annotation at Playhead
 - ✅ Fixed Docusaurus SSG build failures caused by browser API access at import time
@@ -343,12 +351,12 @@ These features expand core functionality and should be implemented first.
   - ✅ Prevents creation inside existing annotations or if not enough space
   - **Location:** `website/src/components/examples/AnnotationsExample.tsx`
 
-- [ ] **Custom playhead component support**
-  - Allow users to provide their own playhead component via prop
-  - Showcase in flexible-api example with polished design
-  - Default playhead: simple vertical line
-  - Custom playhead example: line with triangle/arrow on top
-  - Pass current position and styling props to custom component
+- [x] **Custom playhead component support** ✅
+  - ✅ `renderPlayhead` prop on Waveform component accepts custom render function
+  - ✅ `PlayheadWithMarker` component provides triangle marker variant
+  - ✅ `RenderPlayheadFunction` type for TypeScript consumers
+  - ✅ Showcased in flexible-api example with polished design
+  - **Location:** `packages/ui-components/src/components/Playhead.tsx`, `packages/browser/src/components/Waveform.tsx`
 
 - [x] **Add waveform-data.js support** ✅
   - Integrate https://codeberg.org/chrisn/waveform-data.js

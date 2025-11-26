@@ -19,6 +19,7 @@ import {
   VolumeDownIcon,
   VolumeUpIcon,
   useTheme,
+  type RenderPlayheadFunction,
 } from '@waveform-playlist/ui-components';
 import {
   AnnotationBoxesWrapper,
@@ -34,6 +35,8 @@ const DEFAULT_EMPTY_TRACK_DURATION = 60;
 export interface WaveformProps {
   renderTrackControls?: (trackIndex: number) => ReactNode;
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
+  /** Custom playhead render function. Receives position (pixels) and color from theme. */
+  renderPlayhead?: RenderPlayheadFunction;
   annotationControls?: any[];
   annotationListConfig?: any;
   annotationTextHeight?: number; // Height in pixels for the annotation text list
@@ -56,6 +59,7 @@ export interface WaveformProps {
 export const Waveform: React.FC<WaveformProps> = ({
   renderTrackControls,
   renderTimestamp,
+  renderPlayhead,
   annotationControls,
   annotationListConfig: _annotationListConfig,
   annotationTextHeight,
@@ -480,13 +484,21 @@ export const Waveform: React.FC<WaveformProps> = ({
                 />
               )}
               {(isPlaying || selectionStart === selectionEnd) && (
-                <Playhead
-                  position={
-                    (currentTime * sampleRate) / samplesPerPixel +
-                    (controls.show ? controls.width : 0)
-                  }
-                  color={theme.playheadColor}
-                />
+                renderPlayhead ? (
+                  renderPlayhead({
+                    position: (currentTime * sampleRate) / samplesPerPixel +
+                      (controls.show ? controls.width : 0),
+                    color: theme.playheadColor,
+                  })
+                ) : (
+                  <Playhead
+                    position={
+                      (currentTime * sampleRate) / samplesPerPixel +
+                      (controls.show ? controls.width : 0)
+                    }
+                    color={theme.playheadColor}
+                  />
+                )
               )}
             </>
           </Playlist>

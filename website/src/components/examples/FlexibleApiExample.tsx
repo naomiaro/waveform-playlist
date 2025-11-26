@@ -36,7 +36,7 @@ import {
   useWaveformPlaylist,
   type TimeFormat,
 } from '@waveform-playlist/browser';
-import { CLIP_HEADER_HEIGHT } from '@waveform-playlist/ui-components';
+import { CLIP_HEADER_HEIGHT, PlayheadWithMarker } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { darkTheme } from '@waveform-playlist/ui-components';
 
@@ -348,6 +348,7 @@ const FlexibleApiContent: React.FC = () => {
         renderTrackControls={(trackIndex) => (
           <CustomTrackControls trackIndex={trackIndex} />
         )}
+        renderPlayhead={(props) => <PlayheadWithMarker {...props} />}
         showClipHeaders
       />
 
@@ -495,6 +496,7 @@ export function FlexibleApiExample() {
               <li><Text size="2" color="gray"><code>usePlaylistData()</code> - Get <code>duration</code>, <code>sampleRate</code>, etc.</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistState()</code> - Get/set <code>timeFormat</code>, <code>masterVolume</code>, <code>isAutomaticScroll</code>, etc.</Text></li>
               <li><Text size="2" color="gray">Custom time formatting with <code>formatTime()</code> helper</Text></li>
+              <li><Text size="2" color="gray"><code>renderPlayhead</code> - Custom playhead with triangle marker (see <code>PlayheadWithMarker</code>)</Text></li>
               <li><Text size="2" color="gray">Radix UI components (<code>Button</code>, <code>Slider</code>, <code>Switch</code>, <code>Select</code>)</Text></li>
             </ul>
             <Text size="2" color="gray">

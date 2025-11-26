@@ -26,6 +26,8 @@ const PlaylistTimeScaleScroll = styled.div.attrs<PlaylistTimeScaleScroll>((props
 }))<PlaylistTimeScaleScroll>`
   position: relative;
   overflow: visible; /* Allow time labels to render above the container */
+  border-bottom: 1px solid ${props => props.theme.timeColor};
+  box-sizing: border-box;
 `;
 
 interface TimeTicks {
