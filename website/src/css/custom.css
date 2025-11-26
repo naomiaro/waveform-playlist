@@ -242,6 +242,30 @@ a:not(.button):not(.navbar__link):not(.menu__link):hover {
   background-size: 100% 2px;
 }
 
+/* Docs content spacing - give headings room to breathe */
+.markdown h2 {
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown h3 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown h4 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown > p,
+.markdown > ul,
+.markdown > ol,
+.markdown > table,
+.markdown > pre {
+  margin-bottom: 1.25rem;
+}
+
 /* Docs sidebar - cleaner look */
 .menu__link {
   font-size: 0.9rem;
