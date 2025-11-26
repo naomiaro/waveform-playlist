@@ -85,7 +85,7 @@ function FadePlayer({ fadeType, title, description }: FadePlayerProps) {
   // Use 5.85 seconds of vocals with 1.5 second fades
   const audioConfigs: AudioTrackConfig[] = React.useMemo(() => [
     {
-      src: '/waveform-playlist/media/audio/Vocals30.mp3',
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
       name: title,
       duration: 5.85,
       fadeIn: { duration: 1.5, type: fadeType },

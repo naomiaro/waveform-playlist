@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyMultiClipExample = createLazyExample(
   () => import('../../components/examples/MultiClipExample').then(m => ({ default: m.MultiClipExample }))
@@ -40,6 +41,8 @@ export default function MultiClipExamplePage(): React.ReactElement {
             <li>Visual clip headers with track names</li>
           </ul>
         </div>
+
+        <AudioCredits track="ubiquitous" />
       </main>
     </Layout>
   );

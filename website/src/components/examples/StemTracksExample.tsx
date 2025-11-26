@@ -16,23 +16,55 @@ import {
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
-// Stem tracks configuration
+// Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
 const audioConfigs = [
   {
-    src: '/waveform-playlist/media/audio/Vocals30.mp3',
-    name: 'Vocals',
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/01_Loop1.opus',
+    name: 'Loop 1',
   },
   {
-    src: '/waveform-playlist/media/audio/Guitar30.mp3',
-    name: 'Guitar',
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/02_Loop2.opus',
+    name: 'Loop 2',
   },
   {
-    src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
-    name: 'Pianos & Synth',
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/03_Kick.opus',
+    name: 'Kick',
   },
   {
-    src: '/waveform-playlist/media/audio/BassDrums30.mp3',
-    name: 'Drums',
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/04_Snare.opus',
+    name: 'Snare',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/05_Claps.opus',
+    name: 'Claps',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/06_HiHat.opus',
+    name: 'HiHat',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/07_Bass1.opus',
+    name: 'Bass 1',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/08_Bass2.opus',
+    name: 'Bass 2',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus',
+    name: 'Synth 1',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/10_Synth2.opus',
+    name: 'Synth 2',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/11_Vox_Dry.opus',
+    name: 'Vox Dry',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/12_Vox_Wet.opus',
+    name: 'Vox Wet',
   },
 ];
 

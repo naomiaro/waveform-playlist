@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyStylingExample = createLazyExample(
   () => import('../../components/examples/StylingExample').then(m => ({ default: m.StylingExample }))
@@ -108,6 +109,8 @@ export default function StylingExamplePage(): React.ReactElement {
             </tbody>
           </table>
         </div>
+
+        <AudioCredits track="whiptails" />
       </main>
     </Layout>
   );

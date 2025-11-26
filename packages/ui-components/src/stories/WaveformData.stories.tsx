@@ -125,13 +125,13 @@ const WaveformDataDemo: React.FC<{ src: string; title: string }> = ({ src, title
   );
 };
 
-// Multiple tracks demo
+// Multiple tracks demo - Albert Kader "Ubiquitous" minimal techno
 const MultiTrackDemo: React.FC = () => {
   const tracks = [
-    { src: '/media/audio/Vocals30.dat', name: 'Vocals' },
-    { src: '/media/audio/Guitar30.dat', name: 'Guitar' },
-    { src: '/media/audio/BassDrums30.dat', name: 'Bass & Drums' },
-    { src: '/media/audio/PianoSynth30.dat', name: 'Piano Synth' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/01_Kick.dat', name: 'Kick' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/08_Bass.dat', name: 'Bass' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat', name: 'Synth 1' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/11_Synth2.dat', name: 'Synth 2' },
   ];
 
   return (
@@ -147,13 +147,13 @@ const MultiTrackDemo: React.FC = () => {
   );
 };
 
-// Bit depth comparison demo
+// Bit depth comparison demo - using same 8-bit files (all new tracks are 8-bit)
 const BitDepthComparisonDemo: React.FC = () => {
   const tracks = [
-    { src: '/media/audio/Vocals30-8bit.dat', name: 'Vocals (8-bit, mono, v1)' },
-    { src: '/media/audio/Vocals30-16bit.dat', name: 'Vocals (16-bit, mono, v1)' },
-    { src: '/media/audio/Guitar30-8bit.dat', name: 'Guitar (8-bit, mono, v1)' },
-    { src: '/media/audio/Guitar30-16bit.dat', name: 'Guitar (16-bit, mono, v1)' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/01_Kick.dat', name: 'Kick (8-bit, mono)' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/02_HiHat1.dat', name: 'HiHat (8-bit, mono)' },
+    { src: '/media/audio/AlbertKader_Whiptails/03_Kick.dat', name: 'Kick 2 (8-bit, mono)' },
+    { src: '/media/audio/AlbertKader_Whiptails/06_HiHat.dat', name: 'HiHat 2 (8-bit, mono)' },
   ];
 
   return (
@@ -321,11 +321,11 @@ const StereoWaveformDemo: React.FC<{ src: string; title: string }> = ({ src, tit
   );
 };
 
-// Stereo/Version 2 comparison demo
+// Stereo/Version 2 comparison demo - using stereo tracks from Ubiquitous
 const StereoComparisonDemo: React.FC = () => {
   const tracks = [
-    { src: '/media/audio/Vocals30-stereo-8bit.dat', name: 'Vocals (8-bit, stereo, v2)' },
-    { src: '/media/audio/Vocals30-stereo-16bit.dat', name: 'Vocals (16-bit, stereo, v2)' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/05_SFX1.dat', name: 'SFX 1 (stereo)' },
+    { src: '/media/audio/AlbertKader_Ubiquitous/06_SFX2.dat', name: 'SFX 2 (stereo)' },
   ];
 
   return (
@@ -398,7 +398,7 @@ const peaks = await loadPeaksFromWaveformData('/path/to/peaks.dat');
 export default meta;
 
 export const SingleTrack: StoryObj = {
-  render: () => <WaveformDataDemo src="/media/vocals.dat" title="Vocals Track" />,
+  render: () => <WaveformDataDemo src="/media/audio/AlbertKader_Ubiquitous/08_Bass.dat" title="Bass Track" />,
   parameters: {
     docs: {
       description: {
@@ -447,7 +447,7 @@ export const MetadataOnly: StoryObj = {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-      getWaveformDataMetadata('/media/vocals.dat')
+      getWaveformDataMetadata('/media/audio/AlbertKader_Ubiquitous/08_Bass.dat')
         .then(setMetadata)
         .finally(() => setLoading(false));
     }, []);

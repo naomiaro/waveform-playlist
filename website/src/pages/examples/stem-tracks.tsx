@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyStemTracksExample = createLazyExample(
   () => import('../../components/examples/StemTracksExample').then(m => ({ default: m.StemTracksExample }))
@@ -50,6 +51,8 @@ export default function StemTracksExamplePage(): React.ReactElement {
             <li>Synchronized playback</li>
           </ul>
         </div>
+
+        <AudioCredits track="whiptails" />
       </main>
     </Layout>
   );

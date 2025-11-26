@@ -796,20 +796,21 @@ The multi-clip example uses a **file-reference architecture** to efficiently han
 
 ```typescript
 // Audio files - each loaded and decoded once
+// Albert Kader minimal techno stems
 const audioFiles = [
-  { id: 'vocals', src: 'media/audio/Vocals30.mp3' },
-  { id: 'guitar', src: 'media/audio/Guitar30.mp3' },
-  { id: 'piano', src: 'media/audio/PianoSynth30.mp3' },
-  { id: 'bass', src: 'media/audio/BassDrums30.mp3' },
+  { id: 'kick', src: 'media/audio/AlbertKader_Ubiquitous/01_Kick.opus' },
+  { id: 'bass', src: 'media/audio/AlbertKader_Ubiquitous/08_Bass.opus' },
+  { id: 'synth', src: 'media/audio/AlbertKader_Whiptails/09_Synth1.opus' },
+  { id: 'loop', src: 'media/audio/AlbertKader_Whiptails/01_Loop1.opus' },
 ];
 
 // Track configuration - clips reference files by ID
 const trackConfigs = [
   {
-    name: 'Vocals',
+    name: 'Kick',
     clips: [
-      { fileId: 'vocals', startTime: 0, duration: 10, offset: 0 },
-      { fileId: 'vocals', startTime: 20, duration: 10, offset: 20 },
+      { fileId: 'kick', startTime: 0, duration: 8, offset: 0 },
+      { fileId: 'kick', startTime: 12, duration: 5, offset: 8 },
     ],
   },
   // ... more tracks

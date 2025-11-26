@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyMinimalExample = createLazyExample(
   () => import('../../components/examples/MinimalExample').then(m => ({ default: m.MinimalExample }))
@@ -50,6 +51,8 @@ export default function MinimalExamplePage(): React.ReactElement {
             <li>Audio position display</li>
           </ul>
         </div>
+
+        <AudioCredits track="ubiquitous" />
       </main>
     </Layout>
   );

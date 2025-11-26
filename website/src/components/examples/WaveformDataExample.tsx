@@ -20,35 +20,35 @@ import { Channel } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Track configuration with both audio and BBC peaks files
-// Using 8-bit peaks for smaller file sizes (~11KB vs ~22KB for 16-bit)
+// Albert Kader "Ubiquitous" minimal techno - Using 8-bit peaks at 30 SPP
 const trackConfigs = [
   {
-    name: 'Vocals',
-    audioSrc: '/waveform-playlist/media/audio/Vocals30.mp3',
-    peaksSrc: '/waveform-playlist/media/audio/Vocals30-8bit.dat',
-    peaksSize: 11, // KB
-    audioSize: 469, // KB (~480KB)
+    name: 'Kick',
+    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.dat',
+    peaksSize: 55, // KB (~27K points * 2 bytes)
+    audioSize: 280, // KB (Opus is smaller than MP3)
   },
   {
-    name: 'Guitar',
-    audioSrc: '/waveform-playlist/media/audio/Guitar30.mp3',
-    peaksSrc: '/waveform-playlist/media/audio/Guitar30-8bit.dat',
-    peaksSize: 11,
-    audioSize: 469,
+    name: 'Bass',
+    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.dat',
+    peaksSize: 53,
+    audioSize: 620,
   },
   {
-    name: 'Pianos & Synth',
-    audioSrc: '/waveform-playlist/media/audio/PianoSynth30.mp3',
-    peaksSrc: '/waveform-playlist/media/audio/PianoSynth30-8bit.dat',
-    peaksSize: 11,
-    audioSize: 469,
+    name: 'Synth 1',
+    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
+    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat',
+    peaksSize: 55,
+    audioSize: 340,
   },
   {
-    name: 'Drums',
-    audioSrc: '/waveform-playlist/media/audio/BassDrums30.mp3',
-    peaksSrc: '/waveform-playlist/media/audio/BassDrums30-8bit.dat',
-    peaksSize: 11,
-    audioSize: 469,
+    name: 'Synth 2',
+    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.dat',
+    peaksSize: 55,
+    audioSize: 380,
   },
 ];
 

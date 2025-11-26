@@ -118,8 +118,8 @@ function WaveformVariant({
   const audioConfigs = React.useMemo(
     () => [
       {
-        src: '/waveform-playlist/media/audio/Vocals30.mp3',
-        name: 'Vocals',
+        src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus',
+        name: 'Synth',
       },
     ],
     []

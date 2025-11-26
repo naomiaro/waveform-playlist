@@ -411,22 +411,23 @@ export function FlexibleApiExample() {
     timescaleBackgroundColor: '#2c3e50',
   };
 
+  // Albert Kader "Whiptails" minimal techno
   const audioConfigs = React.useMemo(() => [
     {
-      src: '/waveform-playlist/media/audio/Vocals30.mp3',
-      name: 'Vocals',
+      src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/01_Loop1.opus',
+      name: 'Loop',
     },
     {
-      src: '/waveform-playlist/media/audio/Guitar30.mp3',
-      name: 'Guitar',
+      src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/03_Kick.opus',
+      name: 'Kick',
     },
     {
-      src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
-      name: 'Piano Synth',
+      src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/07_Bass1.opus',
+      name: 'Bass',
     },
     {
-      src: '/waveform-playlist/media/audio/BassDrums30.mp3',
-      name: 'Bass & Drums',
+      src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/10_Synth2.opus',
+      name: 'Synth',
     },
   ], []);
 

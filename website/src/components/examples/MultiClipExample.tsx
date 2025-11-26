@@ -45,41 +45,65 @@ const ControlGroup = styled.div`
 `;
 
 // Audio files - each file is loaded and decoded once
+// All from Ubiquitous for consistency
 const audioFiles = [
-  { id: 'vocals', src: '/waveform-playlist/media/audio/Vocals30.mp3' },
-  { id: 'guitar', src: '/waveform-playlist/media/audio/Guitar30.mp3' },
-  { id: 'piano', src: '/waveform-playlist/media/audio/PianoSynth30.mp3' },
-  { id: 'bass', src: '/waveform-playlist/media/audio/BassDrums30.mp3' },
+  { id: 'kick', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus' },
+  { id: 'hihat', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus' },
+  { id: 'claps', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus' },
+  { id: 'shakers', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus' },
+  { id: 'bass', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus' },
+  { id: 'synth1', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus' },
+  { id: 'synth2', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus' },
 ];
 
 // Track configuration with multiple clips demonstrating gaps and positioning
 const trackConfigs = [
   {
-    name: 'Vocals',
+    name: 'Kick',
     clips: [
-      { fileId: 'vocals', startTime: 0, duration: 10, offset: 0 },
-      { fileId: 'vocals', startTime: 20, duration: 10, offset: 20 },
+      { fileId: 'kick', startTime: 0, duration: 8, offset: 0 },
+      { fileId: 'kick', startTime: 12, duration: 8, offset: 8 },
     ],
   },
   {
-    name: 'Guitar',
+    name: 'HiHat',
     clips: [
-      { fileId: 'guitar', startTime: 0, duration: 30, offset: 0 },
+      { fileId: 'hihat', startTime: 4, duration: 12, offset: 4 },
     ],
   },
   {
-    name: 'Piano',
+    name: 'Claps',
     clips: [
-      { fileId: 'piano', startTime: 5, duration: 10, offset: 5 },
-      { fileId: 'piano', startTime: 20, duration: 10, offset: 20 },
+      { fileId: 'claps', startTime: 8, duration: 4, offset: 0 },
+      { fileId: 'claps', startTime: 16, duration: 4, offset: 4 },
+    ],
+  },
+  {
+    name: 'Shakers',
+    clips: [
+      { fileId: 'shakers', startTime: 0, duration: 6, offset: 0 },
+      { fileId: 'shakers', startTime: 10, duration: 6, offset: 6 },
     ],
   },
   {
     name: 'Bass',
     clips: [
-      { fileId: 'bass', startTime: 0, duration: 8, offset: 0 },
-      { fileId: 'bass', startTime: 10, duration: 6, offset: 10 },
-      { fileId: 'bass', startTime: 20, duration: 10, offset: 20 },
+      { fileId: 'bass', startTime: 0, duration: 20, offset: 0 },
+    ],
+  },
+  {
+    name: 'Synth 1',
+    clips: [
+      { fileId: 'synth1', startTime: 4, duration: 8, offset: 2 },
+      { fileId: 'synth1', startTime: 14, duration: 6, offset: 10 },
+    ],
+  },
+  {
+    name: 'Synth 2',
+    clips: [
+      { fileId: 'synth2', startTime: 0, duration: 4, offset: 0 },
+      { fileId: 'synth2', startTime: 8, duration: 4, offset: 4 },
+      { fileId: 'synth2', startTime: 16, duration: 4, offset: 8 },
     ],
   },
 ];

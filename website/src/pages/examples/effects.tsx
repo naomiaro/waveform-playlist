@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyEffectsExample = createLazyExample(
   () => import('../../components/examples/EffectsExample').then(m => ({ default: m.EffectsExample }))
@@ -40,6 +41,8 @@ export default function EffectsExamplePage(): React.ReactElement {
             <li>Live effect parameter adjustment</li>
           </ul>
         </div>
+
+        <AudioCredits track="ubiquitous" />
       </main>
     </Layout>
   );

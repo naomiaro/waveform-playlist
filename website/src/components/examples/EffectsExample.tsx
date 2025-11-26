@@ -764,23 +764,23 @@ export function EffectsExample() {
   const trackEffectsManager = useTrackDynamicEffects();
   const { addEffectToTrack, clearTrackEffects, getTrackEffectsFunction, trackEffectsState } = trackEffectsManager;
 
-  // Track configurations
+  // Track configurations - Albert Kader "Ubiquitous" minimal techno
   const audioConfigs = React.useMemo(() => [
     {
-      src: '/waveform-playlist/media/audio/Vocals30.mp3',
-      name: 'Vocals',
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+      name: 'Kick',
     },
     {
-      src: '/waveform-playlist/media/audio/Guitar30.mp3',
-      name: 'Guitar',
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+      name: 'Bass',
     },
     {
-      src: '/waveform-playlist/media/audio/PianoSynth30.mp3',
-      name: 'Pianos & Synth',
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
+      name: 'HiHat',
     },
     {
-      src: '/waveform-playlist/media/audio/BassDrums30.mp3',
-      name: 'Drums',
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+      name: 'Synth',
     },
   ], []);
 
@@ -808,17 +808,17 @@ export function EffectsExample() {
       addMasterEffect('reverb');
 
       // Add effects to individual tracks for demonstration
-      // Vocals: Reverb for spaciousness
-      if (tracks[0]) addEffectToTrack(tracks[0].id, 'reverb');
+      // Kick: Compressor for punch
+      if (tracks[0]) addEffectToTrack(tracks[0].id, 'compressor');
 
-      // Guitar: Chorus for richness
-      if (tracks[1]) addEffectToTrack(tracks[1].id, 'chorus');
+      // Bass: Distortion for grit
+      if (tracks[1]) addEffectToTrack(tracks[1].id, 'distortion');
 
-      // Pianos & Synth: Ping Pong Delay
-      if (tracks[2]) addEffectToTrack(tracks[2].id, 'pingPongDelay');
+      // HiHat: Reverb for space
+      if (tracks[2]) addEffectToTrack(tracks[2].id, 'reverb');
 
-      // Drums: Compressor for punch
-      if (tracks[3]) addEffectToTrack(tracks[3].id, 'compressor');
+      // Synth: Ping Pong Delay
+      if (tracks[3]) addEffectToTrack(tracks[3].id, 'pingPongDelay');
     }
   }, [isLoading, tracks, addMasterEffect, addEffectToTrack]);
 

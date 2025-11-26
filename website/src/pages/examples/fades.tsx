@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyFadesExample = createLazyExample(
   () => import('../../components/examples/FadesExample').then(m => ({ default: m.FadesExample }))
@@ -25,6 +26,8 @@ export default function FadesExamplePage(): React.ReactElement {
         </p>
 
         <LazyFadesExample />
+
+        <AudioCredits track="ubiquitous" />
       </main>
     </Layout>
   );

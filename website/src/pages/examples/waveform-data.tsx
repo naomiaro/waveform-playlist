@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyWaveformDataExample = createLazyExample(
   () => import('../../components/examples/WaveformDataExample').then(m => ({ default: m.WaveformDataExample }))
@@ -96,6 +97,8 @@ const peaks = waveformDataToPeaks(waveformData, 0); // channel 0
 />`}
           </pre>
         </div>
+
+        <AudioCredits track="ubiquitous" />
       </main>
     </Layout>
   );

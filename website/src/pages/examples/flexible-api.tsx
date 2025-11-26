@@ -3,6 +3,7 @@ import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
 import { Gear } from '@phosphor-icons/react';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyFlexibleApiExample = createLazyExample(
   () => import('../../components/examples/FlexibleApiExample').then(m => ({ default: m.FlexibleApiExample }))
@@ -28,6 +29,8 @@ export default function FlexibleApiExamplePage(): React.ReactElement {
         <div style={{ marginTop: '2rem' }}>
           <LazyFlexibleApiExample />
         </div>
+
+        <AudioCredits track="whiptails" />
       </main>
     </Layout>
   );
