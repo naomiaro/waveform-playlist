@@ -23,6 +23,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - ✅ Phase 2: Clip-Based Model (multiple clips per track)
 - ✅ Phase 3.1a/b: Drag & Trim (real-time collision detection, bidirectional trimming)
 - ✅ Phase 3.3: Splitting Clips (sample-based architecture, keyboard shortcuts)
+- ✅ Audio Effects: 20 Tone.js effects with UI, runtime parameters, WAV export
 
 ## Documentation Guidelines
 
@@ -213,6 +214,24 @@ interface AudioClip {
 - `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source
 - `annotations`, `recording` → dist/ (have build artifacts like worklets)
 
+**SSR/SSG Pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use lazy loading:
+
+```typescript
+// In example page files (website/src/pages/examples/*.tsx)
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyExample = createLazyExample(
+  () => import('../../components/examples/ExampleComponent').then(m => ({ default: m.ExampleComponent }))
+);
+
+// Use <LazyExample /> in the page
+```
+
+**Why `createLazyExample` instead of just `BrowserOnly`:**
+- Some libraries (Radix UI, Tone.js, AudioWorklets) access `window` at import time
+- `BrowserOnly` only prevents rendering, not importing
+- `React.lazy()` defers the import until render time in the browser
+
 **Pattern:**
 - Use `useDocusaurusTheme()` hook for automatic light/dark theme
 - Export components as functions (no `createRoot()`)
@@ -220,7 +239,7 @@ interface AudioClip {
 
 **Rebuild requirement:** When ui-components changes affect recording, rebuild both packages.
 
-**Location:** `website/src/components/examples/`
+**Location:** `website/src/components/examples/`, `website/src/components/BrowserOnlyWrapper.tsx`
 
 ### Track Selection Styling
 
@@ -236,9 +255,31 @@ interface AudioClip {
 - `useClipDragHandlers` - Drag-to-move and boundary trimming (300+ lines)
 - `useClipSplitting` - Split clips at playhead (150+ lines)
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system (120+ lines)
+- `useDynamicEffects` - Master effects chain with runtime parameter updates
+- `useTrackDynamicEffects` - Per-track effects management
 - `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, etc.
 
 **Location:** `packages/browser/src/hooks/`
+
+### Audio Effects Architecture
+
+**Implementation:** 20 Tone.js effects with full parameter control, organized by category.
+
+**Categories:** Reverb (3), Delay (2), Modulation (5), Filter (3), Distortion (3), Dynamics (3), Spatial (1)
+
+**Key Files:**
+- `packages/browser/src/effects/effectDefinitions.ts` - All effect metadata and parameters
+- `packages/browser/src/effects/effectFactory.ts` - Creates effect instances
+- `packages/browser/src/hooks/useDynamicEffects.ts` - Master chain management
+- `packages/browser/src/hooks/useTrackDynamicEffects.ts` - Per-track effects
+
+**Pattern:** Effects are created via factory, chained in series, support real-time parameter updates without rebuilding the chain.
+
+**Bypass Pattern:** When bypassing, store original wet value and set to 0. On re-enable, restore original wet value (not always 1).
+
+**Offline Rendering:** Both hooks provide `createOfflineEffectsFunction()` for WAV export via `Tone.Offline`.
+
+**Documentation:** `website/docs/effects.md`
 
 ---
 
@@ -335,4 +376,4 @@ const rebuildChain = useCallback(() => {
 
 ---
 
-**Last Updated:** 2025-11-24
+**Last Updated:** 2025-11-25

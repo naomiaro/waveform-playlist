@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { MultiClipExample } from '../../components/examples/MultiClipExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyMultiClipExample = createLazyExample(
+  () => import('../../components/examples/MultiClipExample').then(m => ({ default: m.MultiClipExample }))
+);
 
 export default function MultiClipExamplePage(): React.ReactElement {
   return (
@@ -15,7 +19,7 @@ export default function MultiClipExamplePage(): React.ReactElement {
           split clips, and arrange multiple clips per track.
         </p>
 
-        <MultiClipExample />
+        <LazyMultiClipExample />
 
         <div style={{ marginTop: '2rem' }}>
           <h2>About This Example</h2>

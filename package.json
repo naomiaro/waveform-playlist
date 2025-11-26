@@ -14,8 +14,8 @@
     "test": "echo \"Tests coming soon\"",
     "format": "prettier --write \"packages/**/src/**/*.{ts,tsx}\"",
     "lint": "eslint \"packages/**/src/**/*.{ts,tsx}\"",
-    "jekyll:serve": "jekyll serve -s ghpages --livereload --incremental",
-    "jekyll:build": "jekyll build -s ghpages -d dist/waveform-playlist"
+    "website": "pnpm --filter website start",
+    "website:build": "pnpm --filter website build"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

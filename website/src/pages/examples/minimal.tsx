@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { MinimalExample } from '../../components/examples/MinimalExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyMinimalExample = createLazyExample(
+  () => import('../../components/examples/MinimalExample').then(m => ({ default: m.MinimalExample }))
+);
 
 export default function MinimalExamplePage(): React.ReactElement {
   return (
@@ -26,7 +30,7 @@ export default function MinimalExamplePage(): React.ReactElement {
             border: '1px solid var(--ifm-color-emphasis-300)'
           }}
         >
-          <MinimalExample />
+          <LazyMinimalExample />
         </div>
 
         <div style={{ marginTop: '2rem' }}>

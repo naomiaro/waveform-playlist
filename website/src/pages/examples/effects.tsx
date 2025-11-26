@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { EffectsExample } from '../../components/examples/EffectsExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyEffectsExample = createLazyExample(
+  () => import('../../components/examples/EffectsExample').then(m => ({ default: m.EffectsExample }))
+);
 
 export default function EffectsExamplePage(): React.ReactElement {
   return (
@@ -15,7 +19,7 @@ export default function EffectsExamplePage(): React.ReactElement {
           auto-wah, and other effects.
         </p>
 
-        <EffectsExample />
+        <LazyEffectsExample />
 
         <div style={{ marginTop: '2rem' }}>
           <h2>About This Example</h2>

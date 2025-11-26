@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { FlexibleApiExample } from '../../components/examples/FlexibleApiExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyFlexibleApiExample = createLazyExample(
+  () => import('../../components/examples/FlexibleApiExample').then(m => ({ default: m.FlexibleApiExample }))
+);
 
 export default function FlexibleApiExamplePage(): React.ReactElement {
   return (
@@ -16,7 +20,7 @@ export default function FlexibleApiExamplePage(): React.ReactElement {
         </p>
 
         <div style={{ marginTop: '2rem' }}>
-          <FlexibleApiExample />
+          <LazyFlexibleApiExample />
         </div>
       </main>
     </Layout>

@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { WaveformDataExample } from '../../components/examples/WaveformDataExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyWaveformDataExample = createLazyExample(
+  () => import('../../components/examples/WaveformDataExample').then(m => ({ default: m.WaveformDataExample }))
+);
 
 export default function WaveformDataExamplePage(): React.ReactElement {
   return (
@@ -25,7 +29,7 @@ export default function WaveformDataExamplePage(): React.ReactElement {
             border: '1px solid var(--ifm-color-emphasis-300)'
           }}
         >
-          <WaveformDataExample />
+          <LazyWaveformDataExample />
         </div>
 
         <div style={{ marginTop: '2rem' }}>

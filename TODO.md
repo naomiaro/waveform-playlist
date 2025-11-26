@@ -3,11 +3,23 @@
 Multi-track audio editor roadmap for waveform-playlist.
 
 **Branch:** `tonejs-overhaul` (React migration)
-**Last Updated:** 2025-11-24
+**Last Updated:** 2025-11-25
 
 ---
 
 ## 🎉 Recently Completed
+
+### 2025-11-25: Website Build Fix & Add Annotation at Playhead
+- ✅ Fixed Docusaurus SSG build failures caused by browser API access at import time
+- ✅ Created `createLazyExample` HOC using `React.lazy()` + `BrowserOnly` for SSR-safe dynamic imports
+- ✅ Updated all 10 example pages to use lazy loading pattern
+- ✅ Added `pnpm website` and `pnpm website:build` commands to root package.json
+- ✅ Removed deprecated Jekyll commands from package.json
+- ✅ "Add Annotation" button in annotations example
+- ✅ Keyboard shortcut: 'A' key to create annotation at playhead
+- ✅ Smart span: new annotation extends to next annotation or end of track
+- ✅ Validation: prevents creation inside existing annotations or with insufficient space
+- ✅ Marked effects library integration as complete (20 effects already implemented)
 
 ### 2025-11-24: Fades API Simplification & Example
 - ✅ Simplified Fade API from confusing `{start, end, type}` to simple `{duration, type?}`
@@ -314,11 +326,13 @@ These features expand core functionality and should be implemented first.
   - Created comprehensive documentation guide
   - **Location:** `website/src/components/examples/FadesExample.tsx`, `website/docs/guides/fades.md`
 
-- [ ] **Add new annotation support in annotations example**
-  - Button or keyboard shortcut to create new annotation at current playhead position
-  - New annotation spans from playhead to next annotation (or end of track)
-  - Default placeholder text (editable)
-  - Integrate with existing annotation editing workflow
+- [x] **Add new annotation support in annotations example** ✅
+  - ✅ "Add Annotation" button creates annotation at current playhead position
+  - ✅ Keyboard shortcut: 'A' key to add annotation
+  - ✅ New annotation spans from playhead to next annotation (or end of track)
+  - ✅ Default placeholder text ("New annotation")
+  - ✅ Prevents creation inside existing annotations or if not enough space
+  - **Location:** `website/src/components/examples/AnnotationsExample.tsx`
 
 - [ ] **Custom playhead component support**
   - Allow users to provide their own playhead component via prop
@@ -345,13 +359,15 @@ These features expand core functionality and should be implemented first.
   - **Location:** `recording-app.tsx`, `useIntegratedRecording.ts`, `useMicrophoneAccess.ts`, `MicrophoneSelector.tsx`
   - **Demo:** `ghpages/_examples/17recording.html`
 
-- [ ] **Complete Tone.js effects library integration**
-  - Expose all Tone.js effects (currently have: Reverb, AutoWah, Analyser)
-  - Add: Distortion, Chorus, Delay, Phaser, Tremolo, Vibrato, Compressor, EQ, etc.
-  - Create UI components for effect configuration
-  - Allow runtime modification of effect parameters
-  - Effect presets and save/load functionality
-  - Visual feedback for effect parameters (knobs, sliders, graphs)
+- [x] **Complete Tone.js effects library integration** ✅
+  - ✅ 20 effects implemented: Reverb, Freeverb, JC Reverb, Feedback Delay, Ping Pong Delay, Chorus, Phaser, Tremolo, Vibrato, Auto Panner, Auto Filter, Auto Wah, 3-Band EQ, Distortion, Bit Crusher, Chebyshev, Compressor, Limiter, Gate, Stereo Widener
+  - ✅ UI components: EffectRack, EffectPanel, EffectSelector, TrackEffectControls
+  - ✅ Runtime parameter modification via `useDynamicEffects` and `useTrackDynamicEffects` hooks
+  - ✅ Effect bypass with wet parameter preservation
+  - ✅ WAV export includes effects via Tone.Offline
+  - ✅ Comprehensive documentation at `website/docs/effects.md`
+  - **Location:** `packages/browser/src/effects/`, `packages/browser/src/hooks/useDynamicEffects.ts`
+  - **Nice to have (not blocking):** Effect presets/save-load, custom knob UI components
 
 ### Phase 2: Developer Experience (Should Have)
 

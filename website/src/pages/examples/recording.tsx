@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { RecordingExample } from '../../components/examples/RecordingExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyRecordingExample = createLazyExample(
+  () => import('../../components/examples/RecordingExample').then(m => ({ default: m.RecordingExample }))
+);
 
 export default function RecordingExamplePage(): React.ReactElement {
   return (
@@ -16,7 +20,7 @@ export default function RecordingExamplePage(): React.ReactElement {
         </p>
 
         <div style={{ marginTop: '2rem' }}>
-          <RecordingExample />
+          <LazyRecordingExample />
         </div>
 
         <div style={{ marginTop: '2rem' }}>

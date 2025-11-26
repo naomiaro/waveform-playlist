@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { AnnotationsExample } from '../../components/examples/AnnotationsExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyAnnotationsExample = createLazyExample(
+  () => import('../../components/examples/AnnotationsExample').then(m => ({ default: m.AnnotationsExample }))
+);
 
 export default function AnnotationsExamplePage(): React.ReactElement {
   return (
@@ -16,7 +20,7 @@ export default function AnnotationsExamplePage(): React.ReactElement {
         </p>
 
         <div style={{ marginTop: '2rem' }}>
-          <AnnotationsExample />
+          <LazyAnnotationsExample />
         </div>
 
         <div style={{ marginTop: '2rem' }}>

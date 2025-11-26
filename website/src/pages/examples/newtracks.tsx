@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { NewTracksExample } from '../../components/examples/NewTracksExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyNewTracksExample = createLazyExample(
+  () => import('../../components/examples/NewTracksExample').then(m => ({ default: m.NewTracksExample }))
+);
 
 export default function NewTracksExamplePage(): React.ReactElement {
   return (
@@ -15,7 +19,7 @@ export default function NewTracksExamplePage(): React.ReactElement {
           multiple tracks in real-time.
         </p>
 
-        <NewTracksExample />
+        <LazyNewTracksExample />
 
         <div style={{ marginTop: '2rem' }}>
           <h2>About This Example</h2>

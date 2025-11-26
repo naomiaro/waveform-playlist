@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { DndContext } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
@@ -26,6 +26,7 @@ import {
   usePlaylistData,
   usePlaylistState,
   usePlaylistControls,
+  usePlaybackAnimation,
   useAnnotationDragHandlers,
   useAnnotationKeyboardControls,
   useDragSensors,
@@ -324,6 +325,14 @@ const DangerButton = styled(ActionButton)`
   }
 `;
 
+const SuccessButton = styled(ActionButton)`
+  background: var(--ifm-color-success, #28a745);
+
+  &:hover {
+    background: var(--ifm-color-success-dark, #218838);
+  }
+`;
+
 interface AnnotationsAppContentProps {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
@@ -340,6 +349,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
   const { annotations, linkEndpoints, activeAnnotationId } = usePlaylistState();
   const { setAnnotations } = usePlaylistControls();
+  const { currentTime } = usePlaybackAnimation();
 
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
@@ -363,6 +373,81 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     duration,
     linkEndpoints,
   });
+
+  // Add annotation at current playhead position
+  const addAnnotationAtPlayhead = useCallback(() => {
+    if (duration <= 0) return;
+
+    const playheadTime = currentTime;
+
+    // Check if playhead is inside an existing annotation
+    const existingAnnotation = annotations.find(
+      (a) => playheadTime >= a.start && playheadTime < a.end
+    );
+    if (existingAnnotation) {
+      // Can't create annotation inside existing one
+      console.warn('Cannot create annotation: playhead is inside an existing annotation');
+      return;
+    }
+
+    // Find the next annotation after the playhead (to set end time)
+    const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
+    const nextAnnotation = sortedAnnotations.find((a) => a.start > playheadTime);
+
+    // End time is either the start of next annotation or end of track
+    const endTime = nextAnnotation ? nextAnnotation.start : duration;
+
+    // Minimum duration of 0.5 seconds
+    const minDuration = 0.5;
+    if (endTime - playheadTime < minDuration) {
+      console.warn('Cannot create annotation: not enough space');
+      return;
+    }
+
+    const newAnnotation = {
+      id: 'annotation_' + Date.now(),
+      start: playheadTime,
+      end: endTime,
+      begin: playheadTime.toFixed(3),
+      lines: ['New annotation'],
+      language: 'en',
+    };
+
+    // Insert in chronological order
+    const insertIndex = sortedAnnotations.findIndex((a) => a.start > playheadTime);
+    const newAnnotations =
+      insertIndex === -1
+        ? [...sortedAnnotations, newAnnotation]
+        : [
+            ...sortedAnnotations.slice(0, insertIndex),
+            newAnnotation,
+            ...sortedAnnotations.slice(insertIndex),
+          ];
+
+    setAnnotations(newAnnotations);
+  }, [currentTime, annotations, duration, setAnnotations]);
+
+  // Keyboard shortcut: 'A' to add annotation at playhead
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input field
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        addAnnotationAtPlayhead();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [addAnnotationAtPlayhead]);
 
   // Load audio files
   const loadAudioFiles = async (files: File[]) => {
@@ -521,6 +606,12 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           <Separator />
 
           <ControlGroup>
+            <SuccessButton
+              onClick={addAnnotationAtPlayhead}
+              title="Add annotation at playhead (A)"
+            >
+              + Add Annotation
+            </SuccessButton>
             <DownloadAnnotationsButton />
             <ActionButton onClick={() => jsonInputRef.current?.click()}>
               Upload JSON

@@ -1,6 +1,10 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import { StemTracksExample } from '../../components/examples/StemTracksExample';
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyStemTracksExample = createLazyExample(
+  () => import('../../components/examples/StemTracksExample').then(m => ({ default: m.StemTracksExample }))
+);
 
 export default function StemTracksExamplePage(): React.ReactElement {
   return (
@@ -25,7 +29,7 @@ export default function StemTracksExamplePage(): React.ReactElement {
             border: '1px solid var(--ifm-color-emphasis-300)'
           }}
         >
-          <StemTracksExample />
+          <LazyStemTracksExample />
         </div>
 
         <div style={{ marginTop: '2rem' }}>
