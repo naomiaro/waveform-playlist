@@ -2,8 +2,67 @@ import path from 'path';
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import type {PrismTheme} from 'prism-react-renderer';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+
+// Custom night vision Prism theme - warm amber/red for dark mode
+const nightVisionTheme: PrismTheme = {
+  plain: {
+    color: '#d8c0a8',
+    backgroundColor: '#12100e',
+  },
+  styles: [
+    {
+      types: ['comment', 'prolog', 'doctype', 'cdata'],
+      style: { color: '#7a6858', fontStyle: 'italic' },
+    },
+    {
+      types: ['punctuation'],
+      style: { color: '#a89078' },
+    },
+    {
+      types: ['namespace'],
+      style: { opacity: 0.7 },
+    },
+    {
+      types: ['property', 'tag', 'boolean', 'number', 'constant', 'symbol'],
+      style: { color: '#e8a060' }, // Warm orange
+    },
+    {
+      types: ['selector', 'attr-name', 'string', 'char', 'builtin', 'inserted'],
+      style: { color: '#c49a6c' }, // Amber
+    },
+    {
+      types: ['operator', 'entity', 'url', 'variable'],
+      style: { color: '#d08070' }, // Muted red
+    },
+    {
+      types: ['atrule', 'attr-value', 'keyword'],
+      style: { color: '#c87060' }, // Red like headings
+    },
+    {
+      types: ['function', 'class-name'],
+      style: { color: '#e8c090' }, // Bright amber
+    },
+    {
+      types: ['regex', 'important'],
+      style: { color: '#d4a070' },
+    },
+    {
+      types: ['important', 'bold'],
+      style: { fontWeight: 'bold' },
+    },
+    {
+      types: ['italic'],
+      style: { fontStyle: 'italic' },
+    },
+    {
+      types: ['deleted'],
+      style: { color: '#c87060' },
+    },
+  ],
+};
 
 const config: Config = {
   title: 'Waveform Playlist',
@@ -191,7 +250,7 @@ const config: Config = {
     },
     prism: {
       theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
+      darkTheme: nightVisionTheme,
     },
   } satisfies Preset.ThemeConfig,
 };

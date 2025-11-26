@@ -222,6 +222,92 @@ code {
   font-weight: 500;
 }
 
+/* Dark mode code blocks - night vision aesthetic */
+[data-theme='dark'] pre {
+  background: #12100e !important;
+  border-color: rgba(200, 160, 120, 0.2);
+}
+
+[data-theme='dark'] code {
+  background: rgba(30, 24, 18, 0.8);
+  color: #d8c0a8;
+}
+
+[data-theme='dark'] pre code {
+  background: transparent;
+}
+
+/* Syntax highlighting - warm amber/red palette */
+[data-theme='dark'] .token.comment,
+[data-theme='dark'] .token.prolog,
+[data-theme='dark'] .token.doctype,
+[data-theme='dark'] .token.cdata {
+  color: #7a6858;
+}
+
+[data-theme='dark'] .token.punctuation {
+  color: #a89078;
+}
+
+[data-theme='dark'] .token.property,
+[data-theme='dark'] .token.tag,
+[data-theme='dark'] .token.boolean,
+[data-theme='dark'] .token.number,
+[data-theme='dark'] .token.constant,
+[data-theme='dark'] .token.symbol {
+  color: #e8a060; /* Warm orange */
+}
+
+[data-theme='dark'] .token.selector,
+[data-theme='dark'] .token.attr-name,
+[data-theme='dark'] .token.string,
+[data-theme='dark'] .token.char,
+[data-theme='dark'] .token.builtin {
+  color: #c49a6c; /* Amber */
+}
+
+[data-theme='dark'] .token.operator,
+[data-theme='dark'] .token.entity,
+[data-theme='dark'] .token.url,
+[data-theme='dark'] .language-css .token.string,
+[data-theme='dark'] .style .token.string,
+[data-theme='dark'] .token.variable {
+  color: #d08070; /* Muted red */
+}
+
+[data-theme='dark'] .token.atrule,
+[data-theme='dark'] .token.attr-value,
+[data-theme='dark'] .token.keyword {
+  color: #c87060; /* Red like headings */
+}
+
+[data-theme='dark'] .token.function,
+[data-theme='dark'] .token.class-name {
+  color: #e8c090; /* Bright amber */
+}
+
+[data-theme='dark'] .token.regex,
+[data-theme='dark'] .token.important {
+  color: #d4a070;
+}
+
+[data-theme='dark'] .token.important,
+[data-theme='dark'] .token.bold {
+  font-weight: bold;
+}
+
+[data-theme='dark'] .token.italic {
+  font-style: italic;
+}
+
+/* Inline code in dark mode */
+[data-theme='dark'] :not(pre) > code {
+  background: rgba(40, 32, 24, 0.8);
+  border: 1px solid rgba(200, 160, 120, 0.2);
+  color: #e8a060;
+  padding: 0.1em 0.4em;
+}
+
 /* Cards and containers - brutalist edges */
 .card {
   border-radius: 0;
