@@ -20,6 +20,10 @@ export default function StylingExamplePage(): React.ReactElement {
         </p>
 
         <div style={{ marginTop: '2rem' }}>
+          <LazyStylingExample />
+        </div>
+
+        <div style={{ marginTop: '2rem' }}>
           <h2>Configuration</h2>
           <pre style={{
             background: 'var(--ifm-code-background)',
@@ -58,10 +62,6 @@ export default function StylingExamplePage(): React.ReactElement {
   <Waveform />
 </WaveformPlaylistProvider>`}
           </pre>
-        </div>
-
-        <div style={{ marginTop: '2rem' }}>
-          <LazyStylingExample />
         </div>
 
         <div style={{ marginTop: '2rem' }}>
