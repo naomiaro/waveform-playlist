@@ -24,9 +24,21 @@
   opacity: 1;
 }
 
-/* Dark mode: invert logo to white */
+/* Dark mode: red glow effect */
+[data-theme='dark'] .sponsorsTitle {
+  color: var(--wfpl-heading-h2);
+  text-shadow: 0 0 25px var(--wfpl-heading-glow-medium);
+  opacity: 1;
+}
+
 [data-theme='dark'] .sponsorLogo {
-  filter: brightness(0) invert(1);
+  filter: brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(-50deg);
+  opacity: 0.85;
+}
+
+[data-theme='dark'] .sponsorLogo:hover {
+  filter: brightness(0) invert(1) sepia(1) saturate(6) hue-rotate(-50deg) drop-shadow(0 0 20px var(--wfpl-heading-glow-strong));
+  opacity: 1;
 }
 
 .sponsorCta {

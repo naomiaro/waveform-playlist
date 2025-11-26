@@ -65,6 +65,15 @@
   --ifm-footer-title-color: var(--ifm-font-color-base);
   --ifm-footer-link-color: var(--ifm-font-color-secondary);
   --ifm-footer-link-hover-color: var(--ifm-color-primary);
+
+  /* Night vision heading colors - red/amber tones */
+  --wfpl-heading-h1: #d08070;
+  --wfpl-heading-h2: #c87060;
+  --wfpl-heading-h3: #c87060;
+  --wfpl-heading-h4: #c8a888;
+  --wfpl-heading-glow-strong: rgba(180, 60, 40, 0.5);
+  --wfpl-heading-glow-medium: rgba(200, 80, 50, 0.3);
+  --wfpl-heading-glow-subtle: rgba(180, 80, 60, 0.25);
 }
 
 /* Hero section styling */
@@ -362,28 +371,28 @@ h1:hover, h2:hover {
 /* Main headings - deep red "low watt bulb" */
 [data-theme='dark'] main.container h1,
 [data-theme='dark'] .markdown h1 {
-  color: #d08070;
+  color: var(--wfpl-heading-h1);
   text-shadow:
-    0 0 60px rgba(180, 60, 40, 0.5),
-    0 0 30px rgba(200, 80, 50, 0.3);
+    0 0 60px var(--wfpl-heading-glow-strong),
+    0 0 30px var(--wfpl-heading-glow-medium);
 }
 
 [data-theme='dark'] main.container h2,
 [data-theme='dark'] .markdown h2 {
-  color: #c87060;
-  text-shadow: 0 0 25px rgba(180, 80, 60, 0.3);
+  color: var(--wfpl-heading-h2);
+  text-shadow: 0 0 25px var(--wfpl-heading-glow-medium);
 }
 
 [data-theme='dark'] main.container h3,
 [data-theme='dark'] .markdown h3 {
-  color: #c87060;
-  text-shadow: 0 0 20px rgba(180, 80, 60, 0.25);
+  color: var(--wfpl-heading-h3);
+  text-shadow: 0 0 20px var(--wfpl-heading-glow-subtle);
 }
 
 [data-theme='dark'] .markdown h4,
 [data-theme='dark'] .markdown h5,
 [data-theme='dark'] .markdown h6 {
-  color: #c8a888;
+  color: var(--wfpl-heading-h4);
 }
 
 
