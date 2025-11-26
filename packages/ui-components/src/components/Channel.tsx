@@ -114,7 +114,9 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
 
   useLayoutEffect(() => {
     const canvases = canvasesRef.current;
-    let offset = 0;
+    const step = barWidth + barGap;
+    let globalPixelOffset = 0; // Track global pixel position across all canvases
+
     for (let i = 0; i < canvases.length; i++) {
       const canvas = canvases[i];
       const ctx = canvas.getContext('2d');
@@ -134,24 +136,44 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         );
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        const peakSegmentLength = canvas.width / devicePixelRatio;
-        const step = barWidth + barGap;
-        for (let i = 0; i < peakSegmentLength; i += step) {
-          const peakIndex = Math.floor(i + offset);
-          const minPeak = data[peakIndex * 2] / maxValue;
-          const maxPeak = data[peakIndex * 2 + 1] / maxValue;
+        const canvasWidth = canvas.width / devicePixelRatio;
 
-          const min = Math.abs(minPeak * h2);
-          const max = Math.abs(maxPeak * h2);
+        // Calculate where bars should be drawn in this canvas
+        // by finding where in the global bar pattern this canvas starts
+        const canvasStartGlobal = globalPixelOffset;
+        const canvasEndGlobal = globalPixelOffset + canvasWidth;
 
-          // draw max
-          ctx.fillRect(i, 0, barWidth, h2 - max);
-          // draw min
-          ctx.fillRect(i, h2 + min, barWidth, h2 - min);
+        // Find the first bar that could affect this canvas
+        // A bar at position X extends from X to X+barWidth-1
+        // So we need bars where barStart + barWidth > canvasStartGlobal
+        // Which means barStart > canvasStartGlobal - barWidth
+        const firstBarGlobal = Math.floor((canvasStartGlobal - barWidth + step) / step) * step;
+
+        // Draw bars at the correct positions
+        for (let barGlobal = Math.max(0, firstBarGlobal); barGlobal < canvasEndGlobal; barGlobal += step) {
+          const x = barGlobal - canvasStartGlobal; // Local x position in this canvas
+
+          // Skip if the entire bar would be before this canvas
+          if (x + barWidth <= 0) continue;
+
+          const peakIndex = barGlobal; // Each pixel position corresponds to a peak
+
+          if (peakIndex * 2 + 1 < data.length) {
+            const minPeak = data[peakIndex * 2] / maxValue;
+            const maxPeak = data[peakIndex * 2 + 1] / maxValue;
+
+            const min = Math.abs(minPeak * h2);
+            const max = Math.abs(maxPeak * h2);
+
+            // draw max
+            ctx.fillRect(x, 0, barWidth, h2 - max);
+            // draw min
+            ctx.fillRect(x, h2 + min, barWidth, h2 - min);
+          }
         }
       }
 
-      offset += MAX_CANVAS_WIDTH;
+      globalPixelOffset += canvas.width / devicePixelRatio;
     }
   }, [
     data,
