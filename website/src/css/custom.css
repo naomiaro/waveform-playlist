@@ -1,30 +1,307 @@
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * Waveform Playlist - Berlin Underground Aesthetic
+ * Dark, moody, industrial vibes with electric accents
  */
 
-/* You can override the default Infima variables here. */
+/* Import Space Grotesk - a modern, slightly industrial font */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  /* Electric coral/salmon - like neon club lights */
+  --ifm-color-primary: #ff6b6b;
+  --ifm-color-primary-dark: #ff4757;
+  --ifm-color-primary-darker: #ff3344;
+  --ifm-color-primary-darkest: #ee1133;
+  --ifm-color-primary-light: #ff8585;
+  --ifm-color-primary-lighter: #ff9999;
+  --ifm-color-primary-lightest: #ffb3b3;
+
   --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --docusaurus-highlighted-code-line-bg: rgba(255, 107, 107, 0.15);
+
+  /* Typography */
+  --ifm-font-family-base: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', 'Fira Code', monospace;
+  --ifm-heading-font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --ifm-heading-font-weight: 600;
+
+  /* Spacing - slightly tighter for that editorial feel */
+  --ifm-heading-line-height: 1.2;
+  --ifm-leading: 1.6;
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* Dark mode - the default Berlin vibe */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  /* Cyan/teal accent - like vintage synth LEDs */
+  --ifm-color-primary: #00d4aa;
+  --ifm-color-primary-dark: #00c49d;
+  --ifm-color-primary-darker: #00b894;
+  --ifm-color-primary-darkest: #009975;
+  --ifm-color-primary-light: #1de9b6;
+  --ifm-color-primary-lighter: #4aedc4;
+  --ifm-color-primary-lightest: #7ff1d5;
+
+  --docusaurus-highlighted-code-line-bg: rgba(0, 212, 170, 0.15);
+
+  /* Deep, moody backgrounds */
+  --ifm-background-color: #0a0a0f;
+  --ifm-background-surface-color: #12121a;
+  --ifm-navbar-background-color: rgba(10, 10, 15, 0.95);
+  --ifm-footer-background-color: #08080c;
+
+  /* Muted text for that underground feel */
+  --ifm-font-color-base: #e0e0e5;
+  --ifm-font-color-secondary: #9090a0;
+}
+
+/* Hero section styling */
+.hero {
+  background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
+  padding: 6rem 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(255, 107, 107, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(0, 212, 170, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+[data-theme='dark'] .hero {
+  background: linear-gradient(135deg, #0a0a0f 0%, #0f0f18 50%, #0a0a0f 100%);
+}
+
+[data-theme='dark'] .hero::before {
+  background:
+    radial-gradient(circle at 20% 80%, rgba(0, 212, 170, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 107, 107, 0.05) 0%, transparent 50%);
+}
+
+.hero__title {
+  font-size: 4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+}
+
+.hero__subtitle {
+  font-size: 1.4rem;
+  font-weight: 400;
+  opacity: 0.85;
+  max-width: 600px;
+  margin: 0 auto 2rem;
+  line-height: 1.5;
+}
+
+/* Brutalist button style */
+.button {
+  font-family: var(--ifm-font-family-base);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  padding: 0.9rem 2rem;
+  border-radius: 0;
+  transition: all 0.2s ease;
+}
+
+.button--primary {
+  background: var(--ifm-color-primary);
+  border: 2px solid var(--ifm-color-primary);
+  color: #0a0a0f;
+}
+
+.button--primary:hover {
+  background: transparent;
+  color: var(--ifm-color-primary);
+  transform: translateY(-2px);
+}
+
+.button--secondary {
+  background: transparent;
+  border: 2px solid var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+.button--secondary:hover {
+  background: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  color: #0a0a0f;
+  transform: translateY(-2px);
+}
+
+/* Navbar - minimal and dark */
+.navbar {
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.navbar__title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.navbar__link {
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Footer - dark and minimal */
+.footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.footer__title {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.8rem;
+}
+
+/* Code blocks - moody syntax highlighting */
+pre {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+}
+
+code {
+  border-radius: 0;
+  font-weight: 500;
+}
+
+/* Cards and containers - brutalist edges */
+.card {
+  border-radius: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--ifm-color-primary);
+  transform: translateY(-4px);
+}
+
+/* Feature section styling */
+.features-section {
+  background: var(--ifm-background-surface-color);
+  padding: 5rem 0;
+}
+
+.feature-card {
+  text-align: left;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.feature-card:hover {
+  border-color: var(--ifm-color-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.feature-card h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.feature-card p {
+  font-size: 0.95rem;
+  opacity: 0.8;
+  line-height: 1.6;
+}
+
+/* Links - subtle underline animation */
+a:not(.button):not(.navbar__link):not(.menu__link) {
+  text-decoration: none;
+  background-image: linear-gradient(var(--ifm-color-primary), var(--ifm-color-primary));
+  background-size: 0% 2px;
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  transition: background-size 0.3s ease;
+}
+
+a:not(.button):not(.navbar__link):not(.menu__link):hover {
+  background-size: 100% 2px;
+}
+
+/* Docs sidebar - cleaner look */
+.menu__link {
+  font-size: 0.9rem;
+  border-radius: 0;
+}
+
+.menu__link--active {
+  border-left: 3px solid var(--ifm-color-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Table of contents */
+.table-of-contents__link {
+  font-size: 0.85rem;
+}
+
+/* Scrollbar - dark and minimal */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ifm-background-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Selection color */
+::selection {
+  background: var(--ifm-color-primary);
+  color: #0a0a0f;
+}
+
+/* Glitch effect for headings on hover (optional, subtle) */
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-1px, 1px); }
+  40% { transform: translate(1px, -1px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+  100% { transform: translate(0); }
+}
+
+h1:hover, h2:hover {
+  animation: glitch 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hero__title {
+    font-size: 2.5rem;
+  }
+
+  .hero__subtitle {
+    font-size: 1.1rem;
+  }
 }

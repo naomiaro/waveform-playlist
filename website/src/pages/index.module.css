@@ -1,23 +1,185 @@
 /**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
+ * Homepage styles - Berlin Underground Aesthetic
  */
 
 .heroBanner {
-  padding: 4rem 0;
+  padding: 6rem 0;
   text-align: center;
   position: relative;
   overflow: hidden;
-}
-
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
 }
 
 .buttons {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+/* Screenshot section */
+.screenshotSection {
+  padding: 0 0 4rem;
+  background: linear-gradient(180deg, var(--ifm-background-color) 0%, var(--ifm-background-surface-color) 100%);
+  margin-top: -3rem;
+  position: relative;
+  z-index: 1;
+}
+
+.screenshot {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Features section */
+.features {
+  background: var(--ifm-background-surface-color);
+  padding: 5rem 0;
+}
+
+.featureCard {
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.3s ease;
+  height: 100%;
+  margin-bottom: 2rem;
+}
+
+.featureCard:hover {
+  border-color: var(--ifm-color-primary);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-4px);
+}
+
+.featureCard h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.featureCard p {
+  font-size: 0.95rem;
+  opacity: 0.8;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.featureIcon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  filter: grayscale(20%);
+}
+
+/* Code example section */
+.codeSection {
+  padding: 5rem 0;
+  background: var(--ifm-background-color);
+}
+
+.codeSection h2 {
+  margin-bottom: 1rem;
+}
+
+.codeSection p {
+  opacity: 0.85;
+  margin-bottom: 1.5rem;
+  max-width: 400px;
+}
+
+.codeBlock {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.5rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.codeBlock code {
+  background: none;
+  padding: 0;
+}
+
+/* Sponsors section */
+.sponsors {
+  padding: 4rem 0;
+  text-align: center;
+  background: var(--ifm-background-surface-color);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sponsorsTitle {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  margin-bottom: 2rem;
+  font-weight: 500;
+}
+
+.sponsorLogo {
+  max-width: 200px;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.sponsorLogo:hover {
+  opacity: 1;
+}
+
+/* Dark mode: invert logo to white */
+[data-theme='dark'] .sponsorLogo {
+  filter: brightness(0) invert(1);
+}
+
+.sponsorCta {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+}
+
+.sponsorCta a {
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.sponsorCta a:hover {
+  opacity: 1;
+}
+
+/* Responsive */
+@media screen and (max-width: 996px) {
+  .heroBanner {
+    padding: 4rem 1rem;
+    min-height: auto;
+  }
+
+  .buttons {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .codeSection .row {
+    flex-direction: column;
+  }
+
+  .codeSection .col {
+    margin-bottom: 2rem;
+  }
+
+  .codeBlock {
+    font-size: 0.75rem;
+  }
 }
