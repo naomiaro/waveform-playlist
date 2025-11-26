@@ -65,9 +65,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-svg-core": "^6.5.1",
-    "@fortawesome/free-solid-svg-icons": "^6.5.1",
-    "@fortawesome/react-fontawesome": "^0.2.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/loaders": "workspace:*",
     "@waveform-playlist/playout": "workspace:*",

@@ -1,10 +1,6 @@
-import styled from 'styled-components';
-import { library } from '@fortawesome/fontawesome-svg-core';
-import { faTrashAlt } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import React from 'react';
+import { Trash, type IconProps } from '@phosphor-icons/react';
 
-library.add(faTrashAlt);
-
-export const TrashIcon = styled(FontAwesomeIcon).attrs({
-  icon: faTrashAlt,
-})``;
+export const TrashIcon: React.FC<IconProps> = (props) => (
+  <Trash weight="light" {...props} />
+);

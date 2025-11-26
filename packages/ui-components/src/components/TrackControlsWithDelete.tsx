@@ -112,7 +112,6 @@ export const TrackControlsWithDelete: React.FC<TrackControlsWithDeleteProps> = (
     <Controls>
       <HeaderContainer>
         <DeleteIconButton onClick={onDelete} title="Delete track">
-          {/* @ts-expect-error - TrashIcon has icon prop set via attrs */}
           <TrashIcon />
         </DeleteIconButton>
         <TrackNameSpan>{trackName}</TrackNameSpan>

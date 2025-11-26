@@ -1,8 +1,39 @@
 import React, { FunctionComponent, useLayoutEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { Peaks, Bits } from '@waveform-playlist/webaudio-peaks';
+import { WaveformColor, isWaveformGradient, waveformColorToCss } from '../wfpl-theme';
+
+// Re-export WaveformColor for consumers
+export type { WaveformColor } from '../wfpl-theme';
 
 const MAX_CANVAS_WIDTH = 1000;
+
+/**
+ * Creates a Canvas gradient from a WaveformColor configuration
+ */
+function createCanvasFillStyle(
+  ctx: CanvasRenderingContext2D,
+  color: WaveformColor,
+  width: number,
+  height: number
+): string | CanvasGradient {
+  if (!isWaveformGradient(color)) {
+    return color;
+  }
+
+  let gradient: CanvasGradient;
+  if (color.direction === 'vertical') {
+    gradient = ctx.createLinearGradient(0, 0, 0, height);
+  } else {
+    gradient = ctx.createLinearGradient(0, 0, width, 0);
+  }
+
+  for (const stop of color.stops) {
+    gradient.addColorStop(stop.offset, stop.color);
+  }
+
+  return gradient;
+}
 
 interface ProgressProps {
   readonly $progress: number;
@@ -38,7 +69,7 @@ interface WrapperProps {
   readonly $index: number;
   readonly $cssWidth: number;
   readonly $waveHeight: number;
-  readonly $waveFillColor: string;
+  readonly $waveFillColor: string; // CSS background value (solid or gradient)
 }
 
 const Wrapper = styled.div.attrs<WrapperProps>((props) => ({
@@ -62,8 +93,10 @@ export interface ChannelProps {
   devicePixelRatio?: number;
   waveHeight?: number;
   waveProgressColor?: string;
-  waveOutlineColor?: string;
-  waveFillColor?: string;
+  /** Waveform bar color - can be a solid color string or gradient config */
+  waveOutlineColor?: WaveformColor;
+  /** Waveform background color - can be a solid color string or gradient config */
+  waveFillColor?: WaveformColor;
   /** Width in pixels of waveform bars. Default: 1 */
   barWidth?: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
@@ -111,7 +144,13 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         ctx.resetTransform();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-        ctx.fillStyle = waveOutlineColor;
+        // Create gradient or use solid color for waveform bars
+        ctx.fillStyle = createCanvasFillStyle(
+          ctx,
+          waveOutlineColor,
+          canvas.width,
+          canvas.height
+        );
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
         const peakSegmentLength = canvas.width / devicePixelRatio;
@@ -166,13 +205,16 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveformCount += 1;
   }
 
+  // Convert waveFillColor to CSS for the background
+  const backgroundCss = waveformColorToCss(waveFillColor);
+
   return (
     <Wrapper
       $index={index}
       $cssWidth={length}
       className={className}
       $waveHeight={waveHeight}
-      $waveFillColor={waveFillColor}
+      $waveFillColor={backgroundCss}
     >
       <Progress
         $progress={progress}

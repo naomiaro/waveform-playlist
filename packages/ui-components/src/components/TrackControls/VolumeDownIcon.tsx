@@ -1,8 +1,6 @@
-import styled from 'styled-components';
-import { faVolumeDown } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon, type FontAwesomeIconProps } from '@fortawesome/react-fontawesome';
-import type React from 'react';
+import React from 'react';
+import { SpeakerLow, type IconProps } from '@phosphor-icons/react';
 
-export const VolumeDownIcon: React.FC<Omit<FontAwesomeIconProps, 'icon'>> = styled(FontAwesomeIcon).attrs({
-  icon: faVolumeDown,
-})``;
+export const VolumeDownIcon: React.FC<IconProps> = (props) => (
+  <SpeakerLow weight="light" {...props} />
+);

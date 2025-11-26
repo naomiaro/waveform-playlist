@@ -26,6 +26,7 @@ import {
   usePlayoutStatusUpdate,
   secondsToPixels,
   defaultTheme,
+  waveformColorToCss,
 } from '@waveform-playlist/ui-components';
 import {
   AnnotationBox,
@@ -544,7 +545,7 @@ class WaveformPlaylistClass {
             <div style={{ fontFamily: 'Arial, sans-serif' }}>
               <Playlist
                 theme={theme}
-                backgroundColor={theme.waveOutlineColor || '#00f'}
+                backgroundColor={waveformColorToCss(theme.waveOutlineColor || '#00f')}
                 scrollContainerWidth={tracksFullWidth}
                 timescaleWidth={tracksFullWidth}
                 tracksWidth={tracksFullWidth}
@@ -582,7 +583,7 @@ class WaveformPlaylistClass {
                       <TrackControlsContext.Provider key={track.id} value={trackControls}>
                         <TrackComponent
                           numChannels={peaksData.data.length}
-                          backgroundColor={theme.waveOutlineColor || '#00f'}
+                          backgroundColor={waveformColorToCss(theme.waveOutlineColor || '#00f')}
                           offset={trackOffsetPx}
                           width={tracksFullWidth}
                         >

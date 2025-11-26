@@ -199,15 +199,9 @@ importers:
 
   packages/ui-components:
     dependencies:
-      '@fortawesome/fontawesome-svg-core':
-        specifier: ^6.5.1
-        version: 6.7.2
-      '@fortawesome/free-solid-svg-icons':
-        specifier: ^6.5.1
-        version: 6.7.2
-      '@fortawesome/react-fontawesome':
-        specifier: ^0.2.0
-        version: 0.2.6(@fortawesome/fontawesome-svg-core@6.7.2)(react@18.3.1)
+      '@phosphor-icons/react':
+        specifier: ^2.1.10
+        version: 2.1.10(react-dom@18.3.1)(react@18.3.1)
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
@@ -3888,36 +3882,6 @@ packages:
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
     dev: false
 
-  /@fortawesome/fontawesome-common-types@6.7.2:
-    resolution: {integrity: sha512-Zs+YeHUC5fkt7Mg1l6XTniei3k4bwG/yo3iFUtZWd/pMx9g3fdvkSK9E0FOC+++phXOka78uJcYb8JaFkW52Xg==}
-    engines: {node: '>=6'}
-    dev: false
-
-  /@fortawesome/fontawesome-svg-core@6.7.2:
-    resolution: {integrity: sha512-yxtOBWDrdi5DD5o1pmVdq3WMCvnobT0LU6R8RyyVXPvFRd2o79/0NCuQoCjNTeZz9EzA9xS3JxNWfv54RIHFEA==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@fortawesome/fontawesome-common-types': 6.7.2
-    dev: false
-
-  /@fortawesome/free-solid-svg-icons@6.7.2:
-    resolution: {integrity: sha512-GsBrnOzU8uj0LECDfD5zomZJIjrPhIlWU82AHwa2s40FKH+kcxQaBvBo3Z4TxyZHIyX8XTDxsyA33/Vx9eFuQA==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@fortawesome/fontawesome-common-types': 6.7.2
-    dev: false
-
-  /@fortawesome/react-fontawesome@0.2.6(@fortawesome/fontawesome-svg-core@6.7.2)(react@18.3.1):
-    resolution: {integrity: sha512-mtBFIi1UsYQo7rYonYFkjgYKGoL8T+fEH6NGUpvuqtY3ytMsAoDaPo5rk25KuMtKDipY4bGYM/CkmCHA1N3FUg==}
-    peerDependencies:
-      '@fortawesome/fontawesome-svg-core': ~1 || ~6 || ~7
-      react: ^16.3 || ^17.0.0 || ^18.0.0 || ^19.0.0
-    dependencies:
-      '@fortawesome/fontawesome-svg-core': 6.7.2
-      prop-types: 15.8.1
-      react: 18.3.1
-    dev: false
-
   /@hapi/hoek@9.3.0:
     resolution: {integrity: sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ==}
 
@@ -4123,6 +4087,17 @@ packages:
   /@opentelemetry/api@1.9.0:
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
+    dev: false
+
+  /@phosphor-icons/react@2.1.10(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: '>= 16.8'
+      react-dom: '>= 16.8'
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
     dev: false
 
   /@phosphor-icons/react@2.1.10(react-dom@19.2.0)(react@19.2.0):

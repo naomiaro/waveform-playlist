@@ -19,6 +19,7 @@ import {
   VolumeDownIcon,
   VolumeUpIcon,
   useTheme,
+  waveformColorToCss,
   type RenderPlayheadFunction,
 } from '@waveform-playlist/ui-components';
 import {
@@ -271,7 +272,7 @@ export const Waveform: React.FC<WaveformProps> = ({
       >
           <Playlist
             theme={theme}
-            backgroundColor={theme.waveOutlineColor}
+            backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
             timescaleBackgroundColor={theme.timescaleBackgroundColor}
             scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0) + (timeScaleHeight > 0 ? timescalePadding : 0)}
             timescaleWidth={tracksFullWidth}
@@ -368,7 +369,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                   <TrackControlsContext.Provider key={track.id} value={trackControls}>
                     <TrackComponent
                       numChannels={maxChannels}
-                      backgroundColor={theme.waveOutlineColor}
+                      backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
                       offset={0}
                       width={tracksFullWidth}
                       hasClipHeaders={showClipHeaders}

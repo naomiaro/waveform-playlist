@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
-import { Cross2Icon } from '@radix-ui/react-icons';
+import { X } from '@phosphor-icons/react';
 import JSZip from 'jszip';
 import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 import {
@@ -390,7 +390,7 @@ const CustomTrackControls: React.FC<CustomTrackControlsProps> = ({
   return (
     <ControlsWrapper>
       <DeleteButton onClick={() => onDeleteTrack(trackIndex)} title="Delete track">
-        <Cross2Icon width={10} height={10} />
+        <X size={10} weight="bold" />
       </DeleteButton>
       <Controls>
         <Header style={{ justifyContent: 'center' }}>

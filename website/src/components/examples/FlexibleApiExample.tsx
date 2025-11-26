@@ -13,17 +13,18 @@ import React from 'react';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
 import {
-  PlayIcon,
-  PauseIcon,
-  StopIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
-  SpeakerLoudIcon,
-  TrackPreviousIcon,
-  TrackNextIcon,
-  DoubleArrowLeftIcon,
-  DoubleArrowRightIcon
-} from '@radix-ui/react-icons';
+  Play,
+  Pause,
+  Stop,
+  MagnifyingGlassPlus,
+  MagnifyingGlassMinus,
+  SpeakerHigh,
+  SkipBack,
+  SkipForward,
+  CaretDoubleLeft,
+  CaretDoubleRight,
+  Lightbulb
+} from '@phosphor-icons/react';
 import '@radix-ui/themes/styles.css';
 import {
   WaveformPlaylistProvider,
@@ -255,31 +256,31 @@ const FlexibleApiContent: React.FC = () => {
         <Flex gap="3" align="center" wrap="wrap">
           <Flex gap="2">
             <Button onClick={handleRewind} variant="soft" size="2">
-              <DoubleArrowLeftIcon width="16" height="16" />
+              <CaretDoubleLeft size={16} weight="light" />
               Rewind
             </Button>
             <Button onClick={handleSkipBackward} variant="soft" size="2">
-              <TrackPreviousIcon width="16" height="16" />
+              <SkipBack size={16} weight="light" />
               Skip -5s
             </Button>
             <Button onClick={() => play()} variant="solid" color="green" size="2">
-              <PlayIcon width="16" height="16" />
+              <Play size={16} weight="fill" />
               Play
             </Button>
             <Button onClick={() => pause()} variant="soft" color="amber" size="2">
-              <PauseIcon width="16" height="16" />
+              <Pause size={16} weight="fill" />
               Pause
             </Button>
             <Button onClick={() => stop()} variant="soft" color="red" size="2">
-              <StopIcon width="16" height="16" />
+              <Stop size={16} weight="fill" />
               Stop
             </Button>
             <Button onClick={handleSkipForward} variant="soft" size="2">
-              <TrackNextIcon width="16" height="16" />
+              <SkipForward size={16} weight="light" />
               Skip +5s
             </Button>
             <Button onClick={handleFastForward} variant="soft" size="2">
-              <DoubleArrowRightIcon width="16" height="16" />
+              <CaretDoubleRight size={16} weight="light" />
               Fast Forward
             </Button>
           </Flex>
@@ -292,11 +293,11 @@ const FlexibleApiContent: React.FC = () => {
           <Flex gap="2" align="center">
             <Text size="2" color="gray">Zoom:</Text>
             <Button onClick={zoomIn} size="2" variant="soft">
-              <ZoomInIcon width="16" height="16" />
+              <MagnifyingGlassPlus size={16} weight="light" />
               In
             </Button>
             <Button onClick={zoomOut} size="2" variant="soft">
-              <ZoomOutIcon width="16" height="16" />
+              <MagnifyingGlassMinus size={16} weight="light" />
               Out
             </Button>
           </Flex>
@@ -314,7 +315,7 @@ const FlexibleApiContent: React.FC = () => {
           <Separator orientation="vertical" />
 
           <Flex gap="2" align="center" style={{ minWidth: '200px' }}>
-            <SpeakerLoudIcon width="16" height="16" />
+            <SpeakerHigh size={16} weight="light" />
             <Text size="2" color="gray">Volume:</Text>
             <Slider
               value={[masterVolume * 100]}
@@ -477,7 +478,7 @@ export function FlexibleApiExample() {
 
         <Card style={{ marginTop: '2rem', background: 'var(--gray-2)' }}>
           <Flex direction="column" gap="2">
-            <Text size="3" weight="bold">💡 About This Example</Text>
+            <Text size="3" weight="bold"><Lightbulb size={18} weight="light" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} /> About This Example</Text>
             <Text size="2" color="gray">
               This example demonstrates the <strong>flexible hooks API</strong> - using individual hooks to build
               completely custom controls with Radix UI components. Instead of using pre-built components like

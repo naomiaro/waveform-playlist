@@ -45,6 +45,7 @@ import {
 } from '@waveform-playlist/recording';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { darkTheme } from '@waveform-playlist/ui-components';
+import { Microphone, FolderOpen, MusicNotes } from '@phosphor-icons/react';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -322,7 +323,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <Flex direction="column" gap="3">
           {!hasPermission ? (
             <Button size="3" onClick={requestMicAccess}>
-              🎤 Enable Microphone
+              <Microphone size={18} weight="light" style={{ marginRight: '6px' }} /> Enable Microphone
             </Button>
           ) : (
             <RecordingControlsRow>
@@ -361,7 +362,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         onClick={() => fileInputRef.current?.click()}
       >
         <Text size="3" weight="medium">
-          {isDragging ? '📂 Drop audio files here' : '🎵 Drop audio files or click to browse'}
+          {isDragging ? <><FolderOpen size={18} weight="light" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }} /> Drop audio files here</> : <><MusicNotes size={18} weight="light" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }} /> Drop audio files or click to browse</>}
         </Text>
         <Text size="2" color="gray">
           Supports MP3, WAV, OGG, and more
