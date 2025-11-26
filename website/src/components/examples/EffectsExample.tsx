@@ -481,7 +481,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
     e.preventDefault();
     setIsDragging(false);
 
-    const files = Array.from(e.dataTransfer.files);
+    const files = Array.from(e.dataTransfer.files) as File[];
     const audioFiles = files.filter(file => file.type.startsWith('audio/'));
 
     if (audioFiles.length === 0) return;
@@ -538,7 +538,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
     if (!files || files.length === 0) return;
 
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+    const audioFiles = (Array.from(files) as File[]).filter(file => file.type.startsWith('audio/'));
     const newTracks: ClipTrack[] = [];
 
     for (const file of audioFiles) {

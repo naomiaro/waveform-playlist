@@ -2,7 +2,27 @@
   // This file is not used in compilation. It is here just for a nice editor experience.
   "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "baseUrl": "."
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "baseUrl": ".",
+    "paths": {
+      "@site/*": ["./*"],
+      "@waveform-playlist/browser": ["../packages/browser/src"],
+      "@waveform-playlist/browser/*": ["../packages/browser/src/*"],
+      "@waveform-playlist/core": ["../packages/core/src"],
+      "@waveform-playlist/core/*": ["../packages/core/src/*"],
+      "@waveform-playlist/playout": ["../packages/playout/src"],
+      "@waveform-playlist/playout/*": ["../packages/playout/src/*"],
+      "@waveform-playlist/ui-components": ["../packages/ui-components/src"],
+      "@waveform-playlist/ui-components/*": ["../packages/ui-components/src/*"],
+      "@waveform-playlist/annotations": ["../packages/annotations/src"],
+      "@waveform-playlist/annotations/*": ["../packages/annotations/src/*"]
+    }
   },
+  "include": [
+    "src/**/*",
+    "src/types/**/*",
+    "../packages/ui-components/src/styled.d.ts",
+    "../packages/annotations/src/styled.d.ts"
+  ],
   "exclude": [".docusaurus", "build"]
 }

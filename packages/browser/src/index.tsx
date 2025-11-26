@@ -25,6 +25,7 @@ import {
   usePlayoutStatus,
   usePlayoutStatusUpdate,
   secondsToPixels,
+  defaultTheme,
 } from '@waveform-playlist/ui-components';
 import {
   AnnotationBox,
@@ -33,14 +34,6 @@ import {
 } from '@waveform-playlist/annotations';
 import { generatePeaks } from './peaksUtil';
 import type { PeakData, Peaks } from '@waveform-playlist/webaudio-peaks';
-
-// Simple theme
-const defaultTheme = {
-  waveOutlineColor: '#00f',
-  waveFillColor: '#0ff',
-  waveProgressColor: '#f00',
-  timeColor: '#000',
-};
 
 interface PlaylistConfig {
   container: HTMLElement;
@@ -1310,6 +1303,7 @@ export {
   useDragSensors,
   useClipSplitting,
   useKeyboardShortcuts,
+  getShortcutLabel,
   useAudioTracks,
   useIntegratedRecording,
   useZoomControls,
@@ -1381,6 +1375,9 @@ export {
 } from './components';
 export type { ExportWavButtonProps } from './components/ExportControls';
 export type { WaveformProps } from './components/Waveform';
+
+// Re-export TimeFormat type from ui-components for convenience
+export type { TimeFormat } from '@waveform-playlist/ui-components';
 
 // Export waveform-data.js utilities
 export {

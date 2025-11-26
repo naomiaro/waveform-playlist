@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   WaveformPlaylistProvider,
   useWaveformPlaylist,
   useZoomControls,
   useTimeFormat,
+  useKeyboardShortcuts,
+  getShortcutLabel,
 } from '@waveform-playlist/browser';
+import type { KeyboardShortcut } from '@waveform-playlist/browser';
 import { BaseButton, BaseSlider, BaseSelect } from '../styled';
 
 /**
@@ -130,6 +133,90 @@ const MasterVolumeDemo: React.FC = () => {
   );
 };
 
+// useKeyboardShortcuts hook demo
+const KeyboardShortcutsDemo: React.FC = () => {
+  const [lastAction, setLastAction] = useState<string>('None');
+  const [actionCount, setActionCount] = useState(0);
+
+  const shortcuts: KeyboardShortcut[] = [
+    {
+      key: ' ',
+      action: () => {
+        setLastAction('Play/Pause (Space)');
+        setActionCount(c => c + 1);
+      },
+      description: 'Play/Pause',
+      preventDefault: true,
+    },
+    {
+      key: 's',
+      action: () => {
+        setLastAction('Split (S)');
+        setActionCount(c => c + 1);
+      },
+      description: 'Split clip at cursor',
+      preventDefault: true,
+    },
+    {
+      key: 'Delete',
+      action: () => {
+        setLastAction('Delete (Delete)');
+        setActionCount(c => c + 1);
+      },
+      description: 'Delete selected',
+      preventDefault: true,
+    },
+    {
+      key: 'z',
+      metaKey: true,
+      action: () => {
+        setLastAction('Undo (Cmd+Z)');
+        setActionCount(c => c + 1);
+      },
+      description: 'Undo',
+      preventDefault: true,
+    },
+    {
+      key: 'z',
+      metaKey: true,
+      shiftKey: true,
+      action: () => {
+        setLastAction('Redo (Cmd+Shift+Z)');
+        setActionCount(c => c + 1);
+      },
+      description: 'Redo',
+      preventDefault: true,
+    },
+  ];
+
+  useKeyboardShortcuts({ shortcuts, enabled: true });
+
+  return (
+    <div style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
+      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>useKeyboardShortcuts</h3>
+      <div style={{ marginBottom: '1rem' }}>
+        <strong>Last Action:</strong> {lastAction}
+      </div>
+      <div style={{ marginBottom: '1rem' }}>
+        <strong>Total Actions:</strong> {actionCount}
+      </div>
+      <div style={{ fontSize: '0.875rem', color: '#666' }}>
+        <strong>Available Shortcuts:</strong>
+        <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+          {shortcuts.map((s, i) => (
+            <li key={i}>
+              <code>{getShortcutLabel(s)}</code> - {s.description}
+            </li>
+          ))}
+        </ul>
+        <p style={{ fontStyle: 'italic' }}>
+          Click in this panel and press keyboard shortcuts to test.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // Provider wrapper for hooks that need context
 const HookDemoWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <WaveformPlaylistProvider tracks={[]} samplesPerPixel={1024}>
@@ -154,12 +241,26 @@ These stories demonstrate how to test and visualize custom React hooks.
 3. Use Storybook's interaction testing for automated tests
 
 ## Available Hooks
+
+### Demoed in Storybook
 - \`useZoomControls\` - Manage zoom levels and navigation
 - \`useTimeFormat\` - Format and parse time values
-- \`useMasterVolume\` - Control master audio volume
-- \`useAudioTracks\` - Load audio files (not demoed here - needs actual files)
-- \`usePlaybackAnimation\` - Animation frame timing for playback
-- And more...
+- \`useMasterVolume\` - Control master audio volume (via context)
+- \`useKeyboardShortcuts\` - Flexible keyboard shortcut system
+
+### Require Full Context (not demoed)
+- \`useAudioTracks\` - Load audio files
+- \`useClipDragHandlers\` - Drag-to-move and boundary trimming
+- \`useClipSplitting\` - Split clips at cursor position
+- \`useAnnotationDragHandlers\` - Drag annotation boundaries
+- \`useAnnotationKeyboardControls\` - Keyboard navigation for annotations
+- \`useDragSensors\` - Configure @dnd-kit sensors
+- \`useIntegratedRecording\` - Recording with auto-add to playlist
+- \`useDynamicEffects\` - Toggle effects on/off dynamically
+- \`useTrackDynamicEffects\` - Per-track effect management
+- \`useExportWav\` - Export playlist to WAV file
+- \`useMasterAnalyser\` - Master output analyser node
+- \`useTrackReverb\`, \`useTrackAutoWah\`, \`useEffectsChain\` - Audio effects
         `,
       },
     },
@@ -214,6 +315,17 @@ export const MasterVolume: StoryObj = {
   },
 };
 
+export const KeyboardShortcuts: StoryObj = {
+  render: () => <KeyboardShortcutsDemo />,
+  parameters: {
+    docs: {
+      description: {
+        story: 'The `useKeyboardShortcuts` hook provides a flexible system for handling keyboard shortcuts with modifier key support.',
+      },
+    },
+  },
+};
+
 export const AllHooks: StoryObj = {
   render: () => (
     <HookDemoWrapper>
@@ -221,6 +333,7 @@ export const AllHooks: StoryObj = {
         <ZoomControlsDemo />
         <TimeFormatDemo />
         <MasterVolumeDemo />
+        <KeyboardShortcutsDemo />
       </div>
     </HookDemoWrapper>
   ),

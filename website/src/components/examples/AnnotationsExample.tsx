@@ -548,7 +548,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
       e.preventDefault();
       setIsDragging(false);
 
-      const files = Array.from(e.dataTransfer.files);
+      const files = Array.from(e.dataTransfer.files) as File[];
       if (files.length > 0) {
         loadAudioFiles(files);
       }
@@ -561,7 +561,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        loadAudioFiles(Array.from(files));
+        loadAudioFiles(Array.from(files) as File[]);
       }
     },
     [tracks]

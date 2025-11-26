@@ -36,9 +36,8 @@ import {
   useWaveformPlaylist,
   type TimeFormat,
 } from '@waveform-playlist/browser';
-import { CLIP_HEADER_HEIGHT, PlayheadWithMarker } from '@waveform-playlist/ui-components';
+import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
-import { darkTheme } from '@waveform-playlist/ui-components';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -171,73 +170,27 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
   );
 };
 
-// Helper to format time based on selected format
-const formatTime = (seconds: number, format: TimeFormat): string => {
-  if (format === 'hh:mm:ss') {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  } else if (format === 'hh:mm:ss.u') {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 10);
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`;
-  } else if (format === 'hh:mm:ss.uu') {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 100);
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-  } else if (format === 'hh:mm:ss.uuu') {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 1000);
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-  }
-  return seconds.toFixed(3);
-};
-
 // Custom Selection Time Inputs using Radix UI
 const CustomSelectionInputs: React.FC = () => {
   const { selectionStart, selectionEnd } = usePlaylistState();
   const { setSelection } = usePlaylistControls();
   const { timeFormat } = usePlaylistData();
-
-  const parseTimeString = (timeStr: string): number => {
-    if (timeFormat === 'seconds') {
-      return parseFloat(timeStr) || 0;
-    }
-
-    // Parse hh:mm:ss or hh:mm:ss.u/uu/uuu format
-    const parts = timeStr.split(':');
-    if (parts.length !== 3) return 0;
-
-    const hours = parseInt(parts[0]) || 0;
-    const minutes = parseInt(parts[1]) || 0;
-    const secondsParts = parts[2].split('.');
-    const seconds = parseInt(secondsParts[0]) || 0;
-    const ms = secondsParts[1] ? parseFloat('0.' + secondsParts[1]) : 0;
-
-    return hours * 3600 + minutes * 60 + seconds + ms;
-  };
+  const format = timeFormat as TimeFormat;
 
   const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newStart = parseTimeString(e.target.value);
+    const newStart = parseTime(e.target.value, format);
     setSelection(newStart, selectionEnd);
   };
 
   const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newEnd = parseTimeString(e.target.value);
+    const newEnd = parseTime(e.target.value, format);
     setSelection(selectionStart, newEnd);
   };
 
   return (
     <Flex gap="2" align="center">
       <TextField.Root
-        value={formatTime(selectionStart, timeFormat)}
+        value={formatTime(selectionStart, format)}
         onChange={handleStartChange}
         placeholder="Start"
         size="2"
@@ -245,7 +198,7 @@ const CustomSelectionInputs: React.FC = () => {
       />
       <Text size="2" color="gray">to</Text>
       <TextField.Root
-        value={formatTime(selectionEnd, timeFormat)}
+        value={formatTime(selectionEnd, format)}
         onChange={handleEndChange}
         placeholder="End"
         size="2"
@@ -261,6 +214,7 @@ const FlexibleApiContent: React.FC = () => {
   const { currentTime, currentTimeRef } = usePlaybackAnimation();
   const { duration, masterVolume, timeFormat } = usePlaylistData();
   const { isAutomaticScroll } = usePlaylistState();
+  const format = timeFormat as TimeFormat;
 
   // Navigation handlers using seekTo
   const handleRewind = () => seekTo(0);
@@ -268,9 +222,9 @@ const FlexibleApiContent: React.FC = () => {
   const handleSkipBackward = () => seekTo((currentTimeRef.current ?? 0) - 5);
   const handleSkipForward = () => seekTo((currentTimeRef.current ?? 0) + 5);
 
-  // Format current time based on selected format
-  const formattedTime = formatTime(currentTime, timeFormat);
-  const formattedDuration = formatTime(duration, timeFormat);
+  // Format current time based on selected format from context
+  const formattedTime = formatTime(currentTime, format);
+  const formattedDuration = formatTime(duration, format);
 
   return (
     <Flex direction="column" gap="3">
@@ -354,7 +308,6 @@ const FlexibleApiContent: React.FC = () => {
       </Card>
 
       <Waveform
-        timescale
         renderTrackControls={(trackIndex) => (
           <CustomTrackControls trackIndex={trackIndex} />
         )}
@@ -505,7 +458,7 @@ export function FlexibleApiExample() {
               <li><Text size="2" color="gray"><code>usePlaybackAnimation()</code> - Get <code>currentTime</code> for live position</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistData()</code> - Get <code>duration</code>, <code>sampleRate</code>, etc.</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistState()</code> - Get/set <code>timeFormat</code>, <code>masterVolume</code>, <code>isAutomaticScroll</code>, etc.</Text></li>
-              <li><Text size="2" color="gray">Custom time formatting with <code>formatTime()</code> helper</Text></li>
+              <li><Text size="2" color="gray"><code>useTimeFormat()</code> - Get <code>formatTime</code> and <code>parseTime</code> for time display/input</Text></li>
               <li><Text size="2" color="gray"><code>renderPlayhead</code> - Custom playhead with triangle marker (see <code>PlayheadWithMarker</code>)</Text></li>
               <li><Text size="2" color="gray">Radix UI components (<code>Button</code>, <code>Slider</code>, <code>Switch</code>, <code>Select</code>)</Text></li>
             </ul>

@@ -99,7 +99,7 @@ export function NewTracksExample() {
       e.preventDefault();
       setIsDragging(false);
 
-      const files = Array.from(e.dataTransfer.files).filter((file) =>
+      const files = (Array.from(e.dataTransfer.files) as File[]).filter((file) =>
         file.type.startsWith('audio/')
       );
 
@@ -115,7 +115,7 @@ export function NewTracksExample() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        addFiles(Array.from(files));
+        addFiles(Array.from(files) as File[]);
       }
     },
     [tracks]
@@ -253,7 +253,6 @@ export function NewTracksExample() {
           </Controls>
 
           <Waveform
-            timescale
             renderTrackControls={(trackIndex) => {
               const track = tracks[trackIndex];
               if (!track) return null;
@@ -286,7 +285,7 @@ export function NewTracksExample() {
                     updatedTracks[trackIndex] = { ...track, pan };
                     setTracks(updatedTracks);
                   }}
-                  onRemove={() => handleRemoveTrack(trackIndex)}
+                  onDelete={() => handleRemoveTrack(trackIndex)}
                 />
               );
             }}

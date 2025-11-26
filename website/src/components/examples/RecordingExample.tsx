@@ -240,7 +240,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     e.preventDefault();
     setIsDragging(false);
 
-    const files = Array.from(e.dataTransfer.files);
+    const files = Array.from(e.dataTransfer.files) as File[];
     const audioFiles = files.filter(file => file.type.startsWith('audio/'));
 
     if (audioFiles.length === 0) return;
@@ -278,7 +278,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       if (!files || files.length === 0) return;
 
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+      const audioFiles = (Array.from(files) as File[]).filter(file => file.type.startsWith('audio/'));
 
       for (const file of audioFiles) {
         const arrayBuffer = await file.arrayBuffer();
@@ -427,7 +427,6 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         modifiers={[restrictToHorizontalAxis, collisionModifier]}
       >
         <Waveform
-          timescale
           showClipHeaders
           interactiveClips
           recordingState={
