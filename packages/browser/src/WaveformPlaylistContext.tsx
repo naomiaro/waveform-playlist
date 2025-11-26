@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { ThemeProvider } from 'styled-components';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
-import { type Track, type ClipTrack } from '@waveform-playlist/core';
+import { type Track, type ClipTrack, type Fade } from '@waveform-playlist/core';
 import { type TimeFormat, type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
 import { start as toneStart, getContext } from 'tone';
 import { generatePeaks } from './peaksUtil';
@@ -16,6 +16,8 @@ export interface ClipPeaks {
   peaks: PeakData;
   startSample: number;
   durationSamples: number;
+  fadeIn?: Fade;
+  fadeOut?: Fade;
 }
 
 export type TrackClipPeaks = ClipPeaks[];
@@ -472,6 +474,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           peaks,
           startSample: clip.startSample,
           durationSamples: clip.durationSamples,
+          fadeIn: clip.fadeIn,
+          fadeOut: clip.fadeOut,
         };
       });
 

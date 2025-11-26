@@ -4,6 +4,8 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { ClipHeader, CLIP_HEADER_HEIGHT } from './ClipHeader';
 import { ClipBoundary, CLIP_BOUNDARY_WIDTH } from './ClipBoundary';
+import { FadeOverlay } from './FadeOverlay';
+import type { Fade } from '@waveform-playlist/core';
 
 interface ClipContainerProps {
   readonly $left?: number; // Horizontal position in pixels (optional for DragOverlay)
@@ -60,6 +62,10 @@ export interface ClipProps {
   isSelected?: boolean; // Whether the track is selected
   onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void; // Called when clip is pressed (for track selection - fires before drag)
   trackId?: string; // Track ID for identifying which track this clip belongs to
+  // Fade configuration
+  fadeIn?: Fade; // Fade in effect
+  fadeOut?: Fade; // Fade out effect
+  sampleRate?: number; // Sample rate for converting fade duration to pixels
 }
 
 /**
@@ -86,6 +92,9 @@ export const Clip: FunctionComponent<ClipProps> = ({
   isSelected = false,
   onMouseDown,
   trackId,
+  fadeIn,
+  fadeOut,
+  sampleRate = 44100,
 }) => {
   // Calculate horizontal position based on start sample
   // Use Math.floor to always snap to pixel boundaries
@@ -164,6 +173,23 @@ export const Clip: FunctionComponent<ClipProps> = ({
       )}
       <ChannelsWrapper $isOverlay={isOverlay}>
         {children}
+        {/* Fade overlays */}
+        {fadeIn && fadeIn.duration > 0 && (
+          <FadeOverlay
+            left={0}
+            width={Math.floor((fadeIn.duration * sampleRate) / samplesPerPixel)}
+            type="fadeIn"
+            curveType={fadeIn.type}
+          />
+        )}
+        {fadeOut && fadeOut.duration > 0 && (
+          <FadeOverlay
+            left={width - Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)}
+            width={Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)}
+            type="fadeOut"
+            curveType={fadeOut.type}
+          />
+        )}
         {showHeader && !disableHeaderDrag && !isOverlay && (
           <>
             <ClipBoundary

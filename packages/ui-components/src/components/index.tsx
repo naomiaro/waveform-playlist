@@ -5,6 +5,7 @@ export * from './Channel';
 export * from './Clip';
 export * from './ClipBoundary';
 export * from './ClipHeader';
+export * from './FadeOverlay';
 export * from './MasterVolumeControl';
 export * from './Playhead';
 export * from './Playlist';

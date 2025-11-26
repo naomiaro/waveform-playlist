@@ -407,6 +407,9 @@ export const Waveform: React.FC<WaveformProps> = ({
                             disableHeaderDrag={!interactiveClips}
                             isSelected={track.id === selectedTrackId}
                             trackId={track.id}
+                            fadeIn={clip.fadeIn}
+                            fadeOut={clip.fadeOut}
+                            sampleRate={sampleRate}
                             onMouseDown={(e) => {
                               // Only select track if clicking on the waveform, not on draggable elements
                               const target = e.target as HTMLElement;

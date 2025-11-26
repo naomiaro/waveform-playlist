@@ -31,6 +31,9 @@ export interface WaveformPlaylistTheme {
   // Selected clip header colors
   selectedClipHeaderBackgroundColor: string;
 
+  // Fade overlay colors
+  fadeOverlayColor: string;
+
   // UI component colors
   backgroundColor: string;
   surfaceColor: string;
@@ -89,6 +92,9 @@ export const defaultTheme: WaveformPlaylistTheme = {
   clipHeaderTextColor: '#333',
   selectedClipHeaderBackgroundColor: '#b3d9ff', // Brighter blue for selected track clip headers
 
+  // Fade overlay colors
+  fadeOverlayColor: 'rgba(0, 0, 0, 0.4)', // Semi-transparent overlay for fade regions
+
   // UI component colors
   backgroundColor: '#ffffff',
   surfaceColor: '#f5f5f5',
@@ -146,6 +152,9 @@ export const darkTheme: WaveformPlaylistTheme = {
   clipHeaderBorderColor: 'rgba(255, 255, 255, 0.2)',
   clipHeaderTextColor: '#e0e0e0', // Light text
   selectedClipHeaderBackgroundColor: '#2a4a6c', // Darker blue for selected clip headers
+
+  // Fade overlay colors
+  fadeOverlayColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent overlay for fade regions
 
   // UI component colors
   backgroundColor: '#1e1e1e',
