@@ -255,10 +255,10 @@
 }
 
 [data-theme='dark'] .heroGlitch {
-  color: #fff;
+  color: #e8c4a0; /* Warm amber - low watt bulb */
   text-shadow:
-    0 0 80px rgba(255, 107, 107, 0.5),
-    0 0 40px rgba(0, 212, 170, 0.3);
+    0 0 60px rgba(180, 80, 40, 0.6),
+    0 0 30px rgba(200, 100, 50, 0.4);
 }
 
 .heroGlitch::before,
@@ -315,7 +315,7 @@
 }
 
 [data-theme='dark'] .heroSubtitle {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(220, 180, 150, 0.8); /* Warm muted amber */
 }
 
 .scrollIndicator {
@@ -334,7 +334,7 @@
 }
 
 [data-theme='dark'] .scrollIndicator {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(200, 150, 120, 0.6); /* Warm muted amber */
 }
 
 .scrollArrow {
@@ -405,7 +405,7 @@
 }
 
 [data-theme='dark'] .categoryTitle {
-  color: #fff;
+  color: #dcc0a0; /* Warm amber */
 }
 
 .categorySubtitle {
@@ -416,7 +416,7 @@
 }
 
 [data-theme='dark'] .categorySubtitle {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(200, 160, 130, 0.6); /* Warm muted amber */
 }
 
 /* Examples Grid */
@@ -559,7 +559,7 @@
 }
 
 [data-theme='dark'] .cardTitle {
-  color: #fff;
+  color: #d8b898; /* Warm amber */
 }
 
 .cardDescription {
@@ -570,7 +570,7 @@
 }
 
 [data-theme='dark'] .cardDescription {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(200, 170, 140, 0.7); /* Warm muted amber */
 }
 
 .cardArrow {
@@ -652,7 +652,8 @@
 }
 
 [data-theme='dark'] .ctaContent h2 {
-  color: #fff;
+  color: #e0c0a0; /* Warm amber */
+  text-shadow: 0 0 40px rgba(180, 100, 50, 0.4);
 }
 
 .ctaContent p {
@@ -662,7 +663,7 @@
 }
 
 [data-theme='dark'] .ctaContent p {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(200, 170, 140, 0.7); /* Warm muted amber */
 }
 
 .ctaButtons {
@@ -702,8 +703,8 @@
 }
 
 [data-theme='dark'] .ctaButtonSecondary {
-  color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.3);
+  color: #d8b898 !important;
+  border-color: rgba(200, 160, 130, 0.4);
 }
 
 .ctaButtonSecondary:hover {
@@ -712,7 +713,7 @@
 }
 
 [data-theme='dark'] .ctaButtonSecondary:hover {
-  border-color: #fff;
+  border-color: #d8b898;
 }
 
 /* ============================================
