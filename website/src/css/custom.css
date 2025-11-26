@@ -395,6 +395,32 @@ h1:hover, h2:hover {
   color: var(--wfpl-heading-h4);
 }
 
+/* Sidebar links - amber text in dark mode */
+[data-theme='dark'] .menu__link {
+  color: var(--ifm-font-color-base);
+}
+
+[data-theme='dark'] .menu__link:hover {
+  color: var(--wfpl-heading-h4);
+}
+
+[data-theme='dark'] .menu__link--active {
+  color: var(--wfpl-heading-h2);
+  border-left-color: var(--wfpl-heading-h2);
+}
+
+/* Table of contents (right sidebar) - amber text */
+[data-theme='dark'] .table-of-contents__link {
+  color: var(--ifm-font-color-secondary);
+}
+
+[data-theme='dark'] .table-of-contents__link:hover {
+  color: var(--wfpl-heading-h4);
+}
+
+[data-theme='dark'] .table-of-contents__link--active {
+  color: var(--wfpl-heading-h2);
+}
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
