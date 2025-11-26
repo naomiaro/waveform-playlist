@@ -7,7 +7,7 @@ export type { ZoomControls, UseZoomControlsProps } from './useZoomControls';
 export { useMasterVolume } from './useMasterVolume';
 export type { MasterVolumeControls, UseMasterVolumeProps } from './useMasterVolume';
 
-export { useMasterAnalyser, useTrackReverb, useTrackAutoWah, useEffectsChain } from './useAudioEffects';
+export { useMasterAnalyser } from './useAudioEffects';
 
 export { useAudioTracks } from './useAudioTracks';
 export type { AudioTrackConfig } from './useAudioTracks';

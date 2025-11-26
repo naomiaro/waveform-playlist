@@ -131,7 +131,11 @@ const config: Config = {
           label: 'Docs',
         },
         {to: '/examples', label: 'Examples', position: 'left'},
-        {href: '/waveform-playlist/storybook/index.html', label: 'Storybook', position: 'left'},
+        {
+          href: 'pathname:///waveform-playlist/storybook/',
+          label: 'Storybook',
+          position: 'left',
+        },
         {
           href: 'https://github.com/naomiaro/waveform-playlist',
           label: 'GitHub',
@@ -173,7 +177,7 @@ const config: Config = {
             },
             {
               label: 'Storybook',
-              href: '/waveform-playlist/storybook/index.html',
+              href: 'pathname:///waveform-playlist/storybook/',
             },
             {
               label: 'GitHub',

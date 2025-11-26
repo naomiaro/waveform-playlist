@@ -9,6 +9,24 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-25: Storybook Complete
+- ✅ 32 story files covering all major components
+- ✅ Added Recording component stories (VUMeter, RecordButton, RecordingIndicator, MicrophoneSelector)
+- ✅ Animated demos showing real-time behavior
+- ✅ Complete Recording Controls story showing all components together
+- ✅ Storybook builds and deploys to `/waveform-playlist/storybook/`
+
+### 2025-11-25: Storybook & TypeScript Fixes
+- ✅ Storybook published to `/waveform-playlist/storybook/` with Docusaurus links
+- ✅ Added `useKeyboardShortcuts` story with interactive demo
+- ✅ Added `parseTime` to `useTimeFormat` hook
+- ✅ Exported `TimeFormat` type from browser package
+- ✅ Fixed website TypeScript errors (Docusaurus virtual modules, theme types)
+- ✅ Created `website/src/types/docusaurus.d.ts` for type declarations
+- ✅ Fixed `timescale` prop (provider-only, not Waveform)
+- ✅ Fixed `onRemove` → `onDelete` in TrackControlsWithDelete
+- ✅ Fixed FlexibleApiExample to use context's `timeFormat` with `formatTime()`
+
 ### 2025-11-25: Custom Playhead Component Support
 - ✅ `renderPlayhead` prop on Waveform component for custom playhead rendering
 - ✅ `PlayheadWithMarker` component - playhead with triangle marker at top
@@ -403,22 +421,23 @@ Foundation for users to get started and understand the library.
   - Generate .d.ts files correctly
   - Test type inference works for consumers
 
-- [ ] **Add Storybook for component demos**
-  - Setup Storybook for ui-components package
-  - Interactive component playground
-  - Document all props and usage patterns
-  - Examples for each component (Waveform, Track, Clip, Controls, etc.)
+- [x] **Add Storybook for component demos** ✅
+  - Storybook setup in ui-components package with 32 story files
+  - Interactive component playground at `/waveform-playlist/storybook/`
+  - Stories for all major components: Waveform, Track, Clip, Channel, Controls
+  - Recording components: VUMeter, RecordButton, RecordingIndicator, MicrophoneSelector
+  - Hooks demos: useZoomControls, useTimeFormat, useMasterVolume, useKeyboardShortcuts
+  - WaveformData stories demonstrating BBC peaks format support
+  - **Location:** `packages/ui-components/src/stories/`
 
-### Phase 3: Documentation Site (Should Have)
+### Phase 3: Documentation Site (COMPLETE) ✅
 
-Professional documentation infrastructure.
-
-- [ ] **Migrate to Docusaurus**
-  - Replace Jekyll site with https://docusaurus.io/
-  - Modern React-based documentation framework
-  - Better navigation, search, and versioning
-  - Migrate existing examples to Docusaurus pages
-  - Add comprehensive documentation (getting started, API reference, guides)
+- [x] **Migrate to Docusaurus** ✅
+  - Modern React-based documentation at https://docusaurus.io/
+  - All 10 examples migrated to Docusaurus-native React components
+  - Storybook integrated at `/waveform-playlist/storybook/`
+  - Comprehensive docs: guides for effects, fades, waveform-data
+  - Dark/light theme support with CSS variables
 
 ### Phase 4: Publishing Infrastructure (Must Have Before Release)
 

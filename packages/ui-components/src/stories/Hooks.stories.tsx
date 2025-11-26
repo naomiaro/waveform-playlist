@@ -256,11 +256,10 @@ These stories demonstrate how to test and visualize custom React hooks.
 - \`useAnnotationKeyboardControls\` - Keyboard navigation for annotations
 - \`useDragSensors\` - Configure @dnd-kit sensors
 - \`useIntegratedRecording\` - Recording with auto-add to playlist
-- \`useDynamicEffects\` - Toggle effects on/off dynamically
+- \`useDynamicEffects\` - Master effects chain (20 effects with runtime toggle)
 - \`useTrackDynamicEffects\` - Per-track effect management
 - \`useExportWav\` - Export playlist to WAV file
-- \`useMasterAnalyser\` - Master output analyser node
-- \`useTrackReverb\`, \`useTrackAutoWah\`, \`useEffectsChain\` - Audio effects
+- \`useMasterAnalyser\` - Master output analyser node for visualization
         `,
       },
     },
