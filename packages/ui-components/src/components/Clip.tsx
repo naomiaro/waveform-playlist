@@ -66,6 +66,7 @@ export interface ClipProps {
   fadeIn?: Fade; // Fade in effect
   fadeOut?: Fade; // Fade out effect
   sampleRate?: number; // Sample rate for converting fade duration to pixels
+  showFades?: boolean; // Show fade in/out overlays
 }
 
 /**
@@ -95,6 +96,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
   fadeIn,
   fadeOut,
   sampleRate = 44100,
+  showFades = false,
 }) => {
   // Calculate horizontal position based on start sample
   // Use Math.floor to always snap to pixel boundaries
@@ -174,7 +176,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
       <ChannelsWrapper $isOverlay={isOverlay}>
         {children}
         {/* Fade overlays */}
-        {fadeIn && fadeIn.duration > 0 && (
+        {showFades && fadeIn && fadeIn.duration > 0 && (
           <FadeOverlay
             left={0}
             width={Math.floor((fadeIn.duration * sampleRate) / samplesPerPixel)}
@@ -182,7 +184,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
             curveType={fadeIn.type}
           />
         )}
-        {fadeOut && fadeOut.duration > 0 && (
+        {showFades && fadeOut && fadeOut.duration > 0 && (
           <FadeOverlay
             left={width - Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)}
             width={Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)}

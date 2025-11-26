@@ -239,7 +239,7 @@ export const darkTheme: WaveformPlaylistTheme = {
   selectedClipHeaderBackgroundColor: '#3a2c20', // Darker warm brown for selected clip headers
 
   // Fade overlay colors
-  fadeOverlayColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent overlay for fade regions
+  fadeOverlayColor: 'rgba(200, 100, 80, 0.5)', // Warm red-orange overlay visible on dark backgrounds
 
   // UI component colors
   backgroundColor: '#1e1e1e',

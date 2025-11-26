@@ -1,6 +1,7 @@
 import React, { FunctionComponent } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import type { FadeType } from '@waveform-playlist/core';
+import type { WaveformPlaylistTheme } from '../wfpl-theme';
 
 interface FadeContainerProps {
   readonly $left: number;
@@ -105,15 +106,20 @@ export const FadeOverlay: FunctionComponent<FadeOverlayProps> = ({
   curveType = 'logarithmic',
   color,
 }) => {
+  const theme = useTheme() as WaveformPlaylistTheme;
+
   // Don't render if width is too small
   if (width < 1) return null;
+
+  // Use color prop, then theme color, then fallback
+  const fillColor = color || theme?.fadeOverlayColor || 'rgba(0, 0, 0, 0.4)';
 
   return (
     <FadeContainer $left={left} $width={width} $type={type}>
       <FadeSvg $type={type} viewBox={`0 0 ${width} 100`} preserveAspectRatio="none">
         <path
           d={generateFadePath(width, 100, curveType)}
-          fill={color || 'var(--fade-overlay-color, rgba(0, 0, 0, 0.4))'}
+          fill={fillColor}
         />
       </FadeSvg>
     </FadeContainer>

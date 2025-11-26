@@ -45,6 +45,7 @@ export interface WaveformProps {
   className?: string;
   showClipHeaders?: boolean; // Show headers on clips for visual organization
   interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (requires @dnd-kit setup)
+  showFades?: boolean; // Show fade in/out overlays on clips
   // Live recording state for real-time waveform preview
   recordingState?: {
     isRecording: boolean;
@@ -68,6 +69,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   className,
   showClipHeaders = false,
   interactiveClips = false,
+  showFades = false,
   recordingState,
 }) => {
   // Get theme from context (typed as WaveformPlaylistTheme)
@@ -413,6 +415,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                             fadeIn={clip.fadeIn}
                             fadeOut={clip.fadeOut}
                             sampleRate={sampleRate}
+                            showFades={showFades}
                             onMouseDown={(e) => {
                               // Only select track if clicking on the waveform, not on draggable elements
                               const target = e.target as HTMLElement;

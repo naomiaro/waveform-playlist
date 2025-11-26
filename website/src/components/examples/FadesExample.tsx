@@ -56,6 +56,22 @@ const WaveformWrapper = styled.div`
   overflow: hidden;
 `;
 
+const Checkbox = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.9rem;
+  color: var(--ifm-font-color-base, #1c1e21);
+
+  input {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+  }
+`;
+
 interface FadePlayerProps {
   fadeType: FadeType;
   title: string;
@@ -64,6 +80,7 @@ interface FadePlayerProps {
 
 function FadePlayer({ fadeType, title, description }: FadePlayerProps) {
   const { theme } = useDocusaurusTheme();
+  const [showFades, setShowFades] = React.useState(true);
 
   // Use 5.85 seconds of vocals with 1.5 second fades
   const audioConfigs: AudioTrackConfig[] = React.useMemo(() => [
@@ -111,9 +128,17 @@ function FadePlayer({ fadeType, title, description }: FadePlayerProps) {
           <PlayButton />
           <PauseButton />
           <StopButton />
+          <Checkbox>
+            <input
+              type="checkbox"
+              checked={showFades}
+              onChange={(e) => setShowFades(e.target.checked)}
+            />
+            Show Fades
+          </Checkbox>
         </Controls>
         <WaveformWrapper>
-          <Waveform />
+          <Waveform showFades={showFades} />
         </WaveformWrapper>
       </WaveformPlaylistProvider>
     </FadeCard>
