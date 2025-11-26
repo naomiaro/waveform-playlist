@@ -135,7 +135,7 @@ export const defaultTheme: WaveformPlaylistTheme = {
     ],
   },
   waveFillColor: '#e8f4f8', // Light teal-gray background
-  waveProgressColor: '#ff6b6b',
+  waveProgressColor: 'rgba(0, 0, 0, 0.15)', // Subtle dark overlay for light mode
   // Selected: brighter cyan gradient
   selectedWaveOutlineColor: {
     type: 'linear',
@@ -215,7 +215,7 @@ export const darkTheme: WaveformPlaylistTheme = {
     ],
   },
   waveFillColor: '#0d0d1a', // Very dark blue-black background
-  waveProgressColor: '#ff6b6b',
+  waveProgressColor: 'rgba(255, 255, 255, 0.15)', // Subtle light overlay for dark mode
   // Selected: electric gold/orange gradient
   selectedWaveOutlineColor: {
     type: 'linear',

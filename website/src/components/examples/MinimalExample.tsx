@@ -71,7 +71,7 @@ export function MinimalExample() {
   }
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024} mono theme={theme}>
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1500} mono theme={theme}>
       <Controls>
         <PlayButton />
         <PauseButton />

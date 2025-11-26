@@ -172,8 +172,9 @@ export const Waveform: React.FC<WaveformProps> = ({
     // The click overlay covers all tracks, so we need to calculate from Y position
     const y = e.clientY - rect.top;
 
-    // Account for timescale height if present (timeScaleHeight is 0 when disabled)
-    const trackY = y - timeScaleHeight;
+    // The ClickOverlay is inside TracksContainer which is BELOW the timescale,
+    // so y is already relative to the tracks area - no need to subtract timeScaleHeight
+    const trackY = y;
 
     // Calculate track index based on cumulative heights
     let cumulativeHeight = 0;
