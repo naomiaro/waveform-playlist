@@ -358,6 +358,7 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 5. **Sample-Based Math** - Use integer samples for all timing calculations
 6. **TypeScript Enforcement** - Build scripts run `pnpm typecheck &&` before bundling
 7. **Refs for Dynamic Audio Callbacks** - When useCallback needs fresh state for audio graph rebuilding, store state in a ref and read from ref inside callback (avoids stale closures)
+8. **Smooth Playback Animation** - Use `requestAnimationFrame` + direct DOM manipulation for 60fps updates (playhead, progress, time display)
 
 ### Refs for Dynamic Audio Callbacks
 
@@ -375,6 +376,73 @@ const rebuildChain = useCallback(() => {
 ```
 
 **Applied in:** `useDynamicEffects`, `useTrackDynamicEffects`
+
+### Smooth Playback Animation Pattern
+
+**Problem:** React state updates during playback cause flickering and are throttled (every 500ms). Components like playhead position, progress overlay, and time display need 60fps updates.
+
+**Solution:** Use `requestAnimationFrame` with direct DOM manipulation via refs. Calculate time directly from audio context for perfect sync.
+
+**Pattern:**
+```typescript
+const elementRef = useRef<HTMLElement>(null);
+const animationFrameRef = useRef<number | null>(null);
+const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
+
+useEffect(() => {
+  const update = () => {
+    if (elementRef.current) {
+      // Calculate time from audio context during playback
+      let time: number;
+      if (isPlaying) {
+        const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
+        time = (audioStartPositionRef.current ?? 0) + elapsed;
+      } else {
+        time = currentTimeRef.current ?? 0;
+      }
+      // Update DOM directly (no React state)
+      elementRef.current.style.transform = `translateX(${time * pixelsPerSecond}px)`;
+    }
+    if (isPlaying) {
+      animationFrameRef.current = requestAnimationFrame(update);
+    }
+  };
+
+  if (isPlaying) {
+    animationFrameRef.current = requestAnimationFrame(update);
+  } else {
+    update(); // Update once when stopped
+  }
+
+  return () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+  };
+}, [isPlaying, ...dependencies]);
+
+// Also update when stopped (for seeks)
+useEffect(() => {
+  if (!isPlaying && elementRef.current) {
+    // Update position from currentTimeRef
+  }
+});
+```
+
+**Key Points:**
+- Use `getContext().currentTime` from Tone.js for accurate audio time
+- Calculate elapsed time: `audioContext.currentTime - playbackStartTimeRef`
+- Add to start position: `audioStartPositionRef + elapsed`
+- Update DOM directly via refs (no setState)
+- Cancel animation frame on cleanup and when stopping
+
+**Applied in:**
+- `AnimatedPlayhead` - Playhead line position
+- `ChannelWithProgress` - Per-channel progress overlay
+- `AudioPosition` - Time display (ContextualControls)
+- `PlayheadWithMarker` - Custom playhead with triangle marker (ui-components)
+
+**Location:** `packages/browser/src/components/`
 
 ---
 
