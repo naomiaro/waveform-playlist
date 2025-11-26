@@ -64,6 +64,10 @@ const createEmptyTracks = (count: number): ClipTrack[] => {
     id: `track-${i + 1}`,
     name: `Track ${i + 1}`,
     clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
   }));
 };
 
@@ -148,10 +152,10 @@ export const WithoutTimescale: Story = {
 export const CustomTrackNames: Story = {
   render: () => {
     const tracks: ClipTrack[] = [
-      { id: 'vocals', name: 'Lead Vocals', clips: [] },
-      { id: 'guitar', name: 'Electric Guitar', clips: [] },
-      { id: 'bass', name: 'Bass', clips: [] },
-      { id: 'drums', name: 'Drums', clips: [] },
+      { id: 'vocals', name: 'Lead Vocals', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+      { id: 'guitar', name: 'Electric Guitar', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+      { id: 'bass', name: 'Bass', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+      { id: 'drums', name: 'Drums', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
     ];
 
     return (

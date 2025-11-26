@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import { AnnotationText } from '@waveform-playlist/annotations';
 import type { AnnotationData, AnnotationAction } from '@waveform-playlist/annotations';
 
@@ -32,7 +32,7 @@ const sampleAnnotations: AnnotationData[] = [
 const deleteAction: AnnotationAction = {
   text: '🗑',
   title: 'Delete annotation',
-  action: (annotation, index, annotations) => {
+  action: (annotation: AnnotationData, index: number, annotations: AnnotationData[]) => {
     annotations.splice(index, 1);
   },
 };
@@ -40,7 +40,7 @@ const deleteAction: AnnotationAction = {
 const editAction: AnnotationAction = {
   text: '✏️',
   title: 'Edit annotation',
-  action: (annotation) => {
+  action: (annotation: AnnotationData) => {
     console.log('Edit annotation:', annotation);
   },
 };

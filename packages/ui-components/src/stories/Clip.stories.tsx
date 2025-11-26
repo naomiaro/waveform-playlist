@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import { useTheme } from 'styled-components';
 import { DndContext } from '@dnd-kit/core';
 import { Clip } from '../components/Clip';

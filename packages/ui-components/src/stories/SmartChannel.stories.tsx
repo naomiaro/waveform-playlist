@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import { SmartChannel } from '../components/SmartChannel';
 import { PlaylistInfoContext } from '../contexts/PlaylistInfo';
 import { DevicePixelRatioProvider } from '../contexts/DevicePixelRatio';

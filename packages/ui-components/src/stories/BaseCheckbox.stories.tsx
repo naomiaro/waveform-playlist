@@ -1,8 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState } from 'react';
 import { BaseCheckboxWrapper, BaseCheckbox, BaseCheckboxLabel } from '../styled';
 
-const CheckboxDemo = ({ checked: initialChecked = false, disabled = false }) => {
+interface CheckboxDemoProps {
+  checked?: boolean;
+  disabled?: boolean;
+}
+
+const CheckboxDemo = ({ checked: initialChecked = false, disabled = false }: CheckboxDemoProps) => {
   const [checked, setChecked] = useState(initialChecked);
 
   return (

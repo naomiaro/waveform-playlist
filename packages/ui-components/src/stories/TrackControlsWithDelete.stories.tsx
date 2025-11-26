@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { useState } from 'react';
+import type { Meta, StoryObj, Decorator } from '@storybook/react';
+import React, { useState } from 'react';
 import { TrackControlsWithDelete } from '../components/TrackControlsWithDelete';
 import { action } from '@storybook/addon-actions';
 
@@ -11,11 +11,11 @@ const meta: Meta<typeof TrackControlsWithDelete> = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    ((Story) => (
       <div style={{ width: '200px', height: '180px' }}>
         <Story />
       </div>
-    ),
+    )) as Decorator,
   ],
 };
 

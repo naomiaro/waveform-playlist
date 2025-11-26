@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import { ClipHeader, ClipHeaderPresentational } from '../components/ClipHeader';
 
 const meta: Meta<typeof ClipHeaderPresentational> = {

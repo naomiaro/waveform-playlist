@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { TimeFormatSelect } from '../components/TimeFormatSelect';
 import type { TimeFormat } from '../utils/timeFormat';

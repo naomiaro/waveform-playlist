@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 import { useTheme } from 'styled-components';
 import { TimeScale } from '../components/TimeScale';

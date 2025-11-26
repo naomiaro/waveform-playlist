@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import { useTheme } from 'styled-components';
 import { Track } from '../components/Track';
 import { Channel } from '../components/Channel';

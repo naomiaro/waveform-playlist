@@ -6,5 +6,5 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 library.add(faTrashAlt);
 
 export const TrashIcon = styled(FontAwesomeIcon).attrs({
-  icon: 'trash-alt',
+  icon: faTrashAlt,
 })``;
