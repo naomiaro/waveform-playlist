@@ -82,6 +82,18 @@
   filter: grayscale(20%);
 }
 
+.featureLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  height: 100%;
+}
+
+.featureLink:hover {
+  text-decoration: none;
+  color: inherit;
+}
+
 /* Code example section */
 .codeSection {
   padding: 5rem 0;

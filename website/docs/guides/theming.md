@@ -51,6 +51,7 @@ const lightTheme = {
   clipHeaderBackgroundColor: 'rgba(0, 0, 0, 0.1)',
   clipHeaderBorderColor: 'rgba(0, 0, 0, 0.2)',
   clipHeaderTextColor: '#333',
+  clipHeaderFontFamily: 'inherit',
   selectedClipHeaderBackgroundColor: '#b3d9ff',
   // ... UI and annotation properties
 };
@@ -76,6 +77,7 @@ const dark = {
   clipHeaderBackgroundColor: 'rgba(255, 255, 255, 0.1)',
   clipHeaderBorderColor: 'rgba(255, 255, 255, 0.2)',
   clipHeaderTextColor: '#e0e0e0',
+  clipHeaderFontFamily: 'inherit',
   selectedClipHeaderBackgroundColor: '#2a4a6c',
   // ... UI and annotation properties
 };
@@ -196,6 +198,7 @@ const oceanTheme = {
   clipHeaderBackgroundColor: '#ade8f4',
   clipHeaderBorderColor: '#48cae4',
   clipHeaderTextColor: '#023e8a',
+  clipHeaderFontFamily: '"Courier New", monospace', // Custom font
   selectedClipHeaderBackgroundColor: '#48cae4',
 
   // Playhead and selection
@@ -259,6 +262,7 @@ interface WaveformPlaylistTheme {
   clipHeaderBackgroundColor: string;
   clipHeaderBorderColor: string;
   clipHeaderTextColor: string;
+  clipHeaderFontFamily: string;    // Font family for clip header text
   selectedClipHeaderBackgroundColor: string;
 
   // UI component colors

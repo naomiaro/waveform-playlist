@@ -40,6 +40,7 @@ const HeaderContainer = styled.div<HeaderContainerProps>`
 const TrackName = styled.span`
   font-size: 11px;
   font-weight: 600;
+  font-family: ${props => props.theme.clipHeaderFontFamily};
   color: ${props => props.theme.clipHeaderTextColor};
   white-space: nowrap;
   overflow: hidden;

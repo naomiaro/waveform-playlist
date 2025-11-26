@@ -113,6 +113,28 @@ const VolumeLabel = styled.label`
   text-align: center;
 `;
 
+// Grungy timestamp style for Berlin underground aesthetic
+const GrungyTimestamp = styled.div<{ $left: number }>`
+  position: absolute;
+  left: ${props => props.$left + 4}px;
+  font-size: 0.7rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: #bdc3c7;
+  text-shadow:
+    1px 1px 0 rgba(0, 0, 0, 0.8),
+    -1px -1px 0 rgba(0, 0, 0, 0.3);
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+
+  &::before {
+    content: '//';
+    color: #5dade2;
+    margin-right: 2px;
+    opacity: 0.7;
+  }
+`;
+
 // Custom Track Controls Component
 const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) => {
   const { trackStates, setTrackMute, setTrackSolo, setTrackVolume } = useWaveformPlaylist();
@@ -312,6 +334,13 @@ const FlexibleApiContent: React.FC = () => {
           <CustomTrackControls trackIndex={trackIndex} />
         )}
         renderPlayhead={(props) => <PlayheadWithMarker {...props} />}
+        renderTimestamp={(timeMs, pixelPosition) => {
+          const seconds = Math.floor(timeMs / 1000);
+          const minutes = Math.floor(seconds / 60);
+          const secs = seconds % 60;
+          const timestamp = `${minutes}:${String(secs).padStart(2, '0')}`;
+          return <GrungyTimestamp $left={pixelPosition}>{timestamp}</GrungyTimestamp>;
+        }}
         showClipHeaders
       />
 
@@ -369,10 +398,11 @@ export function FlexibleApiExample() {
     // Track controls - Subtle blue tint for selected tracks
     selectedTrackControlsBackground: 'rgba(52, 152, 219, 0.2)',
 
-    // Clip headers - Dark blue-gray with light blue accents
+    // Clip headers - Dark blue-gray with grungy monospace font
     clipHeaderBackgroundColor: 'rgba(44, 62, 80, 0.85)',
     clipHeaderBorderColor: 'rgba(93, 173, 226, 0.4)',
     clipHeaderTextColor: '#ecf0f1',
+    clipHeaderFontFamily: '"Courier New", monospace',
     selectedClipHeaderBackgroundColor: 'rgba(52, 152, 219, 0.4)',
 
     // Timescale

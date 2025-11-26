@@ -90,15 +90,17 @@
   font-weight: 700;
   letter-spacing: -0.03em;
   margin-bottom: 1rem;
+  color: #ffffff;
 }
 
 .hero__subtitle {
   font-size: 1.4rem;
   font-weight: 400;
-  opacity: 0.85;
+  opacity: 1;
   max-width: 600px;
   margin: 0 auto 2rem;
   line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* Brutalist button style */

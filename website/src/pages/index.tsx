@@ -54,12 +54,14 @@ type FeatureItem = {
   title: string;
   description: ReactNode;
   icon: string;
+  link?: string;
 };
 
 const FeatureList: FeatureItem[] = [
   {
     title: 'Multi-Track Editing',
     icon: '🎛️',
+    link: '/examples/multi-clip',
     description: (
       <>
         Drag clips, trim boundaries, split at playhead. Full timeline control
@@ -70,6 +72,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: '20+ Audio Effects',
     icon: '🎚️',
+    link: '/examples/effects',
     description: (
       <>
         Reverb, delay, chorus, phaser, distortion, filters and more.
@@ -80,6 +83,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Recording',
     icon: '🎙️',
+    link: '/examples/recording',
     description: (
       <>
         AudioWorklet-based recording with live waveform preview,
@@ -90,6 +94,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Export to WAV',
     icon: '💾',
+    link: '/examples/effects',
     description: (
       <>
         Offline rendering with full effects. Export individual tracks
@@ -100,6 +105,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Annotations',
     icon: '📝',
+    link: '/examples/annotations',
     description: (
       <>
         Time-synced text annotations with keyboard navigation.
@@ -110,6 +116,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Fully Themeable',
     icon: '🎨',
+    link: '/examples/styling',
     description: (
       <>
         Complete control over colors, fonts, and styling.
@@ -119,14 +126,24 @@ const FeatureList: FeatureItem[] = [
   },
 ];
 
-function Feature({title, description, icon}: FeatureItem) {
+function Feature({title, description, icon, link}: FeatureItem) {
+  const content = (
+    <div className={styles.featureCard}>
+      <div className={styles.featureIcon}>{icon}</div>
+      <Heading as="h3">{title}</Heading>
+      <p>{description}</p>
+    </div>
+  );
+
   return (
     <div className={clsx('col col--4')}>
-      <div className={styles.featureCard}>
-        <div className={styles.featureIcon}>{icon}</div>
-        <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
-      </div>
+      {link ? (
+        <Link to={link} className={styles.featureLink}>
+          {content}
+        </Link>
+      ) : (
+        content
+      )}
     </div>
   );
 }
