@@ -151,6 +151,16 @@ Visit http://localhost:3000/waveform-playlist to see the examples.
 
 [Become a sponsor](https://github.com/sponsors/naomiaro)
 
+## Books
+
+Currently writing: [Mastering Tone.js](https://leanpub.com/masteringtonejs)
+
+<p align="center">
+  <a href="https://leanpub.com/masteringtonejs" target="_blank">
+    <img src="https://masteringtonejs.com/title_page.png" title="Mastering Tone.js Cover" width="360" alt="Mastering Tone.js">
+  </a>
+</p>
+
 ## Credits
 
 Originally created for the [Airtime](https://www.sourcefabric.org/software/airtime/) project at [Sourcefabric](https://www.sourcefabric.org/).
