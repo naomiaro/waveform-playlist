@@ -36,6 +36,9 @@ export default function StylingExamplePage(): React.ReactElement {
     waveFillColor: '#4a9eff',      // Background behind waveform
     waveProgressColor: 'orange',   // Fill behind played portion
     playheadColor: 'orange',       // Vertical playhead line
+    // Selected track colors (when track is clicked)
+    selectedWaveOutlineColor: '#E0EFF1',
+    selectedWaveFillColor: '#4a9eff',
   }}
 >
   <Waveform />
