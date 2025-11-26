@@ -49,9 +49,9 @@
   --ifm-navbar-background-color: rgba(10, 10, 15, 0.95);
   --ifm-footer-background-color: #08080c;
 
-  /* Muted text for that underground feel */
-  --ifm-font-color-base: #e0e0e5;
-  --ifm-font-color-secondary: #9090a0;
+  /* Warm amber text - night vision preservation */
+  --ifm-font-color-base: #d8c0a8;
+  --ifm-font-color-secondary: #a89078;
 }
 
 /* Hero section styling */
@@ -320,6 +320,40 @@ a:not(.button):not(.navbar__link):not(.menu__link):hover {
 h1:hover, h2:hover {
   animation: glitch 0.3s ease;
 }
+
+/* ============================================
+   NIGHT VISION DARK MODE
+   Red headers, amber text for night vision preservation
+   Applies to example pages and docs
+   ============================================ */
+
+/* Main headings - deep red "low watt bulb" */
+[data-theme='dark'] main.container h1,
+[data-theme='dark'] .markdown h1 {
+  color: #d08070;
+  text-shadow:
+    0 0 60px rgba(180, 60, 40, 0.5),
+    0 0 30px rgba(200, 80, 50, 0.3);
+}
+
+[data-theme='dark'] main.container h2,
+[data-theme='dark'] .markdown h2 {
+  color: #c87060;
+  text-shadow: 0 0 25px rgba(180, 80, 60, 0.3);
+}
+
+[data-theme='dark'] main.container h3,
+[data-theme='dark'] .markdown h3 {
+  color: #c87060;
+  text-shadow: 0 0 20px rgba(180, 80, 60, 0.25);
+}
+
+[data-theme='dark'] .markdown h4,
+[data-theme='dark'] .markdown h5,
+[data-theme='dark'] .markdown h6 {
+  color: #c8a888;
+}
+
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
