@@ -33,6 +33,16 @@ The main visualization component that renders tracks and handles interactions.
 - Drag to select
 - Drag clips to move/trim
 - Keyboard shortcuts
+- Custom playhead rendering
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `timescale` | `boolean` | `false` | Show timeline with time markers |
+| `showClipHeaders` | `boolean` | `false` | Show clip name headers above waveforms |
+| `renderPlayhead` | `RenderPlayheadFunction` | - | Custom playhead render function |
+| `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom track controls renderer |
 
 ### Usage
 
@@ -43,6 +53,90 @@ The main visualization component that renders tracks and handles interactions.
 ```
 
 The Waveform component reads configuration from the provider context.
+
+---
+
+## Custom Playhead
+
+Replace the default playhead with a custom component using the `renderPlayhead` prop.
+
+### PlayheadProps
+
+The render function receives these props:
+
+```typescript
+interface PlayheadProps {
+  /** Position in pixels from left edge */
+  position: number;
+  /** Playhead color from theme (default: #ff0000) */
+  color?: string;
+}
+```
+
+### Built-in Playhead Components
+
+Import pre-built playhead variants:
+
+```tsx
+import { Playhead, PlayheadWithMarker } from '@waveform-playlist/ui-components';
+```
+
+#### Default Playhead
+
+A simple vertical line (used by default):
+
+```tsx
+<Waveform />
+// or explicitly:
+<Waveform renderPlayhead={(props) => <Playhead {...props} />} />
+```
+
+#### PlayheadWithMarker
+
+A playhead with a triangle marker at the top, positioned to sit in the timescale area:
+
+```tsx
+<Waveform
+  timescale
+  renderPlayhead={(props) => <PlayheadWithMarker {...props} />}
+/>
+```
+
+### Custom Playhead Example
+
+Create your own playhead component:
+
+```tsx
+import styled from 'styled-components';
+
+const CustomPlayheadLine = styled.div<{ $position: number; $color: string }>`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: ${(props) => props.$color};
+  transform: translate3d(${(props) => props.$position}px, 0, 0);
+  z-index: 150;
+  pointer-events: none;
+  will-change: transform;
+  border-radius: 2px;
+  box-shadow: 0 0 4px ${(props) => props.$color};
+`;
+
+const GlowingPlayhead = ({ position, color = '#ff0000' }) => (
+  <CustomPlayheadLine $position={position} $color={color} />
+);
+
+// Usage
+<Waveform renderPlayhead={(props) => <GlowingPlayhead {...props} />} />
+```
+
+### Performance Tips
+
+- Use `transform: translate3d()` for GPU-accelerated positioning
+- Add `will-change: transform` for smooth animation
+- Set `pointer-events: none` to prevent interference with track interactions
 
 ---
 

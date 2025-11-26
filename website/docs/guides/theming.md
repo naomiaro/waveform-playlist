@@ -14,9 +14,9 @@ Themes are applied at the provider level:
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 
 const myTheme = {
-  waveBackgroundColor: '#ffffff',
-  waveColor: '#0066cc',
-  waveOutlineColor: '#003366',
+  waveOutlineColor: '#005BBB',
+  waveFillColor: '#FFD500',
+  playheadColor: '#ff0000',
   // ... more properties
 };
 
@@ -35,17 +35,20 @@ function ThemedPlaylist() {
 
 ```typescript
 interface WaveformTheme {
-  // Background behind waveforms
-  waveBackgroundColor: string;
-
-  // Fill color of the waveform
-  waveColor: string;
-
   // Outline/stroke color of the waveform
   waveOutlineColor: string;
 
+  // Fill color of the waveform
+  waveFillColor: string;
+
+  // Color for played portion of waveform
+  waveProgressColor: string;
+
   // Selected track waveform outline (brighter)
   selectedWaveOutlineColor: string;
+
+  // Selected track waveform fill
+  selectedWaveFillColor: string;
 }
 ```
 
@@ -53,14 +56,8 @@ interface WaveformTheme {
 
 ```typescript
 interface TrackControlsTheme {
-  // Controls panel background
-  trackControlsBackground: string;
-
   // Selected track controls background
   selectedTrackControlsBackground: string;
-
-  // Track name text color
-  trackNameColor: string;
 }
 ```
 
@@ -71,20 +68,23 @@ interface ClipHeaderTheme {
   // Clip header background
   clipHeaderBackgroundColor: string;
 
-  // Selected clip header background
-  selectedClipHeaderBackgroundColor: string;
+  // Clip header border
+  clipHeaderBorderColor: string;
 
   // Clip header text color
   clipHeaderTextColor: string;
+
+  // Selected clip header background
+  selectedClipHeaderBackgroundColor: string;
 }
 ```
 
-### Cursor and Selection
+### Playhead and Selection
 
 ```typescript
-interface CursorTheme {
+interface PlayheadTheme {
   // Playhead cursor color
-  cursorColor: string;
+  playheadColor: string;
 
   // Selection highlight color
   selectionColor: string;
@@ -95,14 +95,70 @@ interface CursorTheme {
 
 ```typescript
 interface TimelineTheme {
+  // Timescale text and tick color
+  timeColor: string;
+
   // Timescale background
   timescaleBackgroundColor: string;
+}
+```
 
-  // Timescale text color
-  timescaleTextColor: string;
+### UI Components
 
-  // Timescale tick marks color
-  timescaleTickColor: string;
+```typescript
+interface UITheme {
+  // General backgrounds
+  backgroundColor: string;
+  surfaceColor: string;
+  borderColor: string;
+
+  // Text colors
+  textColor: string;
+  textColorMuted: string;
+
+  // Input fields
+  inputBackground: string;
+  inputBorder: string;
+  inputText: string;
+  inputPlaceholder: string;
+  inputFocusBorder: string;
+
+  // Buttons
+  buttonBackground: string;
+  buttonText: string;
+  buttonBorder: string;
+  buttonHoverBackground: string;
+
+  // Sliders
+  sliderTrackColor: string;
+  sliderThumbColor: string;
+}
+```
+
+### Annotations
+
+```typescript
+interface AnnotationTheme {
+  annotationBoxBackground: string;
+  annotationBoxActiveBackground: string;
+  annotationBoxHoverBackground: string;
+  annotationBoxBorder: string;
+  annotationBoxActiveBorder: string;
+  annotationLabelColor: string;
+  annotationResizeHandleColor: string;
+  annotationResizeHandleActiveColor: string;
+  annotationTextItemHoverBackground: string;
+}
+```
+
+### Spacing and Typography
+
+```typescript
+interface TypographyTheme {
+  borderRadius: string;
+  fontFamily: string;
+  fontSize: string;
+  fontSizeSmall: string;
 }
 ```
 
@@ -111,43 +167,50 @@ interface TimelineTheme {
 ### Light Theme (Default)
 
 ```tsx
-import { defaultTheme } from '@waveform-playlist/browser';
+import { defaultTheme } from '@waveform-playlist/ui-components';
 
 // defaultTheme values
 const lightTheme = {
-  waveBackgroundColor: '#ffffff',
-  waveColor: '#337ab7',
   waveOutlineColor: '#005BBB',
+  waveFillColor: '#FFD500',
+  waveProgressColor: '#ff0000',
   selectedWaveOutlineColor: '#0099ff',
-  trackControlsBackground: '#f5f5f5',
+  selectedWaveFillColor: '#FFD500',
   selectedTrackControlsBackground: '#d9e9ff',
-  clipHeaderBackgroundColor: '#dce9f5',
+  timeColor: '#000',
+  timescaleBackgroundColor: '#fff',
+  playheadColor: '#f00',
+  selectionColor: 'rgba(255, 105, 180, 0.7)',
+  clipHeaderBackgroundColor: 'rgba(0, 0, 0, 0.1)',
+  clipHeaderBorderColor: 'rgba(0, 0, 0, 0.2)',
+  clipHeaderTextColor: '#333',
   selectedClipHeaderBackgroundColor: '#b3d9ff',
-  cursorColor: '#ff0000',
-  selectionColor: 'rgba(0, 102, 204, 0.3)',
-  timescaleBackgroundColor: '#f0f0f0',
-  timescaleTextColor: '#333333',
+  // ... UI and annotation properties
 };
 ```
 
 ### Dark Theme
 
 ```tsx
-const darkTheme = {
-  waveBackgroundColor: '#1e1e1e',
-  waveColor: '#5c9fd4',
-  waveOutlineColor: '#3a7fc2',
-  selectedWaveOutlineColor: '#66b3ff',
-  trackControlsBackground: '#2d2d2d',
-  selectedTrackControlsBackground: '#3a4a5c',
-  clipHeaderBackgroundColor: '#3a3a3a',
-  selectedClipHeaderBackgroundColor: '#4a5a6a',
-  clipHeaderTextColor: '#ffffff',
-  trackNameColor: '#ffffff',
-  cursorColor: '#ff6666',
-  selectionColor: 'rgba(100, 150, 200, 0.4)',
-  timescaleBackgroundColor: '#2a2a2a',
-  timescaleTextColor: '#cccccc',
+import { darkTheme } from '@waveform-playlist/ui-components';
+
+// darkTheme values
+const dark = {
+  waveOutlineColor: '#4A9EFF',
+  waveFillColor: '#FFD500',
+  waveProgressColor: '#ff4444',
+  selectedWaveOutlineColor: '#66B3FF',
+  selectedWaveFillColor: '#FFD500',
+  selectedTrackControlsBackground: '#1a3a5c',
+  timeColor: '#e0e0e0',
+  timescaleBackgroundColor: '#1e1e1e',
+  playheadColor: '#ff4444',
+  selectionColor: 'rgba(255, 105, 180, 0.7)',
+  clipHeaderBackgroundColor: 'rgba(255, 255, 255, 0.1)',
+  clipHeaderBorderColor: 'rgba(255, 255, 255, 0.2)',
+  clipHeaderTextColor: '#e0e0e0',
+  selectedClipHeaderBackgroundColor: '#2a4a6c',
+  // ... UI and annotation properties
 };
 ```
 
@@ -157,8 +220,8 @@ You can provide partial themes that override only specific properties:
 
 ```tsx
 const customTheme = {
-  waveColor: '#00ff00',      // Only change waveform color
-  cursorColor: '#ff00ff',    // And cursor color
+  waveFillColor: '#00ff00',     // Only change waveform fill
+  playheadColor: '#ff00ff',     // And playhead color
 };
 
 // Other properties use defaults
@@ -171,13 +234,7 @@ Automatically sync with Docusaurus theme:
 
 ```tsx
 import { useColorMode } from '@docusaurus/theme-common';
-import { defaultTheme } from '@waveform-playlist/browser';
-
-const darkTheme = {
-  waveBackgroundColor: '#1e1e1e',
-  waveColor: '#5c9fd4',
-  // ...
-};
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 function DocusaurusExample() {
   const { colorMode } = useColorMode();
@@ -197,24 +254,17 @@ Create a reusable theme hook:
 
 ```tsx
 import { useMemo } from 'react';
-import { defaultTheme } from '@waveform-playlist/browser';
+import { defaultTheme, darkTheme } from '@waveform-playlist/ui-components';
 
 function useCustomTheme(isDark: boolean) {
   return useMemo(() => {
-    if (isDark) {
-      return {
-        ...defaultTheme,
-        waveBackgroundColor: '#1e1e1e',
-        waveColor: '#5c9fd4',
-        waveOutlineColor: '#3a7fc2',
-        trackControlsBackground: '#2d2d2d',
-        clipHeaderBackgroundColor: '#3a3a3a',
-        clipHeaderTextColor: '#ffffff',
-        timescaleBackgroundColor: '#2a2a2a',
-        timescaleTextColor: '#cccccc',
-      };
-    }
-    return defaultTheme;
+    const base = isDark ? darkTheme : defaultTheme;
+    return {
+      ...base,
+      // Custom overrides
+      playheadColor: '#00ff00',
+      selectionColor: 'rgba(0, 255, 0, 0.3)',
+    };
   }, [isDark]);
 }
 ```
@@ -225,21 +275,20 @@ Use CSS variables for dynamic theming:
 
 ```tsx
 const cssVarTheme = {
-  waveBackgroundColor: 'var(--wfpl-wave-bg, #ffffff)',
-  waveColor: 'var(--wfpl-wave-color, #337ab7)',
   waveOutlineColor: 'var(--wfpl-wave-outline, #005BBB)',
-  cursorColor: 'var(--wfpl-cursor, #ff0000)',
-  selectionColor: 'var(--wfpl-selection, rgba(0, 102, 204, 0.3))',
+  waveFillColor: 'var(--wfpl-wave-fill, #FFD500)',
+  playheadColor: 'var(--wfpl-playhead, #ff0000)',
+  selectionColor: 'var(--wfpl-selection, rgba(255, 105, 180, 0.7))',
 };
 
 // In your CSS
 // :root {
-//   --wfpl-wave-bg: #ffffff;
-//   --wfpl-wave-color: #337ab7;
+//   --wfpl-wave-outline: #005BBB;
+//   --wfpl-wave-fill: #FFD500;
 // }
 // :root[data-theme='dark'] {
-//   --wfpl-wave-bg: #1e1e1e;
-//   --wfpl-wave-color: #5c9fd4;
+//   --wfpl-wave-outline: #4A9EFF;
+//   --wfpl-wave-fill: #FFD500;
 // }
 ```
 
@@ -257,29 +306,33 @@ import {
 
 const oceanTheme = {
   // Waveform
-  waveBackgroundColor: '#e8f4f8',
-  waveColor: '#0077b6',
   waveOutlineColor: '#023e8a',
+  waveFillColor: '#0077b6',
+  waveProgressColor: '#ff6b6b',
   selectedWaveOutlineColor: '#00b4d8',
+  selectedWaveFillColor: '#48cae4',
 
   // Track controls
-  trackControlsBackground: '#caf0f8',
   selectedTrackControlsBackground: '#90e0ef',
-  trackNameColor: '#03045e',
 
   // Clip headers
   clipHeaderBackgroundColor: '#ade8f4',
-  selectedClipHeaderBackgroundColor: '#48cae4',
+  clipHeaderBorderColor: '#48cae4',
   clipHeaderTextColor: '#023e8a',
+  selectedClipHeaderBackgroundColor: '#48cae4',
 
-  // Cursor and selection
-  cursorColor: '#ff6b6b',
+  // Playhead and selection
+  playheadColor: '#ff6b6b',
   selectionColor: 'rgba(0, 119, 182, 0.3)',
 
   // Timeline
+  timeColor: '#03045e',
   timescaleBackgroundColor: '#caf0f8',
-  timescaleTextColor: '#03045e',
-  timescaleTickColor: '#0077b6',
+
+  // UI
+  backgroundColor: '#e8f4f8',
+  surfaceColor: '#caf0f8',
+  textColor: '#03045e',
 };
 
 function OceanThemedPlaylist() {
@@ -293,50 +346,84 @@ function OceanThemedPlaylist() {
     <WaveformPlaylistProvider
       tracks={tracks}
       theme={oceanTheme}
-      timescale
-      controls={{ show: true, width: 180 }}
     >
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
         <StopButton />
       </div>
-      <Waveform />
+      <Waveform timescale />
     </WaveformPlaylistProvider>
   );
 }
 ```
 
-## Theme Type Definition
-
-Full TypeScript type for themes:
+## Full Theme Type Definition
 
 ```typescript
 interface WaveformPlaylistTheme {
-  // Waveform
-  waveBackgroundColor: string;
-  waveColor: string;
+  // Waveform colors
   waveOutlineColor: string;
+  waveFillColor: string;
+  waveProgressColor: string;
   selectedWaveOutlineColor: string;
-
-  // Track controls
-  trackControlsBackground: string;
+  selectedWaveFillColor: string;
   selectedTrackControlsBackground: string;
-  trackNameColor: string;
 
-  // Clip headers
-  clipHeaderBackgroundColor: string;
-  selectedClipHeaderBackgroundColor: string;
-  clipHeaderTextColor: string;
+  // Timescale colors
+  timeColor: string;
+  timescaleBackgroundColor: string;
 
-  // Cursor and selection
-  cursorColor: string;
+  // Playback UI colors
+  playheadColor: string;
   selectionColor: string;
 
-  // Timeline
-  timescaleBackgroundColor: string;
-  timescaleTextColor: string;
-  timescaleTickColor: string;
+  // Clip header colors
+  clipHeaderBackgroundColor: string;
+  clipHeaderBorderColor: string;
+  clipHeaderTextColor: string;
+  selectedClipHeaderBackgroundColor: string;
+
+  // UI component colors
+  backgroundColor: string;
+  surfaceColor: string;
+  borderColor: string;
+  textColor: string;
+  textColorMuted: string;
+
+  // Interactive element colors
+  inputBackground: string;
+  inputBorder: string;
+  inputText: string;
+  inputPlaceholder: string;
+  inputFocusBorder: string;
+
+  // Button colors
+  buttonBackground: string;
+  buttonText: string;
+  buttonBorder: string;
+  buttonHoverBackground: string;
+
+  // Slider colors
+  sliderTrackColor: string;
+  sliderThumbColor: string;
+
+  // Annotation colors
+  annotationBoxBackground: string;
+  annotationBoxActiveBackground: string;
+  annotationBoxHoverBackground: string;
+  annotationBoxBorder: string;
+  annotationBoxActiveBorder: string;
+  annotationLabelColor: string;
+  annotationResizeHandleColor: string;
+  annotationResizeHandleActiveColor: string;
+  annotationTextItemHoverBackground: string;
+
+  // Spacing and sizing
+  borderRadius: string;
+  fontFamily: string;
+  fontSize: string;
+  fontSizeSmall: string;
 }
 ```
 
@@ -344,11 +431,12 @@ interface WaveformPlaylistTheme {
 
 1. **Contrast** - Ensure sufficient contrast between waveform and background
 2. **Selection visibility** - Make selected states clearly distinguishable
-3. **Cursor visibility** - Use a high-contrast color for the playhead
+3. **Playhead visibility** - Use a high-contrast color for the playhead
 4. **Consistency** - Match your application's overall design system
 5. **Accessibility** - Test themes with color blindness simulators
 
 ## Next Steps
 
+- [Custom Playhead](/api/components#custom-playhead) - Create a custom playhead component
 - [API Reference: Provider](/api/provider) - Full provider configuration
 - [Examples](/examples) - See themed examples in action
