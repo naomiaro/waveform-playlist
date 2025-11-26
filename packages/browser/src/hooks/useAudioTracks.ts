@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipTrack, createTrack, createClipFromSeconds, type Fade } from '@waveform-playlist/core';
+import { ClipTrack, createTrack, createClipFromSeconds, type Fade, type TrackEffectsFunction } from '@waveform-playlist/core';
 import * as Tone from 'tone';
 
 /**
@@ -13,7 +13,7 @@ export interface AudioTrackConfig {
   volume?: number;
   pan?: number;
   color?: string;
-  effects?: any; // TrackEffectsFunction
+  effects?: TrackEffectsFunction;
   // Multi-clip support
   startTime?: number;  // When the clip starts on the timeline (default: 0)
   duration?: number;   // Duration of the clip (default: full audio duration)

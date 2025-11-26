@@ -12,6 +12,36 @@
 import { Fade } from './index';
 
 /**
+ * Generic effects function type for track-level audio processing.
+ *
+ * The actual implementation receives Tone.js audio nodes. Using generic types
+ * here to avoid circular dependencies with the playout package.
+ *
+ * @param graphEnd - The end of the track's audio graph (Tone.js Gain node)
+ * @param destination - Where to connect the effects output (Tone.js ToneAudioNode)
+ * @param isOffline - Whether rendering offline (for export)
+ * @returns Optional cleanup function called when track is disposed
+ *
+ * @example
+ * ```typescript
+ * const trackEffects: TrackEffectsFunction = (graphEnd, destination, isOffline) => {
+ *   const reverb = new Tone.Reverb({ decay: 1.5 });
+ *   graphEnd.connect(reverb);
+ *   reverb.connect(destination);
+ *
+ *   return () => {
+ *     reverb.dispose();
+ *   };
+ * };
+ * ```
+ */
+export type TrackEffectsFunction = (
+  graphEnd: unknown,
+  destination: unknown,
+  isOffline: boolean
+) => void | (() => void);
+
+/**
  * Represents a single audio clip on the timeline
  *
  * IMPORTANT: All positions/durations are stored as SAMPLE COUNTS (integers)
@@ -82,7 +112,7 @@ export interface ClipTrack {
   height?: number;
 
   /** Optional effects function for this track */
-  effects?: any; // TrackEffectsFunction - typed as any to avoid circular dependency
+  effects?: TrackEffectsFunction;
 }
 
 /**

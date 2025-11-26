@@ -12,7 +12,7 @@ export type { AeneasFragment } from './parsers/aeneas';
 
 // Components
 export { Annotation } from './components/Annotation';
-export type { AnnotationProps, AnnotationData, AnnotationAction } from './components/Annotation';
+export type { AnnotationProps, AnnotationData, AnnotationAction, AnnotationActionOptions } from './components/Annotation';
 
 export { AnnotationBox } from './components/AnnotationBox';
 export type { AnnotationBoxComponentProps } from './components/AnnotationBox';

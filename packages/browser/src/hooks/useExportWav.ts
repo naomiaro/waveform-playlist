@@ -3,8 +3,8 @@ import type { ClipTrack, AudioClip, FadeType } from '@waveform-playlist/core';
 import type { EffectsFunction } from '@waveform-playlist/playout';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
 
-/** Function type for per-track effects */
-export type TrackEffectsFunction = (graphEnd: any, destination: any, isOffline: boolean) => void | (() => void);
+/** Function type for per-track effects (same as in @waveform-playlist/core) */
+export type TrackEffectsFunction = (graphEnd: unknown, destination: unknown, isOffline: boolean) => void | (() => void);
 
 export interface ExportOptions extends WavEncoderOptions {
   /** Filename for download (without extension) */

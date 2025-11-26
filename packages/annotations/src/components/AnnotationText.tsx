@@ -1,6 +1,6 @@
 import React, { FunctionComponent, useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import type { AnnotationData, AnnotationAction } from './Annotation';
+import type { AnnotationData, AnnotationAction, AnnotationActionOptions } from './Annotation';
 
 interface ContainerProps {
   $height?: number;
@@ -120,7 +120,7 @@ export interface AnnotationTextProps {
   shouldScrollToActive?: boolean;
   editable?: boolean;
   controls?: AnnotationAction[];
-  annotationListConfig?: any;
+  annotationListConfig?: AnnotationActionOptions;
   height?: number;
   onAnnotationClick?: (annotation: AnnotationData) => void;
   onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;

@@ -660,8 +660,9 @@ class WaveformPlaylistClass {
                   activeAnnotationId={this.activeAnnotationId || undefined}
                   shouldScrollToActive={this.activeAnnotationId === this.lastScrolledAnnotationId}
                   editable={this.config.annotationList?.editable}
-                  controls={this.config.annotationList?.controls}
-                  annotationListConfig={this.config.annotationList}
+                  // Legacy API uses different types - cast for compatibility
+                  controls={this.config.annotationList?.controls as any}
+                  annotationListConfig={this.config.annotationList as any}
                   onAnnotationClick={(annotation) => {
                     // Just select and seek, don't auto-play
                     this.activeAnnotationId = annotation.id;

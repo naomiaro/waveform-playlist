@@ -26,6 +26,7 @@ import {
   AnnotationBox,
   AnnotationText,
 } from '@waveform-playlist/annotations';
+import type { AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/annotations';
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 
@@ -37,8 +38,8 @@ export interface WaveformProps {
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   /** Custom playhead render function. Receives position (pixels) and color from theme. */
   renderPlayhead?: RenderPlayheadFunction;
-  annotationControls?: any[];
-  annotationListConfig?: any;
+  annotationControls?: AnnotationAction[];
+  annotationListConfig?: AnnotationActionOptions;
   annotationTextHeight?: number; // Height in pixels for the annotation text list
   className?: string;
   showClipHeaders?: boolean; // Show headers on clips for visual organization

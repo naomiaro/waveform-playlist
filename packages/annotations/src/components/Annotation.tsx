@@ -107,11 +107,23 @@ const ControlButton = styled.button`
   }
 `;
 
+/**
+ * Configuration options passed to annotation action handlers
+ */
+export interface AnnotationActionOptions {
+  /** Whether annotation endpoints are linked (moving one endpoint moves the other) */
+  linkEndpoints?: boolean;
+  /** Whether to continue playing after an annotation ends */
+  continuousPlay?: boolean;
+  /** Additional custom properties */
+  [key: string]: unknown;
+}
+
 export interface AnnotationAction {
   class?: string;
   text?: string;
   title: string;
-  action: (annotation: AnnotationData, index: number, annotations: AnnotationData[], opts: any) => void;
+  action: (annotation: AnnotationData, index: number, annotations: AnnotationData[], opts: AnnotationActionOptions) => void;
 }
 
 export interface AnnotationData {
@@ -132,7 +144,7 @@ export interface AnnotationProps {
   editable?: boolean;
   controls?: AnnotationAction[];
   onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;
-  annotationListConfig?: any;
+  annotationListConfig?: AnnotationActionOptions;
   onClick?: (annotation: AnnotationData) => void;
 }
 
