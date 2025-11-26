@@ -9,6 +9,15 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ## 🎉 Recently Completed
 
+### 2025-11-25: Annotation Keyboard Navigation & Playback
+- ✅ Arrow keys (↑↓←→) to navigate between annotations
+- ✅ Home/End keys to jump to first/last annotation
+- ✅ Escape key to deselect annotation
+- ✅ Enter key to play selected annotation (respects continuous play setting)
+- ✅ Auto-scroll waveform to keep selected annotation visible during keyboard navigation
+- ✅ Enhanced `useAnnotationKeyboardControls` hook with scroll and playback support
+- ✅ Updated annotations example documentation with all keyboard shortcuts
+
 ### 2025-11-25: Website Build Fix & Add Annotation at Playhead
 - ✅ Fixed Docusaurus SSG build failures caused by browser API access at import time
 - ✅ Created `createLazyExample` HOC using `React.lazy()` + `BrowserOnly` for SSR-safe dynamic imports

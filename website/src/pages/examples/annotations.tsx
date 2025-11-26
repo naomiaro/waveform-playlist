@@ -35,8 +35,8 @@ export default function AnnotationsExamplePage(): React.ReactElement {
             <li><strong>Smart sizing:</strong> If another annotation is nearby, the new annotation
                 will shrink to fit the available space</li>
             <li><strong>Minimum size:</strong> Annotations require at least 0.5 seconds of space</li>
-            <li><strong>No overlaps:</strong> You cannot create an annotation where the playhead is
-                already inside an existing annotation</li>
+            <li><strong>Smart placement:</strong> If the playhead is inside an existing annotation,
+                the new annotation will be created at the next available gap</li>
           </ul>
           <h3>After Creating</h3>
           <p>
@@ -57,7 +57,7 @@ export default function AnnotationsExamplePage(): React.ReactElement {
             <tbody>
               <tr style={{ borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>
                 <td style={{ padding: '0.5rem' }}><code>A</code></td>
-                <td style={{ padding: '0.5rem' }}>Add new annotation at playhead</td>
+                <td style={{ padding: '0.5rem' }}>Add new annotation at playhead or next available gap</td>
               </tr>
               <tr style={{ borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>
                 <td style={{ padding: '0.5rem' }}><code>↑</code> / <code>←</code></td>

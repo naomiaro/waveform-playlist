@@ -387,52 +387,86 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     onPlay: play,
   });
 
-  // Add annotation at current playhead position
+  // Find the next available gap for an annotation starting from a given time
+  const findNextAvailableGap = useCallback((startFrom: number): { start: number; maxEnd: number } | null => {
+    if (duration <= 0) return null;
+
+    const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
+
+    // Check if we're inside an existing annotation
+    const containingAnnotation = sortedAnnotations.find(
+      (a) => startFrom >= a.start && startFrom < a.end
+    );
+
+    let gapStart: number;
+    let searchFromIndex: number;
+
+    if (containingAnnotation) {
+      // Start searching after this annotation ends
+      gapStart = containingAnnotation.end;
+      searchFromIndex = sortedAnnotations.indexOf(containingAnnotation) + 1;
+    } else {
+      // We're in a gap, start from current position
+      gapStart = startFrom;
+      searchFromIndex = sortedAnnotations.findIndex((a) => a.start > startFrom);
+      if (searchFromIndex === -1) searchFromIndex = sortedAnnotations.length;
+    }
+
+    // Find the next annotation after our gap start (if any)
+    const nextAnnotation = sortedAnnotations[searchFromIndex];
+    const gapEnd = nextAnnotation ? nextAnnotation.start : duration;
+
+    // Check if there's enough space
+    if (gapEnd - gapStart >= minAnnotationDuration) {
+      return { start: gapStart, maxEnd: gapEnd };
+    }
+
+    // No space here, look for the next gap
+    // Iterate through remaining annotations looking for gaps between them
+    for (let i = searchFromIndex; i < sortedAnnotations.length; i++) {
+      const current = sortedAnnotations[i];
+      const next = sortedAnnotations[i + 1];
+      const potentialGapStart = current.end;
+      const potentialGapEnd = next ? next.start : duration;
+
+      if (potentialGapEnd - potentialGapStart >= minAnnotationDuration) {
+        return { start: potentialGapStart, maxEnd: potentialGapEnd };
+      }
+    }
+
+    return null; // No available gap found
+  }, [annotations, duration, minAnnotationDuration]);
+
+  // Add annotation at current playhead position or next available gap
   const addAnnotationAtPlayhead = useCallback(() => {
     if (duration <= 0) return;
 
-    const playheadTime = currentTime;
+    const gap = findNextAvailableGap(currentTime);
 
-    // Check if playhead is inside an existing annotation
-    const existingAnnotation = annotations.find(
-      (a) => playheadTime >= a.start && playheadTime < a.end
-    );
-    if (existingAnnotation) {
-      // Can't create annotation inside existing one
-      console.warn('Cannot create annotation: playhead is inside an existing annotation');
+    if (!gap) {
+      console.warn('Cannot create annotation: no available space found');
       return;
     }
 
-    // Find the next annotation after the playhead (to set end time)
-    const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
-    const nextAnnotation = sortedAnnotations.find((a) => a.start > playheadTime);
-
-    // Calculate available space until next annotation or end of track
-    const availableSpace = nextAnnotation
-      ? nextAnnotation.start - playheadTime
-      : duration - playheadTime;
-
-    // Check minimum space requirement
-    if (availableSpace < minAnnotationDuration) {
-      console.warn(`Cannot create annotation: not enough space (minimum ${minAnnotationDuration}s required)`);
-      return;
-    }
+    // Calculate available space
+    const availableSpace = gap.maxEnd - gap.start;
 
     // Use default duration if there's enough space, otherwise fill available space
     const annotationDuration = Math.min(defaultAnnotationDuration, availableSpace);
-    const endTime = playheadTime + annotationDuration;
+    const endTime = gap.start + annotationDuration;
 
     const newAnnotation = {
       id: 'annotation_' + Date.now(),
-      start: playheadTime,
+      start: gap.start,
       end: endTime,
-      begin: playheadTime.toFixed(3),
+      begin: gap.start.toFixed(3),
       lines: ['New annotation'],
       language: 'en',
     };
 
     // Insert in chronological order
-    const insertIndex = sortedAnnotations.findIndex((a) => a.start > playheadTime);
+    const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
+    const insertIndex = sortedAnnotations.findIndex((a) => a.start > gap.start);
     const newAnnotations =
       insertIndex === -1
         ? [...sortedAnnotations, newAnnotation]
@@ -443,7 +477,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           ];
 
     setAnnotations(newAnnotations);
-  }, [currentTime, annotations, duration, setAnnotations, defaultAnnotationDuration, minAnnotationDuration]);
+  }, [currentTime, annotations, duration, setAnnotations, defaultAnnotationDuration, findNextAvailableGap]);
 
   // Keyboard shortcut: 'A' to add annotation at playhead
   useEffect(() => {

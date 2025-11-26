@@ -195,6 +195,10 @@ const clip = createClipFromSeconds({
   │   ├── useAudioPosition.ts           # Audio position display
   │   ├── useMasterVolume.ts            # Master volume control
   │   ├── useWaveformPlaylist.ts        # Composite hook
+  │   ├── useAnnotationKeyboardControls.ts # Annotation navigation & editing
+  │   ├── useKeyboardShortcuts.ts       # Flexible keyboard shortcut system
+  │   ├── useClipDragHandlers.ts        # Clip drag-to-move and trim
+  │   ├── useClipSplitting.ts           # Split clips at playhead
   │   ├── index.ts                      # Hook exports
   │   └── README.md                     # Hook API docs
   ├── components/                       # Flexible API primitive components
