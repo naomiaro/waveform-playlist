@@ -1,0 +1,634 @@
+/**
+ * Examples Page - Berghain Aesthetic
+ * Dark, immersive, overwhelming in the best way
+ */
+
+/* ============================================
+   HERO SECTION
+   ============================================ */
+
+.heroSection {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+
+.heroBackground {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Parallax gradient layers */
+.parallaxLayer1 {
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(ellipse at 20% 50%, rgba(255, 107, 107, 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 50%, rgba(0, 212, 170, 0.1) 0%, transparent 50%);
+  will-change: transform;
+}
+
+.parallaxLayer2 {
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(ellipse at 60% 30%, rgba(255, 107, 107, 0.08) 0%, transparent 40%),
+              radial-gradient(ellipse at 30% 70%, rgba(0, 212, 170, 0.08) 0%, transparent 40%);
+  will-change: transform;
+}
+
+.parallaxLayer3 {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.3) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+}
+
+/* Floating particles */
+.particleContainer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.particle {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  background: var(--ifm-color-primary);
+  border-radius: 50%;
+  opacity: 0;
+  animation: floatUp var(--duration) var(--delay) infinite ease-out;
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(100vh) scale(0);
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) scale(1);
+  }
+}
+
+/* SVG Decorations */
+.waveformSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.waveBar {
+  animation: waveBarPulse 2s var(--bar-delay) infinite ease-in-out;
+}
+
+@keyframes waveBarPulse {
+  0%, 100% { opacity: 0.2; transform: scaleY(1); }
+  50% { opacity: 0.5; transform: scaleY(1.2); }
+}
+
+.equalizer {
+  width: 100%;
+  height: 100%;
+}
+
+.eqBar {
+  animation: eqBounce 1s var(--eq-delay) infinite ease-in-out;
+  transform-origin: bottom;
+}
+
+@keyframes eqBounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+.circularViz {
+  width: 100%;
+  height: 100%;
+}
+
+.pulseCircle {
+  animation: pulse 4s infinite ease-in-out;
+  transform-origin: center;
+}
+
+.pulseCircle2 {
+  animation: pulse 4s 2s infinite ease-in-out;
+  transform-origin: center;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.2; }
+  50% { transform: scale(1.1); opacity: 0.4; }
+}
+
+.vizLine {
+  animation: lineFlash 2s var(--line-delay) infinite ease-in-out;
+}
+
+@keyframes lineFlash {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.8; }
+}
+
+/* Hero SVG positions */
+.heroWave1 {
+  position: absolute;
+  bottom: 20%;
+  left: 0;
+  right: 0;
+  height: 80px;
+  opacity: 0.5;
+}
+
+.heroWave2 {
+  position: absolute;
+  bottom: 10%;
+  left: 0;
+  right: 0;
+  height: 60px;
+  opacity: 0.3;
+  transform: scaleX(-1);
+}
+
+.heroCircle {
+  position: absolute;
+  top: 10%;
+  right: 5%;
+  width: 300px;
+  height: 300px;
+  opacity: 0.4;
+}
+
+.heroEq {
+  position: absolute;
+  bottom: 15%;
+  left: 5%;
+  width: 150px;
+  height: 150px;
+  opacity: 0.3;
+}
+
+/* Hero Content */
+.heroContent {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 2rem;
+}
+
+.heroGlitch {
+  font-size: clamp(4rem, 15vw, 12rem);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  color: #fff;
+  text-transform: uppercase;
+  position: relative;
+  animation: glitchText 5s infinite;
+}
+
+.heroGlitch::before,
+.heroGlitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.heroGlitch::before {
+  color: var(--ifm-color-primary);
+  animation: glitchBefore 3s infinite;
+  clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+}
+
+.heroGlitch::after {
+  color: #00d4aa;
+  animation: glitchAfter 2s infinite;
+  clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%);
+}
+
+@keyframes glitchText {
+  0%, 92%, 100% { transform: translate(0); }
+  93% { transform: translate(-5px, 2px); }
+  94% { transform: translate(5px, -2px); }
+  95% { transform: translate(-3px, 1px); }
+}
+
+@keyframes glitchBefore {
+  0%, 90%, 100% { transform: translate(0); opacity: 0.8; }
+  91% { transform: translate(10px, -5px); }
+  92% { transform: translate(-10px, 5px); }
+}
+
+@keyframes glitchAfter {
+  0%, 88%, 100% { transform: translate(0); opacity: 0.8; }
+  89% { transform: translate(-8px, 3px); }
+  90% { transform: translate(8px, -3px); }
+}
+
+.heroSubtitle {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 2rem;
+  line-height: 1.8;
+  letter-spacing: 0.05em;
+}
+
+.scrollIndicator {
+  position: absolute;
+  bottom: 3rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.scrollArrow {
+  animation: bounce 2s infinite;
+  font-size: 1.5rem;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(10px); }
+  60% { transform: translateY(5px); }
+}
+
+/* ============================================
+   MAIN CONTENT
+   ============================================ */
+
+.mainContent {
+  background: linear-gradient(180deg, #000 0%, #0a0a0f 5%, #0a0a0f 95%, #000 100%);
+  position: relative;
+}
+
+/* Category Sections */
+.categorySection {
+  padding: 6rem 2rem;
+  position: relative;
+  max-width: 1400px;
+  margin: 0 auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.categorySection:last-of-type {
+  border-bottom: none;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  flex-wrap: wrap;
+}
+
+.categoryNumber {
+  font-size: 4rem;
+  font-weight: 200;
+  color: var(--ifm-color-primary);
+  opacity: 0.3;
+  line-height: 1;
+  font-family: var(--ifm-font-family-monospace);
+}
+
+.categoryTitle {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.categorySubtitle {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  letter-spacing: 0.1em;
+}
+
+/* Examples Grid */
+.examplesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Example Cards */
+.exampleCard {
+  position: relative;
+  display: block;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.02);
+  text-decoration: none !important;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  animation: cardFadeIn 0.6s calc(var(--card-index) * 0.1s) backwards ease-out;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+.exampleCard:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-5px);
+}
+
+/* Card glow effect */
+.cardGlow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(var(--ifm-color-primary-rgb, 255, 107, 107), 0.15) 0%,
+    transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.exampleCard:hover .cardGlow {
+  opacity: 1;
+}
+
+/* Card border animation */
+.cardBorder {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  transition: border-color 0.3s;
+}
+
+.exampleCard:hover .cardBorder {
+  border-color: var(--ifm-color-primary);
+}
+
+.exampleCard:hover .cardBorder::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: linear-gradient(90deg,
+    transparent,
+    var(--ifm-color-primary),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: borderShine 1.5s infinite linear;
+  opacity: 0.5;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  padding: 1px;
+}
+
+@keyframes borderShine {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Card content */
+.cardContent {
+  position: relative;
+  z-index: 1;
+}
+
+.cardIcon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+  transition: all 0.3s;
+}
+
+.exampleCard:hover .cardIcon {
+  opacity: 1;
+  color: var(--ifm-color-primary);
+  transform: scale(1.1);
+}
+
+.cardTitle {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cardDescription {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.cardArrow {
+  position: absolute;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  font-size: 1.5rem;
+  color: var(--ifm-color-primary);
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: all 0.3s;
+}
+
+.exampleCard:hover .cardArrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Section decoration */
+.sectionDecoration {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 200px;
+  height: 100px;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.sectionWave,
+.sectionEq {
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================
+   CTA SECTION
+   ============================================ */
+
+.ctaSection {
+  position: relative;
+  padding: 8rem 2rem;
+  text-align: center;
+  overflow: hidden;
+}
+
+.ctaViz {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  height: 500px;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.ctaContent {
+  position: relative;
+  z-index: 1;
+}
+
+.ctaContent h2 {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ctaContent p {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 2rem;
+}
+
+.ctaButtons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ctaButton,
+.ctaButtonSecondary {
+  padding: 1rem 2.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-decoration: none !important;
+  transition: all 0.3s;
+}
+
+.ctaButton {
+  background: var(--ifm-color-primary);
+  color: #000 !important;
+  border: 2px solid var(--ifm-color-primary);
+}
+
+.ctaButton:hover {
+  background: transparent;
+  color: var(--ifm-color-primary) !important;
+  transform: translateY(-3px);
+}
+
+.ctaButtonSecondary {
+  background: transparent;
+  color: #fff !important;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.ctaButtonSecondary:hover {
+  border-color: #fff;
+  transform: translateY(-3px);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .heroGlitch {
+    font-size: 3rem;
+  }
+
+  .heroCircle {
+    width: 150px;
+    height: 150px;
+    top: 5%;
+    right: 2%;
+  }
+
+  .heroEq {
+    width: 80px;
+    height: 80px;
+    bottom: 20%;
+    left: 2%;
+  }
+
+  .categorySection {
+    padding: 4rem 1rem;
+  }
+
+  .categoryNumber {
+    font-size: 2.5rem;
+  }
+
+  .categoryTitle {
+    font-size: 1.8rem;
+  }
+
+  .categoryHeader {
+    gap: 1rem;
+  }
+
+  .examplesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionDecoration {
+    display: none;
+  }
+
+  .ctaContent h2 {
+    font-size: 2rem;
+  }
+
+  .ctaViz {
+    width: 300px;
+    height: 300px;
+  }
+}
+
+/* Dark mode specific (Docusaurus) */
+[data-theme='dark'] .exampleCard {
+  --ifm-color-primary-rgb: 0, 212, 170;
+}

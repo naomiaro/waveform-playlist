@@ -200,28 +200,6 @@ function App() {
   );
 }
 
-function Sponsors() {
-  return (
-    <section className={styles.sponsors}>
-      <div className="container">
-        <Heading as="h2" className={styles.sponsorsTitle}>Sponsors</Heading>
-        <a href="https://moises.ai/" target="_blank" rel="noopener noreferrer">
-          <img
-            src="/waveform-playlist/img/logos/moises-ai.svg"
-            alt="Moises.ai"
-            className={styles.sponsorLogo}
-          />
-        </a>
-        <p className={styles.sponsorCta}>
-          <a href="https://github.com/sponsors/naomiaro" target="_blank" rel="noopener noreferrer">
-            Become a sponsor →
-          </a>
-        </p>
-      </div>
-    </section>
-  );
-}
-
 export default function Home(): ReactNode {
   return (
     <Layout
@@ -232,7 +210,6 @@ export default function Home(): ReactNode {
         <Screenshot />
         <HomepageFeatures />
         <CodeExample />
-        <Sponsors />
       </main>
     </Layout>
   );
