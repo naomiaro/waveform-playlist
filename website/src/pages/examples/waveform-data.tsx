@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyWaveformDataExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function WaveformDataExamplePage(): React.ReactElement {
   return (
     <Layout
       title="BBC Waveform Data Example"
-      description="Fast waveform loading with pre-computed BBC peaks data"
+      description="Instant waveform display with BBC audiowaveform pre-computed peaks - reduce load times from seconds to milliseconds"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-waveform-data.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-waveform-data.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>BBC Waveform Data Example</h1>
         <p>

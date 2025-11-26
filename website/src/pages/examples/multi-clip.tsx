@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyMultiClipExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function MultiClipExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Multi-Clip Editing"
-      description="Advanced multi-clip editing with drag & drop"
+      description="Advanced multi-clip audio editing with drag & drop, clip splitting, trimming, and collision detection"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-multi-clip.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-multi-clip.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>Multi-Clip Editing Example</h1>
         <p>

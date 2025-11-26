@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyEffectsExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function EffectsExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Effects Example"
-      description="Real-time audio effects with Tone.js"
+      description="Apply 20+ real-time audio effects including reverb, delay, chorus, phaser, and distortion with Tone.js"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-effects.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-effects.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>Effects Example</h1>
         <p>

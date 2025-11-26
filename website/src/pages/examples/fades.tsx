@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyFadesExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function FadesExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Fades Example"
-      description="Compare the four fade curve types: linear, logarithmic, exponential, and S-curve"
+      description="Compare audio fade curve types - linear, logarithmic, exponential, and S-curve with visual overlays"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-fades.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-fades.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>Fade Types Comparison</h1>
         <p>

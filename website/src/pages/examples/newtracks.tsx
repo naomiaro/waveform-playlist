@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyNewTracksExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function NewTracksExamplePage(): React.ReactElement {
   return (
     <Layout
       title="New Tracks Example"
-      description="Dynamically add and remove tracks"
+      description="Dynamically add and remove audio tracks at runtime - load files on demand and manage multi-track playlists"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-newtracks.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-newtracks.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>New Tracks Example</h1>
         <p>

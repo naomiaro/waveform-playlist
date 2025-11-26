@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyStylingExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function StylingExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Styling Example"
-      description="Different waveform visual styles using barWidth and barGap"
+      description="Customize waveform appearance with barWidth, barGap, gradients, and theme colors for dark mode support"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-styling.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-styling.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>Waveform Styling</h1>
         <p>

@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyAnnotationsExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function AnnotationsExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Annotations Example"
-      description="Audio annotations with regions and text labels"
+      description="Time-synced audio annotations with regions, text labels, keyboard navigation, and JSON export for transcription"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-annotations.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-annotations.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>Annotations Example</h1>
         <p>

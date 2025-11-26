@@ -171,8 +171,15 @@ const config: Config = {
   ],
 
   themeConfig: {
-    // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    // Social card image for Open Graph and Twitter
+    image: 'img/social/waveform-playlist-social.png',
+    // SEO metadata
+    metadata: [
+      { name: 'keywords', content: 'waveform, audio editor, web audio, react, multitrack, daw, audio visualization, tone.js' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:site', content: '@waveplaylist' },
+      { name: 'og:type', content: 'website' },
+    ],
     colorMode: {
       defaultMode: 'dark',
       respectPrefersColorScheme: true,

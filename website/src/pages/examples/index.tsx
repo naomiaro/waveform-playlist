@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import Link from '@docusaurus/Link';
 import {
   CircleNotch,
@@ -212,8 +213,12 @@ export default function Examples(): React.ReactElement {
   return (
     <Layout
       title="Examples"
-      description="Enter the world of Waveform Playlist"
+      description="Interactive demos of Waveform Playlist - multi-track editing, effects, recording, annotations, and more"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/waveform-playlist-examples.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/waveform-playlist-examples.png" />
+      </Head>
       {/* Hero Section */}
       <div className={styles.heroSection}>
         <div className={styles.heroBackground}>

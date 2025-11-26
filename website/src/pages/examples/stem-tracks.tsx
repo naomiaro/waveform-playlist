@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
 const LazyStemTracksExample = createLazyExample(
@@ -10,8 +11,12 @@ export default function StemTracksExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Stem Tracks Example"
-      description="Multi-track audio with independent volume and pan controls"
+      description="Multi-track audio player with independent volume, pan, mute and solo controls for each stem"
     >
+      <Head>
+        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-stem-tracks.png" />
+        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-stem-tracks.png" />
+      </Head>
       <main className="container margin-vert--lg">
         <h1>Stem Tracks Example</h1>
         <p>
