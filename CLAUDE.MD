@@ -9,6 +9,18 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 **Key Dependencies:**
 - **Tone.js 15.1.22** - Audio engine for playback, scheduling, and effects
 
+### Website Aesthetic: Berlin Underground
+
+The documentation website follows a **Berlin underground/industrial** aesthetic inspired by electronic music culture:
+
+- **Dark gradient backgrounds** with high-contrast text
+- **Monospace fonts** for timestamps and technical elements (Courier New)
+- **Grungy details** like `//` prefixes on timestamps, text shadows
+- **Muted color palette** with strategic accent colors
+- **Minimal, utilitarian design** - form follows function
+
+When adding new examples or UI elements, maintain this aesthetic. The Flexible API example showcases the full customization potential with custom playheads, grungy timestamps, and monospace clip headers.
+
 ## Project Roadmap
 
 **Source of Truth:** `TODO.md` contains the complete multi-track editing roadmap and recently completed work.

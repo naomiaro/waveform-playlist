@@ -17,6 +17,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 - [ ] **Browser compatibility** - Chrome, Firefox, Safari, Edge
 - [ ] **NPM publishing setup** - Package.json exports, tree-shaking verification
 - [ ] **CI/CD pipeline** - Automated builds, tests, publishing
+- [ ] **Revamp sponsors.md** - Update sponsor information and acknowledgments
 
 ### Nice to Have
 
@@ -31,6 +32,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 ## ✅ Completed Features
 
 ### Core (Phase 1) ✅
+
 - WaveformPlaylistProvider with React Context
 - Playback with Tone.js (play, pause, stop, seek)
 - Waveform rendering with Canvas
@@ -41,6 +43,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 - Theming system
 
 ### Recording ✅
+
 - AudioWorklet-based recording
 - VU meter with AnalyserNode
 - Live waveform during recording
@@ -48,24 +51,28 @@ Multi-track audio editor roadmap for waveform-playlist.
 - Recording-optimized audio constraints
 
 ### Clip-Based Model (Phase 2) ✅
+
 - Multiple clips per track
 - Sample-based architecture (integer samples, not float seconds)
 - File-reference loading pattern
 - Gaps between clips render as silence
 
 ### Drag & Trim (Phase 3.1) ✅
+
 - Drag clip headers to move
 - Drag boundaries to trim (bidirectional)
 - Real-time collision detection
 - `useClipDragHandlers` hook
 
 ### Splitting (Phase 3.3) ✅
+
 - Split clips at playhead with 'S' key
 - `useClipSplitting` hook
 - `useKeyboardShortcuts` hook
 - Track selection system
 
 ### Effects ✅
+
 - 20 Tone.js effects with UI
 - Runtime parameter modification
 - Effect bypass with wet preservation
@@ -73,18 +80,21 @@ Multi-track audio editor roadmap for waveform-playlist.
 - `useDynamicEffects` / `useTrackDynamicEffects` hooks
 
 ### Export ✅
+
 - WAV export via Tone.Offline
 - Master + per-track effects support
 - Export all tracks as ZIP
 - `useExportWav` hook
 
 ### Documentation ✅
+
 - Docusaurus site with 10 examples
 - Storybook with 32 story files
 - Guides: effects, fades, waveform-data
 - Dark/light theme support
 
 ### Other ✅
+
 - Annotations package (optional)
 - BBC waveform-data.js support
 - Custom playhead component (`renderPlayhead` prop)
@@ -96,18 +106,21 @@ Multi-track audio editor roadmap for waveform-playlist.
 ## 🔮 Future Phases (Post-Alpha)
 
 ### Phase 3.4-3.5: Copy/Paste & Multi-Select
+
 - Clipboard operations (Cmd+C/X/V)
 - Multi-select with Cmd+Click, Shift+Click
 - Bulk drag/delete
 - Selection toolbar
 
 ### Phase 4: Performance & Virtual Scrolling
+
 - Horizontal virtual scrolling (2+ hour timelines)
 - Vertical virtual scrolling (20+ tracks)
 - RAF batching
 - Canvas stitching
 
 ### Phase 5: Polish & Usability
+
 - Undo/redo (command pattern)
 - Snap to grid
 - Keyboard shortcuts help overlay
@@ -115,23 +128,23 @@ Multi-track audio editor roadmap for waveform-playlist.
 - Context menus
 
 ### Future Considerations
+
 - Clip grouping
 - Automation lanes
 - Markers and regions
 - MIDI/video sync
-- Cloud storage
-- Collaboration
+- Sticky clip header text (Intersection Observer to keep track name visible when scrolling)
 
 ---
 
 ## 📦 Bundle Sizes
 
-| Bundle | Uncompressed | Gzipped |
-|--------|-------------|---------|
-| Core | 507KB | 132KB |
-| Stem-tracks | 509KB | 150KB |
-| Effects | 530KB | 154KB |
-| Recording | 524KB | 154KB |
+| Bundle      | Uncompressed | Gzipped |
+| ----------- | ------------ | ------- |
+| Core        | 507KB        | 132KB   |
+| Stem-tracks | 509KB        | 150KB   |
+| Effects     | 530KB        | 154KB   |
+| Recording   | 524KB        | 154KB   |
 
 Tree-shaking reduced bundles by 13% (23KB gzipped savings).
 
@@ -144,6 +157,7 @@ Tree-shaking reduced bundles by 13% (23KB gzipped savings).
 **Sample-Based Timing:** All clip positions stored as integer samples to avoid floating-point precision errors.
 
 **Key Files:**
+
 - Types: `packages/core/src/types/clip.ts`
 - Context: `packages/browser/src/WaveformPlaylistContext.tsx`
 - Hooks: `packages/browser/src/hooks/`
