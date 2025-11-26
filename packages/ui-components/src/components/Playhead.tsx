@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
 
 interface PlayheadLineProps {
@@ -44,6 +44,8 @@ export interface PlayheadProps {
   sampleRate: number;
   /** Controls offset in pixels */
   controlsOffset: number;
+  /** Function to get current audio context time - required for smooth animation */
+  getAudioContextTime?: () => number;
 }
 
 /**
@@ -63,11 +65,7 @@ export const Playhead: React.FC<PlayheadProps> = ({ position, color = '#ff0000' 
 
 // === Custom Playhead Variants ===
 
-const PlayheadWithMarkerContainer = styled.div.attrs<PlayheadLineProps>((props) => ({
-  style: {
-    transform: `translate3d(${props.$position}px, 0, 0)`,
-  },
-}))<PlayheadLineProps>`
+const PlayheadWithMarkerContainer = styled.div<{ $color: string }>`
   position: absolute;
   top: 0;
   left: 0;
@@ -100,10 +98,66 @@ const MarkerLine = styled.div<{ $color: string }>`
 /**
  * Playhead with a triangle marker at the top.
  * Provides better visual indication of the current position.
+ * Uses requestAnimationFrame for smooth 60fps animation during playback.
  */
-export const PlayheadWithMarker: React.FC<PlayheadProps> = ({ position, color = '#ff0000' }) => {
+export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
+  color = '#ff0000',
+  isPlaying,
+  currentTimeRef,
+  playbackStartTimeRef,
+  audioStartPositionRef,
+  samplesPerPixel,
+  sampleRate,
+  controlsOffset,
+  getAudioContextTime,
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const updatePosition = () => {
+      if (containerRef.current) {
+        let time: number;
+        if (isPlaying && getAudioContextTime) {
+          const elapsed = getAudioContextTime() - (playbackStartTimeRef.current ?? 0);
+          time = (audioStartPositionRef.current ?? 0) + elapsed;
+        } else {
+          time = currentTimeRef.current ?? 0;
+        }
+        const pos = (time * sampleRate) / samplesPerPixel + controlsOffset;
+        containerRef.current.style.transform = `translate3d(${pos}px, 0, 0)`;
+      }
+
+      if (isPlaying) {
+        animationFrameRef.current = requestAnimationFrame(updatePosition);
+      }
+    };
+
+    if (isPlaying) {
+      animationFrameRef.current = requestAnimationFrame(updatePosition);
+    } else {
+      updatePosition();
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [isPlaying, sampleRate, samplesPerPixel, controlsOffset, currentTimeRef, playbackStartTimeRef, audioStartPositionRef, getAudioContextTime]);
+
+  // Update position when stopped (for seeks)
+  useEffect(() => {
+    if (!isPlaying && containerRef.current) {
+      const time = currentTimeRef.current ?? 0;
+      const pos = (time * sampleRate) / samplesPerPixel + controlsOffset;
+      containerRef.current.style.transform = `translate3d(${pos}px, 0, 0)`;
+    }
+  });
+
   return (
-    <PlayheadWithMarkerContainer $position={position} $color={color}>
+    <PlayheadWithMarkerContainer ref={containerRef} $color={color}>
       <MarkerTriangle $color={color} />
       <MarkerLine $color={color} />
     </PlayheadWithMarkerContainer>

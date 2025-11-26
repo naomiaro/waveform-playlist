@@ -466,9 +466,11 @@ export function FlexibleApiExample() {
       <Container>
         <WaveformPlaylistProvider
           tracks={tracks}
-          samplesPerPixel={1024}
+          samplesPerPixel={512}
           mono
           waveHeight={100}
+          barGap={0}
+          barWidth={1}
           automaticScroll={false}
           controls={{ show: true, width: 120 }}
           theme={customTheme}

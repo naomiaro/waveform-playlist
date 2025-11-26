@@ -1,9 +1,9 @@
-import React, { useRef, useState, ReactNode, useCallback } from 'react';
+import React, { useRef, useState, ReactNode, useCallback, useMemo } from 'react';
+import { getContext } from 'tone';
 import {
   Playlist,
   Track as TrackComponent,
   Clip,
-  SmartChannel,
   Playhead,
   Selection,
   PlaylistInfoContext,
@@ -31,7 +31,7 @@ import type { AnnotationAction, AnnotationActionOptions } from '@waveform-playli
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
-import { AnimatedProgress } from './AnimatedProgress';
+import { ChannelWithProgress } from './ChannelWithProgress';
 
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
@@ -414,13 +414,15 @@ export const Waveform: React.FC<WaveformProps> = ({
                             }}
                           >
                             {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
-                              <SmartChannel
+                              <ChannelWithProgress
                                 key={`${trackIndex}-${clipIndex}-${channelIndex}`}
                                 index={channelIndex}
                                 data={channelPeaks}
                                 bits={peaksData.bits}
                                 length={width}
                                 isSelected={track.id === selectedTrackId}
+                                clipStartSample={clip.startSample}
+                                clipDurationSamples={clip.durationSamples}
                               />
                             ))}
                           </Clip>
@@ -444,13 +446,15 @@ export const Waveform: React.FC<WaveformProps> = ({
                           isSelected={track.id === selectedTrackId}
                           trackId={track.id}
                         >
-                          <SmartChannel
+                          <ChannelWithProgress
                             key={`${trackIndex}-recording-0`}
                             index={0}
                             data={recordingState.peaks}
                             bits={16}
                             length={Math.floor(recordingState.peaks.length / 2)}
                             isSelected={track.id === selectedTrackId}
+                            clipStartSample={recordingState.startSample}
+                            clipDurationSamples={recordingState.durationSamples}
                           />
                         </Clip>
                       )}
@@ -480,12 +484,6 @@ export const Waveform: React.FC<WaveformProps> = ({
                   })}
                 </AnnotationBoxesWrapper>
               )}
-              {/* Animated progress overlay - shows played portion during playback */}
-              {isPlaying && (
-                <AnimatedProgress
-                  controlsOffset={controls.show ? controls.width : 0}
-                />
-              )}
               {selectionStart !== selectionEnd && (
                 <Selection
                   startPosition={
@@ -513,6 +511,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                     samplesPerPixel,
                     sampleRate,
                     controlsOffset: controls.show ? controls.width : 0,
+                    getAudioContextTime: () => getContext().currentTime,
                   })
                 ) : (
                   <AnimatedPlayhead

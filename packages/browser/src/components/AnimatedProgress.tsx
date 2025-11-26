@@ -11,7 +11,7 @@ const ProgressOverlay = styled.div<{ $color: string }>`
   height: 100%;
   background: ${(props) => props.$color};
   pointer-events: none;
-  z-index: 50;
+  z-index: 50; /* Above clips (z-index: 10) but below playhead (z-index: 150) - semi-transparent to show waveforms */
   will-change: width;
 `;
 

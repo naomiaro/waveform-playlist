@@ -28,6 +28,7 @@ const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
   flex-direction: column;
   background: rgba(255, 255, 255, 0.05);
   cursor: crosshair; /* Indicates that pressing 'S' will split the clip */
+  z-index: 10; /* Above progress overlay (z-index: 2) but below controls/playhead */
 
   &:hover {
     background: rgba(255, 255, 255, 0.08);
