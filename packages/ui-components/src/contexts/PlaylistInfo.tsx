@@ -30,8 +30,8 @@ export const PlaylistInfoContext = createContext<PlaylistInfo>({
     width: 150,
   },
   duration: 30000,
-  barWidth: 2,
-  barGap: 1,
+  barWidth: 1,
+  barGap: 0,
 });
 
 export const usePlaylistInfo = () => useContext(PlaylistInfoContext);

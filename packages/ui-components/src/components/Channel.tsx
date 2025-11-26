@@ -48,6 +48,11 @@ const Waveform = styled.canvas.attrs<WaveformProps>((props) => ({
 }))<WaveformProps>`
   float: left;
   position: relative;
+  /* Promote to own compositing layer for smoother scrolling */
+  will-change: transform;
+  /* Disable image rendering interpolation */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 `;
 
 interface WrapperProps {
@@ -66,6 +71,9 @@ const Wrapper = styled.div.attrs<WrapperProps>((props) => ({
 }))<WrapperProps>`
   position: absolute;
   background: ${(props) => props.$waveFillColor};
+  /* Force GPU compositing layer to reduce scroll flickering */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 `;
 
 export interface ChannelProps {
@@ -84,6 +92,8 @@ export interface ChannelProps {
   barWidth?: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
   barGap?: number;
+  /** If true, background is transparent (for use with external progress overlay) */
+  transparentBackground?: boolean;
 }
 
 export const Channel: FunctionComponent<ChannelProps> = (props) => {
@@ -97,8 +107,9 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveHeight = 80,
     waveOutlineColor = '#E0EFF1',
     waveFillColor = 'grey',
-    barWidth = 2,
-    barGap = 1,
+    barWidth = 1,
+    barGap = 0,
+    transparentBackground = false,
   } = props;
   const canvasesRef = useRef<HTMLCanvasElement[]>([]);
 
@@ -127,16 +138,17 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         ctx.resetTransform();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-        // Create gradient or use solid color for waveform bars
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+
+        // Create gradient using CSS pixel coordinates (after scaling)
+        // This ensures the gradient aligns with the drawing coordinates
+        const canvasWidth = canvas.width / devicePixelRatio;
         ctx.fillStyle = createCanvasFillStyle(
           ctx,
           waveOutlineColor,
-          canvas.width,
-          canvas.height
+          canvasWidth,
+          waveHeight
         );
-        ctx.scale(devicePixelRatio, devicePixelRatio);
-
-        const canvasWidth = canvas.width / devicePixelRatio;
 
         // Calculate where bars should be drawn in this canvas
         // by finding where in the global bar pattern this canvas starts
@@ -209,7 +221,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   }
 
   // Convert waveFillColor to CSS for the background
-  const backgroundCss = waveformColorToCss(waveFillColor);
+  const backgroundCss = transparentBackground ? 'transparent' : waveformColorToCss(waveFillColor);
 
   return (
     <Wrapper

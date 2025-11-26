@@ -124,28 +124,12 @@ export interface WaveformPlaylistTheme {
 }
 
 export const defaultTheme: WaveformPlaylistTheme = {
-  // Vertical gradient: deep blue to teal (Berlin underground vibe)
-  waveOutlineColor: {
-    type: 'linear',
-    direction: 'vertical',
-    stops: [
-      { offset: 0, color: '#0a4f6d' },
-      { offset: 0.5, color: '#1a7f8e' },
-      { offset: 1, color: '#0a4f6d' },
-    ],
-  },
+  // Solid teal color (Berlin underground vibe) - solid colors avoid gradient flickering with bar gaps
+  waveOutlineColor: '#1a7f8e',
   waveFillColor: '#e8f4f8', // Light teal-gray background
   waveProgressColor: 'rgba(0, 0, 0, 0.15)', // Subtle dark overlay for light mode
-  // Selected: brighter cyan gradient
-  selectedWaveOutlineColor: {
-    type: 'linear',
-    direction: 'vertical',
-    stops: [
-      { offset: 0, color: '#00b4d8' },
-      { offset: 0.5, color: '#48cae4' },
-      { offset: 1, color: '#00b4d8' },
-    ],
-  },
+  // Selected: brighter cyan
+  selectedWaveOutlineColor: '#00b4d8',
   selectedWaveFillColor: '#caf0f8', // Lighter cyan background when selected
   selectedTrackControlsBackground: '#d9e9ff', // Light blue background for selected track controls
   timeColor: '#000',
@@ -215,7 +199,7 @@ export const darkTheme: WaveformPlaylistTheme = {
     ],
   },
   waveFillColor: '#1a1612', // Very dark warm brown background
-  waveProgressColor: 'rgba(60, 40, 20, 0.5)', // Darker warm overlay - more visible contrast
+  waveProgressColor: 'rgba(100, 70, 40, 0.6)', // Warmer, more visible progress overlay
   // Selected: brighter warm amber
   selectedWaveOutlineColor: {
     type: 'linear',

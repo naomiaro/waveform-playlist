@@ -1,17 +1,28 @@
 import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { getContext } from 'tone';
-import { SmartChannel, type SmartChannelProps, useTheme, usePlaylistInfo, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
+import { SmartChannel, type SmartChannelProps, useTheme, usePlaylistInfo, type WaveformPlaylistTheme, waveformColorToCss } from '@waveform-playlist/ui-components';
 import { usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
 
 const ChannelWrapper = styled.div`
   position: relative;
+`;
 
-  /* Ensure canvas elements are above progress overlay */
-  canvas {
-    position: relative;
-    z-index: 2;
-  }
+interface BackgroundProps {
+  readonly $color: string;
+  readonly $height: number;
+  readonly $top: number;
+  readonly $width: number;
+}
+
+const Background = styled.div<BackgroundProps>`
+  position: absolute;
+  top: ${(props) => props.$top}px;
+  left: 0;
+  width: ${(props) => props.$width}px;
+  height: ${(props) => props.$height}px;
+  background: ${(props) => props.$color};
+  z-index: 0;
 `;
 
 interface ProgressOverlayProps {
@@ -27,8 +38,13 @@ const ProgressOverlay = styled.div<ProgressOverlayProps>`
   height: ${(props) => props.$height}px;
   background: ${(props) => props.$color};
   pointer-events: none;
-  z-index: 1; /* Above background, below canvas (z-index: 2) */
+  z-index: 1;
   will-change: width;
+`;
+
+const ChannelContainer = styled.div`
+  position: relative;
+  z-index: 2;
 `;
 
 export interface ChannelWithProgressProps extends SmartChannelProps {
@@ -135,15 +151,32 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     }
   });
 
+  // Get the background color from the theme, considering selection state
+  const waveFillColor = smartChannelProps.isSelected && theme
+    ? theme.selectedWaveFillColor
+    : theme?.waveFillColor || 'grey';
+  const backgroundCss = waveformColorToCss(waveFillColor);
+
   return (
     <ChannelWrapper>
+      {/* Background layer - shows the waveform fill color */}
+      <Background
+        $color={backgroundCss}
+        $height={waveHeight}
+        $top={smartChannelProps.index * waveHeight}
+        $width={smartChannelProps.length}
+      />
+      {/* Progress overlay - shows played portion with progress color */}
       <ProgressOverlay
         ref={progressRef}
         $color={progressColor}
         $height={waveHeight}
         $top={smartChannelProps.index * waveHeight}
       />
-      <SmartChannel {...smartChannelProps} />
+      {/* Waveform canvas with transparent background */}
+      <ChannelContainer>
+        <SmartChannel {...smartChannelProps} transparentBackground />
+      </ChannelContainer>
     </ChannelWrapper>
   );
 };

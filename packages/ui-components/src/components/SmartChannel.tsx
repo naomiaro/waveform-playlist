@@ -9,9 +9,11 @@ export interface SmartChannelProps {
   bits: 8 | 16;
   length: number;
   isSelected?: boolean; // Whether this channel's track is selected
+  /** If true, background is transparent (for use with external progress overlay) */
+  transparentBackground?: boolean;
 }
 
-export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected, ...props }) => {
+export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected, transparentBackground, ...props }) => {
   const theme = useTheme();
   const { waveHeight, barWidth, barGap } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
@@ -35,6 +37,7 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected,
       devicePixelRatio={devicePixelRatio}
       barWidth={barWidth}
       barGap={barGap}
+      transparentBackground={transparentBackground}
     ></Channel>
   );
 };
