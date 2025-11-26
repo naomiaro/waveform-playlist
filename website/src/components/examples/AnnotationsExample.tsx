@@ -352,9 +352,9 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   defaultAnnotationDuration = 3.0,
   minAnnotationDuration = 0.5,
 }) => {
-  const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
-  const { annotations, linkEndpoints, activeAnnotationId } = usePlaylistState();
-  const { setAnnotations, setActiveAnnotationId } = usePlaylistControls();
+  const { samplesPerPixel, sampleRate, duration, controls } = usePlaylistData();
+  const { annotations, linkEndpoints, activeAnnotationId, continuousPlay } = usePlaylistState();
+  const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play } = usePlaylistControls();
   const { currentTime } = usePlaybackAnimation();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -379,6 +379,12 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     onActiveAnnotationChange: setActiveAnnotationId,
     duration,
     linkEndpoints,
+    continuousPlay,
+    scrollContainerRef,
+    samplesPerPixel,
+    sampleRate,
+    controlsWidth: controls.show ? controls.width : 0,
+    onPlay: play,
   });
 
   // Add annotation at current playhead position

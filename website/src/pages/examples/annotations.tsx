@@ -80,6 +80,10 @@ export default function AnnotationsExamplePage(): React.ReactElement {
                 <td style={{ padding: '0.5rem' }}>Deselect annotation</td>
               </tr>
               <tr style={{ borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>
+                <td style={{ padding: '0.5rem' }}><code>Enter</code></td>
+                <td style={{ padding: '0.5rem' }}>Play selected annotation</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>
                 <td style={{ padding: '0.5rem' }}><code>[</code></td>
                 <td style={{ padding: '0.5rem' }}>Move selected annotation start earlier</td>
               </tr>

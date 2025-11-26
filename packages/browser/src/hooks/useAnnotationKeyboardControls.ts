@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import type { AnnotationType } from '@waveform-playlist/annotations';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
@@ -13,7 +13,19 @@ interface UseAnnotationKeyboardControlsOptions {
   onActiveAnnotationChange?: (id: string | null) => void;
   duration: number;
   linkEndpoints: boolean;
+  /** Whether continuous play is enabled (affects playback duration) */
+  continuousPlay?: boolean;
   enabled?: boolean;
+  /** Optional: scroll container ref for auto-scrolling to annotation */
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  /** Optional: samples per pixel for scroll position calculation */
+  samplesPerPixel?: number;
+  /** Optional: sample rate for scroll position calculation */
+  sampleRate?: number;
+  /** Optional: controls width offset for scroll position calculation */
+  controlsWidth?: number;
+  /** Optional: callback to start playback at a time with optional duration */
+  onPlay?: (startTime: number, duration?: number) => void;
 }
 
 /**
@@ -25,6 +37,7 @@ interface UseAnnotationKeyboardControlsOptions {
  * - Home = Select first annotation
  * - End = Select last annotation
  * - Escape = Deselect annotation
+ * - Enter = Play selected annotation
  *
  * Boundary Editing Shortcuts (requires active annotation):
  * - [ = Move start boundary earlier (left)
@@ -32,7 +45,7 @@ interface UseAnnotationKeyboardControlsOptions {
  * - Shift+[ = Move end boundary earlier (left)
  * - Shift+] = Move end boundary later (right)
  *
- * Respects linkEndpoints setting for linked boundary behavior.
+ * Respects linkEndpoints and continuousPlay settings.
  *
  * @example
  * ```tsx
@@ -53,12 +66,58 @@ export function useAnnotationKeyboardControls({
   onActiveAnnotationChange,
   duration,
   linkEndpoints,
+  continuousPlay = false,
   enabled = true,
+  scrollContainerRef,
+  samplesPerPixel,
+  sampleRate,
+  controlsWidth = 0,
+  onPlay,
 }: UseAnnotationKeyboardControlsOptions) {
   const activeIndex = useMemo(() => {
     if (!activeAnnotationId) return -1;
     return annotations.findIndex((a) => a.id === activeAnnotationId);
   }, [annotations, activeAnnotationId]);
+
+  // Scroll waveform to show a specific annotation
+  const scrollToAnnotation = useCallback(
+    (annotationId: string) => {
+      if (!scrollContainerRef?.current || !samplesPerPixel || !sampleRate) return;
+
+      const annotation = annotations.find((a) => a.id === annotationId);
+      if (!annotation) return;
+
+      const container = scrollContainerRef.current;
+      const containerWidth = container.clientWidth;
+
+      // Calculate pixel positions for annotation start and center
+      const startPixel = (annotation.start * sampleRate) / samplesPerPixel + controlsWidth;
+      const endPixel = (annotation.end * sampleRate) / samplesPerPixel + controlsWidth;
+      const annotationCenter = (startPixel + endPixel) / 2;
+
+      // Check if annotation is currently visible
+      const scrollLeft = container.scrollLeft;
+      const visibleStart = scrollLeft;
+      const visibleEnd = scrollLeft + containerWidth;
+
+      // If annotation is not fully visible, scroll to center it
+      if (startPixel < visibleStart || endPixel > visibleEnd) {
+        const targetScrollLeft = Math.max(0, annotationCenter - containerWidth / 2);
+        container.scrollTo({
+          left: targetScrollLeft,
+          behavior: 'smooth',
+        });
+      }
+    },
+    [annotations, scrollContainerRef, samplesPerPixel, sampleRate, controlsWidth]
+  );
+
+  // Auto-scroll when active annotation changes via keyboard navigation
+  useEffect(() => {
+    if (activeAnnotationId && scrollContainerRef?.current && samplesPerPixel && sampleRate) {
+      scrollToAnnotation(activeAnnotationId);
+    }
+  }, [activeAnnotationId, scrollToAnnotation, scrollContainerRef, samplesPerPixel, sampleRate]);
 
   const moveStartBoundary = useCallback(
     (delta: number) => {
@@ -216,8 +275,18 @@ export function useAnnotationKeyboardControls({
     onActiveAnnotationChange(null);
   }, [onActiveAnnotationChange]);
 
-  // Boundary editing shortcuts (only active when annotation is selected)
-  const boundaryShortcuts = useMemo(
+  // Play the currently selected annotation
+  const playActiveAnnotation = useCallback(() => {
+    if (activeIndex < 0 || !onPlay) return;
+
+    const annotation = annotations[activeIndex];
+    // If continuous play is off, play just this annotation's duration
+    const playDuration = !continuousPlay ? annotation.end - annotation.start : undefined;
+    onPlay(annotation.start, playDuration);
+  }, [annotations, activeIndex, continuousPlay, onPlay]);
+
+  // Shortcuts that require an active annotation (boundary editing + playback)
+  const activeAnnotationShortcuts = useMemo(
     () => [
       {
         key: '[',
@@ -245,8 +314,14 @@ export function useAnnotationKeyboardControls({
         description: 'Move annotation end later',
         preventDefault: true,
       },
+      {
+        key: 'Enter',
+        action: playActiveAnnotation,
+        description: 'Play selected annotation',
+        preventDefault: true,
+      },
     ],
-    [moveStartBoundary, moveEndBoundary]
+    [moveStartBoundary, moveEndBoundary, playActiveAnnotation]
   );
 
   // Navigation shortcuts (always active when enabled and there are annotations)
@@ -298,9 +373,9 @@ export function useAnnotationKeyboardControls({
     [selectPrevious, selectNext, selectFirst, selectLast, clearSelection]
   );
 
-  // Boundary shortcuts only work when an annotation is selected
+  // Active annotation shortcuts only work when an annotation is selected
   useKeyboardShortcuts({
-    shortcuts: boundaryShortcuts,
+    shortcuts: activeAnnotationShortcuts,
     enabled: enabled && activeIndex >= 0,
   });
 
@@ -318,5 +393,7 @@ export function useAnnotationKeyboardControls({
     selectFirst,
     selectLast,
     clearSelection,
+    scrollToAnnotation,
+    playActiveAnnotation,
   };
 }
