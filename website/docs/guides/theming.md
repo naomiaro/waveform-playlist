@@ -240,9 +240,9 @@ function OceanThemedPlaylist() {
 ```typescript
 interface WaveformPlaylistTheme {
   // Waveform colors
-  waveOutlineColor: string;
-  waveFillColor: string;
-  waveProgressColor: string;
+  waveOutlineColor: string;      // Color of waveform bars/outline
+  waveFillColor: string;         // Background color behind waveform
+  waveProgressColor: string;     // Fill color behind played portion (SoundCloud-style)
   selectedWaveOutlineColor: string;
   selectedWaveFillColor: string;
   selectedTrackControlsBackground: string;
@@ -252,7 +252,7 @@ interface WaveformPlaylistTheme {
   timescaleBackgroundColor: string;
 
   // Playback UI colors
-  playheadColor: string;
+  playheadColor: string;         // Vertical line showing current position
   selectionColor: string;
 
   // Clip header colors
@@ -304,13 +304,46 @@ interface WaveformPlaylistTheme {
 }
 ```
 
+## Playback Progress Styling
+
+You have two visual indicators for playback position:
+
+1. **Playhead** (`playheadColor`) - A vertical line showing the current position
+2. **Progress fill** (`waveProgressColor`) - Fills behind the played portion of the waveform (SoundCloud-style)
+
+You can customize how these appear:
+
+```tsx
+// Both visible (default) - playhead line + colored progress fill
+const bothVisible = {
+  playheadColor: '#ff0000',
+  waveProgressColor: 'orange',
+};
+
+// Playhead only - set progress same as background
+const playheadOnly = {
+  playheadColor: '#333333',
+  waveProgressColor: '#f0f0f0',  // Same as waveFillColor
+  waveFillColor: '#f0f0f0',
+};
+
+// Progress only - set playhead to transparent
+const progressOnly = {
+  playheadColor: 'transparent',
+  waveProgressColor: 'orange',
+};
+```
+
+See the [Styling Example](/examples/styling) for live demonstrations.
+
 ## Best Practices
 
 1. **Contrast** - Ensure sufficient contrast between waveform and background
 2. **Selection visibility** - Make selected states clearly distinguishable
 3. **Playhead visibility** - Use a high-contrast color for the playhead
-4. **Consistency** - Match your application's overall design system
-5. **Accessibility** - Test themes with color blindness simulators
+4. **Progress visibility** - Consider whether you want both playhead and progress, or just one
+5. **Consistency** - Match your application's overall design system
+6. **Accessibility** - Test themes with color blindness simulators
 
 ## Next Steps
 

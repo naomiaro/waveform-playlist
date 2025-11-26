@@ -148,13 +148,15 @@ Features:
 
 ### Waveform Styling
 
-Customize waveform appearance with bar width and gap controls.
+Customize waveform appearance with bar width, gap controls, and playback styling.
 
 [View Styling Example](/examples/styling)
 
 Features:
 - `barWidth` - Control the width of waveform bars
 - `barGap` - Add spacing between bars
+- `waveProgressColor` - Colored fill behind played portion
+- `playheadColor` - Vertical line at playback position
 - SoundCloud-style waveforms
 - Multiple theme color combinations
 

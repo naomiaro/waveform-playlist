@@ -32,9 +32,10 @@ export default function StylingExamplePage(): React.ReactElement {
   barWidth={3}    // Width of each bar in pixels
   barGap={1}      // Gap between bars in pixels
   theme={{
-    waveOutlineColor: '#E0EFF1',  // Background/outline color
-    waveFillColor: '#4a9eff',      // Fill color behind waveform
-    waveProgressColor: 'orange',   // Playback progress color
+    waveOutlineColor: '#E0EFF1',  // Waveform bars color
+    waveFillColor: '#4a9eff',      // Background behind waveform
+    waveProgressColor: 'orange',   // Fill behind played portion
+    playheadColor: 'orange',       // Vertical playhead line
   }}
 >
   <Waveform />
