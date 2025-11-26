@@ -9,6 +9,11 @@ const examples = [
     path: 'minimal',
   },
   {
+    title: 'Styling',
+    description: 'Bar width, gap, progress color, and selected track styling',
+    path: 'styling',
+  },
+  {
     title: 'New Tracks',
     description: 'Add and remove tracks dynamically',
     path: 'newtracks',
@@ -44,14 +49,14 @@ const examples = [
     path: 'multi-clip',
   },
   {
-    title: 'Flexible API',
-    description: 'Advanced API usage and customization',
-    path: 'flexible-api',
-  },
-  {
     title: 'BBC Waveform Data',
     description: 'Fast waveform loading with pre-computed BBC peaks',
     path: 'waveform-data',
+  },
+  {
+    title: 'Flexible API',
+    description: 'Advanced API usage and customization',
+    path: 'flexible-api',
   },
 ];
 

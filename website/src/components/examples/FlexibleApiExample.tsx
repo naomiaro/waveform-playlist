@@ -129,19 +129,29 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
       <TrackButtonsRow>
         <Button
           size="1"
-          variant={trackState.muted ? "solid" : "soft"}
+          variant={trackState.muted ? "solid" : "outline"}
           color={trackState.muted ? "red" : "gray"}
           onClick={() => setTrackMute(trackIndex, !trackState.muted)}
-          style={{ flex: 1, minWidth: 0 }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            // Ensure readable on dark track controls background
+            ...(!trackState.muted && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
+          }}
         >
           M
         </Button>
         <Button
           size="1"
-          variant={trackState.soloed ? "solid" : "soft"}
+          variant={trackState.soloed ? "solid" : "outline"}
           color={trackState.soloed ? "amber" : "gray"}
           onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
-          style={{ flex: 1, minWidth: 0 }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            // Ensure readable on dark track controls background
+            ...(!trackState.soloed && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
+          }}
         >
           S
         </Button>

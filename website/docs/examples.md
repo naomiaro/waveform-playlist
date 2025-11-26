@@ -157,6 +157,7 @@ Features:
 - `barGap` - Add spacing between bars
 - `waveProgressColor` - Colored fill behind played portion
 - `playheadColor` - Vertical line at playback position
+- `selectedWaveOutlineColor` / `selectedWaveFillColor` - Colors when track is selected
 - SoundCloud-style waveforms
 - Multiple theme color combinations
 
