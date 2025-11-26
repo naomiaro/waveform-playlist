@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { Cross2Icon } from '@radix-ui/react-icons';
+import JSZip from 'jszip';
 import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
@@ -21,6 +22,7 @@ import {
   useAudioTracks,
   usePlaylistData,
   usePlaylistControls,
+  useExportWav,
 } from '@waveform-playlist/browser';
 import {
   Controls,
@@ -31,6 +33,7 @@ import {
   SliderWrapper,
   VolumeDownIcon,
   VolumeUpIcon,
+  BaseControlButton,
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { EffectRack, TrackEffectControls } from '../effects';
@@ -456,16 +459,66 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Export options state
-  const [exportMode, setExportMode] = useState<'master' | 'individual'>('master');
+  const [exportMode, setExportMode] = useState<'master' | 'individual' | 'all'>('master');
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number>(0);
   const [applyEffectsToExport, setApplyEffectsToExport] = useState(true);
-  const { trackStates } = usePlaylistData();
+  const [isExportingZip, setIsExportingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState(0);
+  const { tracks: contextTracks, trackStates } = usePlaylistData();
+  const { exportWav } = useExportWav();
 
   // Get the offline effects functions when needed
   const offlineEffectsFunction = applyEffectsToExport ? createOfflineMasterEffects() : undefined;
   const createOfflineTrackEffects = applyEffectsToExport
     ? trackEffectsManager.createOfflineTrackEffectsFunction
     : undefined;
+
+  // Export all tracks as ZIP
+  const handleExportAllAsZip = useCallback(async () => {
+    if (contextTracks.length === 0) return;
+
+    setIsExportingZip(true);
+    setZipProgress(0);
+
+    try {
+      const zip = new JSZip();
+      const totalTracks = contextTracks.length;
+
+      for (let i = 0; i < totalTracks; i++) {
+        const trackName = trackStates[i]?.name || `track-${i + 1}`;
+        // Sanitize filename
+        const safeFilename = trackName.replace(/[^a-z0-9_-]/gi, '_');
+
+        const result = await exportWav(contextTracks, trackStates, {
+          mode: 'individual',
+          trackIndex: i,
+          applyEffects: applyEffectsToExport,
+          effectsFunction: offlineEffectsFunction,
+          createOfflineTrackEffects,
+          autoDownload: false,
+        });
+
+        zip.file(`${safeFilename}.wav`, result.blob);
+        setZipProgress((i + 1) / totalTracks);
+      }
+
+      // Generate and download the ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tracks.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting tracks as ZIP:', error);
+    } finally {
+      setIsExportingZip(false);
+      setZipProgress(0);
+    }
+  }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
 
   // Render custom track controls using the track effects manager
   const renderTrackControls = (trackIndex: number) => (
@@ -618,10 +671,11 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         <ExportOptionsWrapper>
           <ExportSelect
             value={exportMode}
-            onChange={(e) => setExportMode(e.target.value as 'master' | 'individual')}
+            onChange={(e) => setExportMode(e.target.value as 'master' | 'individual' | 'all')}
           >
             <option value="master">Full Mix</option>
             <option value="individual">Individual Track</option>
+            <option value="all">All Tracks (ZIP)</option>
           </ExportSelect>
 
           {exportMode === 'individual' && (
@@ -646,15 +700,24 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
             Apply Effects
           </CheckboxLabel>
 
-          <ExportWavButton
-            label={exportMode === 'master' ? 'Export Mix' : 'Export Track'}
-            filename={exportMode === 'master' ? 'mix' : `${trackStates[selectedTrackIndex]?.name || `track-${selectedTrackIndex + 1}`}`}
-            mode={exportMode}
-            trackIndex={exportMode === 'individual' ? selectedTrackIndex : undefined}
-            applyEffects={applyEffectsToExport}
-            effectsFunction={offlineEffectsFunction}
-            createOfflineTrackEffects={createOfflineTrackEffects}
-          />
+          {exportMode === 'all' ? (
+            <BaseControlButton
+              onClick={handleExportAllAsZip}
+              disabled={isExportingZip || contextTracks.length === 0}
+            >
+              {isExportingZip ? `Exporting ${Math.round(zipProgress * 100)}%` : 'Export ZIP'}
+            </BaseControlButton>
+          ) : (
+            <ExportWavButton
+              label={exportMode === 'master' ? 'Export Mix' : 'Export Track'}
+              filename={exportMode === 'master' ? 'mix' : `${trackStates[selectedTrackIndex]?.name || `track-${selectedTrackIndex + 1}`}`}
+              mode={exportMode}
+              trackIndex={exportMode === 'individual' ? selectedTrackIndex : undefined}
+              applyEffects={applyEffectsToExport}
+              effectsFunction={offlineEffectsFunction}
+              createOfflineTrackEffects={createOfflineTrackEffects}
+            />
+          )}
         </ExportOptionsWrapper>
       </TimeControlsBar>
 

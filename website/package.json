@@ -30,6 +30,7 @@
     "@waveform-playlist/recording": "workspace:5.0.0-alpha.0",
     "@waveform-playlist/ui-components": "workspace:5.0.0-alpha.0",
     "clsx": "^2.0.0",
+    "jszip": "^3.10.1",
     "prism-react-renderer": "^2.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
