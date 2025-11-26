@@ -11,7 +11,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 ### Must Have Before Release
 
 - [ ] **Comprehensive README** - Quick start, installation, basic examples, screenshots
-- [ ] **TypeScript types validation** - No `any` in public APIs, verify .d.ts generation
+- [x] **TypeScript types validation** - No `any` in public APIs, verify .d.ts generation
 - [ ] **Unit tests** - Hooks, components, audio processing (Vitest + RTL)
 - [ ] **E2E tests** - Key workflows (Playwright)
 - [ ] **Browser compatibility** - Chrome, Firefox, Safari, Edge
@@ -75,6 +75,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 ### Export ✅
 - WAV export via Tone.Offline
 - Master + per-track effects support
+- Export all tracks as ZIP
 - `useExportWav` hook
 
 ### Documentation ✅
