@@ -13,6 +13,10 @@ type PlaylistInfo = {
   timeScaleHeight: number;
   duration: number;
   controls: Controls;
+  /** Width in pixels of waveform bars. Default: 1 */
+  barWidth: number;
+  /** Spacing in pixels between waveform bars. Default: 0 */
+  barGap: number;
 };
 
 export const PlaylistInfoContext = createContext<PlaylistInfo>({
@@ -26,6 +30,8 @@ export const PlaylistInfoContext = createContext<PlaylistInfo>({
     width: 150,
   },
   duration: 30000,
+  barWidth: 1,
+  barGap: 0,
 });
 
 export const usePlaylistInfo = () => useContext(PlaylistInfoContext);

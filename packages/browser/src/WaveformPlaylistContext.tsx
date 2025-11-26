@@ -187,6 +187,8 @@ export interface PlaylistDataContextValue {
   masterVolume: number;
   canZoomIn: boolean;
   canZoomOut: boolean;
+  barWidth: number;
+  barGap: number;
 }
 
 // Create the 4 separate contexts
@@ -221,6 +223,10 @@ export interface WaveformPlaylistProviderProps {
   effects?: EffectsFunction;
   onReady?: () => void;
   onAnnotationUpdate?: (annotations: AnnotationData[]) => void;
+  /** Width in pixels of waveform bars. Default: 1 */
+  barWidth?: number;
+  /** Spacing in pixels between waveform bars. Default: 0 */
+  barGap?: number;
   children: ReactNode;
 }
 
@@ -238,6 +244,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   effects,
   onReady,
   onAnnotationUpdate: _onAnnotationUpdate,
+  barWidth = 1,
+  barGap = 0,
   children,
 }) => {
   // State
@@ -881,6 +889,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     masterVolume,
     canZoomIn: zoom.canZoomIn,
     canZoomOut: zoom.canZoomOut,
+    barWidth,
+    barGap,
   };
 
   // Combined value for backwards compatibility

@@ -63,6 +63,10 @@ interface PlaylistConfig {
   isAutomaticScroll?: boolean;
   effects?: EffectsFunction;
   annotationList?: AnnotationListConfig;
+  /** Width in pixels of waveform bars. Default: 1 */
+  barWidth?: number;
+  /** Spacing in pixels between waveform bars. Default: 0 */
+  barGap?: number;
 }
 
 export type TrackEffectsFunction = (graphEnd: ToneAudioNode, masterGainNode: ToneAudioNode, isOffline: boolean) => void | (() => void);
@@ -396,6 +400,8 @@ class WaveformPlaylistClass {
         show: showControls,
         width: controlsWidth,
       },
+      barWidth: this.config.barWidth ?? 1,
+      barGap: this.config.barGap ?? 0,
     };
 
     // Waveform component using Channel from ui-components - memoize to prevent recreation

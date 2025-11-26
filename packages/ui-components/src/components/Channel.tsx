@@ -64,6 +64,10 @@ export interface ChannelProps {
   waveProgressColor?: string;
   waveOutlineColor?: string;
   waveFillColor?: string;
+  /** Width in pixels of waveform bars. Default: 1 */
+  barWidth?: number;
+  /** Spacing in pixels between waveform bars. Default: 0 */
+  barGap?: number;
 }
 
 export const Channel: FunctionComponent<ChannelProps> = (props) => {
@@ -79,6 +83,8 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveProgressColor = 'orange',
     waveOutlineColor = '#E0EFF1',
     waveFillColor = 'grey',
+    barWidth = 1,
+    barGap = 0,
   } = props;
   const canvasesRef = useRef<HTMLCanvasElement[]>([]);
 
@@ -109,17 +115,19 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
         const peakSegmentLength = canvas.width / devicePixelRatio;
-        for (let i = 0; i < peakSegmentLength; i += 1) {
-          const minPeak = data[(i + offset) * 2] / maxValue;
-          const maxPeak = data[(i + offset) * 2 + 1] / maxValue;
+        const step = barWidth + barGap;
+        for (let i = 0; i < peakSegmentLength; i += step) {
+          const peakIndex = Math.floor(i + offset);
+          const minPeak = data[peakIndex * 2] / maxValue;
+          const maxPeak = data[peakIndex * 2 + 1] / maxValue;
 
           const min = Math.abs(minPeak * h2);
           const max = Math.abs(maxPeak * h2);
 
           // draw max
-          ctx.fillRect(i, 0, 1, h2 - max);
+          ctx.fillRect(i, 0, barWidth, h2 - max);
           // draw min
-          ctx.fillRect(i, h2 + min, 1, h2 - min);
+          ctx.fillRect(i, h2 + min, barWidth, h2 - min);
         }
       }
 
@@ -132,6 +140,8 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveOutlineColor,
     devicePixelRatio,
     length,
+    barWidth,
+    barGap,
   ]);
 
   let totalWidth = length;

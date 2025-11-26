@@ -108,6 +108,8 @@ export const Waveform: React.FC<WaveformProps> = ({
     timeScaleHeight,
     controls,
     playoutRef,
+    barWidth,
+    barGap,
   } = usePlaylistData();
 
   const [isSelecting, setIsSelecting] = useState(false);
@@ -262,13 +264,15 @@ export const Waveform: React.FC<WaveformProps> = ({
           timeScaleHeight,
           duration: displayDuration,
           controls,
+          barWidth,
+          barGap,
         }}
       >
           <Playlist
             theme={theme}
             backgroundColor={theme.waveOutlineColor}
             timescaleBackgroundColor={theme.timescaleBackgroundColor}
-            scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0) + timescalePadding}
+            scrollContainerWidth={tracksFullWidth + (controls.show ? controls.width : 0) + (timeScaleHeight > 0 ? timescalePadding : 0)}
             timescaleWidth={tracksFullWidth}
             tracksWidth={tracksFullWidth}
             controlsWidth={controls.show ? controls.width : 0}
@@ -374,6 +378,21 @@ export const Waveform: React.FC<WaveformProps> = ({
                         const peaksData = clip.peaks;
                         const width = peaksData.length;
 
+                        // Calculate progress in pixels for this clip
+                        // Progress shows how far through the clip the playhead is
+                        const currentSample = currentTime * sampleRate;
+                        const clipEndSample = clip.startSample + clip.durationSamples;
+                        let clipProgress = 0;
+                        if (currentSample >= clip.startSample && currentSample < clipEndSample) {
+                          // Playhead is within this clip
+                          const sampleIntoClip = currentSample - clip.startSample;
+                          clipProgress = sampleIntoClip / samplesPerPixel;
+                        } else if (currentSample >= clipEndSample) {
+                          // Playhead is past this clip - show full progress
+                          clipProgress = width;
+                        }
+                        // else: playhead is before clip, progress = 0
+
                         return (
                           <Clip
                             key={`${trackIndex}-${clipIndex}`}
@@ -408,7 +427,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                                 data={channelPeaks}
                                 bits={peaksData.bits}
                                 length={width}
-                                progress={0}
+                                progress={clipProgress}
                                 isSelected={track.id === selectedTrackId}
                               />
                             ))}

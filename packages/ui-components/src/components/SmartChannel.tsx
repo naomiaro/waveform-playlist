@@ -14,7 +14,7 @@ export interface SmartChannelProps {
 
 export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected, ...props }) => {
   const theme = useTheme();
-  const { waveHeight } = usePlaylistInfo();
+  const { waveHeight, barWidth, barGap } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
 
   // Use selected colors if track is selected
@@ -34,6 +34,8 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected,
       waveFillColor={waveFillColor}
       waveHeight={waveHeight}
       devicePixelRatio={devicePixelRatio}
+      barWidth={barWidth}
+      barGap={barGap}
     ></Channel>
   );
 };

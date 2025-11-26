@@ -146,6 +146,20 @@ Features:
 
 ---
 
+### Waveform Styling
+
+Customize waveform appearance with bar width and gap controls.
+
+[View Styling Example](/examples/styling)
+
+Features:
+- `barWidth` - Control the width of waveform bars
+- `barGap` - Add spacing between bars
+- SoundCloud-style waveforms
+- Multiple theme color combinations
+
+---
+
 ### Flexible API
 
 Advanced usage showing programmatic control.
