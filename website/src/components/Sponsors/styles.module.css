@@ -32,12 +32,17 @@
 }
 
 [data-theme='dark'] .sponsorLogo {
-  filter: brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(-50deg);
-  opacity: 0.85;
+  filter: brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(-50deg)
+    drop-shadow(0 0 15px rgba(200, 80, 60, 0.6))
+    drop-shadow(0 0 30px rgba(180, 60, 40, 0.4));
+  opacity: 0.9;
 }
 
 [data-theme='dark'] .sponsorLogo:hover {
-  filter: brightness(0) invert(1) sepia(1) saturate(6) hue-rotate(-50deg) drop-shadow(0 0 20px var(--wfpl-heading-glow-strong));
+  filter: brightness(0) invert(1) sepia(1) saturate(6) hue-rotate(-50deg)
+    drop-shadow(0 0 20px rgba(200, 80, 60, 0.8))
+    drop-shadow(0 0 40px rgba(180, 60, 40, 0.6))
+    drop-shadow(0 0 60px rgba(160, 50, 30, 0.4));
   opacity: 1;
 }
 
