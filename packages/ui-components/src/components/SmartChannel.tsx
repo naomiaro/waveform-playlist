@@ -27,6 +27,9 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected,
     ? theme.selectedWaveFillColor
     : theme?.waveFillColor;
 
+  // Get draw mode from theme (defaults to 'inverted' for backwards compatibility)
+  const drawMode = theme?.waveformDrawMode || 'inverted';
+
   return (
     <Channel
       {...props}
@@ -38,6 +41,7 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({ isSelected,
       barWidth={barWidth}
       barGap={barGap}
       transparentBackground={transparentBackground}
+      drawMode={drawMode}
     ></Channel>
   );
 };

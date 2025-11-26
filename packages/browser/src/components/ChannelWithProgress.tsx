@@ -151,15 +151,25 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     }
   });
 
-  // Get the background color from the theme, considering selection state
-  const waveFillColor = smartChannelProps.isSelected && theme
-    ? theme.selectedWaveFillColor
-    : theme?.waveFillColor || 'grey';
-  const backgroundCss = waveformColorToCss(waveFillColor);
+  // Get the draw mode from theme (defaults to 'inverted')
+  const drawMode = theme?.waveformDrawMode || 'inverted';
+
+  // Get the background color from the theme, considering selection state and draw mode
+  // The background div shows the color that should appear in the PEAK areas (where audio is)
+  // - In 'normal' mode: peaks drawn on canvas with waveFillColor, background has waveOutlineColor (gradient)
+  // - In 'inverted' mode: canvas masks non-peak areas with waveFillColor, background has waveOutlineColor (gradient)
+  //                       This results in gradient showing through only in peak areas
+  // Both modes use waveOutlineColor for background since:
+  // - normal: waveOutlineColor is the gradient background, waveFillColor is solid peaks
+  // - inverted: waveOutlineColor is gradient (shows as peaks), waveFillColor masks non-peak areas
+  const backgroundColor = smartChannelProps.isSelected && theme
+    ? theme.selectedWaveOutlineColor
+    : theme?.waveOutlineColor || 'grey';
+  const backgroundCss = waveformColorToCss(backgroundColor);
 
   return (
     <ChannelWrapper>
-      {/* Background layer - shows the waveform fill color */}
+      {/* Background layer - shows either waveOutlineColor (normal) or waveFillColor (inverted) */}
       <Background
         $color={backgroundCss}
         $height={waveHeight}

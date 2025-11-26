@@ -1,10 +1,11 @@
 import React, { FunctionComponent, useLayoutEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { Peaks, Bits } from '@waveform-playlist/webaudio-peaks';
-import { WaveformColor, isWaveformGradient, waveformColorToCss } from '../wfpl-theme';
+import { WaveformColor, WaveformDrawMode, isWaveformGradient, waveformColorToCss } from '../wfpl-theme';
 
 // Re-export WaveformColor for consumers
 export type { WaveformColor } from '../wfpl-theme';
+export type { WaveformDrawMode } from '../wfpl-theme';
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -94,6 +95,12 @@ export interface ChannelProps {
   barGap?: number;
   /** If true, background is transparent (for use with external progress overlay) */
   transparentBackground?: boolean;
+  /**
+   * Drawing mode:
+   * - 'inverted': Draw waveOutlineColor where there's NO audio (current default). Good for gradient bars.
+   * - 'normal': Draw waveFillColor where there IS audio. Good for gradient backgrounds.
+   */
+  drawMode?: WaveformDrawMode;
 }
 
 export const Channel: FunctionComponent<ChannelProps> = (props) => {
@@ -110,6 +117,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     barWidth = 1,
     barGap = 0,
     transparentBackground = false,
+    drawMode = 'inverted',
   } = props;
   const canvasesRef = useRef<HTMLCanvasElement[]>([]);
 
@@ -143,9 +151,26 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         // Create gradient using CSS pixel coordinates (after scaling)
         // This ensures the gradient aligns with the drawing coordinates
         const canvasWidth = canvas.width / devicePixelRatio;
+
+        // Choose fill color based on draw mode and transparentBackground
+        // - inverted: draw to mask areas where there's NO audio
+        // - normal: draw where there IS audio (actual peak bars)
+        //
+        // When transparentBackground is true (for use with external progress overlay):
+        // - inverted: swap colors - draw waveFillColor (solid) to mask, background div has gradient
+        //             This creates gradient peaks (background shows through in peak areas)
+        // - normal: draw waveFillColor where audio IS (same as before)
+        let fillColor: WaveformColor;
+        if (drawMode === 'normal') {
+          fillColor = waveFillColor;
+        } else {
+          // Inverted mode: swap colors when using transparent background
+          // to achieve gradient peaks instead of gradient mask
+          fillColor = transparentBackground ? waveFillColor : waveOutlineColor;
+        }
         ctx.fillStyle = createCanvasFillStyle(
           ctx,
-          waveOutlineColor,
+          fillColor,
           canvasWidth,
           waveHeight
         );
@@ -177,10 +202,18 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
             const min = Math.abs(minPeak * h2);
             const max = Math.abs(maxPeak * h2);
 
-            // draw max
-            ctx.fillRect(x, 0, barWidth, h2 - max);
-            // draw min
-            ctx.fillRect(x, h2 + min, barWidth, h2 - min);
+            if (drawMode === 'normal') {
+              // Normal mode: draw the actual peak bars
+              // Draw from h2-max to h2+min (the actual waveform shape)
+              ctx.fillRect(x, h2 - max, barWidth, max + min);
+            } else {
+              // Inverted mode (default): draw areas WITHOUT audio
+              // This masks the background color to reveal the peaks
+              // draw top region (above max peak)
+              ctx.fillRect(x, 0, barWidth, h2 - max);
+              // draw bottom region (below min peak)
+              ctx.fillRect(x, h2 + min, barWidth, h2 - min);
+            }
           }
         }
       }
@@ -192,10 +225,12 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     bits,
     waveHeight,
     waveOutlineColor,
+    waveFillColor,
     devicePixelRatio,
     length,
     barWidth,
     barGap,
+    drawMode,
   ]);
 
   let totalWidth = length;

@@ -134,6 +134,8 @@ export function StemTracksExample() {
         controls={{ show: true, width: 200 }}
         theme={theme}
         timescale
+        barWidth={2}
+        barGap={1}
       >
         <Controls>
           <ControlGroup>
