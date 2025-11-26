@@ -1,6 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import {
+  CircleNotch,
+  Palette,
+  PlusCircle,
+  Stack,
+  WaveTriangle,
+  SlidersHorizontal,
+  Microphone,
+  Rows,
+  TextAa,
+  Lightning,
+  Infinity,
+} from '@phosphor-icons/react';
 import styles from './examples.module.css';
 
 // Example categories with icons and descriptions
@@ -10,77 +23,77 @@ const examples = [
     description: 'Pure essence. No distractions.',
     path: 'minimal',
     category: 'foundation',
-    icon: '◯',
+    icon: <CircleNotch weight="light" />,
   },
   {
     title: 'Styling',
     description: 'Shape the waveform. Own the aesthetic.',
     path: 'styling',
     category: 'foundation',
-    icon: '◐',
+    icon: <Palette weight="light" />,
   },
   {
     title: 'New Tracks',
     description: 'Dynamic. Ever-evolving.',
     path: 'newtracks',
     category: 'foundation',
-    icon: '⊕',
+    icon: <PlusCircle weight="light" />,
   },
   {
     title: 'Stem Tracks',
     description: 'Layers upon layers. The full spectrum.',
     path: 'stem-tracks',
     category: 'playback',
-    icon: '☰',
+    icon: <Stack weight="light" />,
   },
   {
     title: 'Fades',
     description: 'Smooth transitions. Controlled energy.',
     path: 'fades',
     category: 'playback',
-    icon: '◢',
+    icon: <WaveTriangle weight="light" />,
   },
   {
     title: 'Effects',
     description: 'Transform. Distort. Elevate.',
     path: 'effects',
     category: 'advanced',
-    icon: '◈',
+    icon: <SlidersHorizontal weight="light" />,
   },
   {
     title: 'Recording',
     description: 'Capture the moment. Live.',
     path: 'recording',
     category: 'advanced',
-    icon: '●',
+    icon: <Microphone weight="light" />,
   },
   {
     title: 'Multi-Clip',
     description: 'Arrange. Rearrange. Create.',
     path: 'multi-clip',
     category: 'advanced',
-    icon: '▣',
+    icon: <Rows weight="light" />,
   },
   {
     title: 'Annotations',
     description: 'Mark the drops. Remember the builds.',
     path: 'annotations',
     category: 'tools',
-    icon: '⌘',
+    icon: <TextAa weight="light" />,
   },
   {
     title: 'BBC Waveform',
     description: 'Pre-computed peaks. Instant load.',
     path: 'waveform-data',
     category: 'tools',
-    icon: '⚡',
+    icon: <Lightning weight="light" />,
   },
   {
     title: 'Flexible API',
     description: 'Total control. Unlimited possibilities.',
     path: 'flexible-api',
     category: 'tools',
-    icon: '∞',
+    icon: <Infinity weight="light" />,
   },
 ];
 
