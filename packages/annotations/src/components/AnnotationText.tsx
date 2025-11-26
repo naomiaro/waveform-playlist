@@ -17,15 +17,20 @@ const AnnotationItem = styled.div<{ $isActive?: boolean }>`
   padding: 12px;
   margin-bottom: 6px;
   border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : 'transparent')};
-  background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.08)' : 'transparent')};
+  background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.15)' : 'transparent')};
   border-radius: 4px;
   transition: all 0.2s;
   cursor: pointer;
-  box-shadow: ${(props) => (props.$isActive ? '0 1px 3px rgba(255, 152, 0, 0.15)' : 'none')};
+  box-shadow: ${(props) => (props.$isActive ? '0 2px 8px rgba(255, 152, 0, 0.25), inset 0 0 0 1px rgba(255, 152, 0, 0.3)' : 'none')};
 
   &:hover {
-    background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.12)' : props.theme?.annotationTextItemHoverBackground || 'rgba(0, 0, 0, 0.03)')};
+    background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.2)' : props.theme?.annotationTextItemHoverBackground || 'rgba(0, 0, 0, 0.05)')};
     border-left-color: ${(props) => (props.$isActive ? '#ff9800' : props.theme?.borderColor || '#ddd')};
+  }
+
+  &:focus-visible {
+    outline: 2px solid #ff9800;
+    outline-offset: 2px;
   }
 `;
 
@@ -222,6 +227,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
           key={annotation.id}
           ref={isActive ? activeAnnotationRef : null}
           $isActive={isActive}
+          onClick={() => onAnnotationClick?.(annotation)}
         >
           <AnnotationHeader>
             <AnnotationInfo>

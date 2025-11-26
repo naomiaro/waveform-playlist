@@ -9,15 +9,24 @@ interface UseAnnotationKeyboardControlsOptions {
   annotations: AnnotationType[];
   activeAnnotationId: string | null;
   onAnnotationsChange: (annotations: AnnotationType[]) => void;
+  /** Callback to set the active annotation ID for selection */
+  onActiveAnnotationChange?: (id: string | null) => void;
   duration: number;
   linkEndpoints: boolean;
   enabled?: boolean;
 }
 
 /**
- * Hook for keyboard-based annotation boundary editing
+ * Hook for keyboard-based annotation navigation and boundary editing
  *
- * Shortcuts:
+ * Navigation Shortcuts:
+ * - ArrowUp / ArrowLeft = Select previous annotation
+ * - ArrowDown / ArrowRight = Select next annotation
+ * - Home = Select first annotation
+ * - End = Select last annotation
+ * - Escape = Deselect annotation
+ *
+ * Boundary Editing Shortcuts (requires active annotation):
  * - [ = Move start boundary earlier (left)
  * - ] = Move start boundary later (right)
  * - Shift+[ = Move end boundary earlier (left)
@@ -31,6 +40,7 @@ interface UseAnnotationKeyboardControlsOptions {
  *   annotations,
  *   activeAnnotationId,
  *   onAnnotationsChange: setAnnotations,
+ *   onActiveAnnotationChange: setActiveAnnotationId,
  *   duration,
  *   linkEndpoints,
  * });
@@ -40,6 +50,7 @@ export function useAnnotationKeyboardControls({
   annotations,
   activeAnnotationId,
   onAnnotationsChange,
+  onActiveAnnotationChange,
   duration,
   linkEndpoints,
   enabled = true,
@@ -167,7 +178,46 @@ export function useAnnotationKeyboardControls({
     [annotations, activeIndex, duration, linkEndpoints, onAnnotationsChange]
   );
 
-  const shortcuts = useMemo(
+  // Navigation functions
+  const selectPrevious = useCallback(() => {
+    if (!onActiveAnnotationChange || annotations.length === 0) return;
+
+    if (activeIndex <= 0) {
+      // If no selection or at first, select last annotation
+      onActiveAnnotationChange(annotations[annotations.length - 1].id);
+    } else {
+      onActiveAnnotationChange(annotations[activeIndex - 1].id);
+    }
+  }, [annotations, activeIndex, onActiveAnnotationChange]);
+
+  const selectNext = useCallback(() => {
+    if (!onActiveAnnotationChange || annotations.length === 0) return;
+
+    if (activeIndex < 0 || activeIndex >= annotations.length - 1) {
+      // If no selection or at last, select first annotation
+      onActiveAnnotationChange(annotations[0].id);
+    } else {
+      onActiveAnnotationChange(annotations[activeIndex + 1].id);
+    }
+  }, [annotations, activeIndex, onActiveAnnotationChange]);
+
+  const selectFirst = useCallback(() => {
+    if (!onActiveAnnotationChange || annotations.length === 0) return;
+    onActiveAnnotationChange(annotations[0].id);
+  }, [annotations, onActiveAnnotationChange]);
+
+  const selectLast = useCallback(() => {
+    if (!onActiveAnnotationChange || annotations.length === 0) return;
+    onActiveAnnotationChange(annotations[annotations.length - 1].id);
+  }, [annotations, onActiveAnnotationChange]);
+
+  const clearSelection = useCallback(() => {
+    if (!onActiveAnnotationChange) return;
+    onActiveAnnotationChange(null);
+  }, [onActiveAnnotationChange]);
+
+  // Boundary editing shortcuts (only active when annotation is selected)
+  const boundaryShortcuts = useMemo(
     () => [
       {
         key: '[',
@@ -199,13 +249,74 @@ export function useAnnotationKeyboardControls({
     [moveStartBoundary, moveEndBoundary]
   );
 
+  // Navigation shortcuts (always active when enabled and there are annotations)
+  const navigationShortcuts = useMemo(
+    () => [
+      {
+        key: 'ArrowUp',
+        action: selectPrevious,
+        description: 'Select previous annotation',
+        preventDefault: true,
+      },
+      {
+        key: 'ArrowLeft',
+        action: selectPrevious,
+        description: 'Select previous annotation',
+        preventDefault: true,
+      },
+      {
+        key: 'ArrowDown',
+        action: selectNext,
+        description: 'Select next annotation',
+        preventDefault: true,
+      },
+      {
+        key: 'ArrowRight',
+        action: selectNext,
+        description: 'Select next annotation',
+        preventDefault: true,
+      },
+      {
+        key: 'Home',
+        action: selectFirst,
+        description: 'Select first annotation',
+        preventDefault: true,
+      },
+      {
+        key: 'End',
+        action: selectLast,
+        description: 'Select last annotation',
+        preventDefault: true,
+      },
+      {
+        key: 'Escape',
+        action: clearSelection,
+        description: 'Deselect annotation',
+        preventDefault: true,
+      },
+    ],
+    [selectPrevious, selectNext, selectFirst, selectLast, clearSelection]
+  );
+
+  // Boundary shortcuts only work when an annotation is selected
   useKeyboardShortcuts({
-    shortcuts,
+    shortcuts: boundaryShortcuts,
     enabled: enabled && activeIndex >= 0,
+  });
+
+  // Navigation shortcuts work whenever there are annotations
+  useKeyboardShortcuts({
+    shortcuts: navigationShortcuts,
+    enabled: enabled && annotations.length > 0 && !!onActiveAnnotationChange,
   });
 
   return {
     moveStartBoundary,
     moveEndBoundary,
+    selectPrevious,
+    selectNext,
+    selectFirst,
+    selectLast,
+    clearSelection,
   };
 }

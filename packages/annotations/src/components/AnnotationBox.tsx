@@ -34,10 +34,10 @@ const Box = styled.div<BoxProps>`
   right: 0;
   height: 100%;
   background: ${(props) => props.$isActive
-    ? (props.theme?.annotationBoxActiveBackground || 'rgba(255, 255, 255, 0.95)')
+    ? (props.theme?.annotationBoxActiveBackground || 'rgba(255, 200, 100, 0.95)')
     : (props.theme?.annotationBoxBackground || 'rgba(255, 255, 255, 0.85)')};
-  border: 2px solid ${(props) => props.$isActive
-    ? (props.theme?.annotationBoxActiveBorder || '#d67600')
+  border: ${(props) => props.$isActive ? '3px' : '2px'} solid ${(props) => props.$isActive
+    ? (props.theme?.annotationBoxActiveBorder || '#ff9800')
     : props.$color};
   border-radius: 4px;
   cursor: pointer;
@@ -47,11 +47,13 @@ const Box = styled.div<BoxProps>`
   justify-content: center;
   overflow: hidden;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: ${(props) => props.$isActive
+    ? '0 2px 8px rgba(255, 152, 0, 0.4), inset 0 0 0 1px rgba(255, 152, 0, 0.2)'
+    : '0 1px 3px rgba(0, 0, 0, 0.1)'};
 
   &:hover {
     background: ${(props) => props.theme?.annotationBoxHoverBackground || 'rgba(255, 255, 255, 0.98)'};
-    border-color: ${(props) => props.theme?.annotationBoxActiveBorder || '#d67600'};
+    border-color: ${(props) => props.theme?.annotationBoxActiveBorder || '#ff9800'};
     border-width: 3px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   }

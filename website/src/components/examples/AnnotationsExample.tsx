@@ -338,6 +338,10 @@ interface AnnotationsAppContentProps {
   onTracksChange: (tracks: ClipTrack[]) => void;
   onAnnotationsLoaded: (annotations: any[]) => void;
   onClearAll: () => void;
+  /** Default duration for new annotations in seconds (default: 3.0) */
+  defaultAnnotationDuration?: number;
+  /** Minimum duration for new annotations in seconds (default: 0.5) */
+  minAnnotationDuration?: number;
 }
 
 const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
@@ -345,10 +349,12 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   onTracksChange,
   onAnnotationsLoaded,
   onClearAll,
+  defaultAnnotationDuration = 3.0,
+  minAnnotationDuration = 0.5,
 }) => {
   const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
   const { annotations, linkEndpoints, activeAnnotationId } = usePlaylistState();
-  const { setAnnotations } = usePlaylistControls();
+  const { setAnnotations, setActiveAnnotationId } = usePlaylistControls();
   const { currentTime } = usePlaybackAnimation();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -370,6 +376,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     annotations,
     activeAnnotationId,
     onAnnotationsChange: setAnnotations,
+    onActiveAnnotationChange: setActiveAnnotationId,
     duration,
     linkEndpoints,
   });
@@ -394,15 +401,20 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
     const nextAnnotation = sortedAnnotations.find((a) => a.start > playheadTime);
 
-    // End time is either the start of next annotation or end of track
-    const endTime = nextAnnotation ? nextAnnotation.start : duration;
+    // Calculate available space until next annotation or end of track
+    const availableSpace = nextAnnotation
+      ? nextAnnotation.start - playheadTime
+      : duration - playheadTime;
 
-    // Minimum duration of 0.5 seconds
-    const minDuration = 0.5;
-    if (endTime - playheadTime < minDuration) {
-      console.warn('Cannot create annotation: not enough space');
+    // Check minimum space requirement
+    if (availableSpace < minAnnotationDuration) {
+      console.warn(`Cannot create annotation: not enough space (minimum ${minAnnotationDuration}s required)`);
       return;
     }
+
+    // Use default duration if there's enough space, otherwise fill available space
+    const annotationDuration = Math.min(defaultAnnotationDuration, availableSpace);
+    const endTime = playheadTime + annotationDuration;
 
     const newAnnotation = {
       id: 'annotation_' + Date.now(),
@@ -425,7 +437,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           ];
 
     setAnnotations(newAnnotations);
-  }, [currentTime, annotations, duration, setAnnotations]);
+  }, [currentTime, annotations, duration, setAnnotations, defaultAnnotationDuration, minAnnotationDuration]);
 
   // Keyboard shortcut: 'A' to add annotation at playhead
   useEffect(() => {
