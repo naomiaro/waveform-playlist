@@ -255,10 +255,10 @@
 }
 
 [data-theme='dark'] .heroGlitch {
-  color: #e8c4a0; /* Warm amber - low watt bulb */
+  color: #d08070; /* Deep red - night vision / cockpit */
   text-shadow:
-    0 0 60px rgba(180, 80, 40, 0.6),
-    0 0 30px rgba(200, 100, 50, 0.4);
+    0 0 80px rgba(180, 60, 40, 0.7),
+    0 0 40px rgba(200, 80, 50, 0.5);
 }
 
 .heroGlitch::before,
@@ -405,7 +405,8 @@
 }
 
 [data-theme='dark'] .categoryTitle {
-  color: #dcc0a0; /* Warm amber */
+  color: #c87060; /* Deep red - night vision preservation */
+  text-shadow: 0 0 30px rgba(180, 80, 60, 0.4);
 }
 
 .categorySubtitle {
@@ -652,8 +653,8 @@
 }
 
 [data-theme='dark'] .ctaContent h2 {
-  color: #e0c0a0; /* Warm amber */
-  text-shadow: 0 0 40px rgba(180, 100, 50, 0.4);
+  color: #c87060; /* Deep red - night vision preservation */
+  text-shadow: 0 0 40px rgba(180, 80, 60, 0.4);
 }
 
 .ctaContent p {

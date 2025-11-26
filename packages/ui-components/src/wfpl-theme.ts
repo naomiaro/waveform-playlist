@@ -204,39 +204,39 @@ export const defaultTheme: WaveformPlaylistTheme = {
 };
 
 export const darkTheme: WaveformPlaylistTheme = {
-  // Vertical gradient: cyan → magenta → cyan (synthwave/Berlin club vibe)
+  // Warm amber gradient - matches the "low watt bulb" text aesthetic
   waveOutlineColor: {
     type: 'linear',
     direction: 'vertical',
     stops: [
-      { offset: 0, color: '#00ffcc' },    // Bright cyan at top
-      { offset: 0.5, color: '#ff00aa' },  // Hot magenta in middle
-      { offset: 1, color: '#00ffcc' },    // Bright cyan at bottom
+      { offset: 0, color: '#c49a6c' },    // Muted amber at top
+      { offset: 0.5, color: '#a07850' },  // Deeper amber in middle
+      { offset: 1, color: '#c49a6c' },    // Muted amber at bottom
     ],
   },
-  waveFillColor: '#0d0d1a', // Very dark blue-black background
-  waveProgressColor: 'rgba(255, 255, 255, 0.15)', // Subtle light overlay for dark mode
-  // Selected: electric gold/orange gradient
+  waveFillColor: '#1a1612', // Very dark warm brown background
+  waveProgressColor: 'rgba(60, 40, 20, 0.5)', // Darker warm overlay - more visible contrast
+  // Selected: brighter warm amber
   selectedWaveOutlineColor: {
     type: 'linear',
     direction: 'vertical',
     stops: [
-      { offset: 0, color: '#ffcc00' },    // Gold at top
-      { offset: 0.5, color: '#ff6600' },  // Orange in middle
-      { offset: 1, color: '#ffcc00' },    // Gold at bottom
+      { offset: 0, color: '#e8c090' },    // Brighter amber at top
+      { offset: 0.5, color: '#d4a070' },  // Warm amber in middle
+      { offset: 1, color: '#e8c090' },    // Brighter amber at bottom
     ],
   },
-  selectedWaveFillColor: '#1a1000', // Very dark amber when selected
-  selectedTrackControlsBackground: '#1a3a5c', // Dark blue for selected track controls
-  timeColor: '#e0e0e0', // Light gray for text on dark background
-  timescaleBackgroundColor: '#1e1e1e', // Dark background
-  playheadColor: '#ff4444',
-  selectionColor: 'rgba(255, 105, 180, 0.7)', // hot pink - high contrast on dark backgrounds
-  clipHeaderBackgroundColor: 'rgba(255, 255, 255, 0.1)', // Light overlay for dark mode
-  clipHeaderBorderColor: 'rgba(255, 255, 255, 0.2)',
-  clipHeaderTextColor: '#e0e0e0', // Light text
+  selectedWaveFillColor: '#241c14', // Slightly lighter warm brown when selected
+  selectedTrackControlsBackground: '#2a2218', // Dark warm brown for selected track controls
+  timeColor: '#d8c0a8', // Warm amber for timescale text
+  timescaleBackgroundColor: '#1a1612', // Dark warm brown background
+  playheadColor: '#e07040', // Warm orange-red playhead
+  selectionColor: 'rgba(224, 160, 100, 0.5)', // Warm amber selection
+  clipHeaderBackgroundColor: 'rgba(200, 160, 120, 0.15)', // Warm overlay for dark mode
+  clipHeaderBorderColor: 'rgba(200, 160, 120, 0.25)',
+  clipHeaderTextColor: '#d8c0a8', // Warm amber text
   clipHeaderFontFamily: 'inherit',
-  selectedClipHeaderBackgroundColor: '#2a4a6c', // Darker blue for selected clip headers
+  selectedClipHeaderBackgroundColor: '#3a2c20', // Darker warm brown for selected clip headers
 
   // Fade overlay colors
   fadeOverlayColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent overlay for fade regions
@@ -265,16 +265,16 @@ export const darkTheme: WaveformPlaylistTheme = {
   sliderTrackColor: '#555',
   sliderThumbColor: '#f0c040', // brighter goldenrod for dark mode
 
-  // Annotation colors (dark mode)
-  annotationBoxBackground: 'rgba(45, 45, 45, 0.9)',
-  annotationBoxActiveBackground: 'rgba(55, 55, 55, 0.95)',
-  annotationBoxHoverBackground: 'rgba(65, 65, 65, 0.98)',
-  annotationBoxBorder: '#ffb74d',
-  annotationBoxActiveBorder: '#ffa726',
-  annotationLabelColor: '#e0e0e0',
-  annotationResizeHandleColor: 'rgba(255, 255, 255, 0.4)',
-  annotationResizeHandleActiveColor: 'rgba(255, 255, 255, 0.8)',
-  annotationTextItemHoverBackground: 'rgba(255, 255, 255, 0.05)',
+  // Annotation colors (dark mode - warm amber theme)
+  annotationBoxBackground: 'rgba(40, 32, 24, 0.9)',
+  annotationBoxActiveBackground: 'rgba(50, 40, 30, 0.95)',
+  annotationBoxHoverBackground: 'rgba(60, 48, 36, 0.98)',
+  annotationBoxBorder: '#c49a6c',
+  annotationBoxActiveBorder: '#d4a87c',
+  annotationLabelColor: '#d8c0a8',
+  annotationResizeHandleColor: 'rgba(200, 160, 120, 0.5)',
+  annotationResizeHandleActiveColor: 'rgba(220, 180, 140, 0.8)',
+  annotationTextItemHoverBackground: 'rgba(200, 160, 120, 0.08)',
 
   // Spacing and sizing
   borderRadius: '4px',

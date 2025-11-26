@@ -159,10 +159,10 @@
 }
 
 [data-theme='dark'] .heroTitle {
-  color: #e8c4a0; /* Warm amber - low watt bulb */
+  color: #d08070; /* Deep red - night vision / cockpit */
   text-shadow:
-    0 0 60px rgba(180, 80, 40, 0.5),
-    0 0 30px rgba(200, 100, 50, 0.3);
+    0 0 80px rgba(180, 60, 40, 0.6),
+    0 0 40px rgba(200, 80, 50, 0.4);
 }
 
 .heroSubtitle {
