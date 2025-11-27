@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - tonejs-overhaul  # TODO: remove after merge to main
   workflow_dispatch:
 
 concurrency:
