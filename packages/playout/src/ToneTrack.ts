@@ -220,8 +220,11 @@ export class ToneTrack {
     // Evaluate now() inside function body, not in parameter default (which is evaluated at module load time)
     const startWhen = when ?? now();
 
-    // Don't start if already playing
-    if (this.isPlaying) return;
+    // Stop any existing playback before starting new playback
+    // This handles cases where play is called while still playing (e.g., selection replay)
+    if (this.isPlaying) {
+      this.stop();
+    }
 
     this.activePlayers = 0;
 

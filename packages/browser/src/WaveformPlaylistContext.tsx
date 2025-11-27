@@ -536,6 +536,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Animation loop
   const startAnimationLoop = useCallback(() => {
+    // Cancel any existing animation frame before starting a new one
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
     const updateTime = () => {
       // Calculate current position based on context.currentTime timing
       const elapsed = getContext().currentTime - playbackStartTimeRef.current;
@@ -720,6 +726,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     const actualStartTime = startTime ?? currentTimeRef.current;
     playStartPositionRef.current = actualStartTime;
+
+    // Update currentTimeRef to match the actual start position
+    // This ensures the animation loop starts from the correct position
+    currentTimeRef.current = actualStartTime;
 
     // Clear any existing playback complete callback before stopping
     // Otherwise stopping will trigger the old callback and interfere with new playback
