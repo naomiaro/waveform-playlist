@@ -306,21 +306,26 @@ const LazyExample = createLazyExample(
 
 **Critical:** Context must be resumed on user interaction via `resumeGlobalAudioContext()`
 
-### Shared MediaStreamSource Pattern
+### MediaStreamSource Per Hook (Firefox Compatibility)
 
-**Rule:** Always use **targeted disconnect** when reconnecting:
+**Pattern:** Each recording hook creates its own `MediaStreamSource` directly from Tone's `getContext()`.
 
 ```typescript
-// ✅ CORRECT - Only disconnects specific connection
-source.disconnect(analyser);
-source.connect(analyser);
-
-// ❌ WRONG - Breaks ALL connections including other consumers
-source.disconnect();
-source.connect(analyser);
+// ✅ CORRECT - Create source from same context as other audio nodes
+const context = getContext();  // Tone.js shared context
+const source = context.createMediaStreamSource(stream);
+const meter = new Meter({ smoothing, context });
+connect(source, meter);
 ```
 
-**Why:** Both `useRecording` and `useMicrophoneLevel` share the same MediaStreamSource.
+**Why:** Firefox throws "Can't connect nodes from different AudioContexts" when:
+- A shared `MediaStreamSource` is created in one module (e.g., playout package)
+- Audio nodes (Meter, AudioWorklet) are created in another module (recording package)
+- Even though both use `getContext()` from Tone.js, bundler module resolution can cause different context instances
+
+**Solution:** Both `useRecording` and `useMicrophoneLevel` create their own source directly from `getContext()`. This ensures the source and connected nodes share the exact same context instance.
+
+**Note:** Creating multiple `MediaStreamAudioSourceNode` instances from the same `MediaStream` is valid - they independently read from the same underlying stream.
 
 ### Debugging AudioWorklets
 
@@ -338,6 +343,19 @@ source.connect(analyser);
 **Defaults in `useMicrophoneAccess`:** `echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`, `latency: 0`
 
 Users can override via `audioConstraints` parameter.
+
+### VU Meter Level Normalization
+
+**Implementation:** `useMicrophoneLevel` uses Tone.js `Meter` which returns dB values.
+
+**dB to 0-1 Conversion:**
+```typescript
+// Meter returns -Infinity to 0 dB
+// Map -100dB..0dB to 0..1 (using -100dB floor for Firefox compatibility)
+const normalized = Math.max(0, Math.min(1, (dbValue + 100) / 100));
+```
+
+**Why -100dB floor:** Firefox reports lower dB values than Chrome (e.g., -70 to -85 dB for quiet input). Using -60dB floor caused all quiet signals to map to 0.
 
 ### Tone.js Initialization
 

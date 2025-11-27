@@ -211,7 +211,7 @@ const clip = createClipFromSeconds({
   └── examples/                         # Usage examples
       └── CustomControlsExample.tsx     # Custom UI example
   ```
-- **Build:** Webpack production builds → `ghpages/js/`
+- **Build:** Vite production builds
 
 ### 🔊 Audio Layer
 
@@ -342,16 +342,15 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   ```
 
 - **Key Architecture:**
-  - **Shared MediaStreamSource** - Single source per MediaStream, shared across multiple consumers
-    - Managed by `mediaStreamSourceManager.ts` in playout package
-    - Both `useRecording` (AudioWorklet) and `useMicrophoneLevel` (AnalyserNode) connect to same source
-    - **CRITICAL:** Always use targeted disconnect: `source.disconnect(destination)` not `source.disconnect()`
-    - Blanket `disconnect()` breaks ALL connections, including other consumers!
+  - **MediaStreamSource Per Hook** - Each hook creates its own source from Tone's `getContext()`
+    - Avoids Firefox cross-context errors when sources/nodes are created in different modules
+    - Both `useRecording` and `useMicrophoneLevel` create independent sources from same stream
+    - See CLAUDE.md "MediaStreamSource Per Hook" for details
   - **Two-System Monitoring:**
-    - `useMicrophoneLevel` - Pre-recording monitoring using AnalyserNode (60fps)
-    - `useRecording` - During-recording RMS calculation in AudioWorklet (~16ms chunks)
+    - `useMicrophoneLevel` - Pre-recording monitoring using Tone.js Meter (60fps)
+    - `useRecording` - During-recording peak calculation in AudioWorklet (~16ms chunks)
   - **Test Microphone Button** - Resumes AudioContext to enable pre-recording level checks
-  - **AudioWorklet RMS Calculation** - Calculates audio levels in worklet thread, sends to main thread
+  - **AudioWorklet Processing** - Captures audio samples in worklet thread, sends to main thread
   - **Duration Timer with Refs** - Uses `isRecordingRef`/`isPausedRef` for synchronous checks in animation loop
     - React state updates are asynchronous, can't be used in `requestAnimationFrame` loops
     - Refs update immediately and can be checked reliably in the animation loop
@@ -379,15 +378,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - Controls: MicrophoneSelector
 
 - **Important Patterns:**
-  1. **Targeted Disconnect** - Always specify destination when disconnecting shared nodes:
-     ```typescript
-     // ✅ CORRECT - Only disconnects specific connection
-     source.disconnect(analyser);
-
-     // ❌ WRONG - Breaks ALL connections including other consumers
-     source.disconnect();
-     ```
-  2. **Refs in Animation Loops** - Use refs for values checked in `requestAnimationFrame`:
+  1. **Refs in Animation Loops** - Use refs for values checked in `requestAnimationFrame`:
      ```typescript
      const isRecordingRef = useRef(false);
      const updateDuration = () => {
@@ -397,14 +388,13 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
        }
      };
      ```
-  3. **AudioWorklet Debugging** - console.log in worklets doesn't appear in browser console
+  2. **AudioWorklet Debugging** - console.log in worklets doesn't appear in browser console
      - Use `postMessage()` to send debug data to main thread
      - Update UI/document.title to display values
-  4. **Worklet Deployment** - Worklet files require manual steps:
-     - Build: `pnpm build` (creates `dist/recording-processor.worklet.js`)
-     - Copy: `cp packages/recording/dist/recording-processor.worklet.js ghpages/js/worklet/`
-     - Restart Jekyll server to clear cache
-  5. **Try-Catch for Cleanup** - Wrap disconnect calls in try-catch for microphone switching:
+  3. **Worklet Deployment** - Worklet files bundled automatically via tsup
+     - Build: `pnpm build` (creates `dist/worklet/recording-processor.worklet.js`)
+     - Docusaurus webpack aliases handle module resolution
+  4. **Try-Catch for Cleanup** - Wrap disconnect calls in try-catch for microphone switching:
      ```typescript
      try {
        source.disconnect(destination);
@@ -415,30 +405,12 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 
 - **Peer Dependencies:** React ^18.0.0, styled-components ^6.0.0
 - **Use Cases:** Voice recording, podcast editing, audio capture, live input, microphone testing
-- **Example:** `ghpages/_examples/17recording.html`
+- **Example:** `website/src/components/examples/RecordingExample.tsx`
 - **Debugging:** See `DEBUGGING.md` for comprehensive troubleshooting guide
 
 ## Data Flow Architecture
 
-### Old Architecture (jQuery/emitter.js)
-
-```
-User Interaction (DOM Events)
-    ↓
-EventEmitter (emitter.js)
-    ↓
-jQuery DOM Manipulation
-    ↓
-Web Audio API (direct)
-```
-
-**Files:**
-
-- `ghpages/js/emitter.js` - Central event coordinator
-- `ghpages/js/annotations.js` - Annotations data
-- HTML templates with inline event listeners
-
-### New Architecture (React + Hooks + Context)
+### Current Architecture (React + Hooks + Context)
 
 **Flexible API Pattern (Provider + Primitives):**
 
@@ -487,26 +459,6 @@ The provider uses **4 separate contexts** to optimize performance by isolating d
 4. **PlaylistDataContext** - Static/infrequent
    - Audio buffers, duration, sample rate
    - Changes rarely after initialization
-
-**Traditional Pattern (Component-based):**
-
-```
-User Interaction (React Events)
-    ↓
-WaveformPlaylistComponent (State)
-    ↓
-├─→ Custom Hooks (Business Logic)
-│   ├─→ usePlaybackControls
-│   ├─→ useTimeFormat
-│   ├─→ useZoomControls
-│   └─→ useMasterVolume
-│
-├─→ UI Components (React)
-│   └─→ Canvas Rendering (SmartChannel)
-│
-└─→ TonePlayout (Tone.js)
-    └─→ Web Audio API
-```
 
 **Key Files:**
 
@@ -674,69 +626,30 @@ Output per package:
 - `dist/index.mjs` (ESM)
 - `dist/index.d.ts` (Types)
 
-### 2. Webpack Bundles (browser package)
+### 2. Vite Bundles (browser package)
 
 ```bash
 # Auto-runs during pnpm build
-webpack --mode production
+vite build
 ```
 
 Outputs:
 
-- `packages/browser/dist/waveform-playlist.js`
-- `packages/browser/dist/annotations-bundle.js`
+- `packages/browser/dist/index.js` (CJS)
+- `packages/browser/dist/index.mjs` (ESM)
 
-These are copied to:
-
-- `ghpages/js/` (for Jekyll)
-
-### 3. Jekyll Site
+### 3. Docusaurus Website
 
 ```bash
-jekyll build -s ghpages -d _site        # Local dev
-jekyll build -s ghpages -d dist/waveform-playlist  # Production
+pnpm website        # Start dev server (localhost:3000)
+pnpm website:build  # Production build
 ```
+
+Docusaurus webpack aliases resolve workspace packages from source for live development.
 
 ## Key Integration Points
 
-### 1. Selection Time Inputs (HTML ↔ React Bridge)
-
-**Problem:** Jekyll templates have HTML inputs, React components need to control them
-
-**Solution:** `SelectionTimeInputsManager`
-
-```
-HTML Template (timeformat.html)
-    ↓
-  <input id="audio_start">  ← Original HTML
-    ↓
-SelectionTimeInputsManager  ← Replaces with React
-    ↓
-  <TimeInput />  ← React component
-    ↓
-WaveformPlaylistComponent  ← State updates
-```
-
-### 2. Event Emitter → React Events (Migration)
-
-**Old:**
-
-```javascript
-ee.on("select", (start, end) => {
-  updateInputs(start, end);
-});
-```
-
-**New:**
-
-```typescript
-const handleMouseUp = (e: MouseEvent) => {
-  setSelectionStart(start);
-  setSelectionEnd(end);
-};
-```
-
-### 3. Audio Playback Flow
+### Audio Playback Flow
 
 ```
 User clicks Play button
@@ -760,31 +673,22 @@ Re-render Playhead position
 
 ## Example Page Flow
 
-### Annotations Example
+### Example Components (Docusaurus)
 
-1. **HTML Template:** `ghpages/_examples/13annotations.html`
-   - Includes layout, forms, buttons
-   - Loads `annotations-bundle.js`
+Examples are React components in `website/src/components/examples/`:
 
-2. **JavaScript Entry:** `packages/browser/src/annotations-app.tsx`
-   - Initializes React app
-   - Loads annotation data (`notes`)
-   - Mounts `WaveformPlaylistComponent`
+1. **Component:** e.g., `AnnotationsExample.tsx`
+   - Self-contained React component
+   - Uses `WaveformPlaylistProvider` pattern
+   - Loads audio and annotations
 
-3. **React Render:**
+2. **Page Wrapper:** `website/src/pages/examples/annotations.tsx`
+   - Uses `createLazyExample()` for SSR compatibility
+   - Lazy loads the example component
 
-   ```tsx
-   <WaveformPlaylistComponent
-     tracks={[{ src: 'media/audio/sonnet.mp3' }]}
-     annotationList={{ annotations: notes, ... }}
-   />
-   ```
-
-4. **Component Lifecycle:**
+3. **Component Lifecycle:**
    - Load audio → decode → generate peaks
-   - Initialize TonePlayout
-   - Mount SelectionTimeInputsManager
-   - Attach button event listeners
+   - Initialize TonePlayout via context
    - Render waveform canvas
 
 ### Multi-Clip Example
@@ -836,42 +740,7 @@ const trackConfigs = [
 - ✅ Easy to copy/paste clip configurations
 - ✅ Efficient memory usage
 
-**Location:** `packages/browser/src/multi-clip-app.tsx`
-
-### Bootstrap Styling Convention
-
-**Pattern:** Move static content (notes, feature lists) from React components to Jekyll templates using Bootstrap alert styling.
-
-**Benefits:**
-- Reduces bundle size (static content not in JS)
-- Consistent styling across examples
-- Easier to update without rebuilding
-
-**Example (Recording):**
-
-```html
-<!-- Features list in Jekyll template -->
-<div class="alert alert-info mb-4">
-  <h5>Features:</h5>
-  <ul class="mb-0">
-    <li>AudioWorklet-based recording</li>
-    <li>Real-time waveform visualization</li>
-  </ul>
-</div>
-
-<!-- Note/warning in Jekyll template -->
-<div class="alert alert-warning mb-4">
-  <strong>Note:</strong> Requires HTTPS or localhost.
-</div>
-```
-
-**Alert Variants:**
-- `alert-info` (blue) - Feature lists, informational content
-- `alert-warning` (yellow) - Notes, warnings, prerequisites
-- `alert-success` (green) - Success messages
-- `alert-danger` (red) - Error messages
-
-**Location:** `ghpages/_examples/17recording.html`, `18multi-clip.html`
+**Location:** `website/src/components/examples/MultiClipExample.tsx`
 
 ## Migration Status
 
@@ -927,23 +796,19 @@ const trackConfigs = [
 ### Local Development
 
 ```bash
-# Terminal 1: Watch mode (if needed)
-pnpm dev
+# Terminal 1: Docusaurus dev server (hot reload)
+pnpm website
 
-# Terminal 2: Jekyll server
-jekyll serve -s ghpages --livereload
-
-# Terminal 3: Build after changes
-pnpm build && jekyll build -s ghpages -d _site
+# Terminal 2: Build packages after changes (if needed)
+pnpm build
 ```
 
 ### Testing Changes
 
 1. Edit code in `packages/`
-2. Run `pnpm build`
-3. Rebuild Jekyll site
-4. Hard refresh browser (Cmd+Shift+R)
-5. Check `http://localhost:4000/waveform-playlist/annotations.html`
+2. Docusaurus hot reloads automatically (webpack aliases resolve from source)
+3. For dist changes, run `pnpm build` then hard refresh browser (Cmd+Shift+R)
+4. Check `http://localhost:3000/waveform-playlist/examples/`
 
 ## Important Files
 
@@ -953,19 +818,14 @@ pnpm build && jekyll build -s ghpages -d _site
 - `package.json` - Root package, scripts
 - `tsconfig.json` - TypeScript base config
 - `packages/*/tsup.config.ts` - Build configs
-- `packages/browser/webpack.config.js` - Bundle config
-
-### Jekyll
-
-- `ghpages/_config.yml` - Jekyll configuration
-- `ghpages/_layouts/page.html` - Page template
-- `ghpages/_includes/` - Reusable HTML snippets
+- `packages/browser/vite.config.ts` - Browser bundle config
+- `website/docusaurus.config.ts` - Docusaurus config with webpack aliases
 
 ### Entry Points
 
 - `packages/browser/src/index.tsx` - Main bundle entry
-- `packages/browser/src/annotations-app.tsx` - Annotations entry
 - `packages/ui-components/src/index.tsx` - Component library exports
+- `website/src/components/examples/` - Example components
 
 ### Documentation
 
@@ -1077,7 +937,7 @@ import { WaveformPlaylistComponent } from '@waveform-playlist/browser';
 
 - `packages/browser/HOOKS_ARCHITECTURE.md` - Hooks architecture overview
 - `packages/browser/src/hooks/README.md` - Hooks API documentation
-- `ghpages/_examples/flexible-api.html` - Live demo of flexible API
+- `website/src/components/examples/FlexibleApiExample.tsx` - Flexible API example
 
 ## E2E Testing
 
