@@ -4,12 +4,16 @@ sidebar_position: 1
 
 # Installation
 
+:::info Pre-release Version
+Waveform Playlist v5 is currently in pre-release. Install with the `@next` tag to get the latest features.
+:::
+
 ## Package Manager
 
 Install the main package using your preferred package manager:
 
 ```bash npm2yarn
-npm install @waveform-playlist/browser
+npm install @waveform-playlist/browser@next
 ```
 
 This will install the browser package along with its peer dependencies.
@@ -38,7 +42,7 @@ Depending on your needs, you may want to install additional packages:
 For time-synchronized annotations:
 
 ```bash npm2yarn
-npm install @waveform-playlist/annotations
+npm install @waveform-playlist/annotations@next
 ```
 
 ### Recording
@@ -46,7 +50,7 @@ npm install @waveform-playlist/annotations
 For microphone recording:
 
 ```bash npm2yarn
-npm install @waveform-playlist/recording
+npm install @waveform-playlist/recording@next
 ```
 
 ## TypeScript
@@ -58,7 +62,7 @@ All packages include TypeScript definitions. No additional `@types` packages are
 For quick prototyping, you can use the UMD build from a CDN:
 
 ```html
-<script src="https://unpkg.com/@waveform-playlist/browser/dist/index.umd.js"></script>
+<script src="https://unpkg.com/@waveform-playlist/browser@next/dist/index.umd.js"></script>
 ```
 
 Note: CDN usage is not recommended for production applications.

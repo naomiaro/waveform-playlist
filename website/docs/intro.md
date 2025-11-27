@@ -5,6 +5,10 @@ slug: /
 
 # Introduction
 
+:::info Pre-release Version
+Waveform Playlist v5 is currently in pre-release. APIs may change before the stable release. Install with `npm install @waveform-playlist/browser@next`.
+:::
+
 Waveform Playlist is a multitrack Web Audio editor and player with canvas waveform visualization. Built with React and [Tone.js](https://tonejs.github.io/), it provides a complete solution for audio editing in the browser.
 
 ## Features

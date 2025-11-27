@@ -805,7 +805,7 @@ export function AnnotationsExample() {
       controls={{ show: true, width: 200 }}
       theme={theme}
       timescale
-      barWidth={1}
+      barWidth={4}
       barGap={0}
       progressBarWidth={2}
       annotationList={{

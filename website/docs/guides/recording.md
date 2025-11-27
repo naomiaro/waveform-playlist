@@ -11,7 +11,7 @@ Record audio directly from the microphone with level monitoring and waveform vis
 Install the recording package:
 
 ```bash npm2yarn
-npm install @waveform-playlist/recording
+npm install @waveform-playlist/recording@next
 ```
 
 ## Basic Recording
@@ -174,6 +174,114 @@ function RecordingControls() {
   );
 }
 ```
+
+## Accessing Recorded Audio Data
+
+After recording stops, the `audioBuffer` from `useRecording` contains the full recorded audio as a Web Audio API [AudioBuffer](https://developer.mozilla.org/en-US/docs/Web/API/AudioBuffer). You can also await the return value of `stopRecording()` to get the buffer directly.
+
+### Getting the AudioBuffer
+
+```tsx
+import { useRecording, useMicrophoneAccess } from '@waveform-playlist/recording';
+
+function RecordingWithDataAccess() {
+  const { stream } = useMicrophoneAccess();
+  const {
+    isRecording,
+    audioBuffer,
+    startRecording,
+    stopRecording,
+  } = useRecording(stream);
+
+  const handleStopAndProcess = async () => {
+    // Option 1: Await stopRecording() directly
+    const buffer = await stopRecording();
+    if (buffer) {
+      console.log('Duration:', buffer.duration, 'seconds');
+      console.log('Sample rate:', buffer.sampleRate);
+      console.log('Channels:', buffer.numberOfChannels);
+    }
+  };
+
+  // Option 2: Access audioBuffer state after recording
+  useEffect(() => {
+    if (audioBuffer) {
+      console.log('Recording complete:', audioBuffer.duration, 'seconds');
+    }
+  }, [audioBuffer]);
+
+  return (
+    <button onClick={isRecording ? handleStopAndProcess : startRecording}>
+      {isRecording ? 'Stop' : 'Record'}
+    </button>
+  );
+}
+```
+
+### Extracting Raw PCM Data
+
+The `AudioBuffer` provides access to raw PCM sample data via `getChannelData()`:
+
+```tsx
+function processRecordedAudio(audioBuffer: AudioBuffer) {
+  // Get raw PCM samples for each channel
+  const leftChannel = audioBuffer.getChannelData(0);   // Float32Array
+  const rightChannel = audioBuffer.numberOfChannels > 1
+    ? audioBuffer.getChannelData(1)
+    : leftChannel;
+
+  console.log('Samples:', leftChannel.length);
+  console.log('Sample rate:', audioBuffer.sampleRate);
+  console.log('Duration:', audioBuffer.duration, 'seconds');
+
+  // Sample values are floats between -1.0 and 1.0
+  const peakLevel = Math.max(...leftChannel.map(Math.abs));
+  console.log('Peak level:', peakLevel);
+
+  return { leftChannel, rightChannel };
+}
+```
+
+### Converting to Other Formats
+
+You can convert the recorded audio to various formats:
+
+```tsx
+// Convert to 16-bit integer PCM
+function toInt16PCM(floatData: Float32Array): Int16Array {
+  const int16 = new Int16Array(floatData.length);
+  for (let i = 0; i < floatData.length; i++) {
+    // Clamp and convert float [-1, 1] to int16 [-32768, 32767]
+    const s = Math.max(-1, Math.min(1, floatData[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return int16;
+}
+
+// Example usage
+const pcmData = audioBuffer.getChannelData(0);
+const int16Data = toInt16PCM(pcmData);
+```
+
+### Sending to a Server
+
+```tsx
+async function uploadRecording(audioBuffer: AudioBuffer) {
+  // Get raw PCM data
+  const pcmData = audioBuffer.getChannelData(0);
+
+  // Send as Float32Array
+  const response = await fetch('/api/upload-audio', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: pcmData.buffer,
+  });
+
+  return response.json();
+}
+```
+
+For WAV file export, use the `useExportWav` hook or `ExportWavButton` component described in the [Download Recorded Audio](#download-recorded-audio) section.
 
 ## Level Monitoring
 
