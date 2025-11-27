@@ -12,14 +12,28 @@
       "require": "./dist/index.js"
     }
   },
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["waveform", "audio", "recording", "audioworklet"],
+  "keywords": ["waveform", "audio", "recording", "audioworklet", "waveform-playlist"],
   "author": "Naomi Aro",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/recording"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "@types/react": "^18.2.45",
     "@types/styled-components": "^5.1.26",

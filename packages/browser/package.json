@@ -2,12 +2,17 @@
   "name": "@waveform-playlist/browser",
   "version": "5.0.0-alpha.0",
   "description": "Browser bundle for waveform-playlist with React",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./package.json": "./package.json"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
   },
+  "sideEffects": false,
   "scripts": {
     "build": "pnpm typecheck && vite build",
     "dev": "vite build --watch",
@@ -17,17 +22,34 @@
     "waveform",
     "audio",
     "browser",
-    "react"
+    "react",
+    "waveform-playlist",
+    "audio-editor",
+    "multitrack"
   ],
   "author": "Naomi Aro",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/browser"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "@types/node": "^20.10.6",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@vitejs/plugin-react": "^5.1.1",
     "typescript": "^5.3.3",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vite-plugin-dts": "^4.5.0"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

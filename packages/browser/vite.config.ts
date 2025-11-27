@@ -1,11 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import dts from 'vite-plugin-dts';
 import { resolve } from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
   plugins: [
     react(),
+    dts({
+      include: ['src/**/*'],
+      rollupTypes: true,
+    }),
     visualizer({
       filename: './bundle-stats.html',
       gzipSize: true,

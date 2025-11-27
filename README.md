@@ -6,6 +6,18 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
 
 > **⚠️ v5 Alpha**: This is a complete React rewrite. For the stable v4 release, see [waveform-playlist@4.x](https://www.npmjs.com/package/waveform-playlist).
 
+## Sponsors
+
+<p align="center">
+  <a href="https://moises.ai/" target="_blank">
+    <img width="222px" src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/logos/moises-ai.svg" alt="Moises.ai">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/sponsors/naomiaro">Become a sponsor</a>
+</p>
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/waveform-playlist.png" alt="Waveform Playlist Screenshot" width="800">
 </p>
@@ -24,7 +36,7 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
 ## Quick Start
 
 ```bash
-npm install @waveform-playlist/browser@alpha @waveform-playlist/core@alpha @waveform-playlist/ui-components@alpha
+npm install @waveform-playlist/browser@next @waveform-playlist/core@next @waveform-playlist/ui-components@next
 ```
 
 ```tsx
@@ -85,16 +97,16 @@ function App() {
 
 ## Packages
 
-All packages are currently published under the `alpha` tag (v5.0.0-alpha.x):
+All v5 packages are published under the `next` tag (install with `@next`):
 
-| Package | Description | Install |
-|---------|-------------|---------|
-| `@waveform-playlist/browser` | Main React components, hooks, and context | `npm i @waveform-playlist/browser@alpha` |
-| `@waveform-playlist/core` | Types, utilities, and clip/track creation | `npm i @waveform-playlist/core@alpha` |
-| `@waveform-playlist/ui-components` | Styled UI components (buttons, sliders, etc.) | `npm i @waveform-playlist/ui-components@alpha` |
-| `@waveform-playlist/playout` | Tone.js audio engine | `npm i @waveform-playlist/playout@alpha` |
-| `@waveform-playlist/annotations` | Optional annotation support | `npm i @waveform-playlist/annotations@alpha` |
-| `@waveform-playlist/recording` | Optional recording support | `npm i @waveform-playlist/recording@alpha` |
+| Package | Description |
+|---------|-------------|
+| `@waveform-playlist/browser` | Main React components, hooks, and context |
+| `@waveform-playlist/core` | Types, utilities, and clip/track creation |
+| `@waveform-playlist/ui-components` | Styled UI components (buttons, sliders, etc.) |
+| `@waveform-playlist/playout` | Tone.js audio engine |
+| `@waveform-playlist/annotations` | Optional annotation support |
+| `@waveform-playlist/recording` | Optional recording support |
 
 ## Key Hooks
 
@@ -144,16 +156,6 @@ pnpm build
 ```
 
 Visit http://localhost:3000/waveform-playlist to see the examples.
-
-## Sponsors
-
-<p align="center">
-  <a href="https://moises.ai/" target="_blank">
-    <img width="222px" src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/logos/moises-ai.svg" alt="Moises.ai">
-  </a>
-</p>
-
-[Become a sponsor](https://github.com/sponsors/naomiaro)
 
 ## Books
 

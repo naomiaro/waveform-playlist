@@ -12,14 +12,28 @@
       "require": "./dist/index.js"
     }
   },
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["waveform", "audio", "webaudio"],
+  "keywords": ["waveform", "audio", "webaudio", "waveform-playlist", "types"],
   "author": "Naomi Aro",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"

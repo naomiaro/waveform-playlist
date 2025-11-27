@@ -12,6 +12,7 @@
       "require": "./dist/index.js"
     }
   },
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -21,10 +22,24 @@
     "webaudio",
     "peaks",
     "waveform",
-    "visualization"
+    "visualization",
+    "waveform-playlist"
   ],
   "author": "Naomi Aro <naomiaro@gmail.com> (https://naomiaro.github.io/)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/webaudio-peaks"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
