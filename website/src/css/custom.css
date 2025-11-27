@@ -508,6 +508,45 @@ h1:hover, h2:hover {
   color: var(--wfpl-heading-h2);
 }
 
+/* Announcement bar - theme-aware styling */
+/* Light mode (default) */
+div[class*='announcementBar'] {
+  background: #fff8f0 !important;
+  color: #5c4a3a !important;
+}
+
+div[class*='announcementBar'] a {
+  color: #d35400 !important;
+}
+
+div[class*='announcementBar'] code {
+  background: #f5ebe0;
+  border: 1px solid #e0d0c0;
+  color: #c0392b;
+  padding: 0.1em 0.4em;
+}
+
+/* Dark mode */
+[data-theme='dark'] div[class*='announcementBar'] {
+  background: #2a2520 !important;
+  color: #c49a6c !important;
+}
+
+[data-theme='dark'] div[class*='announcementBar'] button[class*='close'] {
+  color: #d08070 !important;
+}
+
+[data-theme='dark'] div[class*='announcementBar'] a {
+  color: #63C75F !important;
+}
+
+[data-theme='dark'] div[class*='announcementBar'] code {
+  background: rgba(40, 32, 24, 0.8);
+  border: 1px solid rgba(200, 160, 120, 0.3);
+  color: #e8a060;
+  padding: 0.1em 0.4em;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .hero__title {

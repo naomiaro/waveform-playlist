@@ -171,11 +171,11 @@ export const defaultTheme: WaveformPlaylistTheme = {
   inputPlaceholder: '#999',
   inputFocusBorder: '#0066cc',
 
-  // Button colors
-  buttonBackground: '#f0f0f0',
-  buttonText: '#333',
-  buttonBorder: '#ccc',
-  buttonHoverBackground: '#e0e0e0',
+  // Button colors - blue to match common UI patterns
+  buttonBackground: '#0091ff',
+  buttonText: '#ffffff',
+  buttonBorder: '#0081e6',
+  buttonHoverBackground: '#0081e6',
 
   // Slider colors
   sliderTrackColor: '#ddd',

@@ -17,7 +17,8 @@
     "format": "prettier --write \"packages/**/src/**/*.{ts,tsx}\"",
     "lint": "eslint \"packages/**/src/**/*.{ts,tsx}\"",
     "website": "pnpm --filter website start",
-    "website:build": "pnpm --filter website build"
+    "website:build": "pnpm --filter website build",
+    "version:bump": "node scripts/bump-version.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

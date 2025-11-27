@@ -171,6 +171,12 @@ const config: Config = {
   ],
 
   themeConfig: {
+    announcementBar: {
+      id: 'v5_prerelease',
+      content:
+        '🚧 <strong>v5 Pre-release</strong> — This documentation is for <code>@next</code>. For stable v4, see <a href="https://www.npmjs.com/package/waveform-playlist" target="_blank">waveform-playlist@4.x</a>',
+      isCloseable: true,
+    },
     // Social card image for Open Graph and Twitter
     image: 'img/social/waveform-playlist-social.png',
     // SEO metadata

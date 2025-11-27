@@ -321,7 +321,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       <Card style={{ marginBottom: '1.5rem' }}>
         <Flex direction="column" gap="3">
           {!hasPermission ? (
-            <Button size="3" variant="soft" color="gray" onClick={requestMicAccess}>
+            <Button size="3" variant="solid" color="blue" onClick={requestMicAccess}>
               <MicrophoneIcon size={18} weight="light" style={{ marginRight: '6px' }} /> Enable Microphone
             </Button>
           ) : (
@@ -366,7 +366,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <Text size="2" color="gray">
           Supports MP3, WAV, OGG, and more
         </Text>
-        <Button size="2" variant="soft" color="gray" style={{ marginTop: '0.5rem' }} onClick={(e) => {
+        <Button size="2" variant="solid" color="blue" style={{ marginTop: '0.5rem' }} onClick={(e) => {
           e.stopPropagation();
           onAddTrack();
         }}>
