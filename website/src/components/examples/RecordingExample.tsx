@@ -44,7 +44,6 @@ import {
   RecordingIndicator,
 } from '@waveform-playlist/recording';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
-import { darkTheme } from '@waveform-playlist/ui-components';
 import { MicrophoneIcon, FolderOpenIcon, MusicNotesIcon } from '@phosphor-icons/react';
 
 const Container = styled.div`
@@ -487,8 +486,8 @@ export function RecordingExample() {
           controls={{ show: true, width: 200 }}
           theme={theme}
           timescale
-          barWidth={4}
-          barGap={2}
+          barWidth={1}
+          barGap={0}
         >
           <RecordingControlsInner
             tracks={tracks}
