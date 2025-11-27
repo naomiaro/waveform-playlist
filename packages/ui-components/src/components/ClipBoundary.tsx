@@ -16,7 +16,7 @@ interface BoundaryContainerProps {
 
 const BoundaryContainer = styled.div<BoundaryContainerProps>`
   position: absolute;
-  ${props => props.$edge}: 0;
+  ${props => props.$edge === 'left' ? 'left: 0;' : 'right: 0;'}
   top: 0;
   bottom: 0;
   width: ${CLIP_BOUNDARY_WIDTH}px;
@@ -33,24 +33,39 @@ const BoundaryContainer = styled.div<BoundaryContainerProps>`
         : 'transparent'
   };
 
-  border-${props => props.$edge}: 2px solid ${props =>
-    props.$isDragging
-      ? 'rgba(255, 255, 255, 0.8)'
-      : props.$isHovered
-        ? 'rgba(255, 255, 255, 0.5)'
-        : 'transparent'
-  };
+  ${props => props.$edge === 'left'
+    ? `border-left: 2px solid ${
+        props.$isDragging
+          ? 'rgba(255, 255, 255, 0.8)'
+          : props.$isHovered
+            ? 'rgba(255, 255, 255, 0.5)'
+            : 'transparent'
+      };`
+    : `border-right: 2px solid ${
+        props.$isDragging
+          ? 'rgba(255, 255, 255, 0.8)'
+          : props.$isHovered
+            ? 'rgba(255, 255, 255, 0.5)'
+            : 'transparent'
+      };`
+  }
 
   transition: background 0.15s ease, border-color 0.15s ease;
 
   &:hover {
     background: rgba(255, 255, 255, 0.2);
-    border-${props => props.$edge}: 2px solid rgba(255, 255, 255, 0.5);
+    ${props => props.$edge === 'left'
+      ? 'border-left: 2px solid rgba(255, 255, 255, 0.5);'
+      : 'border-right: 2px solid rgba(255, 255, 255, 0.5);'
+    }
   }
 
   &:active {
     background: rgba(255, 255, 255, 0.4);
-    border-${props => props.$edge}: 2px solid rgba(255, 255, 255, 0.8);
+    ${props => props.$edge === 'left'
+      ? 'border-left: 2px solid rgba(255, 255, 255, 0.8);'
+      : 'border-right: 2px solid rgba(255, 255, 255, 0.8);'
+    }
   }
 `;
 

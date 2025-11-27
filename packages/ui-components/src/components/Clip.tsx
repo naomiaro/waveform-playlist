@@ -193,35 +193,36 @@ export const Clip: FunctionComponent<ClipProps> = ({
             curveType={fadeOut.type}
           />
         )}
-        {showHeader && !disableHeaderDrag && !isOverlay && (
-          <>
-            <ClipBoundary
-              clipId={clipId}
-              trackIndex={trackIndex}
-              clipIndex={clipIndex}
-              edge="left"
-              dragHandleProps={{
-                attributes: leftBoundaryAttributes,
-                listeners: leftBoundaryListeners,
-                setActivatorNodeRef: setLeftBoundaryActivatorRef,
-                isDragging: isLeftBoundaryDragging,
-              }}
-            />
-            <ClipBoundary
-              clipId={clipId}
-              trackIndex={trackIndex}
-              clipIndex={clipIndex}
-              edge="right"
-              dragHandleProps={{
-                attributes: rightBoundaryAttributes,
-                listeners: rightBoundaryListeners,
-                setActivatorNodeRef: setRightBoundaryActivatorRef,
-                isDragging: isRightBoundaryDragging,
-              }}
-            />
-          </>
-        )}
       </ChannelsWrapper>
+      {/* Clip boundaries - outside ChannelsWrapper to avoid overflow:hidden clipping */}
+      {showHeader && !disableHeaderDrag && !isOverlay && (
+        <>
+          <ClipBoundary
+            clipId={clipId}
+            trackIndex={trackIndex}
+            clipIndex={clipIndex}
+            edge="left"
+            dragHandleProps={{
+              attributes: leftBoundaryAttributes,
+              listeners: leftBoundaryListeners,
+              setActivatorNodeRef: setLeftBoundaryActivatorRef,
+              isDragging: isLeftBoundaryDragging,
+            }}
+          />
+          <ClipBoundary
+            clipId={clipId}
+            trackIndex={trackIndex}
+            clipIndex={clipIndex}
+            edge="right"
+            dragHandleProps={{
+              attributes: rightBoundaryAttributes,
+              listeners: rightBoundaryListeners,
+              setActivatorNodeRef: setRightBoundaryActivatorRef,
+              isDragging: isRightBoundaryDragging,
+            }}
+          />
+        </>
+      )}
     </ClipContainer>
   );
 };

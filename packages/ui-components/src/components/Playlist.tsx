@@ -53,7 +53,7 @@ const ClickOverlay = styled.div<ClickOverlayProps>`
   right: 0;
   bottom: 0;
   cursor: crosshair;
-  z-index: 100;
+  z-index: 1; /* Low z-index - clip headers and boundaries have higher z-index */
 `;
 
 export interface PlaylistProps {
