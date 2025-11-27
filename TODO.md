@@ -17,7 +17,6 @@ Multi-track audio editor roadmap for waveform-playlist.
 - [ ] **Browser compatibility** - Chrome, Firefox, Safari, Edge
 - [ ] **NPM publishing setup** - Package.json exports, tree-shaking verification
 - [ ] **CI/CD pipeline** - Automated builds, tests, publishing
-- [ ] **Revamp sponsors.md** - Update sponsor information and acknowledgments
 
 ### Nice to Have
 
@@ -134,6 +133,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 - Markers and regions
 - MIDI/video sync
 - Sticky clip header text (Intersection Observer to keep track name visible when scrolling)
+- Revamp GitHub Sponsors tiers (via GitHub UI)
 
 ---
 

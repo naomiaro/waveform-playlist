@@ -21,10 +21,9 @@ import {
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
-// Gradient amber theme for minimal example (no scrolling, so gradient is safe)
-const amberGradientTheme: Partial<WaveformPlaylistTheme> = {
+// Dark mode: Amber/gold gradient waveform on dark brown background
+const darkModeGradientTheme: Partial<WaveformPlaylistTheme> = {
   waveformDrawMode: 'inverted',
-  // Gradient amber/gold for the waveform bars
   waveOutlineColor: {
     type: 'linear',
     direction: 'vertical',
@@ -48,6 +47,32 @@ const amberGradientTheme: Partial<WaveformPlaylistTheme> = {
   selectedWaveFillColor: '#241c14',
 };
 
+// Light mode: Teal gradient waveform bars on light background
+const lightModeGradientTheme: Partial<WaveformPlaylistTheme> = {
+  waveformDrawMode: 'normal',
+  waveOutlineColor: '#f5f5f5', // Background
+  waveFillColor: {
+    type: 'linear',
+    direction: 'vertical',
+    stops: [
+      { offset: 0, color: '#3d8b8b' },
+      { offset: 0.5, color: '#2a7070' },
+      { offset: 1, color: '#3d8b8b' },
+    ],
+  },
+  waveProgressColor: 'rgba(42, 112, 112, 0.3)',
+  selectedWaveOutlineColor: '#e8e8e8', // Background when selected
+  selectedWaveFillColor: {
+    type: 'linear',
+    direction: 'vertical',
+    stops: [
+      { offset: 0, color: '#4a9e9e' },
+      { offset: 0.5, color: '#3d8b8b' },
+      { offset: 1, color: '#4a9e9e' },
+    ],
+  },
+};
+
 const Controls = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -65,7 +90,8 @@ const Container = styled.div`
 `;
 
 export function MinimalExample() {
-  const { theme } = useDocusaurusTheme();
+  const { theme, isDarkMode } = useDocusaurusTheme();
+  const gradientTheme = isDarkMode ? darkModeGradientTheme : lightModeGradientTheme;
 
   // Define your track configuration - use useMemo to prevent re-creating on every render
   const audioConfigs = React.useMemo(() => [
@@ -99,7 +125,7 @@ export function MinimalExample() {
   }
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1500} mono theme={{ ...theme, ...amberGradientTheme }} barWidth={4} barGap={2}>
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1500} mono theme={{ ...theme, ...gradientTheme }} progressBarWidth={2}>
       <Controls>
         <PlayButton />
         <PauseButton />
