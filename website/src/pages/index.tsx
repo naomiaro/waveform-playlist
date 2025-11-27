@@ -5,12 +5,12 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 import {
-  Waveform,
-  SlidersHorizontal,
-  Microphone,
-  Export,
-  TextAa,
-  Palette,
+  WaveformIcon,
+  SlidersHorizontalIcon,
+  MicrophoneIcon,
+  ExportIcon,
+  TextAaIcon,
+  PaletteIcon,
 } from '@phosphor-icons/react';
 
 import styles from './index.module.css';
@@ -172,7 +172,7 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     title: 'Multi-Track Editing',
-    icon: <Waveform weight="light" />,
+    icon: <WaveformIcon weight="light" />,
     link: '/examples/multi-clip',
     description: (
       <>
@@ -183,7 +183,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: '20+ Audio Effects',
-    icon: <SlidersHorizontal weight="light" />,
+    icon: <SlidersHorizontalIcon weight="light" />,
     link: '/examples/effects',
     description: (
       <>
@@ -194,7 +194,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Recording',
-    icon: <Microphone weight="light" />,
+    icon: <MicrophoneIcon weight="light" />,
     link: '/examples/recording',
     description: (
       <>
@@ -205,7 +205,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Export to WAV',
-    icon: <Export weight="light" />,
+    icon: <ExportIcon weight="light" />,
     link: '/examples/effects',
     description: (
       <>
@@ -216,7 +216,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Annotations',
-    icon: <TextAa weight="light" />,
+    icon: <TextAaIcon weight="light" />,
     link: '/examples/annotations',
     description: (
       <>
@@ -227,7 +227,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Fully Themeable',
-    icon: <Palette weight="light" />,
+    icon: <PaletteIcon weight="light" />,
     link: '/examples/styling',
     description: (
       <>

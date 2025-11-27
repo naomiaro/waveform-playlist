@@ -1,7 +1,7 @@
 import type { Meta, StoryObj, Decorator } from '@storybook/react';
 import React, { useState } from 'react';
 import { TrackControlsWithDelete } from '../components/TrackControlsWithDelete';
-import { action } from '@storybook/addon-actions';
+import { fn } from 'storybook/test';
 
 const meta: Meta<typeof TrackControlsWithDelete> = {
   title: 'Components/TrackControlsWithDelete',
@@ -30,11 +30,11 @@ export const Default: Story = {
     soloed: false,
     volume: 1,
     pan: 0,
-    onMuteChange: action('onMuteChange'),
-    onSoloChange: action('onSoloChange'),
-    onVolumeChange: action('onVolumeChange'),
-    onPanChange: action('onPanChange'),
-    onDelete: action('onDelete'),
+    onMuteChange: fn(),
+    onSoloChange: fn(),
+    onVolumeChange: fn(),
+    onPanChange: fn(),
+    onDelete: fn(),
   },
 };
 

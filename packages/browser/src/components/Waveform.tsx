@@ -199,7 +199,7 @@ export const Waveform: React.FC<WaveformProps> = ({
 
     // Select the clicked track
     if (clickedTrackIndex !== -1) {
-      selectTrack(clickedTrackIndex, `Clicked at Y=${trackY}px`);
+      selectTrack(clickedTrackIndex);
     }
 
     setIsSelecting(true);
@@ -313,7 +313,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                 const trackControls = renderTrackControls ? (
                   renderTrackControls(trackIndex)
                 ) : (
-                  <Controls onClick={() => selectTrack(trackIndex, 'Clicked controls')}>
+                  <Controls onClick={() => selectTrack(trackIndex)}>
                     <Header style={{ justifyContent: 'center' }}>
                       {trackState.name || `Track ${trackIndex + 1}`}
                     </Header>
@@ -409,7 +409,7 @@ export const Waveform: React.FC<WaveformProps> = ({
                                 // Don't select track - let drag event handler take over
                                 return;
                               }
-                              selectTrack(trackIndex, 'Clicked clip');
+                              selectTrack(trackIndex);
                             }}
                           >
                             {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (

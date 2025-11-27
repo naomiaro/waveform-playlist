@@ -1,6 +1,6 @@
 import React from 'react';
-import { Trash, type IconProps } from '@phosphor-icons/react';
+import { TrashIcon as PhosphorTrashIcon, type IconProps } from '@phosphor-icons/react';
 
 export const TrashIcon: React.FC<IconProps> = (props) => (
-  <Trash weight="light" {...props} />
+  <PhosphorTrashIcon weight="light" {...props} />
 );

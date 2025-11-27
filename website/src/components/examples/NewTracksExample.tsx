@@ -24,7 +24,7 @@ import {
 import { TrackControlsWithDelete } from '@waveform-playlist/ui-components';
 import { ClipTrack, createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
-import { FolderOpen, MusicNotes } from '@phosphor-icons/react';
+import { FolderOpenIcon, MusicNotesIcon } from '@phosphor-icons/react';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -204,7 +204,7 @@ export function NewTracksExample() {
         ) : (
           <>
             <DropZoneText>
-              {isDragging ? <><FolderOpen size={20} weight="light" style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Drop audio files here</> : <><MusicNotes size={20} weight="light" style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Drop audio files here to add tracks</>}
+              {isDragging ? <><FolderOpenIcon size={20} weight="light" style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Drop audio files here</> : <><MusicNotesIcon size={20} weight="light" style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Drop audio files here to add tracks</>}
             </DropZoneText>
             <DropZoneSubtext>
               or click to browse (supports MP3, WAV, OGG, and more)

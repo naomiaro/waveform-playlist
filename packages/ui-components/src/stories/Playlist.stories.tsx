@@ -6,7 +6,7 @@ import { Channel } from '../components/Channel';
 import { PlaylistInfoContext } from '../contexts/PlaylistInfo';
 import { TrackControlsContext } from '../contexts/TrackControls';
 import type { WaveformPlaylistTheme } from '../wfpl-theme';
-import { action } from '@storybook/addon-actions';
+import { fn } from 'storybook/test';
 
 // Generate sample waveform data for stories
 function generateSamplePeaks(length: number, bits: 8 | 16 = 8): Int8Array | Int16Array {
@@ -186,10 +186,10 @@ export const MultipleTracks: Story = {
 export const WithClickHandler: Story = {
   args: {
     tracksWidth: 600,
-    onTracksClick: action('onTracksClick'),
-    onTracksMouseDown: action('onTracksMouseDown'),
-    onTracksMouseMove: action('onTracksMouseMove'),
-    onTracksMouseUp: action('onTracksMouseUp'),
+    onTracksClick: fn(),
+    onTracksMouseDown: fn(),
+    onTracksMouseMove: fn(),
+    onTracksMouseUp: fn(),
   },
   render: (args) => (
     <Playlist {...args}>
