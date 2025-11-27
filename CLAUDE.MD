@@ -441,6 +441,8 @@ const analyser = context.createAnalyser();
 6. **TypeScript Enforcement** - Build scripts run `pnpm typecheck &&` before bundling
 7. **Refs for Dynamic Audio Callbacks** - When useCallback needs fresh state for audio graph rebuilding, store state in a ref and read from ref inside callback (avoids stale closures)
 8. **Smooth Playback Animation** - Use `requestAnimationFrame` + direct DOM manipulation for 60fps updates (playhead, progress, time display)
+9. **Animation Loop Restart** - When restarting playback, cancel existing animation frames AND reset `currentTimeRef` to the new start position before calling `startAnimationLoop()`
+10. **Constraint-First Drag Handling** - When implementing boundary trimming, calculate constrained delta first, then apply uniformly to all affected properties (startSample, offsetSamples, durationSamples)
 
 ### Refs for Dynamic Audio Callbacks
 
