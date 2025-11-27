@@ -25,6 +25,7 @@ const HeaderContainer = styled.div<HeaderContainerProps>`
   user-select: none;
   z-index: 110;
   flex-shrink: 0;
+  pointer-events: auto; /* Re-enable pointer events (parent ClipContainer has pointer-events: none) */
 
   ${props => props.$interactive && `
     &:hover {

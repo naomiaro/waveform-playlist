@@ -23,6 +23,7 @@ const BoundaryContainer = styled.div<BoundaryContainerProps>`
   cursor: col-resize;
   user-select: none;
   z-index: 105; /* Above waveform, below header */
+  pointer-events: auto; /* Re-enable pointer events (parent ClipContainer has pointer-events: none) */
 
   /* Invisible by default, visible on hover */
   background: ${props =>
