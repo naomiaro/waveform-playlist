@@ -154,10 +154,9 @@ export const Waveform: React.FC<WaveformProps> = ({
   };
 
   // Shared function for track selection
-  const selectTrack = useCallback((trackIndex: number, source: string = 'unknown') => {
+  const selectTrack = useCallback((trackIndex: number) => {
     if (trackIndex >= 0 && trackIndex < tracks.length) {
       const track = tracks[trackIndex];
-      console.log(`[Track Selection] ${source}: track "${track.name}" (ID: ${track.id})`);
       setSelectedTrackId(track.id);
     }
   }, [tracks, setSelectedTrackId]);

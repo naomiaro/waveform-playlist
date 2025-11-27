@@ -11,7 +11,6 @@ import {
   ZoomOutButton,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
-  ExportWavButton,
   useAudioTracks,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -161,9 +160,6 @@ export function StemTracksExample() {
             <AutomaticScrollCheckbox />
           </ControlGroup>
 
-          <ControlGroup>
-            <ExportWavButton filename="stem-mix" />
-          </ControlGroup>
         </Controls>
 
         <Waveform />
