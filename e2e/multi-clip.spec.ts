@@ -21,12 +21,12 @@ test.describe('Multi-Clip Example', () => {
 
   test.describe('Playhead Positioning', () => {
     test('clicking on waveform area moves playhead', async ({ page }) => {
-      // Get the tracks container position
-      const tracksContainer = page.locator('[data-scroll-container]');
-      const box = await tracksContainer.boundingBox();
+      // Get the first clip container - this ensures we click on actual waveform content
+      const clipContainer = page.locator('[data-clip-container]').first();
+      const box = await clipContainer.boundingBox();
       expect(box).toBeTruthy();
 
-      // Click somewhere in the middle of the tracks area
+      // Click somewhere in the middle of the clip (not at the very start)
       const clickX = box!.x + box!.width / 2;
       const clickY = box!.y + box!.height / 2;
 
@@ -36,7 +36,7 @@ test.describe('Multi-Clip Example', () => {
       const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
       const timeText = await timeDisplay.textContent();
 
-      // After clicking in the middle, time should not be 00:00:00.000
+      // After clicking in the middle of the clip, time should not be 00:00:00.000
       // (exact value depends on zoom level and click position)
       expect(timeText).not.toBe('00:00:00.000');
     });
