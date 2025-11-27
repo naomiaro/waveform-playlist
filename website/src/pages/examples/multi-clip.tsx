@@ -20,9 +20,9 @@ export default function MultiClipExamplePage(): React.ReactElement {
       </Head>
       <main className="container margin-vert--lg">
         <h1>Multi-Clip Editing Example</h1>
-        <p>
-          Advanced multi-track, multi-clip editing with drag-and-drop. Move clips along the timeline,
-          split clips, and arrange multiple clips per track.
+        <p style={{ marginBottom: '2rem' }}>
+          Advanced multi-track, multi-clip editing inspired by Audacity. Move clips along the timeline
+          with drag-and-drop, split clips at the playhead, trim boundaries, and arrange multiple clips per track.
         </p>
 
         <LazyMultiClipExample />
@@ -37,8 +37,15 @@ export default function MultiClipExamplePage(): React.ReactElement {
             <li>Drag clips to reposition on timeline</li>
             <li>Real-time collision detection</li>
             <li>Trim clips by dragging boundaries</li>
-            <li>Split clips at playhead (S key)</li>
             <li>Visual clip headers with track names</li>
+          </ul>
+
+          <h3>Keyboard Shortcuts</h3>
+          <ul>
+            <li><code>Space</code> - Play/Pause</li>
+            <li><code>Escape</code> - Stop</li>
+            <li><code>0</code> - Rewind to start</li>
+            <li><code>S</code> - Split clip at playhead (select a track first)</li>
           </ul>
         </div>
 

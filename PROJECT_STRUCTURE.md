@@ -197,6 +197,7 @@ const clip = createClipFromSeconds({
   │   ├── useWaveformPlaylist.ts        # Composite hook
   │   ├── useAnnotationKeyboardControls.ts # Annotation navigation & editing
   │   ├── useKeyboardShortcuts.ts       # Flexible keyboard shortcut system
+  │   ├── usePlaybackShortcuts.ts       # Default playback shortcuts (0 = rewind)
   │   ├── useClipDragHandlers.ts        # Clip drag-to-move and trim
   │   ├── useClipSplitting.ts           # Split clips at playhead
   │   ├── index.ts                      # Hook exports

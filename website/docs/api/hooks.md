@@ -527,6 +527,133 @@ function useAnnotationControls(): {
 
 ---
 
+## Keyboard Shortcuts
+
+### usePlaybackShortcuts
+
+Enable common playback keyboard shortcuts.
+
+#### Default Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Space` | Toggle play/pause |
+| `Escape` | Stop playback |
+| `0` | Rewind to start |
+
+#### Signature
+
+```typescript
+function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): {
+  togglePlayPause: () => void;
+  stopPlayback: () => void;
+  rewindToStart: () => void;
+  shortcuts: KeyboardShortcut[];
+};
+```
+
+#### Options
+
+```typescript
+interface UsePlaybackShortcutsOptions {
+  enabled?: boolean;              // Enable shortcuts (default: true)
+  additionalShortcuts?: KeyboardShortcut[];  // Add custom shortcuts
+  shortcuts?: KeyboardShortcut[]; // Override all shortcuts
+}
+```
+
+#### Example
+
+```tsx
+// Basic usage - enables default shortcuts
+usePlaybackShortcuts();
+
+// With additional custom shortcuts
+usePlaybackShortcuts({
+  additionalShortcuts: [
+    { key: 's', action: splitClipAtPlayhead, description: 'Split clip' },
+    { key: ' ', action: togglePlay, description: 'Play/Pause' },
+  ],
+});
+
+// Override defaults completely
+usePlaybackShortcuts({
+  shortcuts: [
+    { key: 'Home', action: rewindToStart, description: 'Go to start' },
+  ],
+});
+```
+
+---
+
+### useKeyboardShortcuts
+
+Low-level hook for custom keyboard shortcuts.
+
+#### Signature
+
+```typescript
+function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void;
+```
+
+#### KeyboardShortcut
+
+```typescript
+interface KeyboardShortcut {
+  key: string;           // Key to listen for
+  action: () => void;    // Function to call
+  ctrlKey?: boolean;     // Require Ctrl modifier
+  shiftKey?: boolean;    // Require Shift modifier
+  metaKey?: boolean;     // Require Meta/Cmd modifier
+  altKey?: boolean;      // Require Alt modifier
+  description?: string;  // Human-readable description
+  preventDefault?: boolean;  // Prevent default behavior (default: true)
+}
+```
+
+#### Example
+
+```tsx
+useKeyboardShortcuts({
+  shortcuts: [
+    {
+      key: 's',
+      action: () => splitClip(),
+      description: 'Split clip at playhead',
+    },
+    {
+      key: 'z',
+      metaKey: true,
+      action: () => undo(),
+      description: 'Undo',
+    },
+    {
+      key: 'z',
+      metaKey: true,
+      shiftKey: true,
+      action: () => redo(),
+      description: 'Redo',
+    },
+  ],
+  enabled: !isInputFocused,
+});
+```
+
+#### getShortcutLabel
+
+Get a human-readable label for a shortcut:
+
+```tsx
+import { getShortcutLabel } from '@waveform-playlist/browser';
+
+const shortcut = { key: 's', metaKey: true, shiftKey: true };
+const label = getShortcutLabel(shortcut);
+// On Mac: "Cmd+Shift+S"
+// On Windows: "Ctrl+Shift+S"
+```
+
+---
+
 ## Best Practices
 
 ### 1. Use Specific Hooks

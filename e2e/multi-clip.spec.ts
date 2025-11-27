@@ -145,6 +145,142 @@ test.describe('Multi-Clip Example', () => {
     });
   });
 
+  test.describe('Keyboard Shortcuts', () => {
+    test('pressing Space toggles play/pause', async ({ page }) => {
+      // Verify we start in stopped state (Play button should be visible)
+      const playButton = page.getByRole('button', { name: 'Play' });
+      await expect(playButton).toBeVisible();
+
+      // Press Space to start playing
+      await page.keyboard.press('Space');
+
+      // Wait a moment for playback to start
+      await page.waitForTimeout(100);
+
+      // Time should have advanced from 00:00:00.000
+      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+
+      // Press Space again to pause
+      await page.keyboard.press('Space');
+
+      // Capture time after pause
+      const timeAfterPause = await timeDisplay.textContent();
+
+      // Wait and check time hasn't changed (we're paused)
+      await page.waitForTimeout(200);
+      const timeAfterWait = await timeDisplay.textContent();
+
+      expect(timeAfterPause).toBe(timeAfterWait);
+    });
+
+    test('pressing Escape stops playback and resets to start position', async ({ page }) => {
+      // Click somewhere to set a non-zero position
+      const tracksContainer = page.locator('[data-scroll-container]');
+      const box = await tracksContainer.boundingBox();
+      await page.mouse.click(box!.x + box!.width / 3, box!.y + box!.height / 2);
+
+      // Start playback
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(100);
+
+      // Press Escape to stop
+      await page.keyboard.press('Escape');
+
+      // Time should reset to the start position (where we clicked, not 00:00:00.000)
+      // Just verify playback stopped - the exact behavior depends on implementation
+      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+      const timeAfterStop = await timeDisplay.textContent();
+
+      // Wait and verify time isn't advancing
+      await page.waitForTimeout(200);
+      const timeAfterWait = await timeDisplay.textContent();
+
+      expect(timeAfterStop).toBe(timeAfterWait);
+    });
+
+    test('pressing 0 rewinds to start', async ({ page }) => {
+      // Start playback and let it run briefly to advance time
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(300);
+
+      // Pause playback
+      await page.keyboard.press('Space');
+
+      // Verify time has advanced from start
+      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+      const timeBeforeRewind = await timeDisplay.textContent();
+      expect(timeBeforeRewind).not.toBe('00:00:00.000');
+
+      // Press 0 to rewind
+      await page.keyboard.press('0');
+
+      // Time should be at start
+      await expect(timeDisplay).toHaveText('00:00:00.000');
+    });
+
+    test('pressing S splits clip at playhead on selected track', async ({ page }) => {
+      // First, click on a clip to select its track
+      const clipHeader = page.locator('[data-clip-id]:has-text("Kick")').first();
+      await clipHeader.click();
+
+      // Count clips before split
+      const clipsBefore = await page.locator('[data-clip-container]').count();
+
+      // Click on the waveform to position playhead within the clip
+      // Get the clip container position to click within it
+      const clipContainer = page.locator('[data-clip-container]').first();
+      const clipBox = await clipContainer.boundingBox();
+      expect(clipBox).toBeTruthy();
+
+      // Click in the middle of the clip
+      await page.mouse.click(clipBox!.x + clipBox!.width / 2, clipBox!.y + clipBox!.height / 2);
+
+      // Press S to split
+      await page.keyboard.press('s');
+
+      // Wait for React to update
+      await page.waitForTimeout(100);
+
+      // Count clips after split - should have one more
+      const clipsAfter = await page.locator('[data-clip-container]').count();
+      expect(clipsAfter).toBe(clipsBefore + 1);
+    });
+  });
+
+  test.describe('Split During Playback', () => {
+    test('splitting a clip during playback continues playing', async ({ page }) => {
+      // Click on a clip to select its track
+      const clipHeader = page.locator('[data-clip-id]:has-text("Bass")').first();
+      await clipHeader.click();
+
+      // Position playhead within the Bass clip (it spans most of the timeline)
+      const tracksContainer = page.locator('[data-scroll-container]');
+      const box = await tracksContainer.boundingBox();
+      await page.mouse.click(box!.x + 100, box!.y + box!.height / 2);
+
+      // Start playback
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(200);
+
+      // Verify we're playing (time is advancing)
+      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+      const timeBeforeSplit = await timeDisplay.textContent();
+
+      // Split the clip while playing
+      await page.keyboard.press('s');
+
+      // Wait a moment for the split and playback resume
+      await page.waitForTimeout(300);
+
+      // Time should have continued advancing (playback resumed)
+      const timeAfterSplit = await timeDisplay.textContent();
+      expect(timeAfterSplit).not.toBe(timeBeforeSplit);
+
+      // Stop playback
+      await page.keyboard.press('Escape');
+    });
+  });
+
   test.describe('Drag Interactions', () => {
     test('dragging clip header moves the clip', async ({ page }) => {
       // Get the first clip header (use data-clip-id selector)

@@ -11,7 +11,7 @@ import {
   useClipDragHandlers,
   useDragSensors,
   useClipSplitting,
-  useKeyboardShortcuts,
+  usePlaybackShortcuts,
   Waveform,
   PlayButton,
   PauseButton,
@@ -140,8 +140,9 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     samplesPerPixel,
   });
 
-  useKeyboardShortcuts({
-    shortcuts: [
+  // Enable default playback shortcuts (0 = rewind to start) plus split shortcut
+  usePlaybackShortcuts({
+    additionalShortcuts: [
       {
         key: 's',
         action: splitClipAtPlayhead,

@@ -290,7 +290,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
   const activeAnnotationIdRef = useRef<string | null>(null);
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  const lastStateUpdateRef = useRef<number>(0); // For throttling state updates
 
   // Custom hooks
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
@@ -342,6 +341,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     samplesPerPixelRef.current = newSamplesPerPixel;
   }, [samplesPerPixel, audioBuffers, controls]);
 
+  // Track pending playback resume after tracks change
+  const pendingResumeRef = useRef<{ position: number } | null>(null);
+
   // Load audio from clips (only when tracks change)
   useEffect(() => {
     if (tracks.length === 0) {
@@ -355,6 +357,21 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         playoutRef.current = null;
       }
       return;
+    }
+
+    // Capture playback state before rebuilding playout
+    const wasPlaying = isPlaying;
+    const resumePosition = currentTimeRef.current;
+
+    // Stop current playback and animation before disposing
+    if (playoutRef.current && wasPlaying) {
+      playoutRef.current.stop();
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      // Mark that we need to resume playback after playout is rebuilt
+      pendingResumeRef.current = { position: resumePosition };
     }
 
     const loadAudio = async () => {
@@ -392,6 +409,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           volume: track.volume,
           pan: track.pan,
         })));
+
+        // Dispose old playout before creating new one
+        if (playoutRef.current) {
+          playoutRef.current.dispose();
+        }
 
         // Create playout with clips
         const playout = new TonePlayout({
@@ -457,7 +479,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         playoutRef.current.dispose();
       }
     };
-  }, [tracks, onReady]);
+  }, [tracks, onReady, isPlaying]);
 
   // Regenerate peaks when zoom or mono changes (without reloading audio)
   useEffect(() => {
@@ -514,21 +536,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Animation loop
   const startAnimationLoop = useCallback(() => {
-    const STATE_UPDATE_INTERVAL = 500; // Throttle state updates to 2fps (500ms) - only for time display
-
     const updateTime = () => {
       // Calculate current position based on context.currentTime timing
       const elapsed = getContext().currentTime - playbackStartTimeRef.current;
       const time = audioStartPositionRef.current + elapsed;
       currentTimeRef.current = time;
 
-      // Throttle state updates heavily to reduce React re-renders
-      // AnimatedPlayhead/AnimatedProgress use currentTimeRef directly for smooth 60fps animation
-      const now = performance.now();
-      if (now - lastStateUpdateRef.current >= STATE_UPDATE_INTERVAL) {
-        lastStateUpdateRef.current = now;
-        setCurrentTime(time);
-      }
+      // Update state on every frame - context splitting isolates this from other components
+      setCurrentTime(time);
 
       // Handle annotation playback based on continuous play mode
       if (annotations.length > 0) {
@@ -669,6 +684,30 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     reschedulePlayback();
   }, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop]);
+
+  // Resume playback after tracks change (e.g., after splitting a clip during playback)
+  useEffect(() => {
+    const resumePlayback = async () => {
+      if (pendingResumeRef.current && playoutRef.current) {
+        const { position } = pendingResumeRef.current;
+        pendingResumeRef.current = null;
+
+        await playoutRef.current.init();
+        playoutRef.current.setOnPlaybackComplete(() => {});
+
+        const context = getContext();
+        const timeNow = context.currentTime;
+        playbackStartTimeRef.current = timeNow;
+        audioStartPositionRef.current = position;
+
+        playoutRef.current.play(timeNow, position);
+        setIsPlaying(true);
+        startAnimationLoop();
+      }
+    };
+
+    resumePlayback();
+  }, [tracks, startAnimationLoop]);
 
   // Playback controls
   const play = useCallback(async (startTime?: number, playDuration?: number) => {

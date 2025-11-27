@@ -270,15 +270,15 @@ export class ToneTrack {
   }
 
   pause(): void {
-    if (!this.isPlaying) return;
-
-    // Stop all playing clips and update their paused positions
+    // Stop all clips - both started and scheduled
+    // Scheduled clips have state 'stopped' but still need to be cancelled
     this.clips.forEach(clipPlayer => {
       if (clipPlayer.player.state === 'started') {
         const elapsed = (now() - clipPlayer.playStartTime) * clipPlayer.player.playbackRate;
         clipPlayer.pausedPosition = clipPlayer.pausedPosition + elapsed;
-        clipPlayer.player.stop();
       }
+      // Always call stop() to cancel any scheduled playback
+      clipPlayer.player.stop();
     });
 
     this.activePlayers = 0;

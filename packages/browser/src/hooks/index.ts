@@ -24,6 +24,9 @@ export type { UseClipSplittingOptions, UseClipSplittingResult } from './useClipS
 export { useKeyboardShortcuts, getShortcutLabel } from './useKeyboardShortcuts';
 export type { KeyboardShortcut, UseKeyboardShortcutsOptions } from './useKeyboardShortcuts';
 
+export { usePlaybackShortcuts } from './usePlaybackShortcuts';
+export type { UsePlaybackShortcutsOptions, UsePlaybackShortcutsReturn } from './usePlaybackShortcuts';
+
 export { useAnnotationKeyboardControls } from './useAnnotationKeyboardControls';
 
 export { useIntegratedRecording } from './useIntegratedRecording';

@@ -20,7 +20,7 @@ export default function EffectsExamplePage(): React.ReactElement {
       </Head>
       <main className="container margin-vert--lg">
         <h1>Effects Example</h1>
-        <p>
+        <p style={{ marginBottom: '2rem' }}>
           Apply real-time audio effects to tracks using Tone.js. Experiment with reverb, delay,
           auto-wah, and other effects.
         </p>

@@ -281,6 +281,7 @@ const LazyExample = createLazyExample(
 - `useClipDragHandlers` - Drag-to-move and boundary trimming (300+ lines)
 - `useClipSplitting` - Split clips at playhead (150+ lines)
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system (120+ lines)
+- `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind to start)
 - `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback
 - `useDynamicEffects` - Master effects chain with runtime parameter updates
 - `useTrackDynamicEffects` - Per-track effects management

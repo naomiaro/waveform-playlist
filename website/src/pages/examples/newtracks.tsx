@@ -19,7 +19,7 @@ export default function NewTracksExamplePage(): React.ReactElement {
       </Head>
       <main className="container margin-vert--lg">
         <h1>New Tracks Example</h1>
-        <p>
+        <p style={{ marginBottom: '2rem' }}>
           Dynamically add and remove tracks from the playlist. Load audio files and manage
           multiple tracks in real-time.
         </p>

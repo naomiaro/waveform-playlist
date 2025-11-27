@@ -38,7 +38,7 @@ export interface UseClipSplittingResult {
  */
 export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
   const { tracks, onTracksChange, sampleRate } = options;
-  const { currentTime } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackAnimation();
   const { selectedTrackId } = usePlaylistState();
 
   /**
@@ -159,6 +159,9 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
 
     const track = tracks[trackIndex];
 
+    // Use ref for real-time position during playback (state updates are throttled)
+    const currentTime = currentTimeRef.current ?? 0;
+
     // Find clip at current time on the selected track
     for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
       const clip = track.clips[clipIndex];
@@ -175,7 +178,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
 
     console.log(`No clip found at playhead position on track "${track.name}"`);
     return false;
-  }, [tracks, currentTime, selectedTrackId, splitClipAt, sampleRate]);
+  }, [tracks, currentTimeRef, selectedTrackId, splitClipAt, sampleRate]);
 
   return {
     splitClipAtPlayhead,
