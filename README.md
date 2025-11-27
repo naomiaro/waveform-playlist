@@ -4,6 +4,8 @@
 
 A multi-track audio editor and player built with React, Tone.js, and the Web Audio API. Features canvas-based waveform visualization, drag-and-drop clip editing, and professional audio effects.
 
+> **⚠️ v5 Alpha**: This is a complete React rewrite. For the stable v4 release, see [waveform-playlist@4.x](https://www.npmjs.com/package/waveform-playlist).
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/waveform-playlist.png" alt="Waveform Playlist Screenshot" width="800">
 </p>
@@ -22,7 +24,7 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
 ## Quick Start
 
 ```bash
-npm install @waveform-playlist/browser @waveform-playlist/core @waveform-playlist/ui-components
+npm install @waveform-playlist/browser@alpha @waveform-playlist/core@alpha @waveform-playlist/ui-components@alpha
 ```
 
 ```tsx
@@ -83,14 +85,16 @@ function App() {
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `@waveform-playlist/browser` | Main React components, hooks, and context |
-| `@waveform-playlist/core` | Types, utilities, and clip/track creation |
-| `@waveform-playlist/ui-components` | Styled UI components (buttons, sliders, etc.) |
-| `@waveform-playlist/playout` | Tone.js audio engine |
-| `@waveform-playlist/annotations` | Optional annotation support |
-| `@waveform-playlist/recording` | Optional recording support |
+All packages are currently published under the `alpha` tag (v5.0.0-alpha.x):
+
+| Package | Description | Install |
+|---------|-------------|---------|
+| `@waveform-playlist/browser` | Main React components, hooks, and context | `npm i @waveform-playlist/browser@alpha` |
+| `@waveform-playlist/core` | Types, utilities, and clip/track creation | `npm i @waveform-playlist/core@alpha` |
+| `@waveform-playlist/ui-components` | Styled UI components (buttons, sliders, etc.) | `npm i @waveform-playlist/ui-components@alpha` |
+| `@waveform-playlist/playout` | Tone.js audio engine | `npm i @waveform-playlist/playout@alpha` |
+| `@waveform-playlist/annotations` | Optional annotation support | `npm i @waveform-playlist/annotations@alpha` |
+| `@waveform-playlist/recording` | Optional recording support | `npm i @waveform-playlist/recording@alpha` |
 
 ## Key Hooks
 
