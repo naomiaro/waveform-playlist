@@ -43,6 +43,22 @@ When adding new examples or UI elements, maintain this aesthetic. The Flexible A
 - ✅ Phase 3.3: Splitting Clips (sample-based architecture, keyboard shortcuts)
 - ✅ Audio Effects: 20 Tone.js effects with UI, runtime parameters, WAV export
 
+## Publishing Convention
+
+**Prerelease Tag:** Use `@next` for prerelease versions (following Tone.js, React, Next.js convention).
+
+```bash
+# Publish prerelease
+pnpm publish --tag next
+
+# Users install prerelease with:
+npm install waveform-playlist@next
+```
+
+After stable release, publish without tag to update `@latest`.
+
+---
+
 ## Documentation Guidelines
 
 **Where to track progress/updates:**

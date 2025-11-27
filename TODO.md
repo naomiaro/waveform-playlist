@@ -10,12 +10,12 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ### Must Have Before Release
 
-- [ ] **Comprehensive README** - Quick start, installation, basic examples, screenshots
+- [x] **Comprehensive README** - Quick start, installation, basic examples, screenshots
 - [x] **TypeScript types validation** - No `any` in public APIs, verify .d.ts generation
 - [ ] **Unit tests** - Hooks, components, audio processing (Vitest + RTL)
 - [ ] **E2E tests** - Key workflows (Playwright)
 - [ ] **Browser compatibility** - Chrome, Firefox, Safari, Edge
-- [ ] **NPM publishing setup** - Package.json exports, tree-shaking verification
+- [x] **NPM publishing setup** - Package.json exports, tree-shaking verification
 - [ ] **CI/CD pipeline** - Automated builds, tests, publishing
 
 ### Nice to Have
