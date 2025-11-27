@@ -107,6 +107,14 @@ When adding new examples or UI elements, maintain this aesthetic. The Flexible A
 - After changes to shared theme, controls, or base components
 - Use `pnpm build` to rebuild all 9 bundles at once
 
+### E2E Testing with Playwright
+
+- **Run tests**: `pnpm test`, `pnpm test:ui` (interactive), `pnpm test:headed` (visible browser)
+- **Config**: `playwright.config.ts` - uses `BASE_PATH` and `PORT` env vars
+- **Location**: `e2e/` directory
+
+**Key Selectors:** `[data-clip-id]`, `[data-boundary-edge]`, `[data-clip-container]`, `[data-scroll-container]`
+
 ### Jekyll Example Pages Convention
 
 **File naming pattern:** `ghpages/_examples/##name.html`

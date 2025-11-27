@@ -11,13 +11,16 @@
     "typecheck": "pnpm -r --filter './packages/*' typecheck",
     "clean": "pnpm -r --filter './packages/*' exec rm -rf dist",
     "install:all": "pnpm install",
-    "test": "echo \"Tests coming soon\"",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
     "format": "prettier --write \"packages/**/src/**/*.{ts,tsx}\"",
     "lint": "eslint \"packages/**/src/**/*.{ts,tsx}\"",
     "website": "pnpm --filter website start",
     "website:build": "pnpm --filter website build"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@types/node": "^20.10.6",
     "prettier": "^3.1.1",
     "rollup-plugin-visualizer": "^6.0.5",

@@ -1078,6 +1078,31 @@ import { WaveformPlaylistComponent } from '@waveform-playlist/browser';
 - `packages/browser/src/hooks/README.md` - Hooks API documentation
 - `ghpages/_examples/flexible-api.html` - Live demo of flexible API
 
+## E2E Testing
+
+**Location:** `e2e/`, **Config:** `playwright.config.ts`
+
+**Commands:** `pnpm test`, `pnpm test:ui`, `pnpm test:headed`
+
+**Environment:** `BASE_PATH` (default: `/waveform-playlist`), `PORT` (default: `3000`)
+
+### Data Attributes
+
+| Attribute | Purpose |
+|-----------|---------|
+| `data-clip-id` | Draggable clip headers |
+| `data-boundary-edge` | Trim handles (left/right) |
+| `data-clip-container` | Clip wrapper |
+| `data-scroll-container` | Playhead click target |
+
+### pointer-events Architecture
+
+Enables click-through for playhead positioning while keeping clips interactive:
+
+- `ClickOverlay`: `pointer-events: auto` (catches timeline clicks)
+- `ClipContainer`: `pointer-events: none` (passes clicks through)
+- `ClipHeader`, `ClipBoundary`: `pointer-events: auto` (re-enabled for drag/trim)
+
 ## Future Improvements
 
 See `TODO.md` for roadmap and progress tracking.
