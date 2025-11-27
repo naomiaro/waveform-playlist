@@ -193,52 +193,69 @@ export function useClipDragHandlers({
           const audioBufferDurationSamples = Math.floor(clip.audioBuffer.duration * sampleRate);
 
           if (boundary === 'left') {
-            // Apply cumulative delta to ORIGINAL state (not current state)
-            let newOffsetSamples = Math.floor(originalClip.offsetSamples + sampleDelta);
-            let newDurationSamples = Math.floor(originalClip.durationSamples - sampleDelta);
-            let newStartSample = Math.floor(originalClip.startSample + sampleDelta);
+            // Left boundary drag: moving left (negative delta) expands clip, moving right shrinks it
+            // The RIGHT edge stays fixed. We're moving the LEFT edge.
+            //
+            // When dragging left (sampleDelta < 0):
+            //   - startSample decreases (moves left)
+            //   - durationSamples increases (clip gets longer)
+            //   - offsetSamples decreases (reveal earlier audio from buffer)
+            //
+            // When dragging right (sampleDelta > 0):
+            //   - startSample increases (moves right)
+            //   - durationSamples decreases (clip gets shorter)
+            //   - offsetSamples increases (hide earlier audio)
 
-            // Constraint: startSample >= 0 (apply FIRST to prevent right edge expansion)
-            if (newStartSample < 0) {
-              const correction = -newStartSample;
-              newStartSample = 0;
-              newOffsetSamples += correction;  // Reduce the trim amount
-              newDurationSamples -= correction;  // Reduce the duration change
+            // Calculate the constrained delta first, then apply it uniformly
+            let constrainedDelta = Math.floor(sampleDelta);
+
+            // Constraint 1: startSample cannot go below 0 (dragging left limit)
+            // newStartSample = originalClip.startSample + delta >= 0
+            // delta >= -originalClip.startSample
+            const minDeltaForStart = -originalClip.startSample;
+            if (constrainedDelta < minDeltaForStart) {
+              constrainedDelta = minDeltaForStart;
             }
 
-            if (newOffsetSamples < 0) {
-              const correction = -newOffsetSamples;
-              newOffsetSamples = 0;
-              newDurationSamples += correction;
-              newStartSample -= correction;
+            // Constraint 2: offsetSamples cannot go below 0 (can't reveal audio before buffer start)
+            // newOffsetSamples = originalClip.offsetSamples + delta >= 0
+            // delta >= -originalClip.offsetSamples
+            const minDeltaForOffset = -originalClip.offsetSamples;
+            if (constrainedDelta < minDeltaForOffset) {
+              constrainedDelta = minDeltaForOffset;
             }
 
-            if (newDurationSamples < MIN_DURATION_SAMPLES) {
-              const correction = MIN_DURATION_SAMPLES - newDurationSamples;
-              newDurationSamples = MIN_DURATION_SAMPLES;
-              newOffsetSamples -= correction;
-              newStartSample -= correction;
-              newOffsetSamples = Math.max(0, newOffsetSamples);
-            }
-
-            if (newOffsetSamples + newDurationSamples > audioBufferDurationSamples) {
-              newOffsetSamples = audioBufferDurationSamples - newDurationSamples;
-            }
-
+            // Constraint 3: Cannot overlap with previous clip (dragging left limit)
             const previousClip = sortedIndex > 0 ? sortedClips[sortedIndex - 1] : null;
             if (previousClip) {
               const previousEndSample = previousClip.startSample + previousClip.durationSamples;
-              if (newStartSample < previousEndSample) {
-                const correction = previousEndSample - newStartSample;
-                newStartSample = previousEndSample;
-                newOffsetSamples += correction;
-                newDurationSamples -= correction;
-                if (newDurationSamples < MIN_DURATION_SAMPLES) {
-                  newDurationSamples = MIN_DURATION_SAMPLES;
-                  newOffsetSamples = Math.min(newOffsetSamples, audioBufferDurationSamples - MIN_DURATION_SAMPLES);
-                }
+              // newStartSample = originalClip.startSample + delta >= previousEndSample
+              // delta >= previousEndSample - originalClip.startSample
+              const minDeltaForPrevious = previousEndSample - originalClip.startSample;
+              if (constrainedDelta < minDeltaForPrevious) {
+                constrainedDelta = minDeltaForPrevious;
               }
             }
+
+            // Constraint 4: Minimum duration (dragging right limit)
+            // newDurationSamples = originalClip.durationSamples - delta >= MIN_DURATION_SAMPLES
+            // -delta >= MIN_DURATION_SAMPLES - originalClip.durationSamples
+            // delta <= originalClip.durationSamples - MIN_DURATION_SAMPLES
+            const maxDeltaForMinDuration = originalClip.durationSamples - MIN_DURATION_SAMPLES;
+            if (constrainedDelta > maxDeltaForMinDuration) {
+              constrainedDelta = maxDeltaForMinDuration;
+            }
+
+            // Constraint 5: Cannot exceed audio buffer length
+            // newOffsetSamples + newDurationSamples <= audioBufferDurationSamples
+            // (originalClip.offsetSamples + delta) + (originalClip.durationSamples - delta) <= audioBufferDurationSamples
+            // This simplifies to: originalClip.offsetSamples + originalClip.durationSamples <= audioBufferDurationSamples
+            // This is always true if the clip was valid to begin with, so no constraint needed here
+
+            // Now apply the constrained delta
+            const newOffsetSamples = originalClip.offsetSamples + constrainedDelta;
+            const newDurationSamples = originalClip.durationSamples - constrainedDelta;
+            const newStartSample = originalClip.startSample + constrainedDelta;
 
             return {
               ...clip,
