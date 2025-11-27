@@ -444,7 +444,9 @@ export function FlexibleApiExample() {
   // Custom theme with dark blue/teal aesthetic (matching old flexible-api example)
   const customTheme = {
     ...theme,
-    // Waveforms - Dark blue outline with light blue fill
+    // Normal mode: waveFillColor draws the bars, waveOutlineColor is background
+    waveformDrawMode: 'inverted',
+    // Waveforms - Dark blue background with light blue bars
     waveOutlineColor: '#1e3a5f',
     waveFillColor: '#5dade2',
     waveProgressColor: '#e74c3c',

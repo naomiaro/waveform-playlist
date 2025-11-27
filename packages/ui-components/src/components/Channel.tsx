@@ -152,21 +152,14 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         // This ensures the gradient aligns with the drawing coordinates
         const canvasWidth = canvas.width / devicePixelRatio;
 
-        // Choose fill color based on draw mode and transparentBackground
-        // - inverted: draw to mask areas where there's NO audio
-        // - normal: draw where there IS audio (actual peak bars)
-        //
-        // When transparentBackground is true (for use with external progress overlay):
-        // - inverted: swap colors - draw waveFillColor (solid) to mask, background div has gradient
-        //             This creates gradient peaks (background shows through in peak areas)
-        // - normal: draw waveFillColor where audio IS (same as before)
+        // Choose canvas fill color based on draw mode:
         let fillColor: WaveformColor;
         if (drawMode === 'normal') {
+          // Normal: canvas draws the bars directly
           fillColor = waveFillColor;
         } else {
-          // Inverted mode: swap colors when using transparent background
-          // to achieve gradient peaks instead of gradient mask
-          fillColor = transparentBackground ? waveFillColor : waveOutlineColor;
+          // Inverted: canvas masks non-audio areas, background shows as bars
+          fillColor = waveOutlineColor;
         }
         ctx.fillStyle = createCanvasFillStyle(
           ctx,
@@ -255,8 +248,12 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveformCount += 1;
   }
 
-  // Convert waveFillColor to CSS for the background
-  const backgroundCss = transparentBackground ? 'transparent' : waveformColorToCss(waveFillColor);
+  // Background color depends on draw mode:
+  // Visual result is always: waveOutlineColor = bars, waveFillColor = background
+  // - normal: waveFillColor is background, canvas draws waveOutlineColor bars on top
+  // - inverted: waveFillColor is background, canvas masks with it to reveal waveOutlineColor (bars)
+  const bgColor = waveFillColor;
+  const backgroundCss = transparentBackground ? 'transparent' : waveformColorToCss(bgColor);
 
   return (
     <Wrapper

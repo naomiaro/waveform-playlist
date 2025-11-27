@@ -136,32 +136,13 @@ export interface WaveformPlaylistTheme {
 }
 
 export const defaultTheme: WaveformPlaylistTheme = {
-  // Inverted mode: gradient on canvas (bars), solid background
-  // Good for gradient bars - light theme demo
-  waveformDrawMode: 'inverted',
-  // Teal gradient for the waveform bars (drawn as inverse mask)
-  waveOutlineColor: {
-    type: 'linear',
-    direction: 'vertical',
-    stops: [
-      { offset: 0, color: '#0d5c63' },    // Darker teal at top
-      { offset: 0.5, color: '#1a7f8e' },  // Medium teal in middle
-      { offset: 1, color: '#0d5c63' },    // Darker teal at bottom
-    ],
-  },
-  waveFillColor: '#ffffff', // White background for crisp look
-  waveProgressColor: 'rgba(0, 0, 0, 0.15)', // Subtle dark overlay for light mode
-  // Selected: brighter cyan gradient
-  selectedWaveOutlineColor: {
-    type: 'linear',
-    direction: 'vertical',
-    stops: [
-      { offset: 0, color: '#0088a3' },
-      { offset: 0.5, color: '#00b4d8' },
-      { offset: 1, color: '#0088a3' },
-    ],
-  },
-  selectedWaveFillColor: '#ffffff', // White background when selected for crisp look
+  waveformDrawMode: 'normal',
+  waveOutlineColor: '#ffffff',
+  waveFillColor: '#1a7f8e', // White background for crisp look
+  waveProgressColor: 'rgba(0, 0, 0, 0.10)', // Subtle dark overlay for light mode
+
+  selectedWaveOutlineColor: '#ffffff',
+  selectedWaveFillColor: '#00b4d8',   // Selected: brighter cyan
   selectedTrackControlsBackground: '#d9e9ff', // Light blue background for selected track controls
   timeColor: '#000',
   timescaleBackgroundColor: '#fff',
@@ -219,33 +200,15 @@ export const defaultTheme: WaveformPlaylistTheme = {
 };
 
 export const darkTheme: WaveformPlaylistTheme = {
-  // Inverted mode with swapped colors for dark theme
-  // Background div shows waveOutlineColor (dark), canvas masks with waveFillColor (gradient)
-  // Result: gradient bars on dark background
+  // Normal mode: waveOutlineColor = bars, waveFillColor = background
   waveformDrawMode: 'inverted',
-  waveOutlineColor: '#1a1612', // Very dark warm brown for background
-  // Warm amber gradient for the waveform bars (drawn by canvas mask)
-  waveFillColor: {
-    type: 'linear',
-    direction: 'vertical',
-    stops: [
-      { offset: 0, color: '#c49a6c' },    // Muted amber at top
-      { offset: 0.5, color: '#a07850' },  // Deeper amber in middle
-      { offset: 1, color: '#c49a6c' },    // Muted amber at bottom
-    ],
-  },
+  // Dark bars on warm amber background
+  waveOutlineColor: '#c49a6c', // Solid warm amber for background
+  waveFillColor: '#1a1612', // Very dark warm brown for bars
   waveProgressColor: 'rgba(100, 70, 40, 0.6)', // Warmer, more visible progress overlay
-  // Selected: brighter warm amber bars
-  selectedWaveOutlineColor: '#241c14', // Slightly lighter warm brown when selected
-  selectedWaveFillColor: {
-    type: 'linear',
-    direction: 'vertical',
-    stops: [
-      { offset: 0, color: '#e8c090' },    // Brighter amber at top
-      { offset: 0.5, color: '#d4a070' },  // Warm amber in middle
-      { offset: 1, color: '#e8c090' },    // Brighter amber at bottom
-    ],
-  },
+  // Selected: slightly lighter bars on brighter amber background
+  selectedWaveFillColor: '#241c14', // Slightly lighter warm brown bars when selected
+  selectedWaveOutlineColor: '#e8c090', // Brighter amber background when selected
   selectedTrackControlsBackground: '#2a2218', // Dark warm brown for selected track controls
   timeColor: '#d8c0a8', // Warm amber for timescale text
   timescaleBackgroundColor: '#1a1612', // Dark warm brown background
