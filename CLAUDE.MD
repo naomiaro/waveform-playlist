@@ -95,17 +95,10 @@ When adding new examples or UI elements, maintain this aesthetic. The Flexible A
 
 ### Building and Testing
 
-- **Build all bundles**: `pnpm build` - Runs `./build-all.sh` to build all 9 example bundles
-- **Build single entry**: `env VITE_ENTRY=multi-clip pnpm build:single` - Build one specific bundle
+- **Build packages**: `pnpm build` - Build all packages
 - **TypeScript check**: `pnpm typecheck` (enforced in build scripts)
-- **Jekyll**: `jekyll serve -s ghpages --skip-initial-build`
-- **Dev server**: `http://localhost:4000/waveform-playlist/`
+- **Dev server**: `pnpm --filter website start` - Docusaurus dev server
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
-
-**When to rebuild all bundles:**
-- After changes to `ui-components` package (affects all examples)
-- After changes to shared theme, controls, or base components
-- Use `pnpm build` to rebuild all 9 bundles at once
 
 ### E2E Testing with Playwright
 
@@ -114,14 +107,6 @@ When adding new examples or UI elements, maintain this aesthetic. The Flexible A
 - **Location**: `e2e/` directory
 
 **Key Selectors:** `[data-clip-id]`, `[data-boundary-edge]`, `[data-clip-container]`, `[data-scroll-container]`
-
-### Jekyll Example Pages Convention
-
-**File naming pattern:** `ghpages/_examples/##name.html`
-
-- Use numbered prefixes (e.g., `01minimal.html`, `18multi-clip.html`) to control ordering
-- Keep `flexible-api.html` last by not numbering it
-- Always add `permalink:` in front matter for clean, permanent URLs
 
 ---
 
@@ -362,6 +347,54 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
 **Master volume:** Uses Web Audio standard 0-1.0 range (not 0-100).
 
+### Firefox Compatibility (standardized-audio-context)
+
+**Problem 1: AudioListener Error**
+Firefox throws `"param must be an AudioParam"` when Tone.js initializes because Firefox's `AudioListener` implementation differs from Chrome/Safari.
+
+**Problem 2: AudioWorkletNode Error**
+Firefox throws `"parameter 1 is not of type 'BaseAudioContext'"` when creating `AudioWorkletNode` with a native `AudioContext`.
+
+**Root Cause:** Both issues stem from using native `AudioContext` instead of `standardized-audio-context` which normalizes browser differences.
+
+**Solution:** Use Tone.js's `Context` class directly. It wraps `standardized-audio-context` and provides cross-browser compatible methods:
+
+```typescript
+// packages/playout/src/audioContext.ts
+import { Context, setContext } from 'tone';
+
+export function getGlobalContext(): Context {
+  if (!globalToneContext) {
+    globalToneContext = new Context();
+    setContext(globalToneContext);
+  }
+  return globalToneContext;
+}
+```
+
+**Recording/Monitoring:** Use Tone.js Context methods directly:
+
+```typescript
+// packages/recording/src/hooks/useRecording.ts
+import { getGlobalContext } from '@waveform-playlist/playout';
+
+const context = getGlobalContext();
+
+// These methods handle cross-browser compatibility automatically:
+await context.addAudioWorkletModule(workletUrl);
+const workletNode = context.createAudioWorkletNode('recording-processor');
+const source = context.createMediaStreamSource(stream);
+const analyser = context.createAnalyser();
+```
+
+**Key Files:**
+- `packages/playout/src/audioContext.ts` - Context management (`getGlobalContext()`)
+- `packages/recording/src/hooks/useRecording.ts` - Uses Tone.js Context methods
+- `packages/recording/src/hooks/useMicrophoneLevel.ts` - Uses Tone.js Context methods
+
+**References:**
+- [Tone.js Issue #681](https://github.com/Tonejs/Tone.js/issues/681) - AudioListener Firefox error
+
 ---
 
 ## Important Patterns
@@ -468,8 +501,8 @@ useEffect(() => {
 - **Debugging Guide:** `DEBUGGING.md`
 - **Main branch:** `main`
 - **Current work:** `tonejs-overhaul`
-- **Dev server:** `http://localhost:4000/waveform-playlist/`
+- **Dev server:** `http://localhost:3000/` (Docusaurus)
 
 ---
 
-**Last Updated:** 2025-11-25
+**Last Updated:** 2025-11-26

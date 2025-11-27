@@ -48,27 +48,38 @@ const MeterContainer = styled.div<{ $width: number; $height: number }>`
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
-const MeterFill = styled.div<{ $level: number; $height: number }>`
+// Helper to get gradient color based on level
+const getLevelGradient = (level: number): string => {
+  if (level < 0.6) return 'linear-gradient(90deg, #27ae60, #2ecc71)';
+  if (level < 0.85) return 'linear-gradient(90deg, #f39c12, #f1c40f)';
+  return 'linear-gradient(90deg, #c0392b, #e74c3c)';
+};
+
+// Use .attrs() for frequently changing styles to avoid generating new CSS classes
+const MeterFill = styled.div.attrs<{ $level: number; $height: number }>(props => ({
+  style: {
+    width: `${props.$level * 100}%`,
+    height: `${props.$height}px`,
+    background: getLevelGradient(props.$level),
+    boxShadow: props.$level > 0.01 ? '0 0 8px rgba(255, 255, 255, 0.3)' : 'none',
+  },
+}))<{ $level: number; $height: number }>`
   position: absolute;
   left: 0;
   top: 0;
-  height: ${props => props.$height}px;
-  width: ${props => props.$level * 100}%;
-  background: ${props => {
-    if (props.$level < 0.6) return 'linear-gradient(90deg, #27ae60, #2ecc71)';
-    if (props.$level < 0.85) return 'linear-gradient(90deg, #f39c12, #f1c40f)';
-    return 'linear-gradient(90deg, #c0392b, #e74c3c)';
-  }};
   transition: width 0.05s ease-out, background 0.1s ease-out;
-  box-shadow: ${props => props.$level > 0.01 ? '0 0 8px rgba(255, 255, 255, 0.3)' : 'none'};
 `;
 
-const PeakIndicator = styled.div<{ $peakLevel: number; $height: number }>`
+// Use .attrs() for frequently changing left position
+const PeakIndicator = styled.div.attrs<{ $peakLevel: number; $height: number }>(props => ({
+  style: {
+    left: `${props.$peakLevel * 100}%`,
+    height: `${props.$height}px`,
+  },
+}))<{ $peakLevel: number; $height: number }>`
   position: absolute;
-  left: ${props => props.$peakLevel * 100}%;
   top: 0;
   width: 2px;
-  height: ${props => props.$height}px;
   background: #ecf0f1;
   box-shadow: 0 0 4px rgba(236, 240, 241, 0.8);
   transition: left 0.1s ease-out;

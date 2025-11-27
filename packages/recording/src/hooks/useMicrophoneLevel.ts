@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react';
-import { getGlobalAudioContext, getMediaStreamSource } from '@waveform-playlist/playout';
+import { getGlobalContext } from '@waveform-playlist/playout';
 
 export interface UseMicrophoneLevelOptions {
   /**
@@ -93,15 +93,15 @@ export function useMicrophoneLevel(
 
     // Setup audio monitoring asynchronously
     const setupMonitoring = async () => {
-      // Use global AudioContext (shared with Tone.js and recording)
-      const context = getGlobalAudioContext();
+      // Use global Tone.js Context for cross-browser compatibility
+      const context = getGlobalContext();
 
       // Note: AudioContext will be resumed by Record button click
       // We set up the nodes now, and they'll start working when context is resumed
 
       if (!isMounted) return;
 
-      // Create analyser node
+      // Create analyser node using Tone.js Context
       const analyser = context.createAnalyser();
       analyser.fftSize = fftSize;
       analyser.smoothingTimeConstant = smoothingTimeConstant;
@@ -112,8 +112,8 @@ export function useMicrophoneLevel(
       const dataArray = new Uint8Array(bufferLength);
       dataArrayRef.current = dataArray;
 
-      // Get or create media stream source (managed, shared across consumers)
-      const source = getMediaStreamSource(stream);
+      // Create media stream source using Tone.js Context
+      const source = context.createMediaStreamSource(stream);
       source.connect(analyser);
       sourceRef.current = source;
 
@@ -156,8 +156,7 @@ export function useMicrophoneLevel(
         cancelAnimationFrame(animationFrameRef.current);
       }
 
-      // Disconnect analyser from the shared source
-      // (Don't disconnect the source itself - it's managed and may have other consumers)
+      // Disconnect analyser from the source
       if (analyserRef.current && sourceRef.current) {
         try {
           sourceRef.current.disconnect(analyserRef.current);
@@ -168,7 +167,6 @@ export function useMicrophoneLevel(
       }
 
       // Don't close the global AudioContext - it's shared across the app
-      // Don't disconnect the MediaStreamSource - it's managed and shared
 
       analyserRef.current = null;
       sourceRef.current = null;

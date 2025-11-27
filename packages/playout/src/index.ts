@@ -1,9 +1,3 @@
-import { setContext } from 'tone';
-import { getGlobalAudioContext } from './audioContext';
-
-// Initialize Tone.js to use our global AudioContext
-setContext(getGlobalAudioContext());
-
 export { TonePlayout } from './TonePlayout';
 export { ToneTrack } from './ToneTrack';
 export type { TonePlayoutOptions, EffectsFunction } from './TonePlayout';
@@ -11,7 +5,9 @@ export type { ToneTrackOptions, TrackEffectsFunction } from './ToneTrack';
 
 // Export global AudioContext manager
 export {
+  getGlobalContext,
   getGlobalAudioContext,
+  getGlobalToneContext,
   resumeGlobalAudioContext,
   getGlobalAudioContextState,
   closeGlobalAudioContext,

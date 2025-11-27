@@ -10,9 +10,12 @@
  *
  * This manager ensures a single source is shared across multiple consumers
  * (e.g., AnalyserNode for VU meter, AudioWorkletNode for recording).
+ *
+ * NOTE: With Tone.js Context, you can also use context.createMediaStreamSource()
+ * directly, which handles cross-browser compatibility internally.
  */
 
-import { getGlobalAudioContext } from './audioContext';
+import { getGlobalContext } from './audioContext';
 
 // Map of MediaStream -> MediaStreamAudioSourceNode
 const streamSources = new Map<MediaStream, MediaStreamAudioSourceNode>();
@@ -43,8 +46,9 @@ export function getMediaStreamSource(
     return streamSources.get(stream)!;
   }
 
-  // Create new source using global AudioContext
-  const context = getGlobalAudioContext();
+  // Create new source using global Tone.js Context
+  // This ensures cross-browser compatibility
+  const context = getGlobalContext();
   const source = context.createMediaStreamSource(stream);
   streamSources.set(stream, source);
 

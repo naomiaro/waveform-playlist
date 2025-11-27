@@ -7,9 +7,9 @@ import { UseRecordingReturn, RecordingOptions } from '../types';
 import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUtils';
 import { appendPeaks } from '../utils/peaksGenerator';
 import {
+  getGlobalContext,
   getGlobalAudioContext,
   resumeGlobalAudioContext,
-  getMediaStreamSource,
 } from '@waveform-playlist/playout';
 
 export function useRecording(
@@ -48,21 +48,22 @@ export function useRecording(
   const isPausedRef = useRef<boolean>(false);
 
   // Load AudioWorklet module
-  const loadWorklet = useCallback(async (context: AudioContext) => {
+  const loadWorklet = useCallback(async () => {
     // Skip if already loaded to prevent "already registered" error
     if (workletLoadedRef.current) {
       return;
     }
 
     try {
-      // Load the worklet module
+      const context = getGlobalContext();
+      // Load the worklet module using Tone.js Context method
       // Use a relative path that works when bundled
       const workletUrl = new URL(
         './worklet/recording-processor.worklet.js',
         import.meta.url
       ).href;
 
-      await context.audioWorklet.addModule(workletUrl);
+      await context.addAudioWorkletModule(workletUrl);
       workletLoadedRef.current = true;
     } catch (err) {
       console.error('Failed to load AudioWorklet module:', err);
@@ -80,28 +81,28 @@ export function useRecording(
     try {
       setError(null);
 
-      // Use global AudioContext (shared with Tone.js and monitoring)
-      const context = getGlobalAudioContext();
+      // Use global Tone.js Context for cross-browser compatibility
+      const context = getGlobalContext();
 
       // Resume AudioContext if suspended
       await resumeGlobalAudioContext();
 
       // Load worklet module
-      await loadWorklet(context);
+      await loadWorklet();
 
-      // Get or create media stream source (managed, shared across consumers)
-      const source = getMediaStreamSource(stream);
+      // Create media stream source using Tone.js Context
+      const source = context.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
 
-      // Create AudioWorklet node
-      const workletNode = new AudioWorkletNode(context, 'recording-processor');
+      // Create AudioWorklet node using Tone.js Context for cross-browser compatibility
+      const workletNode = context.createAudioWorkletNode('recording-processor');
       workletNodeRef.current = workletNode;
 
       // Connect source to worklet (but not to destination - no monitoring)
       source.connect(workletNode);
 
       //Listen for audio data from worklet
-      workletNode.port.onmessage = (event) => {
+      workletNode.port.onmessage = (event: MessageEvent) => {
         const { samples } = event.data;
 
         // Accumulate samples
