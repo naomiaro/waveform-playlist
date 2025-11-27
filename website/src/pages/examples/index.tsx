@@ -14,6 +14,7 @@ import {
   TextAa,
   Lightning,
   Infinity,
+  Headphones,
 } from '@phosphor-icons/react';
 import styles from './examples.module.css';
 
@@ -95,6 +96,13 @@ const examples = [
     path: 'flexible-api',
     category: 'tools',
     icon: <Infinity weight="light" />,
+  },
+  {
+    title: 'Stereo',
+    description: 'Left and right. The full dimension.',
+    path: 'stereo',
+    category: 'foundation',
+    icon: <Headphones weight="light" />,
   },
 ];
 

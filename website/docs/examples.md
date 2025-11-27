@@ -44,6 +44,19 @@ function MinimalExample() {
 
 ---
 
+### Stereo
+
+Stereo waveform rendering with separate left and right channels.
+
+[View Stereo Example](/examples/stereo)
+
+Features:
+- Separate left (L) and right (R) channel waveforms
+- Each stereo track displays two waveform rows
+- Use `mono` prop to collapse to single channel
+
+---
+
 ### Stem Tracks
 
 Multi-track audio with mute/solo controls for mixing stems.

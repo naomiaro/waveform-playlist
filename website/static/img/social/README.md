@@ -26,6 +26,7 @@ All images should be **1200x630 pixels** (or 2:1 aspect ratio) for optimal displ
 | `example-annotations.png` | Annotations - Time-synced text labels |
 | `example-waveform-data.png` | BBC Waveform - Pre-computed peaks |
 | `example-flexible-api.png` | Flexible API - Custom UI hooks |
+| `example-stereo.png` | Stereo - L/R channel waveforms |
 
 ## Tips for Screenshots
 
