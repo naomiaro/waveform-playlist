@@ -487,6 +487,8 @@ export function RecordingExample() {
           controls={{ show: true, width: 200 }}
           theme={theme}
           timescale
+          barWidth={4}
+          barGap={2}
         >
           <RecordingControlsInner
             tracks={tracks}

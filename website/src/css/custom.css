@@ -39,16 +39,16 @@
 
 /* Dark mode - the default Berlin vibe */
 [data-theme='dark'] {
-  /* Cyan/teal accent - like vintage synth LEDs */
-  --ifm-color-primary: #00d4aa;
-  --ifm-color-primary-dark: #00c49d;
-  --ifm-color-primary-darker: #00b894;
-  --ifm-color-primary-darkest: #009975;
-  --ifm-color-primary-light: #1de9b6;
-  --ifm-color-primary-lighter: #4aedc4;
-  --ifm-color-primary-lightest: #7ff1d5;
+  /* Ampelmännchen green - official brand #63C75F with glow */
+  --ifm-color-primary: #63C75F;
+  --ifm-color-primary-dark: #52b84e;
+  --ifm-color-primary-darker: #48a845;
+  --ifm-color-primary-darkest: #3a8838;
+  --ifm-color-primary-light: #78d074;
+  --ifm-color-primary-lighter: #8dd889;
+  --ifm-color-primary-lightest: #a8e3a5;
 
-  --docusaurus-highlighted-code-line-bg: rgba(0, 212, 170, 0.15);
+  --docusaurus-highlighted-code-line-bg: rgba(99, 199, 95, 0.15);
 
   /* Deep, moody backgrounds */
   --ifm-background-color: #0a0a0f;

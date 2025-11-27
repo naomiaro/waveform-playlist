@@ -126,15 +126,15 @@ export function StemTracksExample() {
     <Container>
       <WaveformPlaylistProvider
         tracks={tracks}
-        samplesPerPixel={1024}
+        samplesPerPixel={512}
         mono
         waveHeight={100}
         automaticScroll={true}
         controls={{ show: true, width: 200 }}
         theme={theme}
         timescale
-        barWidth={2}
-        barGap={1}
+        barWidth={4}
+        barGap={2}
       >
         <Controls>
           <ControlGroup>

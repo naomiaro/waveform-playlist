@@ -231,6 +231,8 @@ export function NewTracksExample() {
           controls={{ show: true, width: 200 }}
           theme={theme}
           timescale
+          barWidth={4}
+          barGap={2}
         >
           <Controls>
             <ControlGroup>

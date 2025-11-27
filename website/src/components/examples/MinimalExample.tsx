@@ -18,7 +18,35 @@ import {
   AudioPosition,
   useAudioTracks,
 } from '@waveform-playlist/browser';
+import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+
+// Gradient amber theme for minimal example (no scrolling, so gradient is safe)
+const amberGradientTheme: Partial<WaveformPlaylistTheme> = {
+  waveformDrawMode: 'inverted',
+  // Gradient amber/gold for the waveform bars
+  waveOutlineColor: {
+    type: 'linear',
+    direction: 'vertical',
+    stops: [
+      { offset: 0, color: '#d4a574' },
+      { offset: 0.5, color: '#c49a6c' },
+      { offset: 1, color: '#d4a574' },
+    ],
+  },
+  waveFillColor: '#1a1612',
+  waveProgressColor: 'rgba(100, 70, 40, 0.5)',
+  selectedWaveOutlineColor: {
+    type: 'linear',
+    direction: 'vertical',
+    stops: [
+      { offset: 0, color: '#e8c090' },
+      { offset: 0.5, color: '#d4a87c' },
+      { offset: 1, color: '#e8c090' },
+    ],
+  },
+  selectedWaveFillColor: '#241c14',
+};
 
 const Controls = styled.div`
   display: flex;
@@ -71,7 +99,7 @@ export function MinimalExample() {
   }
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1500} mono theme={theme}>
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1500} mono theme={{ ...theme, ...amberGradientTheme }} barWidth={4} barGap={2}>
       <Controls>
         <PlayButton />
         <PauseButton />

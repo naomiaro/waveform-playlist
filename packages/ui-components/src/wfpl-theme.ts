@@ -136,7 +136,7 @@ export interface WaveformPlaylistTheme {
 }
 
 export const defaultTheme: WaveformPlaylistTheme = {
-  waveformDrawMode: 'normal',
+  waveformDrawMode: 'inverted',
   waveOutlineColor: '#ffffff',
   waveFillColor: '#1a7f8e', // White background for crisp look
   waveProgressColor: 'rgba(0, 0, 0, 0.10)', // Subtle dark overlay for light mode
@@ -205,14 +205,14 @@ export const darkTheme: WaveformPlaylistTheme = {
   // Dark bars on warm amber background
   waveOutlineColor: '#c49a6c', // Solid warm amber for background
   waveFillColor: '#1a1612', // Very dark warm brown for bars
-  waveProgressColor: 'rgba(100, 70, 40, 0.6)', // Warmer, more visible progress overlay
+  waveProgressColor: 'rgba(100, 70, 40, 0.6)', // Warm brown progress overlay
   // Selected: slightly lighter bars on brighter amber background
   selectedWaveFillColor: '#241c14', // Slightly lighter warm brown bars when selected
   selectedWaveOutlineColor: '#e8c090', // Brighter amber background when selected
   selectedTrackControlsBackground: '#2a2218', // Dark warm brown for selected track controls
   timeColor: '#d8c0a8', // Warm amber for timescale text
   timescaleBackgroundColor: '#1a1612', // Dark warm brown background
-  playheadColor: '#e07040', // Warm orange-red playhead
+  playheadColor: '#3a8838', // Darker Ampelmännchen green playhead
   selectionColor: 'rgba(224, 160, 100, 0.5)', // Warm amber selection
   clipHeaderBackgroundColor: 'rgba(200, 160, 120, 0.15)', // Warm overlay for dark mode
   clipHeaderBorderColor: 'rgba(200, 160, 120, 0.25)',
@@ -237,11 +237,11 @@ export const darkTheme: WaveformPlaylistTheme = {
   inputPlaceholder: '#777',
   inputFocusBorder: '#4A9EFF',
 
-  // Button colors
-  buttonBackground: '#3d3d3d',
-  buttonText: '#e0e0e0',
-  buttonBorder: '#555',
-  buttonHoverBackground: '#4d4d4d',
+  // Button colors - Ampelmännchen green (#63C75F) with black text
+  buttonBackground: '#63C75F',
+  buttonText: '#0a0a0f',
+  buttonBorder: '#52b84e',
+  buttonHoverBackground: '#78d074',
 
   // Slider colors
   sliderTrackColor: '#555',

@@ -19,6 +19,12 @@ The documentation website follows a **Berlin underground/industrial** aesthetic 
 - **Muted color palette** with strategic accent colors
 - **Minimal, utilitarian design** - form follows function
 
+**Dark Mode Color Palette - "Ampelmännchen Traffic Light":**
+Inspired by the iconic DDR pedestrian signal with its friendly walking figure and hat.
+- 🟢 **Green** (`#63C75F`) - Official Ampelmännchen brand green for buttons/links
+- 🟡 **Amber** (`#c49a6c`) - Warm golden waveform bars and body text
+- 🔴 **Red** (`#d08070`) - Headings and accent elements
+
 When adding new examples or UI elements, maintain this aesthetic. The Flexible API example showcases the full customization potential with custom playheads, grungy timestamps, and monospace clip headers.
 
 ## Project Roadmap

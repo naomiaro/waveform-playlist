@@ -872,7 +872,7 @@ export function EffectsExample() {
 
       <WaveformPlaylistProvider
         tracks={tracksWithEffects}
-        samplesPerPixel={1024}
+        samplesPerPixel={512}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         waveHeight={100}
         theme={theme}
@@ -880,6 +880,8 @@ export function EffectsExample() {
         automaticScroll={true}
         effects={masterEffects}
         timescale={true}
+        barWidth={2}
+        barGap={0}
       >
         <EffectsControls
           analyserRef={analyserRef}

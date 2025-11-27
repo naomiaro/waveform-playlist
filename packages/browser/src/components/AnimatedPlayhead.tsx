@@ -3,11 +3,11 @@ import styled from 'styled-components';
 import { getContext } from 'tone';
 import { usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
 
-const PlayheadLine = styled.div<{ $color: string }>`
+const PlayheadLine = styled.div<{ $color: string; $width: number }>`
   position: absolute;
   top: 0;
   left: 0;
-  width: 2px;
+  width: ${(props) => props.$width}px;
   background: ${(props) => props.$color};
   height: 100%;
   z-index: 150;
@@ -33,7 +33,7 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({
   const animationFrameRef = useRef<number | null>(null);
 
   const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
-  const { samplesPerPixel, sampleRate } = usePlaylistData();
+  const { samplesPerPixel, sampleRate, progressBarWidth } = usePlaylistData();
 
   useEffect(() => {
     const updatePosition = () => {
@@ -80,5 +80,5 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({
     }
   });
 
-  return <PlayheadLine ref={playheadRef} $color={color} />;
+  return <PlayheadLine ref={playheadRef} $color={color} $width={progressBarWidth} />;
 };

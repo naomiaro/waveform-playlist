@@ -37,6 +37,10 @@ const EffectCount = styled.span`
   background: var(--ifm-color-primary, #3578e5);
   color: white;
   font-weight: 500;
+
+  [data-theme='dark'] & {
+    color: #0a0a0f;
+  }
 `;
 
 const EffectsList = styled.div`

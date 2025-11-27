@@ -17,6 +17,8 @@ type PlaylistInfo = {
   barWidth: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
   barGap: number;
+  /** Width in pixels of progress bars. Default: barWidth + barGap (fills gaps). Set to barWidth for no gap fill. */
+  progressBarWidth?: number;
 };
 
 export const PlaylistInfoContext = createContext<PlaylistInfo>({

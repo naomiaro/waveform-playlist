@@ -340,6 +340,52 @@ const progressOnly = {
 
 See the [Styling Example](/examples/styling) for live demonstrations.
 
+## Gradient Colors
+
+Waveform colors support both solid colors and linear gradients:
+
+```tsx
+const gradientTheme = {
+  // Solid color (string)
+  waveFillColor: '#1a1612',
+
+  // Gradient color (object)
+  waveOutlineColor: {
+    type: 'linear',
+    direction: 'vertical',  // 'vertical' or 'horizontal'
+    stops: [
+      { offset: 0, color: '#d4a574' },
+      { offset: 0.5, color: '#c49a6c' },
+      { offset: 1, color: '#d4a574' },
+    ],
+  },
+};
+```
+
+### Gradient Color Type
+
+```typescript
+type WaveformColor = string | {
+  type: 'linear';
+  direction: 'vertical' | 'horizontal';
+  stops: Array<{
+    offset: number;  // 0 to 1
+    color: string;
+  }>;
+};
+```
+
+The following properties support gradients:
+- `waveOutlineColor` / `selectedWaveOutlineColor`
+- `waveFillColor` / `selectedWaveFillColor`
+- `waveProgressColor`
+
+:::warning Gradients and Scrolling
+Gradient colors work best for **non-scrolling waveforms** (single tracks that fit in the viewport). When using `automaticScroll` or horizontal scrolling, gradients will scroll with the content, which can look unnatural since the gradient position shifts as you scroll.
+
+For scrolling playlists, prefer solid colors instead.
+:::
+
 ## Best Practices
 
 1. **Contrast** - Ensure sufficient contrast between waveform and background
@@ -348,6 +394,7 @@ See the [Styling Example](/examples/styling) for live demonstrations.
 4. **Progress visibility** - Consider whether you want both playhead and progress, or just one
 5. **Consistency** - Match your application's overall design system
 6. **Accessibility** - Test themes with color blindness simulators
+7. **Gradients** - Use gradients only for non-scrolling waveforms
 
 ## Next Steps
 

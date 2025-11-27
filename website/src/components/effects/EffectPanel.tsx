@@ -34,6 +34,11 @@ const CategoryBadge = styled.span`
   color: var(--ifm-color-primary-dark, #3b5998);
   text-transform: uppercase;
   font-weight: 500;
+
+  [data-theme='dark'] & {
+    background: var(--ifm-color-primary, #63C75F);
+    color: #0a0a0f;
+  }
 `;
 
 const BypassButton = styled.button<{ $bypassed: boolean }>`

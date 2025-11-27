@@ -51,7 +51,7 @@ const ControlsWrapper = styled.div.attrs<ControlsWrapperProps>((props) => ({
   },
 }))<ControlsWrapperProps>`
   position: sticky;
-  z-index: 999;
+  z-index: 101; /* Above ClickOverlay (z-index: 100), below Docusaurus navbar (z-index: 200) */
   left: 0;
   height: 100%;
   flex-shrink: 0;

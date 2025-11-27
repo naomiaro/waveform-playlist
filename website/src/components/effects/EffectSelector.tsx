@@ -41,7 +41,7 @@ const Select = styled.select`
 const AddButton = styled.button`
   padding: 8px 16px;
   background: var(--ifm-color-primary, #3578e5);
-  color: white;
+  color: var(--ifm-color-primary-contrast-foreground, white);
   border: none;
   border-radius: 6px;
   font-size: 13px;
@@ -56,6 +56,10 @@ const AddButton = styled.button`
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  [data-theme='dark'] & {
+    color: #0a0a0f;
   }
 `;
 

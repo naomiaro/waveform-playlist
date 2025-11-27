@@ -194,6 +194,8 @@ export interface PlaylistDataContextValue {
   canZoomOut: boolean;
   barWidth: number;
   barGap: number;
+  /** Width in pixels of progress bars. Defaults to barWidth + barGap (fills gaps). */
+  progressBarWidth: number;
 }
 
 // Create the 4 separate contexts
@@ -232,6 +234,8 @@ export interface WaveformPlaylistProviderProps {
   barWidth?: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
   barGap?: number;
+  /** Width in pixels of progress bars. Default: barWidth + barGap (fills gaps). */
+  progressBarWidth?: number;
   children: ReactNode;
 }
 
@@ -251,8 +255,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   onAnnotationUpdate: _onAnnotationUpdate,
   barWidth = 1,
   barGap = 0,
+  progressBarWidth: progressBarWidthProp,
   children,
 }) => {
+  // Default progressBarWidth to barWidth + barGap (fills gaps)
+  const progressBarWidth = progressBarWidthProp ?? (barWidth + barGap);
   // State
   const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
   const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
@@ -910,6 +917,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     canZoomOut: zoom.canZoomOut,
     barWidth,
     barGap,
+    progressBarWidth,
   };
 
   // Combined value for backwards compatibility

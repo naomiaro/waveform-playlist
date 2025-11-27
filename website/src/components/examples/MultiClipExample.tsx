@@ -290,6 +290,8 @@ export function MultiClipExample() {
       controls={{ show: true, width: 200 }}
       theme={theme}
       timescale
+      barWidth={4}
+      barGap={2}
     >
       <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />
     </WaveformPlaylistProvider>

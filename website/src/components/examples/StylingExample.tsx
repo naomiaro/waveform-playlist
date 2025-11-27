@@ -139,6 +139,7 @@ function WaveformVariant({
     <WaveformPlaylistProvider
       tracks={tracks}
       samplesPerPixel={3000}
+      progressBarWidth={0}
       mono
       theme={theme}
       barWidth={barWidth}

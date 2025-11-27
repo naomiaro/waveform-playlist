@@ -26,6 +26,11 @@ const EffectsButton = styled.button<{ $hasEffects: boolean }>`
     background: ${({ $hasEffects }) =>
       $hasEffects ? 'var(--ifm-color-primary-dark, #2d66c3)' : 'var(--ifm-color-emphasis-200, #e0e0e0)'};
   }
+
+  [data-theme='dark'] & {
+    color: ${({ $hasEffects }) =>
+      $hasEffects ? '#0a0a0f' : 'var(--ifm-color-content-secondary, #999)'};
+  }
 `;
 
 const EffectsBadge = styled.span`
@@ -34,6 +39,11 @@ const EffectsBadge = styled.span`
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.3);
   font-weight: 600;
+
+  [data-theme='dark'] & {
+    background: rgba(0, 0, 0, 0.3);
+    color: #0a0a0f;
+  }
 `;
 
 // Modal overlay
