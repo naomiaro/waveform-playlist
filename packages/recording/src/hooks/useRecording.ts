@@ -6,11 +6,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { UseRecordingReturn, RecordingOptions } from '../types';
 import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUtils';
 import { appendPeaks } from '../utils/peaksGenerator';
-import {
-  getGlobalContext,
-  getGlobalAudioContext,
-  resumeGlobalAudioContext,
-} from '@waveform-playlist/playout';
+import { getContext } from 'tone';
 
 export function useRecording(
   stream: MediaStream | null,
@@ -55,14 +51,15 @@ export function useRecording(
     }
 
     try {
-      const context = getGlobalContext();
-      // Load the worklet module using Tone.js Context method
+      const context = getContext();
+      // Load the worklet module
       // Use a relative path that works when bundled
       const workletUrl = new URL(
         './worklet/recording-processor.worklet.js',
         import.meta.url
       ).href;
 
+      // Use Tone's addAudioWorkletModule for cross-browser compatibility
       await context.addAudioWorkletModule(workletUrl);
       workletLoadedRef.current = true;
     } catch (err) {
@@ -81,20 +78,23 @@ export function useRecording(
     try {
       setError(null);
 
-      // Use global Tone.js Context for cross-browser compatibility
-      const context = getGlobalContext();
+      // Use Tone.js Context for cross-browser compatibility
+      const context = getContext();
 
       // Resume AudioContext if suspended
-      await resumeGlobalAudioContext();
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
 
       // Load worklet module
       await loadWorklet();
 
-      // Create media stream source using Tone.js Context
+      // Create MediaStreamSource from Tone's context
+      // Each hook creates its own source to avoid cross-context issues in Firefox
       const source = context.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
 
-      // Create AudioWorklet node using Tone.js Context for cross-browser compatibility
+      // Create AudioWorklet node using Tone's method
       const workletNode = context.createAudioWorkletNode('recording-processor');
       workletNodeRef.current = workletNode;
 
@@ -171,7 +171,6 @@ export function useRecording(
         workletNodeRef.current.port.postMessage({ command: 'stop' });
 
         // Disconnect worklet from source
-        // (Don't disconnect the source itself - it's managed and may have other consumers)
         if (mediaStreamSourceRef.current) {
           try {
             mediaStreamSourceRef.current.disconnect(workletNodeRef.current);
@@ -191,11 +190,13 @@ export function useRecording(
 
       // Create final AudioBuffer from accumulated chunks
       const allSamples = concatenateAudioData(recordedChunksRef.current);
-      const context = getGlobalAudioContext();
+      const context = getContext();
+      // Use rawContext for createBuffer (native AudioContext method)
+      const rawContext = context.rawContext as AudioContext;
       const buffer = createAudioBuffer(
-        context,
+        rawContext,
         allSamples,
-        context.sampleRate,
+        rawContext.sampleRate,
         channelCount
       );
 
@@ -267,7 +268,6 @@ export function useRecording(
         cancelAnimationFrame(animationFrameRef.current);
       }
       // Don't close the global AudioContext - it's shared across the app
-      // Don't disconnect the MediaStreamSource - it's managed and shared
     };
   }, []);
 

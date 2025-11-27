@@ -9,12 +9,16 @@ interface FadeContainerProps {
   readonly $type: 'fadeIn' | 'fadeOut';
 }
 
-const FadeContainer = styled.div<FadeContainerProps>`
+// Use .attrs() for left/width to avoid generating new CSS classes on every render
+const FadeContainer = styled.div.attrs<FadeContainerProps>((props) => ({
+  style: {
+    left: `${props.$left}px`,
+    width: `${props.$width}px`,
+  },
+}))<FadeContainerProps>`
   position: absolute;
   top: 0;
   bottom: 0;
-  left: ${props => props.$left}px;
-  width: ${props => props.$width}px;
   pointer-events: none;
   z-index: 50;
 `;

@@ -15,7 +15,7 @@
  * directly, which handles cross-browser compatibility internally.
  */
 
-import { getGlobalContext } from './audioContext';
+import { getContext } from 'tone';
 
 // Map of MediaStream -> MediaStreamAudioSourceNode
 const streamSources = new Map<MediaStream, MediaStreamAudioSourceNode>();
@@ -46,9 +46,8 @@ export function getMediaStreamSource(
     return streamSources.get(stream)!;
   }
 
-  // Create new source using global Tone.js Context
-  // This ensures cross-browser compatibility
-  const context = getGlobalContext();
+  // Create new source using Tone.js's shared context for cross-browser compatibility
+  const context = getContext();
   const source = context.createMediaStreamSource(stream);
   streamSources.set(stream, source);
 

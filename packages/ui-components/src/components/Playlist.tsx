@@ -12,10 +12,12 @@ interface ScrollContainerProps {
   readonly $width?: number;
 }
 
-const ScrollContainer = styled.div<ScrollContainerProps>`
+// Use .attrs() for width to avoid generating new CSS classes on every render
+const ScrollContainer = styled.div.attrs<ScrollContainerProps>((props) => ({
+  style: props.$width !== undefined ? { width: `${props.$width}px` } : {},
+}))<ScrollContainerProps>`
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
-  ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
 `;
 
 interface TimescaleWrapperProps {
@@ -23,9 +25,11 @@ interface TimescaleWrapperProps {
   readonly $backgroundColor?: string;
 }
 
-const TimescaleWrapper = styled.div<TimescaleWrapperProps>`
+// Use .attrs() for width to avoid generating new CSS classes on every render
+const TimescaleWrapper = styled.div.attrs<TimescaleWrapperProps>((props) => ({
+  style: props.$width ? { minWidth: `${props.$width}px` } : {},
+}))<TimescaleWrapperProps>`
   background: ${(props) => props.$backgroundColor || 'white'};
-  ${(props) => props.$width && `min-width: ${props.$width}px;`}
   width: 100%;
   overflow: visible;
 `;
@@ -35,10 +39,12 @@ interface TracksContainerProps {
   readonly $backgroundColor?: string;
 }
 
-const TracksContainer = styled.div<TracksContainerProps>`
+// Use .attrs() for width to avoid generating new CSS classes on every render
+const TracksContainer = styled.div.attrs<TracksContainerProps>((props) => ({
+  style: props.$width !== undefined ? { minWidth: `${props.$width}px` } : {},
+}))<TracksContainerProps>`
   position: relative;
   background: ${(props) => props.$backgroundColor || 'transparent'};
-  ${(props) => props.$width !== undefined && `min-width: ${props.$width}px;`}
   width: 100%;
 `;
 
