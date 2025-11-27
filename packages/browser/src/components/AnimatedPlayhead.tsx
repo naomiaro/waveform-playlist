@@ -10,7 +10,7 @@ const PlayheadLine = styled.div<{ $color: string; $width: number }>`
   width: ${(props) => props.$width}px;
   background: ${(props) => props.$color};
   height: 100%;
-  z-index: 150;
+  z-index: 100; /* Below sticky controls (z-index: 101) so playhead is hidden when scrolled behind controls */
   pointer-events: none;
   will-change: transform;
 `;

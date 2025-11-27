@@ -299,38 +299,38 @@ const HiddenFileInput = styled.input`
 
 const ActionButton = styled.button`
   padding: 0.5rem 1rem;
-  background: var(--ifm-color-primary, #3578e5);
-  color: white;
-  border: none;
+  background: var(--ifm-background-surface-color, #f5f5f5);
+  color: var(--ifm-font-color-base, #333);
+  border: 1px solid var(--ifm-color-emphasis-300, #ddd);
   border-radius: 0.25rem;
   cursor: pointer;
   font-size: 0.875rem;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
 
   &:hover {
-    background: var(--ifm-color-primary-dark, #2d6cd4);
+    background: var(--ifm-color-emphasis-200, #e8e8e8);
+    border-color: var(--ifm-color-emphasis-400, #ccc);
   }
 
   &:disabled {
-    background: var(--ifm-color-emphasis-400, #ced4da);
+    background: var(--ifm-color-emphasis-200, #e8e8e8);
+    color: var(--ifm-color-emphasis-500, #999);
     cursor: not-allowed;
   }
 `;
 
 const DangerButton = styled(ActionButton)`
-  background: var(--ifm-color-danger, #dc3545);
+  color: var(--ifm-color-danger, #dc3545);
+  border-color: var(--ifm-color-danger, #dc3545);
 
   &:hover {
-    background: var(--ifm-color-danger-dark, #c82333);
+    background: var(--ifm-color-danger, #dc3545);
+    color: white;
   }
 `;
 
 const SuccessButton = styled(ActionButton)`
-  background: var(--ifm-color-success, #28a745);
-
-  &:hover {
-    background: var(--ifm-color-success-dark, #218838);
-  }
+  /* Same as ActionButton - no special styling */
 `;
 
 interface AnnotationsAppContentProps {
@@ -805,13 +805,14 @@ export function AnnotationsExample() {
       controls={{ show: true, width: 200 }}
       theme={theme}
       timescale
-      barWidth={4}
-      barGap={2}
+      barWidth={1}
+      barGap={0}
+      progressBarWidth={2}
       annotationList={{
         annotations: annotations,
         editable: true,
         linkEndpoints: true,
-        isContinuousPlay: false,
+        isContinuousPlay: true,
       }}
     >
       <AnnotationsAppContent

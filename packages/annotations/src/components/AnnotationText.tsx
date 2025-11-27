@@ -77,7 +77,7 @@ const AnnotationControls = styled.div`
 `;
 
 const ControlButton = styled.button`
-  background: transparent;
+  background: ${(props) => props.theme?.surfaceColor || '#f5f5f5'};
   border: 1px solid ${(props) => props.theme?.borderColor || '#ccc'};
   color: ${(props) => props.theme?.textColor || '#333'};
   padding: 4px 8px;
@@ -87,8 +87,8 @@ const ControlButton = styled.button`
   transition: all 0.15s ease;
 
   &:hover {
-    background: ${(props) => props.theme?.buttonHoverBackground || '#e8e8e8'};
-    border-color: ${(props) => props.theme?.inputFocusBorder || '#999'};
+    background: ${(props) => props.theme?.inputBackground || '#3d3d3d'};
+    border-color: ${(props) => props.theme?.textColorMuted || '#999'};
     transform: scale(1.05);
   }
 
