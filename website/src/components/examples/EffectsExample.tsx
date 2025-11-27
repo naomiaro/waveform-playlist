@@ -71,11 +71,10 @@ const VisualizerWrapper = styled.div`
 const VisualizerCanvas = styled.canvas`
   max-width: 100%;
   height: 120px;
-  border-radius: 0.5rem;
-  background: linear-gradient(180deg,
-    var(--ifm-background-color, #1a1a2e) 0%,
-    var(--ifm-background-surface-color, #16213e) 100%);
-  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #0d0d0d 0%, #1a1a1a 100%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  border: 1px solid #2a2a2a;
 `;
 
 const TimeControlsBar = styled.div`
@@ -240,21 +239,24 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({ analyserRef, 
     canvasCtx.scale(scale, scale);
 
     // Create gradient for bars (vertical gradient from bottom to top)
+    // Berlin underground / Ampelmännchen color palette
     const barGradient = canvasCtx.createLinearGradient(0, scaledHeight, 0, 0);
     if (isDarkMode) {
-      // Vibrant colors for dark mode
-      barGradient.addColorStop(0, '#00d4ff');    // Cyan at bottom
-      barGradient.addColorStop(0.3, '#00ff88');  // Green
-      barGradient.addColorStop(0.5, '#ffff00');  // Yellow
-      barGradient.addColorStop(0.7, '#ff8800');  // Orange
-      barGradient.addColorStop(1, '#ff0066');    // Pink/Red at top
+      // Industrial Berlin palette - green to amber to red
+      barGradient.addColorStop(0, '#2d4a2d');    // Dark green at bottom (quiet)
+      barGradient.addColorStop(0.3, '#63C75F');  // Ampelmännchen green
+      barGradient.addColorStop(0.5, '#8fa563');  // Olive transition
+      barGradient.addColorStop(0.7, '#c49a6c');  // Warm amber
+      barGradient.addColorStop(0.85, '#d08070'); // Muted red
+      barGradient.addColorStop(1, '#a85050');    // Deep red at top (loud/clipping)
     } else {
-      // Softer colors for light mode
-      barGradient.addColorStop(0, '#0088cc');    // Blue at bottom
-      barGradient.addColorStop(0.3, '#00aa66');  // Green
-      barGradient.addColorStop(0.5, '#ccaa00');  // Yellow/Gold
-      barGradient.addColorStop(0.7, '#cc6600');  // Orange
-      barGradient.addColorStop(1, '#cc0044');    // Red at top
+      // Light mode - similar palette, slightly muted
+      barGradient.addColorStop(0, '#4a6b4a');    // Muted green at bottom
+      barGradient.addColorStop(0.3, '#5ab354');  // Green
+      barGradient.addColorStop(0.5, '#7a9a5a');  // Olive
+      barGradient.addColorStop(0.7, '#b08860');  // Amber
+      barGradient.addColorStop(0.85, '#c07060'); // Coral
+      barGradient.addColorStop(1, '#a05050');    // Deep red at top
     }
     gradientRef.current = barGradient;
 
@@ -269,29 +271,38 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({ analyserRef, 
       const dataArray = analyserRef.current.getValue();
       const bufferLength = dataArray.length;
 
-      // Clear with theme-aware background
+      // Clear with theme-aware background - industrial dark aesthetic
       if (isDarkMode) {
-        // Dark gradient background
+        // Dark industrial gradient
         const bgGradient = canvasCtx.createLinearGradient(0, 0, 0, scaledHeight);
-        bgGradient.addColorStop(0, '#1a1a2e');
-        bgGradient.addColorStop(1, '#16213e');
+        bgGradient.addColorStop(0, '#0d0d0d');
+        bgGradient.addColorStop(1, '#1a1a1a');
         canvasCtx.fillStyle = bgGradient;
       } else {
-        // Light gradient background
+        // Light mode - still dark for the visualizer
         const bgGradient = canvasCtx.createLinearGradient(0, 0, 0, scaledHeight);
-        bgGradient.addColorStop(0, '#f8f9fa');
-        bgGradient.addColorStop(1, '#e9ecef');
+        bgGradient.addColorStop(0, '#1a1a1a');
+        bgGradient.addColorStop(1, '#252525');
         canvasCtx.fillStyle = bgGradient;
       }
       canvasCtx.fillRect(0, 0, scaledWidth, scaledHeight);
 
-      // Draw subtle grid lines
-      canvasCtx.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+      // Draw subtle horizontal grid lines (industrial look)
+      canvasCtx.strokeStyle = 'rgba(99, 199, 95, 0.08)'; // Subtle green tint
       canvasCtx.lineWidth = 1;
       for (let y = 0; y < scaledHeight; y += 20) {
         canvasCtx.beginPath();
         canvasCtx.moveTo(0, y);
         canvasCtx.lineTo(scaledWidth, y);
+        canvasCtx.stroke();
+      }
+
+      // Draw vertical grid lines for frequency bands
+      canvasCtx.strokeStyle = 'rgba(99, 199, 95, 0.05)';
+      for (let x = 0; x < scaledWidth; x += 50) {
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(x, 0);
+        canvasCtx.lineTo(x, scaledHeight);
         canvasCtx.stroke();
       }
 
@@ -310,10 +321,10 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({ analyserRef, 
           // Draw bar with gradient
           canvasCtx.fillStyle = gradientRef.current!;
 
-          // Add slight glow effect in dark mode
+          // Add slight glow effect in dark mode - green tint for Berlin vibe
           if (isDarkMode && barHeight > 20) {
-            canvasCtx.shadowColor = 'rgba(0, 212, 255, 0.5)';
-            canvasCtx.shadowBlur = 8;
+            canvasCtx.shadowColor = 'rgba(99, 199, 95, 0.4)';
+            canvasCtx.shadowBlur = 6;
           } else {
             canvasCtx.shadowBlur = 0;
           }
@@ -341,12 +352,20 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({ analyserRef, 
         if (x > scaledWidth) break;
       }
 
-      // Add reflection effect at bottom
-      const reflectionGradient = canvasCtx.createLinearGradient(0, scaledHeight - 10, 0, scaledHeight);
+      // Add floor reflection effect - industrial look
+      const reflectionGradient = canvasCtx.createLinearGradient(0, scaledHeight - 8, 0, scaledHeight);
       reflectionGradient.addColorStop(0, 'transparent');
-      reflectionGradient.addColorStop(1, isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)');
+      reflectionGradient.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
       canvasCtx.fillStyle = reflectionGradient;
-      canvasCtx.fillRect(0, scaledHeight - 10, scaledWidth, 10);
+      canvasCtx.fillRect(0, scaledHeight - 8, scaledWidth, 8);
+
+      // Add subtle top edge highlight
+      canvasCtx.strokeStyle = 'rgba(99, 199, 95, 0.15)';
+      canvasCtx.lineWidth = 1;
+      canvasCtx.beginPath();
+      canvasCtx.moveTo(0, 0.5);
+      canvasCtx.lineTo(scaledWidth, 0.5);
+      canvasCtx.stroke();
     };
 
     draw();

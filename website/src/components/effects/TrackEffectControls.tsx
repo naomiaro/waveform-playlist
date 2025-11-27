@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser';
 import { effectCategories } from '@waveform-playlist/browser';
@@ -61,7 +62,7 @@ const ModalOverlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-  background: var(--ifm-background-color, white);
+  background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   max-width: 500px;
@@ -70,6 +71,10 @@ const ModalContent = styled.div`
   overflow: hidden;
   display: flex;
   flex-direction: column;
+
+  [data-theme='dark'] & {
+    background: #1a1a1f;
+  }
 `;
 
 const ModalHeader = styled.div`
@@ -78,7 +83,11 @@ const ModalHeader = styled.div`
   align-items: center;
   padding: 16px;
   border-bottom: 1px solid var(--ifm-color-emphasis-200, #e0e0e0);
-  background: var(--ifm-background-surface-color, #f5f5f5);
+  background: #f5f5f5;
+
+  [data-theme='dark'] & {
+    background: #252530;
+  }
 `;
 
 const ModalTitle = styled.h3`
@@ -106,6 +115,11 @@ const ModalBody = styled.div`
   padding: 16px;
   overflow-y: auto;
   flex: 1;
+  background: #ffffff;
+
+  [data-theme='dark'] & {
+    background: #1a1a1f;
+  }
 `;
 
 const AddEffectRow = styled.div`
@@ -120,12 +134,19 @@ const EffectSelect = styled.select`
   font-size: 14px;
   border: 1px solid var(--ifm-color-emphasis-300, #ddd);
   border-radius: 4px;
-  background: var(--ifm-background-color, white);
+  background: #ffffff;
+  color: var(--ifm-color-content, #333);
   cursor: pointer;
 
   &:focus {
     outline: none;
     border-color: var(--ifm-color-primary, #3578e5);
+  }
+
+  [data-theme='dark'] & {
+    background: #252530;
+    color: #e0e0e0;
+    border-color: #404050;
   }
 `;
 
@@ -166,8 +187,12 @@ const EffectCardHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  background: var(--ifm-background-surface-color, #f5f5f5);
+  background: #f5f5f5;
   border-bottom: 1px solid var(--ifm-color-emphasis-200, #e0e0e0);
+
+  [data-theme='dark'] & {
+    background: #252530;
+  }
 `;
 
 const EffectName = styled.span`
@@ -222,6 +247,11 @@ const ParametersGrid = styled.div`
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: #ffffff;
+
+  [data-theme='dark'] & {
+    background: #1a1a1f;
+  }
 `;
 
 const ParameterRow = styled.div`
@@ -322,7 +352,7 @@ export const TrackEffectControls: React.FC<TrackEffectControlsProps> = ({
         )}
       </EffectsButton>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <ModalOverlay onClick={() => setIsOpen(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
@@ -420,7 +450,8 @@ export const TrackEffectControls: React.FC<TrackEffectControlsProps> = ({
               )}
             </ModalBody>
           </ModalContent>
-        </ModalOverlay>
+        </ModalOverlay>,
+        document.body
       )}
     </>
   );
