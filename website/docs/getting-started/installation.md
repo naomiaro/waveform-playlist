@@ -64,6 +64,30 @@ For microphone recording:
 npm install @waveform-playlist/recording
 ```
 
+Use `useIntegratedRecording` inside a `WaveformPlaylistProvider` to combine mic access, recording, and track management:
+
+```tsx
+import { useIntegratedRecording, RecordButton, VUMeter } from '@waveform-playlist/recording';
+
+function RecordingControls({ tracks, setTracks, selectedTrackId }) {
+  const { isRecording, startRecording, stopRecording, requestMicAccess, level } =
+    useIntegratedRecording(tracks, setTracks, selectedTrackId);
+
+  return (
+    <>
+      <button onClick={requestMicAccess}>Enable Mic</button>
+      <RecordButton isRecording={isRecording} onStart={startRecording} onStop={stopRecording} />
+      <VUMeter level={level} />
+    </>
+  );
+}
+
+<WaveformPlaylistProvider tracks={tracks}>
+  <RecordingControls tracks={tracks} setTracks={setTracks} selectedTrackId={selectedTrackId} />
+  <Waveform />
+</WaveformPlaylistProvider>
+```
+
 ### Spectrogram
 
 For spectrogram visualization (FFT computation, worker-based rendering, color maps):

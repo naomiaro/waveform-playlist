@@ -208,9 +208,9 @@ const config: Config = {
 
   themeConfig: {
     announcementBar: {
-      id: 'v5_release',
+      id: 'v6_release',
       content:
-        '🎉 <strong>v5 Released!</strong> — A complete React rewrite with Tone.js. <a href="/waveform-playlist/docs/getting-started/installation">Get started →</a>',
+        '🎉 <strong>v6 Released!</strong> — Recording, annotations &amp; spectrogram are now optional peer dependencies. <a href="/waveform-playlist/docs/getting-started/installation">Upgrade guide →</a>',
       isCloseable: true,
     },
     // Social card image for Open Graph and Twitter
