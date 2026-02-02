@@ -23,6 +23,7 @@ test.describe('Multi-Clip Example', () => {
     test('clicking on waveform area moves playhead', async ({ page }) => {
       // Get the first clip container - this ensures we click on actual waveform content
       const clipContainer = page.locator('[data-clip-container]').first();
+      await expect(clipContainer).toBeVisible();
       const box = await clipContainer.boundingBox();
       expect(box).toBeTruthy();
 
@@ -59,6 +60,7 @@ test.describe('Multi-Clip Example', () => {
     test('clip boundaries are clickable (not blocked by other elements)', async ({ page }) => {
       // Get the first left boundary
       const boundary = page.locator('[data-boundary-edge="left"]').first();
+      await expect(boundary).toBeVisible();
       const box = await boundary.boundingBox();
       expect(box).toBeTruthy();
 
@@ -73,8 +75,8 @@ test.describe('Multi-Clip Example', () => {
 
     test('boundary shows col-resize cursor on hover', async ({ page }) => {
       const boundary = page.locator('[data-boundary-edge="left"]').first();
+      await expect(boundary).toBeVisible();
 
-      // Check computed cursor style
       const cursor = await boundary.evaluate((el) => {
         return window.getComputedStyle(el).cursor;
       });
@@ -84,6 +86,7 @@ test.describe('Multi-Clip Example', () => {
 
     test('boundary has pointer-events: auto', async ({ page }) => {
       const boundary = page.locator('[data-boundary-edge="left"]').first();
+      await expect(boundary).toBeVisible();
 
       const pointerEvents = await boundary.evaluate((el) => {
         return window.getComputedStyle(el).pointerEvents;
@@ -105,6 +108,7 @@ test.describe('Multi-Clip Example', () => {
 
     test('clip headers are draggable (have dnd-kit attributes)', async ({ page }) => {
       const header = page.locator('[data-clip-id]').first();
+      await expect(header).toBeVisible();
 
       // Check for dnd-kit draggable attributes
       const roleDescription = await header.getAttribute('aria-roledescription');
@@ -114,6 +118,7 @@ test.describe('Multi-Clip Example', () => {
     test('clip headers have pointer-events: auto', async ({ page }) => {
       // Find the header container (the styled div with data-clip-id)
       const headerContainer = page.locator('[data-clip-id]').first();
+      await expect(headerContainer).toBeVisible();
 
       const pointerEvents = await headerContainer.evaluate((el) => {
         return window.getComputedStyle(el).pointerEvents;
@@ -124,6 +129,7 @@ test.describe('Multi-Clip Example', () => {
 
     test('clip headers show grab cursor', async ({ page }) => {
       const headerContainer = page.locator('[data-clip-id]').first();
+      await expect(headerContainer).toBeVisible();
 
       const cursor = await headerContainer.evaluate((el) => {
         return window.getComputedStyle(el).cursor;
@@ -136,6 +142,7 @@ test.describe('Multi-Clip Example', () => {
   test.describe('Clip Container', () => {
     test('clip container has pointer-events: none (allows click-through)', async ({ page }) => {
       const clipContainer = page.locator('[data-clip-container]').first();
+      await expect(clipContainer).toBeVisible();
 
       const pointerEvents = await clipContainer.evaluate((el) => {
         return window.getComputedStyle(el).pointerEvents;
@@ -176,6 +183,7 @@ test.describe('Multi-Clip Example', () => {
     test('pressing Escape stops playback and resets to start position', async ({ page }) => {
       // Click somewhere to set a non-zero position
       const tracksContainer = page.locator('[data-scroll-container]');
+      await expect(tracksContainer).toBeVisible();
       const box = await tracksContainer.boundingBox();
       await page.mouse.click(box!.x + box!.width / 3, box!.y + box!.height / 2);
 
@@ -229,6 +237,7 @@ test.describe('Multi-Clip Example', () => {
       // Click on the waveform to position playhead within the clip
       // Get the clip container position to click within it
       const clipContainer = page.locator('[data-clip-container]').first();
+      await expect(clipContainer).toBeVisible();
       const clipBox = await clipContainer.boundingBox();
       expect(clipBox).toBeTruthy();
 
@@ -255,6 +264,7 @@ test.describe('Multi-Clip Example', () => {
 
       // Position playhead within the Bass clip (it spans most of the timeline)
       const tracksContainer = page.locator('[data-scroll-container]');
+      await expect(tracksContainer).toBeVisible();
       const box = await tracksContainer.boundingBox();
       await page.mouse.click(box!.x + 100, box!.y + box!.height / 2);
 
@@ -287,6 +297,8 @@ test.describe('Multi-Clip Example', () => {
       // We verify clips have lower z-index than playhead as a proxy for correct layering
       const clipContainer = page.locator('[data-clip-container]').first();
       const playhead = page.locator('[data-playhead]');
+      await expect(clipContainer).toBeVisible();
+      await expect(playhead).toBeVisible();
 
       const clipZIndex = await clipContainer.evaluate((el) => {
         return window.getComputedStyle(el).zIndex;
@@ -307,6 +319,7 @@ test.describe('Multi-Clip Example', () => {
     test('dragging clip header moves the clip', async ({ page }) => {
       // Get the first clip header (use data-clip-id selector)
       const header = page.locator('[data-clip-id]').first();
+      await expect(header).toBeVisible();
       const headerBox = await header.boundingBox();
       expect(headerBox).toBeTruthy();
 
@@ -322,18 +335,19 @@ test.describe('Multi-Clip Example', () => {
       await page.mouse.move(headerBox!.x + headerBox!.width / 2 + 100, headerBox!.y + headerBox!.height / 2, { steps: 10 });
       await page.mouse.up();
 
-      // Check that position changed (clip moved)
-      const finalLeft = await clipContainer.evaluate((el) => {
-        return el.style.left || window.getComputedStyle(el).left;
-      });
-
-      // Position should have changed
-      expect(finalLeft).not.toBe(initialLeft);
+      // Check that position changed (clip moved) — use retrying assertion
+      await expect(async () => {
+        const finalLeft = await clipContainer.evaluate((el) => {
+          return el.style.left || window.getComputedStyle(el).left;
+        });
+        expect(finalLeft).not.toBe(initialLeft);
+      }).toPass({ timeout: 5000 });
     });
 
     test('dragging boundary trims the clip', async ({ page }) => {
       // Get the first right boundary (easier to test trimming from the end)
       const boundary = page.locator('[data-boundary-edge="right"]').first();
+      await expect(boundary).toBeVisible();
       const boundaryBox = await boundary.boundingBox();
       expect(boundaryBox).toBeTruthy();
 
@@ -349,15 +363,15 @@ test.describe('Multi-Clip Example', () => {
       await page.mouse.move(boundaryBox!.x - 50, boundaryBox!.y + boundaryBox!.height / 2, { steps: 10 });
       await page.mouse.up();
 
-      // Check that width changed (clip trimmed)
-      const finalWidth = await clipContainer.evaluate((el) => {
-        return el.style.width || window.getComputedStyle(el).width;
-      });
-
-      // Width should have decreased
-      const initialPx = parseInt(initialWidth);
-      const finalPx = parseInt(finalWidth);
-      expect(finalPx).toBeLessThan(initialPx);
+      // Check that width changed (clip trimmed) — use retrying assertion
+      await expect(async () => {
+        const finalWidth = await clipContainer.evaluate((el) => {
+          return el.style.width || window.getComputedStyle(el).width;
+        });
+        const initialPx = parseInt(initialWidth);
+        const finalPx = parseInt(finalWidth);
+        expect(finalPx).toBeLessThan(initialPx);
+      }).toPass({ timeout: 5000 });
     });
   });
 });

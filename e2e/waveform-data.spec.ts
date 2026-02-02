@@ -160,12 +160,12 @@ test.describe('BBC Waveform Data Example', () => {
   test.describe('Track Controls', () => {
     test('each track has mute button', async ({ page }) => {
       const muteButtons = page.getByRole('button', { name: 'Mute' });
-      expect(await muteButtons.count()).toBe(4);
+      await expect(muteButtons).toHaveCount(4);
     });
 
     test('each track has solo button', async ({ page }) => {
       const soloButtons = page.getByRole('button', { name: 'Solo' });
-      expect(await soloButtons.count()).toBe(4);
+      await expect(soloButtons).toHaveCount(4);
     });
 
     test('can mute a track', async ({ page }) => {
@@ -185,21 +185,23 @@ test.describe('BBC Waveform Data Example', () => {
     test('each track has volume slider', async ({ page }) => {
       // Volume sliders have max="1" min="0"
       const volumeSliders = page.locator('input[type="range"][max="1"][min="0"]');
-      expect(await volumeSliders.count()).toBe(4);
+      await expect(volumeSliders).toHaveCount(4);
     });
 
     test('each track has pan slider', async ({ page }) => {
       // Pan sliders have max="1" min="-1"
       const panSliders = page.locator('input[type="range"][max="1"][min="-1"]');
-      expect(await panSliders.count()).toBe(4);
+      await expect(panSliders).toHaveCount(4);
     });
 
     test('pan sliders have L and R labels', async ({ page }) => {
       const leftLabels = page.getByText('L');
       const rightLabels = page.getByText('R');
 
-      expect(await leftLabels.count()).toBeGreaterThanOrEqual(4);
-      expect(await rightLabels.count()).toBeGreaterThanOrEqual(4);
+      await expect(async () => {
+        expect(await leftLabels.count()).toBeGreaterThanOrEqual(4);
+        expect(await rightLabels.count()).toBeGreaterThanOrEqual(4);
+      }).toPass({ timeout: 5000 });
     });
   });
 

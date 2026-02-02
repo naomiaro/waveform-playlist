@@ -98,6 +98,7 @@ test.describe('Mobile Annotations Example', () => {
 
     test('buttons have minimum touch target size', async ({ page }) => {
       const playButton = page.getByRole('button', { name: /play/i });
+      await expect(playButton).toBeVisible();
       const box = await playButton.boundingBox();
 
       expect(box).toBeTruthy();

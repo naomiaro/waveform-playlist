@@ -59,10 +59,12 @@ test.describe('Annotations Example', () => {
       const splitButtons = page.getByRole('button', { name: '✂' });
       const deleteButtons = page.getByRole('button', { name: '🗑' });
 
-      expect(await minusButtons.count()).toBeGreaterThan(0);
-      expect(await plusButtons.count()).toBeGreaterThan(0);
-      expect(await splitButtons.count()).toBeGreaterThan(0);
-      expect(await deleteButtons.count()).toBeGreaterThan(0);
+      await expect(async () => {
+        expect(await minusButtons.count()).toBeGreaterThan(0);
+        expect(await plusButtons.count()).toBeGreaterThan(0);
+        expect(await splitButtons.count()).toBeGreaterThan(0);
+        expect(await deleteButtons.count()).toBeGreaterThan(0);
+      }).toPass({ timeout: 5000 });
     });
 
     test('annotation boundaries are draggable', async ({ page }) => {

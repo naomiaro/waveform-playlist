@@ -69,6 +69,7 @@ test.describe('Mobile Multi-Clip Example', () => {
   test.describe('Touch Target Sizes', () => {
     test('clip boundaries are wider for touch (24px)', async ({ page }) => {
       const boundary = page.locator('[data-boundary-edge="left"]').first();
+      await expect(boundary).toBeVisible();
       const box = await boundary.boundingBox();
 
       expect(box).toBeTruthy();
@@ -79,6 +80,8 @@ test.describe('Mobile Multi-Clip Example', () => {
     test('both left and right boundaries have larger touch targets', async ({ page }) => {
       const leftBoundary = page.locator('[data-boundary-edge="left"]').first();
       const rightBoundary = page.locator('[data-boundary-edge="right"]').first();
+      await expect(leftBoundary).toBeVisible();
+      await expect(rightBoundary).toBeVisible();
 
       const leftBox = await leftBoundary.boundingBox();
       const rightBox = await rightBoundary.boundingBox();
@@ -126,6 +129,7 @@ test.describe('Mobile Multi-Clip Example', () => {
 
     test('clicking on waveform moves playhead', async ({ page }) => {
       const clipContainer = page.locator('[data-clip-container]').first();
+      await expect(clipContainer).toBeVisible();
       const box = await clipContainer.boundingBox();
       expect(box).toBeTruthy();
 
@@ -207,6 +211,7 @@ test.describe('Mobile Multi-Clip Example', () => {
     test('dragging clip header moves the clip', async ({ page }) => {
       // Get the first clip header
       const header = page.locator('[data-clip-id]:not([data-boundary-edge])').first();
+      await expect(header).toBeVisible();
       const initialBox = await header.boundingBox();
       expect(initialBox).toBeTruthy();
 
@@ -241,6 +246,7 @@ test.describe('Mobile Multi-Clip Example', () => {
 
       // Use the last boundary which should have more room to trim
       const boundary = boundaries.nth(boundaryCount - 1);
+      await expect(boundary).toBeVisible();
       const initialBox = await boundary.boundingBox();
       expect(initialBox).toBeTruthy();
 
