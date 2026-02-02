@@ -415,7 +415,7 @@ interface UseClipSplittingResult {
 
 ---
 
-## Recording
+## Recording (`@waveform-playlist/recording`)
 
 ### useIntegratedRecording
 

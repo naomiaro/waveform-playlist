@@ -369,10 +369,10 @@ function ClippingIndicator() {
 
 ## Adding Recorded Audio to Playlist
 
-For multi-track recording with automatic track management, use the `useIntegratedRecording` hook from `@waveform-playlist/browser`:
+For multi-track recording with automatic track management, use the `useIntegratedRecording` hook from `@waveform-playlist/recording`:
 
 ```tsx
-import { useIntegratedRecording } from '@waveform-playlist/browser';
+import { useIntegratedRecording } from '@waveform-playlist/recording';
 import type { ClipTrack } from '@waveform-playlist/core';
 
 function RecordToPlaylist() {
@@ -492,10 +492,9 @@ import {
   PauseButton,
   StopButton,
   ExportWavButton,
-  useIntegratedRecording,
   usePlaybackAnimation,
 } from '@waveform-playlist/browser';
-import { VUMeter } from '@waveform-playlist/recording';
+import { useIntegratedRecording, VUMeter } from '@waveform-playlist/recording';
 import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 
 function RecordingControls({

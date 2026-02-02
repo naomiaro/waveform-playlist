@@ -17,7 +17,7 @@ npm install @waveform-playlist/annotations
 
 ## Quick Start
 
-The simplest way to add annotations is through the provider's `annotationList` prop. The `<Waveform />` component renders annotation boxes and text automatically.
+The simplest way to add annotations is through the provider's `annotationList` prop. Wrap your playlist with `AnnotationProvider` to enable annotation rendering — the `<Waveform />` component then renders annotation boxes and text automatically.
 
 ```tsx
 import { useState } from 'react';
@@ -26,6 +26,7 @@ import {
   Waveform,
   useAudioTracks,
 } from '@waveform-playlist/browser';
+import { AnnotationProvider } from '@waveform-playlist/annotations';
 
 function AnnotatedPlaylist() {
   const { tracks, loading } = useAudioTracks([
@@ -51,13 +52,15 @@ function AnnotatedPlaylist() {
       }}
       onAnnotationsChange={setAnnotations}
     >
-      <Waveform />
+      <AnnotationProvider>
+        <Waveform />
+      </AnnotationProvider>
     </WaveformPlaylistProvider>
   );
 }
 ```
 
-With this pattern, `<Waveform />` internally renders `AnnotationBoxesWrapper`, `AnnotationBox` components, and `AnnotationText` — no manual composition needed.
+With this pattern, `<Waveform />` internally renders `AnnotationBoxesWrapper`, `AnnotationBox` components, and `AnnotationText` — no manual composition needed. Without `AnnotationProvider`, annotation data is stored but not rendered.
 
 ## Annotation Structure
 

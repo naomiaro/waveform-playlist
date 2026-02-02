@@ -34,9 +34,6 @@ import {
   useDynamicEffects,
   useTrackDynamicEffects,
 
-  // Recording (integrated with playlist)
-  useIntegratedRecording,
-
   // Keyboard shortcuts
   useKeyboardShortcuts,
   usePlaybackShortcuts,
@@ -419,6 +416,8 @@ function TimeDisplay() {
 ## Integrated Recording
 
 ### useIntegratedRecording
+
+*From `@waveform-playlist/recording`*
 
 Full-featured recording hook that integrates with the playlist - handles microphone access, recording, live peaks, and automatic track/clip creation.
 

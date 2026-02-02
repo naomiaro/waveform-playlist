@@ -44,6 +44,18 @@ For time-synchronized annotations:
 npm install @waveform-playlist/annotations
 ```
 
+Wrap your playlist with `AnnotationProvider` to enable annotation rendering:
+
+```tsx
+import { AnnotationProvider } from '@waveform-playlist/annotations';
+
+<WaveformPlaylistProvider tracks={tracks} annotationList={{ annotations, editable: true }}>
+  <AnnotationProvider>
+    <Waveform />
+  </AnnotationProvider>
+</WaveformPlaylistProvider>
+```
+
 ### Recording
 
 For microphone recording:

@@ -23,7 +23,7 @@ waveform-playlist is a React component library for building browser-based audio 
 - `@waveform-playlist/playout` — Audio engine: Tone.js playback, global AudioContext
 - `@waveform-playlist/ui-components` — Styled primitives, theming, playhead components
 - `@waveform-playlist/annotations` — Annotation parsing, rendering, keyboard controls
-- `@waveform-playlist/recording` — Microphone access, AudioWorklet recording, VU meter
+- `@waveform-playlist/recording` — Microphone access, AudioWorklet recording, VU meter, useIntegratedRecording
 - `@waveform-playlist/webaudio-peaks` — Peak extraction from AudioBuffer
 - `@waveform-playlist/media-element-playout` — HTMLAudioElement playback with pitch-preserving speed control
 - `@waveform-playlist/spectrogram` — Optional spectrogram package: FFT computation, worker-based rendering, color maps, frequency scales. Integrates via `SpectrogramProvider` wrapper
@@ -73,7 +73,6 @@ Both providers use React Context with 4 split contexts for performance.
 - `useTrackDynamicEffects()` — Per-track effects management
 - `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming with collision detection
 - `useClipSplitting(opts)` — Split clips at playhead position
-- `useIntegratedRecording(tracks, setTracks, selectedTrackId, opts)` — Full recording with auto clip creation
 - `useExportWav()` — Offline WAV export with effects support
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
 - `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0)
