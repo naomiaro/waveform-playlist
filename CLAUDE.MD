@@ -465,6 +465,8 @@ const normalized = Math.max(0, Math.min(1, (dbValue + 100) / 100));
 
 Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
+**Safari Latency:** `TonePlayout.init()` already calls `await start()`. Do NOT call `await toneStart()` separately in play handlers — the redundant await adds ~2 seconds of latency on Safari.
+
 **Master volume:** Uses Web Audio standard 0-1.0 range (not 0-100).
 
 ### Tone.js Internal AudioParam Access
