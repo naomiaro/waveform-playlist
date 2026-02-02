@@ -303,6 +303,26 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     [tracks, setTracks]
   );
 
+  const handleRemoveTrack = useCallback(
+    (trackIndex: number) => {
+      const trackToRemove = tracks[trackIndex];
+      if (!trackToRemove) return;
+
+      // Stop recording if we're removing the track being recorded to
+      if (isRecording && trackToRemove.id === selectedTrackId) {
+        stopRecording();
+      }
+
+      // Clear selection if removed track was selected
+      if (trackToRemove.id === selectedTrackId) {
+        setSelectedTrackId(null);
+      }
+
+      setTracks(tracks.filter((_, i) => i !== trackIndex));
+    },
+    [tracks, setTracks, selectedTrackId, setSelectedTrackId, isRecording, stopRecording]
+  );
+
   return (
     <>
       {error && (
@@ -425,6 +445,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <Waveform
           showClipHeaders
           interactiveClips
+          onRemoveTrack={handleRemoveTrack}
           recordingState={
             isRecording && selectedTrackId
               ? {
