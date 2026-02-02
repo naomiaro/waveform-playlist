@@ -1,4 +1,5 @@
 import React from 'react';
+import type { RenderAnnotationItemProps } from '@waveform-playlist/core';
 import { useMediaElementState } from '../MediaElementPlaylistContext';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 import { MediaElementPlaylist } from './MediaElementPlaylist';
@@ -17,7 +18,7 @@ export interface MediaElementWaveformProps {
    * When provided, completely replaces the default annotation item rendering.
    * Use this to customize the appearance of each annotation (e.g., add furigana).
    */
-  renderAnnotationItem?: (props: any) => React.ReactNode;
+  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
   /** Whether annotation boundaries can be edited by dragging. Defaults to false. */
   editable?: boolean;
   /** Whether dragging one annotation boundary also moves the adjacent annotation's boundary. Defaults to false. */

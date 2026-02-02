@@ -75,6 +75,7 @@ export function useIntegratedRecording(
   // Track if we're currently monitoring (for auto-resume audio context)
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [hookError, setHookError] = useState<Error | null>(null);
 
   // Microphone access
   const {
@@ -105,27 +106,43 @@ export function useIntegratedRecording(
   // Start recording handler
   const startRecording = useCallback(async () => {
     if (!selectedTrackId) {
-      // No track selected - UI should handle creating/selecting track before calling this
+      setHookError(new Error('Cannot start recording: no track selected. Select or create a track first.'));
       return;
     }
 
-    // Resume audio context if needed
-    if (!isMonitoring) {
-      await resumeGlobalAudioContext();
-      setIsMonitoring(true);
-    }
+    try {
+      setHookError(null);
+      // Resume audio context if needed
+      if (!isMonitoring) {
+        await resumeGlobalAudioContext();
+        setIsMonitoring(true);
+      }
 
-    await startRec();
+      await startRec();
+    } catch (err) {
+      setHookError(err instanceof Error ? err : new Error(String(err)));
+    }
   }, [selectedTrackId, isMonitoring, startRec]);
 
   // Stop recording and add clip to selected track
   const stopRecording = useCallback(async () => {
-    const buffer = await stopRec();
+    let buffer: AudioBuffer | null;
+    try {
+      buffer = await stopRec();
+    } catch (err) {
+      setHookError(err instanceof Error ? err : new Error(String(err)));
+      return;
+    }
 
     // Add clip to track after recording completes
     if (buffer && selectedTrackId) {
       const selectedTrackIndex = tracks.findIndex(t => t.id === selectedTrackId);
-      if (selectedTrackIndex === -1) return;
+      if (selectedTrackIndex === -1) {
+        console.error(
+          `[waveform-playlist] Recording completed but track "${selectedTrackId}" no longer exists. The recorded audio could not be saved.`
+        );
+        return;
+      }
 
       const selectedTrack = tracks[selectedTrackIndex];
 
@@ -182,17 +199,27 @@ export function useIntegratedRecording(
 
   // Request microphone access
   const requestMicAccess = useCallback(async () => {
-    await requestAccess(undefined, audioConstraints);
-    await resumeGlobalAudioContext();
-    setIsMonitoring(true);
+    try {
+      setHookError(null);
+      await requestAccess(undefined, audioConstraints);
+      await resumeGlobalAudioContext();
+      setIsMonitoring(true);
+    } catch (err) {
+      setHookError(err instanceof Error ? err : new Error(String(err)));
+    }
   }, [requestAccess, audioConstraints]);
 
   // Change device
   const changeDevice = useCallback(async (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    await requestAccess(deviceId, audioConstraints);
-    await resumeGlobalAudioContext();
-    setIsMonitoring(true);
+    try {
+      setHookError(null);
+      setSelectedDevice(deviceId);
+      await requestAccess(deviceId, audioConstraints);
+      await resumeGlobalAudioContext();
+      setIsMonitoring(true);
+    } catch (err) {
+      setHookError(err instanceof Error ? err : new Error(String(err)));
+    }
   }, [requestAccess, audioConstraints]);
 
   return {
@@ -202,7 +229,7 @@ export function useIntegratedRecording(
     duration,
     level,
     peakLevel,
-    error: micError || recError,
+    error: hookError || micError || recError,
 
     // Microphone state
     stream,

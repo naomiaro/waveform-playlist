@@ -1,6 +1,6 @@
 import React, { FunctionComponent, useState } from 'react';
 import styled from 'styled-components';
-import type { AnnotationData } from '@waveform-playlist/core';
+import type { AnnotationData, AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/core';
 
 interface AnnotationOverlayProps {
   readonly $left: number;
@@ -108,27 +108,8 @@ const ControlButton = styled.button`
   }
 `;
 
-/**
- * Configuration options passed to annotation action handlers
- */
-export interface AnnotationActionOptions {
-  /** Whether annotation endpoints are linked (moving one endpoint moves the other) */
-  linkEndpoints?: boolean;
-  /** Whether to continue playing after an annotation ends */
-  continuousPlay?: boolean;
-  /** Additional custom properties */
-  [key: string]: unknown;
-}
-
-export interface AnnotationAction {
-  class?: string;
-  text?: string;
-  title: string;
-  action: (annotation: AnnotationData, index: number, annotations: AnnotationData[], opts: AnnotationActionOptions) => void;
-}
-
-// AnnotationData is imported from @waveform-playlist/core
-export type { AnnotationData } from '@waveform-playlist/core';
+// Re-export shared annotation types from core
+export type { AnnotationData, AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/core';
 
 export interface AnnotationProps {
   annotation: AnnotationData;

@@ -1,6 +1,6 @@
 import React, { FunctionComponent, useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import type { AnnotationData, AnnotationAction, AnnotationActionOptions } from './Annotation';
+import type { AnnotationData, AnnotationAction, AnnotationActionOptions, RenderAnnotationItemProps } from '@waveform-playlist/core';
 
 interface ContainerProps {
   $height?: number;
@@ -114,16 +114,8 @@ const AnnotationTextContent = styled.div<{ $isEditable?: boolean }>`
   }
 `;
 
-/**
- * Props passed to the renderAnnotationItem function for custom rendering
- */
-export interface RenderAnnotationItemProps {
-  annotation: AnnotationData;
-  index: number;
-  isActive: boolean;
-  onClick: () => void;
-  formatTime: (seconds: number) => string;
-}
+// Re-export from core
+export type { RenderAnnotationItemProps } from '@waveform-playlist/core';
 
 export interface AnnotationTextProps {
   annotations: AnnotationData[];

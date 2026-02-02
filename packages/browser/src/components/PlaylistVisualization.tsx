@@ -26,12 +26,13 @@ import {
   type RenderPlayheadFunction,
   SpectrogramLabels,
 } from '@waveform-playlist/ui-components';
-import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
+import { useRequireAnnotationIntegration } from '../AnnotationIntegrationContext';
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
+import type { AnnotationAction } from '@waveform-playlist/core';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { useSpectrogramIntegration } from '../SpectrogramIntegrationContext';
 
@@ -43,7 +44,7 @@ export interface PlaylistVisualizationProps {
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   /** Custom playhead render function. Receives position (pixels) and color from theme. */
   renderPlayhead?: RenderPlayheadFunction;
-  annotationControls?: any[];
+  annotationControls?: AnnotationAction[];
   /**
    * Custom function to generate the label shown on annotation boxes in the waveform.
    * Receives the annotation data and its index, returns a string label.
@@ -96,7 +97,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   onRemoveTrack,
   recordingState,
 }) => {
-  const annotationIntegration = useAnnotationIntegration();
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
   const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
@@ -113,6 +113,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     loopEnd,
     isLoopEnabled,
   } = usePlaylistState();
+  const annotationIntegration = useRequireAnnotationIntegration(annotations);
   const {
     setAnnotations,
     setActiveAnnotationId,

@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
+import type { AnnotationAction, AnnotationActionOptions, RenderAnnotationItemProps } from '@waveform-playlist/core';
 import { usePlaylistState } from '../WaveformPlaylistContext';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
@@ -10,14 +11,14 @@ export interface WaveformProps {
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   /** Custom playhead render function. Receives position (pixels) and color from theme. */
   renderPlayhead?: RenderPlayheadFunction;
-  annotationControls?: any[];
-  annotationListConfig?: any;
+  annotationControls?: AnnotationAction[];
+  annotationListConfig?: AnnotationActionOptions;
   annotationTextHeight?: number; // Height in pixels for the annotation text list
   /**
    * Custom render function for annotation items in the text list.
    * Use this to completely customize how each annotation is displayed.
    */
-  renderAnnotationItem?: (props: any) => ReactNode;
+  renderAnnotationItem?: (props: RenderAnnotationItemProps) => ReactNode;
   /**
    * Custom function to generate the label shown on annotation boxes in the waveform.
    * Receives the annotation data and its index, returns a string label.

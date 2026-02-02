@@ -130,7 +130,7 @@ export type { ClipTrack, AudioClip, Fade, AnnotationData } from '@waveform-playl
 export type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from './types/annotations';
 
 // Annotation integration context (for optional annotation support)
-export { AnnotationIntegrationProvider, useAnnotationIntegration } from './AnnotationIntegrationContext';
+export { AnnotationIntegrationProvider, useAnnotationIntegration, useRequireAnnotationIntegration } from './AnnotationIntegrationContext';
 export type { AnnotationIntegration } from './AnnotationIntegrationContext';
 
 // Spectrogram integration context (for optional spectrogram support)

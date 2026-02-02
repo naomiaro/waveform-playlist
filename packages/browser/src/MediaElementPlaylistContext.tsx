@@ -171,6 +171,16 @@ export const MediaElementPlaylistProvider: React.FC<
   // In v6, annotations must be pre-parsed (numeric start/end). Use parseAeneas() from @waveform-playlist/annotations before passing.
   const annotations = useMemo(() => {
     if (!annotationList?.annotations) return [];
+    if (process.env.NODE_ENV !== 'production' && annotationList.annotations.length > 0) {
+      const first = annotationList.annotations[0] as Record<string, unknown>;
+      if (typeof first.start !== 'number' || typeof first.end !== 'number') {
+        console.error(
+          '[waveform-playlist] Annotations must have numeric start/end values. ' +
+          'In v6, use parseAeneas() from @waveform-playlist/annotations before passing annotations. ' +
+          'Received start type: ' + typeof first.start
+        );
+      }
+    }
     return annotationList.annotations as AnnotationData[];
   }, [annotationList?.annotations]);
 

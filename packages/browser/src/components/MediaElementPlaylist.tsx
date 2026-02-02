@@ -13,7 +13,7 @@ import {
   useTheme,
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
-import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
+import { useRequireAnnotationIntegration } from '../AnnotationIntegrationContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 import {
   useMediaElementAnimation,
@@ -60,12 +60,12 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   onAnnotationUpdate,
   className,
 }) => {
-  const annotationIntegration = useAnnotationIntegration();
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
   // MediaElement context hooks
   const { isPlaying, currentTimeRef } = useMediaElementAnimation();
   const { annotations, activeAnnotationId } = useMediaElementState();
+  const annotationIntegration = useRequireAnnotationIntegration(annotations);
   const { play, seekTo, setActiveAnnotationId, setAnnotations, setScrollContainer } = useMediaElementControls();
   const {
     duration,

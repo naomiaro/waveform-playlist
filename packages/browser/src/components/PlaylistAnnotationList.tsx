@@ -1,6 +1,11 @@
 import React, { useCallback } from 'react';
-import type { AnnotationData } from '@waveform-playlist/core';
-import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
+import type {
+  AnnotationData,
+  AnnotationAction,
+  AnnotationActionOptions,
+  RenderAnnotationItemProps,
+} from '@waveform-playlist/core';
+import { useRequireAnnotationIntegration } from '../AnnotationIntegrationContext';
 import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContext';
 import type { OnAnnotationUpdateFn } from '../types/annotations';
 
@@ -13,7 +18,7 @@ export interface PlaylistAnnotationListProps {
    * Custom render function for annotation items in the text list.
    * When provided, completely replaces the default annotation item rendering.
    */
-  renderAnnotationItem?: (props: any) => React.ReactNode;
+  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
   /**
    * Callback when annotations are updated (e.g., text edited).
    * Called with the full updated annotations array.
@@ -23,12 +28,12 @@ export interface PlaylistAnnotationListProps {
    * Action controls to show on each annotation item (e.g., delete, split).
    * Only rendered when `annotationsEditable` is true in context.
    */
-  controls?: any[];
+  controls?: AnnotationAction[];
   /**
    * Override annotation list config. Falls back to context values
    * `{ linkEndpoints, continuousPlay }` if not provided.
    */
-  annotationListConfig?: any;
+  annotationListConfig?: AnnotationActionOptions;
   /** Where to position the active annotation when auto-scrolling. Defaults to 'center'. */
   scrollActivePosition?: ScrollLogicalPosition;
   /** Which scrollable containers to scroll: 'nearest' or 'all'. Defaults to 'nearest'. */
@@ -50,7 +55,6 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
 }) => {
-  const integration = useAnnotationIntegration();
   const {
     annotations,
     activeAnnotationId,
@@ -58,6 +62,7 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
     linkEndpoints,
     continuousPlay,
   } = usePlaylistState();
+  const integration = useRequireAnnotationIntegration(annotations);
   const { setAnnotations } = usePlaylistControls();
 
   const resolvedConfig = annotationListConfig ?? { linkEndpoints, continuousPlay };

@@ -40,3 +40,37 @@ export interface AnnotationEventMap {
   'annotation-delete': (id: string) => void;
   'annotation-create': (annotation: AnnotationData) => void;
 }
+
+/**
+ * Configuration options passed to annotation action handlers.
+ * Used by both browser and annotations packages.
+ */
+export interface AnnotationActionOptions {
+  /** Whether annotation endpoints are linked (moving one endpoint moves the other) */
+  linkEndpoints?: boolean;
+  /** Whether to continue playing after an annotation ends */
+  continuousPlay?: boolean;
+  /** Additional custom properties */
+  [key: string]: unknown;
+}
+
+/**
+ * An action control shown on annotation items (e.g., delete, split).
+ */
+export interface AnnotationAction {
+  class?: string;
+  text?: string;
+  title: string;
+  action: (annotation: AnnotationData, index: number, annotations: AnnotationData[], opts: AnnotationActionOptions) => void;
+}
+
+/**
+ * Props passed to the renderAnnotationItem function for custom rendering.
+ */
+export interface RenderAnnotationItemProps {
+  annotation: AnnotationData;
+  index: number;
+  isActive: boolean;
+  onClick: () => void;
+  formatTime: (seconds: number) => string;
+}
