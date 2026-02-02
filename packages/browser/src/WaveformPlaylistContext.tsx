@@ -3,7 +3,7 @@ import { ThemeProvider } from 'styled-components';
 import { TonePlayout, type EffectsFunction, type TrackEffectsFunction } from '@waveform-playlist/playout';
 import { type Track, type ClipTrack, type Fade } from '@waveform-playlist/core';
 import { type TimeFormat, type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
-import { start as toneStart, getContext } from 'tone';
+import { getContext } from 'tone';
 import { generatePeaks } from './peaksUtil';
 
 import { extractPeaksFromWaveformData } from './waveformDataLoader';
@@ -890,9 +890,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     if (!playoutRef.current || audioBuffers.length === 0) return;
 
     await playoutRef.current.init();
-
-    // Resume Tone.js context if needed (required for Safari and user interaction)
-    await toneStart();
 
     const actualStartTime = startTime ?? currentTimeRef.current;
     playStartPositionRef.current = actualStartTime;
