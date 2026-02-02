@@ -22,3 +22,6 @@ packages/*/dist/
 test-results/
 playwright-report/
 .playwright-mcp/
+
+# Build artifacts
+bundle-stats.html
