@@ -1,14 +1,14 @@
 import { useCallback, useMemo, useEffect } from 'react';
-import type { AnnotationType } from '@waveform-playlist/annotations';
+import type { AnnotationData } from '@waveform-playlist/core';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
 const TIME_DELTA = 0.01; // 10ms adjustment per keypress
 
 interface UseAnnotationKeyboardControlsOptions {
-  annotations: AnnotationType[];
+  annotations: AnnotationData[];
   activeAnnotationId: string | null;
-  onAnnotationsChange: (annotations: AnnotationType[]) => void;
+  onAnnotationsChange: (annotations: AnnotationData[]) => void;
   /** Callback to set the active annotation ID for selection */
   onActiveAnnotationChange?: (id: string | null) => void;
   duration: number;

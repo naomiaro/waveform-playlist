@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/webaudio-peaks",
-  "version": "5.3.2",
+  "version": "6.0.0",
   "description": "Small library to extract peaks from an array of audio samples or an AudioBuffer from the WebAudio API.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

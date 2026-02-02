@@ -1,11 +1,11 @@
 import React from 'react';
-import type { AnnotationType } from '@waveform-playlist/annotations';
+import type { AnnotationData } from '@waveform-playlist/core';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
 
 interface UseAnnotationDragHandlersOptions {
-  annotations: AnnotationType[];
-  onAnnotationsChange: (annotations: AnnotationType[]) => void;
+  annotations: AnnotationData[];
+  onAnnotationsChange: (annotations: AnnotationData[]) => void;
   samplesPerPixel: number;
   sampleRate: number;
   duration: number;
@@ -150,10 +150,10 @@ function updateAnnotationBoundaries({
   annotationIndex: number;
   newTime: number;
   isDraggingStart: boolean;
-  annotations: AnnotationType[];
+  annotations: AnnotationData[];
   duration: number;
   linkEndpoints: boolean;
-}): AnnotationType[] {
+}): AnnotationData[] {
   const updatedAnnotations = [...annotations];
   const annotation = annotations[annotationIndex];
 

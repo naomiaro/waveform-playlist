@@ -1,14 +1,9 @@
 import React, { useCallback } from 'react';
-import { AnnotationText } from '@waveform-playlist/annotations';
-import type {
-  RenderAnnotationItemProps,
-  AnnotationAction,
-  AnnotationActionOptions,
-} from '@waveform-playlist/annotations';
+import type { AnnotationData } from '@waveform-playlist/core';
+import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
 import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContext';
-import type { AnnotationData, OnAnnotationUpdateFn } from '../types/annotations';
+import type { OnAnnotationUpdateFn } from '../types/annotations';
 
-export type { RenderAnnotationItemProps, AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/annotations';
 export type { OnAnnotationUpdateFn } from '../types/annotations';
 
 export interface PlaylistAnnotationListProps {
@@ -18,7 +13,7 @@ export interface PlaylistAnnotationListProps {
    * Custom render function for annotation items in the text list.
    * When provided, completely replaces the default annotation item rendering.
    */
-  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
+  renderAnnotationItem?: (props: any) => React.ReactNode;
   /**
    * Callback when annotations are updated (e.g., text edited).
    * Called with the full updated annotations array.
@@ -28,12 +23,12 @@ export interface PlaylistAnnotationListProps {
    * Action controls to show on each annotation item (e.g., delete, split).
    * Only rendered when `annotationsEditable` is true in context.
    */
-  controls?: AnnotationAction[];
+  controls?: any[];
   /**
    * Override annotation list config. Falls back to context values
    * `{ linkEndpoints, continuousPlay }` if not provided.
    */
-  annotationListConfig?: AnnotationActionOptions;
+  annotationListConfig?: any;
   /** Where to position the active annotation when auto-scrolling. Defaults to 'center'. */
   scrollActivePosition?: ScrollLogicalPosition;
   /** Which scrollable containers to scroll: 'nearest' or 'all'. Defaults to 'nearest'. */
@@ -43,8 +38,8 @@ export interface PlaylistAnnotationListProps {
 /**
  * Standalone annotation text list component for WaveformPlaylistProvider (WebAudio).
  *
- * Reads annotations and playback state from context and renders AnnotationText
- * unconditionally (even when annotations are empty).
+ * Requires @waveform-playlist/annotations with AnnotationProvider.
+ * Returns null if annotations package is not available.
  */
 export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
   height,
@@ -55,6 +50,7 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
 }) => {
+  const integration = useAnnotationIntegration();
   const {
     annotations,
     activeAnnotationId,
@@ -70,6 +66,10 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
     setAnnotations(updatedAnnotations);
     onAnnotationUpdate?.(updatedAnnotations);
   }, [setAnnotations, onAnnotationUpdate]);
+
+  if (!integration) return null;
+
+  const { AnnotationText } = integration;
 
   return (
     <AnnotationText

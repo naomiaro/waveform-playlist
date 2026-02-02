@@ -1,5 +1,6 @@
 import React, { FunctionComponent, useState } from 'react';
 import styled from 'styled-components';
+import type { AnnotationData } from '@waveform-playlist/core';
 
 interface AnnotationOverlayProps {
   readonly $left: number;
@@ -126,13 +127,8 @@ export interface AnnotationAction {
   action: (annotation: AnnotationData, index: number, annotations: AnnotationData[], opts: AnnotationActionOptions) => void;
 }
 
-export interface AnnotationData {
-  id: string;
-  start: number;
-  end: number;
-  lines: string[];
-  language?: string;
-}
+// AnnotationData is imported from @waveform-playlist/core
+export type { AnnotationData } from '@waveform-playlist/core';
 
 export interface AnnotationProps {
   annotation: AnnotationData;

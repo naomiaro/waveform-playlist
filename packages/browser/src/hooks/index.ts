@@ -30,9 +30,6 @@ export type { UsePlaybackShortcutsOptions, UsePlaybackShortcutsReturn } from './
 
 export { useAnnotationKeyboardControls } from './useAnnotationKeyboardControls';
 
-export { useIntegratedRecording } from './useIntegratedRecording';
-export type { UseIntegratedRecordingReturn, IntegratedRecordingOptions } from './useIntegratedRecording';
-
 export { useDynamicEffects } from './useDynamicEffects';
 export type { UseDynamicEffectsReturn, ActiveEffect } from './useDynamicEffects';
 

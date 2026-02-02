@@ -41,7 +41,6 @@ export {
   getShortcutLabel,
   usePlaybackShortcuts,
   useAudioTracks,
-  useIntegratedRecording,
   useZoomControls,
   useTimeFormat,
   useMasterVolume,
@@ -52,8 +51,6 @@ export {
 } from './hooks';
 export type {
   AudioTrackConfig,
-  UseIntegratedRecordingReturn,
-  IntegratedRecordingOptions,
   UsePlaybackShortcutsOptions,
   UsePlaybackShortcutsReturn,
   ZoomControls,
@@ -127,13 +124,14 @@ export type { PlaylistAnnotationListProps } from './components/PlaylistAnnotatio
 export type { TimeFormat } from '@waveform-playlist/ui-components';
 
 // Re-export core types for convenience
-export type { ClipTrack, AudioClip, Fade } from '@waveform-playlist/core';
-
-// Re-export annotation types for custom rendering
-export type { RenderAnnotationItemProps, AnnotationData } from '@waveform-playlist/annotations';
+export type { ClipTrack, AudioClip, Fade, AnnotationData } from '@waveform-playlist/core';
 
 // Export annotation callback types for Waveform components
 export type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from './types/annotations';
+
+// Annotation integration context (for optional annotation support)
+export { AnnotationIntegrationProvider, useAnnotationIntegration } from './AnnotationIntegrationContext';
+export type { AnnotationIntegration } from './AnnotationIntegrationContext';
 
 // Spectrogram integration context (for optional spectrogram support)
 export { SpectrogramIntegrationProvider, useSpectrogramIntegration } from './SpectrogramIntegrationContext';

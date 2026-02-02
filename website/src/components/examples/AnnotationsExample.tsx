@@ -31,6 +31,7 @@ import {
   useAnnotationKeyboardControls,
   useDragSensors,
 } from '@waveform-playlist/browser';
+import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Annotation data - Shakespeare's Sonnet 1
@@ -726,7 +727,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
 export function AnnotationsExample() {
   const { theme } = useDocusaurusTheme();
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [annotations, setAnnotations] = useState<any[]>(defaultNotes);
+  const [annotations, setAnnotations] = useState<any[]>(() => defaultNotes.map(parseAeneas));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -772,7 +773,11 @@ export function AnnotationsExample() {
   }, []);
 
   const handleAnnotationsLoaded = useCallback((newAnnotations: any[]) => {
-    setAnnotations(newAnnotations);
+    // Parse from Aeneas format if needed
+    const parsed = newAnnotations.map((ann: any) =>
+      typeof ann.start === 'number' ? ann : parseAeneas(ann)
+    );
+    setAnnotations(parsed);
   }, []);
 
   const handleClearAll = useCallback(() => {
@@ -817,12 +822,14 @@ export function AnnotationsExample() {
       }}
       onAnnotationsChange={setAnnotations}
     >
-      <AnnotationsAppContent
-        tracks={tracks}
-        onTracksChange={setTracks}
-        onAnnotationsLoaded={handleAnnotationsLoaded}
-        onClearAll={handleClearAll}
-      />
+      <AnnotationProvider>
+        <AnnotationsAppContent
+          tracks={tracks}
+          onTracksChange={setTracks}
+          onAnnotationsLoaded={handleAnnotationsLoaded}
+          onClearAll={handleClearAll}
+        />
+      </AnnotationProvider>
     </WaveformPlaylistProvider>
   );
 }

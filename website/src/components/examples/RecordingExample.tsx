@@ -35,13 +35,13 @@ import {
   usePlaylistState,
   useClipDragHandlers,
   useDragSensors,
-  useIntegratedRecording,
 } from '@waveform-playlist/browser';
 import {
   RecordButton,
   MicrophoneSelector,
   VUMeter,
   RecordingIndicator,
+  useIntegratedRecording,
 } from '@waveform-playlist/recording';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { MicrophoneIcon, FolderOpenIcon, MusicNotesIcon } from '@phosphor-icons/react';

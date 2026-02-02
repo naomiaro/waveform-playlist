@@ -18,7 +18,7 @@ import {
   type WaveformPlaylistTheme,
   defaultTheme,
 } from '@waveform-playlist/ui-components';
-import { parseAeneas, type AnnotationData } from '@waveform-playlist/annotations';
+import type { AnnotationData } from '@waveform-playlist/core';
 import { extractPeaksFromWaveformData } from './waveformDataLoader';
 import type { PeakData } from '@waveform-playlist/webaudio-peaks';
 import type { ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
@@ -168,12 +168,10 @@ export const MediaElementPlaylistProvider: React.FC<
   const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
   // Annotations are derived from prop (single source of truth in parent)
+  // In v6, annotations must be pre-parsed (numeric start/end). Use parseAeneas() from @waveform-playlist/annotations before passing.
   const annotations = useMemo(() => {
     if (!annotationList?.annotations) return [];
-    return annotationList.annotations.map((ann: any) => {
-      if (typeof ann.start === 'number') return ann;
-      return parseAeneas(ann);
-    });
+    return annotationList.annotations as AnnotationData[];
   }, [annotationList?.annotations]);
 
   // Ref for animation loop (avoids restarting loop on annotation change)

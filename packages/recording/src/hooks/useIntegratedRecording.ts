@@ -4,12 +4,10 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import {
-  useRecording,
-  useMicrophoneAccess,
-  useMicrophoneLevel,
-  type MicrophoneDevice,
-} from '@waveform-playlist/recording';
+import { useRecording } from './useRecording';
+import { useMicrophoneAccess } from './useMicrophoneAccess';
+import { useMicrophoneLevel } from './useMicrophoneLevel';
+import type { MicrophoneDevice } from '../types';
 import { type ClipTrack, type AudioClip } from '@waveform-playlist/core';
 import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
 

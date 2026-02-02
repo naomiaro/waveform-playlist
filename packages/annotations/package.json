@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/annotations",
-  "version": "5.3.2",
+  "version": "6.0.0",
   "description": "Annotation support for waveform-playlist",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@types/react": "^18.2.45",
     "@types/styled-components": "^5.1.26",
+    "@waveform-playlist/browser": "workspace:*",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   },
@@ -52,6 +53,7 @@
   "peerDependencies": {
     "@dnd-kit/core": "^6.0.0",
     "@dnd-kit/modifiers": "^9.0.0",
+    "@waveform-playlist/browser": "workspace:*",
     "react": "^18.0.0",
     "styled-components": "^6.0.0"
   }

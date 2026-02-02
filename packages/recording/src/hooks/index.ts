@@ -9,3 +9,9 @@ export type {
   UseMicrophoneLevelOptions,
   UseMicrophoneLevelReturn,
 } from './useMicrophoneLevel';
+
+export { useIntegratedRecording } from './useIntegratedRecording';
+export type {
+  UseIntegratedRecordingReturn,
+  IntegratedRecordingOptions,
+} from './useIntegratedRecording';

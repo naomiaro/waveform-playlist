@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/spectrogram",
-  "version": "5.3.2",
+  "version": "6.0.0",
   "description": "Spectrogram computation and UI for waveform-playlist",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

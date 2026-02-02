@@ -34,6 +34,7 @@ import {
   useAnnotationDragHandlers,
   useDragSensors,
 } from '@waveform-playlist/browser';
+import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Full annotation data - Shakespeare's Sonnet 1
@@ -347,7 +348,7 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
 export function MobileAnnotationsExample() {
   const { theme } = useDocusaurusTheme();
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [annotations, setAnnotations] = useState<any[]>(mobileAnnotations);
+  const [annotations, setAnnotations] = useState<any[]>(() => mobileAnnotations.map(parseAeneas));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -427,7 +428,9 @@ export function MobileAnnotationsExample() {
       }}
       onAnnotationsChange={setAnnotations}
     >
-      <MobileAnnotationsContent tracks={tracks} />
+      <AnnotationProvider>
+        <MobileAnnotationsContent tracks={tracks} />
+      </AnnotationProvider>
     </WaveformPlaylistProvider>
   );
 }

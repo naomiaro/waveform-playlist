@@ -1,10 +1,10 @@
-// Types
+// Types from core
 export type {
-  Annotation as AnnotationType,
+  AnnotationData,
   AnnotationFormat,
   AnnotationListOptions,
-  AnnotationEventMap
-} from './types';
+  AnnotationEventMap,
+} from '@waveform-playlist/core';
 
 // Parsers
 export { parseAeneas, serializeAeneas } from './parsers/aeneas';
@@ -12,7 +12,7 @@ export type { AeneasFragment } from './parsers/aeneas';
 
 // Components
 export { Annotation } from './components/Annotation';
-export type { AnnotationProps, AnnotationData, AnnotationAction, AnnotationActionOptions } from './components/Annotation';
+export type { AnnotationProps, AnnotationAction, AnnotationActionOptions } from './components/Annotation';
 
 export { AnnotationBox } from './components/AnnotationBox';
 export type { AnnotationBoxComponentProps } from './components/AnnotationBox';
@@ -37,6 +37,9 @@ export type { EditableCheckboxProps } from './components/EditableCheckbox';
 
 export { DownloadAnnotationsButton } from './components/DownloadAnnotationsButton';
 export type { DownloadAnnotationsButtonProps } from './components/DownloadAnnotationsButton';
+
+// Provider (registers annotation components with browser package)
+export { AnnotationProvider } from './AnnotationProvider';
 
 // Hooks
 export { useAnnotationControls } from './hooks/useAnnotationControls';

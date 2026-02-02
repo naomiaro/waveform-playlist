@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Annotation, AnnotationListOptions } from '../types';
+import type { AnnotationData, AnnotationListOptions } from '../types';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
 
@@ -12,7 +12,7 @@ export interface AnnotationUpdateParams {
   annotationIndex: number;
   newTime: number;
   isDraggingStart: boolean;
-  annotations: Annotation[];
+  annotations: AnnotationData[];
   duration: number;
   linkEndpoints: boolean;
 }
@@ -22,7 +22,7 @@ export interface UseAnnotationControlsReturn {
   linkEndpoints: boolean;
   setContinuousPlay: (value: boolean) => void;
   setLinkEndpoints: (value: boolean) => void;
-  updateAnnotationBoundaries: (params: AnnotationUpdateParams) => Annotation[];
+  updateAnnotationBoundaries: (params: AnnotationUpdateParams) => AnnotationData[];
 }
 
 /**
@@ -53,7 +53,7 @@ export const useAnnotationControls = (
       annotations,
       duration,
       linkEndpoints: shouldLinkEndpoints,
-    }: AnnotationUpdateParams): Annotation[] => {
+    }: AnnotationUpdateParams): AnnotationData[] => {
       const updatedAnnotations = [...annotations];
       const annotation = annotations[annotationIndex];
 

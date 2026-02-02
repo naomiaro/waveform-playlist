@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { serializeAeneas } from '../parsers/aeneas';
-import type { Annotation } from '../types';
+import type { AnnotationData } from '../types';
 
 const StyledButton = styled.button`
   padding: 0.5rem 1rem;
@@ -32,7 +32,7 @@ const StyledButton = styled.button`
 `;
 
 export interface DownloadAnnotationsButtonProps {
-  annotations: Annotation[];
+  annotations: AnnotationData[];
   filename?: string;
   disabled?: boolean;
   className?: string;

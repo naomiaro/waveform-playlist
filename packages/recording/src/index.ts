@@ -5,10 +5,12 @@
  */
 
 // Hooks
-export { useRecording, useMicrophoneAccess, useMicrophoneLevel } from './hooks';
+export { useRecording, useMicrophoneAccess, useMicrophoneLevel, useIntegratedRecording } from './hooks';
 export type {
   UseMicrophoneLevelOptions,
   UseMicrophoneLevelReturn,
+  UseIntegratedRecordingReturn,
+  IntegratedRecordingOptions,
 } from './hooks';
 
 // Components

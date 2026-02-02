@@ -26,11 +26,7 @@ import {
   type RenderPlayheadFunction,
   SpectrogramLabels,
 } from '@waveform-playlist/ui-components';
-import {
-  AnnotationBoxesWrapper,
-  AnnotationBox,
-} from '@waveform-playlist/annotations';
-import type { AnnotationAction } from '@waveform-playlist/annotations';
+import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
 import { usePlaybackAnimation, usePlaylistState, usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
@@ -47,7 +43,7 @@ export interface PlaylistVisualizationProps {
   renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   /** Custom playhead render function. Receives position (pixels) and color from theme. */
   renderPlayhead?: RenderPlayheadFunction;
-  annotationControls?: AnnotationAction[];
+  annotationControls?: any[];
   /**
    * Custom function to generate the label shown on annotation boxes in the waveform.
    * Receives the annotation data and its index, returns a string label.
@@ -100,6 +96,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   onRemoveTrack,
   recordingState,
 }) => {
+  const annotationIntegration = useAnnotationIntegration();
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
   const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
@@ -583,8 +580,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                   </TrackControlsContext.Provider>
                 );
               })}
-              {annotations.length > 0 && (
-                <AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
+              {annotations.length > 0 && annotationIntegration && (
+                <annotationIntegration.AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
                   {annotations.map((annotation, index) => {
                     const startPosition = (annotation.start * sampleRate) / samplesPerPixel;
                     const endPosition = (annotation.end * sampleRate) / samplesPerPixel;
@@ -592,7 +589,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                       ? getAnnotationBoxLabel(annotation, index)
                       : annotation.id;
                     return (
-                      <AnnotationBox
+                      <annotationIntegration.AnnotationBox
                         key={annotation.id}
                         annotationId={annotation.id}
                         annotationIndex={index}
@@ -606,7 +603,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                       />
                     );
                   })}
-                </AnnotationBoxesWrapper>
+                </annotationIntegration.AnnotationBoxesWrapper>
               )}
               {selectionStart !== selectionEnd && (
                 <Selection

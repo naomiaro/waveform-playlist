@@ -86,3 +86,6 @@ export * from './clip';
 
 // Export spectrogram types
 export * from './spectrogram';
+
+// Export annotation types
+export * from './annotations';
