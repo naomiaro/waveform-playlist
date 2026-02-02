@@ -138,9 +138,11 @@ export function useIntegratedRecording(
     if (buffer && selectedTrackId) {
       const selectedTrackIndex = tracks.findIndex(t => t.id === selectedTrackId);
       if (selectedTrackIndex === -1) {
-        console.error(
-          `[waveform-playlist] Recording completed but track "${selectedTrackId}" no longer exists. The recorded audio could not be saved.`
+        const err = new Error(
+          `Recording completed but track "${selectedTrackId}" no longer exists. The recorded audio could not be saved.`
         );
+        console.error(`[waveform-playlist] ${err.message}`);
+        setHookError(err);
         return;
       }
 

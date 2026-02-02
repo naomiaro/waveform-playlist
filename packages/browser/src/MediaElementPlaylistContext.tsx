@@ -179,6 +179,7 @@ export const MediaElementPlaylistProvider: React.FC<
           'In v6, use parseAeneas() from @waveform-playlist/annotations before passing annotations. ' +
           'Received start type: ' + typeof first.start
         );
+        return [];
       }
     }
     return annotationList.annotations as AnnotationData[];
