@@ -34,10 +34,24 @@ export interface SpectrogramWorkerApi {
   unregisterCanvas: (canvasId: string) => void;
 }
 
-const SpectrogramIntegrationContext = createContext<SpectrogramIntegration | null>(null);
+export const SpectrogramIntegrationContext = createContext<SpectrogramIntegration | null>(null);
 
 export const SpectrogramIntegrationProvider = SpectrogramIntegrationContext.Provider;
 
-export function useSpectrogramIntegration(): SpectrogramIntegration | null {
-  return useContext(SpectrogramIntegrationContext);
+/**
+ * Hook to access spectrogram integration provided by @waveform-playlist/spectrogram.
+ * Throws if used without <SpectrogramProvider> wrapping the component tree.
+ *
+ * Follows the Kent C. Dodds pattern:
+ * https://kentcdodds.com/blog/how-to-use-react-context-effectively
+ */
+export function useSpectrogramIntegration(): SpectrogramIntegration {
+  const context = useContext(SpectrogramIntegrationContext);
+  if (!context) {
+    throw new Error(
+      'useSpectrogramIntegration must be used within <SpectrogramProvider>. ' +
+      'Install @waveform-playlist/spectrogram and wrap your app with <SpectrogramProvider>.'
+    );
+  }
+  return context;
 }

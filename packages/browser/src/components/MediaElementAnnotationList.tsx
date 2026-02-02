@@ -5,7 +5,7 @@ import type {
   AnnotationActionOptions,
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
-import { useRequireAnnotationIntegration } from '../AnnotationIntegrationContext';
+import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
 import { useMediaElementState, useMediaElementControls } from '../MediaElementPlaylistContext';
 import type { OnAnnotationUpdateFn } from '../types/annotations';
 
@@ -59,7 +59,7 @@ export const MediaElementAnnotationList: React.FC<MediaElementAnnotationListProp
   scrollActiveContainer = 'nearest',
 }) => {
   const { annotations, activeAnnotationId, continuousPlay } = useMediaElementState();
-  const integration = useRequireAnnotationIntegration(annotations);
+  const integration = useAnnotationIntegration();
   const { setAnnotations } = useMediaElementControls();
 
   const resolvedConfig = annotationListConfig ?? { linkEndpoints: false, continuousPlay };
@@ -68,8 +68,6 @@ export const MediaElementAnnotationList: React.FC<MediaElementAnnotationListProp
     setAnnotations(updatedAnnotations);
     onAnnotationUpdate?.(updatedAnnotations);
   }, [setAnnotations, onAnnotationUpdate]);
-
-  if (!integration) return null;
 
   const { AnnotationText } = integration;
 

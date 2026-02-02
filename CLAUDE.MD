@@ -293,18 +293,17 @@ interface AudioClip {
 
 **Flow:** Browser defines `XxxIntegrationContext` → optional package creates `XxxProvider` that supplies components/functions → browser components use `useXxxIntegration()` and gracefully return `null` if unavailable.
 
-**Throwing vs Non-Throwing Hooks (Kent C. Dodds Pattern):**
-- `useAnnotationIntegration()` — returns `null` if provider missing. Use for optional UI controls (checkboxes, buttons) that simply hide when annotations aren't available.
-- `useRequireAnnotationIntegration(annotations)` — **throws** if annotations data exists but provider is missing. Use for components that render annotation data (annotation lists, boxes, visualization). Follows the [Kent C. Dodds context pattern](https://kentcdodds.com/blog/how-to-use-react-context-effectively) to fail fast with a clear error message instead of silently rendering nothing.
+**Throwing Context Hooks (Kent C. Dodds Pattern):**
+Both `useAnnotationIntegration()` and `useSpectrogramIntegration()` throw if used without their respective providers. This follows the [Kent C. Dodds context pattern](https://kentcdodds.com/blog/how-to-use-react-context-effectively) — fail fast with a clear error instead of silently rendering nothing.
 
 ```typescript
-// Optional UI control — returns null gracefully
+// Components that need annotations — throws if <AnnotationProvider> missing
 const integration = useAnnotationIntegration();
-if (!integration) return null;
 
-// Data-rendering component — throws if misconfigured
-const integration = useRequireAnnotationIntegration(annotations);
-if (!integration) return null; // Only reached when annotations is empty
+// Internal components that render with or without annotations/spectrograms
+// use useContext(XxxIntegrationContext) directly to get null when absent
+const annotationIntegration = useContext(AnnotationIntegrationContext);
+const spectrogram = useContext(SpectrogramIntegrationContext);
 ```
 
 **Location:** `packages/browser/src/AnnotationIntegrationContext.tsx`, `packages/browser/src/SpectrogramIntegrationContext.tsx`

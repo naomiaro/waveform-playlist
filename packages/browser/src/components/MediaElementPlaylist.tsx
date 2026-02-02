@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useContext, useRef, useState, useCallback } from 'react';
 import { DndContext } from '@dnd-kit/core';
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import {
@@ -13,7 +13,7 @@ import {
   useTheme,
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
-import { useRequireAnnotationIntegration } from '../AnnotationIntegrationContext';
+import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import type { Peaks } from '@waveform-playlist/webaudio-peaks';
 import {
   useMediaElementAnimation,
@@ -65,7 +65,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   // MediaElement context hooks
   const { isPlaying, currentTimeRef } = useMediaElementAnimation();
   const { annotations, activeAnnotationId } = useMediaElementState();
-  const annotationIntegration = useRequireAnnotationIntegration(annotations);
+  const annotationIntegration = useContext(AnnotationIntegrationContext);
   const { play, seekTo, setActiveAnnotationId, setAnnotations, setScrollContainer } = useMediaElementControls();
   const {
     duration,

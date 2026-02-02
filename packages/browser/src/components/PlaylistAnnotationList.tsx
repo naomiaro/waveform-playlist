@@ -5,7 +5,7 @@ import type {
   AnnotationActionOptions,
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
-import { useRequireAnnotationIntegration } from '../AnnotationIntegrationContext';
+import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
 import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContext';
 import type { OnAnnotationUpdateFn } from '../types/annotations';
 
@@ -62,7 +62,7 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
     linkEndpoints,
     continuousPlay,
   } = usePlaylistState();
-  const integration = useRequireAnnotationIntegration(annotations);
+  const integration = useAnnotationIntegration();
   const { setAnnotations } = usePlaylistControls();
 
   const resolvedConfig = annotationListConfig ?? { linkEndpoints, continuousPlay };
@@ -71,8 +71,6 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
     setAnnotations(updatedAnnotations);
     onAnnotationUpdate?.(updatedAnnotations);
   }, [setAnnotations, onAnnotationUpdate]);
-
-  if (!integration) return null;
 
   const { AnnotationText } = integration;
 

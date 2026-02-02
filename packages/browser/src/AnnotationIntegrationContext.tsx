@@ -4,8 +4,8 @@ import type { AnnotationData } from '@waveform-playlist/core';
 /**
  * Interface for annotation integration provided by @waveform-playlist/annotations.
  *
- * Follows the same pattern as SpectrogramIntegrationContext: the browser package
- * defines what it needs, and the optional annotations package provides it.
+ * The browser package defines what it needs, and the optional annotations package
+ * provides it via <AnnotationProvider>.
  */
 export interface AnnotationIntegration {
   // Parser functions
@@ -27,30 +27,25 @@ export interface AnnotationIntegration {
   DownloadAnnotationsButton: React.ComponentType<{ annotations: AnnotationData[]; filename?: string; className?: string }>;
 }
 
-const AnnotationIntegrationContext = createContext<AnnotationIntegration | null>(null);
+export const AnnotationIntegrationContext = createContext<AnnotationIntegration | null>(null);
 
 export const AnnotationIntegrationProvider = AnnotationIntegrationContext.Provider;
 
-export function useAnnotationIntegration(): AnnotationIntegration | null {
-  return useContext(AnnotationIntegrationContext);
-}
-
 /**
- * Hook that throws if annotations data is provided but AnnotationProvider is missing.
- * Follows the Kent C. Dodds pattern: https://kentcdodds.com/blog/how-to-use-react-context-effectively
+ * Hook to access annotation integration provided by @waveform-playlist/annotations.
+ * Throws if used without <AnnotationProvider> wrapping the component tree.
  *
- * Use this in components that render annotation data (e.g., annotation lists, boxes).
- * Use the non-throwing `useAnnotationIntegration()` for optional UI controls that
- * simply return null when annotations aren't available.
+ * Follows the Kent C. Dodds pattern:
+ * https://kentcdodds.com/blog/how-to-use-react-context-effectively
  */
-export function useRequireAnnotationIntegration(annotations: unknown[]): AnnotationIntegration | null {
-  const integration = useContext(AnnotationIntegrationContext);
-  if (!integration && annotations.length > 0) {
+export function useAnnotationIntegration(): AnnotationIntegration {
+  const context = useContext(AnnotationIntegrationContext);
+  if (!context) {
     throw new Error(
-      'Annotation data was provided but <AnnotationProvider> is missing. ' +
-      'Wrap your app with <AnnotationProvider> from @waveform-playlist/annotations. ' +
+      'useAnnotationIntegration must be used within <AnnotationProvider>. ' +
+      'Install @waveform-playlist/annotations and wrap your app with <AnnotationProvider>. ' +
       'See: https://waveform-playlist.naomiaro.com/docs/guides/annotations'
     );
   }
-  return integration;
+  return context;
 }
