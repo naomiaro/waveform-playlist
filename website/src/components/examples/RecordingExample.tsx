@@ -304,13 +304,14 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   );
 
   const handleRemoveTrack = useCallback(
-    (trackIndex: number) => {
+    async (trackIndex: number) => {
       const trackToRemove = tracks[trackIndex];
       if (!trackToRemove) return;
 
       // Stop recording if we're removing the track being recorded to
+      // Must await so the recorded clip is saved before the track is removed
       if (isRecording && trackToRemove.id === selectedTrackId) {
-        stopRecording();
+        await stopRecording();
       }
 
       // Clear selection if removed track was selected

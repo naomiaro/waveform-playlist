@@ -23,7 +23,7 @@ waveform-playlist is a React component library for building browser-based audio 
 - `@waveform-playlist/playout` — Audio engine: Tone.js playback, global AudioContext
 - `@waveform-playlist/ui-components` — Styled primitives, theming, playhead components
 - `@waveform-playlist/annotations` — Annotation parsing, rendering, keyboard controls
-- `@waveform-playlist/recording` — Microphone access, AudioWorklet recording, VU meter, useIntegratedRecording
+- `@waveform-playlist/recording` — Microphone access, AudioWorklet recording, VU meter, integrated recording hook
 - `@waveform-playlist/webaudio-peaks` — Peak extraction from AudioBuffer
 - `@waveform-playlist/media-element-playout` — HTMLAudioElement playback with pitch-preserving speed control
 - `@waveform-playlist/spectrogram` — Optional spectrogram package: FFT computation, worker-based rendering, color maps, frequency scales. Integrates via `SpectrogramProvider` wrapper
@@ -76,6 +76,13 @@ Both providers use React Context with 4 split contexts for performance.
 - `useExportWav()` — Offline WAV export with effects support
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
 - `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0)
+
+### Recording Hooks (from `@waveform-playlist/recording`)
+
+- `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: mic access, VU meter, start/stop/pause recording, auto-adds clips to selected track
+- `useRecording(stream, options)` — Low-level recording via AudioWorklet with live peaks
+- `useMicrophoneAccess()` — Request mic permission, enumerate devices, get MediaStream
+- `useMicrophoneLevel(stream)` — Real-time VU meter level from mic stream
 
 ## Key Components
 

@@ -44,7 +44,7 @@ export interface PlaylistAnnotationListProps {
  * Standalone annotation text list component for WaveformPlaylistProvider (WebAudio).
  *
  * Requires @waveform-playlist/annotations with AnnotationProvider.
- * Returns null if annotations package is not available.
+ * Throws if used without `<AnnotationProvider>` wrapping the component tree.
  */
 export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
   height,

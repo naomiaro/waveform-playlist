@@ -46,7 +46,7 @@ export interface MediaElementAnnotationListProps {
  * Standalone annotation text list component for MediaElementPlaylistProvider.
  *
  * Requires @waveform-playlist/annotations with AnnotationProvider.
- * Returns null if annotations package is not available.
+ * Throws if used without `<AnnotationProvider>` wrapping the component tree.
  */
 export const MediaElementAnnotationList: React.FC<MediaElementAnnotationListProps> = ({
   height,
