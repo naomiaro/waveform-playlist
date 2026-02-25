@@ -330,9 +330,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     trackStatesRef.current = trackStates;
   }, [trackStates]);
 
-  useEffect(() => {
-    tracksRef.current = tracks;
-  }, [tracks]);
+  tracksRef.current = tracks;
 
   // Keep selection refs in sync for animation loop access
   useEffect(() => {

@@ -18,11 +18,15 @@ export interface ToneAdapterOptions {
 export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter {
   let playout: TonePlayout | null = null;
   let _isPlaying = false;
+  let _playoutGeneration = 0;
 
   function buildPlayout(tracks: ClipTrack[]): void {
     if (playout) {
       playout.dispose();
     }
+
+    _playoutGeneration++;
+    const generation = _playoutGeneration;
 
     playout = new TonePlayout({
       effects: options?.effects,
@@ -59,13 +63,16 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       playout.addTrack({
         clips: clipInfos,
         track: trackObj,
+        effects: track.effects,
       });
     }
 
     playout.applyInitialSoloState();
 
     playout.setOnPlaybackComplete(() => {
-      _isPlaying = false;
+      if (generation === _playoutGeneration) {
+        _isPlaying = false;
+      }
     });
   }
 

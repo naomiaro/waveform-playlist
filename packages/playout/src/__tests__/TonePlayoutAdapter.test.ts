@@ -144,6 +144,19 @@ describe('createToneAdapter', () => {
       adapter.setTracks([makeTrack('t2', [clip])]);
       expect(firstInstance.dispose).toHaveBeenCalled();
     });
+
+    it('passes track effects to playout.addTrack', () => {
+      const adapter = createToneAdapter();
+      const effectsFn = vi.fn();
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      const track = makeTrack('t1', [clip]);
+      (track as Record<string, unknown>).effects = effectsFn;
+      adapter.setTracks([track]);
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const addTrackArg = mockInstance.addTrack.mock.calls[0][0];
+      expect(addTrackArg.effects).toBe(effectsFn);
+    });
   });
 
   describe('play', () => {
@@ -186,6 +199,27 @@ describe('createToneAdapter', () => {
       completionCallback();
 
       expect(adapter.isPlaying()).toBe(false);
+    });
+
+    it('ignores stale completion callback after setTracks rebuild', async () => {
+      const adapter = createToneAdapter();
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([makeTrack('t1', [clip])]);
+      await adapter.play(0);
+      expect(adapter.isPlaying()).toBe(true);
+
+      // Capture the old playout's completion callback
+      const oldInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const oldCallback = oldInstance.setOnPlaybackComplete.mock.calls[0][0];
+
+      // Rebuild with new tracks (simulates setTracks during playback)
+      adapter.setTracks([makeTrack('t2', [clip])]);
+      await adapter.play(0);
+      expect(adapter.isPlaying()).toBe(true);
+
+      // Old callback fires (stale) — should NOT reset isPlaying
+      oldCallback();
+      expect(adapter.isPlaying()).toBe(true);
     });
   });
 
