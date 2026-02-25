@@ -16,7 +16,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "waveform",
@@ -42,7 +44,7 @@
   ],
   "devDependencies": {
     "tsup": "^8.0.1",
-    "typescript": "^5.3.3"
-  },
-  "dependencies": {}
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
+  }
 }
