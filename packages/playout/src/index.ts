@@ -28,3 +28,7 @@ export {
   type FadeConfig,
   type FadeType,
 } from './fades';
+
+// Export Tone.js adapter for engine integration
+export { createToneAdapter } from './TonePlayoutAdapter';
+export type { ToneAdapterOptions } from './TonePlayoutAdapter';
