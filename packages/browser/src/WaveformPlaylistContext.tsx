@@ -469,7 +469,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             // Use current UI state if available, otherwise fall back to track props
             const trackState = currentTrackStates[index];
             const trackObj: Track = {
-              id: `track-${index}`, // Use consistent index-based ID for track controls
+              id: track.id,
               name: track.name,
               gain: trackState?.volume ?? track.volume,
               muted: trackState?.muted ?? track.muted,
@@ -887,10 +887,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = `track-${trackIndex}`;
+      const trackId = tracks[trackIndex]?.id;
+      if (!trackId) return;
       playoutRef.current.setMute(trackId, muted);
     }
-  }, [trackStates]);
+  }, [trackStates, tracks]);
 
   const setTrackSolo = useCallback((trackIndex: number, soloed: boolean) => {
     const newStates = [...trackStates];
@@ -898,10 +899,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = `track-${trackIndex}`;
+      const trackId = tracks[trackIndex]?.id;
+      if (!trackId) return;
       playoutRef.current.setSolo(trackId, soloed);
     }
-  }, [trackStates]);
+  }, [trackStates, tracks]);
 
   const setTrackVolume = useCallback((trackIndex: number, volume: number) => {
     const newStates = [...trackStates];
@@ -909,13 +911,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = `track-${trackIndex}`;
-      const track = playoutRef.current.getTrack(trackId);
-      if (track) {
-        track.setVolume(volume);
+      const trackId = tracks[trackIndex]?.id;
+      if (!trackId) return;
+      const toneTrack = playoutRef.current.getTrack(trackId);
+      if (toneTrack) {
+        toneTrack.setVolume(volume);
       }
     }
-  }, [trackStates]);
+  }, [trackStates, tracks]);
 
   const setTrackPan = useCallback((trackIndex: number, pan: number) => {
     const newStates = [...trackStates];
@@ -923,13 +926,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = `track-${trackIndex}`;
-      const track = playoutRef.current.getTrack(trackId);
-      if (track) {
-        track.setPan(pan);
+      const trackId = tracks[trackIndex]?.id;
+      if (!trackId) return;
+      const toneTrack = playoutRef.current.getTrack(trackId);
+      if (toneTrack) {
+        toneTrack.setPan(pan);
       }
     }
-  }, [trackStates]);
+  }, [trackStates, tracks]);
 
   // Selection
   const setSelection = useCallback((start: number, end: number) => {
