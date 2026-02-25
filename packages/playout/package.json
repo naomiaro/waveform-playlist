@@ -54,5 +54,10 @@
   "peerDependencies": {
     "tone": "^15.0.0",
     "@waveform-playlist/engine": ">=7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@waveform-playlist/engine": {
+      "optional": true
+    }
   }
 }

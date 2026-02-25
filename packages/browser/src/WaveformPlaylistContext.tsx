@@ -252,6 +252,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const playoutRef = useRef<TonePlayout | null>(null);
   const playStartPositionRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
+  const tracksRef = useRef<ClipTrack[]>(tracks);
   const trackStatesRef = useRef<TrackState[]>(trackStates);
   const playbackStartTimeRef = useRef<number>(0); // context.currentTime when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
@@ -328,6 +329,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   useEffect(() => {
     trackStatesRef.current = trackStates;
   }, [trackStates]);
+
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
 
   // Keep selection refs in sync for animation loop access
   useEffect(() => {
@@ -882,58 +887,62 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Track controls
   const setTrackMute = useCallback((trackIndex: number, muted: boolean) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
+
     const newStates = [...trackStates];
     newStates[trackIndex] = { ...newStates[trackIndex], muted };
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = tracks[trackIndex]?.id;
-      if (!trackId) return;
       playoutRef.current.setMute(trackId, muted);
     }
-  }, [trackStates, tracks]);
+  }, [trackStates]);
 
   const setTrackSolo = useCallback((trackIndex: number, soloed: boolean) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
+
     const newStates = [...trackStates];
     newStates[trackIndex] = { ...newStates[trackIndex], soloed };
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = tracks[trackIndex]?.id;
-      if (!trackId) return;
       playoutRef.current.setSolo(trackId, soloed);
     }
-  }, [trackStates, tracks]);
+  }, [trackStates]);
 
   const setTrackVolume = useCallback((trackIndex: number, volume: number) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
+
     const newStates = [...trackStates];
     newStates[trackIndex] = { ...newStates[trackIndex], volume };
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = tracks[trackIndex]?.id;
-      if (!trackId) return;
       const toneTrack = playoutRef.current.getTrack(trackId);
       if (toneTrack) {
         toneTrack.setVolume(volume);
       }
     }
-  }, [trackStates, tracks]);
+  }, [trackStates]);
 
   const setTrackPan = useCallback((trackIndex: number, pan: number) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
+
     const newStates = [...trackStates];
     newStates[trackIndex] = { ...newStates[trackIndex], pan };
     setTrackStates(newStates);
 
     if (playoutRef.current) {
-      const trackId = tracks[trackIndex]?.id;
-      if (!trackId) return;
       const toneTrack = playoutRef.current.getTrack(trackId);
       if (toneTrack) {
         toneTrack.setPan(pan);
       }
     }
-  }, [trackStates, tracks]);
+  }, [trackStates]);
 
   // Selection
   const setSelection = useCallback((start: number, end: number) => {
