@@ -1,4 +1,4 @@
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { ClipTrack, Track } from '@waveform-playlist/core';
 import {
   clipStartTime,
   clipEndTime,
@@ -6,7 +6,6 @@ import {
   clipDurationTime,
 } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import type { Track } from '@waveform-playlist/core';
 import { TonePlayout } from './TonePlayout';
 import type { EffectsFunction } from './TonePlayout';
 import type { ClipInfo } from './ToneTrack';
@@ -64,6 +63,10 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     }
 
     playout.applyInitialSoloState();
+
+    playout.setOnPlaybackComplete(() => {
+      _isPlaying = false;
+    });
   }
 
   return {

@@ -173,6 +173,20 @@ describe('createToneAdapter', () => {
       await adapter.play(0);
       expect(adapter.isPlaying()).toBe(true);
     });
+
+    it('sets isPlaying to false on natural playback completion', async () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 })])]);
+      await adapter.play(0);
+      expect(adapter.isPlaying()).toBe(true);
+
+      // Simulate natural playback completion via the callback
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const completionCallback = mockInstance.setOnPlaybackComplete.mock.calls[0][0];
+      completionCallback();
+
+      expect(adapter.isPlaying()).toBe(false);
+    });
   });
 
   describe('pause', () => {
