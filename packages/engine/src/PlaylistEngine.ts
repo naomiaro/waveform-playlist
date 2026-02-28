@@ -35,6 +35,12 @@ export class PlaylistEngine {
   private _sampleRate: number;
   private _zoomLevels: number[];
   private _zoomIndex: number;
+  private _selectionStart = 0;
+  private _selectionEnd = 0;
+  private _masterVolume = 1.0;
+  private _loopStart = 0;
+  private _loopEnd = 0;
+  private _isLoopEnabled = false;
   private _adapter: PlayoutAdapter | null;
   private _animFrameId: number | null = null;
   private _disposed = false;
@@ -70,6 +76,12 @@ export class PlaylistEngine {
       zoomIndex: this._zoomIndex,
       canZoomIn: this._zoomIndex > 0,
       canZoomOut: this._zoomIndex < this._zoomLevels.length - 1,
+      selectionStart: this._selectionStart,
+      selectionEnd: this._selectionEnd,
+      masterVolume: this._masterVolume,
+      loopStart: this._loopStart,
+      loopEnd: this._loopEnd,
+      isLoopEnabled: this._isLoopEnabled,
     };
   }
 
@@ -260,7 +272,34 @@ export class PlaylistEngine {
   }
 
   setMasterVolume(volume: number): void {
+    if (volume === this._masterVolume) return;
+    this._masterVolume = volume;
     this._adapter?.setMasterVolume(volume);
+    this._emitStateChange();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selection & Loop
+  // ---------------------------------------------------------------------------
+
+  setSelection(start: number, end: number): void {
+    if (start === this._selectionStart && end === this._selectionEnd) return;
+    this._selectionStart = start;
+    this._selectionEnd = end;
+    this._emitStateChange();
+  }
+
+  setLoopRegion(start: number, end: number): void {
+    if (start === this._loopStart && end === this._loopEnd) return;
+    this._loopStart = start;
+    this._loopEnd = end;
+    this._emitStateChange();
+  }
+
+  setLoopEnabled(enabled: boolean): void {
+    if (enabled === this._isLoopEnabled) return;
+    this._isLoopEnabled = enabled;
+    this._emitStateChange();
   }
 
   // ---------------------------------------------------------------------------

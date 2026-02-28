@@ -36,6 +36,12 @@ export interface EngineState {
   zoomIndex: number;
   canZoomIn: boolean;
   canZoomOut: boolean;
+  selectionStart: number;
+  selectionEnd: number;
+  masterVolume: number;
+  loopStart: number;
+  loopEnd: number;
+  isLoopEnabled: boolean;
 }
 
 /**

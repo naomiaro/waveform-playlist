@@ -347,13 +347,16 @@ test.describe('Stem Tracks Example', () => {
 
   test.describe('Keyboard Shortcuts', () => {
     test('Space toggles play/pause', async ({ page }) => {
+      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+
       // Press Space to play
       await page.keyboard.press('Space');
-      await page.waitForTimeout(100);
 
-      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
-      const timeAfterPlay = await timeDisplay.textContent();
-      expect(timeAfterPlay).not.toBe('00:00:00.000');
+      // Wait for time to advance (auto-retrying — tolerates AudioContext init delay)
+      await expect(async () => {
+        const time = await timeDisplay.textContent();
+        expect(time).not.toBe('00:00:00.000');
+      }).toPass({ timeout: 5000 });
 
       // Press Space to pause
       await page.keyboard.press('Space');

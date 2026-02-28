@@ -223,15 +223,16 @@ test.describe('Annotations Example', () => {
       await page.locator('[data-scroll-container]').click();
 
       await page.keyboard.press('Space');
-      await page.waitForTimeout(100);
+
+      // Wait for time to advance (auto-retrying — tolerates AudioContext init delay)
+      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+      await expect(async () => {
+        const time = await timeDisplay.textContent();
+        expect(time).not.toBe('00:00:00.000');
+      }).toPass({ timeout: 5000 });
 
       // Pause
       await page.keyboard.press('Space');
-
-      // Time should have advanced
-      const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
-      const time = await timeDisplay.textContent();
-      expect(time).not.toBe('00:00:00.000');
     });
 
     test('A key adds annotation at playhead', async ({ page }) => {
