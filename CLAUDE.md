@@ -7,6 +7,7 @@ This file contains important context, decisions, and conventions for AI-assisted
 Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas waveform visualizations. Currently undergoing a React refactor (Tone.js overhaul branch).
 
 **Key Dependencies:**
+
 - **Tone.js 15.1.22** - Audio engine for playback, scheduling, and effects
 
 ### Website Aesthetic: Berlin Underground
@@ -21,6 +22,7 @@ The documentation website follows a **Berlin underground/industrial** aesthetic 
 
 **Dark Mode Color Palette - "Ampelmännchen Traffic Light":**
 Inspired by the iconic DDR pedestrian signal with its friendly walking figure and hat.
+
 - 🟢 **Green** (`#63C75F`) - Official Ampelmännchen brand green for buttons/links
 - 🟡 **Amber** (`#c49a6c`) - Warm golden waveform bars and body text
 - 🔴 **Red** (`#d08070`) - Headings and accent elements
@@ -36,6 +38,7 @@ When adding new examples or UI elements, maintain this aesthetic. The Flexible A
 **Semantic Versioning:** Now that v5 is released, follow semver for all changes. Breaking changes require a major version bump.
 
 **Key Milestones Completed:**
+
 - ✅ Phase 1: Foundation (React refactor, provider pattern, all core features)
 - ✅ Phase 1.5: Bundle Optimization (tree-shaking, 23KB gzipped savings)
 - ✅ Phase 2: Clip-Based Model (multiple clips per track)
@@ -56,11 +59,13 @@ npm install @waveform-playlist/browser
 ```
 
 **Version Bumping:** All 12 `package.json` files (root + 11 packages) must be bumped in sync:
+
 ```bash
 sed -i '' 's/"version": "OLD"/"version": "NEW"/g' package.json packages/*/package.json
 ```
 
 **First-time scoped packages:** New `@waveform-playlist/*` packages need `--access public` on first npm publish:
+
 ```bash
 pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access public
 ```
@@ -72,23 +77,27 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 ## Documentation Guidelines
 
 **Where to track progress/updates:**
+
 - ✅ **TODO.md** - Roadmap, recently completed work, session notes, progress updates
 - ✅ **CLAUDE.md** - Architectural decisions, conventions, patterns (minimal, timeless)
 - ✅ **PROJECT_STRUCTURE.md** - Architecture, file organization, data flow (NO progress/todos)
 
 **When completing work:**
+
 1. Update TODO.md "Recently Completed" section with date and details
 2. Update CLAUDE.md only if architectural decision or pattern established
 3. Update PROJECT_STRUCTURE.md only if structure/architecture changed
 4. Never add progress/changelog to PROJECT_STRUCTURE.md
 
 **TODO.md Writing Style:**
+
 - **Keep concise** - Brief task descriptions, avoid verbose explanations
 - Save detailed implementation notes for CLAUDE.md or PROJECT_STRUCTURE.md
 
 ### Documentation Maintenance
 
 **API Source of Truth:**
+
 - Context types (hooks, state, controls): `packages/browser/src/WaveformPlaylistContext.tsx`
 - Context hooks: `usePlaybackAnimation`, `usePlaylistState`, `usePlaylistControls`, `usePlaylistData` (no combined hook — `useWaveformPlaylist` was removed in v6.0.2)
 - MediaElement context types: `packages/browser/src/MediaElementPlaylistContext.tsx`
@@ -103,6 +112,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **Moving/Renaming Doc Pages:** Run `pnpm --filter website build` after moving docs — Docusaurus broken link checker will find all internal links that need updating.
 
 **LLM-Readable Docs:**
+
 - `website/static/llms.txt` — Library discovery page, served at `/llms.txt`. Update when packages, architecture, or key APIs change.
 - `website/docs/api/llm-reference.md` — All TypeScript interfaces from source, no prose. Update when any context type, hook signature, or component prop changes.
 - **Keep both in sync** — When adding new providers or components, update both `llms.txt` and `llm-reference.md`.
@@ -140,6 +150,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - Use transient props (prefix with `$`) for props that shouldn't pass to DOM
 - Example: `$left`, `$width`, `$color`
 - **Use `.attrs()` for frequently changing props** — props that change on every render (positions, sizes, colors) must use `.attrs()` with a `style` object. Putting them in the template literal generates a new CSS class per render, causing "over 200 classes generated" warnings and memory bloat.
+
   ```typescript
   // ✅ GOOD - inline style via .attrs(), single CSS class reused
   const Box = styled.div.attrs<{ $left: number }>((props) => ({
@@ -179,6 +190,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **Key Selectors:** `[data-clip-id]`, `[data-boundary-edge]`, `[data-clip-container]`, `[data-scroll-container]`
 
 **Preventing Flaky Tests:**
+
 - Always `await expect(locator).toBeVisible()` before `boundingBox()` — returns null if element isn't laid out
 - Use `await expect(locator).toHaveCount(n)` (auto-retrying) instead of `expect(await locator.count()).toBe(n)` (one-shot)
 - Wrap post-interaction state checks with `await expect(async () => { ... }).toPass({ timeout: 5000 })` for timing tolerance
@@ -197,11 +209,12 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **Why:** Eliminates floating-point precision errors that cause pixel gaps between clips.
 
 **Types:**
+
 ```typescript
 interface AudioClip {
-  startSample: number;      // Position on timeline (samples)
-  durationSamples: number;  // Clip duration (samples)
-  offsetSamples: number;    // Start within audio file (samples)
+  startSample: number; // Position on timeline (samples)
+  durationSamples: number; // Clip duration (samples)
+  offsetSamples: number; // Start within audio file (samples)
   // ... other properties
 }
 ```
@@ -213,11 +226,13 @@ interface AudioClip {
 **Decision:** Canvas for waveform rendering, DOM/React for interactions.
 
 **Why NOT canvas libraries (Konva, Fabric, PixiJS):**
+
 - Bundle size: 200-500KB vs our 13KB @dnd-kit
 - Unnecessary for waveform-specific rendering
 - Performance overhead for scene graph
 
 **Technology Stack:**
+
 - Rendering: Canvas API (optimized waveform code)
 - Interactions: @dnd-kit (13KB) for drag-and-drop
 - State: React Context + useReducer for undo/redo
@@ -237,6 +252,7 @@ interface AudioClip {
 **Reasoning:** Keep bundle small (~132KB gzipped), maximize user flexibility.
 
 **Approved Approach:**
+
 1. Continue using **styled-components**
 2. Use **Radix UI** or **React Aria** selectively for complex components (headless only)
 3. Build simple components ourselves
@@ -247,6 +263,7 @@ interface AudioClip {
 **Decision:** Add a root flat ESLint config with TypeScript + React Hooks checks.
 
 **Implementation:**
+
 - Config file: `eslint.config.mjs`
 - Root `package.json` devDependencies include:
   - `eslint`, `@eslint/js`
@@ -260,6 +277,7 @@ interface AudioClip {
 **Decision:** Docusaurus-native React components instead of Jekyll + separate bundles.
 
 **Webpack Aliases:** In `website/docusaurus.config.ts`, packages transpiled from source:
+
 - `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source
 - `annotations`, `recording` → dist/ (have build artifacts like worklets)
 
@@ -269,19 +287,23 @@ interface AudioClip {
 // In example page files (website/src/pages/examples/*.tsx)
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 
-const LazyExample = createLazyExample(
-  () => import('../../components/examples/ExampleComponent').then(m => ({ default: m.ExampleComponent }))
+const LazyExample = createLazyExample(() =>
+  import('../../components/examples/ExampleComponent').then((m) => ({
+    default: m.ExampleComponent,
+  }))
 );
 
 // Use <LazyExample /> in the page
 ```
 
 **Why `createLazyExample` instead of just `BrowserOnly`:**
+
 - Some libraries (Radix UI, Tone.js, AudioWorklets) access `window` at import time
 - `BrowserOnly` only prevents rendering, not importing
 - `React.lazy()` defers the import until render time in the browser
 
 **Pattern:**
+
 - Use `useDocusaurusTheme()` hook for automatic light/dark theme
 - Export components as functions (no `createRoot()`)
 - Styled components use CSS variables: `var(--ifm-background-surface-color, #fallback)`
@@ -311,7 +333,7 @@ const LazyExample = createLazyExample(
 15. **Derive Render Guards from Props, Not Effect State** - Don't use effect-set state (e.g., `audioBuffers`) in render guards. Effect state lags props by one+ renders, causing content to flash/disappear. Compute values synchronously from props instead.
 16. **Copy Refs in useEffect Body** - When accessing a ref in `useEffect` cleanup, copy `.current` to a local variable inside the effect body. ESLint's `react-hooks/exhaustive-deps` rule flags refs that may change between render and cleanup.
 17. **Refs from Custom Hooks in Dep Arrays** - When a `useRef` is returned from a custom hook, ESLint's `exhaustive-deps` can't trace its stability. Include it in the dep array (harmless, never triggers) rather than using `eslint-disable-next-line` which would mask real missing dependencies.
-18. **Engine State Ownership** — Engine owns selection, loop, and selectedTrackId; React subscribes to statechange. Engine setters normalize invariants (start <= end). Control callbacks delegate to engine via `engineRef.current?.method()` — React state updated only via statechange subscription, never dual-written.
+18. **Engine State Ownership** — Engine owns selection, loop, and selectedTrackId; React subscribes to statechange. Engine setters normalize invariants (start <= end). Control callbacks delegate to engine via `engineRef.current?.method()` — React state updated only via statechange subscription. Exception: `masterVolume` is still dual-written by `useMasterVolume` hook (consolidation planned for PR 2).
 
 ---
 

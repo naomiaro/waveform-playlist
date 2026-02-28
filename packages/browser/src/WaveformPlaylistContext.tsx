@@ -502,10 +502,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current = engine;
 
         // Subscribe to engine statechange — engine is the source of truth
-        // for selection, loop, and selectedTrackId. Refs are updated
-        // synchronously here so the animation loop always sees fresh values.
-        // Guards avoid unnecessary React setState calls when unrelated
-        // engine events fire (e.g., clip drags, zoom, play/pause).
+        // for selection, loop, and selectedTrackId. Ref assignments are
+        // synchronous (available to the animation loop immediately);
+        // setState calls are batched by React and applied asynchronously.
+        // Guards skip setState when the field didn't actually change,
+        // avoiding unnecessary re-renders during unrelated engine events
+        // (e.g., clip drags, zoom, play/pause).
         engine.on('statechange', (state: EngineState) => {
           if (state.selectionStart !== selectionStartRef.current) {
             selectionStartRef.current = state.selectionStart;
