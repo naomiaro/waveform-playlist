@@ -13,7 +13,12 @@
 - `useDynamicEffects` - Master effects chain with runtime parameter updates
 - `useTrackDynamicEffects` - Per-track effects management
 - `useDynamicTracks` - Runtime track additions with placeholder-then-replace pattern
-- `usePlaybackControls`, `useTimeFormat`, `useZoomControls`, etc.
+- `useSelectionState` - Selection state (start/end) with engine delegation
+- `useLoopState` - Loop state (enabled, start, end) with engine delegation
+- `useSelectedTrack` - Selected track ID with engine delegation
+- `useZoomControls` - Zoom state (samplesPerPixel, canZoomIn/Out) with engine delegation
+- `useMasterVolume` - Master volume with engine delegation
+- `usePlaybackControls`, `useTimeFormat`, etc.
 
 **Location:** `src/hooks/`
 
@@ -177,17 +182,22 @@ useEffect(() => {
 
 ## Engine State Subscription Pattern
 
-**Pattern:** Engine owns state → emits `statechange` → React mirrors into useState/refs.
+**Pattern:** Engine owns state → emits `statechange` → hook's `onEngineState()` mirrors into useState/refs.
 
-**Currently engine-owned:** selectionStart/End, loopStart/End, isLoopEnabled, selectedTrackId, samplesPerPixel, canZoomIn, canZoomOut, masterVolume
+**All engine-owned state uses the `onEngineState()` hook pattern:**
+- `useSelectionState` — selectionStart, selectionEnd
+- `useLoopState` — isLoopEnabled, loopStart, loopEnd
+- `useSelectedTrack` — selectedTrackId
+- `useZoomControls` — samplesPerPixel, canZoomIn, canZoomOut
+- `useMasterVolume` — masterVolume
 
 **Still React-only:** currentTime, isPlaying (animation loop timing), tracks (loaded via useAudioTracks)
 
-**Subscription location:** Inside `loadAudio()` after `engineRef.current = engine`, the statechange handler updates both React state (for UI re-renders) and refs (for 60fps animation loop reads).
+**Subscription location:** Inside `loadAudio()` after `engineRef.current = engine`, the statechange handler calls each hook's `onEngineState(state)`.
 
-**Seed on rebuild:** When `loadAudio()` creates a fresh engine, seed it from current refs (`selectionStartRef`, `loopStartRef`, etc.) before `setTracks()` — otherwise the first statechange resets user state to zeros.
+**Seed on rebuild:** When `loadAudio()` creates a fresh engine, seed it from hook-exposed refs (`selectionStartRef`, `loopStartRef`, etc.) before `setTracks()` — otherwise the first statechange resets user state to zeros.
 
-**Guard handler with ref comparisons:** The handler fires on every engine event (clip drags, zoom, play/pause). Compare `state.field !== fieldRef.current` before calling `setState` to skip unnecessary React updates. Ref assignments are synchronous; `setState` calls are batched by React.
+**Guard handler with ref comparisons:** Each hook's `onEngineState()` compares `state.field !== ref.current` before calling `setState` to skip unnecessary React updates. Ref assignments are synchronous; `setState` calls are batched by React.
 
 ## Important Patterns (Browser-Specific)
 

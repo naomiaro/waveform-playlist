@@ -30,6 +30,9 @@ import {
   useTimeFormat,
   useZoomControls,
   useMasterVolume,
+  useSelectionState,
+  useLoopState,
+  useSelectedTrack,
   useAnimationFrameLoop,
   useWaveformDataCache,
 } from './hooks';
@@ -260,18 +263,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [audioBuffers, setAudioBuffers] = useState<AudioBuffer[]>([]);
   const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]); // Updated for clip-based peaks
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
-  const [selectionStart, setSelectionStart] = useState(0);
-  const [selectionEnd, setSelectionEnd] = useState(0);
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
   const [continuousPlay, setContinuousPlayState] = useState(
     annotationList?.isContinuousPlay ?? false
   );
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? false);
   const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
-  const [isLoopEnabled, setIsLoopEnabledState] = useState(false);
-  const [loopStart, setLoopStartState] = useState(0);
-  const [loopEnd, setLoopEndState] = useState(0);
   const [isReady, setIsReady] = useState(false);
 
   // Refs
@@ -291,14 +288,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
   const activeAnnotationIdRef = useRef<string | null>(null);
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  const isLoopEnabledRef = useRef<boolean>(false);
-  const selectionStartRef = useRef<number>(0);
-  const selectionEndRef = useRef<number>(0);
-  const loopStartRef = useRef<number>(0);
-  const loopEndRef = useRef<number>(0);
-  const selectedTrackIdRef = useRef<string | null>(null);
 
-  // Custom hooks
+  // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
   const zoom = useZoomControls({ engineRef, initialSamplesPerPixel, zoomLevels });
   const { samplesPerPixel, onEngineState: onZoomEngineState } = zoom;
@@ -309,6 +300,31 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     masterVolumeRef,
     onEngineState: onVolumeEngineState,
   } = volume;
+  const {
+    selectionStart,
+    selectionEnd,
+    setSelection: setSelectionEngine,
+    selectionStartRef,
+    selectionEndRef,
+    onEngineState: onSelectionEngineState,
+  } = useSelectionState({ engineRef });
+  const {
+    isLoopEnabled,
+    loopStart,
+    loopEnd,
+    setLoopEnabled,
+    setLoopRegion,
+    clearLoopRegion,
+    isLoopEnabledRef,
+    loopStartRef,
+    loopEndRef,
+    onEngineState: onLoopEngineState,
+  } = useLoopState({ engineRef });
+  const {
+    selectedTrackId,
+    setSelectedTrackId: setSelectedTrackIdControl,
+    onEngineState: onSelectedTrackEngineState,
+  } = useSelectedTrack({ engineRef });
   const { animationFrameRef, startAnimationFrameLoop, stopAnimationFrameLoop } =
     useAnimationFrameLoop();
 
@@ -332,27 +348,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setActiveAnnotationIdState(value); // Update state (triggers re-render)
   }, []);
 
-  // Delegates to engine — statechange subscription updates state + refs
-  const setLoopEnabled = useCallback((value: boolean) => {
-    engineRef.current?.setLoopEnabled(value);
-  }, []);
-
-  // Delegates to engine — statechange subscription updates state + refs
-  const setLoopRegion = useCallback((start: number, end: number) => {
-    engineRef.current?.setLoopRegion(start, end);
-  }, []);
-
+  // Cross-hook concern: reads selection refs to set loop region
   const setLoopRegionFromSelection = useCallback(() => {
-    const start = selectionStartRef.current;
-    const end = selectionEndRef.current;
+    const start = selectionStartRef.current ?? 0;
+    const end = selectionEndRef.current ?? 0;
     if (start !== end && end > start) {
       setLoopRegion(start, end);
     }
-  }, [setLoopRegion]);
-
-  const clearLoopRegion = useCallback(() => {
-    setLoopRegion(0, 0);
-  }, [setLoopRegion]);
+  }, [setLoopRegion, selectionStartRef, selectionEndRef]);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -487,8 +490,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         // Seed engine with current UI state so a fresh engine doesn't
         // reset selection/loop to zeros on the first statechange emission.
-        engine.setSelection(selectionStartRef.current, selectionEndRef.current);
-        engine.setLoopRegion(loopStartRef.current, loopEndRef.current);
+        engine.setSelection(selectionStartRef.current ?? 0, selectionEndRef.current ?? 0);
+        engine.setLoopRegion(loopStartRef.current ?? 0, loopEndRef.current ?? 0);
         if (isLoopEnabledRef.current) engine.setLoopEnabled(true);
         engine.setMasterVolume(masterVolumeRef.current ?? 1.0);
 
@@ -508,39 +511,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engine.setTracks(tracksWithState);
         engineRef.current = engine;
 
-        // Subscribe to engine statechange — engine is the source of truth
-        // for selection, loop, selectedTrackId, zoom, and masterVolume.
-        // Ref assignments are
-        // synchronous (available to the animation loop immediately);
-        // setState calls are batched by React and applied asynchronously.
-        // Guards skip setState when the field didn't actually change,
-        // avoiding unnecessary re-renders during unrelated engine events
-        // (e.g., clip drags, zoom, play/pause).
+        // Subscribe to engine statechange — each hook's onEngineState()
+        // handles its own ref guards and setState calls.
         engine.on('statechange', (state: EngineState) => {
-          if (state.selectionStart !== selectionStartRef.current) {
-            selectionStartRef.current = state.selectionStart;
-            setSelectionStart(state.selectionStart);
-          }
-          if (state.selectionEnd !== selectionEndRef.current) {
-            selectionEndRef.current = state.selectionEnd;
-            setSelectionEnd(state.selectionEnd);
-          }
-          if (state.selectedTrackId !== selectedTrackIdRef.current) {
-            selectedTrackIdRef.current = state.selectedTrackId;
-            setSelectedTrackId(state.selectedTrackId);
-          }
-          if (state.isLoopEnabled !== isLoopEnabledRef.current) {
-            isLoopEnabledRef.current = state.isLoopEnabled;
-            setIsLoopEnabledState(state.isLoopEnabled);
-          }
-          if (state.loopStart !== loopStartRef.current) {
-            loopStartRef.current = state.loopStart;
-            setLoopStartState(state.loopStart);
-          }
-          if (state.loopEnd !== loopEndRef.current) {
-            loopEndRef.current = state.loopEnd;
-            setLoopEndState(state.loopEnd);
-          }
+          onSelectionEngineState(state);
+          onLoopEngineState(state);
+          onSelectedTrackEngineState(state);
           onZoomEngineState(state);
           onVolumeEngineState(state);
         });
@@ -576,9 +552,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     isPlaying,
     effects,
     stopAnimationFrameLoop,
+    onSelectionEngineState,
+    onLoopEngineState,
+    onSelectedTrackEngineState,
     onZoomEngineState,
     onVolumeEngineState,
     masterVolumeRef,
+    selectionStartRef,
+    selectionEndRef,
+    loopStartRef,
+    loopEndRef,
+    isLoopEnabledRef,
     zoomLevels,
   ]);
 
@@ -740,24 +724,25 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       }
 
       // Audacity-style loop region: loop when cursor enters and reaches end of loop region
-      const hasValidLoopRegion =
-        loopStartRef.current !== loopEndRef.current && loopEndRef.current > loopStartRef.current;
+      const loopS = loopStartRef.current ?? 0;
+      const loopE = loopEndRef.current ?? 0;
+      const hasValidLoopRegion = loopS !== loopE && loopE > loopS;
 
       if (isLoopEnabledRef.current && hasValidLoopRegion) {
         // Check if we've reached or passed the loop end point
-        if (time >= loopEndRef.current) {
+        if (time >= loopE) {
           // Loop: restart from loop start
           engineRef.current?.stop();
 
           const context = getContext();
           const timeNow = context.currentTime;
           playbackStartTimeRef.current = timeNow;
-          audioStartPositionRef.current = loopStartRef.current;
-          currentTimeRef.current = loopStartRef.current;
+          audioStartPositionRef.current = loopS;
+          currentTimeRef.current = loopS;
 
           // Restart playback from loop start (no duration limit - will loop again when reaching loop end)
           // Fire-and-forget: adapter.init() is already resolved after first play, so this is synchronous in practice
-          engineRef.current?.play(loopStartRef.current);
+          engineRef.current?.play(loopS);
 
           // Continue animation loop
           startAnimationFrameLoop(updateTime);
@@ -786,6 +771,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     controls.width,
     setActiveAnnotationId,
     startAnimationFrameLoop,
+    isLoopEnabledRef,
+    loopStartRef,
+    loopEndRef,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
@@ -998,11 +986,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [trackStates]
   );
 
-  // Selection — delegates to engine; statechange subscription updates React state + refs.
-  // Also updates currentTime to selection start (playback concern stays in React).
+  // Selection — wraps hook setter with playback side-effects (provider concern).
   const setSelection = useCallback(
     async (start: number, end: number) => {
-      engineRef.current?.setSelection(start, end);
+      setSelectionEngine(start, end);
       currentTimeRef.current = start;
       setCurrentTime(start);
 
@@ -1011,13 +998,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         await engineRef.current.play(start);
       }
     },
-    [isPlaying]
+    [isPlaying, setSelectionEngine]
   );
-
-  // Delegates to engine — statechange subscription updates React state
-  const setSelectedTrackIdControl = useCallback((trackId: string | null) => {
-    engineRef.current?.selectTrack(trackId);
-  }, []);
 
   // Memoize setScrollContainer callback
   const setScrollContainer = useCallback((element: HTMLDivElement | null) => {

@@ -7,6 +7,15 @@ export type { ZoomControls, UseZoomControlsProps } from './useZoomControls';
 export { useMasterVolume } from './useMasterVolume';
 export type { MasterVolumeControls, UseMasterVolumeProps } from './useMasterVolume';
 
+export { useSelectionState } from './useSelectionState';
+export type { SelectionStateControls, UseSelectionStateProps } from './useSelectionState';
+
+export { useLoopState } from './useLoopState';
+export type { LoopStateControls, UseLoopStateProps } from './useLoopState';
+
+export { useSelectedTrack } from './useSelectedTrack';
+export type { SelectedTrackControls, UseSelectedTrackProps } from './useSelectedTrack';
+
 export { useMasterAnalyser } from './useAudioEffects';
 
 export { useAudioTracks } from './useAudioTracks';
