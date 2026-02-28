@@ -497,6 +497,29 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it('normalizes start > end so selectionStart <= selectionEnd', () => {
+      const engine = new PlaylistEngine();
+      engine.setSelection(5.0, 2.0);
+      const state = engine.getState();
+      expect(state.selectionStart).toBe(2.0);
+      expect(state.selectionEnd).toBe(5.0);
+      engine.dispose();
+    });
+
+    it('emits when only start changes', () => {
+      const engine = new PlaylistEngine();
+      engine.setSelection(1.0, 3.0);
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+
+      engine.setSelection(1.5, 3.0);
+      expect(listener).toHaveBeenCalledTimes(1);
+      const state = engine.getState();
+      expect(state.selectionStart).toBe(1.5);
+      expect(state.selectionEnd).toBe(3.0);
+      engine.dispose();
+    });
+
     it('does not emit when selection unchanged', () => {
       const engine = new PlaylistEngine();
       engine.setSelection(1.0, 2.0);
@@ -520,6 +543,15 @@ describe('PlaylistEngine', () => {
       expect(state.loopStart).toBe(2.0);
       expect(state.loopEnd).toBe(5.0);
       expect(listener).toHaveBeenCalledTimes(1);
+      engine.dispose();
+    });
+
+    it('normalizes start > end so loopStart <= loopEnd', () => {
+      const engine = new PlaylistEngine();
+      engine.setLoopRegion(8.0, 3.0);
+      const state = engine.getState();
+      expect(state.loopStart).toBe(3.0);
+      expect(state.loopEnd).toBe(8.0);
       engine.dispose();
     });
 

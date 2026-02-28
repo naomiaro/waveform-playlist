@@ -36,11 +36,17 @@ export interface EngineState {
   zoomIndex: number;
   canZoomIn: boolean;
   canZoomOut: boolean;
+  /** Start of the audio selection range. Guaranteed: selectionStart <= selectionEnd. */
   selectionStart: number;
+  /** End of the audio selection range. Guaranteed: selectionStart <= selectionEnd. */
   selectionEnd: number;
+  /** Master output volume, 0.0–1.0. */
   masterVolume: number;
+  /** Start of the loop region. Guaranteed: loopStart <= loopEnd. */
   loopStart: number;
+  /** End of the loop region. Guaranteed: loopStart <= loopEnd. */
   loopEnd: number;
+  /** Whether loop playback is active. */
   isLoopEnabled: boolean;
 }
 

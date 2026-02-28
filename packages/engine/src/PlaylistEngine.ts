@@ -284,16 +284,20 @@ export class PlaylistEngine {
   // ---------------------------------------------------------------------------
 
   setSelection(start: number, end: number): void {
-    if (start === this._selectionStart && end === this._selectionEnd) return;
-    this._selectionStart = start;
-    this._selectionEnd = end;
+    const s = Math.min(start, end);
+    const e = Math.max(start, end);
+    if (s === this._selectionStart && e === this._selectionEnd) return;
+    this._selectionStart = s;
+    this._selectionEnd = e;
     this._emitStateChange();
   }
 
   setLoopRegion(start: number, end: number): void {
-    if (start === this._loopStart && end === this._loopEnd) return;
-    this._loopStart = start;
-    this._loopEnd = end;
+    const s = Math.min(start, end);
+    const e = Math.max(start, end);
+    if (s === this._loopStart && e === this._loopEnd) return;
+    this._loopStart = s;
+    this._loopEnd = e;
     this._emitStateChange();
   }
 
