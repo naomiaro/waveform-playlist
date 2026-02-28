@@ -297,6 +297,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const selectionEndRef = useRef<number>(0);
   const loopStartRef = useRef<number>(0);
   const loopEndRef = useRef<number>(0);
+  const selectedTrackIdRef = useRef<string | null>(null);
 
   // Custom hooks
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
@@ -478,6 +479,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         const adapter = createToneAdapter({ effects });
         const engine = new PlaylistEngine({ adapter });
 
+        // Seed engine with current UI state so a fresh engine doesn't
+        // reset selection/loop to zeros on the first statechange emission.
+        engine.setSelection(selectionStartRef.current, selectionEndRef.current);
+        engine.setLoopRegion(loopStartRef.current, loopEndRef.current);
+        if (isLoopEnabledRef.current) engine.setLoopEnabled(true);
+
         // Merge current UI state into tracks before passing to engine
         const currentTrackStates = trackStatesRef.current;
         const tracksWithState = tracks.map((track, index) => {
@@ -496,20 +503,34 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         // Subscribe to engine statechange — engine is the source of truth
         // for selection, loop, and selectedTrackId. Refs are updated
-        // synchronously here (handler runs synchronously when engine
-        // methods are called) so the animation loop always sees fresh values.
+        // synchronously here so the animation loop always sees fresh values.
+        // Guards avoid unnecessary React setState calls when unrelated
+        // engine events fire (e.g., clip drags, zoom, play/pause).
         engine.on('statechange', (state: EngineState) => {
-          setSelectionStart(state.selectionStart);
-          setSelectionEnd(state.selectionEnd);
-          selectionStartRef.current = state.selectionStart;
-          selectionEndRef.current = state.selectionEnd;
-          setSelectedTrackId(state.selectedTrackId);
-          setIsLoopEnabledState(state.isLoopEnabled);
-          isLoopEnabledRef.current = state.isLoopEnabled;
-          setLoopStartState(state.loopStart);
-          loopStartRef.current = state.loopStart;
-          setLoopEndState(state.loopEnd);
-          loopEndRef.current = state.loopEnd;
+          if (state.selectionStart !== selectionStartRef.current) {
+            selectionStartRef.current = state.selectionStart;
+            setSelectionStart(state.selectionStart);
+          }
+          if (state.selectionEnd !== selectionEndRef.current) {
+            selectionEndRef.current = state.selectionEnd;
+            setSelectionEnd(state.selectionEnd);
+          }
+          if (state.selectedTrackId !== selectedTrackIdRef.current) {
+            selectedTrackIdRef.current = state.selectedTrackId;
+            setSelectedTrackId(state.selectedTrackId);
+          }
+          if (state.isLoopEnabled !== isLoopEnabledRef.current) {
+            isLoopEnabledRef.current = state.isLoopEnabled;
+            setIsLoopEnabledState(state.isLoopEnabled);
+          }
+          if (state.loopStart !== loopStartRef.current) {
+            loopStartRef.current = state.loopStart;
+            setLoopStartState(state.loopStart);
+          }
+          if (state.loopEnd !== loopEndRef.current) {
+            loopEndRef.current = state.loopEnd;
+            setLoopEndState(state.loopEnd);
+          }
         });
 
         setIsReady(true);
