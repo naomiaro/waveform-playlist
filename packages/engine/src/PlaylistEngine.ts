@@ -112,6 +112,7 @@ export class PlaylistEngine {
   }
 
   selectTrack(trackId: string | null): void {
+    if (trackId === this._selectedTrackId) return;
     this._selectedTrackId = trackId;
     this._emitStateChange();
   }

@@ -145,6 +145,15 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it('selectTrack does not emit when track unchanged', () => {
+      engine.selectTrack('t1');
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+      engine.selectTrack('t1'); // same track
+      expect(listener).not.toHaveBeenCalled();
+      engine.dispose();
+    });
+
     it('copies input tracks to prevent external mutation', () => {
       const tracks = [makeTrack('t1', [])];
       engine.setTracks(tracks);

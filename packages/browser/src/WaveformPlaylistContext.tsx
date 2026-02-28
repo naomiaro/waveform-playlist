@@ -275,8 +275,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [isReady, setIsReady] = useState(false);
 
   // Refs
-  // Engine owns selection, loop, selectedTrackId, and masterVolume state.
+  // Engine owns selection, loop, and selectedTrackId state.
   // React subscribes to engine statechange and mirrors into useState/refs.
+  // masterVolume still uses dual-write (useMasterVolume hook manages React state).
   // Playback timing (currentTime, isPlaying) remains in React for animation loop.
   const engineRef = useRef<PlaylistEngine | null>(null);
   const playStartPositionRef = useRef<number>(0);
