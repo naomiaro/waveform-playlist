@@ -187,6 +187,10 @@ useEffect(() => {
 
 **Subscription location:** Inside `loadAudio()` after `engineRef.current = engine`, the statechange handler updates both React state (for UI re-renders) and refs (for 60fps animation loop reads).
 
+**Seed on rebuild:** When `loadAudio()` creates a fresh engine, seed it from current refs (`selectionStartRef`, `loopStartRef`, etc.) before `setTracks()` — otherwise the first statechange resets user state to zeros.
+
+**Guard handler with ref comparisons:** The handler fires on every engine event (clip drags, zoom, play/pause). Compare `state.field !== fieldRef.current` before calling `setState` to skip unnecessary React updates. Ref assignments are synchronous; `setState` calls are batched by React.
+
 ## Important Patterns (Browser-Specific)
 
 - **Context Value Memoization** - All context value objects in providers must be wrapped with `useMemo`. Extract inline callbacks into `useCallback` first to avoid dependency churn.
