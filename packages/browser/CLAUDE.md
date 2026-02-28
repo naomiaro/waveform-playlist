@@ -175,6 +175,18 @@ useEffect(() => {
 
 **Location:** `src/components/`
 
+## Engine State Subscription Pattern
+
+**Pattern:** Engine owns state → emits `statechange` → React mirrors into useState/refs.
+
+**Currently engine-owned:** selectionStart/End, loopStart/End, isLoopEnabled, selectedTrackId
+
+**Currently dual-write:** masterVolume (useMasterVolume hook manages own React state)
+
+**Still React-only:** currentTime, isPlaying (animation loop timing), tracks (loaded via useAudioTracks)
+
+**Subscription location:** Inside `loadAudio()` after `engineRef.current = engine`, the statechange handler updates both React state (for UI re-renders) and refs (for 60fps animation loop reads).
+
 ## Important Patterns (Browser-Specific)
 
 - **Context Value Memoization** - All context value objects in providers must be wrapped with `useMemo`. Extract inline callbacks into `useCallback` first to avoid dependency churn.
