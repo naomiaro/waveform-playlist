@@ -1,13 +1,13 @@
 import React, {
   createContext,
+  ReactNode,
+  useCallback,
   useContext,
   useEffect,
-  useCallback,
   useMemo,
   useRef,
   useSyncExternalStore,
-  ReactNode,
-} from 'react';
+} from "react";
 
 export interface ScrollViewport {
   scrollLeft: number;
@@ -104,7 +104,7 @@ export const ScrollViewportProvider = ({
     measure();
 
     // Scroll listener throttled via requestAnimationFrame
-    el.addEventListener('scroll', scheduleUpdate, { passive: true });
+    el.addEventListener("scroll", scheduleUpdate, { passive: true });
 
     // ResizeObserver for container width changes
     const resizeObserver = new ResizeObserver(() => {
@@ -113,7 +113,7 @@ export const ScrollViewportProvider = ({
     resizeObserver.observe(el);
 
     return () => {
-      el.removeEventListener('scroll', scheduleUpdate);
+      el.removeEventListener("scroll", scheduleUpdate);
       resizeObserver.disconnect();
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
@@ -168,7 +168,11 @@ export function useScrollViewportSelector<T>(
  * @param totalWidth Total width in CSS pixels of the content being chunked.
  * @param chunkWidth Width of each chunk in CSS pixels (typically MAX_CANVAS_WIDTH, 1000).
  */
-export function useVisibleChunkIndices(totalWidth: number, chunkWidth: number): number[] {
+export function useVisibleChunkIndices(
+  totalWidth: number,
+  chunkWidth: number,
+  originX: number = 0,
+): number[] {
   const visibleChunkKey = useScrollViewportSelector((viewport) => {
     const totalChunks = Math.ceil(totalWidth / chunkWidth);
     const indices: number[] = [];
@@ -178,8 +182,12 @@ export function useVisibleChunkIndices(totalWidth: number, chunkWidth: number): 
       const thisChunkWidth = Math.min(totalWidth - chunkLeft, chunkWidth);
 
       if (viewport) {
-        const chunkEnd = chunkLeft + thisChunkWidth;
-        if (chunkEnd <= viewport.visibleStart || chunkLeft >= viewport.visibleEnd) {
+        const chunkLeftGlobal = originX + chunkLeft;
+        const chunkEndGlobal = chunkLeftGlobal + thisChunkWidth;
+        if (
+          chunkEndGlobal <= viewport.visibleStart ||
+          chunkLeftGlobal >= viewport.visibleEnd
+        ) {
           continue;
         }
       }
@@ -187,13 +195,13 @@ export function useVisibleChunkIndices(totalWidth: number, chunkWidth: number): 
       indices.push(i);
     }
 
-    return indices.join(',');
+    return indices.join(",");
   });
 
   // Memoize on the key string so the returned array is referentially stable
   // between renders — safe to use directly in useLayoutEffect dependency arrays.
   return useMemo(
-    () => visibleChunkKey ? visibleChunkKey.split(',').map(Number) : [],
+    () => (visibleChunkKey ? visibleChunkKey.split(",").map(Number) : []),
     [visibleChunkKey],
   );
 }
