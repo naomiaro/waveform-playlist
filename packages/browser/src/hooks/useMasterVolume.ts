@@ -1,57 +1,55 @@
-import { useState, useCallback, RefObject } from 'react';
-import type { PlaylistEngine } from '@waveform-playlist/engine';
+import { useState, useCallback, useRef, type RefObject } from 'react';
+import type { PlaylistEngine, EngineState } from '@waveform-playlist/engine';
 
 export interface UseMasterVolumeProps {
   engineRef: RefObject<PlaylistEngine | null>;
   initialVolume?: number; // 0-1.0 (linear gain, consistent with Web Audio API)
-  onVolumeChange?: (volume: number) => void;
 }
 
 export interface MasterVolumeControls {
   masterVolume: number;
   setMasterVolume: (volume: number) => void;
+  /** Ref holding the current masterVolume for seeding a fresh engine. */
+  masterVolumeRef: React.RefObject<number>;
 }
 
 /**
- * Hook for managing master volume control
+ * Hook for managing master volume via PlaylistEngine delegation.
  *
- * @example
- * ```tsx
- * const { masterVolume, setMasterVolume } = useMasterVolume({
- *   engineRef,
- *   initialVolume: 1.0,
- * });
- *
- * <MasterVolumeControl
- *   volume={masterVolume}
- *   onChange={setMasterVolume}
- * />
- * ```
+ * setMasterVolume delegates to the engine. State is mirrored back from
+ * the engine via onEngineState(), which the provider's statechange
+ * handler calls on every engine event.
  */
 export function useMasterVolume({
   engineRef,
   initialVolume = 1.0,
-  onVolumeChange,
-}: UseMasterVolumeProps): MasterVolumeControls {
+}: UseMasterVolumeProps): MasterVolumeControls & {
+  onEngineState: (state: EngineState) => void;
+} {
   const [masterVolume, setMasterVolumeState] = useState(initialVolume);
+
+  // Internal ref for statechange guard + engine seeding on rebuild.
+  const masterVolumeRef = useRef(initialVolume);
 
   const setMasterVolume = useCallback(
     (volume: number) => {
-      setMasterVolumeState(volume);
-
-      // Update the engine with linear gain (0-1.0 range)
-      if (engineRef.current) {
-        engineRef.current.setMasterVolume(volume);
-      }
-
-      // Call optional callback
-      onVolumeChange?.(volume);
+      engineRef.current?.setMasterVolume(volume);
     },
-    [engineRef, onVolumeChange]
+    [engineRef]
   );
+
+  // Called by the provider's statechange handler to mirror engine state.
+  const onEngineState = useCallback((state: EngineState) => {
+    if (state.masterVolume !== masterVolumeRef.current) {
+      masterVolumeRef.current = state.masterVolume;
+      setMasterVolumeState(state.masterVolume);
+    }
+  }, []);
 
   return {
     masterVolume,
     setMasterVolume,
+    masterVolumeRef,
+    onEngineState,
   };
 }

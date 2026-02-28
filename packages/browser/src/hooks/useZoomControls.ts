@@ -1,4 +1,5 @@
-import { useState, useCallback, startTransition } from 'react';
+import { useState, useCallback, useRef, startTransition, type RefObject } from 'react';
+import type { PlaylistEngine, EngineState } from '@waveform-playlist/engine';
 
 export interface ZoomControls {
   samplesPerPixel: number;
@@ -9,40 +10,66 @@ export interface ZoomControls {
 }
 
 export interface UseZoomControlsProps {
+  engineRef: RefObject<PlaylistEngine | null>;
   initialSamplesPerPixel: number;
   zoomLevels?: number[]; // Array of samples per pixel values (lower = more zoomed in)
 }
 
-const DEFAULT_ZOOM_LEVELS = [256, 512, 1024, 2048, 4096, 8192];
-
+/**
+ * Hook for managing zoom controls via PlaylistEngine delegation.
+ *
+ * zoomIn/zoomOut delegate to the engine. State is mirrored back from
+ * the engine via onEngineState(), which the provider's statechange
+ * handler calls on every engine event.
+ *
+ * samplesPerPixel updates use startTransition so React treats them as
+ * non-urgent — during playback, animation RAF callbacks interleave
+ * with the zoom re-render instead of being blocked.
+ */
 export function useZoomControls({
+  engineRef,
   initialSamplesPerPixel,
-  zoomLevels = DEFAULT_ZOOM_LEVELS,
-}: UseZoomControlsProps): ZoomControls {
-  const [zoomIndex, setZoomIndex] = useState(() => {
-    const index = zoomLevels.indexOf(initialSamplesPerPixel);
-    return index !== -1 ? index : Math.floor(zoomLevels.length / 2);
-  });
+}: UseZoomControlsProps): ZoomControls & {
+  onEngineState: (state: EngineState) => void;
+} {
+  const [samplesPerPixel, setSamplesPerPixel] = useState(initialSamplesPerPixel);
+  const [canZoomIn, setCanZoomIn] = useState(true);
+  const [canZoomOut, setCanZoomOut] = useState(true);
 
-  const samplesPerPixel = zoomLevels[zoomIndex];
-  const canZoomIn = zoomIndex > 0;
-  const canZoomOut = zoomIndex < zoomLevels.length - 1;
+  // Internal refs for statechange guards — prevent redundant setState
+  // calls during high-frequency engine events (clip drags, play/pause).
+  // Note: samplesPerPixel guard uses the provider's samplesPerPixelRef
+  // (passed via the scroll-adjust effect), NOT a hook-internal ref,
+  // because the scroll-adjust effect needs the old value for scroll ratio.
+  const canZoomInRef = useRef(true);
+  const canZoomOutRef = useRef(true);
+  const samplesPerPixelRef = useRef(initialSamplesPerPixel);
 
-  // Wrap zoom state changes in startTransition so React treats them as
-  // non-urgent. During playback, this allows animation RAF callbacks to
-  // interleave with the zoom re-render. Rapid consecutive zooms are
-  // batched — only the final level triggers peak recalculation.
   const zoomIn = useCallback(() => {
-    startTransition(() => {
-      setZoomIndex((prev) => Math.max(0, prev - 1));
-    });
-  }, []);
+    engineRef.current?.zoomIn();
+  }, [engineRef]);
 
   const zoomOut = useCallback(() => {
-    startTransition(() => {
-      setZoomIndex((prev) => Math.min(zoomLevels.length - 1, prev + 1));
-    });
-  }, [zoomLevels.length]);
+    engineRef.current?.zoomOut();
+  }, [engineRef]);
+
+  // Called by the provider's statechange handler to mirror engine state.
+  const onEngineState = useCallback((state: EngineState) => {
+    if (state.samplesPerPixel !== samplesPerPixelRef.current) {
+      samplesPerPixelRef.current = state.samplesPerPixel;
+      startTransition(() => {
+        setSamplesPerPixel(state.samplesPerPixel);
+      });
+    }
+    if (state.canZoomIn !== canZoomInRef.current) {
+      canZoomInRef.current = state.canZoomIn;
+      setCanZoomIn(state.canZoomIn);
+    }
+    if (state.canZoomOut !== canZoomOutRef.current) {
+      canZoomOutRef.current = state.canZoomOut;
+      setCanZoomOut(state.canZoomOut);
+    }
+  }, []);
 
   return {
     samplesPerPixel,
@@ -50,5 +77,6 @@ export function useZoomControls({
     zoomOut,
     canZoomIn,
     canZoomOut,
+    onEngineState,
   };
 }

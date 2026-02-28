@@ -179,9 +179,7 @@ useEffect(() => {
 
 **Pattern:** Engine owns state → emits `statechange` → React mirrors into useState/refs.
 
-**Currently engine-owned:** selectionStart/End, loopStart/End, isLoopEnabled, selectedTrackId
-
-**Currently dual-write:** masterVolume (useMasterVolume hook manages own React state)
+**Currently engine-owned:** selectionStart/End, loopStart/End, isLoopEnabled, selectedTrackId, samplesPerPixel, canZoomIn, canZoomOut, masterVolume
 
 **Still React-only:** currentTime, isPlaying (animation loop timing), tracks (loaded via useAudioTracks)
 

@@ -275,9 +275,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [isReady, setIsReady] = useState(false);
 
   // Refs
-  // Engine owns selection, loop, and selectedTrackId state.
+  // Engine owns selection, loop, selectedTrackId, zoom, and masterVolume state.
   // React subscribes to engine statechange and mirrors into useState/refs.
-  // masterVolume still uses dual-write (useMasterVolume hook manages React state).
   // Playback timing (currentTime, isPlaying) remains in React for animation loop.
   const engineRef = useRef<PlaylistEngine | null>(null);
   const playStartPositionRef = useRef<number>(0);
@@ -301,12 +300,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Custom hooks
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
-  const zoom = useZoomControls({ initialSamplesPerPixel, zoomLevels });
-  const samplesPerPixel = zoom.samplesPerPixel;
-  const { masterVolume, setMasterVolume } = useMasterVolume({
-    engineRef,
-    initialVolume: 1.0,
-  });
+  const zoom = useZoomControls({ engineRef, initialSamplesPerPixel, zoomLevels });
+  const { samplesPerPixel, onEngineState: onZoomEngineState } = zoom;
+  const volume = useMasterVolume({ engineRef, initialVolume: 1.0 });
+  const {
+    masterVolume,
+    setMasterVolume,
+    masterVolumeRef,
+    onEngineState: onVolumeEngineState,
+  } = volume;
   const { animationFrameRef, startAnimationFrameLoop, stopAnimationFrameLoop } =
     useAnimationFrameLoop();
 
@@ -477,13 +479,18 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         // Create engine with Tone.js adapter
         const adapter = createToneAdapter({ effects });
-        const engine = new PlaylistEngine({ adapter });
+        const engine = new PlaylistEngine({
+          adapter,
+          samplesPerPixel: samplesPerPixelRef.current,
+          zoomLevels,
+        });
 
         // Seed engine with current UI state so a fresh engine doesn't
         // reset selection/loop to zeros on the first statechange emission.
         engine.setSelection(selectionStartRef.current, selectionEndRef.current);
         engine.setLoopRegion(loopStartRef.current, loopEndRef.current);
         if (isLoopEnabledRef.current) engine.setLoopEnabled(true);
+        engine.setMasterVolume(masterVolumeRef.current ?? 1.0);
 
         // Merge current UI state into tracks before passing to engine
         const currentTrackStates = trackStatesRef.current;
@@ -502,7 +509,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current = engine;
 
         // Subscribe to engine statechange — engine is the source of truth
-        // for selection, loop, and selectedTrackId. Ref assignments are
+        // for selection, loop, selectedTrackId, zoom, and masterVolume.
+        // Ref assignments are
         // synchronous (available to the animation loop immediately);
         // setState calls are batched by React and applied asynchronously.
         // Guards skip setState when the field didn't actually change,
@@ -533,6 +541,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             loopEndRef.current = state.loopEnd;
             setLoopEndState(state.loopEnd);
           }
+          onZoomEngineState(state);
+          onVolumeEngineState(state);
         });
 
         setIsReady(true);
@@ -560,7 +570,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current.dispose();
       }
     };
-  }, [tracks, onReady, isPlaying, effects, stopAnimationFrameLoop]);
+  }, [
+    tracks,
+    onReady,
+    isPlaying,
+    effects,
+    stopAnimationFrameLoop,
+    onZoomEngineState,
+    onVolumeEngineState,
+    masterVolumeRef,
+    zoomLevels,
+  ]);
 
   // Regenerate peaks when zoom, mono, or waveformDataCache changes (without reloading audio)
   // Peak sources in priority order:

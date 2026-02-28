@@ -333,7 +333,7 @@ const LazyExample = createLazyExample(() =>
 15. **Derive Render Guards from Props, Not Effect State** - Don't use effect-set state (e.g., `audioBuffers`) in render guards. Effect state lags props by one+ renders, causing content to flash/disappear. Compute values synchronously from props instead.
 16. **Copy Refs in useEffect Body** - When accessing a ref in `useEffect` cleanup, copy `.current` to a local variable inside the effect body. ESLint's `react-hooks/exhaustive-deps` rule flags refs that may change between render and cleanup.
 17. **Refs from Custom Hooks in Dep Arrays** - When a `useRef` is returned from a custom hook, ESLint's `exhaustive-deps` can't trace its stability. Include it in the dep array (harmless, never triggers) rather than using `eslint-disable-next-line` which would mask real missing dependencies.
-18. **Engine State Ownership** — Engine owns selection, loop, and selectedTrackId; React subscribes to statechange. Engine setters normalize invariants (start <= end). Control callbacks delegate to engine via `engineRef.current?.method()` — React state updated only via statechange subscription. Exception: `masterVolume` is still dual-written by `useMasterVolume` hook (consolidation planned for PR 2).
+18. **Engine State Ownership** — Engine owns selection, loop, selectedTrackId, zoom (samplesPerPixel, canZoomIn, canZoomOut), and masterVolume; React subscribes to statechange. Engine setters normalize invariants (start <= end). Control callbacks delegate to engine via `engineRef.current?.method()` — React state updated only via statechange subscription. `useZoomControls` and `useMasterVolume` hooks encapsulate their state and expose `onEngineState()` for the provider's statechange handler.
 
 ---
 

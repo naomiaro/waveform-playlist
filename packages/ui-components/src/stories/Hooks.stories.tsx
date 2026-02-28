@@ -4,7 +4,6 @@ import {
   WaveformPlaylistProvider,
   usePlaylistData,
   usePlaylistControls,
-  useZoomControls,
   useTimeFormat,
   useKeyboardShortcuts,
   getShortcutLabel,
@@ -20,18 +19,16 @@ import type { TimeFormat as TimeFormatType } from '../utils/timeFormat';
  * This pattern allows us to test hooks in Storybook by creating wrapper components.
  */
 
-// useZoomControls hook demo
-const ZOOM_LEVELS = [256, 512, 1024, 2048, 4096];
-
+// Zoom controls via context hooks demo
 const ZoomControlsDemo: React.FC = () => {
-  const { samplesPerPixel, zoomIn, zoomOut, canZoomIn, canZoomOut } = useZoomControls({
-    initialSamplesPerPixel: 1024,
-    zoomLevels: ZOOM_LEVELS,
-  });
+  const { samplesPerPixel, canZoomIn, canZoomOut } = usePlaylistData();
+  const { zoomIn, zoomOut } = usePlaylistControls();
 
   return (
     <div style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
-      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>useZoomControls</h3>
+      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>
+        usePlaylistData + usePlaylistControls (zoom)
+      </h3>
       <div style={{ marginBottom: '1rem' }}>
         <strong>Current:</strong> {samplesPerPixel} samples/pixel
       </div>
@@ -46,7 +43,6 @@ const ZoomControlsDemo: React.FC = () => {
       <div style={{ fontSize: '0.875rem', color: '#666' }}>
         <div>Can zoom in: {canZoomIn ? 'Yes' : 'No'}</div>
         <div>Can zoom out: {canZoomOut ? 'Yes' : 'No'}</div>
-        <div>Available levels: {ZOOM_LEVELS.join(', ')}</div>
       </div>
     </div>
   );
@@ -250,9 +246,8 @@ These stories demonstrate how to test and visualize custom React hooks.
 ## Available Hooks
 
 ### Demoed in Storybook
-- \`useZoomControls\` - Manage zoom levels and navigation
+- \`usePlaylistData\` + \`usePlaylistControls\` - Zoom controls and master volume (via context)
 - \`useTimeFormat\` - Format and parse time values
-- \`useMasterVolume\` - Control master audio volume (via context)
 - \`useKeyboardShortcuts\` - Flexible keyboard shortcut system
 
 ### Require Full Context (not demoed)
@@ -285,7 +280,8 @@ export const ZoomControls: StoryObj = {
   parameters: {
     docs: {
       description: {
-        story: 'The `useZoomControls` hook manages zoom levels for waveform display.',
+        story:
+          'Zoom controls accessed via `usePlaylistData` (state) and `usePlaylistControls` (actions). Engine owns zoom state.',
       },
     },
   },
@@ -315,7 +311,8 @@ export const MasterVolume: StoryObj = {
   parameters: {
     docs: {
       description: {
-        story: 'The `useMasterVolume` hook controls the master audio output volume.',
+        story:
+          'Master volume accessed via `usePlaylistData` (state) and `usePlaylistControls` (actions). Engine owns volume state.',
       },
     },
   },
