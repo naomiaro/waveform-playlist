@@ -13,6 +13,7 @@
  * (e.g., when the AudioContext is suspended and Tone.js Signal doesn't propagate).
  *
  * This uses `_param` which is a private Tone.js 15.x internal.
+ * See: https://github.com/Tonejs/Tone.js/issues/1418
  * Pin the Tone.js version carefully if upgrading.
  *
  * @param signal - A Tone.js Signal or Param wrapper (e.g., `gain.gain`)
