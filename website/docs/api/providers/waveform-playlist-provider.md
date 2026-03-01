@@ -136,6 +136,18 @@ Callback when annotations change. Required for editable annotations to persist.
 
 ### Callbacks
 
+#### `onTracksChange`
+
+**Type:** `(tracks: ClipTrack[]) => void`
+
+Called when engine clip operations (move, trim, split) update the tracks. Use this to keep your parent state in sync with engine mutations:
+
+```tsx
+const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
+
+<WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks}>
+```
+
 #### `onReady`
 
 **Type:** `() => void`
@@ -261,11 +273,14 @@ interface PlaylistDataContextValue {
   sampleRate: number;
   waveHeight: number;
   samplesPerPixel: number;
-  timeFormat: string;
+  timeFormat: TimeFormat;
   masterVolume: number;
   canZoomIn: boolean;
   canZoomOut: boolean;
   isReady: boolean;
+  mono: boolean;
+  playoutRef: RefObject<PlaylistEngine | null>;  // from @waveform-playlist/engine
+  isDraggingRef: MutableRefObject<boolean>;       // true during boundary trim drags
 }
 ```
 
@@ -335,6 +350,8 @@ interface WaveformPlaylistProviderProps {
   // Callbacks
   onReady?: () => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
+  /** Called when engine clip operations (move/trim/split) update tracks */
+  onTracksChange?: (tracks: ClipTrack[]) => void;
 
   // Waveform rendering
   barWidth?: number;

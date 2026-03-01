@@ -20,8 +20,13 @@ import {
   // Specialized hooks
   useAudioTracks,
   useDynamicTracks,
-  useZoomControls,
   useTimeFormat,
+
+  // Engine-delegation hooks (internal, used by provider)
+  useSelectionState,
+  useLoopState,
+  useSelectedTrack,
+  useZoomControls,
   useMasterVolume,
 
   // Drag & drop
@@ -72,16 +77,21 @@ function usePlaylistData(): {
   sampleRate: number;
   duration: number;
   audioBuffers: AudioBuffer[];
+  tracks: ClipTrack[];
+  trackStates: TrackState[];
 
   // Display settings
   samplesPerPixel: number;
   waveHeight: number;
   mono: boolean;
+  masterVolume: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
   controls: { show: boolean; width: number };
 
   // Refs for direct access
-  playoutRef: RefObject<TonePlayout>;
-  scrollContainerRef: RefObject<HTMLDivElement>;
+  playoutRef: RefObject<PlaylistEngine | null>;  // from @waveform-playlist/engine
+  isDraggingRef: MutableRefObject<boolean>;       // true during boundary trim drags
 
   // Loading state
   isReady: boolean;  // True when all tracks are loaded
@@ -406,21 +416,25 @@ function CustomControls() {
 
 ## useZoomControls
 
-Control zoom level.
+Zoom state management with engine delegation. Internal hook used by the provider — delegates `zoomIn()` / `zoomOut()` to the engine and mirrors state via `onEngineState()`.
 
 ### Signature
 
 ```typescript
-function useZoomControls(): {
+function useZoomControls(props: {
+  engineRef: RefObject<PlaylistEngine | null>;
+  initialSamplesPerPixel: number;
+}): {
   samplesPerPixel: number;
   zoomIn: () => void;
   zoomOut: () => void;
   canZoomIn: boolean;
   canZoomOut: boolean;
+  onEngineState: (state: EngineState) => void;
 };
 ```
 
-Note: `useZoomControls` is an internal hook used by the provider. For zooming, use `zoomIn()` and `zoomOut()` from `usePlaylistControls()`, or the `ZoomInButton` / `ZoomOutButton` components.
+Note: For zooming in consumer components, use `zoomIn()` and `zoomOut()` from `usePlaylistControls()`, or the `ZoomInButton` / `ZoomOutButton` components. The `canZoomIn` / `canZoomOut` / `samplesPerPixel` values are also available from `usePlaylistData()`.
 
 ### Example
 
@@ -438,6 +452,92 @@ function ZoomControls() {
   );
 }
 ```
+
+---
+
+## useMasterVolume
+
+Master volume state with engine delegation. Internal hook used by the provider.
+
+### Signature
+
+```typescript
+function useMasterVolume(props: {
+  engineRef: RefObject<PlaylistEngine | null>;
+  initialVolume?: number;  // Default: 1.0
+}): {
+  masterVolume: number;
+  setMasterVolume: (volume: number) => void;
+  masterVolumeRef: RefObject<number>;
+  onEngineState: (state: EngineState) => void;
+};
+```
+
+Note: For consumer components, use `setMasterVolume()` from `usePlaylistControls()` and `masterVolume` from `usePlaylistData()`, or the `MasterVolumeControl` component.
+
+---
+
+## Engine-Delegation Hooks
+
+These hooks follow the **onEngineState pattern**: they delegate mutations to `PlaylistEngine` methods and mirror engine state into React via an `onEngineState()` callback. They are used internally by `WaveformPlaylistProvider` but can be useful for advanced custom providers.
+
+### useSelectionState
+
+Selection state (start/end) with engine delegation.
+
+```typescript
+function useSelectionState(props: {
+  engineRef: RefObject<PlaylistEngine | null>;
+}): {
+  selectionStart: number;
+  selectionEnd: number;
+  setSelection: (start: number, end: number) => void;
+  selectionStartRef: RefObject<number>;
+  selectionEndRef: RefObject<number>;
+  onEngineState: (state: EngineState) => void;
+};
+```
+
+Note: For consumer components, use `setSelection()` from `usePlaylistControls()` and `selectionStart` / `selectionEnd` from `usePlaylistState()`.
+
+### useLoopState
+
+Loop region state with engine delegation.
+
+```typescript
+function useLoopState(props: {
+  engineRef: RefObject<PlaylistEngine | null>;
+}): {
+  isLoopEnabled: boolean;
+  loopStart: number;
+  loopEnd: number;
+  setLoopEnabled: (enabled: boolean) => void;
+  setLoopRegion: (start: number, end: number) => void;
+  isLoopEnabledRef: RefObject<boolean>;
+  loopStartRef: RefObject<number>;
+  loopEndRef: RefObject<number>;
+  onEngineState: (state: EngineState) => void;
+};
+```
+
+Note: For consumer components, use `setLoopEnabled()` / `setLoopRegion()` / `clearLoopRegion()` from `usePlaylistControls()` and loop state from `usePlaylistState()`.
+
+### useSelectedTrack
+
+Selected track ID with engine delegation.
+
+```typescript
+function useSelectedTrack(props: {
+  engineRef: RefObject<PlaylistEngine | null>;
+}): {
+  selectedTrackId: string | null;
+  setSelectedTrackId: (trackId: string | null) => void;
+  selectedTrackIdRef: RefObject<string | null>;
+  onEngineState: (state: EngineState) => void;
+};
+```
+
+Note: For consumer components, use `setSelectedTrackId()` from `usePlaylistControls()` and `selectedTrackId` from `usePlaylistState()`.
 
 ---
 
@@ -592,13 +692,14 @@ function RecordingControls() {
 
 ### useClipDragHandlers
 
-Handles clip dragging (move) and boundary trimming with collision detection.
+Handles clip dragging (move) and boundary trimming with collision detection. Delegates move operations to `engine.moveClip()` and trim operations to `engine.trimClip()`.
 
 ```typescript
 function useClipDragHandlers(options: UseClipDragHandlersOptions): {
   onDragStart: (event: DragStartEvent) => void;
   onDragMove: (event: DragMoveEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
+  onDragCancel: (event: DragCancelEvent) => void;
   collisionModifier: Modifier;
 };
 ```
@@ -611,6 +712,9 @@ interface UseClipDragHandlersOptions {
   onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   sampleRate: number;
+  engineRef: RefObject<PlaylistEngine | null>;
+  /** Ref toggled during boundary trim drags. Obtain from usePlaylistData(). */
+  isDraggingRef: MutableRefObject<boolean>;
 }
 ```
 
@@ -622,15 +726,18 @@ import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 
 function EditablePlaylist() {
   const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
-  const { samplesPerPixel, sampleRate } = usePlaylistData();
+  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
   const sensors = useDragSensors();
 
-  const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
-    tracks,
-    onTracksChange: setTracks,
-    samplesPerPixel,
-    sampleRate,
-  });
+  const { onDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } =
+    useClipDragHandlers({
+      tracks,
+      onTracksChange: setTracks,
+      samplesPerPixel,
+      sampleRate,
+      engineRef: playoutRef,
+      isDraggingRef,
+    });
 
   return (
     <DndContext
@@ -638,6 +745,7 @@ function EditablePlaylist() {
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
       modifiers={[restrictToHorizontalAxis, collisionModifier]}
     >
       <Waveform interactiveClips showClipHeaders />
@@ -664,7 +772,7 @@ Similar to `useClipDragHandlers` but for annotation boxes.
 
 ### useClipSplitting
 
-Split clips at the playhead position.
+Split clips at the playhead position. Delegates to `engine.splitClip()` — the engine handles clip creation, adapter sync, and statechange emission.
 
 ```typescript
 function useClipSplitting(options: UseClipSplittingOptions): UseClipSplittingResult;
@@ -675,9 +783,9 @@ function useClipSplitting(options: UseClipSplittingOptions): UseClipSplittingRes
 ```typescript
 interface UseClipSplittingOptions {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
-  selectedTrackId?: string | null;
-  selectedClipId?: string | null;
+  sampleRate: number;
+  samplesPerPixel: number;
+  engineRef: RefObject<PlaylistEngine | null>;
 }
 ```
 
@@ -685,8 +793,8 @@ interface UseClipSplittingOptions {
 
 ```typescript
 interface UseClipSplittingResult {
-  splitClipAtPlayhead: () => void;
-  canSplit: boolean;
+  splitClipAtPlayhead: () => boolean;
+  splitClipAt: (trackIndex: number, clipIndex: number, splitTime: number) => boolean;
 }
 ```
 
@@ -694,19 +802,17 @@ interface UseClipSplittingResult {
 
 ```tsx
 function SplitButton() {
-  const { selectedTrackId } = usePlaylistState();
-  const { tracks } = usePlaylistData();
-  const [localTracks, setLocalTracks] = useState(tracks);
+  const { tracks, sampleRate, samplesPerPixel, playoutRef } = usePlaylistData();
 
-  const { splitClipAtPlayhead, canSplit } = useClipSplitting({
-    tracks: localTracks,
-    onTracksChange: setLocalTracks,
-    selectedTrackId,
-    selectedClipId: null, // Set from your own state if needed
+  const { splitClipAtPlayhead } = useClipSplitting({
+    tracks,
+    sampleRate,
+    samplesPerPixel,
+    engineRef: playoutRef,
   });
 
   return (
-    <button onClick={splitClipAtPlayhead} disabled={!canSplit}>
+    <button onClick={splitClipAtPlayhead}>
       Split Clip (S)
     </button>
   );
