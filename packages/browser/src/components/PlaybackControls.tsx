@@ -15,18 +15,13 @@ export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
   const handleClick = async () => {
     const hasSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;
 
-    if (hasSelection) {
-      if (isLoopEnabled) {
-        // With loop: Start from selection start, let loop logic handle boundaries
-        // Playback continues until it gets trapped in loop or reaches end
-        await play(selectionStart);
-      } else {
-        // Without loop: Play selection region only, then stop
-        const duration = selectionEnd - selectionStart;
-        await play(selectionStart, duration);
-      }
+    if (hasSelection && !isLoopEnabled) {
+      // Without loop: Play selection region only, then stop
+      const duration = selectionEnd - selectionStart;
+      await play(selectionStart, duration);
     } else {
-      // No selection: Play from current position to the end
+      // With loop or no selection: Play from current cursor position.
+      // Transport loop handles boundaries when loop is enabled.
       await play(currentTimeRef.current ?? 0);
     }
   };
