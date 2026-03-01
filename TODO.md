@@ -17,6 +17,11 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 - [ ] Add `renderPlayhead` prop to `MediaElementWaveform` (already exists in `Waveform`)
 
+### Playback UX
+
+- [ ] **Eager AudioContext resume** — Resume AudioContext on first user interaction (click/keydown) within playlist, before play is pressed. Eliminates ~200-500ms delay on first space bar press. Use `resumeGlobalAudioContext()` (raw context resume), NOT `Tone.start()` which adds ~2s latency on Safari if called redundantly.
+- [ ] **Fix remaining flaky E2E tests** — `annotations.spec.ts` and `effects.spec.ts` still use `waitForTimeout(200)` for playback assertions. Replace with `.toPass({ timeout: 5000 })` retry pattern (already fixed in `stem-tracks.spec.ts`).
+
 ### Nice to Have
 
 - [ ] Migration guide from v4
