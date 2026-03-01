@@ -34,9 +34,9 @@ export interface PlayheadProps {
   isPlaying: boolean;
   /** Ref to current time in seconds - use for smooth animation during playback */
   currentTimeRef: React.RefObject<number>;
-  /** Audio context start time when playback began - for calculating elapsed time */
+  /** Audio context start time when playback began. Fallback when getPlaybackTime is not provided. */
   playbackStartTimeRef: React.RefObject<number>;
-  /** Audio position when playback started - for calculating current position */
+  /** Audio position when playback started. Fallback when getPlaybackTime is not provided. */
   audioStartPositionRef: React.RefObject<number>;
   /** Samples per pixel - for converting time to pixels */
   samplesPerPixel: number;

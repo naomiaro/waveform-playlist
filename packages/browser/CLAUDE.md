@@ -101,7 +101,7 @@ const rebuildChain = useCallback(() => {
 
 **Problem:** React state updates during playback cause flickering. Components need 60fps updates.
 
-**Solution:** `requestAnimationFrame` + direct DOM manipulation via refs. Calculate time from `getContext().currentTime` (Tone.js) for perfect audio sync. No `setState` in the loop.
+**Solution:** `requestAnimationFrame` + direct DOM manipulation via refs. Read time via `getPlaybackTime()` which delegates to `Transport.seconds` for perfect audio sync. No `setState` in the loop.
 
 **Key points:** Use `getPlaybackTime()` (from `usePlaybackAnimation()`) — delegates to `engine.getCurrentTime()` which reads `Transport.seconds` (auto-wraps at loop boundaries). Fallback: manual elapsed calculation from `audioContext.currentTime`. Update DOM directly. Cancel animation frame on cleanup.
 

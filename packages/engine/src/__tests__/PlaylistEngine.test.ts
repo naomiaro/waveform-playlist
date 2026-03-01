@@ -624,6 +624,31 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it('play() does not call setLoop when loop is disabled', async () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setLoopRegion(1.0, 3.0);
+      // Loop is disabled (default)
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      await engine.play(0);
+      expect(adapter.setLoop).not.toHaveBeenCalled();
+      engine.dispose();
+    });
+
+    it('pause() does not disable Transport loop', async () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setLoopRegion(1.0, 3.0);
+      engine.setLoopEnabled(true);
+      await engine.play();
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      engine.pause();
+      expect(adapter.setLoop).not.toHaveBeenCalled();
+      engine.dispose();
+    });
+
     it('stop() disables Transport loop before stopping', async () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });

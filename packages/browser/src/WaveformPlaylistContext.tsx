@@ -761,11 +761,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Returns current playback time from engine (auto-wraps at loop boundaries).
   // Falls back to manual calculation when engine is unavailable.
+  const getPlaybackTimeFallbackWarnedRef = useRef(false);
   const getPlaybackTime = useCallback(() => {
     if (engineRef.current) {
       return engineRef.current.getCurrentTime();
     }
-    // Fallback: manual calculation
+    // Fallback: manual calculation (does not handle loop wrapping)
+    if (!getPlaybackTimeFallbackWarnedRef.current) {
+      getPlaybackTimeFallbackWarnedRef.current = true;
+      console.warn(
+        '[waveform-playlist] getPlaybackTime called without engine. ' +
+          'Falling back to manual elapsed time (loop wrapping will not work).'
+      );
+    }
     const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
     return (audioStartPositionRef.current ?? 0) + elapsed;
   }, []);
@@ -851,7 +859,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Transport.seconds auto-wraps at loop boundaries, so getPlaybackTime() returns
       // the correct position without manual detection here.
 
-      if (time >= duration) {
+      if (time >= duration && !isLoopEnabledRef.current) {
         // Stop playback - inline to avoid circular dependency
         if (engineRef.current) {
           engineRef.current.stop();
@@ -873,6 +881,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setActiveAnnotationId,
     startAnimationFrameLoop,
     getPlaybackTime,
+    isLoopEnabledRef,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;

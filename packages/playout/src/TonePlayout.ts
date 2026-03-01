@@ -168,13 +168,21 @@ export class TonePlayout {
   }
 
   pause(): void {
-    getTransport().pause();
+    try {
+      getTransport().pause();
+    } catch (err) {
+      console.warn('[waveform-playlist] Transport.pause() failed:', err);
+    }
     this.tracks.forEach((track) => track.cancelFades());
     this.clearCompletionEvent();
   }
 
   stop(): void {
-    getTransport().stop();
+    try {
+      getTransport().stop();
+    } catch (err) {
+      console.warn('[waveform-playlist] Transport.stop() failed:', err);
+    }
     this.tracks.forEach((track) => track.cancelFades());
     this.clearCompletionEvent();
   }
@@ -236,12 +244,21 @@ export class TonePlayout {
 
     if (enabled && !this._loopHandler) {
       this._loopHandler = () => {
-        // Re-schedule fades for the new loop iteration
+        // Re-schedule fades for the new loop iteration.
+        // Transport stops all synced sources at loopEnd and restarts at loopStart.
+        // Fade envelopes (AudioParam automations) don't persist across this cycle.
         const currentTime = now();
         const transportOffset = transport.seconds;
         this.tracks.forEach((track) => {
-          track.cancelFades();
-          track.prepareFades(currentTime, transportOffset);
+          try {
+            track.cancelFades();
+            track.prepareFades(currentTime, transportOffset);
+          } catch (err) {
+            console.warn(
+              `[waveform-playlist] Error re-scheduling fades for track "${track.id}" on loop:`,
+              err
+            );
+          }
         });
       };
       transport.on('loop', this._loopHandler);

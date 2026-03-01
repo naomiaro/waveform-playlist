@@ -24,7 +24,7 @@ interface AnimatedPlayheadProps {
 
 /**
  * Animated playhead that updates position via direct DOM manipulation.
- * Calculates time directly from audio context for perfect synchronization.
+ * Reads playback time from the engine via getPlaybackTime() for Transport-synced positioning.
  * Uses requestAnimationFrame for smooth 60fps animation without React re-renders.
  */
 export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({

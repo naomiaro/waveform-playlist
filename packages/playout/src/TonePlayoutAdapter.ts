@@ -25,7 +25,12 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
   function buildPlayout(tracks: ClipTrack[]): void {
     if (playout) {
-      playout.dispose();
+      try {
+        playout.dispose();
+      } catch (err) {
+        console.warn('[waveform-playlist] Error disposing previous playout during rebuild:', err);
+      }
+      playout = null;
     }
 
     _playoutGeneration++;
