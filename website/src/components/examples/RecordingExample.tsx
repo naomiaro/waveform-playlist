@@ -121,7 +121,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   onAddTrack,
 }) => {
   const { currentTime } = usePlaybackAnimation();
-  const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
+  const { sampleRate, samplesPerPixel, controls, playoutRef } = usePlaylistData();
   const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId } = usePlaylistControls();
   const { isAutomaticScroll } = usePlaylistState();
 
@@ -137,6 +137,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     onTracksChange: setTracks,
     samplesPerPixel,
     sampleRate,
+    engineRef: playoutRef,
   });
 
   // Drop zone state
@@ -496,6 +497,7 @@ export function RecordingExample() {
       <Container>
         <WaveformPlaylistProvider
           tracks={tracks}
+          onTracksChange={setTracks}
           samplesPerPixel={1024}
           zoomLevels={[256, 512, 1024, 2048, 4096]}
           mono

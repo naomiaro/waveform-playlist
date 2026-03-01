@@ -278,6 +278,51 @@ describe('PlaylistEngine', () => {
     });
   });
 
+  describe('clip editing adapter sync', () => {
+    it('moveClip syncs adapter with updated tracks', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      const clip1 = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      const clip2 = makeClip({ id: 'c2', startSample: 88200, durationSamples: 44100 });
+      engine.setTracks([makeTrack('t1', [clip1, clip2])]);
+      (adapter.setTracks as ReturnType<typeof vi.fn>).mockClear();
+
+      engine.moveClip('t1', 'c1', 22050);
+      expect(adapter.setTracks).toHaveBeenCalledTimes(1);
+      const tracks = (adapter.setTracks as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(tracks[0].clips[0].startSample).toBe(22050);
+      engine.dispose();
+    });
+
+    it('trimClip syncs adapter with updated tracks', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      engine.setTracks([makeTrack('t1', [clip])]);
+      (adapter.setTracks as ReturnType<typeof vi.fn>).mockClear();
+
+      engine.trimClip('t1', 'c1', 'right', -22050);
+      expect(adapter.setTracks).toHaveBeenCalledTimes(1);
+      const tracks = (adapter.setTracks as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(tracks[0].clips[0].durationSamples).toBe(22050);
+      engine.dispose();
+    });
+
+    it('splitClip syncs adapter with updated tracks', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100, name: 'Clip 1' });
+      engine.setTracks([makeTrack('t1', [clip])]);
+      (adapter.setTracks as ReturnType<typeof vi.fn>).mockClear();
+
+      engine.splitClip('t1', 'c1', 22050);
+      expect(adapter.setTracks).toHaveBeenCalledTimes(1);
+      const tracks = (adapter.setTracks as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(tracks[0].clips).toHaveLength(2);
+      engine.dispose();
+    });
+  });
+
   describe('zoom', () => {
     it('zooms in and out', () => {
       const levels = [256, 512, 1024, 2048];

@@ -1,12 +1,14 @@
-import { useCallback } from 'react';
-import { type ClipTrack, createClip } from '@waveform-playlist/core';
+import React, { useCallback } from 'react';
+import type { ClipTrack } from '@waveform-playlist/core';
+import { calculateSplitPoint, canSplitAt } from '@waveform-playlist/engine';
+import type { PlaylistEngine } from '@waveform-playlist/engine';
 import { usePlaybackAnimation, usePlaylistState } from '../WaveformPlaylistContext';
 
 export interface UseClipSplittingOptions {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
   sampleRate: number;
   samplesPerPixel: number;
+  engineRef: React.RefObject<PlaylistEngine | null>;
 }
 
 export interface UseClipSplittingResult {
@@ -17,6 +19,10 @@ export interface UseClipSplittingResult {
 /**
  * Hook for splitting clips at the playhead or at a specific time
  *
+ * Splitting delegates to `engine.splitClip()` — the engine handles clip creation,
+ * adapter sync, and emits statechange. The provider's statechange handler propagates
+ * the updated tracks to the parent via `onTracksChange`.
+ *
  * @param options - Configuration options
  * @returns Object with split functions
  *
@@ -24,8 +30,9 @@ export interface UseClipSplittingResult {
  * ```tsx
  * const { splitClipAtPlayhead } = useClipSplitting({
  *   tracks,
- *   onTracksChange: setTracks,
- *   currentTime,
+ *   sampleRate,
+ *   samplesPerPixel,
+ *   engineRef: playoutRef,
  * });
  *
  * // In keyboard handler
@@ -37,7 +44,7 @@ export interface UseClipSplittingResult {
  * ```
  */
 export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
-  const { tracks, onTracksChange, sampleRate } = options;
+  const { tracks, sampleRate, engineRef } = options;
   const { currentTimeRef } = usePlaybackAnimation();
   const { selectedTrackId } = usePlaylistState();
 
@@ -51,10 +58,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
    */
   const splitClipAt = useCallback(
     (trackIndex: number, clipIndex: number, splitTime: number): boolean => {
-      // Work with samples and pixels (all integers!) to avoid floating-point precision issues
-      // Key insight: A pixel represents a RANGE of samples (samplesPerPixel samples)
-      // By working in samples, we eliminate all floating-point errors
-      const { sampleRate, samplesPerPixel } = options;
+      const { samplesPerPixel } = options;
 
       const track = tracks[trackIndex];
       if (!track) return false;
@@ -62,85 +66,25 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       const clip = track.clips[clipIndex];
       if (!clip) return false;
 
-      // Convert clip positions from samples to seconds for bounds checking
-      const clipStartTime = clip.startSample / sampleRate;
-      const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
+      // Convert split time to sample position, snapped to pixel boundary
+      const splitSample = Math.round(splitTime * sampleRate);
+      const snappedSplitSample = calculateSplitPoint(splitSample, samplesPerPixel);
 
-      // Validate that split time is within clip bounds
-      if (splitTime <= clipStartTime || splitTime >= clipEndTime) {
-        console.warn('Split time is outside clip bounds');
+      // Validate split using engine's pure function
+      const MIN_DURATION_SAMPLES = Math.floor(0.1 * sampleRate);
+      if (!canSplitAt(clip, snappedSplitSample, MIN_DURATION_SAMPLES)) {
+        console.warn('Split point is invalid (outside bounds or too close to edge)');
         return false;
       }
 
-      // Convert split time from seconds to samples (round to nearest sample)
-      const splitSample = Math.round(splitTime * sampleRate);
+      // Delegate to engine — handles clip creation, adapter sync, and emits statechange
+      const engine = engineRef.current;
+      if (!engine) return false;
 
-      // Calculate pixel positions from sample positions using integer division
-      const splitPixel = Math.floor(splitSample / samplesPerPixel);
-      const clipEndSample = clip.startSample + clip.durationSamples;
-
-      // Calculate sample positions from exact pixel boundaries
-      // Both clips share the same boundary: the start of the split pixel
-      const snappedSplitSample = splitPixel * samplesPerPixel;
-
-      // First clip: starts at clip's original start, ends at split pixel boundary
-      const firstClipStartSample = clip.startSample;
-      const firstClipDurationSamples = snappedSplitSample - firstClipStartSample;
-
-      // Second clip: starts at split pixel boundary, ends at clip's original end
-      const secondClipStartSample = snappedSplitSample;
-      const secondClipDurationSamples = clipEndSample - secondClipStartSample;
-
-      // Calculate offset increment for second clip (in samples)
-      const offsetIncrement = snappedSplitSample - clip.startSample;
-
-      // Create first clip (from start to split point)
-      const firstClip = createClip({
-        audioBuffer: clip.audioBuffer,
-        startSample: firstClipStartSample,
-        durationSamples: firstClipDurationSamples,
-        offsetSamples: clip.offsetSamples,
-        sampleRate: clip.sampleRate,
-        sourceDurationSamples: clip.sourceDurationSamples,
-        gain: clip.gain,
-        name: clip.name ? `${clip.name} (1)` : undefined,
-        color: clip.color,
-        fadeIn: clip.fadeIn,
-        waveformData: clip.waveformData, // Share waveformData - slicing happens at render time
-        // Note: fadeOut removed for first clip since it's cut
-      });
-
-      // Create second clip (from split point to end)
-      const secondClip = createClip({
-        audioBuffer: clip.audioBuffer,
-        startSample: secondClipStartSample,
-        durationSamples: secondClipDurationSamples,
-        offsetSamples: clip.offsetSamples + offsetIncrement,
-        sampleRate: clip.sampleRate,
-        sourceDurationSamples: clip.sourceDurationSamples,
-        gain: clip.gain,
-        name: clip.name ? `${clip.name} (2)` : undefined,
-        color: clip.color,
-        waveformData: clip.waveformData, // Share waveformData - slicing happens at render time
-        // Note: fadeIn removed for second clip since it's cut
-        fadeOut: clip.fadeOut,
-      });
-
-      // Create new clips array with the split clips
-      const newClips = [...track.clips];
-      newClips.splice(clipIndex, 1, firstClip, secondClip);
-
-      // Update the track with new clips
-      const newTracks = [...tracks];
-      newTracks[trackIndex] = {
-        ...track,
-        clips: newClips,
-      };
-
-      onTracksChange(newTracks);
+      engine.splitClip(track.id, clip.id, snappedSplitSample);
       return true;
     },
-    [tracks, onTracksChange, options]
+    [tracks, options, sampleRate, engineRef]
   );
 
   /**

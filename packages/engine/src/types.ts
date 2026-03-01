@@ -27,6 +27,8 @@ export interface PlayoutAdapter {
  */
 export interface EngineState {
   tracks: ClipTrack[];
+  /** Monotonic counter incremented on any tracks mutation (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). */
+  tracksVersion: number;
   duration: number;
   currentTime: number;
   isPlaying: boolean;

@@ -1,12 +1,16 @@
 import React from 'react';
 import type { DragEndEvent, DragStartEvent, DragMoveEvent, Modifier } from '@dnd-kit/core';
 import type { ClipTrack } from '@waveform-playlist/core';
+import { sortClipsByTime } from '@waveform-playlist/core';
+import { constrainClipDrag, constrainBoundaryTrim } from '@waveform-playlist/engine';
+import type { PlaylistEngine } from '@waveform-playlist/engine';
 
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   sampleRate: number;
+  engineRef: React.RefObject<PlaylistEngine | null>;
 }
 
 /**
@@ -15,6 +19,10 @@ interface UseClipDragHandlersOptions {
  * Provides drag handlers and collision modifier for use with @dnd-kit/core DndContext.
  * Handles both clip movement (dragging entire clips) and boundary trimming (adjusting clip edges).
  *
+ * Clip movement delegates to `engine.moveClip()` — the engine handles constraints,
+ * updates the adapter, and emits statechange. The provider's statechange handler
+ * propagates the updated tracks to the parent via `onTracksChange`.
+ *
  * @example
  * ```tsx
  * const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
@@ -22,6 +30,7 @@ interface UseClipDragHandlersOptions {
  *   onTracksChange: setTracks,
  *   samplesPerPixel,
  *   sampleRate,
+ *   engineRef: playoutRef,
  * });
  *
  * return (
@@ -41,6 +50,7 @@ export function useClipDragHandlers({
   onTracksChange,
   samplesPerPixel,
   sampleRate,
+  engineRef,
 }: UseClipDragHandlersOptions) {
   // Store original clip state when drag starts (for cumulative delta application)
   const originalClipStateRef = React.useRef<{
@@ -49,7 +59,8 @@ export function useClipDragHandlers({
     startSample: number;
   } | null>(null);
 
-  // Custom modifier for real-time collision detection during clip movement
+  // Custom modifier for real-time collision detection during clip movement.
+  // Uses the engine's constrainClipDrag pure function for constraint math.
   const collisionModifier = React.useCallback(
     (args: Parameters<Modifier>[0]) => {
       const { transform, active } = args;
@@ -74,44 +85,14 @@ export function useClipDragHandlers({
       const clip = track.clips[clipIndex];
       if (!clip) return { ...transform, scaleX: 1, scaleY: 1 };
 
-      // Convert sample-based properties to time for calculations
-      const clipStartTime = clip.startSample / sampleRate;
-      const clipDuration = clip.durationSamples / sampleRate;
+      // Convert pixel delta to samples and use engine's constrainClipDrag
+      const deltaSamples = transform.x * samplesPerPixel;
+      const sortedClips = sortClipsByTime(track.clips);
+      const sortedIndex = sortedClips.findIndex((c) => c.id === clip.id);
+      const constrainedDelta = constrainClipDrag(clip, deltaSamples, sortedClips, sortedIndex);
 
-      // Convert pixel delta to time delta
-      const timeDelta = (transform.x * samplesPerPixel) / sampleRate;
-
-      // Handle clip movement (not trimming)
-      let newStartTime = clipStartTime + timeDelta;
-
-      // Get sorted clips for collision detection
-      const sortedClips = [...track.clips].sort((a, b) => a.startSample - b.startSample);
-      const sortedIndex = sortedClips.findIndex((c) => c === clip);
-
-      // Constraint 1: Cannot go before time 0
-      newStartTime = Math.max(0, newStartTime);
-
-      // Constraint 2: Cannot overlap with previous clip
-      const previousClip = sortedIndex > 0 ? sortedClips[sortedIndex - 1] : null;
-      if (previousClip) {
-        const previousEndTime =
-          (previousClip.startSample + previousClip.durationSamples) / sampleRate;
-        newStartTime = Math.max(newStartTime, previousEndTime);
-      }
-
-      // Constraint 3: Cannot overlap with next clip
-      const nextClip = sortedIndex < sortedClips.length - 1 ? sortedClips[sortedIndex + 1] : null;
-      if (nextClip) {
-        const newEndTime = newStartTime + clipDuration;
-        const nextClipStartTime = nextClip.startSample / sampleRate;
-        if (newEndTime > nextClipStartTime) {
-          newStartTime = nextClipStartTime - clipDuration;
-        }
-      }
-
-      // Convert constrained time back to pixel delta
-      const constrainedTimeDelta = newStartTime - clipStartTime;
-      const constrainedX = (constrainedTimeDelta * sampleRate) / samplesPerPixel;
+      // Convert constrained sample delta back to pixel delta
+      const constrainedX = constrainedDelta / samplesPerPixel;
 
       return {
         ...transform,
@@ -120,7 +101,7 @@ export function useClipDragHandlers({
         scaleY: 1,
       };
     },
-    [tracks, samplesPerPixel, sampleRate]
+    [tracks, samplesPerPixel]
   );
 
   const onDragStart = React.useCallback(
@@ -195,66 +176,23 @@ export function useClipDragHandlers({
           const audioBufferDurationSamples = clip.sourceDurationSamples;
 
           if (boundary === 'left') {
-            // Left boundary drag: moving left (negative delta) expands clip, moving right shrinks it
-            // The RIGHT edge stays fixed. We're moving the LEFT edge.
-            //
-            // When dragging left (sampleDelta < 0):
-            //   - startSample decreases (moves left)
-            //   - durationSamples increases (clip gets longer)
-            //   - offsetSamples decreases (reveal earlier audio from buffer)
-            //
-            // When dragging right (sampleDelta > 0):
-            //   - startSample increases (moves right)
-            //   - durationSamples decreases (clip gets shorter)
-            //   - offsetSamples increases (hide earlier audio)
+            // Use constrainBoundaryTrim from engine for the left boundary.
+            // Build a temporary clip with original state for constraint calculation.
+            const tempClip = {
+              ...clip,
+              startSample: originalClip.startSample,
+              offsetSamples: originalClip.offsetSamples,
+              durationSamples: originalClip.durationSamples,
+            };
+            const constrainedDelta = constrainBoundaryTrim(
+              tempClip,
+              Math.floor(sampleDelta),
+              'left',
+              sortedClips,
+              sortedIndex,
+              MIN_DURATION_SAMPLES
+            );
 
-            // Calculate the constrained delta first, then apply it uniformly
-            let constrainedDelta = Math.floor(sampleDelta);
-
-            // Constraint 1: startSample cannot go below 0 (dragging left limit)
-            // newStartSample = originalClip.startSample + delta >= 0
-            // delta >= -originalClip.startSample
-            const minDeltaForStart = -originalClip.startSample;
-            if (constrainedDelta < minDeltaForStart) {
-              constrainedDelta = minDeltaForStart;
-            }
-
-            // Constraint 2: offsetSamples cannot go below 0 (can't reveal audio before buffer start)
-            // newOffsetSamples = originalClip.offsetSamples + delta >= 0
-            // delta >= -originalClip.offsetSamples
-            const minDeltaForOffset = -originalClip.offsetSamples;
-            if (constrainedDelta < minDeltaForOffset) {
-              constrainedDelta = minDeltaForOffset;
-            }
-
-            // Constraint 3: Cannot overlap with previous clip (dragging left limit)
-            const previousClip = sortedIndex > 0 ? sortedClips[sortedIndex - 1] : null;
-            if (previousClip) {
-              const previousEndSample = previousClip.startSample + previousClip.durationSamples;
-              // newStartSample = originalClip.startSample + delta >= previousEndSample
-              // delta >= previousEndSample - originalClip.startSample
-              const minDeltaForPrevious = previousEndSample - originalClip.startSample;
-              if (constrainedDelta < minDeltaForPrevious) {
-                constrainedDelta = minDeltaForPrevious;
-              }
-            }
-
-            // Constraint 4: Minimum duration (dragging right limit)
-            // newDurationSamples = originalClip.durationSamples - delta >= MIN_DURATION_SAMPLES
-            // -delta >= MIN_DURATION_SAMPLES - originalClip.durationSamples
-            // delta <= originalClip.durationSamples - MIN_DURATION_SAMPLES
-            const maxDeltaForMinDuration = originalClip.durationSamples - MIN_DURATION_SAMPLES;
-            if (constrainedDelta > maxDeltaForMinDuration) {
-              constrainedDelta = maxDeltaForMinDuration;
-            }
-
-            // Constraint 5: Cannot exceed audio buffer length
-            // newOffsetSamples + newDurationSamples <= audioBufferDurationSamples
-            // (originalClip.offsetSamples + delta) + (originalClip.durationSamples - delta) <= audioBufferDurationSamples
-            // This simplifies to: originalClip.offsetSamples + originalClip.durationSamples <= audioBufferDurationSamples
-            // This is always true if the clip was valid to begin with, so no constraint needed here
-
-            // Now apply the constrained delta
             const newOffsetSamples = originalClip.offsetSamples + constrainedDelta;
             const newDurationSamples = originalClip.durationSamples - constrainedDelta;
             const newStartSample = originalClip.startSample + constrainedDelta;
@@ -266,26 +204,32 @@ export function useClipDragHandlers({
               startSample: newStartSample,
             };
           } else {
-            // Right boundary - only update duration
-            // Apply cumulative delta to ORIGINAL state (not current state)
-            let newDurationSamples = Math.floor(originalClip.durationSamples + sampleDelta);
-            newDurationSamples = Math.max(MIN_DURATION_SAMPLES, newDurationSamples);
+            // Right boundary - use constrainBoundaryTrim from engine
+            const tempClip = {
+              ...clip,
+              startSample: originalClip.startSample,
+              offsetSamples: originalClip.offsetSamples,
+              durationSamples: originalClip.durationSamples,
+            };
+            const constrainedDelta = constrainBoundaryTrim(
+              tempClip,
+              Math.floor(sampleDelta),
+              'right',
+              sortedClips,
+              sortedIndex,
+              MIN_DURATION_SAMPLES
+            );
 
-            if (originalClip.offsetSamples + newDurationSamples > audioBufferDurationSamples) {
-              newDurationSamples = audioBufferDurationSamples - originalClip.offsetSamples;
-            }
+            const newDurationSamples = originalClip.durationSamples + constrainedDelta;
 
-            const nextClip =
-              sortedIndex < sortedClips.length - 1 ? sortedClips[sortedIndex + 1] : null;
-            if (nextClip) {
-              const newEndSample = originalClip.startSample + newDurationSamples;
-              if (newEndSample > nextClip.startSample) {
-                newDurationSamples = nextClip.startSample - originalClip.startSample;
-                newDurationSamples = Math.max(MIN_DURATION_SAMPLES, newDurationSamples);
-              }
-            }
+            // Additional constraint: cannot exceed audio buffer length
+            // (engine's constrainBoundaryTrim handles this via sourceDurationSamples)
+            const clampedDuration = Math.min(
+              newDurationSamples,
+              audioBufferDurationSamples - originalClip.offsetSamples
+            );
 
-            return { ...clip, durationSamples: newDurationSamples };
+            return { ...clip, durationSamples: clampedDuration };
           }
         });
 
@@ -302,10 +246,9 @@ export function useClipDragHandlers({
       const { active, delta } = event;
 
       // Extract clip metadata from drag data
-      const { trackIndex, clipIndex, boundary } = active.data.current as {
+      const { trackIndex, clipId, boundary } = active.data.current as {
         clipId: string;
         trackIndex: number;
-        clipIndex: number;
         boundary?: 'left' | 'right';
       };
 
@@ -321,58 +264,13 @@ export function useClipDragHandlers({
         return;
       }
 
-      // Handle clip movement (not trimming)
-      const newTracks = tracks.map((track, tIdx) => {
-        if (tIdx !== trackIndex) return track;
-
-        // Get sorted clips for collision detection
-        const sortedClips = [...track.clips].sort((a, b) => a.startSample - b.startSample);
-        const sortedIndex = sortedClips.findIndex((clip) => clip === track.clips[clipIndex]);
-
-        // Update the specific clip in this track
-        const newClips = track.clips.map((clip, cIdx) => {
-          if (cIdx !== clipIndex) return clip;
-
-          // Calculate desired new start sample
-          let newStartSample = Math.floor(clip.startSample + sampleDelta);
-
-          // Collision detection constraints:
-          // 1. Cannot go before sample 0
-          newStartSample = Math.max(0, newStartSample);
-
-          // 2. Cannot overlap with previous clip
-          const previousClip = sortedIndex > 0 ? sortedClips[sortedIndex - 1] : null;
-          if (previousClip) {
-            const previousEndSample = previousClip.startSample + previousClip.durationSamples;
-            newStartSample = Math.max(newStartSample, previousEndSample);
-          }
-
-          // 3. Cannot overlap with next clip
-          const nextClip =
-            sortedIndex < sortedClips.length - 1 ? sortedClips[sortedIndex + 1] : null;
-          if (nextClip) {
-            const newEndSample = newStartSample + clip.durationSamples;
-            if (newEndSample > nextClip.startSample) {
-              // Push back to be adjacent to next clip
-              newStartSample = nextClip.startSample - clip.durationSamples;
-            }
-          }
-
-          return {
-            ...clip,
-            startSample: newStartSample,
-          };
-        });
-
-        return {
-          ...track,
-          clips: newClips,
-        };
-      });
-
-      onTracksChange(newTracks);
+      // Delegate to engine — handles constraints, adapter sync, and emits statechange
+      const trackId = tracks[trackIndex]?.id;
+      if (trackId && engineRef.current) {
+        engineRef.current.moveClip(trackId, clipId, Math.floor(sampleDelta));
+      }
     },
-    [tracks, onTracksChange, samplesPerPixel]
+    [tracks, samplesPerPixel, engineRef]
   );
 
   return {

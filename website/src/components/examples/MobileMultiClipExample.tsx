@@ -149,7 +149,7 @@ interface PlaylistWithDragProps {
 }
 
 const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
-  const { samplesPerPixel, sampleRate } = usePlaylistData();
+  const { samplesPerPixel, sampleRate, playoutRef } = usePlaylistData();
   const { setSelectedTrackId } = usePlaylistControls();
 
   // Use touch-optimized sensors with 250ms delay to distinguish drag from scroll
@@ -160,6 +160,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     onTracksChange,
     samplesPerPixel,
     sampleRate,
+    engineRef: playoutRef,
   });
 
   const onDragStart = (event: any) => {
@@ -326,6 +327,7 @@ export function MobileMultiClipExample() {
 
       <WaveformPlaylistProvider
         tracks={tracks}
+        onTracksChange={setTracks}
         samplesPerPixel={1024}
         mono
         waveHeight={120}

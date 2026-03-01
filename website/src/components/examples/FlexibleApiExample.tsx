@@ -299,7 +299,7 @@ interface FlexibleApiContentProps {
 const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTracksChange }) => {
   const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
   const { currentTimeRef } = usePlaybackAnimation();
-  const { duration, masterVolume, timeFormat, sampleRate, samplesPerPixel } = usePlaylistData();
+  const { duration, masterVolume, timeFormat, sampleRate, samplesPerPixel, playoutRef } = usePlaylistData();
   const { isAutomaticScroll, selectionStart, selectionEnd, isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
   const format = timeFormat as TimeFormat;
 
@@ -310,14 +310,15 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
     onTracksChange,
     samplesPerPixel,
     sampleRate,
+    engineRef: playoutRef,
   });
 
   // Enable clip splitting
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
-    onTracksChange,
     sampleRate,
     samplesPerPixel,
+    engineRef: playoutRef,
   });
 
   // Enable keyboard shortcuts (Space=play/pause, Escape=stop, 0=rewind, S=split)
@@ -600,6 +601,7 @@ export function FlexibleApiExample() {
       <Container>
         <WaveformPlaylistProvider
           tracks={tracks}
+          onTracksChange={setTracks}
           samplesPerPixel={512}
           mono
           waveHeight={40}
