@@ -33,7 +33,14 @@ export function useMasterVolume({
 
   const setMasterVolume = useCallback(
     (volume: number) => {
-      engineRef.current?.setMasterVolume(volume);
+      if (engineRef.current) {
+        // Engine exists — delegate; statechange will update ref + React state.
+        engineRef.current.setMasterVolume(volume);
+      } else {
+        // No engine yet — persist locally so loadAudio() seeds correctly.
+        masterVolumeRef.current = volume;
+        setMasterVolumeState(volume);
+      }
     },
     [engineRef]
   );

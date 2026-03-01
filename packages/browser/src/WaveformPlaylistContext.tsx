@@ -232,6 +232,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 }) => {
   // Default progressBarWidth to barWidth + barGap (fills gaps)
   const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
+
+  // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
+  // create a new reference every render, which would trigger engine rebuild via
+  // loadAudio deps. Content-based comparison avoids spurious rebuilds.
+  const stableZoomLevels = useMemo(
+    () => zoomLevels,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [zoomLevels?.join(',')]
+  );
+
   // Annotations are derived from prop (single source of truth in parent)
   // In v6, annotations must be pre-parsed (numeric start/end). Use parseAeneas() from @waveform-playlist/annotations before passing.
   const annotations = useMemo(() => {
@@ -287,6 +297,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const isAutomaticScrollRef = useRef<boolean>(false);
   const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
   const activeAnnotationIdRef = useRef<string | null>(null);
+  // Provider-level ref for scroll-position math and animation loop pixel
+  // calculation. Distinct from useZoomControls's internal ref (statechange guard).
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
@@ -330,8 +342,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Worker-based WaveformData cache for fast zoom resampling
   const baseScale = useMemo(
-    () => Math.min(...(zoomLevels ?? [256, 512, 1024, 2048, 4096, 8192])),
-    [zoomLevels]
+    () => Math.min(...(stableZoomLevels ?? [256, 512, 1024, 2048, 4096, 8192])),
+    [stableZoomLevels]
   );
   const { cache: waveformDataCache } = useWaveformDataCache(tracks, baseScale);
 
@@ -485,7 +497,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         const engine = new PlaylistEngine({
           adapter,
           samplesPerPixel: samplesPerPixelRef.current,
-          zoomLevels,
+          zoomLevels: stableZoomLevels,
         });
 
         // Seed engine with current UI state so a fresh engine doesn't
@@ -508,11 +520,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           };
         });
 
-        engine.setTracks(tracksWithState);
-        engineRef.current = engine;
-
-        // Subscribe to engine statechange — each hook's onEngineState()
-        // handles its own ref guards and setState calls.
+        // Subscribe to engine statechange BEFORE setTracks() so the first
+        // emission (which carries correct canZoomIn/canZoomOut) is captured.
+        // Seeding statechanges fired above are harmless — they contain values
+        // that already match the hooks' current state, so onEngineState()
+        // ref guards skip them.
         engine.on('statechange', (state: EngineState) => {
           onSelectionEngineState(state);
           onLoopEngineState(state);
@@ -520,6 +532,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           onZoomEngineState(state);
           onVolumeEngineState(state);
         });
+
+        engine.setTracks(tracksWithState);
+        engineRef.current = engine;
 
         setIsReady(true);
 
@@ -563,7 +578,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     loopStartRef,
     loopEndRef,
     isLoopEnabledRef,
-    zoomLevels,
+    stableZoomLevels,
   ]);
 
   // Regenerate peaks when zoom, mono, or waveformDataCache changes (without reloading audio)
