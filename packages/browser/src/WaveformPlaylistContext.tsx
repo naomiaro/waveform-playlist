@@ -291,7 +291,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
-  const zoom = useZoomControls({ engineRef, initialSamplesPerPixel, zoomLevels });
+  const zoom = useZoomControls({ engineRef, initialSamplesPerPixel });
   const { samplesPerPixel, onEngineState: onZoomEngineState } = zoom;
   const volume = useMasterVolume({ engineRef, initialVolume: 1.0 });
   const {

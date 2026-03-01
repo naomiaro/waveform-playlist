@@ -958,11 +958,9 @@ function MyPlaylist() {
 
 ```typescript
 import {
-  usePlaybackControls,
   useTimeFormat,
 } from "@waveform-playlist/browser/hooks";
 
-const { play, pause, stop } = usePlaybackControls({ playoutRef });
 const { formatTime } = useTimeFormat();
 ```
 

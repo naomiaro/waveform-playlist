@@ -5,7 +5,7 @@ export interface UseLoopStateProps {
   engineRef: RefObject<PlaylistEngine | null>;
 }
 
-export interface LoopStateControls {
+export interface LoopControls {
   isLoopEnabled: boolean;
   loopStart: number;
   loopEnd: number;
@@ -24,9 +24,7 @@ export interface LoopStateControls {
  * engine. State is mirrored back from the engine via onEngineState(),
  * which the provider's statechange handler calls on every engine event.
  */
-export function useLoopState({
-  engineRef,
-}: UseLoopStateProps): LoopStateControls & {
+export function useLoopState({ engineRef }: UseLoopStateProps): LoopControls & {
   onEngineState: (state: EngineState) => void;
 } {
   const [isLoopEnabled, setIsLoopEnabledState] = useState(false);

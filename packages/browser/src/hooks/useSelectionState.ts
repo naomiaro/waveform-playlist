@@ -5,7 +5,7 @@ export interface UseSelectionStateProps {
   engineRef: RefObject<PlaylistEngine | null>;
 }
 
-export interface SelectionStateControls {
+export interface SelectionControls {
   selectionStart: number;
   selectionEnd: number;
   setSelection: (start: number, end: number) => void;
@@ -24,9 +24,7 @@ export interface SelectionStateControls {
  * (updating currentTime, restarting playback). This hook only handles
  * the engine delegation + state mirroring.
  */
-export function useSelectionState({
-  engineRef,
-}: UseSelectionStateProps): SelectionStateControls & {
+export function useSelectionState({ engineRef }: UseSelectionStateProps): SelectionControls & {
   onEngineState: (state: EngineState) => void;
 } {
   const [selectionStart, setSelectionStartState] = useState(0);

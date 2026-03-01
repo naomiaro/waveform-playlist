@@ -214,8 +214,7 @@ function FileUploader() {
 
 ```tsx
 function KeyboardShortcuts() {
-  const { play, pause, stop, isPlaying } = usePlaybackControls();
-  const { seek } = usePlaylistControls();
+  const { play, pause, stop, isPlaying, seekTo } = usePlaylistControls();
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -225,7 +224,7 @@ function KeyboardShortcuts() {
           isPlaying ? pause() : play();
           break;
         case 'Home':
-          seek(0);
+          seekTo(0);
           break;
         case 'Escape':
           stop();

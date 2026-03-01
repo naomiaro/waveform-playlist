@@ -18,7 +18,7 @@
 - `useSelectedTrack` - Selected track ID with engine delegation
 - `useZoomControls` - Zoom state (samplesPerPixel, canZoomIn/Out) with engine delegation
 - `useMasterVolume` - Master volume with engine delegation
-- `usePlaybackControls`, `useTimeFormat`, etc.
+- `useTimeFormat`, etc.
 
 **Location:** `src/hooks/`
 

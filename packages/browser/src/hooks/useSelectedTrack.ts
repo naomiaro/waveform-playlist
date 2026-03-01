@@ -8,7 +8,6 @@ export interface UseSelectedTrackProps {
 export interface SelectedTrackControls {
   selectedTrackId: string | null;
   setSelectedTrackId: (trackId: string | null) => void;
-  selectedTrackIdRef: React.RefObject<string | null>;
 }
 
 /**
@@ -18,9 +17,7 @@ export interface SelectedTrackControls {
  * State is mirrored back from the engine via onEngineState(), which
  * the provider's statechange handler calls on every engine event.
  */
-export function useSelectedTrack({
-  engineRef,
-}: UseSelectedTrackProps): SelectedTrackControls & {
+export function useSelectedTrack({ engineRef }: UseSelectedTrackProps): SelectedTrackControls & {
   onEngineState: (state: EngineState) => void;
 } {
   const [selectedTrackId, setSelectedTrackIdState] = useState<string | null>(null);
@@ -46,7 +43,6 @@ export function useSelectedTrack({
   return {
     selectedTrackId,
     setSelectedTrackId,
-    selectedTrackIdRef,
     onEngineState,
   };
 }

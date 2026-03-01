@@ -12,7 +12,6 @@ export interface ZoomControls {
 export interface UseZoomControlsProps {
   engineRef: RefObject<PlaylistEngine | null>;
   initialSamplesPerPixel: number;
-  zoomLevels?: number[]; // Array of samples per pixel values (lower = more zoomed in)
 }
 
 /**
@@ -38,9 +37,6 @@ export function useZoomControls({
 
   // Internal refs for statechange guards — prevent redundant setState
   // calls during high-frequency engine events (clip drags, play/pause).
-  // Note: samplesPerPixel guard uses the provider's samplesPerPixelRef
-  // (passed via the scroll-adjust effect), NOT a hook-internal ref,
-  // because the scroll-adjust effect needs the old value for scroll ratio.
   const canZoomInRef = useRef(true);
   const canZoomOutRef = useRef(true);
   const samplesPerPixelRef = useRef(initialSamplesPerPixel);

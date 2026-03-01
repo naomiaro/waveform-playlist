@@ -8,10 +8,10 @@ export { useMasterVolume } from './useMasterVolume';
 export type { MasterVolumeControls, UseMasterVolumeProps } from './useMasterVolume';
 
 export { useSelectionState } from './useSelectionState';
-export type { SelectionStateControls, UseSelectionStateProps } from './useSelectionState';
+export type { SelectionControls, UseSelectionStateProps } from './useSelectionState';
 
 export { useLoopState } from './useLoopState';
-export type { LoopStateControls, UseLoopStateProps } from './useLoopState';
+export type { LoopControls, UseLoopStateProps } from './useLoopState';
 
 export { useSelectedTrack } from './useSelectedTrack';
 export type { SelectedTrackControls, UseSelectedTrackProps } from './useSelectedTrack';

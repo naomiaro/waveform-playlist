@@ -23,6 +23,6 @@
 - `PlayoutAdapter.isPlaying()` is defined but not called by engine (engine tracks own `_isPlaying`). Known design gap.
 - Engine uses `seek()` while browser package uses `seekTo()` — naming divergence, noted in root CLAUDE.md "Common Doc Drift"
 - **Guard Against No-Op State Emissions** - In stateful classes with event emitters, check if an operation would actually change state before emitting. Zero-delta moves/trims, removing non-existent items, and setting zoom to the same level should bail early to avoid wasted listener calls and UI re-renders.
-- **Engine owns selection, loop, and selectedTrackId state** — React subscribes to `statechange` and mirrors into useState/refs. masterVolume is dual-write (useMasterVolume hook manages React state independently). Playback timing (currentTime, isPlaying) remains in React for animation loop.
+- **Engine owns selection, loop, selectedTrackId, zoom, and masterVolume** — React subscribes to `statechange` and mirrors into useState/refs via `onEngineState()` callbacks in each hook. Playback timing (currentTime, isPlaying) remains in React for animation loop.
 - `setSelection()` and `setLoopRegion()` normalize `start <= end` via `Math.min/Math.max` — consumers can trust `EngineState` invariants without defensive normalization
 - `engine.dispose()` calls `_listeners.clear()`, so explicit `engine.off()` is unnecessary when the engine itself is being disposed
