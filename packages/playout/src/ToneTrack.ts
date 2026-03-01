@@ -203,8 +203,7 @@ export class ToneTrack {
 
       if (transportOffset >= absClipStart) {
         // Mid-clip: playing now
-        const clipOffset =
-          transportOffset - absClipStart + clipPlayer.clipInfo.offset;
+        const clipOffset = transportOffset - absClipStart + clipPlayer.clipInfo.offset;
         this.scheduleFades(clipPlayer, when, clipOffset);
       } else {
         // Clip starts later
