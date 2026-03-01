@@ -2,7 +2,7 @@
 
 ## Tone.js Adapter (`createToneAdapter`)
 
-**Purpose:** Bridges `PlayoutAdapter` interface to existing `TonePlayout`/`ToneTrack` classes.
+**Purpose:** Bridges `PlayoutAdapter` interface to `TonePlayout`/`ToneTrack` classes.
 
 **Location:** `src/TonePlayoutAdapter.ts`
 
@@ -13,8 +13,6 @@
 **Clip time helpers:** `clipStartTime`, `clipEndTime`, `clipOffsetTime`, `clipDurationTime` in `packages/core/src/clipTimeHelpers.ts`. Pure functions: `samples / sampleRate`.
 
 **Testing:** `src/__tests__/TonePlayoutAdapter.test.ts` — mocks `TonePlayout` to avoid AudioContext. `packages/core/src/__tests__/clipTimeHelpers.test.ts`.
-
-**Not yet wired:** Browser package still uses `TonePlayout` directly. Engine integration is a separate PR.
 
 ## Transport-Synced Players
 
@@ -32,7 +30,7 @@ Players are synced to Tone.js Transport at creation time via `player.sync().star
 
 **Implementation:** Recording and playback use a global shared AudioContext (same as Tone.js).
 
-**Location:** `getGlobalAudioContext()` from `src/audioContext.ts`
+**Location:** `getGlobalContext()` from `src/audioContext.ts`
 
 **Critical:** Context must be resumed on user interaction via `resumeGlobalAudioContext()`
 
@@ -48,11 +46,11 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
 ## Tone.js Internal AudioParam Access
 
-**Pattern:** Access raw `AudioParam` via `(signal as any)._param` for `setValueAtTime`/`cancelScheduledValues` when Tone.js Signal wrapper doesn't propagate changes (e.g., suspended AudioContext).
+**Pattern:** `getUnderlyingAudioParam(signal)` in `src/fades.ts` — accesses raw `AudioParam` via `_param` for `setValueAtTime`/`cancelScheduledValues` when Tone.js Signal wrapper doesn't propagate changes (e.g., suspended AudioContext). Includes a one-time warning if `_param` is missing.
 
 **Used in:** `ToneTrack.setMute()`, `ToneTrack.scheduleFades()`, `ToneTrack.cancelFades()`
 
-**Risk:** `_param` is a private Tone.js 15.x internal. Pin version carefully. Consider consolidating into a shared utility with null guard.
+**Risk:** `_param` is a private Tone.js 15.x internal. Pin version carefully.
 
 ## Firefox Compatibility (standardized-audio-context)
 
@@ -78,26 +76,6 @@ export function getGlobalContext(): Context {
   return globalToneContext;
 }
 ```
-
-**Recording/Monitoring:** Use Tone.js Context methods directly:
-
-```typescript
-// packages/recording/src/hooks/useRecording.ts
-import { getGlobalContext } from '@waveform-playlist/playout';
-
-const context = getGlobalContext();
-
-// These methods handle cross-browser compatibility automatically:
-await context.addAudioWorkletModule(workletUrl);
-const workletNode = context.createAudioWorkletNode('recording-processor');
-const source = context.createMediaStreamSource(stream);
-const analyser = context.createAnalyser();
-```
-
-**Key Files:**
-- `src/audioContext.ts` - Context management (`getGlobalContext()`)
-- `packages/recording/src/hooks/useRecording.ts` - Uses Tone.js Context methods
-- `packages/recording/src/hooks/useMicrophoneLevel.ts` - Uses Tone.js Context methods
 
 **References:**
 - [Tone.js Issue #681](https://github.com/Tonejs/Tone.js/issues/681) - AudioListener Firefox error
