@@ -35,7 +35,7 @@ function createMockAdapter(): PlayoutAdapter {
   return {
     init: vi.fn().mockResolvedValue(undefined),
     setTracks: vi.fn(),
-    play: vi.fn().mockResolvedValue(undefined),
+    play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
     seek: vi.fn(),
@@ -498,13 +498,13 @@ describe('PlaylistEngine', () => {
   });
 
   describe('playback delegation', () => {
-    it('delegates play/pause/stop to adapter', async () => {
+    it('delegates play/pause/stop to adapter', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
       ]);
-      await engine.play(1.5);
+      engine.play(1.5);
       expect(adapter.play).toHaveBeenCalledWith(1.5, undefined);
       engine.pause();
       expect(adapter.pause).toHaveBeenCalled();
@@ -535,22 +535,22 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('works without adapter (state-only mode)', async () => {
+    it('works without adapter (state-only mode)', () => {
       const engine = new PlaylistEngine();
-      await engine.play();
+      engine.play();
       engine.pause();
       engine.stop();
       engine.dispose();
     });
 
-    it('pause captures currentTime from adapter', async () => {
+    it('pause captures currentTime from adapter', () => {
       const adapter = createMockAdapter();
       (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(3.5);
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
       ]);
-      await engine.play();
+      engine.play();
       engine.pause();
       expect(engine.getState().currentTime).toBe(3.5);
       engine.dispose();
@@ -576,40 +576,40 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('clamps startTime in play()', async () => {
+    it('clamps startTime in play()', () => {
       const engine = new PlaylistEngine();
       engine.setTracks([
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
       ]);
-      await engine.play(100); // Beyond duration of 1 second
+      engine.play(100); // Beyond duration of 1 second
       expect(engine.getState().currentTime).toBe(1);
       engine.dispose();
     });
 
-    it('does not set isPlaying when adapter.play rejects', async () => {
+    it('does not set isPlaying when adapter.play throws', () => {
       const adapter = createMockAdapter();
-      (adapter.play as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error('AudioContext not resumed')
-      );
+      (adapter.play as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error('AudioContext not resumed');
+      });
       const engine = new PlaylistEngine({ adapter });
-      await expect(engine.play()).rejects.toThrow('AudioContext not resumed');
+      expect(() => engine.play()).toThrow('AudioContext not resumed');
       expect(engine.getState().isPlaying).toBe(false);
       engine.dispose();
     });
 
-    it('play() enables Transport loop when loop is enabled', async () => {
+    it('play() enables Transport loop when loop is enabled', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setLoopRegion(1.0, 3.0);
       engine.setLoopEnabled(true);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
-      await engine.play(1.0);
+      engine.play(1.0);
       expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 3.0);
       engine.dispose();
     });
 
-    it('play(start, end) disables Transport loop for selection playback', async () => {
+    it('play(start, end) disables Transport loop for selection playback', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
@@ -619,29 +619,29 @@ describe('PlaylistEngine', () => {
       engine.setLoopEnabled(true);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
-      await engine.play(2.0, 4.0);
+      engine.play(2.0, 4.0);
       expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
       engine.dispose();
     });
 
-    it('play() does not call setLoop when loop is disabled', async () => {
+    it('play() does not call setLoop when loop is disabled', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setLoopRegion(1.0, 3.0);
       // Loop is disabled (default)
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
-      await engine.play(0);
+      engine.play(0);
       expect(adapter.setLoop).not.toHaveBeenCalled();
       engine.dispose();
     });
 
-    it('pause() does not disable Transport loop', async () => {
+    it('pause() does not disable Transport loop', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setLoopRegion(1.0, 3.0);
       engine.setLoopEnabled(true);
-      await engine.play();
+      engine.play();
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
       engine.pause();
@@ -649,12 +649,12 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('stop() disables Transport loop before stopping', async () => {
+    it('stop() disables Transport loop before stopping', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setLoopRegion(1.0, 3.0);
       engine.setLoopEnabled(true);
-      await engine.play();
+      engine.play();
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
       engine.stop();
@@ -669,11 +669,11 @@ describe('PlaylistEngine', () => {
   });
 
   describe('getCurrentTime', () => {
-    it('returns adapter.getCurrentTime when playing', async () => {
+    it('returns adapter.getCurrentTime when playing', () => {
       const adapter = createMockAdapter();
       (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(2.5);
       const engine = new PlaylistEngine({ adapter });
-      await engine.play();
+      engine.play();
 
       expect(engine.getCurrentTime()).toBe(2.5);
       engine.dispose();
@@ -690,12 +690,12 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('returns stored currentTime without adapter', async () => {
+    it('returns stored currentTime without adapter', () => {
       const engine = new PlaylistEngine();
       engine.setTracks([
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
       ]);
-      await engine.play(1.5);
+      engine.play(1.5);
 
       // Without adapter, getCurrentTime returns stored _currentTime
       expect(engine.getCurrentTime()).toBe(1.5);
@@ -716,7 +716,7 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('emits play/pause/stop events', async () => {
+    it('emits play/pause/stop events', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       const playListener = vi.fn();
@@ -725,7 +725,7 @@ describe('PlaylistEngine', () => {
       engine.on('play', playListener);
       engine.on('pause', pauseListener);
       engine.on('stop', stopListener);
-      await engine.play();
+      engine.play();
       expect(playListener).toHaveBeenCalled();
       engine.pause();
       expect(pauseListener).toHaveBeenCalled();

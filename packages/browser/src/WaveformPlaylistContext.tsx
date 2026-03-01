@@ -301,6 +301,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // React subscribes to engine statechange and mirrors into useState/refs.
   // Playback timing (currentTime, isPlaying) remains in React for animation loop.
   const engineRef = useRef<PlaylistEngine | null>(null);
+  const audioInitializedRef = useRef<boolean>(false);
   const playStartPositionRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
   const tracksRef = useRef<ClipTrack[]>(tracks);
@@ -558,6 +559,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineTracksRef.current = null;
 
         // Create engine with Tone.js adapter
+        // Reset init flag — new adapter needs Tone.start() on first play
+        audioInitializedRef.current = false;
         const adapter = createToneAdapter({ effects });
         const engine = new PlaylistEngine({
           adapter,
@@ -907,7 +910,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           audioStartPositionRef.current = currentPos;
 
           // Play without duration - will play to end of track
-          await engineRef.current.play(currentPos);
+          engineRef.current.play(currentPos);
           startAnimationLoop();
         } else {
           // Just restart animation loop for continuous play OFF
@@ -932,7 +935,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         playbackStartTimeRef.current = timeNow;
         audioStartPositionRef.current = position;
 
-        await engineRef.current.play(position);
+        if (!audioInitializedRef.current) {
+          await engineRef.current.init();
+          audioInitializedRef.current = true;
+        }
+
+        engineRef.current.play(position);
         setIsPlaying(true);
         startAnimationLoop();
       }
@@ -972,8 +980,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // The animation loop handles stopping at annotation boundaries
       // This avoids callback timing issues when switching between annotations
 
+      // Ensure AudioContext is resumed (requires user gesture, no-op after first call).
+      // Guarded by ref so subsequent plays skip the await entirely.
+      if (!audioInitializedRef.current) {
+        await engineRef.current.init();
+        audioInitializedRef.current = true;
+      }
+
       const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
-      await engineRef.current.play(actualStartTime, endTime);
+      engineRef.current.play(actualStartTime, endTime);
       setIsPlaying(true);
       startAnimationLoop();
     },

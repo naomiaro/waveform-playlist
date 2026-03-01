@@ -270,7 +270,13 @@ export class PlaylistEngine {
   // Playback (delegates to adapter, no-ops without adapter)
   // ---------------------------------------------------------------------------
 
-  async play(startTime?: number, endTime?: number): Promise<void> {
+  async init(): Promise<void> {
+    if (this._adapter) {
+      await this._adapter.init();
+    }
+  }
+
+  play(startTime?: number, endTime?: number): void {
     if (startTime !== undefined) {
       const duration = calculateDuration(this._tracks);
       this._currentTime = clampSeekPosition(startTime, duration);
@@ -283,7 +289,7 @@ export class PlaylistEngine {
       } else if (this._isLoopEnabled) {
         this._adapter.setLoop(true, this._loopStart, this._loopEnd);
       }
-      await this._adapter.play(this._currentTime, endTime);
+      this._adapter.play(this._currentTime, endTime);
       this._startTimeUpdateLoop();
     }
 

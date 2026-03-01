@@ -96,9 +96,8 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       buildPlayout(tracks);
     },
 
-    async play(startTime: number, endTime?: number): Promise<void> {
+    play(startTime: number, endTime?: number): void {
       if (!playout) return;
-      await playout.init();
       const duration = endTime !== undefined ? endTime - startTime : undefined;
       playout.play(now(), startTime, duration);
       _isPlaying = true;
