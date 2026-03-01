@@ -103,9 +103,11 @@ const rebuildChain = useCallback(() => {
 
 **Solution:** `requestAnimationFrame` + direct DOM manipulation via refs. Calculate time from `getContext().currentTime` (Tone.js) for perfect audio sync. No `setState` in the loop.
 
-**Key points:** Compute elapsed = `audioContext.currentTime - playbackStartTimeRef`, add `audioStartPositionRef`. Update DOM directly. Cancel animation frame on cleanup.
+**Key points:** Use `getPlaybackTime()` (from `usePlaybackAnimation()`) — delegates to `engine.getCurrentTime()` which reads `Transport.seconds` (auto-wraps at loop boundaries). Fallback: manual elapsed calculation from `audioContext.currentTime`. Update DOM directly. Cancel animation frame on cleanup.
 
 **Reference implementation:** `AnimatedPlayhead` component. Also used by `ChannelWithProgress`, `AudioPosition`, `PlayheadWithMarker`.
+
+**Loop handling:** Looping is handled natively by Tone.js Transport (`Transport.loop`/`loopStart`/`loopEnd`). The animation loop does NOT detect loop boundaries — `Transport.seconds` auto-wraps, so `getPlaybackTime()` returns the correct position. Selection/annotation playback disables Transport loop; `stop()` disables it before stopping.
 
 ## Engine State Subscription Pattern
 
@@ -118,7 +120,7 @@ const rebuildChain = useCallback(() => {
 - `useZoomControls` — samplesPerPixel, canZoomIn, canZoomOut
 - `useMasterVolume` — masterVolume
 
-**Still React-only:** currentTime, isPlaying (animation loop timing), tracks (loaded via useAudioTracks)
+**Still React-only:** isPlaying (animation loop timing), tracks (loaded via useAudioTracks). `currentTime` is read from engine during playback via `getPlaybackTime()` (→ `engine.getCurrentTime()` → `Transport.seconds`).
 
 **Subscription location:** Inside `loadAudio()` after `engineRef.current = engine`, the statechange handler calls each hook's `onEngineState(state)`.
 

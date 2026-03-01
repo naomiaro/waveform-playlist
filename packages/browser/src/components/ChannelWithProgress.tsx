@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import { getContext } from 'tone';
 import {
   SmartChannel,
   type SmartChannelProps,
@@ -91,8 +90,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   const theme = useTheme() as WaveformPlaylistTheme;
   const { waveHeight } = usePlaylistInfo();
 
-  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } =
-    usePlaybackAnimation();
+  const { isPlaying, currentTimeRef, getPlaybackTime } = usePlaybackAnimation();
   const { samplesPerPixel, sampleRate } = usePlaylistData();
 
   const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
@@ -100,24 +98,11 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   useEffect(() => {
     const updateProgress = () => {
       if (progressRef.current) {
-        // Calculate current time from audio context
-        let currentTime: number;
-        if (isPlaying) {
-          const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
-          currentTime = (audioStartPositionRef.current ?? 0) + elapsed;
-        } else {
-          currentTime = currentTimeRef.current ?? 0;
-        }
-
-        // Convert current time to samples
+        const currentTime = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
         const currentSample = currentTime * sampleRate;
-
-        // Calculate clip bounds in samples
         const clipEndSample = clipStartSample + clipDurationSamples;
 
-        // Calculate progress ratio (0 to 1) for scaleX transform
         let ratio = 0;
-
         if (currentSample <= clipStartSample) {
           ratio = 0;
         } else if (currentSample >= clipEndSample) {
@@ -139,7 +124,6 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     if (isPlaying) {
       animationFrameRef.current = requestAnimationFrame(updateProgress);
     } else {
-      // When stopped, update once to show final position
       updateProgress();
     }
 
@@ -157,8 +141,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     clipDurationSamples,
     smartChannelProps.length,
     currentTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
+    getPlaybackTime,
   ]);
 
   // Also update when not playing (for seeks, stops, etc.)

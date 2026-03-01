@@ -21,6 +21,7 @@ vi.mock('../TonePlayout', () => {
       }),
       dispose: vi.fn(),
       setOnPlaybackComplete: vi.fn(),
+      setLoop: vi.fn(),
     })),
   };
 });
@@ -373,6 +374,41 @@ describe('createToneAdapter', () => {
       expect(mockInstance.getTrack).toHaveBeenCalledWith('t1');
       const mockTrack = mockInstance.getTrack.mock.results[0].value;
       expect(mockTrack.setPan).toHaveBeenCalledWith(-0.5);
+    });
+  });
+
+  describe('setLoop', () => {
+    it('delegates to playout.setLoop', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      adapter.setLoop(true, 1.0, 3.0);
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      expect(mockInstance.setLoop).toHaveBeenCalledWith(true, 1.0, 3.0);
+    });
+
+    it('is safe to call without setTracks', () => {
+      const adapter = createToneAdapter();
+      expect(() => adapter.setLoop(true, 0, 5)).not.toThrow();
+    });
+
+    it('persists loop state across setTracks rebuilds', () => {
+      const adapter = createToneAdapter();
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+
+      adapter.setTracks([makeTrack('t1', [clip])]);
+      adapter.setLoop(true, 2.0, 6.0);
+
+      // Rebuild with new tracks — loop state should be re-applied
+      adapter.setTracks([makeTrack('t2', [clip])]);
+
+      // The second TonePlayout instance should have setLoop called during buildPlayout
+      const secondInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[1]
+        .value;
+      expect(secondInstance.setLoop).toHaveBeenCalledWith(true, 2.0, 6.0);
     });
   });
 

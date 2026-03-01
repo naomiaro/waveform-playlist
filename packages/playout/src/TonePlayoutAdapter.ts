@@ -19,6 +19,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
   let playout: TonePlayout | null = null;
   let _isPlaying = false;
   let _playoutGeneration = 0;
+  let _loopEnabled = false;
+  let _loopStart = 0;
+  let _loopEnd = 0;
 
   function buildPlayout(tracks: ClipTrack[]): void {
     if (playout) {
@@ -68,6 +71,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     }
 
     playout.applyInitialSoloState();
+    playout.setLoop(_loopEnabled, _loopStart, _loopEnd);
 
     playout.setOnPlaybackComplete(() => {
       if (generation === _playoutGeneration) {
@@ -135,6 +139,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
     setTrackPan(trackId: string, pan: number): void {
       playout?.getTrack(trackId)?.setPan(pan);
+    },
+
+    setLoop(enabled: boolean, start: number, end: number): void {
+      _loopEnabled = enabled;
+      _loopStart = start;
+      _loopEnd = end;
+      playout?.setLoop(enabled, start, end);
     },
 
     dispose(): void {

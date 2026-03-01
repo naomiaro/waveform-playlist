@@ -33,6 +33,7 @@ export class TonePlayout {
   private effectsCleanup?: () => void;
   private onPlaybackCompleteCallback?: () => void;
   private _completionEventId: number | null = null;
+  private _loopHandler: (() => void) | null = null;
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Volume(this.gainToDb(options.masterGain ?? 1));
@@ -127,13 +128,6 @@ export class TonePlayout {
 
     // Clear any pending completion event
     this.clearCompletionEvent();
-
-    // Stop Transport before restarting to ensure a clean state.
-    // Calling Transport.start() while already running emits a duplicate
-    // "start" event, which triggers _syncedStart() on every synced Player,
-    // creating additional BufferSourceNodes without stopping the old ones.
-    // This causes audible layering on loop restarts and rapid play calls.
-    getTransport().stop();
 
     // Cancel stale fades and re-schedule for all tracks
     const transportOffset = offset ?? 0;
@@ -234,6 +228,29 @@ export class TonePlayout {
     }
   }
 
+  setLoop(enabled: boolean, loopStart: number, loopEnd: number): void {
+    const transport = getTransport();
+    transport.loop = enabled;
+    transport.loopStart = loopStart;
+    transport.loopEnd = loopEnd;
+
+    if (enabled && !this._loopHandler) {
+      this._loopHandler = () => {
+        // Re-schedule fades for the new loop iteration
+        const currentTime = now();
+        const transportOffset = transport.seconds;
+        this.tracks.forEach((track) => {
+          track.cancelFades();
+          track.prepareFades(currentTime, transportOffset);
+        });
+      };
+      transport.on('loop', this._loopHandler);
+    } else if (!enabled && this._loopHandler) {
+      transport.off('loop', this._loopHandler);
+      this._loopHandler = null;
+    }
+  }
+
   getCurrentTime(): number {
     return getTransport().seconds;
   }
@@ -244,6 +261,16 @@ export class TonePlayout {
 
   dispose(): void {
     this.clearCompletionEvent();
+
+    // Clean up loop handler
+    if (this._loopHandler) {
+      try {
+        getTransport().off('loop', this._loopHandler);
+      } catch (err) {
+        console.warn('[waveform-playlist] Error removing Transport loop handler:', err);
+      }
+      this._loopHandler = null;
+    }
 
     this.tracks.forEach((track) => {
       try {

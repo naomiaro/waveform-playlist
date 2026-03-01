@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import { getContext } from 'tone';
 import { usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
 
 const PlayheadLine = styled.div.attrs<{ $color: string; $width: number }>((props) => ({
@@ -35,21 +34,13 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({
   const playheadRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } =
-    usePlaybackAnimation();
+  const { isPlaying, currentTimeRef, getPlaybackTime } = usePlaybackAnimation();
   const { samplesPerPixel, sampleRate, progressBarWidth } = usePlaylistData();
 
   useEffect(() => {
     const updatePosition = () => {
       if (playheadRef.current) {
-        // Calculate time directly from audio context for perfect sync
-        let time: number;
-        if (isPlaying) {
-          const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
-          time = (audioStartPositionRef.current ?? 0) + elapsed;
-        } else {
-          time = currentTimeRef.current ?? 0;
-        }
+        const time = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
         const position = (time * sampleRate) / samplesPerPixel + controlsOffset;
         playheadRef.current.style.transform = `translate3d(${position}px, 0, 0)`;
       }
@@ -60,10 +51,8 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({
     };
 
     if (isPlaying) {
-      // Start animation loop
       animationFrameRef.current = requestAnimationFrame(updatePosition);
     } else {
-      // When stopped, update once to show final position
       updatePosition();
     }
 
@@ -73,15 +62,7 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({
         animationFrameRef.current = null;
       }
     };
-  }, [
-    isPlaying,
-    sampleRate,
-    samplesPerPixel,
-    controlsOffset,
-    currentTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
-  ]);
+  }, [isPlaying, sampleRate, samplesPerPixel, controlsOffset, currentTimeRef, getPlaybackTime]);
 
   // Also update position when not playing (for seeks, stops, etc.)
   useEffect(() => {

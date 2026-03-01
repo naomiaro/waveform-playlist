@@ -277,6 +277,12 @@ export class PlaylistEngine {
     }
 
     if (this._adapter) {
+      // Disable Transport loop for duration-limited playback (selection/annotation)
+      if (endTime !== undefined) {
+        this._adapter.setLoop(false, this._loopStart, this._loopEnd);
+      } else if (this._isLoopEnabled) {
+        this._adapter.setLoop(true, this._loopStart, this._loopEnd);
+      }
       await this._adapter.play(this._currentTime, endTime);
       this._startTimeUpdateLoop();
     }
@@ -301,6 +307,7 @@ export class PlaylistEngine {
     this._isPlaying = false;
     this._currentTime = 0;
     this._stopTimeUpdateLoop();
+    this._adapter?.setLoop(false, this._loopStart, this._loopEnd);
     this._adapter?.stop();
     this._emit('stop');
     this._emitStateChange();
@@ -318,6 +325,13 @@ export class PlaylistEngine {
     this._masterVolume = volume;
     this._adapter?.setMasterVolume(volume);
     this._emitStateChange();
+  }
+
+  getCurrentTime(): number {
+    if (this._isPlaying && this._adapter) {
+      return this._adapter.getCurrentTime();
+    }
+    return this._currentTime;
   }
 
   // ---------------------------------------------------------------------------
@@ -339,12 +353,14 @@ export class PlaylistEngine {
     if (s === this._loopStart && e === this._loopEnd) return;
     this._loopStart = s;
     this._loopEnd = e;
+    this._adapter?.setLoop(this._isLoopEnabled, this._loopStart, this._loopEnd);
     this._emitStateChange();
   }
 
   setLoopEnabled(enabled: boolean): void {
     if (enabled === this._isLoopEnabled) return;
     this._isLoopEnabled = enabled;
+    this._adapter?.setLoop(this._isLoopEnabled, this._loopStart, this._loopEnd);
     this._emitStateChange();
   }
 

@@ -104,8 +104,13 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } =
-    usePlaybackAnimation();
+  const {
+    isPlaying,
+    currentTimeRef,
+    playbackStartTimeRef,
+    audioStartPositionRef,
+    getPlaybackTime,
+  } = usePlaybackAnimation();
   const {
     selectionStart,
     selectionEnd,
@@ -710,6 +715,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                   sampleRate,
                   controlsOffset: controls.show ? controls.width : 0,
                   getAudioContextTime: () => getContext().currentTime,
+                  getPlaybackTime,
                 })
               ) : (
                 <AnimatedPlayhead

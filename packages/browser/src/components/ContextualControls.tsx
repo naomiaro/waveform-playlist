@@ -1,5 +1,4 @@
 import React, { useRef, useEffect } from 'react';
-import { getContext } from 'tone';
 import {
   MasterVolumeControl as BaseMasterVolumeControl,
   TimeFormatSelect as BaseTimeFormatSelect,
@@ -57,20 +56,13 @@ const PositionDisplay = styled.span`
 export const AudioPosition: React.FC<{ className?: string }> = ({ className }) => {
   const timeRef = useRef<HTMLSpanElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } =
-    usePlaybackAnimation();
+  const { isPlaying, currentTimeRef, getPlaybackTime } = usePlaybackAnimation();
   const { timeFormat: format } = usePlaylistData();
 
   useEffect(() => {
     const updateTime = () => {
       if (timeRef.current) {
-        let time: number;
-        if (isPlaying) {
-          const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
-          time = (audioStartPositionRef.current ?? 0) + elapsed;
-        } else {
-          time = currentTimeRef.current ?? 0;
-        }
+        const time = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
         timeRef.current.textContent = formatTime(time, format);
       }
 
@@ -91,7 +83,7 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
         animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, format, currentTimeRef, playbackStartTimeRef, audioStartPositionRef]);
+  }, [isPlaying, format, currentTimeRef, getPlaybackTime]);
 
   // Update when stopped (for seeks)
   useEffect(() => {

@@ -24,6 +24,8 @@ Players are synced to Tone.js Transport at creation time via `player.sync().star
 
 **Completion detection:** `TonePlayout` schedules a single `Transport.scheduleOnce()` event at `offset + duration` for duration-limited playback, instead of tracking per-track stop callbacks.
 
+**Transport-native looping:** `TonePlayout.setLoop()` sets `Transport.loop`/`loopStart`/`loopEnd`. Transport's `_processTick()` handles boundary crossing atomically — emits `loopEnd` (stops synced sources), resets ticks, emits `loopStart` (restarts sources), then emits `loop`. The `loop` event re-schedules fades for each iteration via `track.cancelFades()` + `track.prepareFades()`. Adapter persists loop state (`_loopEnabled`, `_loopStart`, `_loopEnd`) across `buildPlayout()` rebuilds.
+
 **WAV export** is not affected — `useExportWav.ts` creates its own Players inside `Tone.Offline`, never touching `ToneTrack` or `TonePlayout`.
 
 ## Global AudioContext Pattern

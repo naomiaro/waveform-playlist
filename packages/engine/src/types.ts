@@ -19,6 +19,7 @@ export interface PlayoutAdapter {
   setTrackMute(trackId: string, muted: boolean): void;
   setTrackSolo(trackId: string, soloed: boolean): void;
   setTrackPan(trackId: string, pan: number): void;
+  setLoop(enabled: boolean, start: number, end: number): void;
   dispose(): void;
 }
 

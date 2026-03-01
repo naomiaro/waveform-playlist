@@ -76,6 +76,8 @@ export interface PlaybackAnimationContextValue {
   // Refs for direct time calculation in animated components (avoids timing drift)
   playbackStartTimeRef: React.RefObject<number>; // context.currentTime when playback started
   audioStartPositionRef: React.RefObject<number>; // Audio position when playback started
+  /** Returns current playback time from engine (auto-wraps at loop boundaries). */
+  getPlaybackTime: () => number;
 }
 
 export interface PlaylistStateContextValue {
@@ -757,12 +759,22 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setPeaksDataArray(allTrackPeaks);
   }, [tracks, samplesPerPixel, mono, waveformDataCache]);
 
+  // Returns current playback time from engine (auto-wraps at loop boundaries).
+  // Falls back to manual calculation when engine is unavailable.
+  const getPlaybackTime = useCallback(() => {
+    if (engineRef.current) {
+      return engineRef.current.getCurrentTime();
+    }
+    // Fallback: manual calculation
+    const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
+    return (audioStartPositionRef.current ?? 0) + elapsed;
+  }, []);
+
   // Animation loop
   const startAnimationLoop = useCallback(() => {
     const updateTime = () => {
-      // Calculate current position based on context.currentTime timing
-      const elapsed = getContext().currentTime - playbackStartTimeRef.current;
-      const time = audioStartPositionRef.current + elapsed;
+      // Get current time from engine (auto-wraps at loop boundaries via Transport.seconds)
+      const time = getPlaybackTime();
       currentTimeRef.current = time;
 
       // Handle annotation playback based on continuous play mode
@@ -835,32 +847,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         return;
       }
 
-      // Audacity-style loop region: loop when cursor enters and reaches end of loop region
-      const loopS = loopStartRef.current ?? 0;
-      const loopE = loopEndRef.current ?? 0;
-      const hasValidLoopRegion = loopS !== loopE && loopE > loopS;
-
-      if (isLoopEnabledRef.current && hasValidLoopRegion) {
-        // Check if we've reached or passed the loop end point
-        if (time >= loopE) {
-          // Loop: restart from loop start
-          engineRef.current?.stop();
-
-          const context = getContext();
-          const timeNow = context.currentTime;
-          playbackStartTimeRef.current = timeNow;
-          audioStartPositionRef.current = loopS;
-          currentTimeRef.current = loopS;
-
-          // Restart playback from loop start (no duration limit - will loop again when reaching loop end)
-          // Fire-and-forget: adapter.init() is already resolved after first play, so this is synchronous in practice
-          engineRef.current?.play(loopS);
-
-          // Continue animation loop
-          startAnimationFrameLoop(updateTime);
-          return;
-        }
-      }
+      // Loop is handled natively by Tone.js Transport (Transport.loop/loopStart/loopEnd).
+      // Transport.seconds auto-wraps at loop boundaries, so getPlaybackTime() returns
+      // the correct position without manual detection here.
 
       if (time >= duration) {
         // Stop playback - inline to avoid circular dependency
@@ -883,9 +872,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     controls.width,
     setActiveAnnotationId,
     startAnimationFrameLoop,
-    isLoopEnabledRef,
-    loopStartRef,
-    loopEndRef,
+    getPlaybackTime,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
@@ -987,9 +974,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const pause = useCallback(() => {
     if (!engineRef.current) return;
 
-    // Calculate exact pause position using context.currentTime timing
-    const elapsed = getContext().currentTime - playbackStartTimeRef.current;
-    const pauseTime = audioStartPositionRef.current + elapsed;
+    // Get current position from engine (auto-wraps at loop boundaries)
+    const pauseTime = getPlaybackTime();
 
     engineRef.current.pause();
     setIsPlaying(false);
@@ -998,7 +984,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // Update to the calculated pause position
     currentTimeRef.current = pauseTime;
     setCurrentTime(pauseTime);
-  }, [stopAnimationLoop]);
+  }, [stopAnimationLoop, getPlaybackTime]);
 
   const stop = useCallback(() => {
     if (!engineRef.current) return;
@@ -1154,8 +1140,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       currentTimeRef,
       playbackStartTimeRef,
       audioStartPositionRef,
+      getPlaybackTime,
     }),
-    [isPlaying, currentTime, currentTimeRef, playbackStartTimeRef, audioStartPositionRef]
+    [
+      isPlaying,
+      currentTime,
+      currentTimeRef,
+      playbackStartTimeRef,
+      audioStartPositionRef,
+      getPlaybackTime,
+    ]
   );
 
   const stateValue: PlaylistStateContextValue = useMemo(
