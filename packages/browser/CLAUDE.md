@@ -5,9 +5,9 @@
 **Pattern:** Extract complex logic into reusable custom hooks.
 
 **Key Hooks:**
-- `useClipDragHandlers` - Drag-to-move and boundary trimming (300+ lines)
-- `useClipSplitting` - Split clips at playhead (150+ lines)
-- `useKeyboardShortcuts` - Flexible keyboard shortcut system (120+ lines)
+- `useClipDragHandlers` - Drag-to-move and boundary trimming
+- `useClipSplitting` - Split clips at playhead
+- `useKeyboardShortcuts` - Flexible keyboard shortcut system
 - `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind to start)
 - `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback
 - `useDynamicEffects` - Master effects chain with runtime parameter updates
@@ -73,33 +73,10 @@
 
 ## Playlist Loading Detection
 
-**Problem:** Detecting when a playlist has finished loading all tracks for CSS styling, E2E testing, or external integrations.
-
-**Solution:** Three approaches available:
-
-1. **Data Attribute** (`data-playlist-state`) - For CSS and E2E tests:
-```css
-[data-playlist-state="loading"] { opacity: 0.5; }
-[data-playlist-state="ready"] { opacity: 1; }
-```
-```typescript
-// Playwright
-await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
-```
-
-2. **Custom Event** (`waveform-playlist:ready`) - For external integrations:
-```typescript
-window.addEventListener('waveform-playlist:ready', (event: CustomEvent) => {
-  console.log('Tracks loaded:', event.detail.trackCount);
-  console.log('Duration:', event.detail.duration);
-});
-```
-
-3. **React Hook** (`isReady` from `usePlaylistData()`) - For internal components:
-```typescript
-const { isReady, tracks } = usePlaylistData();
-if (!isReady) return <LoadingSpinner />;
-```
+Three approaches for detecting when tracks finish loading:
+1. **Data Attribute** — `[data-playlist-state="ready"]` for CSS and E2E tests (Playwright `waitForSelector`)
+2. **Custom Event** — `waveform-playlist:ready` (CustomEvent with `trackCount`, `duration`) for external integrations
+3. **React Hook** — `isReady` from `usePlaylistData()` for internal components
 
 **Applied in:** `WaveformPlaylistContext.tsx`, `Playlist.tsx`, all E2E tests
 
@@ -122,63 +99,13 @@ const rebuildChain = useCallback(() => {
 
 ## Smooth Playback Animation Pattern
 
-**Problem:** React state updates during playback cause flickering and are throttled (every 500ms). Components like playhead position, progress overlay, and time display need 60fps updates.
+**Problem:** React state updates during playback cause flickering. Components need 60fps updates.
 
-**Solution:** Use `requestAnimationFrame` with direct DOM manipulation via refs. Calculate time directly from audio context for perfect sync.
+**Solution:** `requestAnimationFrame` + direct DOM manipulation via refs. Calculate time from `getContext().currentTime` (Tone.js) for perfect audio sync. No `setState` in the loop.
 
-**Pattern:**
-```typescript
-const elementRef = useRef<HTMLElement>(null);
-const animationFrameRef = useRef<number | null>(null);
-const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
+**Key points:** Compute elapsed = `audioContext.currentTime - playbackStartTimeRef`, add `audioStartPositionRef`. Update DOM directly. Cancel animation frame on cleanup.
 
-useEffect(() => {
-  const update = () => {
-    if (elementRef.current) {
-      // Calculate time from audio context during playback
-      let time: number;
-      if (isPlaying) {
-        const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
-        time = (audioStartPositionRef.current ?? 0) + elapsed;
-      } else {
-        time = currentTimeRef.current ?? 0;
-      }
-      // Update DOM directly (no React state)
-      elementRef.current.style.transform = `translateX(${time * pixelsPerSecond}px)`;
-    }
-    if (isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(update);
-    }
-  };
-
-  if (isPlaying) {
-    animationFrameRef.current = requestAnimationFrame(update);
-  } else {
-    update(); // Update once when stopped
-  }
-
-  return () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-  };
-}, [isPlaying, ...dependencies]);
-```
-
-**Key Points:**
-- Use `getContext().currentTime` from Tone.js for accurate audio time
-- Calculate elapsed time: `audioContext.currentTime - playbackStartTimeRef`
-- Add to start position: `audioStartPositionRef + elapsed`
-- Update DOM directly via refs (no setState)
-- Cancel animation frame on cleanup and when stopping
-
-**Applied in:**
-- `AnimatedPlayhead` - Playhead line position
-- `ChannelWithProgress` - Per-channel progress overlay
-- `AudioPosition` - Time display (ContextualControls)
-- `PlayheadWithMarker` - Custom playhead with triangle marker (ui-components)
-
-**Location:** `src/components/`
+**Reference implementation:** `AnimatedPlayhead` component. Also used by `ChannelWithProgress`, `AudioPosition`, `PlayheadWithMarker`.
 
 ## Engine State Subscription Pattern
 
@@ -195,9 +122,26 @@ useEffect(() => {
 
 **Subscription location:** Inside `loadAudio()` after `engineRef.current = engine`, the statechange handler calls each hook's `onEngineState(state)`.
 
-**Seed on rebuild:** When `loadAudio()` creates a fresh engine, seed it from hook-exposed refs (`selectionStartRef`, `loopStartRef`, etc.) before `setTracks()` — otherwise the first statechange resets user state to zeros.
+**Seed on rebuild:** When `loadAudio()` creates a fresh engine, seed it from hook-exposed refs before `setTracks()` — otherwise the first statechange resets user state to defaults. **Checklist** (update when adding engine-owned state):
+- `engine.setSelection(selectionStartRef.current ?? 0, selectionEndRef.current ?? 0)`
+- `engine.setLoopRegion(loopStartRef.current ?? 0, loopEndRef.current ?? 0)`
+- `if (isLoopEnabledRef.current) engine.setLoopEnabled(true)`
+- `engine.setMasterVolume(masterVolumeRef.current ?? 1.0)`
+- `if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current)`
 
 **Guard handler with ref comparisons:** Each hook's `onEngineState()` compares `state.field !== ref.current` before calling `setState` to skip unnecessary React updates. Ref assignments are synchronous; `setState` calls are batched by React.
+
+## Trim/Move Asymmetry in useClipDragHandlers
+
+**Move:** `onDragEnd` delegates to `engine.moveClip()` in one shot. The collision modifier constrains the visual position per-frame using the engine's pure `constrainClipDrag` function.
+
+**Trim:** `onDragMove` updates React state per-frame via `onTracksChange` for smooth visual feedback (cumulative deltas from original clip snapshot). `isDraggingRef` prevents `loadAudio` from rebuilding the engine during the drag, so the engine keeps the original (pre-drag) clip positions. On drag end, `engine.trimClip()` commits the final delta.
+
+**Why not `engine.trimClip()` per frame:** Engine methods apply incremental deltas to current state. The drag handler computes cumulative deltas from the original snapshot. Calling the engine per frame would compound deltas incorrectly.
+
+**`isDraggingRef` lifecycle:** Set `true` in `onDragStart` (boundary trim only), set `false` in `onDragEnd` before `engine.trimClip()`. Guards two places in the provider: (1) `loadAudio` effect body skips full rebuild, (2) `skipEngineDisposeRef` prevents the previous effect cleanup from disposing the engine mid-drag.
+
+**`skipEngineDisposeRef` must include `isDraggingRef`:** During drag, `onDragMove` triggers `loadAudio` re-runs (because `tracks` is in deps). The previous effect's cleanup checks `skipEngineDisposeRef` — if it only checks `isEngineTracks` (which is `false` during drag), it disposes the engine on the first drag move.
 
 ## Important Patterns (Browser-Specific)
 
