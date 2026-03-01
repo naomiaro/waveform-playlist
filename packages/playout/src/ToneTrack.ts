@@ -193,6 +193,9 @@ export class ToneTrack {
   /**
    * Prepare fade envelopes for all clips based on Transport offset.
    * Called before Transport.start() to schedule fades at correct AudioContext times.
+   *
+   * @param when - AudioContext time when playback begins
+   * @param transportOffset - Transport position (seconds) where playback starts
    */
   prepareFades(when: number, transportOffset: number): void {
     this.clips.forEach((clipPlayer) => {
@@ -221,6 +224,8 @@ export class ToneTrack {
     this.clips.forEach(({ fadeGain, clipInfo }) => {
       const audioParam = getUnderlyingAudioParam(fadeGain.gain);
       if (audioParam) {
+        // Time 0 means "immediately" — cancels all future scheduled values
+        // and resets the gain to the clip's nominal level.
         audioParam.cancelScheduledValues(0);
         audioParam.setValueAtTime(clipInfo.gain, 0);
       }
@@ -261,19 +266,50 @@ export class ToneTrack {
   dispose(): void {
     // Clean up effects if cleanup function was provided
     if (this.effectsCleanup) {
-      this.effectsCleanup();
+      try {
+        this.effectsCleanup();
+      } catch (err) {
+        console.warn(`[waveform-playlist] Error during track "${this.id}" effects cleanup:`, err);
+      }
     }
 
     // Dispose all clip players (Player.dispose() calls unsync() internally)
-    this.clips.forEach((clipPlayer) => {
-      clipPlayer.player.dispose();
-      clipPlayer.fadeGain.dispose();
+    this.clips.forEach((clipPlayer, index) => {
+      try {
+        clipPlayer.player.dispose();
+      } catch (err) {
+        console.warn(
+          `[waveform-playlist] Error disposing player ${index} on track "${this.id}":`,
+          err
+        );
+      }
+      try {
+        clipPlayer.fadeGain.dispose();
+      } catch (err) {
+        console.warn(
+          `[waveform-playlist] Error disposing fadeGain ${index} on track "${this.id}":`,
+          err
+        );
+      }
     });
 
-    // Dispose shared track nodes
-    this.volumeNode.dispose();
-    this.panNode.dispose();
-    this.muteGain.dispose();
+    // Dispose shared track nodes — each wrapped individually so one failure
+    // doesn't prevent cleanup of the remaining nodes.
+    try {
+      this.volumeNode.dispose();
+    } catch (err) {
+      console.warn(`[waveform-playlist] Error disposing volumeNode on track "${this.id}":`, err);
+    }
+    try {
+      this.panNode.dispose();
+    } catch (err) {
+      console.warn(`[waveform-playlist] Error disposing panNode on track "${this.id}":`, err);
+    }
+    try {
+      this.muteGain.dispose();
+    } catch (err) {
+      console.warn(`[waveform-playlist] Error disposing muteGain on track "${this.id}":`, err);
+    }
   }
 
   get id(): string {

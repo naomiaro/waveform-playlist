@@ -62,7 +62,11 @@ export class TonePlayout {
 
   private clearCompletionEvent(): void {
     if (this._completionEventId !== null) {
-      getTransport().clear(this._completionEventId);
+      try {
+        getTransport().clear(this._completionEventId);
+      } catch (err) {
+        console.warn('[waveform-playlist] Error clearing Transport completion event:', err);
+      }
       this._completionEventId = null;
     }
   }
@@ -115,17 +119,17 @@ export class TonePlayout {
 
   play(when?: number, offset?: number, duration?: number): void {
     if (!this.isInitialized) {
-      console.warn('TonePlayout not initialized. Call init() first.');
+      console.warn('[waveform-playlist] TonePlayout not initialized. Call init() first.');
       return;
     }
 
     const startTime = when ?? now();
-    const transportOffset = offset ?? 0;
 
     // Clear any pending completion event
     this.clearCompletionEvent();
 
     // Cancel stale fades and re-schedule for all tracks
+    const transportOffset = offset ?? 0;
     this.tracks.forEach((track) => {
       track.cancelFades();
       track.prepareFades(startTime, transportOffset);
@@ -135,12 +139,31 @@ export class TonePlayout {
     if (duration !== undefined) {
       this._completionEventId = getTransport().scheduleOnce(() => {
         this._completionEventId = null;
-        this.onPlaybackCompleteCallback?.();
+        try {
+          this.onPlaybackCompleteCallback?.();
+        } catch (err) {
+          console.warn('[waveform-playlist] Error in playback completion callback:', err);
+        }
       }, transportOffset + duration);
     }
 
     // Start Transport — drives all synced Players
-    getTransport().start(startTime, transportOffset);
+    try {
+      if (offset !== undefined) {
+        getTransport().start(startTime, offset);
+      } else {
+        // No offset — let Transport resume from its current position
+        getTransport().start(startTime);
+      }
+    } catch (err) {
+      // Clean up scheduled events since Transport failed to start
+      this.clearCompletionEvent();
+      this.tracks.forEach((track) => track.cancelFades());
+      console.warn(
+        '[waveform-playlist] Transport.start() failed. Audio playback could not begin.',
+        err
+      );
+    }
   }
 
   pause(): void {
@@ -216,16 +239,28 @@ export class TonePlayout {
     this.clearCompletionEvent();
 
     this.tracks.forEach((track) => {
-      track.dispose();
+      try {
+        track.dispose();
+      } catch (err) {
+        console.warn(`[waveform-playlist] Error disposing track "${track.id}":`, err);
+      }
     });
     this.tracks.clear();
 
     // Clean up effects if cleanup function was provided
     if (this.effectsCleanup) {
-      this.effectsCleanup();
+      try {
+        this.effectsCleanup();
+      } catch (err) {
+        console.warn('[waveform-playlist] Error during master effects cleanup:', err);
+      }
     }
 
-    this.masterVolume.dispose();
+    try {
+      this.masterVolume.dispose();
+    } catch (err) {
+      console.warn('[waveform-playlist] Error disposing master volume:', err);
+    }
   }
 
   get context(): BaseContext {

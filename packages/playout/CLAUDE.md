@@ -16,7 +16,7 @@
 
 ## Transport-Synced Players
 
-Players are synced to Tone.js Transport at creation time via `player.sync().start(transportTime, bufferOffset, duration)`. This bypasses the [StateTimeline bug](https://github.com/Tonejs/Tone.js/issues/1076) — synced playback uses `_syncedStart()` which only reads the StateTimeline (never writes), so the monotonically-increasing constraint is never violated.
+Players are synced to Tone.js Transport at creation time via `player.sync().start(transportTime, bufferOffset, duration)`. The initial `.sync().start()` call writes one entry to the StateTimeline, but subsequent Transport stop→restart cycles bypass the [StateTimeline bug](https://github.com/Tonejs/Tone.js/issues/1076) — synced playback uses `_syncedStart()` which only reads the StateTimeline (never writes), so the monotonically-increasing constraint is never violated on subsequent plays.
 
 **ToneTrack** is a passive audio graph — no `play()`/`pause()`/`stop()` methods. Transport drives all playback.
 
