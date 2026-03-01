@@ -16,6 +16,18 @@
 
 **Not yet wired:** Browser package still uses `TonePlayout` directly. Engine integration is a separate PR.
 
+## Transport-Synced Players
+
+Players are synced to Tone.js Transport at creation time via `player.sync().start(transportTime, bufferOffset, duration)`. This bypasses the [StateTimeline bug](https://github.com/Tonejs/Tone.js/issues/1076) — synced playback uses `_syncedStart()` which only reads the StateTimeline (never writes), so the monotonically-increasing constraint is never violated.
+
+**ToneTrack** is a passive audio graph — no `play()`/`pause()`/`stop()` methods. Transport drives all playback.
+
+**Fades** are re-scheduled on each play via `prepareFades(when, transportOffset)` and cleared on pause/stop via `cancelFades()`.
+
+**Completion detection:** `TonePlayout` schedules a single `Transport.scheduleOnce()` event at `offset + duration` for duration-limited playback, instead of tracking per-track stop callbacks.
+
+**WAV export** is not affected — `useExportWav.ts` creates its own Players inside `Tone.Offline`, never touching `ToneTrack` or `TonePlayout`.
+
 ## Global AudioContext Pattern
 
 **Implementation:** Recording and playback use a global shared AudioContext (same as Tone.js).
@@ -38,7 +50,7 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
 **Pattern:** Access raw `AudioParam` via `(signal as any)._param` for `setValueAtTime`/`cancelScheduledValues` when Tone.js Signal wrapper doesn't propagate changes (e.g., suspended AudioContext).
 
-**Used in:** `ToneTrack.setMute()`, `ToneTrack.scheduleFades()`
+**Used in:** `ToneTrack.setMute()`, `ToneTrack.scheduleFades()`, `ToneTrack.cancelFades()`
 
 **Risk:** `_param` is a private Tone.js 15.x internal. Pin version carefully. Consider consolidating into a shared utility with null guard.
 

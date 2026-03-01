@@ -154,6 +154,11 @@ const config: Config = {
         name: 'waveform-playlist-webpack',
         configureWebpack(config, isServer, utils) {
           return {
+            // Suppress postcss-calc parse warnings from @radix-ui/themes CSS
+            // (nested calc() + var() fallbacks that the browser handles fine)
+            ignoreWarnings: [
+              { message: /postcss-calc/ },
+            ],
             module: {
               rules: [
                 {

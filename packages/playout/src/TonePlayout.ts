@@ -32,8 +32,7 @@ export class TonePlayout {
   private manualMuteState: Map<string, boolean> = new Map();
   private effectsCleanup?: () => void;
   private onPlaybackCompleteCallback?: () => void;
-  private activeTracks: Map<string, number> = new Map(); // Map track ID to session ID
-  private playbackSessionId: number = 0;
+  private _completionEventId: number | null = null;
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Volume(this.gainToDb(options.masterGain ?? 1));
@@ -59,6 +58,13 @@ export class TonePlayout {
 
   private gainToDb(gain: number): number {
     return 20 * Math.log10(gain);
+  }
+
+  private clearCompletionEvent(): void {
+    if (this._completionEventId !== null) {
+      getTransport().clear(this._completionEventId);
+      this._completionEventId = null;
+    }
   }
 
   async init(): Promise<void> {
@@ -113,82 +119,40 @@ export class TonePlayout {
       return;
     }
 
-    // Use now() as default, but call it here after init check (not in function signature)
     const startTime = when ?? now();
-    const playbackPosition = offset ?? 0;
+    const transportOffset = offset ?? 0;
 
-    // Increment session ID to invalidate old callbacks
-    this.playbackSessionId++;
-    const currentSessionId = this.playbackSessionId;
+    // Clear any pending completion event
+    this.clearCompletionEvent();
 
-    // Clear active tracks and set up stop callbacks if duration is specified
-    this.activeTracks.clear();
-
-    // Play tracks based on their individual start times
-    this.tracks.forEach((toneTrack) => {
-      const trackStartTime = toneTrack.startTime;
-
-      if (playbackPosition >= trackStartTime) {
-        // Track should be playing - calculate buffer offset and start immediately
-        const bufferOffset = playbackPosition - trackStartTime;
-
-        if (duration !== undefined) {
-          this.activeTracks.set(toneTrack.id, currentSessionId);
-          toneTrack.setOnStopCallback(() => {
-            // Only process if this track is still in activeTracks with matching session ID
-            if (this.activeTracks.get(toneTrack.id) === currentSessionId) {
-              this.activeTracks.delete(toneTrack.id);
-              if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
-                this.onPlaybackCompleteCallback();
-              }
-            }
-          });
-        }
-
-        toneTrack.play(startTime, bufferOffset, duration);
-      } else {
-        // Track should start later - schedule it to start when playback reaches its start time
-        const delay = trackStartTime - playbackPosition;
-
-        if (duration !== undefined) {
-          this.activeTracks.set(toneTrack.id, currentSessionId);
-          toneTrack.setOnStopCallback(() => {
-            // Only process if this track is still in activeTracks with matching session ID
-            if (this.activeTracks.get(toneTrack.id) === currentSessionId) {
-              this.activeTracks.delete(toneTrack.id);
-              if (this.activeTracks.size === 0 && this.onPlaybackCompleteCallback) {
-                this.onPlaybackCompleteCallback();
-              }
-            }
-          });
-        }
-
-        toneTrack.play(startTime + delay, 0, duration);
-      }
+    // Cancel stale fades and re-schedule for all tracks
+    this.tracks.forEach((track) => {
+      track.cancelFades();
+      track.prepareFades(startTime, transportOffset);
     });
 
-    // Start transport
-    if (offset !== undefined) {
-      // Explicit offset provided - seek to that position
-      getTransport().start(startTime, offset);
-    } else {
-      // No offset - resume from pause (Transport resumes from current position)
-      getTransport().start(startTime);
+    // Schedule duration-limited stop via Transport
+    if (duration !== undefined) {
+      this._completionEventId = getTransport().scheduleOnce(() => {
+        this._completionEventId = null;
+        this.onPlaybackCompleteCallback?.();
+      }, transportOffset + duration);
     }
+
+    // Start Transport — drives all synced Players
+    getTransport().start(startTime, transportOffset);
   }
 
   pause(): void {
     getTransport().pause();
-    this.tracks.forEach((track) => {
-      track.pause();
-    });
+    this.tracks.forEach((track) => track.cancelFades());
+    this.clearCompletionEvent();
   }
 
   stop(): void {
     getTransport().stop();
-    this.tracks.forEach((track) => {
-      track.stop();
-    });
+    this.tracks.forEach((track) => track.cancelFades());
+    this.clearCompletionEvent();
   }
 
   setMasterGain(gain: number): void {
@@ -249,6 +213,8 @@ export class TonePlayout {
   }
 
   dispose(): void {
+    this.clearCompletionEvent();
+
     this.tracks.forEach((track) => {
       track.dispose();
     });

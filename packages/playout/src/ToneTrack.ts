@@ -1,5 +1,5 @@
 // Named imports for tree-shaking
-import { Player, Volume, Gain, Panner, ToneAudioNode, getDestination, now } from 'tone';
+import { Player, Volume, Gain, Panner, ToneAudioNode, getDestination } from 'tone';
 import { Track, type Fade } from '@waveform-playlist/core';
 import { applyFadeIn, applyFadeOut, getUnderlyingAudioParam } from './fades';
 
@@ -32,8 +32,6 @@ interface ClipPlayer {
   player: Player;
   clipInfo: ClipInfo;
   fadeGain: Gain;
-  pausedPosition: number;
-  playStartTime: number;
 }
 
 export class ToneTrack {
@@ -43,8 +41,6 @@ export class ToneTrack {
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
-  private onStopCallback?: () => void;
-  private activePlayers: number = 0; // Count of currently playing clips
 
   constructor(options: ToneTrackOptions) {
     this.track = options.track;
@@ -82,17 +78,11 @@ export class ToneTrack {
           ]
         : []);
 
-    // Create ClipPlayer for each clip
+    // Create ClipPlayer for each clip, sync to Transport
     this.clips = clipInfos.map((clipInfo) => {
       const player = new Player({
         url: clipInfo.buffer,
         loop: false,
-        onstop: () => {
-          this.activePlayers--;
-          if (this.activePlayers === 0 && this.onStopCallback) {
-            this.onStopCallback();
-          }
-        },
       });
 
       const fadeGain = new Gain(clipInfo.gain);
@@ -101,21 +91,21 @@ export class ToneTrack {
       player.connect(fadeGain);
       fadeGain.chain(this.volumeNode, this.panNode, this.muteGain);
 
-      // Note: Fades are scheduled in play() method, not here in constructor,
-      // because AudioParam automation requires absolute AudioContext time
+      // Sync to Transport: player starts at absolute timeline position
+      // with buffer offset and duration. Transport drives all playback.
+      const absTransportTime = this.track.startTime + clipInfo.startTime;
+      player.sync().start(absTransportTime, clipInfo.offset, clipInfo.duration);
 
       return {
         player,
         clipInfo,
         fadeGain,
-        pausedPosition: 0,
-        playStartTime: 0,
       };
     });
   }
 
   /**
-   * Schedule fade envelopes for a clip at the given start time
+   * Schedule fade envelopes for a clip at the given AudioContext time
    */
   private scheduleFades(
     clipPlayer: ClipPlayer,
@@ -200,6 +190,44 @@ export class ToneTrack {
     }
   }
 
+  /**
+   * Prepare fade envelopes for all clips based on Transport offset.
+   * Called before Transport.start() to schedule fades at correct AudioContext times.
+   */
+  prepareFades(when: number, transportOffset: number): void {
+    this.clips.forEach((clipPlayer) => {
+      const absClipStart = this.track.startTime + clipPlayer.clipInfo.startTime;
+      const absClipEnd = absClipStart + clipPlayer.clipInfo.duration;
+
+      if (transportOffset >= absClipEnd) return; // clip already finished
+
+      if (transportOffset >= absClipStart) {
+        // Mid-clip: playing now
+        const clipOffset =
+          transportOffset - absClipStart + clipPlayer.clipInfo.offset;
+        this.scheduleFades(clipPlayer, when, clipOffset);
+      } else {
+        // Clip starts later
+        const delay = absClipStart - transportOffset;
+        this.scheduleFades(clipPlayer, when + delay, clipPlayer.clipInfo.offset);
+      }
+    });
+  }
+
+  /**
+   * Cancel all scheduled fade automation and reset to nominal gain.
+   * Called on pause/stop to prevent stale fade envelopes.
+   */
+  cancelFades(): void {
+    this.clips.forEach(({ fadeGain, clipInfo }) => {
+      const audioParam = getUnderlyingAudioParam(fadeGain.gain);
+      if (audioParam) {
+        audioParam.cancelScheduledValues(0);
+        audioParam.setValueAtTime(clipInfo.gain, 0);
+      }
+    });
+  }
+
   private gainToDb(gain: number): number {
     return 20 * Math.log10(gain);
   }
@@ -231,120 +259,13 @@ export class ToneTrack {
     this.track.soloed = soloed;
   }
 
-  play(when?: number, offset: number = 0, duration?: number): void {
-    // Recreate all players to avoid Tone.js StateTimeline issues when seeking
-    // See: https://github.com/Tonejs/Tone.js/issues/1076
-    // The Player's internal StateTimeline doesn't properly clear on stop(),
-    // so we need fresh Player instances when rescheduling
-    this.clips.forEach((clipPlayer) => {
-      // Dispose old player
-      clipPlayer.player.stop();
-      clipPlayer.player.disconnect();
-      clipPlayer.player.dispose();
-
-      // Create new player with same buffer
-      const newPlayer = new Player({
-        url: clipPlayer.clipInfo.buffer,
-        loop: false,
-        onstop: () => {
-          this.activePlayers--;
-          if (this.activePlayers === 0 && this.onStopCallback) {
-            this.onStopCallback();
-          }
-        },
-      });
-
-      // Reconnect to audio graph
-      newPlayer.connect(clipPlayer.fadeGain);
-
-      // Update reference
-      clipPlayer.player = newPlayer;
-      clipPlayer.pausedPosition = 0;
-    });
-
-    this.activePlayers = 0;
-    // Play each clip that should be active at this offset
-    this.clips.forEach((clipPlayer) => {
-      const { player, clipInfo } = clipPlayer;
-
-      // Calculate absolute timeline position we're starting from
-      const playbackPosition = offset;
-
-      // Check if this clip should be playing at this position
-      const clipStart = clipInfo.startTime;
-      const clipEnd = clipInfo.startTime + clipInfo.duration;
-
-      if (playbackPosition < clipEnd) {
-        // This clip should play
-        this.activePlayers++;
-
-        // Get fresh now() for each clip to avoid "time in the past" errors
-        // This is important when seeking during playback - time passes between scheduling clips
-        const currentTime = when ?? now();
-        clipPlayer.playStartTime = currentTime;
-
-        if (playbackPosition >= clipStart) {
-          // We're starting in the middle of this clip
-          const clipOffset = playbackPosition - clipStart + clipInfo.offset;
-          const remainingDuration = clipInfo.duration - (playbackPosition - clipStart);
-          const clipDuration = duration ? Math.min(duration, remainingDuration) : remainingDuration;
-
-          clipPlayer.pausedPosition = clipOffset;
-          // Schedule fades at the actual playback start time
-          this.scheduleFades(clipPlayer, currentTime, clipOffset);
-          player.start(currentTime, clipOffset, clipDuration);
-        } else {
-          // This clip starts later - schedule it
-          const delay = clipStart - playbackPosition;
-          const clipDuration = duration
-            ? Math.min(duration - delay, clipInfo.duration)
-            : clipInfo.duration;
-
-          if (delay < (duration ?? Infinity)) {
-            clipPlayer.pausedPosition = clipInfo.offset;
-            // Schedule fades at the delayed start time
-            this.scheduleFades(clipPlayer, currentTime + delay, clipInfo.offset);
-            player.start(currentTime + delay, clipInfo.offset, clipDuration);
-          } else {
-            this.activePlayers--;
-          }
-        }
-      }
-    });
-  }
-
-  pause(): void {
-    // Stop all clips - both started and scheduled
-    // Scheduled clips have state 'stopped' but still need to be cancelled
-    this.clips.forEach((clipPlayer) => {
-      if (clipPlayer.player.state === 'started') {
-        const elapsed = (now() - clipPlayer.playStartTime) * clipPlayer.player.playbackRate;
-        clipPlayer.pausedPosition = clipPlayer.pausedPosition + elapsed;
-      }
-      // Always call stop() to cancel any scheduled playback
-      clipPlayer.player.stop();
-    });
-
-    this.activePlayers = 0;
-  }
-
-  stop(when?: number): void {
-    // Evaluate now() inside function body, not in parameter default (which is evaluated at module load time)
-    const stopWhen = when ?? now();
-    this.clips.forEach((clipPlayer) => {
-      clipPlayer.player.stop(stopWhen);
-      clipPlayer.pausedPosition = 0;
-    });
-    this.activePlayers = 0;
-  }
-
   dispose(): void {
     // Clean up effects if cleanup function was provided
     if (this.effectsCleanup) {
       this.effectsCleanup();
     }
 
-    // Dispose all clip players
+    // Dispose all clip players (Player.dispose() calls unsync() internally)
     this.clips.forEach((clipPlayer) => {
       clipPlayer.player.dispose();
       clipPlayer.fadeGain.dispose();
@@ -385,9 +306,5 @@ export class ToneTrack {
     // Return the track's start time from the Track object
     // This is the absolute timeline position where the track starts
     return this.track.startTime;
-  }
-
-  setOnStopCallback(callback: () => void): void {
-    this.onStopCallback = callback;
   }
 }

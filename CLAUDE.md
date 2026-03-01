@@ -107,7 +107,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **Common Doc Drift:** Docs may reference deleted hooks, wrong property names (e.g., `gain` vs `volume`, `seek` vs `seekTo`), or properties attributed to wrong context hooks. Always cross-check docs against source interfaces.
 
-**Verify docs render:** `pnpm --filter website build` (CSS calc warnings are pre-existing, harmless)
+**Verify docs render:** `pnpm --filter website build`
 
 **Moving/Renaming Doc Pages:** Run `pnpm --filter website build` after moving docs — Docusaurus broken link checker will find all internal links that need updating.
 
