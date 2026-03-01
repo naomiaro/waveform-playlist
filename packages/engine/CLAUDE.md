@@ -8,7 +8,7 @@
 
 **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 
-**Key types:** `PlayoutAdapter` (pluggable audio backend interface), `EngineState` (state snapshot), `EngineEvents` (statechange, timeupdate, play/pause/stop).
+**Key types:** `PlayoutAdapter` (pluggable audio backend interface — `play()` returns `void`, `init()` returns `Promise<void>`), `EngineState` (state snapshot), `EngineEvents` (statechange, timeupdate, play/pause/stop).
 
 **Operations:** `clipOperations.ts` (drag constraints, trim, split), `viewportOperations.ts` (bounds, chunks, scroll threshold), `timelineOperations.ts` (duration, zoom, seek).
 
@@ -29,4 +29,4 @@
 - **Console warn diagnostics** — `moveClip`, `trimClip`, `splitClip` log `console.warn('[waveform-playlist/engine] methodName: ...')` on invalid track/clip IDs. Tests exercising these paths must mock `console.warn`.
 - **`tracksVersion` counter** — Monotonic counter in `EngineState` that increments only on track mutations (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). Does NOT increment on selection/zoom/volume/loop changes. Used by the provider to detect track-specific statechange events and skip `loadAudio` rebuilds.
 - `getCurrentTime()` delegates to `adapter.getCurrentTime()` when playing (returns `Transport.seconds`, auto-wraps at loop boundaries), otherwise returns stored `_currentTime`. Engine's `play(startTime)` clamps startTime to track duration — tests need tracks loaded for meaningful startTime values.
-- `play()` enables Transport loop if `_isLoopEnabled`; `play(start, end)` disables it for selection playback. `stop()` disables Transport loop before calling `adapter.stop()`.
+- `play()` is **synchronous** (not async) — enables Transport loop if `_isLoopEnabled`; `play(start, end)` disables it for selection playback. `stop()` disables Transport loop before calling `adapter.stop()`. Separate `init()` method delegates to `adapter.init()` for AudioContext resume.

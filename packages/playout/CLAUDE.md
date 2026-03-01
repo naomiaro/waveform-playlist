@@ -46,6 +46,10 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
 **Safari Latency:** `TonePlayout.init()` already calls `await start()`. Do NOT call `await toneStart()` separately in play handlers — the redundant await adds ~2 seconds of latency on Safari.
 
+**play() is synchronous:** `TonePlayoutAdapter.play()` returns `void` (not `Promise<void>`). AudioContext init (`Tone.start()`) is handled separately via `adapter.init()` — called once by the browser layer on first user-gesture play, not on every play call.
+
+**Defensive Transport.stop() in play():** `TonePlayout.play()` calls `getTransport().stop()` immediately before `getTransport().start()` to prevent audio layering. Without this, rapid play/stop/play (e.g., spacebar) can emit duplicate `_syncedStart` events, creating overlapping BufferSourceNodes.
+
 **Master volume:** Uses Web Audio standard 0-1.0 range (not 0-100).
 
 ## Tone.js Internal AudioParam Access
