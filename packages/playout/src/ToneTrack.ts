@@ -105,6 +105,7 @@ export class ToneTrack {
       player.sync().start(absTransportTime, clipInfo.offset, clipInfo.duration).stop(clipEndTime);
 
       // Guard tick-0 transport.schedule() callback against TickSource drift.
+      // See: https://github.com/Tonejs/Tone.js/issues/1417
       //
       // player.sync().start(0, ...) creates a transport.schedule() callback
       // at tick 0 that unconditionally calls _start() — no state check.
