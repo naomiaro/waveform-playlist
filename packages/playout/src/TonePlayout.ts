@@ -128,6 +128,13 @@ export class TonePlayout {
     // Clear any pending completion event
     this.clearCompletionEvent();
 
+    // Stop Transport before restarting to ensure a clean state.
+    // Calling Transport.start() while already running emits a duplicate
+    // "start" event, which triggers _syncedStart() on every synced Player,
+    // creating additional BufferSourceNodes without stopping the old ones.
+    // This causes audible layering on loop restarts and rapid play calls.
+    getTransport().stop();
+
     // Cancel stale fades and re-schedule for all tracks
     const transportOffset = offset ?? 0;
     this.tracks.forEach((track) => {
