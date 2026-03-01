@@ -104,5 +104,6 @@ Both providers use React Context with 4 split contexts for performance.
 
 - Full docs: https://naomiaro.github.io/waveform-playlist/docs/
 - LLM API reference: https://naomiaro.github.io/waveform-playlist/docs/api/llm-reference
+- Engine guide (framework-agnostic): https://naomiaro.github.io/waveform-playlist/docs/guides/engine
 - Examples: https://naomiaro.github.io/waveform-playlist/docs/examples
 - GitHub: https://github.com/naomiaro/waveform-playlist
