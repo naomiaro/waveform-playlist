@@ -20,7 +20,8 @@ waveform-playlist is a React component library for building browser-based audio 
 
 - `@waveform-playlist/browser` — Main package: React components, hooks, effects
 - `@waveform-playlist/core` — Data model: ClipTrack, AudioClip, sample-based math
-- `@waveform-playlist/playout` — Audio engine: Tone.js playback, global AudioContext
+- `@waveform-playlist/engine` — Framework-agnostic timeline engine: PlaylistEngine class, pure clip/timeline operations, event emitter. Owns selection, loop, zoom, volume, selectedTrackId, and clip mutation state.
+- `@waveform-playlist/playout` — Audio playback: Tone.js adapter (implements PlayoutAdapter from engine), global AudioContext
 - `@waveform-playlist/ui-components` — Styled primitives, theming, virtual scrolling contexts, playhead components, PlaylistErrorBoundary
 - `@waveform-playlist/annotations` — Annotation parsing, rendering, keyboard controls
 - `@waveform-playlist/recording` — Microphone access, AudioWorklet recording, VU meter, integrated recording hook
@@ -58,7 +59,7 @@ Both providers use React Context with 4 split contexts for performance.
 1. **usePlaybackAnimation()** — High-frequency: isPlaying, currentTime, timing refs
 2. **usePlaylistState()** — Medium-frequency: selection, loop, annotations, settings
 3. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, track controls, zoom, settings setters
-4. **usePlaylistData()** — Stable: duration, tracks, trackStates, display config, isReady
+4. **usePlaylistData()** — Stable: duration, tracks, trackStates, playoutRef (PlaylistEngine), isDraggingRef, display config, isReady
 
 **MediaElementPlaylistProvider** (single-track, HTMLAudioElement):
 1. **useMediaElementAnimation()** — isPlaying, currentTime
@@ -72,8 +73,8 @@ Both providers use React Context with 4 split contexts for performance.
 - `useDynamicTracks()` — Imperative hook for runtime track additions (drag-and-drop, file picker). Creates placeholder tracks instantly while audio decodes in parallel
 - `useDynamicEffects()` — Master effects chain with runtime add/remove/parameter updates
 - `useTrackDynamicEffects()` — Per-track effects management
-- `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming with collision detection
-- `useClipSplitting(opts)` — Split clips at playhead position
+- `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip()
+- `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip()
 - `useExportWav()` — Offline WAV export with effects support
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
 - `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0)
@@ -93,7 +94,7 @@ Both providers use React Context with 4 split contexts for performance.
 
 ## Key Components
 
-- `WaveformPlaylistProvider` — Multi-track provider (Web Audio API / Tone.js). Props: tracks, timescale, controls, theme, effects, annotationList, onAnnotationsChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel, zoomLevels
+- `WaveformPlaylistProvider` — Multi-track provider (Web Audio API / Tone.js). Props: tracks, timescale, controls, theme, effects, annotationList, onAnnotationsChange, onTracksChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel, zoomLevels, mono
 - `MediaElementPlaylistProvider` — Single-track provider (HTMLAudioElement). Props: track, playbackRate, timescale, controls, theme, annotationList, onAnnotationsChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel. Use for language learning, podcasts, single-track viewers.
 - `Waveform` — Main visualization. Props: showClipHeaders, interactiveClips, renderPlayhead, renderTrackControls, showFades, touchOptimized
 - Buttons: PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton, LoopButton, SetLoopRegionButton, ZoomInButton, ZoomOutButton, ExportWavButton

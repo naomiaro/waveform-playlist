@@ -2,7 +2,17 @@
 
 Multi-track audio editor roadmap for waveform-playlist.
 
-**Branch:** `main` | **Last Updated:** 2026-02-01
+**Branch:** `main` | **Last Updated:** 2026-02-28
+
+---
+
+## ✅ Recently Completed
+
+### Engine State Ownership & Clip Operations (2026-02-28)
+
+- **PR #291:** Engine as single source of truth for selection, loop, volume, selectedTrackId
+- **PR #292:** Extracted useSelectionState, useLoopState, useSelectedTrack, useZoomControls, useMasterVolume hooks with onEngineState() pattern
+- **PR #293:** Delegated clip operations (move, trim, split) to PlaylistEngine — hooks call engine methods instead of inline mutation logic. Added `onTracksChange` prop, `isDraggingRef` for trim safety, `onDragCancel` handler.
 
 ---
 

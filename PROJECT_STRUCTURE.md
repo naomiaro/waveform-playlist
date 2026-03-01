@@ -16,6 +16,7 @@ waveform-playlist/
 │   ├── core/              # Core types and interfaces
 │   ├── loaders/           # Audio file loaders
 │   ├── media-element-playout/  # Audio playback (HTMLAudioElement, no Tone.js)
+│   ├── engine/            # Framework-agnostic timeline engine
 │   ├── playout/           # Audio playback (Tone.js wrapper)
 │   ├── recording/         # 📦 OPTIONAL: Audio recording with AudioWorklet
 │   ├── spectrogram/       # 📦 OPTIONAL: FFT computation, worker rendering, color maps
@@ -104,6 +105,22 @@ const clip = createClipFromSeconds({
 - **Exports:** Peak data structures, peak generation functions
 - **Key concept:** Converts AudioBuffer → peak data for canvas rendering
 - **Dependencies:** Core
+
+#### `@waveform-playlist/engine`
+
+- **Purpose:** Framework-agnostic timeline engine — stateful `PlaylistEngine` class with event emitter
+- **Architecture:** Two layers — pure operations functions + stateful class
+  - `operations/clipOperations.ts` — Drag constraints, boundary trim, split
+  - `operations/viewportOperations.ts` — Bounds, chunks, scroll threshold
+  - `operations/timelineOperations.ts` — Duration, zoom, seek
+  - `PlaylistEngine.ts` — Composes operations with state + events
+- **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
+- **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
+- **Key Types:** `PlayoutAdapter` (pluggable audio backend), `EngineState` (state snapshot), `EngineEvents` (statechange, timeupdate, play/pause/stop)
+- **State Ownership:** Engine owns selection, loop, selectedTrackId, zoom, masterVolume, and tracks (for clip mutations). React subscribes to `statechange` events.
+- **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` update internal tracks, sync adapter via `adapter.setTracks()`, and emit `statechange`. The browser package's provider mirrors updated tracks back to the parent via `onTracksChange`.
+- **Dependencies:** Only peer dependency is `@waveform-playlist/core`
+- **No React, no Tone.js** — zero framework dependencies
 
 ### 🎨 UI Layer
 
@@ -214,19 +231,22 @@ const clip = createClipFromSeconds({
   │   ├── useAnnotationKeyboardControls.ts # Annotation navigation & editing
   │   ├── useAudioEffects.ts            # Audio effects management
   │   ├── useAudioTracks.ts             # Track loading and management
-  │   ├── useClipDragHandlers.ts        # Clip drag-to-move and trim
-  │   ├── useClipSplitting.ts           # Split clips at playhead
+  │   ├── useClipDragHandlers.ts        # Clip drag/move/trim (delegates to engine)
+  │   ├── useClipSplitting.ts           # Split clips at playhead (delegates to engine)
   │   ├── useDragSensors.ts             # @dnd-kit sensor config
   │   ├── useDynamicEffects.ts          # Master effects chain
   │   ├── useDynamicTracks.ts           # Runtime track additions (placeholder-then-replace)
   │   ├── useExportWav.ts               # WAV export via Tone.Offline
   │   ├── useKeyboardShortcuts.ts       # Flexible keyboard shortcut system
-  │   ├── useMasterVolume.ts            # Master volume control
+  │   ├── useLoopState.ts               # Loop state (engine delegation + onEngineState)
+  │   ├── useMasterVolume.ts            # Master volume (engine delegation + onEngineState)
   │   ├── usePlaybackShortcuts.ts       # Default playback shortcuts
+  │   ├── useSelectedTrack.ts           # Selected track ID (engine delegation + onEngineState)
+  │   ├── useSelectionState.ts          # Selection state (engine delegation + onEngineState)
   │   ├── useTimeFormat.ts              # Time formatting
   │   ├── useTrackDynamicEffects.ts     # Per-track effects
   │   ├── useWaveformDataCache.ts       # Web worker peak generation cache
-  │   └── useZoomControls.ts            # Zoom level management
+  │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
   │   ├── PlaylistVisualization.tsx      # Main waveform + track rendering
   │   ├── Waveform.tsx                  # Public waveform component
@@ -503,7 +523,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 
 ### Current Architecture (React + Hooks + Context)
 
-**Flexible API Pattern (Provider + Primitives):**
+**Flexible API Pattern (Provider + Engine + Primitives):**
 
 ```
 User Interaction (React Events)
@@ -512,11 +532,11 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     ├─→ PlaybackAnimationContext (60fps updates)
     │   └─→ isPlaying, currentTime, currentTimeRef
     ├─→ PlaylistStateContext (user interactions)
-    │   └─→ continuousPlay, annotations, selection, etc.
+    │   └─→ selection, loop, selectedTrackId, annotations, etc.
     ├─→ PlaylistControlsContext (stable functions)
-    │   └─→ play(), pause(), setContinuousPlay(), etc.
+    │   └─→ play(), pause(), zoomIn(), setSelection(), etc.
     └─→ PlaylistDataContext (static/infrequent updates)
-        └─→ duration, audioBuffers, peaksDataArray, etc.
+        └─→ duration, audioBuffers, peaksDataArray, isDraggingRef, etc.
     ↓
 ├─→ Primitive Components (subscribe to relevant contexts only)
 │   ├─→ PlayButton, PauseButton, StopButton
@@ -527,8 +547,25 @@ WaveformPlaylistProvider (Split Contexts for Performance)
 ├─→ UI Components (React)
 │   └─→ Canvas Rendering (SmartChannel)
 │
-└─→ TonePlayout (Tone.js)
-    └─→ Web Audio API
+└─→ PlaylistEngine (state + events)
+    ├─→ Owns: selection, loop, zoom, volume, selectedTrackId, tracks (clip mutations)
+    ├─→ Emits: statechange → provider mirrors into React state
+    └─→ ToneAdapter (PlayoutAdapter interface)
+        └─→ TonePlayout (Tone.js)
+            └─→ Web Audio API
+```
+
+**Engine State Flow:**
+```
+Hook calls engine method (e.g., engine.moveClip())
+    ↓
+Engine updates internal state + syncs adapter
+    ↓
+Engine emits 'statechange' with EngineState snapshot
+    ↓
+Provider's statechange handler:
+    ├─→ Calls each hook's onEngineState() to mirror into React state
+    └─→ Calls onTracksChange() for track mutations → parent updates tracks prop
 ```
 
 **Context Splitting Architecture:**
@@ -557,6 +594,8 @@ The provider uses **4 separate contexts** to optimize performance by isolating d
 - `packages/browser/src/SpectrogramIntegrationContext.tsx` - Optional spectrogram integration
 - `packages/browser/src/hooks/` - Reusable business logic
 - `packages/browser/src/components/` - React components
+- `packages/engine/src/PlaylistEngine.ts` - Stateful timeline engine
+- `packages/engine/src/operations/` - Pure clip/timeline/viewport operations
 - `packages/ui-components/src/components/Playlist.tsx` - UI container
 - `packages/playout/src/TonePlayout.ts` - Audio playback
 
@@ -576,16 +615,20 @@ export interface PlaybackAnimationContextValue {
   currentTimeRef: React.RefObject<number>;
 }
 
-// 2. User interaction state - UI components
+// 2. User interaction state - UI components (includes engine-mirrored state)
 export interface PlaylistStateContextValue {
   continuousPlay: boolean;
   linkEndpoints: boolean;
   annotationsEditable: boolean;
   isAutomaticScroll: boolean;
+  isLoopEnabled: boolean;
   annotations: AnnotationData[];
   activeAnnotationId: string | null;
   selectionStart: number;
   selectionEnd: number;
+  selectedTrackId: string | null;
+  loopStart: number;
+  loopEnd: number;
 }
 
 // 3. Control functions - Stable, don't cause re-renders
@@ -595,6 +638,13 @@ export interface PlaylistControlsContextValue {
   stop: () => void;
   setContinuousPlay: (value: boolean) => void;
   setAnnotations: (annotations: AnnotationData[]) => void;
+  setSelection: (start: number, end: number) => void;
+  setSelectedTrackId: (trackId: string | null) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  setMasterVolume: (volume: number) => void;
+  setLoopEnabled: (enabled: boolean) => void;
+  setLoopRegion: (start: number, end: number) => void;
   // ... other controls
 }
 
@@ -602,9 +652,11 @@ export interface PlaylistControlsContextValue {
 export interface PlaylistDataContextValue {
   duration: number;
   audioBuffers: AudioBuffer[];
-  peaksDataArray: PeakData[];
+  peaksDataArray: TrackClipPeaks[];
   sampleRate: number;
-  playoutRef: React.RefObject<Playout | null>;
+  playoutRef: React.RefObject<PlaylistEngine | null>;
+  isDraggingRef: React.MutableRefObject<boolean>;
+  mono: boolean;
   // ... other data
 }
 ```
@@ -648,8 +700,8 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 
 - `useAnimationFrameLoop` - Shared rAF lifecycle for both playlist providers
 - `useAudioTracks` - Declarative track loading (configs-driven)
-- `useClipDragHandlers` - Clip drag-to-move and boundary trimming
-- `useClipSplitting` - Split clips at playhead
+- `useClipDragHandlers` - Clip drag-to-move and boundary trimming (delegates to engine)
+- `useClipSplitting` - Split clips at playhead (delegates to engine)
 - `useAnnotationDragHandlers` - Annotation drag logic
 - `useAnnotationKeyboardControls` - Annotation navigation & editing
 - `useDynamicTracks` - Runtime track additions with placeholder-then-replace pattern
@@ -659,10 +711,13 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 - `useTrackDynamicEffects` - Per-track effects management
 - `useAudioEffects` - Audio effects management
 - `useExportWav` - WAV export via Tone.Offline
-- `useMasterVolume` - Master volume control
+- `useSelectionState` - Selection start/end (engine delegation + onEngineState)
+- `useLoopState` - Loop enabled/start/end (engine delegation + onEngineState)
+- `useSelectedTrack` - Selected track ID (engine delegation + onEngineState)
+- `useMasterVolume` - Master volume (engine delegation + onEngineState)
+- `useZoomControls` - Zoom samplesPerPixel/canZoomIn/Out (engine delegation + onEngineState)
 - `useTimeFormat` - Time formatting and format selection
 - `useWaveformDataCache` - Web worker peak generation and cache
-- `useZoomControls` - Zoom level management
 - `useDragSensors` - @dnd-kit sensor configuration
 
 Users can:
@@ -706,9 +761,10 @@ const { duration, audioBuffers } = usePlaylistData();
 ### Refs for Performance
 
 ```typescript
-const playoutRef = useRef<TonePlayout | null>(null);
+const playoutRef = useRef<PlaylistEngine | null>(null); // Engine ref (renamed from TonePlayout)
 const currentTimeRef = useRef<number>(0); // For animation loop
 const isSelectingRef = useRef(false); // For mouse interactions
+const isDraggingRef = useRef(false); // Guards loadAudio during boundary trim drags
 ```
 
 ## Build Process
@@ -758,10 +814,10 @@ User clicks Play button
 handlePlayClick()
     ↓
 Check for selection?
-    ├─ Yes → playoutRef.play(start, duration)
-    └─ No  → playoutRef.play(currentTime)
+    ├─ Yes → engine.play(start, end)
+    └─ No  → engine.play(currentTime)
     ↓
-TonePlayout (Tone.js)
+PlaylistEngine → ToneAdapter → TonePlayout (Tone.js)
     ↓
 Web Audio API
     ↓
@@ -770,6 +826,24 @@ Animation loop (requestAnimationFrame)
 Update currentTime state
     ↓
 Re-render Playhead position
+```
+
+### Clip Mutation Flow (Move/Trim/Split)
+
+```
+User drags clip
+    ↓
+useClipDragHandlers → engine.moveClip(trackId, clipId, deltaSamples)
+    ↓
+PlaylistEngine:
+    ├─ Constrains delta (collision detection)
+    ├─ Updates internal _tracks
+    ├─ adapter.setTracks() (syncs TonePlayout)
+    ├─ _tracksVersion++
+    └─ Emits 'statechange' with new EngineState
+    ↓
+Provider statechange handler:
+    └─ onTracksChange(state.tracks) → parent updates tracks prop
 ```
 
 ## Example Page Flow

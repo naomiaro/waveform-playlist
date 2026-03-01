@@ -27,15 +27,17 @@ interface WaveformPlaylistProviderProps {
   theme?: Partial<WaveformPlaylistTheme>;
   controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }
   annotationList?: {
-    annotations?: any[];
+    annotations?: AnnotationData[];
     editable?: boolean;
     isContinuousPlay?: boolean;
     linkEndpoints?: boolean;
-    controls?: any[];
+    controls?: AnnotationAction[];
   };
   effects?: EffectsFunction;
   onReady?: () => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
+  /** Called when engine clip operations (move/trim/split) update tracks */
+  onTracksChange?: (tracks: ClipTrack[]) => void;
   barWidth?: number;                      // Default: 1
   barGap?: number;                        // Default: 0
   progressBarWidth?: number;              // Default: barWidth + barGap
@@ -238,9 +240,9 @@ interface PlaylistDataContextValue {
   timeScaleHeight: number;
   minimumPlaylistHeight: number;
   controls: { show: boolean; width: number };
-  playoutRef: RefObject<TonePlayout | null>;
+  playoutRef: RefObject<PlaylistEngine | null>;  // PlaylistEngine from @waveform-playlist/engine
   samplesPerPixel: number;
-  timeFormat: string;
+  timeFormat: TimeFormat;
   masterVolume: number;
   canZoomIn: boolean;
   canZoomOut: boolean;
@@ -248,6 +250,9 @@ interface PlaylistDataContextValue {
   barGap: number;
   progressBarWidth: number;
   isReady: boolean;
+  mono: boolean;
+  /** Ref toggled during boundary trim drags — when true, loadAudio skips engine rebuild */
+  isDraggingRef: MutableRefObject<boolean>;
 }
 ```
 
@@ -414,6 +419,7 @@ function useClipDragHandlers(options: UseClipDragHandlersOptions): {
   onDragStart: (event: DragStartEvent) => void;
   onDragMove: (event: DragMoveEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
+  onDragCancel: (event: DragCancelEvent) => void;
   collisionModifier: Modifier;
 };
 
@@ -422,8 +428,13 @@ interface UseClipDragHandlersOptions {
   onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   sampleRate: number;
+  engineRef: RefObject<PlaylistEngine | null>;
+  /** Ref toggled during boundary trim drags. Obtain from usePlaylistData(). */
+  isDraggingRef: MutableRefObject<boolean>;
 }
 ```
+
+Delegates move to `engine.moveClip()` and trim to `engine.trimClip()`. During trim drags, `isDraggingRef` prevents engine rebuild. `onDragCancel` resets drag state on interruption (focus loss, Escape, unmount).
 
 ### useClipSplitting
 
@@ -432,15 +443,68 @@ function useClipSplitting(options: UseClipSplittingOptions): UseClipSplittingRes
 
 interface UseClipSplittingOptions {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
   sampleRate: number;
   samplesPerPixel: number;
+  engineRef: RefObject<PlaylistEngine | null>;
 }
 
 interface UseClipSplittingResult {
   splitClipAtPlayhead: () => boolean;
   splitClipAt: (trackIndex: number, clipIndex: number, splitTime: number) => boolean;
 }
+```
+
+Delegates to `engine.splitClip()` — engine handles clip creation, adapter sync, and statechange emission.
+
+---
+
+## Engine (`@waveform-playlist/engine`)
+
+Framework-agnostic timeline engine. Used internally by the browser package provider.
+
+```typescript
+import { PlaylistEngine } from '@waveform-playlist/engine';
+import type { EngineState, PlayoutAdapter, EngineEvents, PlaylistEngineOptions } from '@waveform-playlist/engine';
+
+interface PlaylistEngineOptions {
+  adapter?: PlayoutAdapter;
+  sampleRate?: number;          // Default: 44100
+  samplesPerPixel?: number;     // Default: 1000
+  zoomLevels?: number[];        // Default: [256, 512, 1024, 2048, 4096, 8192]
+}
+
+interface EngineState {
+  tracks: ClipTrack[];
+  tracksVersion: number;        // Monotonic counter, increments on track mutations only
+  duration: number;
+  currentTime: number;
+  isPlaying: boolean;
+  samplesPerPixel: number;
+  sampleRate: number;
+  selectedTrackId: string | null;
+  zoomIndex: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
+  selectionStart: number;       // Guaranteed: selectionStart <= selectionEnd
+  selectionEnd: number;
+  masterVolume: number;         // 0.0–1.0
+  loopStart: number;            // Guaranteed: loopStart <= loopEnd
+  loopEnd: number;
+  isLoopEnabled: boolean;
+}
+
+// Key methods on PlaylistEngine:
+// Track management: setTracks(), addTrack(), removeTrack(), selectTrack()
+// Clip editing: moveClip(), trimClip(), splitClip()
+// Playback: play(), pause(), stop(), seek()
+// State: setSelection(), setLoopRegion(), setLoopEnabled(), setMasterVolume()
+// Zoom: zoomIn(), zoomOut(), setZoomLevel()
+// Events: on(event, listener), off(event, listener)
+// Lifecycle: dispose()
+
+// Pure operations (also exported for use without PlaylistEngine):
+import { constrainClipDrag, constrainBoundaryTrim, canSplitAt, splitClip, calculateSplitPoint } from '@waveform-playlist/engine';
+import { calculateDuration, clampSeekPosition, findClosestZoomIndex } from '@waveform-playlist/engine';
 ```
 
 ---
