@@ -258,10 +258,13 @@ describe('PlaylistEngine', () => {
       engine.on('statechange', listener);
       listener.mockClear(); // clear from setTracks in beforeEach
 
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       engine.moveClip('nonexistent', 'c1', 1000);
       engine.splitClip('nonexistent', 'c1', 22050);
       engine.trimClip('nonexistent', 'c1', 'left', 1000);
       expect(listener).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledTimes(3);
+      warnSpy.mockRestore();
       engine.dispose();
     });
 
@@ -270,10 +273,88 @@ describe('PlaylistEngine', () => {
       engine.on('statechange', listener);
       listener.mockClear();
 
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       engine.moveClip('t1', 'nonexistent', 1000);
       engine.splitClip('t1', 'nonexistent', 22050);
       engine.trimClip('t1', 'nonexistent', 'left', 1000);
       expect(listener).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledTimes(3);
+      warnSpy.mockRestore();
+      engine.dispose();
+    });
+  });
+
+  describe('tracksVersion counter', () => {
+    it('starts at 0', () => {
+      const engine = new PlaylistEngine();
+      expect(engine.getState().tracksVersion).toBe(0);
+      engine.dispose();
+    });
+
+    it('increments on setTracks, addTrack, removeTrack', () => {
+      const engine = new PlaylistEngine();
+      engine.setTracks([makeTrack('t1', [])]);
+      expect(engine.getState().tracksVersion).toBe(1);
+
+      engine.addTrack(makeTrack('t2', []));
+      expect(engine.getState().tracksVersion).toBe(2);
+
+      engine.removeTrack('t1');
+      expect(engine.getState().tracksVersion).toBe(3);
+      engine.dispose();
+    });
+
+    it('increments on moveClip, trimClip, splitClip', () => {
+      const engine = new PlaylistEngine();
+      const clip = makeClip({ id: 'c1', startSample: 44100, durationSamples: 44100, name: 'C1' });
+      engine.setTracks([makeTrack('t1', [clip])]);
+      const versionAfterSet = engine.getState().tracksVersion;
+
+      engine.moveClip('t1', 'c1', 1000);
+      expect(engine.getState().tracksVersion).toBe(versionAfterSet + 1);
+
+      engine.trimClip('t1', 'c1', 'right', -5000);
+      expect(engine.getState().tracksVersion).toBe(versionAfterSet + 2);
+
+      engine.splitClip('t1', 'c1', engine.getState().tracks[0].clips[0].startSample + 10000);
+      expect(engine.getState().tracksVersion).toBe(versionAfterSet + 3);
+      engine.dispose();
+    });
+
+    it('does not increment on selection, zoom, volume, or loop changes', () => {
+      const engine = new PlaylistEngine({ zoomLevels: [256, 512, 1024] });
+      engine.setTracks([makeTrack('t1', [])]);
+      const version = engine.getState().tracksVersion;
+
+      engine.setSelection(1, 2);
+      engine.setLoopRegion(1, 3);
+      engine.setLoopEnabled(true);
+      engine.setMasterVolume(0.5);
+      engine.zoomIn();
+      engine.selectTrack('t1');
+
+      expect(engine.getState().tracksVersion).toBe(version);
+      engine.dispose();
+    });
+
+    it('does not increment on no-op mutations', () => {
+      const engine = new PlaylistEngine();
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      engine.setTracks([makeTrack('t1', [clip])]);
+      const version = engine.getState().tracksVersion;
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Move constrained to 0 (already at left edge)
+      engine.moveClip('t1', 'c1', -1000);
+      // Trim constrained to 0 (already at left edge)
+      engine.trimClip('t1', 'c1', 'left', -1000);
+      // Non-existent track/clip (produces console.warn)
+      engine.moveClip('nope', 'c1', 1000);
+      engine.splitClip('t1', 'nope', 22050);
+
+      warnSpy.mockRestore();
+      expect(engine.getState().tracksVersion).toBe(version);
       engine.dispose();
     });
   });
@@ -319,6 +400,45 @@ describe('PlaylistEngine', () => {
       expect(adapter.setTracks).toHaveBeenCalledTimes(1);
       const tracks = (adapter.setTracks as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(tracks[0].clips).toHaveLength(2);
+      // Verify left clip: starts at 0, duration up to split point
+      expect(tracks[0].clips[0].startSample).toBe(0);
+      expect(tracks[0].clips[0].durationSamples).toBe(22050);
+      expect(tracks[0].clips[0].offsetSamples).toBe(0);
+      expect(tracks[0].clips[0].name).toBe('Clip 1 (1)');
+      // Verify right clip: starts at split point, remaining duration
+      expect(tracks[0].clips[1].startSample).toBe(22050);
+      expect(tracks[0].clips[1].durationSamples).toBe(22050);
+      expect(tracks[0].clips[1].offsetSamples).toBe(22050);
+      expect(tracks[0].clips[1].name).toBe('Clip 1 (2)');
+      engine.dispose();
+    });
+
+    it('no-op operations do not call adapter.setTracks', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      engine.setTracks([makeTrack('t1', [clip])]);
+      (adapter.setTracks as ReturnType<typeof vi.fn>).mockClear();
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Zero-delta move (already at left edge, constrained to 0)
+      engine.moveClip('t1', 'c1', -1000);
+      expect(adapter.setTracks).not.toHaveBeenCalled();
+
+      // Zero-delta trim (already at left edge)
+      engine.trimClip('t1', 'c1', 'left', -1000);
+      expect(adapter.setTracks).not.toHaveBeenCalled();
+
+      // Non-existent track
+      engine.moveClip('nope', 'c1', 1000);
+      expect(adapter.setTracks).not.toHaveBeenCalled();
+
+      // Non-existent clip for split
+      engine.splitClip('t1', 'nope', 22050);
+      expect(adapter.setTracks).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
       engine.dispose();
     });
   });

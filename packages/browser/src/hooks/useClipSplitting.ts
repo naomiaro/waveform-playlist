@@ -54,7 +54,9 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
    * @param trackIndex - Index of the track containing the clip
    * @param clipIndex - Index of the clip within the track
    * @param splitTime - Timeline position where to split (in seconds)
-   * @returns true if split was successful, false otherwise
+   * @returns true if pre-validation passed and the engine was called, false otherwise.
+   * Note: engine.splitClip() returns void so a true here assumes the engine accepted
+   * the split (it performs its own canSplitAt check internally).
    */
   const splitClipAt = useCallback(
     (trackIndex: number, clipIndex: number, splitTime: number): boolean => {
@@ -70,7 +72,8 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       const splitSample = Math.round(splitTime * sampleRate);
       const snappedSplitSample = calculateSplitPoint(splitSample, samplesPerPixel);
 
-      // Validate split using engine's pure function
+      // Pre-flight validation before sending to engine (engine also validates internally).
+      // Duplicated here to provide early user feedback via console.warn.
       const MIN_DURATION_SAMPLES = Math.floor(0.1 * sampleRate);
       if (!canSplitAt(clip, snappedSplitSample, MIN_DURATION_SAMPLES)) {
         console.warn('Split point is invalid (outside bounds or too close to edge)');
@@ -79,7 +82,10 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
 
       // Delegate to engine — handles clip creation, adapter sync, and emits statechange
       const engine = engineRef.current;
-      if (!engine) return false;
+      if (!engine) {
+        console.warn('[waveform-playlist] engineRef is null — split not synced to adapter');
+        return false;
+      }
 
       engine.splitClip(track.id, clip.id, snappedSplitSample);
       return true;
@@ -96,7 +102,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
   const splitClipAtPlayhead = useCallback((): boolean => {
     // If no track is selected, cannot split
     if (!selectedTrackId) {
-      console.log('No track selected - click a clip to select a track first');
+      console.warn('[waveform-playlist] No track selected — click a clip to select a track first');
       return false;
     }
 
@@ -121,12 +127,11 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       // Check if currentTime is within this clip (not at boundaries)
       if (currentTime > clipStartTime && currentTime < clipEndTime) {
         // Found a clip! Split it
-        console.log(`Splitting clip on track "${track.name}" at ${currentTime}s`);
         return splitClipAt(trackIndex, clipIndex, currentTime);
       }
     }
 
-    console.log(`No clip found at playhead position on track "${track.name}"`);
+    console.warn(`[waveform-playlist] No clip found at playhead position on track "${track.name}"`);
     return false;
   }, [tracks, currentTimeRef, selectedTrackId, splitClipAt, sampleRate]);
 

@@ -19,6 +19,7 @@ export interface SelectedTrackControls {
  */
 export function useSelectedTrack({ engineRef }: UseSelectedTrackProps): SelectedTrackControls & {
   onEngineState: (state: EngineState) => void;
+  selectedTrackIdRef: React.RefObject<string | null>;
 } {
   const [selectedTrackId, setSelectedTrackIdState] = useState<string | null>(null);
 
@@ -44,5 +45,6 @@ export function useSelectedTrack({ engineRef }: UseSelectedTrackProps): Selected
     selectedTrackId,
     setSelectedTrackId,
     onEngineState,
+    selectedTrackIdRef,
   };
 }

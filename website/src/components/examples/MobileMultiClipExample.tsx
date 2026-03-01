@@ -149,18 +149,19 @@ interface PlaylistWithDragProps {
 }
 
 const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
-  const { samplesPerPixel, sampleRate, playoutRef } = usePlaylistData();
+  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
   const { setSelectedTrackId } = usePlaylistControls();
 
   // Use touch-optimized sensors with 250ms delay to distinguish drag from scroll
   const sensors = useDragSensors({ touchOptimized: true });
 
-  const { onDragStart: handleDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
+  const { onDragStart: handleDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } = useClipDragHandlers({
     tracks,
     onTracksChange,
     samplesPerPixel,
     sampleRate,
     engineRef: playoutRef,
+    isDraggingRef,
   });
 
   const onDragStart = (event: any) => {
@@ -177,6 +178,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
       modifiers={[restrictToHorizontalAxis, collisionModifier]}
     >
       <Controls>

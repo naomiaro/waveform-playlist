@@ -1,5 +1,11 @@
 import React from 'react';
-import type { DragEndEvent, DragStartEvent, DragMoveEvent, Modifier } from '@dnd-kit/core';
+import type {
+  DragEndEvent,
+  DragStartEvent,
+  DragMoveEvent,
+  DragCancelEvent,
+  Modifier,
+} from '@dnd-kit/core';
 import type { ClipTrack } from '@waveform-playlist/core';
 import { sortClipsByTime } from '@waveform-playlist/core';
 import { constrainClipDrag, constrainBoundaryTrim } from '@waveform-playlist/engine';
@@ -11,6 +17,10 @@ interface UseClipDragHandlersOptions {
   samplesPerPixel: number;
   sampleRate: number;
   engineRef: React.RefObject<PlaylistEngine | null>;
+  /** Ref toggled during boundary trim drags. When true, the provider's loadAudio
+   *  skips engine rebuilds so engine keeps original clip positions. On drag end,
+   *  engine.trimClip() commits the final delta. Obtain from usePlaylistData(). */
+  isDraggingRef: React.MutableRefObject<boolean>;
 }
 
 /**
@@ -19,18 +29,22 @@ interface UseClipDragHandlersOptions {
  * Provides drag handlers and collision modifier for use with @dnd-kit/core DndContext.
  * Handles both clip movement (dragging entire clips) and boundary trimming (adjusting clip edges).
  *
- * Clip movement delegates to `engine.moveClip()` — the engine handles constraints,
- * updates the adapter, and emits statechange. The provider's statechange handler
- * propagates the updated tracks to the parent via `onTracksChange`.
+ * **Move:** `onDragEnd` delegates to `engine.moveClip()` in one shot.
+ *
+ * **Trim:** `onDragMove` updates React state per-frame via `onTracksChange` for smooth
+ * visual feedback (using cumulative deltas from the original clip snapshot). `isDraggingRef`
+ * prevents loadAudio from rebuilding the engine during the drag, so the engine keeps the
+ * original clip positions. On drag end, `engine.trimClip()` commits the final delta.
  *
  * @example
  * ```tsx
- * const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
+ * const { onDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } = useClipDragHandlers({
  *   tracks,
  *   onTracksChange: setTracks,
  *   samplesPerPixel,
  *   sampleRate,
  *   engineRef: playoutRef,
+ *   isDraggingRef,
  * });
  *
  * return (
@@ -38,6 +52,7 @@ interface UseClipDragHandlersOptions {
  *     onDragStart={onDragStart}
  *     onDragMove={onDragMove}
  *     onDragEnd={onDragEnd}
+ *     onDragCancel={onDragCancel}
  *     modifiers={[restrictToHorizontalAxis, collisionModifier]}
  *   >
  *     <Waveform showClipHeaders={true} />
@@ -51,6 +66,7 @@ export function useClipDragHandlers({
   samplesPerPixel,
   sampleRate,
   engineRef,
+  isDraggingRef,
 }: UseClipDragHandlersOptions) {
   // Store original clip state when drag starts (for cumulative delta application)
   const originalClipStateRef = React.useRef<{
@@ -132,9 +148,11 @@ export function useClipDragHandlers({
           durationSamples: clip.durationSamples,
           startSample: clip.startSample,
         };
+        // Signal provider to skip loadAudio rebuilds during the drag
+        isDraggingRef.current = true;
       }
     },
-    [tracks]
+    [tracks, isDraggingRef]
   );
 
   const onDragMove = React.useCallback(
@@ -171,9 +189,6 @@ export function useClipDragHandlers({
 
         const newClips = track.clips.map((clip, cIdx) => {
           if (cIdx !== clipIndex) return clip;
-
-          // Use sourceDurationSamples (works for both audio and peaks-only clips)
-          const audioBufferDurationSamples = clip.sourceDurationSamples;
 
           if (boundary === 'left') {
             // Use constrainBoundaryTrim from engine for the left boundary.
@@ -222,14 +237,7 @@ export function useClipDragHandlers({
 
             const newDurationSamples = originalClip.durationSamples + constrainedDelta;
 
-            // Additional constraint: cannot exceed audio buffer length
-            // (engine's constrainBoundaryTrim handles this via sourceDurationSamples)
-            const clampedDuration = Math.min(
-              newDurationSamples,
-              audioBufferDurationSamples - originalClip.offsetSamples
-            );
-
-            return { ...clip, durationSamples: clampedDuration };
+            return { ...clip, durationSamples: newDurationSamples };
           }
         });
 
@@ -255,28 +263,56 @@ export function useClipDragHandlers({
       // Convert pixel delta to samples
       const sampleDelta = delta.x * samplesPerPixel;
 
-      // Check if this is a boundary trim operation
+      const trackId = tracks[trackIndex]?.id;
+
+      // Boundary trim: onDragMove updated React state per-frame for visuals.
+      // isDraggingRef prevented loadAudio from rebuilding the engine, so the
+      // engine still has the original (pre-drag) clip positions. Commit the
+      // final delta via engine.trimClip() so the adapter has correct positions.
       if (boundary) {
-        // For boundary trimming, onDragMove already updated the tracks
-        // onDragEnd doesn't need to do anything (state is already correct)
-        // Just clear the original clip state ref
+        isDraggingRef.current = false;
+        if (!trackId) {
+          console.warn(
+            `[waveform-playlist] onDragEnd: track at index ${trackIndex} not found — trim not synced to adapter`
+          );
+        } else if (!engineRef.current) {
+          console.warn('[waveform-playlist] engineRef is null — trim not synced to adapter');
+        } else {
+          engineRef.current.trimClip(trackId, clipId, boundary, Math.floor(sampleDelta));
+        }
         originalClipStateRef.current = null;
         return;
       }
 
-      // Delegate to engine — handles constraints, adapter sync, and emits statechange
-      const trackId = tracks[trackIndex]?.id;
-      if (trackId && engineRef.current) {
+      // Clip move: delegate to engine in one shot
+      if (!trackId) {
+        console.warn(
+          `[waveform-playlist] onDragEnd: track at index ${trackIndex} not found — move not synced to adapter`
+        );
+      } else if (!engineRef.current) {
+        console.warn('[waveform-playlist] engineRef is null — move not synced to adapter');
+      } else {
         engineRef.current.moveClip(trackId, clipId, Math.floor(sampleDelta));
       }
     },
-    [tracks, samplesPerPixel, engineRef]
+    [tracks, samplesPerPixel, engineRef, isDraggingRef]
+  );
+
+  // Safety reset for cancelled drags (focus loss, Escape key, component unmount).
+  // Without this, isDraggingRef stays true and loadAudio skips rebuilds permanently.
+  const onDragCancel = React.useCallback(
+    (_event: DragCancelEvent) => {
+      isDraggingRef.current = false;
+      originalClipStateRef.current = null;
+    },
+    [isDraggingRef]
   );
 
   return {
     onDragStart,
     onDragMove,
     onDragEnd,
+    onDragCancel,
     collisionModifier,
   };
 }

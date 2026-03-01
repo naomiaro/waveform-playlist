@@ -128,10 +128,18 @@ export class PlaylistEngine {
 
   moveClip(trackId: string, clipId: string, deltaSamples: number): void {
     const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) return;
+    if (!track) {
+      console.warn(`[waveform-playlist/engine] moveClip: track "${trackId}" not found`);
+      return;
+    }
 
     const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
-    if (clipIndex === -1) return;
+    if (clipIndex === -1) {
+      console.warn(
+        `[waveform-playlist/engine] moveClip: clip "${clipId}" not found in track "${trackId}"`
+      );
+      return;
+    }
 
     const clip = track.clips[clipIndex];
     const sortedClips = sortClipsByTime(track.clips);
@@ -161,15 +169,29 @@ export class PlaylistEngine {
 
   splitClip(trackId: string, clipId: string, atSample: number): void {
     const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) return;
+    if (!track) {
+      console.warn(`[waveform-playlist/engine] splitClip: track "${trackId}" not found`);
+      return;
+    }
 
     const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
-    if (clipIndex === -1) return;
+    if (clipIndex === -1) {
+      console.warn(
+        `[waveform-playlist/engine] splitClip: clip "${clipId}" not found in track "${trackId}"`
+      );
+      return;
+    }
 
     const clip = track.clips[clipIndex];
     const minDuration = Math.floor(DEFAULT_MIN_DURATION_SECONDS * this._sampleRate);
 
-    if (!canSplitAt(clip, atSample, minDuration)) return;
+    if (!canSplitAt(clip, atSample, minDuration)) {
+      console.warn(
+        `[waveform-playlist/engine] splitClip: cannot split clip "${clipId}" at sample ${atSample} ` +
+          `(clip range: ${clip.startSample}–${clip.startSample + clip.durationSamples}, minDuration: ${minDuration})`
+      );
+      return;
+    }
 
     const { left, right } = splitClipOp(clip, atSample);
 
@@ -192,10 +214,18 @@ export class PlaylistEngine {
     deltaSamples: number
   ): void {
     const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) return;
+    if (!track) {
+      console.warn(`[waveform-playlist/engine] trimClip: track "${trackId}" not found`);
+      return;
+    }
 
     const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
-    if (clipIndex === -1) return;
+    if (clipIndex === -1) {
+      console.warn(
+        `[waveform-playlist/engine] trimClip: clip "${clipId}" not found in track "${trackId}"`
+      );
+      return;
+    }
 
     const clip = track.clips[clipIndex];
     const sortedClips = sortClipsByTime(track.clips);

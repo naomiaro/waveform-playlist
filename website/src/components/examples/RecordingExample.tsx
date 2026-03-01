@@ -121,7 +121,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   onAddTrack,
 }) => {
   const { currentTime } = usePlaybackAnimation();
-  const { sampleRate, samplesPerPixel, controls, playoutRef } = usePlaylistData();
+  const { sampleRate, samplesPerPixel, controls, playoutRef, isDraggingRef } = usePlaylistData();
   const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId } = usePlaylistControls();
   const { isAutomaticScroll } = usePlaylistState();
 
@@ -132,12 +132,13 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   // Configure sensors and drag handlers
   const sensors = useDragSensors();
-  const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
+  const { onDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } = useClipDragHandlers({
     tracks,
     onTracksChange: setTracks,
     samplesPerPixel,
     sampleRate,
     engineRef: playoutRef,
+    isDraggingRef,
   });
 
   // Drop zone state
@@ -442,6 +443,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
+        onDragCancel={onDragCancel}
         modifiers={[restrictToHorizontalAxis, collisionModifier]}
       >
         <Waveform

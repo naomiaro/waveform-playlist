@@ -118,16 +118,17 @@ interface PlaylistWithDragProps {
 }
 
 const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange, loading, loadedCount, totalCount }) => {
-  const { samplesPerPixel, sampleRate, playoutRef } = usePlaylistData();
+  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
   const { setSelectedTrackId } = usePlaylistControls();
 
   const sensors = useDragSensors();
-  const { onDragStart: handleDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
+  const { onDragStart: handleDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } = useClipDragHandlers({
     tracks,
     onTracksChange,
     samplesPerPixel,
     sampleRate,
     engineRef: playoutRef,
+    isDraggingRef,
   });
 
   const onDragStart = (event: any) => {
@@ -163,6 +164,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
       modifiers={[restrictToHorizontalAxis, collisionModifier]}
     >
       <Controls>

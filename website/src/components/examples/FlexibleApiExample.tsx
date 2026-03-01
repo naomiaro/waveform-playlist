@@ -299,18 +299,19 @@ interface FlexibleApiContentProps {
 const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTracksChange }) => {
   const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
   const { currentTimeRef } = usePlaybackAnimation();
-  const { duration, masterVolume, timeFormat, sampleRate, samplesPerPixel, playoutRef } = usePlaylistData();
+  const { duration, masterVolume, timeFormat, sampleRate, samplesPerPixel, playoutRef, isDraggingRef } = usePlaylistData();
   const { isAutomaticScroll, selectionStart, selectionEnd, isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
   const format = timeFormat as TimeFormat;
 
   // Setup drag sensors and handlers for clip movement/trimming
   const sensors = useDragSensors();
-  const { onDragStart, onDragMove, onDragEnd, collisionModifier } = useClipDragHandlers({
+  const { onDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } = useClipDragHandlers({
     tracks,
     onTracksChange,
     samplesPerPixel,
     sampleRate,
     engineRef: playoutRef,
+    isDraggingRef,
   });
 
   // Enable clip splitting
@@ -454,6 +455,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
+        onDragCancel={onDragCancel}
         modifiers={[restrictToHorizontalAxis, collisionModifier]}
       >
         <Waveform
