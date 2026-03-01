@@ -105,7 +105,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - Effects hooks return types: `packages/browser/src/hooks/useDynamicEffects.ts`, `useTrackDynamicEffects.ts`
 - Peak types (`Peaks`, `Bits`, `PeakData`): `packages/core/src/types/index.ts` (re-exported by `webaudio-peaks` for backwards compat)
 
-**Common Doc Drift:** Non-existent hooks (e.g., `useWaveformPlaylist` was removed), wrong property names (e.g., `gain` vs `volume`, `seek` vs `seekTo`), properties attributed to wrong context hooks. Always cross-check docs against source interfaces.
+**Common Doc Drift:** Non-existent hooks (e.g., `useWaveformPlaylist` removed in v6.0.2, `usePlaybackControls` removed — play/pause/stop inlined in provider), wrong property names (e.g., `gain` vs `volume`, `seek` vs `seekTo`), properties attributed to wrong context hooks. Always cross-check docs against source interfaces.
 
 **Verify docs render:** `pnpm --filter website build` (CSS calc warnings are pre-existing, harmless)
 
