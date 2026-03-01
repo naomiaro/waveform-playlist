@@ -1002,8 +1002,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setIsPlaying(false);
     stopAnimationLoop();
 
-    currentTimeRef.current = playStartPositionRef.current;
-    setCurrentTime(playStartPositionRef.current);
+    // Reset to beginning — matches engine.stop() which sets _currentTime = 0
+    currentTimeRef.current = 0;
+    setCurrentTime(0);
     setActiveAnnotationId(null);
   }, [stopAnimationLoop, setActiveAnnotationId]);
 
