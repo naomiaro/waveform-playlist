@@ -34,6 +34,7 @@ export class TonePlayout {
   private onPlaybackCompleteCallback?: () => void;
   private _completionEventId: number | null = null;
   private _loopHandler: (() => void) | null = null;
+  private _loopStart = 0;
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Volume(this.gainToDb(options.masterGain ?? 1));
@@ -125,20 +126,23 @@ export class TonePlayout {
     }
 
     const startTime = when ?? now();
+    const transport = getTransport();
 
     // Clear any pending completion event
     this.clearCompletionEvent();
 
-    // Cancel stale fades and re-schedule for all tracks
+    // Tell tracks what offset we're starting from (deterministic tick-0 guard)
+    // and re-schedule fades for all tracks
     const transportOffset = offset ?? 0;
     this.tracks.forEach((track) => {
       track.cancelFades();
+      track.setTransportStartOffset(transportOffset);
       track.prepareFades(startTime, transportOffset);
     });
 
     // Schedule duration-limited stop via Transport
     if (duration !== undefined) {
-      this._completionEventId = getTransport().scheduleOnce(() => {
+      this._completionEventId = transport.scheduleOnce(() => {
         this._completionEventId = null;
         try {
           this.onPlaybackCompleteCallback?.();
@@ -150,17 +154,17 @@ export class TonePlayout {
 
     // Start Transport — drives all synced Players
     try {
-      // Stop Transport before restarting to prevent layered audio.
-      // Without this, calling start() while Transport is still running
-      // (e.g., rapid play/stop/play via spacebar) can emit duplicate
-      // _syncedStart events, creating overlapping BufferSourceNodes.
-      getTransport().stop();
+      // Only stop Transport if it's still running (e.g., rapid play calls
+      // without an intervening stop).
+      if (transport.state !== 'stopped') {
+        transport.stop();
+      }
 
       if (offset !== undefined) {
-        getTransport().start(startTime, offset);
+        transport.start(startTime, offset);
       } else {
         // No offset — let Transport resume from its current position
-        getTransport().start(startTime);
+        transport.start(startTime);
       }
     } catch (err) {
       // Clean up scheduled events since Transport failed to start
@@ -174,8 +178,9 @@ export class TonePlayout {
   }
 
   pause(): void {
+    const transport = getTransport();
     try {
-      getTransport().pause();
+      transport.pause();
     } catch (err) {
       console.warn('[waveform-playlist] Transport.pause() failed:', err);
     }
@@ -184,8 +189,9 @@ export class TonePlayout {
   }
 
   stop(): void {
+    const transport = getTransport();
     try {
-      getTransport().stop();
+      transport.stop();
     } catch (err) {
       console.warn('[waveform-playlist] Transport.stop() failed:', err);
     }
@@ -247,17 +253,22 @@ export class TonePlayout {
     transport.loop = enabled;
     transport.loopStart = loopStart;
     transport.loopEnd = loopEnd;
+    this._loopStart = loopStart;
 
     if (enabled && !this._loopHandler) {
       this._loopHandler = () => {
         // Re-schedule fades for the new loop iteration.
         // Transport stops all synced sources at loopEnd and restarts at loopStart.
         // Fade envelopes (AudioParam automations) don't persist across this cycle.
+        // Use this._loopStart (exact configured value) for the tick-0 guard,
+        // NOT transport.seconds which has floating-point drift after loop cycles.
+        // transport.seconds is still used for fade scheduling (close enough).
         const currentTime = now();
         const transportOffset = transport.seconds;
         this.tracks.forEach((track) => {
           try {
             track.cancelFades();
+            track.setTransportStartOffset(this._loopStart);
             track.prepareFades(currentTime, transportOffset);
           } catch (err) {
             console.warn(

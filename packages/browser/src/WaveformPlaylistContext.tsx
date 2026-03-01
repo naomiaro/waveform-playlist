@@ -302,6 +302,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Playback timing (currentTime, isPlaying) remains in React for animation loop.
   const engineRef = useRef<PlaylistEngine | null>(null);
   const audioInitializedRef = useRef<boolean>(false);
+  const isPlayingRef = useRef<boolean>(false);
+  isPlayingRef.current = isPlaying;
   const playStartPositionRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
   const tracksRef = useRef<ClipTrack[]>(tracks);
@@ -489,8 +491,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       return;
     }
 
-    // Capture playback state before rebuilding playout
-    const wasPlaying = isPlaying;
+    // Capture playback state before rebuilding playout (read from ref, not state,
+    // so isPlaying can be excluded from the dep array — play/pause must not trigger rebuilds)
+    const wasPlaying = isPlayingRef.current;
     const resumePosition = currentTimeRef.current;
 
     // Stop current playback and animation before disposing
@@ -664,8 +667,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // isEngineTracks is intentionally excluded — it's a render-phase guard read
     // inside the effect body, not a trigger. Including it causes a spurious re-run
     // when it flips from true→false after engineTracksRef is cleared.
+    // isPlaying is intentionally excluded — read from isPlayingRef inside the
+    // effect body. Including it causes a full engine+playout rebuild on every
+    // play/pause/stop, destroying and recreating all audio Players.
     onReady,
-    isPlaying,
     effects,
     stopAnimationFrameLoop,
     onSelectionEngineState,

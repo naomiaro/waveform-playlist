@@ -22,6 +22,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
   let _loopEnabled = false;
   let _loopStart = 0;
   let _loopEnd = 0;
+  let _audioInitialized = false;
 
   function buildPlayout(tracks: ClipTrack[]): void {
     if (playout) {
@@ -39,6 +40,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     playout = new TonePlayout({
       effects: options?.effects,
     });
+
+    // If Tone.start() was already called (AudioContext resumed), carry
+    // initialization forward. Tone.start() is global and idempotent —
+    // the resolved promise completes synchronously on subsequent calls.
+    if (_audioInitialized) {
+      playout.init();
+    }
 
     for (const track of tracks) {
       const playableClips = track.clips.filter((c) => c.audioBuffer);
@@ -89,6 +97,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     async init(): Promise<void> {
       if (playout) {
         await playout.init();
+        _audioInitialized = true;
       }
     },
 
