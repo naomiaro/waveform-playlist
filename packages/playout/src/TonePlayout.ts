@@ -150,6 +150,12 @@ export class TonePlayout {
 
     // Start Transport — drives all synced Players
     try {
+      // Stop Transport before restarting to prevent layered audio.
+      // Without this, calling start() while Transport is still running
+      // (e.g., rapid play/stop/play via spacebar) can emit duplicate
+      // _syncedStart events, creating overlapping BufferSourceNodes.
+      getTransport().stop();
+
       if (offset !== undefined) {
         getTransport().start(startTime, offset);
       } else {
