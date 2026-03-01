@@ -171,6 +171,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Build packages**: `pnpm build` - Build all packages
 - **TypeScript check**: `pnpm typecheck` (enforced in build scripts)
 - **Lint**: `pnpm lint` - ESLint across all packages. **Always run before committing.** This is a root-only script; run from repo root or use `pnpm -w lint`.
+- **Format**: `pnpm format` - Prettier across all packages. **Always run before committing.**
 - **Dev server**: `pnpm --filter website start` - Docusaurus dev server
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components)
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
