@@ -93,3 +93,5 @@ export function getGlobalContext(): Context {
 
 **References:**
 - [Tone.js Issue #681](https://github.com/Tonejs/Tone.js/issues/681) - AudioListener Firefox error
+- [Tone.js Issue #1417](https://github.com/Tonejs/Tone.js/issues/1417) - Tick-0 phantom replay bug (GT offset skip + unconditional callback)
+- [Tone.js Issue #1418](https://github.com/Tonejs/Tone.js/issues/1418) - Feature request: public AudioParam accessor on Param/Signal
