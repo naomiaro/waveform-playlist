@@ -626,15 +626,34 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('play() enables Transport loop when loop is enabled', () => {
+    it('play() enables Transport loop when starting inside loop region', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
       engine.setLoopRegion(1.0, 3.0);
       engine.setLoopEnabled(true);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
       engine.play(1.0);
       expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 3.0);
+      engine.dispose();
+    });
+
+    it('play() disables Transport loop when starting outside loop region', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
+      engine.setLoopRegion(1.0, 3.0);
+      engine.setLoopEnabled(true);
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      // Start at 5.0 — outside the loop region [1.0, 3.0)
+      engine.play(5.0);
+      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
       engine.dispose();
     });
 

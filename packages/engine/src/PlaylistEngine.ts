@@ -278,6 +278,7 @@ export class PlaylistEngine {
   }
 
   play(startTime?: number, endTime?: number): void {
+    console.log('[DEBUG engine.play()]', { startTime, endTime, currentTime: this._currentTime, isLoopEnabled: this._isLoopEnabled, loopStart: this._loopStart, loopEnd: this._loopEnd });
     if (startTime !== undefined) {
       const duration = calculateDuration(this._tracks);
       this._currentTime = clampSeekPosition(startTime, duration);
@@ -291,7 +292,11 @@ export class PlaylistEngine {
       if (endTime !== undefined) {
         this._adapter.setLoop(false, this._loopStart, this._loopEnd);
       } else if (this._isLoopEnabled) {
-        this._adapter.setLoop(true, this._loopStart, this._loopEnd);
+        // Only enable Transport loop if starting within the loop region.
+        // Starting outside plays normally to the end (Audacity/DAW behavior).
+        const inLoopRegion =
+          this._currentTime >= this._loopStart && this._currentTime < this._loopEnd;
+        this._adapter.setLoop(inLoopRegion, this._loopStart, this._loopEnd);
       }
       this._adapter.play(this._currentTime, endTime);
       this._startTimeUpdateLoop();
@@ -314,6 +319,7 @@ export class PlaylistEngine {
   }
 
   stop(): void {
+    console.log('[DEBUG engine.stop()]', { isPlaying: this._isPlaying, currentTime: this._currentTime, playStartPosition: this._playStartPosition });
     this._isPlaying = false;
     this._currentTime = this._playStartPosition;
     this._stopTimeUpdateLoop();
@@ -477,6 +483,16 @@ export class PlaylistEngine {
       if (this._disposed || !this._isPlaying) return;
       if (this._adapter) {
         this._currentTime = this._adapter.getCurrentTime();
+
+        // Natural end detection: Transport has no inherent duration limit,
+        // so it will tick forever unless we detect the end ourselves.
+        const duration = calculateDuration(this._tracks);
+        if (duration > 0 && this._currentTime >= duration) {
+          console.log('[DEBUG tick] natural end detected', { currentTime: this._currentTime, duration });
+          this.stop();
+          return;
+        }
+
         this._emit('timeupdate', this._currentTime);
       }
       this._animFrameId = requestAnimationFrame(tick);

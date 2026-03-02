@@ -127,6 +127,7 @@ export class TonePlayout {
 
     const startTime = when ?? now();
     const transport = getTransport();
+    console.log('[DEBUG TonePlayout.play()]', { transportState: transport.state, startTime, offset, duration, loopEnabled: transport.loop, loopStart: transport.loopStart, loopEnd: transport.loopEnd });
 
     // Clear any pending completion event
     this.clearCompletionEvent();
@@ -157,15 +158,48 @@ export class TonePlayout {
       // Only stop Transport if it's still running (e.g., rapid play calls
       // without an intervening stop).
       if (transport.state !== 'stopped') {
+        console.log('[DEBUG TonePlayout.play()] stopping transport first');
         transport.stop();
+        // Log active sources BEFORE force-stop
+        this.tracks.forEach((track) => {
+          const clips = (track as any).clips ?? [];
+          const detail = clips.map((cp: any) => ({
+            state: cp.player.state,
+            activeSources: (cp.player as any)._activeSources?.size ?? '?',
+          }));
+          const hasActive = detail.some((d: any) => d.activeSources > 0 || d.state === 'started');
+          if (hasActive) {
+            console.warn(`[DEBUG pre-forceStop] ACTIVE track "${track.id}":`, JSON.stringify(detail));
+          }
+        });
+        // Force-dispose orphaned active sources before restarting
+        this.tracks.forEach((track) => track.forceStopSources());
+        // Log active sources AFTER force-stop
+        this.tracks.forEach((track) => {
+          const clips = (track as any).clips ?? [];
+          const activeCount = clips.reduce((sum: number, cp: any) =>
+            sum + ((cp.player as any)._activeSources?.size ?? 0), 0);
+          if (activeCount > 0) {
+            console.warn(`[DEBUG post-forceStop] STILL ACTIVE track "${track.id}": ${activeCount}`);
+          }
+        });
       }
 
       if (offset !== undefined) {
+        console.log('[DEBUG TonePlayout.play()] transport.start()', { startTime, offset });
         transport.start(startTime, offset);
       } else {
-        // No offset — let Transport resume from its current position
         transport.start(startTime);
       }
+      // Log player states after transport.start()
+      this.tracks.forEach((track) => {
+        const clips = (track as any).clips ?? [];
+        const detail = clips.map((cp: any) => ({
+          state: cp.player.state,
+          activeSources: (cp.player as any)._activeSources?.size ?? '?',
+        }));
+        console.log(`[DEBUG after start] track "${track.id}":`, JSON.stringify(detail));
+      });
     } catch (err) {
       // Clean up scheduled events since Transport failed to start
       this.clearCompletionEvent();
@@ -192,11 +226,39 @@ export class TonePlayout {
 
   stop(): void {
     const transport = getTransport();
+    console.log('[DEBUG TonePlayout.stop()]', { transportState: transport.state });
     try {
       transport.stop();
     } catch (err) {
       console.warn('[waveform-playlist] Transport.stop() failed:', err);
     }
+    // Log active sources BEFORE force-stop
+    this.tracks.forEach((track) => {
+      const clips = (track as any).clips ?? [];
+      const detail = clips.map((cp: any) => ({
+        state: cp.player.state,
+        activeSources: (cp.player as any)._activeSources?.size ?? '?',
+      }));
+      const hasActive = detail.some((d: any) => d.activeSources > 0 || d.state === 'started');
+      if (hasActive) {
+        console.warn(`[DEBUG stop() pre-forceStop] ACTIVE track "${track.id}":`, JSON.stringify(detail));
+      }
+    });
+    // Force-dispose orphaned active sources immediately.
+    // Transport.stop() triggers _syncedStop which calls source.stop(),
+    // but cleanup (_activeSources.delete) is async via context.setTimeout.
+    // Without this, a subsequent Transport.start() layers new sources on
+    // top of orphaned ones, producing double audio.
+    this.tracks.forEach((track) => track.forceStopSources());
+    // Verify force-stop worked
+    this.tracks.forEach((track) => {
+      const clips = (track as any).clips ?? [];
+      const activeCount = clips.reduce((sum: number, cp: any) =>
+        sum + ((cp.player as any)._activeSources?.size ?? 0), 0);
+      if (activeCount > 0) {
+        console.warn(`[DEBUG stop() post-forceStop] STILL ACTIVE track "${track.id}": ${activeCount}`);
+      }
+    });
     this.tracks.forEach((track) => track.cancelFades());
     this.clearCompletionEvent();
   }
@@ -252,6 +314,7 @@ export class TonePlayout {
 
   setLoop(enabled: boolean, loopStart: number, loopEnd: number): void {
     const transport = getTransport();
+    console.log('[DEBUG TonePlayout.setLoop()]', { enabled, loopStart, loopEnd, transportState: transport.state, hadHandler: !!this._loopHandler });
     try {
       transport.loop = enabled;
       transport.loopStart = loopStart;

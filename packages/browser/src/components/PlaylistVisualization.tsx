@@ -149,7 +149,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     waveHeight,
     timeScaleHeight,
     controls,
-    playoutRef,
     barWidth,
     barGap,
     isReady,
@@ -279,6 +278,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     const controlWidth = controls.show ? controls.width : 0;
     const x = e.clientX - rect.left - controlWidth;
     const clickTime = (x * samplesPerPixel) / sampleRate;
+    console.log('[DEBUG mouseDown]', { clickTime, isPlaying, isSelecting });
 
     const y = e.clientY - rect.top;
     const trackY = y;
@@ -341,14 +341,14 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     const start = Math.min(selectionStart, endTime);
     const end = Math.max(selectionStart, endTime);
 
+    console.log('[DEBUG mouseUp]', { start, end, diff: Math.abs(end - start), isPlaying });
+
     if (Math.abs(end - start) < 0.1) {
       setCurrentTime(start);
 
-      if (isPlaying && playoutRef.current) {
-        playoutRef.current.stop();
+      if (isPlaying) {
+        console.log('[DEBUG mouseUp] calling play()', { start });
         play(start);
-      } else if (playoutRef.current) {
-        playoutRef.current.stop();
       }
     } else {
       setSelection(start, end);

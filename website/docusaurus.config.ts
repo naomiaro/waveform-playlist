@@ -166,6 +166,7 @@ const config: Config = {
                   include: [
                     /packages[\\/]browser[\\/]src/,
                     /packages[\\/]core[\\/]src/,
+                    /packages[\\/]engine[\\/]src/,
                     /packages[\\/]playout[\\/]src/,
                     /packages[\\/]ui-components[\\/]src/,
                     /packages[\\/]annotations[\\/]src/,
@@ -192,6 +193,7 @@ const config: Config = {
                 '@waveform-playlist/browser': path.resolve(__dirname, '../packages/browser/src'),
                 '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
                 '@waveform-playlist/playout': path.resolve(__dirname, '../packages/playout/src'),
+                '@waveform-playlist/engine': path.resolve(__dirname, '../packages/engine/src'),
                 '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
                 '@waveform-playlist/annotations': path.resolve(__dirname, '../packages/annotations/src'),
                 '@waveform-playlist/spectrogram': path.resolve(__dirname, '../packages/spectrogram/src'),

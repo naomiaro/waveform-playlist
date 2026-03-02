@@ -318,6 +318,34 @@ export class ToneTrack {
     this.track.soloed = soloed;
   }
 
+  /**
+   * Force-stop and dispose all active audio sources across all clips.
+   *
+   * Tone.js Player._activeSources retains ToneBufferSource references after
+   * Transport.stop() because the cleanup chain (onended → Set.delete) is
+   * async (fires via context.setTimeout). If Transport.start() is called
+   * before cleanup finishes, new sources layer on top of orphaned ones,
+   * producing double audio.
+   *
+   * This method synchronously disposes orphaned sources and clears the Set
+   * so subsequent Transport.start() creates a clean slate.
+   */
+  forceStopSources(): void {
+    this.clips.forEach(({ player }) => {
+      const activeSources = (player as any)._activeSources as Set<any> | undefined;
+      if (activeSources && activeSources.size > 0) {
+        activeSources.forEach((source: any) => {
+          try {
+            source.dispose();
+          } catch {
+            // Source may already be disposed
+          }
+        });
+        activeSources.clear();
+      }
+    });
+  }
+
   dispose(): void {
     // Clean up effects if cleanup function was provided
     if (this.effectsCleanup) {
@@ -384,8 +412,7 @@ export class ToneTrack {
   }
 
   get isPlaying(): boolean {
-    // Track is playing if any clip is playing
-    return this.clips.some((clipPlayer) => clipPlayer.player.state === 'started');
+    return this.clips.some((cp) => cp.player.state === 'started');
   }
 
   get muted(): boolean {

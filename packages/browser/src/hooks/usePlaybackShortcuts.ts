@@ -1,9 +1,5 @@
 import { useCallback } from 'react';
-import {
-  usePlaybackAnimation,
-  usePlaylistControls,
-  usePlaylistData,
-} from '../WaveformPlaylistContext';
+import { usePlaybackAnimation, usePlaylistControls } from '../WaveformPlaylistContext';
 import { useKeyboardShortcuts, type KeyboardShortcut } from './useKeyboardShortcuts';
 
 export interface UsePlaybackShortcutsOptions {
@@ -67,7 +63,6 @@ export const usePlaybackShortcuts = (
 
   const { isPlaying } = usePlaybackAnimation();
   const { setCurrentTime, play, pause, stop } = usePlaylistControls();
-  const { playoutRef } = usePlaylistData();
 
   /**
    * Toggle between play and pause.
@@ -92,14 +87,12 @@ export const usePlaybackShortcuts = (
    * If playing, stops and restarts playback from the beginning.
    */
   const rewindToStart = useCallback(() => {
-    if (isPlaying && playoutRef.current) {
-      playoutRef.current.stop();
-      setCurrentTime(0);
+    setCurrentTime(0);
+
+    if (isPlaying) {
       play(0);
-    } else {
-      setCurrentTime(0);
     }
-  }, [isPlaying, playoutRef, setCurrentTime, play]);
+  }, [isPlaying, setCurrentTime, play]);
 
   // Default playback shortcuts
   const defaultShortcuts: KeyboardShortcut[] = [

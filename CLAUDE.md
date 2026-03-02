@@ -279,8 +279,8 @@ interface AudioClip {
 
 **Webpack Aliases:** In `website/docusaurus.config.ts`, packages transpiled from source:
 
-- `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source
-- `annotations`, `recording` → dist/ (have build artifacts like worklets)
+- `@waveform-playlist/browser`, `core`, `engine`, `playout`, `ui-components`, `annotations`, `spectrogram` → source
+- `recording`, `loaders`, `webaudio-peaks` → dist/ (have build artifacts like worklets)
 
 **SSR/SSG Pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use lazy loading:
 
