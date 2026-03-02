@@ -45,7 +45,14 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     // initialization forward. Tone.start() is global and idempotent —
     // the resolved promise completes synchronously on subsequent calls.
     if (_audioInitialized) {
-      playout.init();
+      playout.init().catch((err) => {
+        console.warn(
+          '[waveform-playlist] Failed to re-initialize playout after rebuild. ' +
+            'Audio playback will require another user gesture.',
+          err
+        );
+        _audioInitialized = false;
+      });
     }
 
     for (const track of tracks) {
@@ -109,6 +116,8 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       if (!playout) return;
       const duration = endTime !== undefined ? endTime - startTime : undefined;
       playout.play(now(), startTime, duration);
+      // Only set _isPlaying if play() didn't throw
+      // (TonePlayout.play() re-throws after cleanup on Transport failure)
       _isPlaying = true;
     },
 
@@ -162,7 +171,11 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     },
 
     dispose(): void {
-      playout?.dispose();
+      try {
+        playout?.dispose();
+      } catch (err) {
+        console.warn('[waveform-playlist] Error disposing playout:', err);
+      }
       playout = null;
       _isPlaying = false;
     },

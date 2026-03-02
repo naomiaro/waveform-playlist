@@ -498,6 +498,14 @@ describe('PlaylistEngine', () => {
   });
 
   describe('playback delegation', () => {
+    it('delegates init to adapter', async () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      await engine.init();
+      expect(adapter.init).toHaveBeenCalled();
+      engine.dispose();
+    });
+
     it('delegates play/pause/stop to adapter', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
@@ -583,6 +591,27 @@ describe('PlaylistEngine', () => {
       ]);
       engine.play(100); // Beyond duration of 1 second
       expect(engine.getState().currentTime).toBe(1);
+      engine.dispose();
+    });
+
+    it('stop() returns currentTime to play start position (Audacity-style)', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
+      engine.play(3.0);
+      expect(engine.getState().currentTime).toBe(3.0);
+      engine.stop();
+      expect(engine.getState().currentTime).toBe(3.0);
+      engine.dispose();
+    });
+
+    it('stop() returns to 0 when play() was called without startTime', () => {
+      const engine = new PlaylistEngine();
+      engine.play();
+      engine.stop();
+      expect(engine.getState().currentTime).toBe(0);
       engine.dispose();
     });
 

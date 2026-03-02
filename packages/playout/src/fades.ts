@@ -25,7 +25,7 @@ export function getUnderlyingAudioParam(signal: unknown): AudioParam | undefined
   const param = (signal as { _param?: AudioParam })._param;
   if (!param && !hasWarned) {
     hasWarned = true;
-    console.warn(
+    console.error(
       '[waveform-playlist] Unable to access Tone.js internal _param. ' +
         'This likely means the Tone.js version is incompatible. ' +
         'Fades and mute scheduling may not work correctly.'

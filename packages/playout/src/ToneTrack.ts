@@ -43,7 +43,7 @@ export class ToneTrack {
   private effectsCleanup?: () => void;
   // Transport start offset set by TonePlayout before each Transport.start().
   // Used by the tick-0 guard to deterministically decide whether the
-  // transport.schedule() callback is legitimate (starting near 0) or
+  // transport.schedule() callback is legitimate (starting at < 0.01s) or
   // spurious (TickSource drift after stop→start from mid-playback).
   private _transportStartOffset = 0;
 
@@ -105,34 +105,38 @@ export class ToneTrack {
       player.sync().start(absTransportTime, clipInfo.offset, clipInfo.duration).stop(clipEndTime);
 
       // Guard tick-0 transport.schedule() callback against TickSource drift.
+      // Source._syncedStart skips offset=0 via GT(offset, 0), making the
+      // schedule() callback the only start path for clips at time 0. After
+      // stop→start cycles, drift causes phantom replays. We replace with a
+      // guarded callback that checks _transportStartOffset.
       // See: https://github.com/Tonejs/Tone.js/issues/1417
-      //
-      // player.sync().start(0, ...) creates a transport.schedule() callback
-      // at tick 0 that unconditionally calls _start() — no state check.
-      // After Transport stop → start cycles, floating-point drift in the
-      // TickSource (~1e-16) causes tick 0 to fire even when starting at a
-      // later offset, creating phantom BufferSourceNodes.
-      //
-      // IMPORTANT: This callback is the ONLY start path for clips at
-      // time 0 — Source._syncedStart has a GT(offset, 0) guard that
-      // skips offset=0 entirely.
-      //
-      // Instead of checking transport.seconds (timing-dependent, fragile),
-      // we check _transportStartOffset which TonePlayout sets before each
-      // Transport.start(). This is deterministic: we know exactly what
-      // offset we started from.
       if (absTransportTime === 0) {
-        const scheduled = (player as any)._scheduled as number[];
-        const playerTransport = (player as any).context.transport;
-        // _scheduled[0] is the .start() callback (pushed first)
-        if (scheduled.length >= 1) {
-          playerTransport.clear(scheduled[0]);
-          const guardedId = playerTransport.schedule((t: number) => {
-            if (this._transportStartOffset < 0.01) {
-              (player as any)._start(t, clipInfo.offset, clipInfo.duration);
-            }
-          }, 0);
-          scheduled[0] = guardedId;
+        try {
+          const scheduled = (player as any)._scheduled as number[];
+          const playerTransport = (player as any).context.transport;
+          // _scheduled[0] is the .start() callback (pushed first in Tone.js 15.x)
+          if (scheduled?.length >= 1 && playerTransport) {
+            playerTransport.clear(scheduled[0]);
+            const guardedId = playerTransport.schedule((t: number) => {
+              try {
+                if (this._transportStartOffset < 0.01) {
+                  (player as any)._start(t, clipInfo.offset, clipInfo.duration);
+                }
+              } catch (err) {
+                console.warn(
+                  `[waveform-playlist] Error in tick-0 guarded callback for track "${this.track.id}":`,
+                  err
+                );
+              }
+            }, 0);
+            scheduled[0] = guardedId;
+          }
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] Failed to install tick-0 guard. ' +
+              'Tone.js internals may have changed. Phantom replays possible.',
+            err
+          );
         }
       }
 

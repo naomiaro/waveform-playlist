@@ -20,7 +20,7 @@ Players are synced to Tone.js Transport at creation time via `player.sync().star
 
 **ToneTrack** is a passive audio graph — no `play()`/`pause()`/`stop()` methods. Transport drives all playback.
 
-**Tick-0 guard (Tone.js bug workaround):** `Source._syncedStart` has a `GT(offset, 0)` check that skips offset=0 entirely, making the `transport.schedule()` callback the ONLY start path for clips at Transport time 0. That callback is unconditional (no state check), so TickSource floating-point drift (~1e-16) after stop→start cycles causes phantom replays. Fix: replace the callback with a guarded version that checks `ToneTrack._transportStartOffset` — set by `TonePlayout` before each `Transport.start()` and on loop-back via `setTransportStartOffset()`. This is deterministic (no timing thresholds). Accesses private Tone.js internals: `player._scheduled`, `player._start()`, `player.context.transport`.
+**Tick-0 guard (Tone.js bug workaround):** `Source._syncedStart` has a `GT(offset, 0)` check that skips offset=0 entirely, making the `transport.schedule()` callback the ONLY start path for clips at Transport time 0. That callback is unconditional (no state check), so TickSource floating-point drift (~1e-16) after stop→start cycles causes phantom replays. Fix: replace the callback with a guarded version that checks `ToneTrack._transportStartOffset` — set by `TonePlayout` before each `Transport.start()` and on loop-back via `setTransportStartOffset()`. This is deterministic — it compares against the configured start offset rather than reading `transport.seconds` at callback time. A small threshold (0.01s) accommodates floating-point imprecision. Accesses private Tone.js internals: `player._scheduled` (array of Transport schedule IDs), `player._start()` (creates BufferSourceNode). Also accesses `player.context.transport` (public API).
 
 **Fades** are re-scheduled on each play via `prepareFades(when, transportOffset)` and cleared on pause/stop via `cancelFades()`.
 
@@ -64,7 +64,7 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
 **Risk:** `_param` is a private Tone.js 15.x internal. Pin version carefully.
 
-**Tick-0 guard internals:** `_scheduled` (array of Transport schedule IDs), `_start()` (creates BufferSourceNode), `context.transport` — all private Tone.js 15.x internals used by the tick-0 guard in `ToneTrack`. Same pinning risk as `_param`.
+**Tick-0 guard internals:** `_scheduled` (array of Transport schedule IDs), `_start()` (creates BufferSourceNode) — private Tone.js 15.x internals used by the tick-0 guard in `ToneTrack`. `context.transport` is public API. Same pinning risk as `_param` for the private fields.
 
 ## Firefox Compatibility (standardized-audio-context)
 

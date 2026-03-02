@@ -174,6 +174,8 @@ export class TonePlayout {
         '[waveform-playlist] Transport.start() failed. Audio playback could not begin.',
         err
       );
+      // Re-throw so the caller can avoid setting _isPlaying = true
+      throw err;
     }
   }
 
@@ -250,9 +252,13 @@ export class TonePlayout {
 
   setLoop(enabled: boolean, loopStart: number, loopEnd: number): void {
     const transport = getTransport();
-    transport.loop = enabled;
-    transport.loopStart = loopStart;
-    transport.loopEnd = loopEnd;
+    try {
+      transport.loop = enabled;
+      transport.loopStart = loopStart;
+      transport.loopEnd = loopEnd;
+    } catch (err) {
+      console.warn('[waveform-playlist] Error configuring Transport loop:', err);
+    }
     this._loopStart = loopStart;
 
     if (enabled && !this._loopHandler) {

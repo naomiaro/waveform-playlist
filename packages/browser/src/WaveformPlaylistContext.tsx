@@ -1022,9 +1022,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setIsPlaying(false);
     stopAnimationLoop();
 
-    // Reset to beginning — matches engine.stop() which sets _currentTime = 0
-    currentTimeRef.current = 0;
-    setCurrentTime(0);
+    // Return cursor to where playback started (Audacity-style)
+    currentTimeRef.current = playStartPositionRef.current;
+    setCurrentTime(playStartPositionRef.current);
     setActiveAnnotationId(null);
   }, [stopAnimationLoop, setActiveAnnotationId]);
 

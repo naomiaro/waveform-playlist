@@ -423,6 +423,41 @@ describe('createToneAdapter', () => {
     });
   });
 
+  describe('audioInitialized persistence', () => {
+    it('calls init on new playout after setTracks rebuild when previously initialized', async () => {
+      const adapter = createToneAdapter();
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+
+      adapter.setTracks([makeTrack('t1', [clip])]);
+      await adapter.init();
+
+      const firstInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      expect(firstInstance.init).toHaveBeenCalled();
+
+      // Rebuild with new tracks — init should be called on the new instance
+      adapter.setTracks([makeTrack('t2', [clip])]);
+
+      const secondInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[1]
+        .value;
+      expect(secondInstance.init).toHaveBeenCalled();
+    });
+
+    it('does not call init on new playout if never initialized', () => {
+      const adapter = createToneAdapter();
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+
+      adapter.setTracks([makeTrack('t1', [clip])]);
+      // No init() call
+
+      adapter.setTracks([makeTrack('t2', [clip])]);
+
+      const secondInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[1]
+        .value;
+      expect(secondInstance.init).not.toHaveBeenCalled();
+    });
+  });
+
   describe('dispose', () => {
     it('disposes playout', () => {
       const adapter = createToneAdapter();

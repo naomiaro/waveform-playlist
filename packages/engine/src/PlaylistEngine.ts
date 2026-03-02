@@ -30,6 +30,7 @@ type EventName = keyof EngineEvents;
 export class PlaylistEngine {
   private _tracks: ClipTrack[] = [];
   private _currentTime = 0;
+  private _playStartPosition = 0;
   private _isPlaying = false;
   private _selectedTrackId: string | null = null;
   private _sampleRate: number;
@@ -282,6 +283,9 @@ export class PlaylistEngine {
       this._currentTime = clampSeekPosition(startTime, duration);
     }
 
+    // Remember where playback started (Audacity-style: stop returns here)
+    this._playStartPosition = this._currentTime;
+
     if (this._adapter) {
       // Disable Transport loop for duration-limited playback (selection/annotation)
       if (endTime !== undefined) {
@@ -311,7 +315,7 @@ export class PlaylistEngine {
 
   stop(): void {
     this._isPlaying = false;
-    this._currentTime = 0;
+    this._currentTime = this._playStartPosition;
     this._stopTimeUpdateLoop();
     this._adapter?.setLoop(false, this._loopStart, this._loopEnd);
     this._adapter?.stop();
