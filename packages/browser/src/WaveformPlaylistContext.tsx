@@ -957,7 +957,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Playback controls
   const play = useCallback(
     async (startTime?: number, playDuration?: number) => {
-      console.log('[DEBUG play()]', { startTime, playDuration, hasEngine: !!engineRef.current, bufferCount: audioBuffers.length });
       if (!engineRef.current || audioBuffers.length === 0) return;
 
       const actualStartTime = startTime ?? currentTimeRef.current;
@@ -1017,7 +1016,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   }, [stopAnimationLoop, getPlaybackTime]);
 
   const stop = useCallback(() => {
-    console.log('[DEBUG stop()]');
     if (!engineRef.current) return;
 
     engineRef.current.stop();

@@ -113,7 +113,6 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     },
 
     play(startTime: number, endTime?: number): void {
-      console.log('[DEBUG adapter.play()]', { startTime, endTime, hasPlayout: !!playout });
       if (!playout) return;
       const duration = endTime !== undefined ? endTime - startTime : undefined;
       playout.play(now(), startTime, duration);
@@ -128,7 +127,6 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     },
 
     stop(): void {
-      console.log('[DEBUG adapter.stop()]');
       playout?.stop();
       _isPlaying = false;
     },
@@ -166,7 +164,6 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     },
 
     setLoop(enabled: boolean, start: number, end: number): void {
-      console.log('[DEBUG adapter.setLoop()]', { enabled, start, end });
       _loopEnabled = enabled;
       _loopStart = start;
       _loopEnd = end;

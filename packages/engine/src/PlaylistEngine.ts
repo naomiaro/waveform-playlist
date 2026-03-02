@@ -278,7 +278,6 @@ export class PlaylistEngine {
   }
 
   play(startTime?: number, endTime?: number): void {
-    console.log('[DEBUG engine.play()]', { startTime, endTime, currentTime: this._currentTime, isLoopEnabled: this._isLoopEnabled, loopStart: this._loopStart, loopEnd: this._loopEnd });
     if (startTime !== undefined) {
       const duration = calculateDuration(this._tracks);
       this._currentTime = clampSeekPosition(startTime, duration);
@@ -319,7 +318,6 @@ export class PlaylistEngine {
   }
 
   stop(): void {
-    console.log('[DEBUG engine.stop()]', { isPlaying: this._isPlaying, currentTime: this._currentTime, playStartPosition: this._playStartPosition });
     this._isPlaying = false;
     this._currentTime = this._playStartPosition;
     this._stopTimeUpdateLoop();
@@ -488,7 +486,6 @@ export class PlaylistEngine {
         // so it will tick forever unless we detect the end ourselves.
         const duration = calculateDuration(this._tracks);
         if (duration > 0 && this._currentTime >= duration) {
-          console.log('[DEBUG tick] natural end detected', { currentTime: this._currentTime, duration });
           this.stop();
           return;
         }
