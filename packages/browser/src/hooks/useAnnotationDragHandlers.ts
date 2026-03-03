@@ -2,6 +2,7 @@ import React from 'react';
 import type {
   DragStartEvent as DragStartCallback,
   DragMoveEvent as DragMoveCallback,
+  DragEndEvent as DragEndCallback,
 } from '@dnd-kit/abstract';
 import type { AnnotationData } from '@waveform-playlist/core';
 
@@ -108,9 +109,8 @@ export function useAnnotationDragHandlers({
 
       // The dragmove event is dispatched BEFORE position.current is updated (happens
       // in a microtask), so the snapshot's position.current is stale. Use event.to
-      // (the PointerSensor's target coordinates) for the correct current position.
-      const moveEvent = event as unknown as { to?: { x: number } };
-      const currentX = moveEvent.to?.x ?? event.operation.position.current.x;
+      // (the pointer's current coordinates from the sensor) for the correct position.
+      const currentX = event.to?.x ?? event.operation.position.current.x;
       const rawDeltaX = currentX - event.operation.position.initial.x;
       const timeDelta = (rawDeltaX * samplesPerPixel) / sampleRate;
 
@@ -133,9 +133,21 @@ export function useAnnotationDragHandlers({
     [annotations, onAnnotationsChange, samplesPerPixel, sampleRate, duration, linkEndpoints]
   );
 
-  const onDragEnd = React.useCallback(() => {
-    originalAnnotationStateRef.current = null;
-  }, []);
+  const onDragEnd = React.useCallback(
+    (event: Parameters<DragEndCallback>[0]) => {
+      // Handle canceled drags — revert annotations to pre-drag state
+      if (event.canceled && originalAnnotationStateRef.current) {
+        const { annotationIndex, start, end } = originalAnnotationStateRef.current;
+        const revertedAnnotations = annotations.map((annotation, idx) => {
+          if (idx !== annotationIndex) return annotation;
+          return { ...annotation, start, end };
+        });
+        onAnnotationsChange(revertedAnnotations);
+      }
+      originalAnnotationStateRef.current = null;
+    },
+    [annotations, onAnnotationsChange]
+  );
 
   return {
     onDragStart,

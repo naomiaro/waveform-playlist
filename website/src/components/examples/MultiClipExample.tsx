@@ -133,8 +133,8 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     isDraggingRef,
   });
 
-  const onDragStart = (event: any) => {
-    const trackIndex = event.operation?.source?.data?.trackIndex;
+  const onDragStart = (event: Parameters<typeof handleDragStart>[0]) => {
+    const trackIndex = event.operation?.source?.data?.trackIndex as number | undefined;
     if (trackIndex !== undefined && tracks[trackIndex]) {
       setSelectedTrackId(tracks[trackIndex].id);
     }

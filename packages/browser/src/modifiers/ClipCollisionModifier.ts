@@ -21,8 +21,8 @@ interface ClipCollisionOptions {
  * For boundary trim operations: returns zero transform because visual feedback
  * comes from React state updates resizing the clip, not from CSS translate.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class ClipCollisionModifier extends Modifier<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   DragDropManager<any, any>,
   ClipCollisionOptions
 > {

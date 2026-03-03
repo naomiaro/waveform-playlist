@@ -2,12 +2,11 @@
  * Hook for configuring @dnd-kit sensors for clip dragging
  *
  * Provides consistent drag activation behavior across all examples.
- * The new @dnd-kit/dom PointerSensor has built-in defaults:
- * - Mouse with handle: immediate activation
+ * The @dnd-kit/dom PointerSensor has built-in defaults:
+ * - Mouse on handle element: immediate activation (no constraints)
  * - Touch: 250ms delay with 5px tolerance
- * - Other inputs: 200ms delay with 5px distance
- *
- * These defaults closely match the legacy sensor configuration.
+ * - Text inputs: 200ms delay with 0 tolerance
+ * - Other: 200ms delay/10px tolerance + 5px distance (whichever fires first)
  */
 
 import { useMemo } from 'react';
@@ -53,9 +52,9 @@ export interface DragSensorOptions {
  * // Mobile-optimized with custom touch delay
  * const sensors = useDragSensors({ touchOptimized: true, touchDelay: 300 });
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useDragSensors(
   options: DragSensorOptions = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): (typeof PointerSensor | PluginDescriptor<any, any, any>)[] {
   const {
     touchOptimized = false,

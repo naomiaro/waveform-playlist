@@ -8,10 +8,9 @@ import type { Fade } from '@waveform-playlist/core';
 import { ClipViewportOriginProvider } from '../contexts/ClipViewportOrigin';
 
 interface ClipContainerProps {
-  readonly $left?: number; // Horizontal position in pixels (optional for DragOverlay)
-  readonly $width?: number; // Width in pixels (optional for DragOverlay)
-  readonly $isOverlay?: boolean; // Whether this is rendering in DragOverlay
-  readonly $isDragging?: boolean; // Whether this clip is being dragged
+  readonly $left?: number; // Horizontal position in pixels (optional for overlay)
+  readonly $width?: number; // Width in pixels (optional for overlay)
+  readonly $isOverlay?: boolean; // Whether this is rendering in overlay mode
 }
 
 const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
@@ -60,7 +59,7 @@ export interface ClipProps {
   // Optional header (for multi-clip editing with drag-to-move)
   showHeader?: boolean;
   disableHeaderDrag?: boolean; // Disable drag on header (for presentation-only rendering)
-  isOverlay?: boolean; // Rendering in DragOverlay (disables absolute positioning)
+  isOverlay?: boolean; // Rendering in overlay mode (disables absolute positioning)
   // Track selection
   isSelected?: boolean; // Whether the track is selected
   onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void; // Called when clip is pressed (for track selection - fires before drag)
@@ -77,7 +76,7 @@ export interface ClipProps {
 /**
  * Clip component for rendering individual audio clips within a track
  *
- * Each clip is positioned based on its startTime and has a width based on its duration.
+ * Each clip is positioned based on its startSample and has a width based on its durationSamples.
  * This allows multiple clips to be arranged on a single track with gaps or overlaps.
  *
  * Includes a draggable ClipHeader at the top for repositioning clips on the timeline.

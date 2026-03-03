@@ -134,9 +134,8 @@ export function useClipDragHandlers({
 
       // The dragmove event is dispatched BEFORE position.current is updated (happens
       // in a microtask), so the snapshot's position.current is stale. Use event.to
-      // (the PointerSensor's target coordinates) for the correct current position.
-      const moveEvent = event as unknown as { to?: { x: number } };
-      const currentX = moveEvent.to?.x ?? event.operation.position.current.x;
+      // (the pointer's current coordinates from the sensor) for the correct position.
+      const currentX = event.to?.x ?? event.operation.position.current.x;
       const rawDeltaX = currentX - event.operation.position.initial.x;
       const sampleDelta = rawDeltaX * samplesPerPixel;
       const MIN_DURATION_SAMPLES = Math.floor(0.1 * sampleRate); // 0.1 seconds minimum
@@ -219,6 +218,31 @@ export function useClipDragHandlers({
       // Handle canceled drags (focus loss, Escape key, component unmount).
       // Without this, isDraggingRef stays true and loadAudio skips rebuilds permanently.
       if (event.canceled) {
+        // Revert React state for boundary trims — onDragMove updated tracks per-frame,
+        // but the engine still has original positions (isDraggingRef blocked rebuilds).
+        if (originalClipStateRef.current) {
+          const cancelData = event.operation.source?.data as
+            | { trackIndex: number; clipIndex: number }
+            | undefined;
+          if (cancelData) {
+            const { trackIndex, clipIndex } = cancelData;
+            const original = originalClipStateRef.current;
+            const revertedTracks = tracks.map((track, tIdx) => {
+              if (tIdx !== trackIndex) return track;
+              const newClips = track.clips.map((clip, cIdx) => {
+                if (cIdx !== clipIndex) return clip;
+                return {
+                  ...clip,
+                  offsetSamples: original.offsetSamples,
+                  durationSamples: original.durationSamples,
+                  startSample: original.startSample,
+                };
+              });
+              return { ...track, clips: newClips };
+            });
+            onTracksChange(revertedTracks);
+          }
+        }
         isDraggingRef.current = false;
         originalClipStateRef.current = null;
         lastBoundaryDeltaRef.current = 0;
@@ -276,7 +300,7 @@ export function useClipDragHandlers({
         engineRef.current.moveClip(trackId, clipId, Math.floor(sampleDelta));
       }
     },
-    [tracks, samplesPerPixel, engineRef, isDraggingRef]
+    [tracks, onTracksChange, samplesPerPixel, engineRef, isDraggingRef]
   );
 
   return {

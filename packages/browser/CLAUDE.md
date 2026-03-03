@@ -150,7 +150,7 @@ const rebuildChain = useCallback(() => {
 ## @dnd-kit/react v0.3.2 Event API Quirks
 
 - **`event.operation.position.delta`** is `undefined` in snapshots — `@derived` getters are non-enumerable and stripped by `snapshot()`. Compute manually: `position.current.x - position.initial.x`.
-- **`event.operation.position.current`** is stale in `onDragMove` — `move()` dispatches before updating `position.current` (happens in `queueMicrotask`). Use `(event as any).to?.x` for the correct current pointer position.
+- **`event.operation.position.current`** is stale in `onDragMove` — `move()` dispatches before updating `position.current` (happens in `queueMicrotask`). Use `event.to?.x` for the correct pointer position (`to?: Coordinates` is typed on the dragmove event).
 - **`event.operation.transform.x`** in `onDragEnd` reflects the final post-modifier transform. Use for clip moves; for boundary trims, cache the last delta from `onDragMove` in a ref.
 - **`noDropAnimationPlugins`** — exported helper that configures DragDropProvider's Feedback plugin with `dropAnimation: null`. Prevents snap-back on clip drop.
 

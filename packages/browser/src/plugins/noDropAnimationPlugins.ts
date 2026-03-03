@@ -12,5 +12,20 @@ import type { Plugins } from '@dnd-kit/abstract';
  * <DragDropProvider plugins={noDropAnimationPlugins} ...>
  * ```
  */
-export const noDropAnimationPlugins = (defaults: Plugins): Plugins =>
-  defaults.map((p) => (p === Feedback ? Feedback.configure({ dropAnimation: null }) : p));
+export const noDropAnimationPlugins = (defaults: Plugins): Plugins => {
+  let feedbackFound = false;
+  const result = defaults.map((p) => {
+    if (p === Feedback) {
+      feedbackFound = true;
+      return Feedback.configure({ dropAnimation: null });
+    }
+    return p;
+  });
+  if (!feedbackFound) {
+    console.warn(
+      '[waveform-playlist] noDropAnimationPlugins: Feedback plugin not found in defaults — ' +
+        'drop animation may not be disabled. Check @dnd-kit/dom version.'
+    );
+  }
+  return result;
+};
