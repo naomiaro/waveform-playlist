@@ -145,6 +145,8 @@ const rebuildChain = useCallback(() => {
 
 **`isDraggingRef` lifecycle:** Set `true` in `onDragStart` (boundary trim only), set `false` in `onDragEnd` before `engine.trimClip()`. Guards two places in the provider: (1) `loadAudio` effect body skips full rebuild, (2) `skipEngineDisposeRef` prevents the previous effect cleanup from disposing the engine mid-drag.
 
+**Cancel-revert for boundary trims:** `onDragEnd` checks `event.canceled` and restores React state from `originalClipStateRef` snapshot. Without this, Escape during trim leaves UI at partially-trimmed state while engine has original positions. Same pattern in `useAnnotationDragHandlers` with `originalAnnotationStateRef`.
+
 **`skipEngineDisposeRef` must include `isDraggingRef`:** During drag, `onDragMove` triggers `loadAudio` re-runs (because `tracks` is in deps). The previous effect's cleanup checks `skipEngineDisposeRef` — if it only checks `isEngineTracks` (which is `false` during drag), it disposes the engine on the first drag move.
 
 ## @dnd-kit/react v0.3.2 Event API Quirks
@@ -152,7 +154,7 @@ const rebuildChain = useCallback(() => {
 - **`event.operation.position.delta`** is `undefined` in snapshots — `@derived` getters are non-enumerable and stripped by `snapshot()`. Compute manually: `position.current.x - position.initial.x`.
 - **`event.operation.position.current`** is stale in `onDragMove` — `move()` dispatches before updating `position.current` (happens in `queueMicrotask`). Use `event.to?.x` for the correct pointer position (`to?: Coordinates` is typed on the dragmove event).
 - **`event.operation.transform.x`** in `onDragEnd` reflects the final post-modifier transform. Use for clip moves; for boundary trims, cache the last delta from `onDragMove` in a ref.
-- **`noDropAnimationPlugins`** — exported helper that configures DragDropProvider's Feedback plugin with `dropAnimation: null`. Prevents snap-back on clip drop.
+- **`noDropAnimationPlugins`** — exported helper that configures DragDropProvider's Feedback plugin with `dropAnimation: null`. Prevents snap-back on clip drop. Warns if `Feedback` identity check fails (module duplication). Only needed for clip moves (boundary trims use `feedback: 'none'`).
 
 ## Error Handling in Playback Callbacks
 
