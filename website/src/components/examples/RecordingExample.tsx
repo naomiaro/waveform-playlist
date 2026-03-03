@@ -14,8 +14,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
-import { DndContext } from '@dnd-kit/core';
-import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import { DragDropProvider } from '@dnd-kit/react';
+import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
@@ -35,6 +35,7 @@ import {
   usePlaylistState,
   useClipDragHandlers,
   useDragSensors,
+  ClipCollisionModifier,
 } from '@waveform-playlist/browser';
 import {
   RecordButton,
@@ -132,7 +133,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   // Configure sensors and drag handlers
   const sensors = useDragSensors();
-  const { onDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } = useClipDragHandlers({
+  const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
     tracks,
     onTracksChange: setTracks,
     samplesPerPixel,
@@ -438,13 +439,12 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         </Flex>
       </Card>
 
-      <DndContext
+      <DragDropProvider
         sensors={sensors}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
-        onDragCancel={onDragCancel}
-        modifiers={[restrictToHorizontalAxis, collisionModifier]}
+        modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
       >
         <Waveform
           showClipHeaders
@@ -462,7 +462,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               : undefined
           }
         />
-      </DndContext>
+      </DragDropProvider>
 
       {tracks.length === 0 && (
         <Flex justify="center" style={{ padding: '3rem', color: 'var(--gray-9)' }}>

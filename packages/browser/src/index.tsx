@@ -139,6 +139,9 @@ export {
 } from './SpectrogramIntegrationContext';
 export type { SpectrogramIntegration } from './SpectrogramIntegrationContext';
 
+// Export modifiers for drag-and-drop
+export { ClipCollisionModifier } from './modifiers/ClipCollisionModifier';
+
 // Export waveform-data.js utilities
 export {
   loadWaveformData,

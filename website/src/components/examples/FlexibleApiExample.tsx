@@ -43,8 +43,9 @@ import {
   type TimeFormat,
   type ClipTrack,
 } from '@waveform-playlist/browser';
-import { DndContext } from '@dnd-kit/core';
-import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import { DragDropProvider } from '@dnd-kit/react';
+import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
+import { ClipCollisionModifier } from '@waveform-playlist/browser';
 import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -305,7 +306,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
 
   // Setup drag sensors and handlers for clip movement/trimming
   const sensors = useDragSensors();
-  const { onDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } = useClipDragHandlers({
+  const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
     tracks,
     onTracksChange,
     samplesPerPixel,
@@ -450,13 +451,12 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
         </Flex>
       </Card>
 
-      <DndContext
+      <DragDropProvider
         sensors={sensors}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
-        onDragCancel={onDragCancel}
-        modifiers={[restrictToHorizontalAxis, collisionModifier]}
+        modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
       >
         <Waveform
           renderTrackControls={(trackIndex) => (
@@ -473,7 +473,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
           showClipHeaders
           interactiveClips
         />
-      </DndContext>
+      </DragDropProvider>
 
       {/* Time Controls Bar */}
       <Card>

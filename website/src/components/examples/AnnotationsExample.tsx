@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import { DndContext } from '@dnd-kit/core';
-import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import { DragDropProvider } from '@dnd-kit/react';
+import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import * as Tone from 'tone';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
@@ -608,12 +608,12 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   };
 
   return (
-    <DndContext
+    <DragDropProvider
       sensors={sensors}
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
-      modifiers={[restrictToHorizontalAxis]}
+      modifiers={[RestrictToHorizontalAxis]}
     >
       <Container>
         {/* Drop Zone for Audio */}
@@ -720,7 +720,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           </ControlGroup>
         </TimeControlsBar>
       </Container>
-    </DndContext>
+    </DragDropProvider>
   );
 };
 

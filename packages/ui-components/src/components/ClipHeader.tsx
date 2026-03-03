@@ -1,7 +1,5 @@
 import React, { FunctionComponent } from 'react';
 import styled from 'styled-components';
-import type { DraggableAttributes } from '@dnd-kit/core';
-import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 
 export const CLIP_HEADER_HEIGHT = 22; // Height of the clip header in pixels
 
@@ -72,9 +70,7 @@ export const ClipHeaderPresentational: FunctionComponent<ClipHeaderPresentationa
 };
 
 export interface DragHandleProps {
-  attributes: DraggableAttributes;
-  listeners: SyntheticListenerMap | undefined;
-  setActivatorNodeRef: (element: HTMLElement | null) => void;
+  handleRef: (element: Element | null) => void;
 }
 
 export interface ClipHeaderProps {
@@ -113,16 +109,14 @@ export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
     return <ClipHeaderPresentational trackName={trackName} isSelected={isSelected} />;
   }
 
-  const { attributes, listeners, setActivatorNodeRef } = dragHandleProps;
+  const { handleRef } = dragHandleProps;
 
   return (
     <HeaderContainer
-      ref={setActivatorNodeRef}
+      ref={handleRef}
       data-clip-id={clipId}
       $interactive={true}
       $isSelected={isSelected}
-      {...listeners}
-      {...attributes}
     >
       <TrackName>{trackName}</TrackName>
     </HeaderContainer>

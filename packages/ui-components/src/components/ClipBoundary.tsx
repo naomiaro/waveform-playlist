@@ -1,6 +1,5 @@
 import React, { FunctionComponent } from 'react';
 import styled from 'styled-components';
-import type { DragHandleProps as BaseDragHandleProps } from './ClipHeader';
 
 export const CLIP_BOUNDARY_WIDTH = 8; // Width of the draggable boundary in pixels
 export const CLIP_BOUNDARY_WIDTH_TOUCH = 24; // Larger touch target for mobile (minimum 44px recommended, but 24px works well for trim handles)
@@ -70,8 +69,8 @@ const BoundaryContainer = styled.div<BoundaryContainerProps>`
   }
 `;
 
-// Extend the base DragHandleProps to add isDragging
-interface DragHandleProps extends BaseDragHandleProps {
+interface BoundaryDragHandleProps {
+  ref: (element: Element | null) => void;
   isDragging?: boolean;
 }
 
@@ -80,7 +79,7 @@ export interface ClipBoundaryProps {
   trackIndex: number;
   clipIndex: number;
   edge: BoundaryEdge;
-  dragHandleProps?: DragHandleProps;
+  dragHandleProps?: BoundaryDragHandleProps;
   /**
    * Enable larger touch targets for mobile devices.
    * When true, boundary width increases from 8px to 24px for easier touch targeting.
@@ -112,11 +111,11 @@ export const ClipBoundary: FunctionComponent<ClipBoundaryProps> = ({
     return null;
   }
 
-  const { attributes, listeners, setActivatorNodeRef, isDragging } = dragHandleProps;
+  const { ref: boundaryRef, isDragging } = dragHandleProps;
 
   return (
     <BoundaryContainer
-      ref={setActivatorNodeRef}
+      ref={boundaryRef}
       data-clip-id={clipId}
       data-boundary-edge={edge}
       $edge={edge}
@@ -125,8 +124,6 @@ export const ClipBoundary: FunctionComponent<ClipBoundaryProps> = ({
       $touchOptimized={touchOptimized}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      {...listeners}
-      {...attributes}
     />
   );
 };

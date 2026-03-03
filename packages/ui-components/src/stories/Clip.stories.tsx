@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useTheme } from 'styled-components';
-import { DndContext } from '@dnd-kit/core';
+import { DragDropProvider } from '@dnd-kit/react';
 import { Clip } from '../components/Clip';
 import { Channel } from '../components/Channel';
 import type { WaveformPlaylistTheme } from '../wfpl-theme';
@@ -56,11 +56,11 @@ const meta: Meta<typeof Clip> = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <DndContext>
+      <DragDropProvider>
         <div style={{ position: 'relative', height: '120px', width: '600px' }}>
           <Story />
         </div>
-      </DndContext>
+      </DragDropProvider>
     ),
   ],
 };
@@ -166,7 +166,7 @@ export const Overlay: Story = {
   },
   decorators: [
     (Story) => (
-      <DndContext>
+      <DragDropProvider>
         <div
           style={{
             position: 'relative',
@@ -177,7 +177,7 @@ export const Overlay: Story = {
         >
           <Story />
         </div>
-      </DndContext>
+      </DragDropProvider>
     ),
   ],
   render: (args) => (

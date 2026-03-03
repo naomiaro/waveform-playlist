@@ -1,7 +1,6 @@
 import React, { FunctionComponent, ReactNode } from 'react';
 import styled from 'styled-components';
-import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
+import { useDraggable } from '@dnd-kit/react';
 import { ClipHeader } from './ClipHeader';
 import { ClipBoundary } from './ClipBoundary';
 import { FadeOverlay } from './FadeOverlay';
@@ -119,21 +118,15 @@ export const Clip: FunctionComponent<ClipProps> = ({
 
   // Main clip draggable (for moving entire clip)
   const draggableId = `clip-${trackIndex}-${clipIndex}`;
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
-    useDraggable({
-      id: draggableId,
-      data: { clipId, trackIndex, clipIndex },
-      disabled: !enableDrag,
-    });
+  const { ref: clipRef, handleRef, isDragSource } = useDraggable({
+    id: draggableId,
+    data: { clipId, trackIndex, clipIndex },
+    disabled: !enableDrag,
+  });
 
   // Left boundary draggable (for trimming start)
   const leftBoundaryId = `clip-boundary-left-${trackIndex}-${clipIndex}`;
-  const {
-    attributes: leftBoundaryAttributes,
-    listeners: leftBoundaryListeners,
-    setActivatorNodeRef: setLeftBoundaryActivatorRef,
-    isDragging: isLeftBoundaryDragging,
-  } = useDraggable({
+  const { ref: leftBoundaryRef, isDragSource: isLeftBoundaryDragging } = useDraggable({
     id: leftBoundaryId,
     data: { clipId, trackIndex, clipIndex, boundary: 'left' },
     disabled: !enableDrag,
@@ -141,28 +134,18 @@ export const Clip: FunctionComponent<ClipProps> = ({
 
   // Right boundary draggable (for trimming end)
   const rightBoundaryId = `clip-boundary-right-${trackIndex}-${clipIndex}`;
-  const {
-    attributes: rightBoundaryAttributes,
-    listeners: rightBoundaryListeners,
-    setActivatorNodeRef: setRightBoundaryActivatorRef,
-    isDragging: isRightBoundaryDragging,
-  } = useDraggable({
+  const { ref: rightBoundaryRef, isDragSource: isRightBoundaryDragging } = useDraggable({
     id: rightBoundaryId,
     data: { clipId, trackIndex, clipIndex, boundary: 'right' },
     disabled: !enableDrag,
   });
 
-  // Apply transform for dragging
-  const style = transform
-    ? {
-        transform: CSS.Translate.toString(transform),
-        zIndex: isDragging ? 100 : undefined, // Below controls (z-index: 999) but above other clips
-      }
-    : undefined;
+  // Elevate z-index during drag (below controls z-index: 999, above other clips)
+  const style = isDragSource ? { zIndex: 100 } : undefined;
 
   return (
     <ClipContainer
-      ref={setNodeRef}
+      ref={clipRef}
       style={style}
       className={className}
       $left={left}
@@ -180,7 +163,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
           trackName={trackName}
           isSelected={isSelected}
           disableDrag={disableHeaderDrag}
-          dragHandleProps={enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined}
+          dragHandleProps={enableDrag ? { handleRef } : undefined}
         />
       )}
       <ClipViewportOriginProvider originX={left}>
@@ -215,9 +198,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
             edge="left"
             touchOptimized={touchOptimized}
             dragHandleProps={{
-              attributes: leftBoundaryAttributes,
-              listeners: leftBoundaryListeners,
-              setActivatorNodeRef: setLeftBoundaryActivatorRef,
+              ref: leftBoundaryRef,
               isDragging: isLeftBoundaryDragging,
             }}
           />
@@ -228,9 +209,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
             edge="right"
             touchOptimized={touchOptimized}
             dragHandleProps={{
-              attributes: rightBoundaryAttributes,
-              listeners: rightBoundaryListeners,
-              setActivatorNodeRef: setRightBoundaryActivatorRef,
+              ref: rightBoundaryRef,
               isDragging: isRightBoundaryDragging,
             }}
           />

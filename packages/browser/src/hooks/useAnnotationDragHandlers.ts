@@ -1,5 +1,8 @@
 import React from 'react';
-import type { DragStartEvent, DragMoveEvent } from '@dnd-kit/core';
+import type {
+  DragStartEvent as DragStartCallback,
+  DragMoveEvent as DragMoveCallback,
+} from '@dnd-kit/abstract';
 import type { AnnotationData } from '@waveform-playlist/core';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
@@ -16,7 +19,7 @@ interface UseAnnotationDragHandlersOptions {
 /**
  * Custom hook for handling annotation drag operations (boundary trimming)
  *
- * Provides drag handlers for use with @dnd-kit/core DndContext.
+ * Provides drag handlers for use with @dnd-kit/react DragDropProvider.
  * Handles annotation boundary resizing with linked endpoints support.
  *
  * @example
@@ -31,14 +34,14 @@ interface UseAnnotationDragHandlersOptions {
  * });
  *
  * return (
- *   <DndContext
+ *   <DragDropProvider
  *     onDragStart={onDragStart}
  *     onDragMove={onDragMove}
  *     onDragEnd={onDragEnd}
- *     modifiers={[restrictToHorizontalAxis]}
+ *     modifiers={[RestrictToHorizontalAxis]}
  *   >
  *     {renderAnnotations()}
- *   </DndContext>
+ *   </DragDropProvider>
  * );
  * ```
  */
@@ -58,13 +61,12 @@ export function useAnnotationDragHandlers({
   } | null>(null);
 
   const onDragStart = React.useCallback(
-    (event: DragStartEvent) => {
-      const { active } = event;
-      const data = active.data.current as {
+    (event: Parameters<DragStartCallback>[0]) => {
+      const data = event.operation.source?.data as {
         annotationId: string;
         annotationIndex: number;
         edge: 'start' | 'end';
-      };
+      } | undefined;
 
       if (!data || data.annotationIndex === undefined) {
         originalAnnotationStateRef.current = null;
@@ -84,26 +86,24 @@ export function useAnnotationDragHandlers({
   );
 
   const onDragMove = React.useCallback(
-    (event: DragMoveEvent) => {
-      const { active, delta } = event;
-
+    (event: Parameters<DragMoveCallback>[0]) => {
       if (!originalAnnotationStateRef.current) {
         return;
       }
 
-      const data = active.data.current as {
+      const data = event.operation.source?.data as {
         annotationId: string;
         annotationIndex: number;
         edge: 'start' | 'end';
-      };
+      } | undefined;
 
       if (!data) return;
 
       const { edge, annotationIndex } = data;
       const originalState = originalAnnotationStateRef.current;
 
-      // Convert pixel delta to time delta
-      const timeDelta = (delta.x * samplesPerPixel) / sampleRate;
+      // Convert pixel delta to time delta (use position.delta for raw pre-modifier delta)
+      const timeDelta = (event.operation.position.delta.x * samplesPerPixel) / sampleRate;
 
       // Apply delta to original state
       const newTime =

@@ -1,8 +1,6 @@
 import React, { FunctionComponent } from 'react';
 import styled from 'styled-components';
-import { useDraggable } from '@dnd-kit/core';
-import type { DraggableAttributes } from '@dnd-kit/core';
-import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
+import { useDraggable } from '@dnd-kit/react';
 
 interface WrapperProps {
   readonly $left: number;
@@ -127,13 +125,6 @@ const ResizeHandle = styled.div<ResizeHandleStyledProps>`
   }
 `;
 
-export interface DragHandleProps {
-  attributes: DraggableAttributes;
-  listeners: SyntheticListenerMap | undefined;
-  setActivatorNodeRef: (element: HTMLElement | null) => void;
-  isDragging: boolean;
-}
-
 export interface AnnotationBoxComponentProps {
   annotationId: string;
   annotationIndex: number;
@@ -161,12 +152,7 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
 
   // Left (start) boundary draggable
   const leftBoundaryId = `annotation-boundary-start-${annotationIndex}`;
-  const {
-    attributes: leftAttributes,
-    listeners: leftListeners,
-    setActivatorNodeRef: setLeftActivatorRef,
-    isDragging: isLeftDragging,
-  } = useDraggable({
+  const { ref: leftRef, isDragSource: isLeftDragging } = useDraggable({
     id: leftBoundaryId,
     data: { annotationId, annotationIndex, edge: 'start' as const },
     disabled: !editable,
@@ -174,12 +160,7 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
 
   // Right (end) boundary draggable
   const rightBoundaryId = `annotation-boundary-end-${annotationIndex}`;
-  const {
-    attributes: rightAttributes,
-    listeners: rightListeners,
-    setActivatorNodeRef: setRightActivatorRef,
-    isDragging: isRightDragging,
-  } = useDraggable({
+  const { ref: rightRef, isDragSource: isRightDragging } = useDraggable({
     id: rightBoundaryId,
     data: { annotationId, annotationIndex, edge: 'end' as const },
     disabled: !editable,
@@ -188,15 +169,6 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
   if (width <= 0) {
     return null;
   }
-
-  // Wrap @dnd-kit pointer handlers to also stop propagation
-  // This prevents the ClickOverlay from capturing the event
-  const createPointerDownHandler = (dndKitHandler?: (e: React.PointerEvent) => void) => {
-    return (e: React.PointerEvent) => {
-      e.stopPropagation();
-      dndKitHandler?.(e);
-    };
-  };
 
   const handleHandleClick = (e: React.MouseEvent) => {
     // Prevent clicks on resize handles from bubbling to annotation box
@@ -210,28 +182,18 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
       </Box>
       {editable && (
         <ResizeHandle
-          ref={setLeftActivatorRef}
+          ref={leftRef}
           $position="left"
           $isDragging={isLeftDragging}
           onClick={handleHandleClick}
-          {...leftListeners}
-          onPointerDown={createPointerDownHandler(
-            leftListeners?.onPointerDown as ((e: React.PointerEvent) => void) | undefined
-          )}
-          {...leftAttributes}
         />
       )}
       {editable && (
         <ResizeHandle
-          ref={setRightActivatorRef}
+          ref={rightRef}
           $position="right"
           $isDragging={isRightDragging}
           onClick={handleHandleClick}
-          {...rightListeners}
-          onPointerDown={createPointerDownHandler(
-            rightListeners?.onPointerDown as ((e: React.PointerEvent) => void) | undefined
-          )}
-          {...rightAttributes}
         />
       )}
     </Wrapper>

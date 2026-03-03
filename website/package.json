@@ -16,8 +16,10 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@dnd-kit/core": "^6.1.0",
-    "@dnd-kit/modifiers": "^7.0.0",
+    "@dnd-kit/abstract": "^0.3.0",
+    "@dnd-kit/dom": "^0.3.0",
+    "@dnd-kit/react": "^0.3.0",
+    "@dnd-kit/state": "^0.3.0",
     "@docusaurus/core": "3.9.2",
     "@docusaurus/preset-classic": "3.9.2",
     "@mdx-js/react": "^3.0.0",
