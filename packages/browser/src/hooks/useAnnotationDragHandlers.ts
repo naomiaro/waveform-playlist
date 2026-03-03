@@ -102,8 +102,9 @@ export function useAnnotationDragHandlers({
       const { edge, annotationIndex } = data;
       const originalState = originalAnnotationStateRef.current;
 
-      // Convert pixel delta to time delta (use position.delta for raw pre-modifier delta)
-      const timeDelta = (event.operation.position.delta.x * samplesPerPixel) / sampleRate;
+      // Compute raw delta manually — snapshot() strips @derived getters like position.delta
+      const rawDeltaX = event.operation.position.current.x - event.operation.position.initial.x;
+      const timeDelta = (rawDeltaX * samplesPerPixel) / sampleRate;
 
       // Apply delta to original state
       const newTime =

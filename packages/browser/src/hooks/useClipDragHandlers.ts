@@ -124,8 +124,9 @@ export function useClipDragHandlers({
 
       const { boundary, trackIndex, clipIndex } = data;
 
-      // Use position.delta (raw, pre-modifier) since our modifier zeroes boundary transforms
-      const sampleDelta = event.operation.position.delta.x * samplesPerPixel;
+      // Compute raw delta manually — snapshot() strips @derived getters like position.delta
+      const rawDeltaX = event.operation.position.current.x - event.operation.position.initial.x;
+      const sampleDelta = rawDeltaX * samplesPerPixel;
       const MIN_DURATION_SAMPLES = Math.floor(0.1 * sampleRate); // 0.1 seconds minimum
 
       // Get original clip state (stored on drag start)
@@ -220,9 +221,9 @@ export function useClipDragHandlers({
 
       const { trackIndex, clipId, boundary } = data;
 
-      // Use position.delta (raw) for boundary trims, transform (modifier-constrained) for moves
+      // Raw delta for boundary trims (modifier zeroes transform), constrained transform for moves
       const pixelDelta = boundary
-        ? event.operation.position.delta.x
+        ? event.operation.position.current.x - event.operation.position.initial.x
         : event.operation.transform.x;
       const sampleDelta = pixelDelta * samplesPerPixel;
 
