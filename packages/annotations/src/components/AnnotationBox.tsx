@@ -151,11 +151,14 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
   const width = Math.max(0, endPosition - startPosition);
 
   // Left (start) boundary draggable
+  // feedback: 'none' disables the Feedback plugin for this draggable — resize visual
+  // feedback comes from React state updates repositioning the annotation, not CSS translate.
   const leftBoundaryId = `annotation-boundary-start-${annotationIndex}`;
   const { ref: leftRef, isDragSource: isLeftDragging } = useDraggable({
     id: leftBoundaryId,
     data: { annotationId, annotationIndex, edge: 'start' as const },
     disabled: !editable,
+    feedback: 'none',
   });
 
   // Right (end) boundary draggable
@@ -164,6 +167,7 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
     id: rightBoundaryId,
     data: { annotationId, annotationIndex, edge: 'end' as const },
     disabled: !editable,
+    feedback: 'none',
   });
 
   if (width <= 0) {

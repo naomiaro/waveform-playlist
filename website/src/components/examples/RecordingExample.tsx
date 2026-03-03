@@ -36,6 +36,7 @@ import {
   useClipDragHandlers,
   useDragSensors,
   ClipCollisionModifier,
+  noDropAnimationPlugins,
 } from '@waveform-playlist/browser';
 import {
   RecordButton,
@@ -445,6 +446,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
         modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
+        plugins={noDropAnimationPlugins}
       >
         <Waveform
           showClipHeaders

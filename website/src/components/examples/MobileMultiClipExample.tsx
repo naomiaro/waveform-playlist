@@ -24,6 +24,7 @@ import {
   useClipDragHandlers,
   useDragSensors,
   ClipCollisionModifier,
+  noDropAnimationPlugins,
   loadWaveformData,
   Waveform,
   PlayButton,
@@ -180,6 +181,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
+      plugins={noDropAnimationPlugins}
     >
       <Controls>
         <ControlGroup>

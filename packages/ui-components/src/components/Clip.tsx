@@ -125,11 +125,14 @@ export const Clip: FunctionComponent<ClipProps> = ({
   });
 
   // Left boundary draggable (for trimming start)
+  // feedback: 'none' disables the Feedback plugin for this draggable — trim visual feedback
+  // comes from React state updates resizing the clip, not CSS translate.
   const leftBoundaryId = `clip-boundary-left-${trackIndex}-${clipIndex}`;
   const { ref: leftBoundaryRef, isDragSource: isLeftBoundaryDragging } = useDraggable({
     id: leftBoundaryId,
     data: { clipId, trackIndex, clipIndex, boundary: 'left' },
     disabled: !enableDrag,
+    feedback: 'none',
   });
 
   // Right boundary draggable (for trimming end)
@@ -138,6 +141,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
     id: rightBoundaryId,
     data: { clipId, trackIndex, clipIndex, boundary: 'right' },
     disabled: !enableDrag,
+    feedback: 'none',
   });
 
   // Elevate z-index during drag (below controls z-index: 999, above other clips)
