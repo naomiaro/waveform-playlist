@@ -73,6 +73,10 @@ export function useClipDragHandlers({
     startSample: number;
   } | null>(null);
 
+  // Store the last boundary trim delta (samples) so onDragEnd uses the same value
+  // as the last onDragMove visual update, avoiding stale-position mismatches.
+  const lastBoundaryDeltaRef = React.useRef(0);
+
   const onDragStart = React.useCallback(
     (event: Parameters<DragStartCallback>[0]) => {
       const data = event.operation.source?.data as {
@@ -124,8 +128,12 @@ export function useClipDragHandlers({
 
       const { boundary, trackIndex, clipIndex } = data;
 
-      // Compute raw delta manually — snapshot() strips @derived getters like position.delta
-      const rawDeltaX = event.operation.position.current.x - event.operation.position.initial.x;
+      // The dragmove event is dispatched BEFORE position.current is updated (happens
+      // in a microtask), so the snapshot's position.current is stale. Use event.to
+      // (the PointerSensor's target coordinates) for the correct current position.
+      const moveEvent = event as unknown as { to?: { x: number } };
+      const currentX = moveEvent.to?.x ?? event.operation.position.current.x;
+      const rawDeltaX = currentX - event.operation.position.initial.x;
       const sampleDelta = rawDeltaX * samplesPerPixel;
       const MIN_DURATION_SAMPLES = Math.floor(0.1 * sampleRate); // 0.1 seconds minimum
 
@@ -196,6 +204,7 @@ export function useClipDragHandlers({
         return { ...track, clips: newClips };
       });
 
+      lastBoundaryDeltaRef.current = sampleDelta;
       onTracksChange(newTracks);
     },
     [tracks, onTracksChange, samplesPerPixel, sampleRate]
@@ -208,6 +217,7 @@ export function useClipDragHandlers({
       if (event.canceled) {
         isDraggingRef.current = false;
         originalClipStateRef.current = null;
+        lastBoundaryDeltaRef.current = 0;
         return;
       }
 
@@ -221,11 +231,11 @@ export function useClipDragHandlers({
 
       const { trackIndex, clipId, boundary } = data;
 
-      // Raw delta for boundary trims (modifier zeroes transform), constrained transform for moves
-      const pixelDelta = boundary
-        ? event.operation.position.current.x - event.operation.position.initial.x
-        : event.operation.transform.x;
-      const sampleDelta = pixelDelta * samplesPerPixel;
+      // Boundary trims: use the last delta stored by onDragMove (avoids stale snapshot position).
+      // Clip moves: use transform.x (modifier-constrained, cached as plain object in snapshot).
+      const sampleDelta = boundary
+        ? lastBoundaryDeltaRef.current
+        : event.operation.transform.x * samplesPerPixel;
 
       const trackId = tracks[trackIndex]?.id;
 
@@ -245,6 +255,7 @@ export function useClipDragHandlers({
           engineRef.current.trimClip(trackId, clipId, boundary, Math.floor(sampleDelta));
         }
         originalClipStateRef.current = null;
+        lastBoundaryDeltaRef.current = 0;
         return;
       }
 

@@ -102,8 +102,12 @@ export function useAnnotationDragHandlers({
       const { edge, annotationIndex } = data;
       const originalState = originalAnnotationStateRef.current;
 
-      // Compute raw delta manually — snapshot() strips @derived getters like position.delta
-      const rawDeltaX = event.operation.position.current.x - event.operation.position.initial.x;
+      // The dragmove event is dispatched BEFORE position.current is updated (happens
+      // in a microtask), so the snapshot's position.current is stale. Use event.to
+      // (the PointerSensor's target coordinates) for the correct current position.
+      const moveEvent = event as unknown as { to?: { x: number } };
+      const currentX = moveEvent.to?.x ?? event.operation.position.current.x;
+      const rawDeltaX = currentX - event.operation.position.initial.x;
       const timeDelta = (rawDeltaX * samplesPerPixel) / sampleRate;
 
       // Apply delta to original state
