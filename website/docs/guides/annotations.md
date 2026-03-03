@@ -157,14 +157,14 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 });
 ```
 
-Use with `@dnd-kit`'s `DndContext`:
+Use with `@dnd-kit/react`'s `DragDropProvider`:
 
 ```tsx
-import { DndContext } from '@dnd-kit/core';
+import { DragDropProvider } from '@dnd-kit/react';
 
-<DndContext onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd}>
+<DragDropProvider onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd}>
   {/* annotation boxes */}
-</DndContext>
+</DragDropProvider>
 ```
 
 ### useAnnotationKeyboardControls

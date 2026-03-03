@@ -725,35 +725,35 @@ interface UseClipDragHandlersOptions {
 #### Example
 
 ```tsx
-import { DndContext } from '@dnd-kit/core';
-import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import { DragDropProvider } from '@dnd-kit/react';
+import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
+import { ClipCollisionModifier, noDropAnimationPlugins, useDragSensors } from '@waveform-playlist/browser';
 
 function EditablePlaylist() {
   const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
   const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
   const sensors = useDragSensors();
 
-  const { onDragStart, onDragMove, onDragEnd, onDragCancel, collisionModifier } =
-    useClipDragHandlers({
-      tracks,
-      onTracksChange: setTracks,
-      samplesPerPixel,
-      sampleRate,
-      engineRef: playoutRef,
-      isDraggingRef,
-    });
+  const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
+    tracks,
+    onTracksChange: setTracks,
+    samplesPerPixel,
+    sampleRate,
+    engineRef: playoutRef,
+    isDraggingRef,
+  });
 
   return (
-    <DndContext
+    <DragDropProvider
       sensors={sensors}
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
-      onDragCancel={onDragCancel}
-      modifiers={[restrictToHorizontalAxis, collisionModifier]}
+      modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
+      plugins={noDropAnimationPlugins}
     >
       <Waveform interactiveClips showClipHeaders />
-    </DndContext>
+    </DragDropProvider>
   );
 }
 ```
@@ -763,7 +763,7 @@ function EditablePlaylist() {
 Pre-configured drag sensors for clip editing.
 
 ```typescript
-function useDragSensors(): SensorDescriptor<any>[];
+function useDragSensors(options?: DragSensorOptions): PluginDescriptor[];
 ```
 
 ### useAnnotationDragHandlers

@@ -22,10 +22,10 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
 ## Quick Start
 
 ```bash
-npm install @waveform-playlist/browser tone @dnd-kit/core @dnd-kit/modifiers
+npm install @waveform-playlist/browser tone @dnd-kit/react
 ```
 
-> **Note**: `tone`, `@dnd-kit/core`, and `@dnd-kit/modifiers` are peer dependencies and must be installed separately.
+> **Note**: `tone` and `@dnd-kit/react` are peer dependencies and must be installed separately. `@dnd-kit/dom` and `@dnd-kit/abstract` are transitive dependencies of `@dnd-kit/react`.
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton } from '@waveform-playlist/browser';

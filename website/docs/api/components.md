@@ -41,7 +41,7 @@ The main visualization component that renders tracks and handles interactions.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `showClipHeaders` | `boolean` | `false` | Show clip name headers above waveforms |
-| `interactiveClips` | `boolean` | `false` | Enable dragging/trimming interactions on clips (requires @dnd-kit setup) |
+| `interactiveClips` | `boolean` | `false` | Enable dragging/trimming interactions on clips (requires @dnd-kit/react DragDropProvider setup) |
 | `renderPlayhead` | `RenderPlayheadFunction` | - | Custom playhead render function |
 | `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom track controls renderer |
 
