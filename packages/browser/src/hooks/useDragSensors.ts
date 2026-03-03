@@ -54,7 +54,9 @@ export interface DragSensorOptions {
  * const sensors = useDragSensors({ touchOptimized: true, touchDelay: 300 });
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useDragSensors(options: DragSensorOptions = {}): (typeof PointerSensor | PluginDescriptor<any, any, any>)[] {
+export function useDragSensors(
+  options: DragSensorOptions = {}
+): (typeof PointerSensor | PluginDescriptor<any, any, any>)[] {
   const {
     touchOptimized = false,
     touchDelay = 250,
@@ -78,9 +80,7 @@ export function useDragSensors(options: DragSensorOptions = {}): (typeof Pointer
               ];
             }
             // Mouse/pen get distance-based activation
-            return [
-              new PointerActivationConstraints.Distance({ value: mouseDistance }),
-            ];
+            return [new PointerActivationConstraints.Distance({ value: mouseDistance })];
           },
         }),
       ];

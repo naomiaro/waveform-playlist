@@ -118,7 +118,11 @@ export const Clip: FunctionComponent<ClipProps> = ({
 
   // Main clip draggable (for moving entire clip)
   const draggableId = `clip-${trackIndex}-${clipIndex}`;
-  const { ref: clipRef, handleRef, isDragSource } = useDraggable({
+  const {
+    ref: clipRef,
+    handleRef,
+    isDragSource,
+  } = useDraggable({
     id: draggableId,
     data: { clipId, trackIndex, clipIndex },
     disabled: !enableDrag,

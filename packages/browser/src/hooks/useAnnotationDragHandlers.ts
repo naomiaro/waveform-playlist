@@ -62,11 +62,13 @@ export function useAnnotationDragHandlers({
 
   const onDragStart = React.useCallback(
     (event: Parameters<DragStartCallback>[0]) => {
-      const data = event.operation.source?.data as {
-        annotationId: string;
-        annotationIndex: number;
-        edge: 'start' | 'end';
-      } | undefined;
+      const data = event.operation.source?.data as
+        | {
+            annotationId: string;
+            annotationIndex: number;
+            edge: 'start' | 'end';
+          }
+        | undefined;
 
       if (!data || data.annotationIndex === undefined) {
         originalAnnotationStateRef.current = null;
@@ -91,11 +93,13 @@ export function useAnnotationDragHandlers({
         return;
       }
 
-      const data = event.operation.source?.data as {
-        annotationId: string;
-        annotationIndex: number;
-        edge: 'start' | 'end';
-      } | undefined;
+      const data = event.operation.source?.data as
+        | {
+            annotationId: string;
+            annotationIndex: number;
+            edge: 'start' | 'end';
+          }
+        | undefined;
 
       if (!data) return;
 

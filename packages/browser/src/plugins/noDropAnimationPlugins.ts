@@ -13,6 +13,4 @@ import type { Plugins } from '@dnd-kit/abstract';
  * ```
  */
 export const noDropAnimationPlugins = (defaults: Plugins): Plugins =>
-  defaults.map((p) =>
-    p === Feedback ? Feedback.configure({ dropAnimation: null }) : p
-  );
+  defaults.map((p) => (p === Feedback ? Feedback.configure({ dropAnimation: null }) : p));

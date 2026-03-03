@@ -22,7 +22,10 @@ interface ClipCollisionOptions {
  * comes from React state updates resizing the clip, not from CSS translate.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class ClipCollisionModifier extends Modifier<DragDropManager<any, any>, ClipCollisionOptions> {
+export class ClipCollisionModifier extends Modifier<
+  DragDropManager<any, any>,
+  ClipCollisionOptions
+> {
   apply(operation: DragOperation): { x: number; y: number } {
     const { transform, source } = operation;
 

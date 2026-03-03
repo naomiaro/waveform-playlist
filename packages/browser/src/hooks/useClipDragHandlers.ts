@@ -79,11 +79,13 @@ export function useClipDragHandlers({
 
   const onDragStart = React.useCallback(
     (event: Parameters<DragStartCallback>[0]) => {
-      const data = event.operation.source?.data as {
-        boundary?: 'left' | 'right';
-        trackIndex: number;
-        clipIndex: number;
-      } | undefined;
+      const data = event.operation.source?.data as
+        | {
+            boundary?: 'left' | 'right';
+            trackIndex: number;
+            clipIndex: number;
+          }
+        | undefined;
 
       if (!data) return;
 
@@ -112,11 +114,13 @@ export function useClipDragHandlers({
 
   const onDragMove = React.useCallback(
     (event: Parameters<DragMoveCallback>[0]) => {
-      const data = event.operation.source?.data as {
-        boundary?: 'left' | 'right';
-        trackIndex: number;
-        clipIndex: number;
-      } | undefined;
+      const data = event.operation.source?.data as
+        | {
+            boundary?: 'left' | 'right';
+            trackIndex: number;
+            clipIndex: number;
+          }
+        | undefined;
 
       if (!data) return;
 
@@ -221,11 +225,13 @@ export function useClipDragHandlers({
         return;
       }
 
-      const data = event.operation.source?.data as {
-        clipId: string;
-        trackIndex: number;
-        boundary?: 'left' | 'right';
-      } | undefined;
+      const data = event.operation.source?.data as
+        | {
+            clipId: string;
+            trackIndex: number;
+            boundary?: 'left' | 'right';
+          }
+        | undefined;
 
       if (!data) return;
 
