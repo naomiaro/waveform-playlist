@@ -416,11 +416,9 @@ interface TrackActiveEffect {
 
 ```typescript
 function useClipDragHandlers(options: UseClipDragHandlersOptions): {
-  onDragStart: (event: DragStartEvent) => void;
-  onDragMove: (event: DragMoveEvent) => void;
-  onDragEnd: (event: DragEndEvent) => void;
-  onDragCancel: (event: DragCancelEvent) => void;
-  collisionModifier: Modifier;
+  onDragStart: (event: DragStartCallback) => void;
+  onDragMove: (event: DragMoveCallback) => void;
+  onDragEnd: (event: DragEndCallback) => void;
 };
 
 interface UseClipDragHandlersOptions {
@@ -434,7 +432,40 @@ interface UseClipDragHandlersOptions {
 }
 ```
 
-Delegates move to `engine.moveClip()` and trim to `engine.trimClip()`. During trim drags, `isDraggingRef` prevents engine rebuild. `onDragCancel` resets drag state on interruption (focus loss, Escape, unmount).
+Delegates move to `engine.moveClip()` and trim to `engine.trimClip()`. During trim drags, `isDraggingRef` prevents engine rebuild. Cancel is handled inside `onDragEnd` via `event.canceled` — reverts React state for boundary trims, resets `isDraggingRef`. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop).
+
+### useDragSensors
+
+```typescript
+function useDragSensors(options?: DragSensorOptions): PluginDescriptor[];
+
+interface DragSensorOptions {
+  touchOptimized?: boolean; // default false — all pointers use 1px distance activation
+  touchDelay?: number; // default 250ms (only when touchOptimized)
+  touchTolerance?: number; // default 5px (only when touchOptimized)
+  mouseDistance?: number; // default 1px
+}
+```
+
+Returns configured PointerSensor descriptors for DragDropProvider's `sensors` prop. Default mode uses distance-based activation for all pointer types. Touch-optimized mode uses delay-based activation for touch and distance-based for mouse/pen.
+
+### ClipCollisionModifier
+
+```typescript
+class ClipCollisionModifier extends Modifier {
+  static configure(options: { tracks: ClipTrack[]; samplesPerPixel: number }): PluginDescriptor;
+}
+```
+
+Collision detection modifier for clip moves — constrains horizontal drag to prevent overlapping clips. Passed to DragDropProvider's `modifiers` array alongside `RestrictToHorizontalAxis`.
+
+### noDropAnimationPlugins
+
+```typescript
+const noDropAnimationPlugins: PluginDescriptor[];
+```
+
+Configures DragDropProvider's Feedback plugin with `dropAnimation: null` to prevent snap-back animation on clip drop. Pass to DragDropProvider's `plugins` prop. Only needed for clip moves (boundary trims use `feedback: 'none'` per-entity).
 
 ### useClipSplitting
 

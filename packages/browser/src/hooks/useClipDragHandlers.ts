@@ -220,6 +220,9 @@ export function useClipDragHandlers({
       if (event.canceled) {
         // Revert React state for boundary trims — onDragMove updated tracks per-frame,
         // but the engine still has original positions (isDraggingRef blocked rebuilds).
+        // For clip moves, originalClipStateRef is null so this block is skipped —
+        // no React state revert needed because the Feedback plugin handles the visual
+        // position (CSS translate removed on cancel) and engine was never mutated.
         if (originalClipStateRef.current) {
           const cancelData = event.operation.source?.data as
             | { trackIndex: number; clipIndex: number }

@@ -22,6 +22,7 @@ import {
   useMediaElementData,
 } from '../MediaElementPlaylistContext';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
+import { noDropAnimationPlugins } from '../plugins/noDropAnimationPlugins';
 import { AnimatedMediaElementPlayhead } from './AnimatedMediaElementPlayhead';
 import { ChannelWithMediaElementProgress } from './ChannelWithMediaElementProgress';
 import type {
@@ -312,6 +313,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
                 onDragMove={onDragMove}
                 onDragEnd={onDragEnd}
                 modifiers={editable ? [RestrictToHorizontalAxis] : []}
+                plugins={noDropAnimationPlugins}
               >
                 <annotationIntegration.AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
                   {annotations.map((annotation, index) => {

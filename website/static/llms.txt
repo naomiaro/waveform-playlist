@@ -74,6 +74,9 @@ Both providers use React Context with 4 split contexts for performance.
 - `useDynamicEffects()` — Master effects chain with runtime add/remove/parameter updates
 - `useTrackDynamicEffects()` — Per-track effects management
 - `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip()
+- `useDragSensors(opts?)` — Configures PointerSensor activation constraints for DragDropProvider (distance-based default, optional touch-optimized mode)
+- `ClipCollisionModifier` — Collision detection modifier for clip moves, prevents overlapping clips
+- `noDropAnimationPlugins` — Disables Feedback plugin drop animation for clip moves
 - `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip()
 - `useExportWav()` — Offline WAV export with effects support
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts

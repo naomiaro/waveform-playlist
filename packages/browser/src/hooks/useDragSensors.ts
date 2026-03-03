@@ -2,11 +2,10 @@
  * Hook for configuring @dnd-kit sensors for clip dragging
  *
  * Provides consistent drag activation behavior across all examples.
- * The @dnd-kit/dom PointerSensor has built-in defaults:
- * - Mouse on handle element: immediate activation (no constraints)
- * - Touch: 250ms delay with 5px tolerance
- * - Text inputs: 200ms delay with 0 tolerance
- * - Other: 200ms delay/10px tolerance + 5px distance (whichever fires first)
+ * Always overrides PointerSensor defaults with custom activation constraints:
+ * - Default mode: distance-based activation (1px) for all pointer types
+ * - Touch-optimized mode: delay-based activation for touch (250ms),
+ *   distance-based for mouse/pen
  */
 
 import { useMemo } from 'react';
@@ -16,8 +15,8 @@ import type { PluginDescriptor } from '@dnd-kit/abstract';
 export interface DragSensorOptions {
   /**
    * Enable mobile-optimized touch handling with delay-based activation.
-   * When true, uses PointerSensor with custom touch delay.
-   * When false (default), uses PointerSensor defaults (already touch-aware).
+   * When true, touch events get delay-based activation while mouse/pen get distance-based.
+   * When false (default), all pointer types use distance-based activation (1px).
    */
   touchOptimized?: boolean;
   /**
@@ -45,7 +44,7 @@ export interface DragSensorOptions {
  * @returns Array of sensor constructors/descriptors for DragDropProvider's sensors prop
  *
  * @example
- * // Desktop-optimized (default — uses PointerSensor defaults)
+ * // Desktop-optimized (default — 1px distance activation for all pointer types)
  * const sensors = useDragSensors();
  *
  * @example

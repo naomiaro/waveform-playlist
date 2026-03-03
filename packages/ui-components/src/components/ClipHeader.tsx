@@ -4,7 +4,6 @@ import styled from 'styled-components';
 export const CLIP_HEADER_HEIGHT = 22; // Height of the clip header in pixels
 
 interface HeaderContainerProps {
-  readonly $isDragging?: boolean;
   readonly $interactive?: boolean; // Whether it's draggable or just presentational
   readonly $isSelected?: boolean; // Whether the track is selected
 }
@@ -20,8 +19,7 @@ const HeaderContainer = styled.div<HeaderContainerProps>`
   display: flex;
   align-items: center;
   padding: 0 8px;
-  cursor: ${(props) =>
-    props.$interactive ? (props.$isDragging ? 'grabbing' : 'grab') : 'default'};
+  cursor: ${(props) => (props.$interactive ? 'grab' : 'default')};
   user-select: none;
   z-index: 110;
   flex-shrink: 0;
@@ -63,7 +61,7 @@ export const ClipHeaderPresentational: FunctionComponent<ClipHeaderPresentationa
   isSelected = false,
 }) => {
   return (
-    <HeaderContainer $isDragging={false} $interactive={false} $isSelected={isSelected}>
+    <HeaderContainer $interactive={false} $isSelected={isSelected}>
       <TrackName>{trackName}</TrackName>
     </HeaderContainer>
   );
