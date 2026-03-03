@@ -202,9 +202,12 @@ const config: Config = {
                 // Force single instance of styled-components to avoid "several instances" warning
                 // and ensure styles work correctly across all packages
                 'styled-components': path.resolve(__dirname, 'node_modules/styled-components'),
-                // Force single instance of @dnd-kit/core so DndContext works across packages
-                '@dnd-kit/core': path.resolve(__dirname, 'node_modules/@dnd-kit/core'),
-                '@dnd-kit/modifiers': path.resolve(__dirname, 'node_modules/@dnd-kit/modifiers'),
+                // Force single instance of @dnd-kit packages so DragDropProvider context
+                // works across source-aliased packages (prevents React 18/19 copy split)
+                '@dnd-kit/react': path.resolve(__dirname, 'node_modules/@dnd-kit/react'),
+                '@dnd-kit/abstract': path.resolve(__dirname, 'node_modules/@dnd-kit/abstract'),
+                '@dnd-kit/dom': path.resolve(__dirname, 'node_modules/@dnd-kit/dom'),
+                '@dnd-kit/state': path.resolve(__dirname, 'node_modules/@dnd-kit/state'),
               },
             },
           };
