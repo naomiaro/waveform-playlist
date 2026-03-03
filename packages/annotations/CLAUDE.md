@@ -30,3 +30,7 @@ const annotationIntegration = useContext(AnnotationIntegrationContext);
   onAnnotationsChange={setAnnotations}  // Required for edits to persist
 >
 ```
+
+## @dnd-kit Feedback Plugin
+
+Annotation boundary resize handles use `useDraggable({ feedback: 'none' })` to disable the Feedback plugin. Resize visual feedback comes from React state updates repositioning the annotation, not CSS translate.

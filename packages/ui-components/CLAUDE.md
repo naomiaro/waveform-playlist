@@ -99,6 +99,14 @@
 
 **Backwards compatibility:** `useScrollViewport()` returns `null` without provider. All components default to rendering everything when viewport is `null`.
 
+## @dnd-kit Feedback Plugin Per-Entity Config
+
+**Pattern:** `useDraggable({ feedback: 'none' })` disables the Feedback plugin for that draggable — no fixed positioning, no CSS translate, no placeholder, no drop animation. Used on boundary trim handles where React state provides visual feedback.
+
+**Type chain:** `UseDraggableInput` extends `Omit<DraggableInput, 'handle' | 'element'>` where `DraggableInput` is from `@dnd-kit/dom` (includes `feedback?: FeedbackType`). The `plugins` property does NOT exist on `useDraggable` in v0.3.2.
+
+**Applied in:** `Clip.tsx` (left/right boundary draggables), `AnnotationBox.tsx` (start/end boundary draggables).
+
 ## Important Patterns (UI-Specific)
 
 - **Stable React Keys for Tracks/Clips** - Always use `track.id` / `clip.clipId` as React keys, never array indices. Index-based keys cause DOM reuse on removal, breaking `transferControlToOffscreen()` (can only be called once per canvas) and causing stale OffscreenCanvas references.

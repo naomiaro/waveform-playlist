@@ -147,6 +147,13 @@ const rebuildChain = useCallback(() => {
 
 **`skipEngineDisposeRef` must include `isDraggingRef`:** During drag, `onDragMove` triggers `loadAudio` re-runs (because `tracks` is in deps). The previous effect's cleanup checks `skipEngineDisposeRef` — if it only checks `isEngineTracks` (which is `false` during drag), it disposes the engine on the first drag move.
 
+## @dnd-kit/react v0.3.2 Event API Quirks
+
+- **`event.operation.position.delta`** is `undefined` in snapshots — `@derived` getters are non-enumerable and stripped by `snapshot()`. Compute manually: `position.current.x - position.initial.x`.
+- **`event.operation.position.current`** is stale in `onDragMove` — `move()` dispatches before updating `position.current` (happens in `queueMicrotask`). Use `(event as any).to?.x` for the correct current pointer position.
+- **`event.operation.transform.x`** in `onDragEnd` reflects the final post-modifier transform. Use for clip moves; for boundary trims, cache the last delta from `onDragMove` in a ref.
+- **`noDropAnimationPlugins`** — exported helper that configures DragDropProvider's Feedback plugin with `dropAnimation: null`. Prevents snap-back on clip drop.
+
 ## Error Handling in Playback Callbacks
 
 - **`engine.play()` try-catch in play callback** — `engine.play()` is synchronous but can throw (adapter failures). Wrap in try-catch; on error, `stopAnimationLoop()` and return early to avoid `setIsPlaying(true)` with no audio.
