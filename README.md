@@ -85,16 +85,19 @@ function App() {
 
 ## Packages
 
-v5 packages:
-
 | Package | Description |
 |---------|-------------|
 | `@waveform-playlist/browser` | Main React components, hooks, and context |
 | `@waveform-playlist/core` | Types, utilities, and clip/track creation |
+| `@waveform-playlist/engine` | Framework-agnostic timeline engine with pure operations |
 | `@waveform-playlist/ui-components` | Styled UI components (buttons, sliders, etc.) |
 | `@waveform-playlist/playout` | Tone.js audio engine |
+| `@waveform-playlist/media-element-playout` | HTMLMediaElement-based playout with pitch-preserving playback rate |
 | `@waveform-playlist/annotations` | Optional annotation support |
 | `@waveform-playlist/recording` | Optional recording support (requires [AudioWorklet setup](https://naomiaro.github.io/waveform-playlist/docs/guides/recording#audioworklet-setup)) |
+| `@waveform-playlist/spectrogram` | Optional spectrogram visualization |
+| `@waveform-playlist/loaders` | Audio loaders |
+| `@waveform-playlist/webaudio-peaks` | Peak extraction from AudioBuffer or sample arrays |
 
 ## Key Hooks
 
