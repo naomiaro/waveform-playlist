@@ -107,6 +107,12 @@
 
 **Applied in:** `Clip.tsx` (left/right boundary draggables), `AnnotationBox.tsx` (start/end boundary draggables).
 
+## Bar Width Peak Aggregation (Channel.tsx)
+
+**Invariant:** When `barWidth + barGap > 1` (step > 1), each bar must aggregate ALL peaks in its range using min-of-mins / max-of-maxes. Never sample a single peak per bar — skipping intermediate peaks loses amplitude data, causing zoom-dependent visual inconsistency.
+
+**Performance:** When `step === 1` (the common case), the aggregation loop body never executes — zero overhead.
+
 ## Important Patterns (UI-Specific)
 
 - **Stable React Keys for Tracks/Clips** - Always use `track.id` / `clip.clipId` as React keys, never array indices. Index-based keys cause DOM reuse on removal, breaking `transferControlToOffscreen()` (can only be called once per canvas) and causing stale OffscreenCanvas references.

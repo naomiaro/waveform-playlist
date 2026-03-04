@@ -188,11 +188,23 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
           // Skip if the entire bar would be before this canvas
           if (x + barWidth <= 0) continue;
 
-          const peakIndex = barGlobal; // Each pixel position corresponds to a peak
+          // Aggregate all peaks covered by this bar (min of mins, max of maxes).
+          // With step > 1, skipping intermediate peaks loses amplitude data.
+          const peakStart = barGlobal;
+          const peakEnd = Math.min(barGlobal + step, length);
 
-          if (peakIndex * 2 + 1 < data.length) {
-            const minPeak = data[peakIndex * 2] / maxValue;
-            const maxPeak = data[peakIndex * 2 + 1] / maxValue;
+          if (peakStart * 2 + 1 < data.length) {
+            let minPeak = data[peakStart * 2] / maxValue;
+            let maxPeak = data[peakStart * 2 + 1] / maxValue;
+
+            for (let p = peakStart + 1; p < peakEnd; p++) {
+              if (p * 2 + 1 < data.length) {
+                const pMin = data[p * 2] / maxValue;
+                const pMax = data[p * 2 + 1] / maxValue;
+                if (pMin < minPeak) minPeak = pMin;
+                if (pMax > maxPeak) maxPeak = pMax;
+              }
+            }
 
             const min = Math.abs(minPeak * h2);
             const max = Math.abs(maxPeak * h2);

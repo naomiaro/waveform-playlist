@@ -132,18 +132,41 @@ export function extractPeaksFromWaveformData(
 ): { data: Int8Array | Int16Array; bits: 8 | 16; length: number } {
   let processedData = waveformData;
 
-  // Slice if offset/duration specified (using index-based slicing for sample accuracy)
+  // Resample to target scale first, then slice — this ensures resampled bin
+  // boundaries match full-file resampling regardless of clip offset.
   if (offsetSamples !== undefined && durationSamples !== undefined) {
-    // Convert samples to waveform data indices
-    // waveformData.scale is the samples per pixel of the source data
-    const sourceScale = waveformData.scale;
-    const startIndex = Math.floor(offsetSamples / sourceScale);
-    const endIndex = Math.ceil((offsetSamples + durationSamples) / sourceScale);
-    processedData = processedData.slice({ startIndex, endIndex });
-  }
+    if (processedData.scale !== samplesPerPixel) {
+      const sourceScale = waveformData.scale;
+      const ratio = samplesPerPixel / sourceScale;
 
-  // Resample to target scale if different
-  if (processedData.scale !== samplesPerPixel) {
+      // Compute clip's pixel range in target-scale bins
+      const targetStart = Math.floor(offsetSamples / samplesPerPixel);
+      const targetEnd = Math.ceil(
+        (offsetSamples + durationSamples) / samplesPerPixel
+      );
+
+      // Convert to aligned source indices. targetStart * ratio is always a
+      // multiple of ratio, so the resampler's bin boundaries match the full file.
+      const sourceStart = Math.round(targetStart * ratio);
+      const sourceEnd = Math.min(
+        waveformData.length,
+        Math.round(targetEnd * ratio)
+      );
+
+      processedData = processedData.slice({
+        startIndex: sourceStart,
+        endIndex: sourceEnd,
+      });
+      processedData = processedData.resample({ scale: samplesPerPixel });
+    } else {
+      // No resampling needed — slice directly at base scale
+      const startIndex = Math.floor(offsetSamples / samplesPerPixel);
+      const endIndex = Math.ceil(
+        (offsetSamples + durationSamples) / samplesPerPixel
+      );
+      processedData = processedData.slice({ startIndex, endIndex });
+    }
+  } else if (processedData.scale !== samplesPerPixel) {
     processedData = processedData.resample({ scale: samplesPerPixel });
   }
 
@@ -187,16 +210,40 @@ export function extractPeaksFromWaveformDataFull(
 ): PeakData {
   let processedData = waveformData;
 
-  // Slice if offset/duration specified
+  // Resample to target scale first, then slice — this ensures resampled bin
+  // boundaries match full-file resampling regardless of clip offset.
   if (offsetSamples !== undefined && durationSamples !== undefined) {
-    const sourceScale = waveformData.scale;
-    const startIndex = Math.floor(offsetSamples / sourceScale);
-    const endIndex = Math.ceil((offsetSamples + durationSamples) / sourceScale);
-    processedData = processedData.slice({ startIndex, endIndex });
-  }
+    if (processedData.scale !== samplesPerPixel) {
+      const sourceScale = waveformData.scale;
+      const ratio = samplesPerPixel / sourceScale;
 
-  // Resample to target scale if different
-  if (processedData.scale !== samplesPerPixel) {
+      // Compute clip's pixel range in target-scale bins
+      const targetStart = Math.floor(offsetSamples / samplesPerPixel);
+      const targetEnd = Math.ceil(
+        (offsetSamples + durationSamples) / samplesPerPixel
+      );
+
+      // Convert to aligned source indices. targetStart * ratio is always a
+      // multiple of ratio, so the resampler's bin boundaries match the full file.
+      const sourceStart = Math.round(targetStart * ratio);
+      const sourceEnd = Math.min(
+        waveformData.length,
+        Math.round(targetEnd * ratio)
+      );
+
+      processedData = processedData.slice({
+        startIndex: sourceStart,
+        endIndex: sourceEnd,
+      });
+      processedData = processedData.resample({ scale: samplesPerPixel });
+    } else {
+      const startIndex = Math.floor(offsetSamples / samplesPerPixel);
+      const endIndex = Math.ceil(
+        (offsetSamples + durationSamples) / samplesPerPixel
+      );
+      processedData = processedData.slice({ startIndex, endIndex });
+    }
+  } else if (processedData.scale !== samplesPerPixel) {
     processedData = processedData.resample({ scale: samplesPerPixel });
   }
 

@@ -161,6 +161,26 @@ const rebuildChain = useCallback(() => {
 - **`engine.play()` try-catch in play callback** — `engine.play()` is synchronous but can throw (adapter failures). Wrap in try-catch; on error, `stopAnimationLoop()` and return early to avoid `setIsPlaying(true)` with no audio.
 - **Fire-and-forget async `.catch()` handlers** — `reschedulePlayback()` and `resumePlayback()` are async functions called without `await` in useEffect callbacks. Without `.catch()`, throws become unhandled promise rejections. Each `.catch()` resets UI state (`setIsPlaying(false)`, `stopAnimationLoop()`).
 
+## Aligned Peak Resampling (waveformDataLoader.ts)
+
+**Decision:** When slicing WaveformData before resampling to a different scale, source slice indices must align to the resampling ratio.
+
+**Why:** WaveformData.resample() groups N consecutive source bins per output bin (N = targetScale/sourceScale). If the slice starts at a non-aligned index, output bins cover different source samples than a full-file resample would, causing zoom-dependent peak amplitude.
+
+**Pattern (in both `extractPeaksFromWaveformData` and `extractPeaksFromWaveformDataFull`):**
+```typescript
+const ratio = samplesPerPixel / sourceScale;
+const targetStart = Math.floor(offsetSamples / samplesPerPixel);
+const targetEnd = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
+const sourceStart = Math.round(targetStart * ratio); // Aligned to ratio
+const sourceEnd = Math.round(targetEnd * ratio);     // Aligned to ratio
+// slice(sourceStart, sourceEnd) → resample(targetScale)
+```
+
+**Key invariant:** `sourceStart` is always a multiple of `ratio`, so resampled bin boundaries match the full file.
+
+**Mono merge:** Uses weighted averaging (same as `makeMono` in webaudio-peaks). This is consistent across both packages — do not change to min/max without updating both.
+
 ## Important Patterns (Browser-Specific)
 
 - **Context Value Memoization** - All context value objects in providers must be wrapped with `useMemo`. Extract inline callbacks into `useCallback` first to avoid dependency churn.
