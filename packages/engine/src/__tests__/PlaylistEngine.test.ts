@@ -711,7 +711,23 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('play() disables Transport loop when starting at or past loopEnd', () => {
+    it('play() at exact loopEnd disables Transport loop', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
+      engine.setLoopRegion(1.0, 3.0);
+      engine.setLoopEnabled(true);
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      // Start exactly at loopEnd — 3.0 is NOT < 3.0, so loop is disabled
+      engine.play(3.0);
+      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
+      engine.dispose();
+    });
+
+    it('play() past loopEnd disables Transport loop', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
@@ -785,6 +801,23 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it('setLoopEnabled(true) during playback does not activate at exact loopEnd', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
+      engine.setLoopRegion(1.0, 3.0);
+      engine.play(0);
+      // Position is exactly at loopEnd — strict < means 3.0 is NOT < 3.0
+      (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(3.0);
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      engine.setLoopEnabled(true);
+      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
+      engine.dispose();
+    });
+
     it('setLoopEnabled(true) during playback does not activate when past loopEnd', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
@@ -816,6 +849,23 @@ describe('PlaylistEngine', () => {
 
       engine.setLoopEnabled(true);
       expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 3.0);
+      engine.dispose();
+    });
+
+    it('setLoopRegion() during playback activates when before new loopEnd', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
+      engine.setLoopRegion(1.0, 3.0);
+      engine.setLoopEnabled(true);
+      engine.play(0);
+      (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(2.0);
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      engine.setLoopRegion(1.0, 5.0);
+      expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 5.0);
       engine.dispose();
     });
 

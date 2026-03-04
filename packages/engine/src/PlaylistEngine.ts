@@ -505,6 +505,9 @@ export class PlaylistEngine {
    * Returns whether the current playback position is before loopEnd.
    * Used by setLoopEnabled/setLoopRegion during playback — if past loopEnd,
    * Transport loop stays off so playback continues to the end.
+   * Note: play() uses an inline check instead — _isPlaying is still false
+   * when play() runs, and this method returns true unconditionally when
+   * not playing.
    */
   private _isBeforeLoopEnd(): boolean {
     if (!this._isPlaying) return true;

@@ -224,9 +224,10 @@ export class TonePlayout {
     } catch (err) {
       console.warn('[waveform-playlist] Transport.stop() failed:', err);
     }
-    // Remove loop handler BEFORE stopping sources. Without this, a loop
-    // event queued during transport.stop() could fire the handler, creating
-    // new sources via startMidClipSources() after stopAllSources() runs.
+    // Remove loop handler before stopping sources. Prevents any deferred
+    // loop event from creating new sources via startMidClipSources() after
+    // stopAllSources() runs. Defense-in-depth — setLoop(false) should
+    // already have removed it, but stop() must be self-contained.
     if (this._loopHandler) {
       try {
         transport.off('loop', this._loopHandler);
