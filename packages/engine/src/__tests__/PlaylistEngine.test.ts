@@ -694,7 +694,7 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('play() at exact loopEnd disables Transport loop (half-open interval)', () => {
+    it('play() enables Transport loop regardless of starting position', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
@@ -704,25 +704,10 @@ describe('PlaylistEngine', () => {
       engine.setLoopEnabled(true);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
-      // Start exactly at loopEnd — half-open [1.0, 3.0) means 3.0 is outside
-      engine.play(3.0);
-      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
-      engine.dispose();
-    });
-
-    it('play() disables Transport loop when starting outside loop region', () => {
-      const adapter = createMockAdapter();
-      const engine = new PlaylistEngine({ adapter });
-      engine.setTracks([
-        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
-      ]);
-      engine.setLoopRegion(1.0, 3.0);
-      engine.setLoopEnabled(true);
-      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
-
-      // Start at 5.0 — outside the loop region [1.0, 3.0)
+      // Start at 5.0 — outside the loop region, but Transport loop is still enabled.
+      // Transport handles wrapping at loopEnd naturally.
       engine.play(5.0);
-      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
+      expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 3.0);
       engine.dispose();
     });
 
@@ -784,44 +769,24 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('setLoopEnabled(true) during playback does not activate Transport loop when outside region', () => {
+    it('setLoopEnabled(true) during playback always activates Transport loop', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
       ]);
       engine.setLoopRegion(1.0, 3.0);
-      // Start playing at 0 (outside doesn't matter, loop not enabled yet)
       engine.play(0);
-      // Simulate adapter reporting position past loop end
+      // Even when position is past loop end, enabling loop activates Transport loop
       (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(5.0);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
       engine.setLoopEnabled(true);
-      // Should NOT activate Transport loop — playback is past loopEnd
-      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
-      engine.dispose();
-    });
-
-    it('setLoopEnabled(true) during playback activates Transport loop when inside region', () => {
-      const adapter = createMockAdapter();
-      const engine = new PlaylistEngine({ adapter });
-      engine.setTracks([
-        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
-      ]);
-      engine.setLoopRegion(1.0, 3.0);
-      engine.play(0);
-      // Simulate adapter reporting position inside loop region
-      (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(2.0);
-      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
-
-      engine.setLoopEnabled(true);
-      // Should activate — playback is inside the loop region
       expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 3.0);
       engine.dispose();
     });
 
-    it('setLoopRegion() during playback does not activate Transport loop when position outside new region', () => {
+    it('setLoopRegion() during playback with loop enabled always activates Transport loop', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
@@ -830,13 +795,11 @@ describe('PlaylistEngine', () => {
       engine.setLoopRegion(1.0, 3.0);
       engine.setLoopEnabled(true);
       engine.play(0);
-      // Position is past the new loop region
       (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(6.0);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
-      // Shrink the region — position is now outside
       engine.setLoopRegion(1.0, 4.0);
-      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 4.0);
+      expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 4.0);
       engine.dispose();
     });
 

@@ -298,11 +298,7 @@ export class PlaylistEngine {
         // Disable Transport loop for duration-limited playback (selection/annotation)
         this._adapter.setLoop(false, this._loopStart, this._loopEnd);
       } else if (this._isLoopEnabled) {
-        // Only enable Transport loop if starting within the loop region.
-        // Starting outside plays normally to the end (DAW behavior).
-        const inLoopRegion =
-          this._currentTime >= this._loopStart && this._currentTime < this._loopEnd;
-        this._adapter.setLoop(inLoopRegion, this._loopStart, this._loopEnd);
+        this._adapter.setLoop(true, this._loopStart, this._loopEnd);
       }
       try {
         this._adapter.play(this._currentTime, endTime);
@@ -382,22 +378,14 @@ export class PlaylistEngine {
     if (s === this._loopStart && e === this._loopEnd) return;
     this._loopStart = s;
     this._loopEnd = e;
-    this._adapter?.setLoop(
-      this._isLoopEnabled && this._shouldActivateTransportLoop(),
-      this._loopStart,
-      this._loopEnd
-    );
+    this._adapter?.setLoop(this._isLoopEnabled, this._loopStart, this._loopEnd);
     this._emitStateChange();
   }
 
   setLoopEnabled(enabled: boolean): void {
     if (enabled === this._isLoopEnabled) return;
     this._isLoopEnabled = enabled;
-    this._adapter?.setLoop(
-      enabled && this._shouldActivateTransportLoop(),
-      this._loopStart,
-      this._loopEnd
-    );
+    this._adapter?.setLoop(enabled, this._loopStart, this._loopEnd);
     this._emitStateChange();
   }
 
@@ -504,19 +492,6 @@ export class PlaylistEngine {
 
   private _emitStateChange(): void {
     this._emit('statechange', this.getState());
-  }
-
-  /**
-   * Returns whether Transport loop should be active right now.
-   * When not playing, returns true unconditionally — the intent to loop
-   * should be honored when playback starts (play() has its own position
-   * check). During playback, checks if the live position is within the
-   * loop region [loopStart, loopEnd).
-   */
-  private _shouldActivateTransportLoop(): boolean {
-    if (!this._isPlaying) return true;
-    const t = this._adapter?.getCurrentTime() ?? this._currentTime;
-    return t >= this._loopStart && t < this._loopEnd;
   }
 
   private _startTimeUpdateLoop(): void {

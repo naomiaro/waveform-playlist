@@ -56,6 +56,8 @@ AudioBufferSourceNode (native, one-shot, created per play/loop)
 
 **Optimistic cached state in `setLoop()`:** `_loopEnabled`/`_loopStart`/`_loopEnd` are updated BEFORE the try block that sets Transport properties. If Transport throws, the cached state still reflects the caller's intent — `play()` will use the correct values on the next attempt. Moving the cache update after the try block risks divergence on error (early return skips the update).
 
+**Loop handler cleanup in `stop()`:** `stop()` removes the loop handler (`transport.off('loop', ...)`) and nulls `_loopHandler` BEFORE calling `stopAllSources()`. This prevents a race condition where a loop event fires during `transport.stop()` processing, creating new sources via `startMidClipSources()` after cleanup. The handler is removed independently of `setLoop(false)` for defense-in-depth — `stop()` must be self-contained.
+
 ## Tone.js Type Gotchas
 
 **Gain generic mismatch:** `Volume.input` is `Gain<"decibels">` but plain `Gain` import defaults to `Gain<"gain">`. Accessing native input requires double cast: `(this.volumeNode.input as unknown as Gain).input`.
