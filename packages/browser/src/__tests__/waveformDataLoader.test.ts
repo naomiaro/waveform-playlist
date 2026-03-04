@@ -146,6 +146,27 @@ describe('extractPeaksFromWaveformData', () => {
       expect(result.data).toBeInstanceOf(Int8Array);
     });
 
+    it('handles non-integer ratio with non-zero offset (256 → 1000)', () => {
+      // 40 source bins at scale 256, resample to 1000 (ratio = 3.90625)
+      // This tests the floor/ceil alignment strategy for non-integer ratios
+      const pairs: [number, number][] = Array.from({ length: 40 }, (_, i) => [
+        -(i * 30 + 10),
+        i * 30 + 10,
+      ]);
+      const wd = makeWaveformData(pairs, { scale: 256 });
+
+      // Clip starting at sample offset 2560 (= 10 source bins), duration = 20 source bins
+      const result = extractPeaksFromWaveformData(wd, 1000, 0, 2560, 5120);
+
+      // Should produce valid output without errors
+      expect(result.length).toBeGreaterThan(0);
+      expect(result.bits).toBe(16);
+      // Verify no NaN or undefined values in output
+      for (let i = 0; i < result.length * 2; i++) {
+        expect(Number.isFinite(result.data[i])).toBe(true);
+      }
+    });
+
     it('slices without resampling when scales match', () => {
       const pairs: [number, number][] = [
         [-100, 100],
@@ -167,6 +188,33 @@ describe('extractPeaksFromWaveformData', () => {
     });
   });
 });
+
+/**
+ * Creates a stereo WaveformData instance from per-channel min/max pairs.
+ * Multi-channel data is interleaved per bin: [ch0_min, ch0_max, ch1_min, ch1_max, ...]
+ */
+function makeStereoWaveformData(
+  ch0Pairs: [min: number, max: number][],
+  ch1Pairs: [min: number, max: number][],
+  options: { scale?: number; sampleRate?: number; bits?: 8 | 16 } = {}
+): WaveformData {
+  const { scale = 256, sampleRate = 44100, bits = 16 } = options;
+  const data: number[] = [];
+
+  for (let i = 0; i < ch0Pairs.length; i++) {
+    data.push(ch0Pairs[i][0], ch0Pairs[i][1], ch1Pairs[i][0], ch1Pairs[i][1]);
+  }
+
+  return WaveformData.create({
+    version: 2,
+    channels: 2,
+    sample_rate: sampleRate,
+    samples_per_pixel: scale,
+    bits,
+    length: ch0Pairs.length,
+    data,
+  });
+}
 
 describe('extractPeaksFromWaveformDataFull', () => {
   it('returns empty data when offset is beyond waveform data', () => {
@@ -200,6 +248,53 @@ describe('extractPeaksFromWaveformDataFull', () => {
     for (let ch = 0; ch < clip.data.length; ch++) {
       for (let i = 0; i < clip.data[ch].length; i++) {
         expect(clip.data[ch][i]).toBe(full.data[ch][i]);
+      }
+    }
+  });
+
+  it('merges stereo channels to mono using weighted averaging', () => {
+    // Two channels with known values — mono merge should average them
+    const ch0: [number, number][] = [
+      [-200, 100],
+      [-400, 300],
+    ];
+    const ch1: [number, number][] = [
+      [-100, 200],
+      [-300, 400],
+    ];
+    const wd = makeStereoWaveformData(ch0, ch1, { scale: 256 });
+
+    const result = extractPeaksFromWaveformDataFull(wd, 256, true);
+
+    expect(result.length).toBe(2);
+    expect(result.data.length).toBe(1); // mono = single channel
+
+    // Weighted average: weight = 1/2
+    // Bin 0: min = (-200 + -100) / 2 = -150, max = (100 + 200) / 2 = 150
+    // Bin 1: min = (-400 + -300) / 2 = -350, max = (300 + 400) / 2 = 350
+    expect(result.data[0][0]).toBe(-150); // bin 0 min
+    expect(result.data[0][1]).toBe(150); // bin 0 max
+    expect(result.data[0][2]).toBe(-350); // bin 1 min
+    expect(result.data[0][3]).toBe(350); // bin 1 max
+  });
+
+  it('handles non-integer ratio with non-zero offset', () => {
+    // 40 source bins at scale 256, resample to 1000 (ratio = 3.90625)
+    const pairs: [number, number][] = Array.from({ length: 40 }, (_, i) => [
+      -(i * 30 + 10),
+      i * 30 + 10,
+    ]);
+    const wd = makeWaveformData(pairs, { scale: 256 });
+
+    // Clip starting at sample offset 2560, duration = 5120 samples
+    const result = extractPeaksFromWaveformDataFull(wd, 1000, false, 2560, 5120);
+
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.bits).toBe(16);
+    // Verify all values are finite
+    for (let ch = 0; ch < result.data.length; ch++) {
+      for (let i = 0; i < result.data[ch].length; i++) {
+        expect(Number.isFinite(result.data[ch][i])).toBe(true);
       }
     }
   });

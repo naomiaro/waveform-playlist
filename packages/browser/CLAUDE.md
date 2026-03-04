@@ -181,9 +181,10 @@ const rebuildChain = useCallback(() => {
 const ratio = samplesPerPixel / sourceScale;
 const targetStart = Math.floor(offsetSamples / samplesPerPixel);
 const targetEnd = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
-const sourceStart = Math.floor(targetStart * ratio); // Inclusive start
-const sourceEnd = Math.ceil(targetEnd * ratio); // Inclusive end
+const sourceStart = Math.floor(targetStart * ratio);
+const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 // slice(sourceStart, sourceEnd) → resample(targetScale)
+// (WaveformData.slice endIndex is exclusive, like Array.slice)
 ```
 
 **Key invariant:** Floor/ceil slicing ensures all source bins contributing to target bins are included. For integer ratios (power-of-two scales like 256→1024), this gives exact bin-boundary alignment. For non-integer ratios (e.g., 256→1000), first/last bins may be slightly more inclusive than a full-file resample, but never underrepresent peaks.
