@@ -694,7 +694,7 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('play() enables Transport loop regardless of starting position', () => {
+    it('play() enables Transport loop when starting before loopEnd', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
@@ -704,10 +704,26 @@ describe('PlaylistEngine', () => {
       engine.setLoopEnabled(true);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
-      // Start at 5.0 — outside the loop region, but Transport loop is still enabled.
-      // Transport handles wrapping at loopEnd naturally.
-      engine.play(5.0);
+      // Start at 0 — before loop region, but before loopEnd.
+      // Transport plays through to loopEnd, then wraps to loopStart.
+      engine.play(0);
       expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 3.0);
+      engine.dispose();
+    });
+
+    it('play() disables Transport loop when starting at or past loopEnd', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
+      engine.setLoopRegion(1.0, 3.0);
+      engine.setLoopEnabled(true);
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      // Start at 5.0 — past loopEnd, plays to the end without looping
+      engine.play(5.0);
+      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
       engine.dispose();
     });
 
@@ -769,7 +785,7 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('setLoopEnabled(true) during playback always activates Transport loop', () => {
+    it('setLoopEnabled(true) during playback does not activate when past loopEnd', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
@@ -777,8 +793,25 @@ describe('PlaylistEngine', () => {
       ]);
       engine.setLoopRegion(1.0, 3.0);
       engine.play(0);
-      // Even when position is past loop end, enabling loop activates Transport loop
+      // Position is past loopEnd — enabling loop should NOT activate Transport loop
       (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(5.0);
+      (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
+
+      engine.setLoopEnabled(true);
+      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 3.0);
+      engine.dispose();
+    });
+
+    it('setLoopEnabled(true) during playback activates when before loopEnd', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 441000 })]),
+      ]);
+      engine.setLoopRegion(1.0, 3.0);
+      engine.play(0);
+      // Position is before loopEnd — enabling loop should activate Transport loop
+      (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(2.0);
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
       engine.setLoopEnabled(true);
@@ -786,7 +819,7 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('setLoopRegion() during playback with loop enabled always activates Transport loop', () => {
+    it('setLoopRegion() during playback does not activate when past new loopEnd', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter });
       engine.setTracks([
@@ -799,7 +832,7 @@ describe('PlaylistEngine', () => {
       (adapter.setLoop as ReturnType<typeof vi.fn>).mockClear();
 
       engine.setLoopRegion(1.0, 4.0);
-      expect(adapter.setLoop).toHaveBeenCalledWith(true, 1.0, 4.0);
+      expect(adapter.setLoop).toHaveBeenCalledWith(false, 1.0, 4.0);
       engine.dispose();
     });
 

@@ -298,7 +298,10 @@ export class PlaylistEngine {
         // Disable Transport loop for duration-limited playback (selection/annotation)
         this._adapter.setLoop(false, this._loopStart, this._loopEnd);
       } else if (this._isLoopEnabled) {
-        this._adapter.setLoop(true, this._loopStart, this._loopEnd);
+        // Activate Transport loop if starting before loopEnd. Starting at or
+        // past loopEnd plays to the end without looping (click-past-loop behavior).
+        const beforeLoopEnd = this._currentTime < this._loopEnd;
+        this._adapter.setLoop(beforeLoopEnd, this._loopStart, this._loopEnd);
       }
       try {
         this._adapter.play(this._currentTime, endTime);
@@ -378,14 +381,22 @@ export class PlaylistEngine {
     if (s === this._loopStart && e === this._loopEnd) return;
     this._loopStart = s;
     this._loopEnd = e;
-    this._adapter?.setLoop(this._isLoopEnabled, this._loopStart, this._loopEnd);
+    this._adapter?.setLoop(
+      this._isLoopEnabled && this._isBeforeLoopEnd(),
+      this._loopStart,
+      this._loopEnd
+    );
     this._emitStateChange();
   }
 
   setLoopEnabled(enabled: boolean): void {
     if (enabled === this._isLoopEnabled) return;
     this._isLoopEnabled = enabled;
-    this._adapter?.setLoop(enabled, this._loopStart, this._loopEnd);
+    this._adapter?.setLoop(
+      enabled && this._isBeforeLoopEnd(),
+      this._loopStart,
+      this._loopEnd
+    );
     this._emitStateChange();
   }
 
@@ -488,6 +499,17 @@ export class PlaylistEngine {
         }
       }
     }
+  }
+
+  /**
+   * Returns whether the current playback position is before loopEnd.
+   * Used by setLoopEnabled/setLoopRegion during playback — if past loopEnd,
+   * Transport loop stays off so playback continues to the end.
+   */
+  private _isBeforeLoopEnd(): boolean {
+    if (!this._isPlaying) return true;
+    const t = this._adapter?.getCurrentTime() ?? this._currentTime;
+    return t < this._loopEnd;
   }
 
   private _emitStateChange(): void {
