@@ -111,8 +111,8 @@ export interface ChannelProps {
   transparentBackground?: boolean;
   /**
    * Drawing mode:
-   * - 'inverted': Draw waveOutlineColor where there's NO audio (current default). Good for gradient bars.
-   * - 'normal': Draw waveFillColor where there IS audio. Good for gradient backgrounds.
+   * - 'inverted': Canvas draws waveOutlineColor where there's NO audio, revealing waveFillColor background as bars (default). Good for gradient bars.
+   * - 'normal': Canvas draws waveFillColor where there IS audio. Use with transparentBackground for progress overlays.
    */
   drawMode?: WaveformDrawMode;
 }
@@ -170,13 +170,10 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         }
         ctx.fillStyle = createCanvasFillStyle(ctx, fillColor, canvasWidth, waveHeight);
 
-        // Calculate where bars should be drawn in this canvas
         const canvasStartGlobal = globalPixelOffset;
         const canvasEndGlobal = globalPixelOffset + canvasWidth;
-
         const firstBarGlobal = calculateFirstBarPosition(canvasStartGlobal, barWidth, step);
 
-        // Draw bars at the correct positions
         for (
           let barGlobal = Math.max(0, firstBarGlobal);
           barGlobal < canvasEndGlobal;
@@ -234,9 +231,8 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   });
 
   // Background color depends on draw mode:
-  // Visual result is always: waveOutlineColor = bars, waveFillColor = background
-  // - normal: waveFillColor is background, canvas draws waveOutlineColor bars on top
-  // - inverted: waveFillColor is background, canvas masks with it to reveal waveOutlineColor (bars)
+  // - inverted: waveFillColor background, canvas masks non-audio areas with waveOutlineColor
+  // - normal: waveFillColor background, canvas draws waveFillColor at audio peaks (use with transparentBackground)
   const bgColor = waveFillColor;
   const backgroundCss = transparentBackground ? 'transparent' : waveformColorToCss(bgColor);
 

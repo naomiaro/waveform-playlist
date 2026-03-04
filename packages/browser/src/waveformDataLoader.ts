@@ -132,8 +132,8 @@ export function extractPeaksFromWaveformData(
 ): { data: Int8Array | Int16Array; bits: 8 | 16; length: number } {
   let processedData = waveformData;
 
-  // Resample to target scale first, then slice — this ensures resampled bin
-  // boundaries match full-file resampling regardless of clip offset.
+  // Slice at aligned source indices, then resample — aligned boundaries
+  // ensure resampled bins match full-file resampling regardless of clip offset.
   if (offsetSamples !== undefined && durationSamples !== undefined) {
     if (processedData.scale !== samplesPerPixel) {
       const sourceScale = waveformData.scale;
@@ -141,17 +141,21 @@ export function extractPeaksFromWaveformData(
 
       // Compute clip's pixel range in target-scale bins
       const targetStart = Math.floor(offsetSamples / samplesPerPixel);
-      const targetEnd = Math.ceil(
-        (offsetSamples + durationSamples) / samplesPerPixel
-      );
+      const targetEnd = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
 
-      // Convert to aligned source indices. targetStart * ratio is always a
-      // multiple of ratio, so the resampler's bin boundaries match the full file.
-      const sourceStart = Math.round(targetStart * ratio);
-      const sourceEnd = Math.min(
-        waveformData.length,
-        Math.round(targetEnd * ratio)
-      );
+      // Convert to source indices using floor/ceil for inclusive slicing.
+      // For integer ratios (power-of-two scales), this gives exact alignment.
+      // For non-integer ratios, floor/ceil ensures we always include all source
+      // bins that contribute to the target bins — never underrepresenting peaks.
+      const sourceStart = Math.floor(targetStart * ratio);
+      const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
+
+      if (sourceStart >= sourceEnd) {
+        // Clip offset is beyond the waveform data — return empty peaks
+        const bits = waveformData.bits as 8 | 16;
+        const emptyPeaks = bits === 8 ? new Int8Array(0) : new Int16Array(0);
+        return { data: emptyPeaks, bits, length: 0 };
+      }
 
       processedData = processedData.slice({
         startIndex: sourceStart,
@@ -161,9 +165,7 @@ export function extractPeaksFromWaveformData(
     } else {
       // No resampling needed — slice directly at base scale
       const startIndex = Math.floor(offsetSamples / samplesPerPixel);
-      const endIndex = Math.ceil(
-        (offsetSamples + durationSamples) / samplesPerPixel
-      );
+      const endIndex = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
       processedData = processedData.slice({ startIndex, endIndex });
     }
   } else if (processedData.scale !== samplesPerPixel) {
@@ -210,8 +212,8 @@ export function extractPeaksFromWaveformDataFull(
 ): PeakData {
   let processedData = waveformData;
 
-  // Resample to target scale first, then slice — this ensures resampled bin
-  // boundaries match full-file resampling regardless of clip offset.
+  // Slice at aligned source indices, then resample — aligned boundaries
+  // ensure resampled bins match full-file resampling regardless of clip offset.
   if (offsetSamples !== undefined && durationSamples !== undefined) {
     if (processedData.scale !== samplesPerPixel) {
       const sourceScale = waveformData.scale;
@@ -219,17 +221,20 @@ export function extractPeaksFromWaveformDataFull(
 
       // Compute clip's pixel range in target-scale bins
       const targetStart = Math.floor(offsetSamples / samplesPerPixel);
-      const targetEnd = Math.ceil(
-        (offsetSamples + durationSamples) / samplesPerPixel
-      );
+      const targetEnd = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
 
-      // Convert to aligned source indices. targetStart * ratio is always a
-      // multiple of ratio, so the resampler's bin boundaries match the full file.
-      const sourceStart = Math.round(targetStart * ratio);
-      const sourceEnd = Math.min(
-        waveformData.length,
-        Math.round(targetEnd * ratio)
-      );
+      // Convert to source indices using floor/ceil for inclusive slicing.
+      // For integer ratios (power-of-two scales), this gives exact alignment.
+      // For non-integer ratios, floor/ceil ensures we always include all source
+      // bins that contribute to the target bins — never underrepresenting peaks.
+      const sourceStart = Math.floor(targetStart * ratio);
+      const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
+
+      if (sourceStart >= sourceEnd) {
+        // Clip offset is beyond the waveform data — return empty peaks
+        const bits = waveformData.bits as 8 | 16;
+        return { length: 0, data: [], bits };
+      }
 
       processedData = processedData.slice({
         startIndex: sourceStart,
@@ -238,9 +243,7 @@ export function extractPeaksFromWaveformDataFull(
       processedData = processedData.resample({ scale: samplesPerPixel });
     } else {
       const startIndex = Math.floor(offsetSamples / samplesPerPixel);
-      const endIndex = Math.ceil(
-        (offsetSamples + durationSamples) / samplesPerPixel
-      );
+      const endIndex = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
       processedData = processedData.slice({ startIndex, endIndex });
     }
   } else if (processedData.scale !== samplesPerPixel) {

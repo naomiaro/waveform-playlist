@@ -213,7 +213,7 @@ describe('calculateFirstBarPosition', () => {
     expect(result).toBe(50);
   });
 
-  it('can return negative values when bar extends into canvas from before', () => {
+  it('returns 0 when bar from origin could extend into canvas start', () => {
     // step=10, canvas starts at 3, barWidth=5
     // (3 - 5 + 10) / 10 = 8/10 = 0.8 → floor = 0 → 0
     expect(calculateFirstBarPosition(3, 5, 10)).toBe(0);

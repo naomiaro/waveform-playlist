@@ -5,6 +5,7 @@
 **Pattern:** Extract complex logic into reusable custom hooks.
 
 **Key Hooks:**
+
 - `useClipDragHandlers` - Drag-to-move and boundary trimming
 - `useClipSplitting` - Split clips at playhead
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
@@ -29,6 +30,7 @@
 **Categories:** Reverb (3), Delay (2), Modulation (5), Filter (3), Distortion (3), Dynamics (3), Spatial (1)
 
 **Key Files:**
+
 - `src/effects/effectDefinitions.ts` - All effect metadata and parameters
 - `src/effects/effectFactory.ts` - Creates effect instances
 - `src/hooks/useDynamicEffects.ts` - Master chain management
@@ -47,6 +49,7 @@
 **Decision:** Centralize requestAnimationFrame lifecycle logic in a shared hook used by both playlist providers.
 
 **Implementation:**
+
 - Hook: `src/hooks/useAnimationFrameLoop.ts`
 - Exported from: `src/hooks/index.ts`
 - Integrated into:
@@ -54,6 +57,7 @@
   - `src/MediaElementPlaylistContext.tsx`
 
 **Why:**
+
 - Removes duplicated `requestAnimationFrame` / `cancelAnimationFrame` logic across providers
 - Ensures a single in-flight animation frame per provider
 - Standardizes cleanup on unmount and playback transitions
@@ -63,6 +67,7 @@
 **Decision:** Generate `WaveformData` in a web worker at load time, then use `resample()` for near-instant zoom changes.
 
 **Key files:**
+
 - `src/workers/peaksWorker.ts` — Inline Blob worker (portable across bundlers)
 - `src/hooks/useWaveformDataCache.ts` — Cache hook, watches tracks for clips with `audioBuffer` but no `waveformData`
 - `src/waveformDataLoader.ts` — `extractPeaksFromWaveformDataFull()` for resample + channel extraction
@@ -74,6 +79,7 @@
 ## Playlist Loading Detection
 
 Three approaches for detecting when tracks finish loading:
+
 1. **Data Attribute** — `[data-playlist-state="ready"]` for CSS and E2E tests (Playwright `waitForSelector`)
 2. **Custom Event** — `waveform-playlist:ready` (CustomEvent with `trackCount`, `duration`) for external integrations
 3. **React Hook** — `isReady` from `usePlaylistData()` for internal components
@@ -116,6 +122,7 @@ const rebuildChain = useCallback(() => {
 **Pattern:** Engine owns state → emits `statechange` → hook's `onEngineState()` mirrors into useState/refs.
 
 **All engine-owned state uses the `onEngineState()` hook pattern:**
+
 - `useSelectionState` — selectionStart, selectionEnd
 - `useLoopState` — isLoopEnabled, loopStart, loopEnd
 - `useSelectedTrack` — selectedTrackId
@@ -127,6 +134,7 @@ const rebuildChain = useCallback(() => {
 **Subscription location:** Inside `loadAudio()` after `engineRef.current = engine`, the statechange handler calls each hook's `onEngineState(state)`.
 
 **Seed on rebuild:** When `loadAudio()` creates a fresh engine, seed it from hook-exposed refs before `setTracks()` — otherwise the first statechange resets user state to defaults. **Checklist** (update when adding engine-owned state):
+
 - `engine.setSelection(selectionStartRef.current ?? 0, selectionEndRef.current ?? 0)`
 - `engine.setLoopRegion(loopStartRef.current ?? 0, loopEndRef.current ?? 0)`
 - `if (isLoopEnabledRef.current) engine.setLoopEnabled(true)`
@@ -168,18 +176,29 @@ const rebuildChain = useCallback(() => {
 **Why:** WaveformData.resample() groups N consecutive source bins per output bin (N = targetScale/sourceScale). If the slice starts at a non-aligned index, output bins cover different source samples than a full-file resample would, causing zoom-dependent peak amplitude.
 
 **Pattern (in both `extractPeaksFromWaveformData` and `extractPeaksFromWaveformDataFull`):**
+
 ```typescript
 const ratio = samplesPerPixel / sourceScale;
 const targetStart = Math.floor(offsetSamples / samplesPerPixel);
 const targetEnd = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
-const sourceStart = Math.round(targetStart * ratio); // Aligned to ratio
-const sourceEnd = Math.round(targetEnd * ratio);     // Aligned to ratio
+const sourceStart = Math.floor(targetStart * ratio); // Inclusive start
+const sourceEnd = Math.ceil(targetEnd * ratio); // Inclusive end
 // slice(sourceStart, sourceEnd) → resample(targetScale)
 ```
 
-**Key invariant:** `sourceStart` is always a multiple of `ratio`, so resampled bin boundaries match the full file.
+**Key invariant:** Floor/ceil slicing ensures all source bins contributing to target bins are included. For integer ratios (power-of-two scales like 256→1024), this gives exact bin-boundary alignment. For non-integer ratios (e.g., 256→1000), first/last bins may be slightly more inclusive than a full-file resample, but never underrepresent peaks.
+
+**Why floor/ceil, not round:** `Math.round` can exclude a partial source bin at either boundary, underrepresenting peaks. `Math.floor` (start) and `Math.ceil` (end) are consistently inclusive — they may include one extra source bin, but the resampler's min/max aggregation makes this the safe direction for waveform visualization. Non-integer ratios are common (default `samplesPerPixel=1000` with `baseScale=256` gives ratio 3.90625).
 
 **Mono merge:** Uses weighted averaging (same as `makeMono` in webaudio-peaks). This is consistent across both packages — do not change to min/max without updating both.
+
+## Unit Tests
+
+**Setup:** `vitest` in devDependencies, `vitest.config.ts` (node environment).
+
+**Run:** `cd packages/browser && npx vitest run`
+
+**Test helper:** `WaveformData.create()` requires JSON with `{ version: 2, channels: 1, sample_rate, samples_per_pixel, bits, length, data }` — omitting `version`/`channels` causes a TypeScript error.
 
 ## Important Patterns (Browser-Specific)
 

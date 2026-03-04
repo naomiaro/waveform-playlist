@@ -274,27 +274,31 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
   // Generate peaks from waveform data
   useEffect(() => {
-    const extractedPeaks = extractPeaksFromWaveformData(
-      track.waveformData as WaveformData,
-      samplesPerPixel,
-      0, // channel index
-      0, // offset
-      Math.ceil(track.waveformData.duration * sampleRate) // duration in samples
-    );
+    try {
+      const extractedPeaks = extractPeaksFromWaveformData(
+        track.waveformData as WaveformData,
+        samplesPerPixel,
+        0, // channel index
+        0, // offset
+        Math.ceil(track.waveformData.duration * sampleRate) // duration in samples
+      );
 
-    const clipPeaks: ClipPeaks = {
-      clipId: 'media-element-clip',
-      trackName: track.name ?? 'Track',
-      peaks: {
-        length: extractedPeaks.length,
-        data: [extractedPeaks.data],
-        bits: extractedPeaks.bits,
-      } as PeakData,
-      startSample: 0,
-      durationSamples: Math.ceil(track.waveformData.duration * sampleRate),
-    };
+      const clipPeaks: ClipPeaks = {
+        clipId: 'media-element-clip',
+        trackName: track.name ?? 'Track',
+        peaks: {
+          length: extractedPeaks.length,
+          data: [extractedPeaks.data],
+          bits: extractedPeaks.bits,
+        } as PeakData,
+        startSample: 0,
+        durationSamples: Math.ceil(track.waveformData.duration * sampleRate),
+      };
 
-    setPeaksDataArray([[clipPeaks]]);
+      setPeaksDataArray([[clipPeaks]]);
+    } catch (err) {
+      console.warn('[waveform-playlist] Failed to extract peaks from waveform data:', err);
+    }
   }, [track.waveformData, track.name, samplesPerPixel, sampleRate]);
 
   // Animation loop

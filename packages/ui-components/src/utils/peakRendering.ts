@@ -3,7 +3,13 @@ import type { WaveformDrawMode } from '../wfpl-theme';
 
 /**
  * Result of aggregating peaks over a range.
- * Values are normalized to [-1, 1] by dividing by maxValue (2^(bits-1)).
+ *
+ * Invariants (enforced by aggregatePeaks()):
+ * - min and max are normalized to [-1, 1] by dividing by 2^(bits-1)
+ * - min <= max (min-of-mins, max-of-maxes)
+ * - Values are finite (derived from integer typed arrays)
+ *
+ * Construct via aggregatePeaks() — do not create directly.
  */
 export interface AggregatedPeak {
   min: number;
@@ -11,7 +17,8 @@ export interface AggregatedPeak {
 }
 
 /**
- * Canvas fillRect parameters.
+ * Canvas fillRect parameters for a single waveform bar.
+ * width >= 0 and height >= 0 by construction (from calculateBarRects).
  */
 export interface BarRect {
   x: number;
@@ -98,7 +105,7 @@ export function calculateBarRects(
  * @param canvasStartGlobal - Global pixel offset of the canvas chunk
  * @param barWidth - Width of each bar in pixels
  * @param step - Bar stride (barWidth + barGap)
- * @returns The first bar's global position (may be negative; caller should clamp to 0)
+ * @returns The first bar's global position (always >= 0 when step >= barWidth; caller clamps to 0)
  */
 export function calculateFirstBarPosition(
   canvasStartGlobal: number,

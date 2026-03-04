@@ -172,7 +172,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **TypeScript check**: `pnpm typecheck` (enforced in build scripts)
 - **Lint**: `pnpm lint` - ESLint across all packages. **Always run before committing.** This is a root-only script; run from repo root or use `pnpm -w lint`.
 - **Dev server**: `pnpm --filter website start` - Docusaurus dev server
-- **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components)
+- **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
 
 **CI Validation:** `.github/workflows/ci.yml` runs on PRs to `main`: build, lint, and `prettier --check`. Format code with `pnpm format` before pushing.
@@ -334,7 +334,7 @@ const LazyExample = createLazyExample(() =>
 16. **Copy Refs in useEffect Body** - When accessing a ref in `useEffect` cleanup, copy `.current` to a local variable inside the effect body. ESLint's `react-hooks/exhaustive-deps` rule flags refs that may change between render and cleanup.
 17. **Refs from Custom Hooks in Dep Arrays** - When a `useRef` is returned from a custom hook, ESLint's `exhaustive-deps` can't trace its stability. Include it in the dep array (harmless, never triggers) rather than using `eslint-disable-next-line` which would mask real missing dependencies.
 18. **Engine State Ownership** — Engine owns selection, loop, selectedTrackId, zoom (samplesPerPixel, canZoomIn, canZoomOut), and masterVolume; React subscribes to statechange. Engine setters normalize invariants (start <= end). All engine-owned state uses the `onEngineState()` hook pattern: `useSelectionState`, `useLoopState`, `useSelectedTrack`, `useZoomControls`, `useMasterVolume`. Each hook delegates mutations to engine methods and exposes `onEngineState()` for the provider's statechange handler.
-19. **Render-Phase Guards ≠ Effect Dependencies** — Derived booleans computed during render (e.g., `isEngineTracks = tracks === engineTracksRef.current`) that are read inside effect bodies as guards should NOT be in the effect's dep array. They flip between renders (e.g., true→false after clearing the ref), causing spurious re-runs. Read them inside the effect body; depend only on the source data (`tracks`). When the same guard also needs to be visible to the *previous* effect's cleanup, store it in a ref during render (as with `skipEngineDisposeRef`).
+19. **Render-Phase Guards ≠ Effect Dependencies** — Derived booleans computed during render (e.g., `isEngineTracks = tracks === engineTracksRef.current`) that are read inside effect bodies as guards should NOT be in the effect's dep array. They flip between renders (e.g., true→false after clearing the ref), causing spurious re-runs. Read them inside the effect body; depend only on the source data (`tracks`). When the same guard also needs to be visible to the _previous_ effect's cleanup, store it in a ref during render (as with `skipEngineDisposeRef`).
 
 ---
 
