@@ -161,6 +161,10 @@ export function useWaveformDataCache(
 
     return () => {
       cancelled = true;
+      inflightByBufferRef.current = new WeakMap();
+      subscribersByBufferRef.current = new WeakMap();
+      pendingCountRef.current = 0;
+      setIsGenerating(false);
     };
   }, [tracks, baseScale, getWorker]);
 
