@@ -7,8 +7,9 @@
  *
  * Behavior:
  * - Creates the worker lazily on first clip needing generation
- * - Tracks submitted clip IDs via ref to avoid duplicate worker jobs
- * - Uses a cancelled flag to ignore responses after effect cleanup
+ * - Generates waveform data once per unique AudioBuffer
+ * - Fans out cached/generated waveform data to all clips sharing that buffer
+ * - Uses a cancelled flag to ignore state updates after effect cleanup
  * - Terminates the worker on unmount
  */
 
@@ -30,7 +31,9 @@ export function useWaveformDataCache(
   const [isGenerating, setIsGenerating] = useState(false);
 
   const workerRef = useRef<PeaksWorkerApi | null>(null);
-  const submittedRef = useRef<Set<string>>(new Set());
+  const generatedByBufferRef = useRef<WeakMap<AudioBuffer, WaveformData>>(new WeakMap());
+  const inflightByBufferRef = useRef<WeakMap<AudioBuffer, Promise<void>>>(new WeakMap());
+  const subscribersByBufferRef = useRef<WeakMap<AudioBuffer, Set<string>>>(new WeakMap());
   const pendingCountRef = useRef(0);
 
   // Stable callback to get or create the worker
@@ -43,46 +46,76 @@ export function useWaveformDataCache(
 
   useEffect(() => {
     let cancelled = false;
-    const submitted = submittedRef.current;
-
-    // Find clips that have audioBuffer but no waveformData and haven't been submitted
-    const clipsToProcess: { clipId: string; audioBuffer: AudioBuffer }[] = [];
+    const generatedByBuffer = generatedByBufferRef.current;
+    const inflightByBuffer = inflightByBufferRef.current;
+    const subscribersByBuffer = subscribersByBufferRef.current;
+    const immediateAssignments: Array<{ clipId: string; waveformData: WaveformData }> = [];
+    const buffersToProcess = new Map<AudioBuffer, Set<string>>();
 
     for (const track of tracks) {
       for (const clip of track.clips) {
-        if (clip.audioBuffer && !clip.waveformData && !submitted.has(clip.id)) {
-          clipsToProcess.push({
+        if (!clip.audioBuffer || clip.waveformData) {
+          continue;
+        }
+
+        const existingWaveformData = generatedByBuffer.get(clip.audioBuffer);
+        if (existingWaveformData) {
+          immediateAssignments.push({
             clipId: clip.id,
-            audioBuffer: clip.audioBuffer,
+            waveformData: existingWaveformData,
           });
+          continue;
+        }
+
+        if (inflightByBuffer.get(clip.audioBuffer)) {
+          const existingSubscribers = subscribersByBuffer.get(clip.audioBuffer);
+          if (existingSubscribers) {
+            existingSubscribers.add(clip.id);
+          } else {
+            subscribersByBuffer.set(clip.audioBuffer, new Set([clip.id]));
+          }
+          continue;
+        }
+
+        const clipsForBuffer = buffersToProcess.get(clip.audioBuffer);
+        if (clipsForBuffer) {
+          clipsForBuffer.add(clip.id);
+        } else {
+          buffersToProcess.set(clip.audioBuffer, new Set([clip.id]));
         }
       }
     }
 
-    if (clipsToProcess.length === 0) return;
-
-    // Mark all as submitted before starting async work
-    const submittedThisRun = new Set<string>();
-    for (const { clipId } of clipsToProcess) {
-      submitted.add(clipId);
-      submittedThisRun.add(clipId);
+    if (immediateAssignments.length > 0) {
+      setCache((prev) => {
+        const next = new Map(prev);
+        for (const assignment of immediateAssignments) {
+          next.set(assignment.clipId, assignment.waveformData);
+        }
+        return next;
+      });
     }
 
-    pendingCountRef.current += clipsToProcess.length;
+    if (buffersToProcess.size === 0) return;
+
+    pendingCountRef.current += buffersToProcess.size;
     setIsGenerating(true);
 
     const worker = getWorker();
 
-    for (const { clipId, audioBuffer } of clipsToProcess) {
+    for (const [audioBuffer, clipIds] of buffersToProcess) {
+      subscribersByBuffer.set(audioBuffer, new Set(clipIds));
+
       // .slice() channel buffers to avoid detaching the original AudioBuffer views
       const channels: ArrayBuffer[] = [];
       for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
-        channels.push(audioBuffer.getChannelData(c).slice().buffer);
+        channels.push(audioBuffer.getChannelData(c).slice().buffer as ArrayBuffer);
       }
 
-      worker
+      const id = `buffer-${Math.random().toString(36).slice(2, 11)}`;
+      const job = worker
         .generate({
-          id: clipId,
+          id,
           channels,
           length: audioBuffer.length,
           sampleRate: audioBuffer.sampleRate,
@@ -91,11 +124,17 @@ export function useWaveformDataCache(
           splitChannels: true,
         })
         .then((waveformData) => {
+          generatedByBuffer.set(audioBuffer, waveformData);
+          const subscribers = subscribersByBuffer.get(audioBuffer) ?? new Set<string>();
+          subscribersByBuffer.delete(audioBuffer);
+          inflightByBuffer.delete(audioBuffer);
           if (cancelled) return;
 
           setCache((prev) => {
             const next = new Map(prev);
-            next.set(clipId, waveformData);
+            for (const clipId of subscribers) {
+              next.set(clipId, waveformData);
+            }
             return next;
           });
 
@@ -106,27 +145,23 @@ export function useWaveformDataCache(
           }
         })
         .catch((err) => {
+          subscribersByBuffer.delete(audioBuffer);
+          inflightByBuffer.delete(audioBuffer);
           if (cancelled) return;
           console.warn('[waveform-playlist] Worker peak generation failed:', err);
-          // Remove from submitted so it can be retried on next effect run
-          submitted.delete(clipId);
           pendingCountRef.current--;
           if (pendingCountRef.current <= 0) {
             pendingCountRef.current = 0;
             setIsGenerating(false);
           }
         });
+
+      inflightByBuffer.set(audioBuffer, job);
     }
 
     return () => {
       cancelled = true;
-      // Clear IDs submitted by this effect run so they can be resubmitted
-      // if the effect re-runs with new deps (e.g., tracks changed)
-      for (const clipId of submittedThisRun) {
-        submitted.delete(clipId);
-      }
     };
-    // submittedRef guards against duplicate submissions — no need for cache in deps
   }, [tracks, baseScale, getWorker]);
 
   // Terminate worker on unmount
