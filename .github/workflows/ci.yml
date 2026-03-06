@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -28,3 +28,38 @@ jobs:
 
       - name: Lint and check formatting
         run: pnpm lint
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        react-version: [18, 19]
+    name: Unit Tests (React ${{ matrix.react-version }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Override React version
+        if: matrix.react-version == 19
+        run: |
+          pnpm add -Dw react@^19.0.0 react-dom@^19.0.0 @types/react@^19.0.0 @types/react-dom@^19.0.0
+          pnpm add -D --filter @waveform-playlist/browser react@^19.0.0 react-dom@^19.0.0 @types/react@^19.0.0 @types/react-dom@^19.0.0
+          pnpm add -D --filter @waveform-playlist/ui-components react@^19.0.0 react-dom@^19.0.0 @types/react@^19.0.0 @types/react-dom@^19.0.0
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run unit tests
+        run: pnpm test:unit

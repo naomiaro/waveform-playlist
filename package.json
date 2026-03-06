@@ -18,6 +18,7 @@
     "format:check": "prettier --check \"packages/**/src/**/*.{ts,tsx}\"",
     "lint": "prettier --check \"packages/**/src/**/*.{ts,tsx}\" && eslint \"packages/**/src/**/*.{ts,tsx}\"",
     "website": "pnpm --filter website start",
+    "test:unit": "pnpm -r --filter './packages/*' --if-present run test",
     "website:build": "pnpm --filter website build",
     "version:bump": "node scripts/bump-version.js"
   },
