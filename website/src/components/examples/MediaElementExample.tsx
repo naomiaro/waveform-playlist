@@ -9,18 +9,36 @@ import {
   loadWaveformData,
   MediaElementWaveform,
 } from '@waveform-playlist/browser';
+import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
-// Audio file with pre-computed peaks
-const AUDIO_CONFIG = {
-  name: 'Bass',
-  audioSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-  peaksSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.dat',
-};
+// Audio files with pre-computed peaks
+const AUDIO_CONFIGS = [
+  {
+    name: 'Bass',
+    audioSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+    peaksSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.dat',
+  },
+  {
+    name: 'Kick',
+    audioSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+    peaksSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.dat',
+  },
+];
 
 const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
+`;
+
+const Section = styled.div`
+  margin-bottom: 2rem;
+`;
+
+const SectionLabel = styled.h3`
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  color: var(--ifm-font-color-secondary, #666);
 `;
 
 const Controls = styled.div`
@@ -154,24 +172,28 @@ function PlaybackControls() {
  * Demonstrates the MediaElementPlaylistProvider for single-track playback
  * with pitch-preserving playback rate control.
  *
- * Key features:
- * - HTMLAudioElement playback (no Tone.js required)
- * - Playback rate 0.5x - 2.0x with pitch preservation
- * - Pre-computed peaks for instant waveform display
- * - Simpler API than full WaveformPlaylistProvider
+ * Shows two independent players:
+ * 1. Default playhead (simple vertical line)
+ * 2. Custom playhead with triangle marker (PlayheadWithMarker)
  */
 export function MediaElementExample() {
   const { theme } = useDocusaurusTheme();
-  const [waveformData, setWaveformData] = useState<any>(null);
+  const [waveformDataMap, setWaveformDataMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load BBC peaks file
+  // Load BBC peaks files for both tracks
   useEffect(() => {
-    const loadPeaks = async () => {
+    const loadAllPeaks = async () => {
       try {
-        const data = await loadWaveformData(AUDIO_CONFIG.peaksSrc);
-        setWaveformData(data);
+        const results = await Promise.all(
+          AUDIO_CONFIGS.map(config => loadWaveformData(config.peaksSrc))
+        );
+        const map: Record<string, any> = {};
+        AUDIO_CONFIGS.forEach((config, i) => {
+          map[config.name] = results[i];
+        });
+        setWaveformDataMap(map);
         setLoading(false);
       } catch (err) {
         console.error('Error loading peaks:', err);
@@ -180,18 +202,21 @@ export function MediaElementExample() {
       }
     };
 
-    loadPeaks();
+    loadAllPeaks();
   }, []);
 
-  // Build track config
-  const trackConfig = useMemo(() => {
-    if (!waveformData) return null;
-    return {
-      source: AUDIO_CONFIG.audioSrc,
-      waveformData,
-      name: AUDIO_CONFIG.name,
-    };
-  }, [waveformData]);
+  // Build track configs
+  const trackConfigs = useMemo(() => {
+    return AUDIO_CONFIGS.map(config => {
+      const data = waveformDataMap[config.name];
+      if (!data) return null;
+      return {
+        source: config.audioSrc,
+        waveformData: data,
+        name: config.name,
+      };
+    });
+  }, [waveformDataMap]);
 
   if (loading) {
     return (
@@ -203,11 +228,11 @@ export function MediaElementExample() {
     );
   }
 
-  if (error || !trackConfig) {
+  if (error) {
     return (
       <Container>
         <div style={{ padding: '2rem', color: 'red' }}>
-          Error: {error || 'Failed to create track config'}
+          Error: {error}
         </div>
       </Container>
     );
@@ -215,17 +240,40 @@ export function MediaElementExample() {
 
   return (
     <Container>
-      <MediaElementPlaylistProvider
-        track={trackConfig}
-        samplesPerPixel={512}
-        waveHeight={120}
-        theme={theme}
-        barWidth={2}
-        barGap={0}
-      >
-        <PlaybackControls />
-        <MediaElementWaveform />
-      </MediaElementPlaylistProvider>
+      {trackConfigs[0] && (
+        <Section>
+          <SectionLabel>Default Playhead</SectionLabel>
+          <MediaElementPlaylistProvider
+            track={trackConfigs[0]}
+            samplesPerPixel={512}
+            waveHeight={120}
+            theme={theme}
+            barWidth={2}
+            barGap={0}
+          >
+            <PlaybackControls />
+            <MediaElementWaveform />
+          </MediaElementPlaylistProvider>
+        </Section>
+      )}
+
+      {trackConfigs[1] && (
+        <Section>
+          <SectionLabel>Custom Playhead (PlayheadWithMarker) + Timescale</SectionLabel>
+          <MediaElementPlaylistProvider
+            track={trackConfigs[1]}
+            samplesPerPixel={512}
+            waveHeight={120}
+            theme={{ ...theme, playheadColor: '#00bcd4' }}
+            timescale
+            barWidth={2}
+            barGap={0}
+          >
+            <PlaybackControls />
+            <MediaElementWaveform renderPlayhead={PlayheadWithMarker} />
+          </MediaElementPlaylistProvider>
+        </Section>
+      )}
     </Container>
   );
 }

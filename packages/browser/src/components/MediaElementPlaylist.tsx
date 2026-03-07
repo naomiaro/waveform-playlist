@@ -12,6 +12,7 @@ import {
   useTheme,
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
+import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import type { Peaks } from '@waveform-playlist/core';
 import {
@@ -30,6 +31,36 @@ import type {
   OnAnnotationUpdateFn,
 } from '../types/annotations';
 
+/**
+ * Wrapper that isolates the custom playhead's hooks from MediaElementPlaylist.
+ * Calling renderPlayhead() as a function would merge its hooks into the parent,
+ * causing "Rendered more hooks" errors when renderPlayhead toggles.
+ */
+const CustomMediaElementPlayhead: React.FC<{
+  renderPlayhead: RenderPlayheadFunction;
+  color: string;
+  samplesPerPixel: number;
+  sampleRate: number;
+}> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
+  const { isPlaying, currentTimeRef } = useMediaElementAnimation();
+
+  return (
+    <>
+      {renderPlayhead({
+        position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
+        color,
+        isPlaying,
+        currentTimeRef,
+        playbackStartTimeRef: { current: 0 } as React.RefObject<number>,
+        audioStartPositionRef: { current: 0 } as React.RefObject<number>,
+        samplesPerPixel,
+        sampleRate,
+        controlsOffset: 0,
+      })}
+    </>
+  );
+};
+
 export interface MediaElementPlaylistProps {
   /** Custom function to generate the label shown on annotation boxes */
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
@@ -42,6 +73,8 @@ export interface MediaElementPlaylistProps {
    * Called with the full updated annotations array.
    */
   onAnnotationUpdate?: OnAnnotationUpdateFn;
+  /** Custom playhead render function. Receives position, color, and animation refs for smooth 60fps animation. */
+  renderPlayhead?: RenderPlayheadFunction;
   className?: string;
 }
 
@@ -62,6 +95,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   editable = false,
   linkEndpoints: linkEndpointsProp = false,
   onAnnotationUpdate,
+  renderPlayhead,
   className,
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
@@ -343,7 +377,16 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
                 color={theme.selectionColor}
               />
             )}
-            <AnimatedMediaElementPlayhead color={theme.playheadColor} />
+            {renderPlayhead ? (
+              <CustomMediaElementPlayhead
+                renderPlayhead={renderPlayhead}
+                color={theme.playheadColor}
+                samplesPerPixel={samplesPerPixel}
+                sampleRate={sampleRate}
+              />
+            ) : (
+              <AnimatedMediaElementPlayhead color={theme.playheadColor} />
+            )}
           </>
         </Playlist>
       </PlaylistInfoContext.Provider>

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { RenderAnnotationItemProps } from '@waveform-playlist/core';
+import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import { useMediaElementState } from '../MediaElementPlaylistContext';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 import { MediaElementPlaylist } from './MediaElementPlaylist';
@@ -32,6 +33,8 @@ export interface MediaElementWaveformProps {
   scrollActivePosition?: ScrollLogicalPosition;
   /** Which scrollable containers to scroll: 'nearest' (only the annotation list) or 'all' (including viewport). Defaults to 'nearest'. */
   scrollActiveContainer?: 'nearest' | 'all';
+  /** Custom playhead render function. Receives position, color, and animation refs for smooth 60fps animation. */
+  renderPlayhead?: RenderPlayheadFunction;
   className?: string;
 }
 
@@ -56,6 +59,7 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
   onAnnotationUpdate,
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
+  renderPlayhead,
   className,
 }) => {
   const { annotations } = useMediaElementState();
@@ -67,6 +71,7 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
         editable={editable}
         linkEndpoints={linkEndpoints}
         onAnnotationUpdate={onAnnotationUpdate}
+        renderPlayhead={renderPlayhead}
         className={className}
       />
       {annotations.length > 0 && (
