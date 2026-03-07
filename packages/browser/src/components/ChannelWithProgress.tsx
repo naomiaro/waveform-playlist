@@ -233,14 +233,14 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
             $color="#000"
             $height={halfHeight}
             $top={effectiveTop}
-            $width={clipPixelWidth}
+            $width={smartChannelProps.length}
           />
           {/* Waveform portion: themed background */}
           <Background
             $color={waveformBackgroundCss}
             $height={halfHeight}
             $top={effectiveTop + halfHeight}
-            $width={clipPixelWidth}
+            $width={smartChannelProps.length}
           />
         </>
       ) : (
@@ -248,7 +248,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
           $color={backgroundCss}
           $height={effectiveHeight}
           $top={effectiveTop}
-          $width={clipPixelWidth}
+          $width={smartChannelProps.length}
         />
       )}
       {/* Progress overlay - shows played portion with progress color (skip for piano-roll) */}
