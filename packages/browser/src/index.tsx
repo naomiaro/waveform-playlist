@@ -139,6 +139,13 @@ export {
 } from './SpectrogramIntegrationContext';
 export type { SpectrogramIntegration } from './SpectrogramIntegrationContext';
 
+// Export ClipInteractionProvider for encapsulated drag/trim/snap/collision setup
+export { ClipInteractionProvider } from './components/ClipInteractionProvider';
+export type {
+  ClipInteractionProviderProps,
+  ClipInteractionSnapMode,
+} from './components/ClipInteractionProvider';
+
 // Export modifiers and plugins for drag-and-drop
 export { ClipCollisionModifier } from './modifiers/ClipCollisionModifier';
 export { SnapToGridModifier } from './modifiers/SnapToGridModifier';
