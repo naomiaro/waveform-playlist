@@ -230,9 +230,9 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 ## Progress Overlay Width Invariant
 
-**Decision:** Progress overlay `$width` and `Background` `$width` use `clipPixelWidth()` from core, NOT `smartChannelProps.length` (peak data length).
+**Decision:** In `ChannelWithProgress`, `ProgressOverlay.$width` uses `clipPixelWidth()` from core, but `Background.$width` uses `smartChannelProps.length` (peak data length).
 
-**Why:** When a clip's configured duration exceeds the audio file length, `peaksData.length` is shorter than the clip container. Using it for the overlay causes `scaleX(ratio)` to scale a narrower element, making progress visually lag behind the playhead.
+**Why:** Background must match the canvas area — extending it to `clipPixelWidth` bleeds the waveform fill color into the gap between audio end and clip end (where the playlist background should show). ProgressOverlay must match the clip container — using `peaksData.length` causes `scaleX(ratio)` to scale a narrower element, making progress visually lag behind the playhead.
 
 ## Controls Offset Removed
 
