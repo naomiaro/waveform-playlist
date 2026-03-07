@@ -1,17 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   usePlaylistData,
-  usePlaylistControls,
-  useClipDragHandlers,
-  useDragSensors,
-  ClipCollisionModifier,
-  noDropAnimationPlugins,
+  ClipInteractionProvider,
   useClipSplitting,
   usePlaybackShortcuts,
   Waveform,
@@ -111,36 +105,9 @@ const trackConfigs = [
   },
 ];
 
-interface PlaylistWithDragProps {
-  tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
-  loading?: boolean;
-  loadedCount?: number;
-  totalCount?: number;
-}
-
-const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange, loading, loadedCount, totalCount }) => {
-  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
-  const { setSelectedTrackId } = usePlaylistControls();
-
-  const sensors = useDragSensors();
-  const { onDragStart: handleDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
-    tracks,
-    onTracksChange,
-    samplesPerPixel,
-    sampleRate,
-    engineRef: playoutRef,
-    isDraggingRef,
-  });
-
-  const onDragStart = (event: Parameters<typeof handleDragStart>[0]) => {
-    const trackIndex = event.operation?.source?.data?.trackIndex as number | undefined;
-    if (trackIndex !== undefined && tracks[trackIndex]) {
-      setSelectedTrackId(tracks[trackIndex].id);
-    }
-    handleDragStart(event);
-  };
-
+/** Inner component for keyboard shortcuts that require playlist context */
+const KeyboardShortcuts: React.FC<{ tracks: ClipTrack[] }> = ({ tracks }) => {
+  const { samplesPerPixel, sampleRate, playoutRef } = usePlaylistData();
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
     sampleRate,
@@ -148,7 +115,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     engineRef: playoutRef,
   });
 
-  // Enable default playback shortcuts (0 = rewind to start) plus split shortcut
   usePlaybackShortcuts({
     additionalShortcuts: [
       {
@@ -160,41 +126,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksCha
     ],
   });
 
-  return (
-    <DragDropProvider
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
-      plugins={noDropAnimationPlugins}
-    >
-      <Controls>
-        <ControlGroup>
-          <PlayButton />
-          <PauseButton />
-          <StopButton />
-          <LoopButton />
-          {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
-        </ControlGroup>
-        <ControlGroup>
-          <ZoomInButton />
-          <ZoomOutButton />
-        </ControlGroup>
-        <ControlGroup>
-          <AudioPosition />
-        </ControlGroup>
-        <ControlGroup>
-          <AutomaticScrollCheckbox />
-        </ControlGroup>
-        <ControlGroup>
-          <MasterVolumeControl />
-        </ControlGroup>
-      </Controls>
-
-      <Waveform showClipHeaders interactiveClips />
-    </DragDropProvider>
-  );
+  return null;
 };
 
 // Helper to get required file IDs for a track
@@ -318,7 +250,33 @@ export function MultiClipExample() {
       barWidth={4}
       barGap={0}
     >
-      <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} loading={loading} loadedCount={loadedCount} totalCount={audioFiles.length} />
+      <ClipInteractionProvider snapMode="off">
+        <KeyboardShortcuts tracks={tracks} />
+        <Controls>
+          <ControlGroup>
+            <PlayButton />
+            <PauseButton />
+            <StopButton />
+            <LoopButton />
+            {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+          </ControlGroup>
+          <ControlGroup>
+            <ZoomInButton />
+            <ZoomOutButton />
+          </ControlGroup>
+          <ControlGroup>
+            <AudioPosition />
+          </ControlGroup>
+          <ControlGroup>
+            <AutomaticScrollCheckbox />
+          </ControlGroup>
+          <ControlGroup>
+            <MasterVolumeControl />
+          </ControlGroup>
+        </Controls>
+
+        <Waveform showClipHeaders />
+      </ClipInteractionProvider>
     </WaveformPlaylistProvider>
   );
 }
