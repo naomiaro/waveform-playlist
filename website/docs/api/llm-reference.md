@@ -780,6 +780,22 @@ Error Handling: PlaylistErrorBoundary (from @waveform-playlist/ui-components)
 
 All button/control components connect to context automatically. No props required for basic usage. All accept `className` and `style`.
 
+### ClipInteractionProvider
+
+```typescript
+import { ClipInteractionProvider } from '@waveform-playlist/browser';
+
+type ClipInteractionSnapMode = 'beats' | 'temporal' | 'off';
+
+interface ClipInteractionProviderProps {
+  snapMode: ClipInteractionSnapMode;   // Required — snap behavior for clip moves
+  touchOptimized?: boolean;            // Default: false — 250ms delay activation for touch input
+  children: React.ReactNode;
+}
+```
+
+Declarative wrapper that encapsulates all clip drag/move/trim/snap/collision setup. Replaces manual `DragDropProvider` + `useClipDragHandlers` + `useDragSensors` + modifier configuration. When present, `interactiveClips` is auto-enabled on descendant `Waveform` components via `ClipInteractionContext`. Use `snapMode="beats"` with a `BeatsAndBarsProvider` ancestor for beat/bar snapping.
+
 ### PlaylistErrorBoundary
 
 ```typescript
