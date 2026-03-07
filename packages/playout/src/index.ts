@@ -4,8 +4,15 @@ export { MidiToneTrack } from './MidiToneTrack';
 export type { PlayableTrack, MidiClipInfo, MidiToneTrackOptions } from './MidiToneTrack';
 export { SoundFontToneTrack } from './SoundFontToneTrack';
 export type { SoundFontToneTrackOptions } from './SoundFontToneTrack';
-export { SoundFontCache } from './SoundFontCache';
-export type { SoundFontSample } from './SoundFontCache';
+export {
+  SoundFontCache,
+  timecentsToSeconds,
+  getGeneratorValue,
+  int16ToFloat32,
+  calculatePlaybackRate,
+  extractLoopAndEnvelope,
+} from './SoundFontCache';
+export type { SoundFontSample, PlaybackRateParams, LoopAndEnvelopeParams } from './SoundFontCache';
 export type { TonePlayoutOptions, EffectsFunction } from './TonePlayout';
 export type { ToneTrackOptions, TrackEffectsFunction } from './ToneTrack';
 

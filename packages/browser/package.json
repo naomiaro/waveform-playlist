@@ -16,7 +16,8 @@
   "scripts": {
     "build": "pnpm typecheck && vite build",
     "dev": "vite build --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "keywords": [
     "waveform",

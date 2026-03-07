@@ -5,8 +5,8 @@ import type {
   DragEndEvent as DragEndCallback,
 } from '@dnd-kit/abstract';
 import type { ClipTrack } from '@waveform-playlist/core';
-import { constrainBoundaryTrim } from '@waveform-playlist/engine';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
+import { calculateBoundaryTrim } from '../utils/boundaryTrim';
 
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
@@ -138,7 +138,6 @@ export function useClipDragHandlers({
       const currentX = event.to?.x ?? event.operation.position.current.x;
       const rawDeltaX = currentX - event.operation.position.initial.x;
       const sampleDelta = rawDeltaX * samplesPerPixel;
-      const MIN_DURATION_SAMPLES = Math.floor(0.1 * sampleRate); // 0.1 seconds minimum
 
       // Get original clip state (stored on drag start)
       const originalClip = originalClipStateRef.current;
@@ -153,55 +152,23 @@ export function useClipDragHandlers({
         const newClips = track.clips.map((clip, cIdx) => {
           if (cIdx !== clipIndex) return clip;
 
-          if (boundary === 'left') {
-            // Use constrainBoundaryTrim from engine for the left boundary.
-            // Build a temporary clip with original state for constraint calculation.
-            const tempClip = {
-              ...clip,
-              startSample: originalClip.startSample,
-              offsetSamples: originalClip.offsetSamples,
-              durationSamples: originalClip.durationSamples,
-            };
-            const constrainedDelta = constrainBoundaryTrim(
-              tempClip,
-              Math.floor(sampleDelta),
-              'left',
-              sortedClips,
-              sortedIndex,
-              MIN_DURATION_SAMPLES
-            );
+          const trimResult = calculateBoundaryTrim({
+            originalClip,
+            clip,
+            pixelDelta: rawDeltaX,
+            samplesPerPixel,
+            sampleRate,
+            boundary,
+            sortedClips,
+            sortedIndex,
+          });
 
-            const newOffsetSamples = originalClip.offsetSamples + constrainedDelta;
-            const newDurationSamples = originalClip.durationSamples - constrainedDelta;
-            const newStartSample = originalClip.startSample + constrainedDelta;
-
-            return {
-              ...clip,
-              offsetSamples: newOffsetSamples,
-              durationSamples: newDurationSamples,
-              startSample: newStartSample,
-            };
-          } else {
-            // Right boundary - use constrainBoundaryTrim from engine
-            const tempClip = {
-              ...clip,
-              startSample: originalClip.startSample,
-              offsetSamples: originalClip.offsetSamples,
-              durationSamples: originalClip.durationSamples,
-            };
-            const constrainedDelta = constrainBoundaryTrim(
-              tempClip,
-              Math.floor(sampleDelta),
-              'right',
-              sortedClips,
-              sortedIndex,
-              MIN_DURATION_SAMPLES
-            );
-
-            const newDurationSamples = originalClip.durationSamples + constrainedDelta;
-
-            return { ...clip, durationSamples: newDurationSamples };
-          }
+          return {
+            ...clip,
+            startSample: trimResult.startSample,
+            durationSamples: trimResult.durationSamples,
+            offsetSamples: trimResult.offsetSamples,
+          };
         });
 
         return { ...track, clips: newClips };

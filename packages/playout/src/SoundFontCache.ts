@@ -1,5 +1,5 @@
 import { SoundFont2, GeneratorType } from 'soundfont2';
-import type { Key, Generator, ZoneMap } from 'soundfont2';
+import type { Generator, ZoneMap } from 'soundfont2';
 
 /**
  * Result of looking up a MIDI note in the SoundFont.
@@ -48,6 +48,142 @@ export function getGeneratorValue(
   type: GeneratorType
 ): number | undefined {
   return generators[type]?.value;
+}
+
+/**
+ * Convert Int16Array sample data to Float32Array.
+ * SF2 samples are 16-bit signed integers; Web Audio needs Float32 [-1, 1].
+ */
+export function int16ToFloat32(samples: Int16Array): Float32Array {
+  const floats = new Float32Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    floats[i] = samples[i] / 32768;
+  }
+  return floats;
+}
+
+/**
+ * Input parameters for playback rate calculation.
+ */
+export interface PlaybackRateParams {
+  /** Target MIDI note number (0-127) */
+  midiNote: number;
+  /** OverridingRootKey generator value, or undefined if not set */
+  overrideRootKey: number | undefined;
+  /** sample.header.originalPitch (255 means unpitched) */
+  originalPitch: number;
+  /** CoarseTune generator value in semitones (default 0) */
+  coarseTune: number;
+  /** FineTune generator value in cents (default 0) */
+  fineTune: number;
+  /** sample.header.pitchCorrection in cents (default 0) */
+  pitchCorrection: number;
+}
+
+/**
+ * Calculate playback rate for a MIDI note using the SF2 generator chain.
+ *
+ * SF2 root key resolution priority:
+ *   1. OverridingRootKey generator (per-zone, most specific)
+ *   2. sample.header.originalPitch (sample header)
+ *   3. MIDI note 60 (middle C fallback)
+ *
+ * Tuning adjustments:
+ *   - CoarseTune generator (semitones, additive)
+ *   - FineTune generator (cents, additive)
+ *   - sample.header.pitchCorrection (cents, additive)
+ */
+export function calculatePlaybackRate(params: PlaybackRateParams): number {
+  const { midiNote, overrideRootKey, originalPitch, coarseTune, fineTune, pitchCorrection } =
+    params;
+
+  // Resolve root key: OverridingRootKey → originalPitch → 60
+  const rootKey =
+    overrideRootKey !== undefined ? overrideRootKey : originalPitch !== 255 ? originalPitch : 60;
+
+  // Total offset in semitones: target note - root key + tuning
+  const totalSemitones = midiNote - rootKey + coarseTune + (fineTune + pitchCorrection) / 100;
+
+  return Math.pow(2, totalSemitones / 12);
+}
+
+/**
+ * Input parameters for loop and envelope extraction.
+ */
+export interface LoopAndEnvelopeParams {
+  /** SF2 generators zone map */
+  generators: ZoneMap<Generator>;
+  /** Sample header with loop points and sample rate */
+  header: {
+    startLoop: number;
+    endLoop: number;
+    sampleRate: number;
+  };
+}
+
+/**
+ * Extract loop points and volume envelope data from per-zone generators.
+ *
+ * Loop points are stored as absolute indices into the SF2 sample pool.
+ * We convert to AudioBuffer-relative seconds by subtracting header.start
+ * and dividing by sampleRate.
+ *
+ * Volume envelope times are in SF2 timecents; sustain is centibels attenuation.
+ */
+export function extractLoopAndEnvelope(
+  params: LoopAndEnvelopeParams
+): Omit<SoundFontSample, 'buffer' | 'playbackRate'> {
+  const { generators, header } = params;
+
+  // --- Loop points ---
+  const loopMode = getGeneratorValue(generators, GeneratorType.SampleModes) ?? 0;
+
+  // Compute actual loop positions (header + fine/coarse generator offsets)
+  const rawLoopStart =
+    header.startLoop +
+    (getGeneratorValue(generators, GeneratorType.StartLoopAddrsOffset) ?? 0) +
+    (getGeneratorValue(generators, GeneratorType.StartLoopAddrsCoarseOffset) ?? 0) * 32768;
+  const rawLoopEnd =
+    header.endLoop +
+    (getGeneratorValue(generators, GeneratorType.EndLoopAddrsOffset) ?? 0) +
+    (getGeneratorValue(generators, GeneratorType.EndLoopAddrsCoarseOffset) ?? 0) * 32768;
+
+  // The soundfont2 library already converts startLoop/endLoop to be
+  // relative to sample.data (subtracts header.start during parsing),
+  // so we only need to divide by sampleRate to get seconds.
+  const loopStart = rawLoopStart / header.sampleRate;
+  const loopEnd = rawLoopEnd / header.sampleRate;
+
+  // --- Volume envelope ---
+  const attackVolEnv = timecentsToSeconds(
+    getGeneratorValue(generators, GeneratorType.AttackVolEnv) ?? -12000
+  );
+  const holdVolEnv = timecentsToSeconds(
+    getGeneratorValue(generators, GeneratorType.HoldVolEnv) ?? -12000
+  );
+  const decayVolEnv = timecentsToSeconds(
+    getGeneratorValue(generators, GeneratorType.DecayVolEnv) ?? -12000
+  );
+  const releaseVolEnv = Math.min(
+    timecentsToSeconds(getGeneratorValue(generators, GeneratorType.ReleaseVolEnv) ?? -12000),
+    MAX_RELEASE_SECONDS
+  );
+
+  // SustainVolEnv is centibels attenuation: 0 = full volume, 1440 = silence
+  // Convert to linear gain: 10^(-cb / 200)
+  const sustainCb = getGeneratorValue(generators, GeneratorType.SustainVolEnv) ?? 0;
+  const sustainVolEnv = Math.pow(10, -sustainCb / 200);
+
+  return {
+    loopMode,
+    loopStart,
+    loopEnd,
+    attackVolEnv,
+    holdVolEnv,
+    decayVolEnv,
+    sustainVolEnv,
+    releaseVolEnv,
+  };
 }
 
 /**
@@ -141,122 +277,32 @@ export class SoundFontCache {
 
     // Calculate playback rate using SF2 generator chain for root key.
     // Priority: OverridingRootKey generator → sample.header.originalPitch → 60
-    const playbackRate = this.calculatePlaybackRate(midiNote, keyData);
+    const playbackRate = calculatePlaybackRate({
+      midiNote,
+      overrideRootKey: getGeneratorValue(keyData.generators, GeneratorType.OverridingRootKey),
+      originalPitch: sample.header.originalPitch,
+      coarseTune: getGeneratorValue(keyData.generators, GeneratorType.CoarseTune) ?? 0,
+      fineTune: getGeneratorValue(keyData.generators, GeneratorType.FineTune) ?? 0,
+      pitchCorrection: sample.header.pitchCorrection ?? 0,
+    });
 
     // Extract per-zone loop points and volume envelope from generators
-    const loopAndEnvelope = this.extractLoopAndEnvelope(keyData);
+    const loopAndEnvelope = extractLoopAndEnvelope({
+      generators: keyData.generators,
+      header: keyData.sample.header,
+    });
 
     return { buffer, playbackRate, ...loopAndEnvelope };
   }
 
   /**
-   * Extract loop points and volume envelope data from per-zone generators.
-   *
-   * Loop points are stored as absolute indices into the SF2 sample pool.
-   * We convert to AudioBuffer-relative seconds by subtracting header.start
-   * and dividing by sampleRate.
-   *
-   * Volume envelope times are in SF2 timecents; sustain is centibels attenuation.
-   */
-  private extractLoopAndEnvelope(keyData: Key): Omit<SoundFontSample, 'buffer' | 'playbackRate'> {
-    const { generators } = keyData;
-    const header = keyData.sample.header;
-
-    // --- Loop points ---
-    const loopMode = getGeneratorValue(generators, GeneratorType.SampleModes) ?? 0;
-
-    // Compute actual loop positions (header + fine/coarse generator offsets)
-    const rawLoopStart =
-      header.startLoop +
-      (getGeneratorValue(generators, GeneratorType.StartLoopAddrsOffset) ?? 0) +
-      (getGeneratorValue(generators, GeneratorType.StartLoopAddrsCoarseOffset) ?? 0) * 32768;
-    const rawLoopEnd =
-      header.endLoop +
-      (getGeneratorValue(generators, GeneratorType.EndLoopAddrsOffset) ?? 0) +
-      (getGeneratorValue(generators, GeneratorType.EndLoopAddrsCoarseOffset) ?? 0) * 32768;
-
-    // The soundfont2 library already converts startLoop/endLoop to be
-    // relative to sample.data (subtracts header.start during parsing),
-    // so we only need to divide by sampleRate to get seconds.
-    const loopStart = rawLoopStart / header.sampleRate;
-    const loopEnd = rawLoopEnd / header.sampleRate;
-
-    // --- Volume envelope ---
-    const attackVolEnv = timecentsToSeconds(
-      getGeneratorValue(generators, GeneratorType.AttackVolEnv) ?? -12000
-    );
-    const holdVolEnv = timecentsToSeconds(
-      getGeneratorValue(generators, GeneratorType.HoldVolEnv) ?? -12000
-    );
-    const decayVolEnv = timecentsToSeconds(
-      getGeneratorValue(generators, GeneratorType.DecayVolEnv) ?? -12000
-    );
-    const releaseVolEnv = Math.min(
-      timecentsToSeconds(getGeneratorValue(generators, GeneratorType.ReleaseVolEnv) ?? -12000),
-      MAX_RELEASE_SECONDS
-    );
-
-    // SustainVolEnv is centibels attenuation: 0 = full volume, 1440 = silence
-    // Convert to linear gain: 10^(-cb / 200)
-    const sustainCb = getGeneratorValue(generators, GeneratorType.SustainVolEnv) ?? 0;
-    const sustainVolEnv = Math.pow(10, -sustainCb / 200);
-
-    return {
-      loopMode,
-      loopStart,
-      loopEnd,
-      attackVolEnv,
-      holdVolEnv,
-      decayVolEnv,
-      sustainVolEnv,
-      releaseVolEnv,
-    };
-  }
-
-  /**
-   * Calculate playback rate for a MIDI note using the SF2 generator chain.
-   *
-   * SF2 root key resolution priority:
-   *   1. OverridingRootKey generator (per-zone, most specific)
-   *   2. sample.header.originalPitch (sample header)
-   *   3. MIDI note 60 (middle C fallback)
-   *
-   * Tuning adjustments:
-   *   - CoarseTune generator (semitones, additive)
-   *   - FineTune generator (cents, additive)
-   *   - sample.header.pitchCorrection (cents, additive)
-   */
-  private calculatePlaybackRate(midiNote: number, keyData: Key): number {
-    const sample = keyData.sample;
-    const generators = keyData.generators;
-
-    // Resolve root key: OverridingRootKey → originalPitch → 60
-    const overrideRootKey = getGeneratorValue(generators, GeneratorType.OverridingRootKey);
-    const originalPitch = sample.header.originalPitch;
-    const rootKey =
-      overrideRootKey !== undefined ? overrideRootKey : originalPitch !== 255 ? originalPitch : 60;
-
-    // Tuning adjustments in semitones
-    const coarseTune = getGeneratorValue(generators, GeneratorType.CoarseTune) ?? 0;
-    const fineTune = getGeneratorValue(generators, GeneratorType.FineTune) ?? 0;
-    const pitchCorrection = sample.header.pitchCorrection ?? 0;
-
-    // Total offset in semitones: target note - root key + tuning
-    const totalSemitones = midiNote - rootKey + coarseTune + (fineTune + pitchCorrection) / 100;
-
-    return Math.pow(2, totalSemitones / 12);
-  }
-
-  /**
    * Convert Int16Array sample data to an AudioBuffer.
-   * SF2 samples are 16-bit signed integers; Web Audio needs Float32 [-1, 1].
+   * Uses the extracted int16ToFloat32 for the conversion, then copies into an AudioBuffer.
    */
   private int16ToAudioBuffer(data: Int16Array, sampleRate: number): AudioBuffer {
-    const buffer = this.context.createBuffer(1, data.length, sampleRate);
-    const channel = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      channel[i] = data[i] / 32768;
-    }
+    const floats = int16ToFloat32(data);
+    const buffer = this.context.createBuffer(1, floats.length, sampleRate);
+    buffer.getChannelData(0).set(floats);
     return buffer;
   }
 
