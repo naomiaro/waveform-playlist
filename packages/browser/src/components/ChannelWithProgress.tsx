@@ -1,6 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import type { MidiNoteData } from '@waveform-playlist/core';
+import {
+  clipPixelWidth as computeClipPixelWidth,
+  type MidiNoteData,
+} from '@waveform-playlist/core';
 import {
   SmartChannel,
   type SmartChannelProps,
@@ -104,6 +107,14 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
 
   const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
 
+  // Use shared helper to compute clip pixel width (must match Clip.tsx sizing)
+  // peaksData.length may be shorter than the clip when audio is shorter than configured duration
+  const clipPixelWidth = computeClipPixelWidth(
+    clipStartSample,
+    clipDurationSamples,
+    samplesPerPixel
+  );
+
   useEffect(() => {
     const updateProgress = () => {
       if (progressRef.current) {
@@ -148,7 +159,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     samplesPerPixel,
     clipStartSample,
     clipDurationSamples,
-    smartChannelProps.length,
+    clipPixelWidth,
     currentTimeRef,
     getPlaybackTime,
   ]);
@@ -222,14 +233,14 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
             $color="#000"
             $height={halfHeight}
             $top={effectiveTop}
-            $width={smartChannelProps.length}
+            $width={clipPixelWidth}
           />
           {/* Waveform portion: themed background */}
           <Background
             $color={waveformBackgroundCss}
             $height={halfHeight}
             $top={effectiveTop + halfHeight}
-            $width={smartChannelProps.length}
+            $width={clipPixelWidth}
           />
         </>
       ) : (
@@ -237,7 +248,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
           $color={backgroundCss}
           $height={effectiveHeight}
           $top={effectiveTop}
-          $width={smartChannelProps.length}
+          $width={clipPixelWidth}
         />
       )}
       {/* Progress overlay - shows played portion with progress color (skip for piano-roll) */}
@@ -247,7 +258,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
           $color={progressColor}
           $height={effectiveHeight}
           $top={effectiveTop}
-          $width={smartChannelProps.length}
+          $width={clipPixelWidth}
         />
       )}
       {/* Waveform canvas with transparent background */}

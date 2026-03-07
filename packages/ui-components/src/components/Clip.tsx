@@ -4,7 +4,7 @@ import { useDraggable } from '@dnd-kit/react';
 import { ClipHeader } from './ClipHeader';
 import { ClipBoundary } from './ClipBoundary';
 import { FadeOverlay } from './FadeOverlay';
-import type { Fade } from '@waveform-playlist/core';
+import { clipPixelWidth, type Fade } from '@waveform-playlist/core';
 import { ClipViewportOriginProvider } from '../contexts/ClipViewportOrigin';
 
 interface ClipContainerProps {
@@ -107,10 +107,8 @@ export const Clip: FunctionComponent<ClipProps> = ({
   // Use Math.floor to always snap to pixel boundaries
   const left = Math.floor(startSample / samplesPerPixel);
 
-  // Calculate width as the difference between end and start pixel positions
-  // This ensures clips are perfectly adjacent with no gaps
-  const endPixel = Math.floor((startSample + durationSamples) / samplesPerPixel);
-  const width = endPixel - left;
+  // Calculate width using shared helper (must match ChannelWithProgress)
+  const width = clipPixelWidth(startSample, durationSamples, samplesPerPixel);
 
   // Use draggable only if header is shown and drag is enabled
   const enableDrag = showHeader && !disableHeaderDrag && !isOverlay;
