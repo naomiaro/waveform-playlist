@@ -99,6 +99,40 @@ export interface PlaylistVisualizationProps {
 }
 
 /**
+ * Wrapper that isolates the custom playhead's hooks from PlaylistVisualization.
+ * Calling renderPlayhead() directly would merge its hooks into the parent,
+ * causing "Rendered more hooks" errors if renderPlayhead is conditionally provided.
+ */
+const CustomPlayhead: React.FC<{
+  renderPlayhead: RenderPlayheadFunction;
+  color: string;
+  samplesPerPixel: number;
+  sampleRate: number;
+}> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
+  const {
+    isPlaying,
+    currentTimeRef,
+    playbackStartTimeRef,
+    audioStartPositionRef,
+    getPlaybackTime,
+  } = usePlaybackAnimation();
+
+  return renderPlayhead({
+    position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
+    color,
+    isPlaying,
+    currentTimeRef,
+    playbackStartTimeRef,
+    audioStartPositionRef,
+    samplesPerPixel,
+    sampleRate,
+    controlsOffset: 0,
+    getAudioContextTime: () => getContext().currentTime,
+    getPlaybackTime,
+  }) as React.ReactElement;
+};
+
+/**
  * Standalone playlist visualization component (WebAudio version).
  *
  * Renders the waveform tracks, timescale, annotations boxes, selection,
@@ -124,13 +158,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  const {
-    isPlaying,
-    currentTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
-    getPlaybackTime,
-  } = usePlaybackAnimation();
+  const { isPlaying } = usePlaybackAnimation();
   const {
     selectionStart,
     selectionEnd,
@@ -765,19 +793,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
             )}
             {(isPlaying || selectionStart === selectionEnd) &&
               (renderPlayhead ? (
-                renderPlayhead({
-                  position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
-                  color: theme.playheadColor,
-                  isPlaying,
-                  currentTimeRef,
-                  playbackStartTimeRef,
-                  audioStartPositionRef,
-                  samplesPerPixel,
-                  sampleRate,
-                  controlsOffset: 0,
-                  getAudioContextTime: () => getContext().currentTime,
-                  getPlaybackTime,
-                })
+                <CustomPlayhead
+                  renderPlayhead={renderPlayhead}
+                  color={theme.playheadColor}
+                  samplesPerPixel={samplesPerPixel}
+                  sampleRate={sampleRate}
+                />
               ) : (
                 <AnimatedPlayhead color={theme.playheadColor} />
               ))}
