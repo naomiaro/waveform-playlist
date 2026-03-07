@@ -336,6 +336,7 @@ const LazyExample = createLazyExample(() =>
 21. **will-change Budget** — Only use `will-change` on actively animating elements (playheads, progress overlays). Firefox enforces a 3× document surface area budget; static canvas chunks with `translateZ(0)` don't need it.
 22. **Always Use getGlobalAudioContext()** — Never `new AudioContext()`. Firefox blocks contexts created before user gesture. Use `getGlobalAudioContext()` from playout package (shared with Tone.js, resumed on first play).
 23. **Gate Provider Behind Async Readiness** — When multiple async resources must load before rendering (e.g., MIDI tracks + SoundFont), gate the `WaveformPlaylistProvider` mount behind all resources being ready. This prevents double engine rebuilds. Check both the loading flag AND `tracks.length > 0` since hooks can briefly report `loading: false` with empty data.
+24. **Shared Clip Pixel Width** — Use `clipPixelWidth()` from `@waveform-playlist/core` for any pixel width derived from `startSample`/`durationSamples`/`samplesPerPixel`. Both `Clip.tsx` (container) and `ChannelWithProgress.tsx` (progress overlay) must use this shared function — never `peaksData.length`, which may be shorter than the clip when audio is shorter than configured duration.
 
 ---
 

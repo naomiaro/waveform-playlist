@@ -228,6 +228,12 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 `handleMouseUp` must NOT recompute click time from `getBoundingClientRect()` during playback — auto-scroll shifts the overlay between mouseDown and mouseUp, producing wrong positions. Instead, `mouseDownTimeRef` captures the time at mouseDown, and mouseUp reuses it when `isPlaying`. Applied in both `PlaylistVisualization` and `MediaElementPlaylist`.
 
+## Progress Overlay Width Invariant
+
+**Decision:** Progress overlay `$width` and `Background` `$width` use `clipPixelWidth()` from core, NOT `smartChannelProps.length` (peak data length).
+
+**Why:** When a clip's configured duration exceeds the audio file length, `peaksData.length` is shorter than the clip container. Using it for the overlay causes `scaleX(ratio)` to scale a narrower element, making progress visually lag behind the playhead.
+
 ## Controls Offset Removed
 
 **Decision:** All `controlsOffset` / `controlWidth` arithmetic removed from mouse handlers, playhead positioning, selection, auto-scroll, and zoom calculations.

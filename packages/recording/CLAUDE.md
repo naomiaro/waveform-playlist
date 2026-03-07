@@ -56,3 +56,7 @@ const normalized = Math.max(0, Math.min(1, (dbValue + 100) / 100));
 ```
 
 **Why -100dB floor:** Firefox reports lower dB values than Chrome (e.g., -70 to -85 dB for quiet input). Using -60dB floor caused all quiet signals to map to 0.
+
+## Peak Value Clamping
+
+**Rule:** Always clamp scaled peak values to the valid typed array range before assignment. `Math.floor(1.0 * 32768) = 32768` overflows Int16 (max 32767) and wraps to -32768. Use `Math.min(maxValue - 1, ...)` for max and `Math.max(-maxValue, ...)` for min.
