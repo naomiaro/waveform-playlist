@@ -48,7 +48,7 @@ export interface FadeConfig {
 /**
  * Generate a linear fade curve
  */
-function linearCurve(length: number, fadeIn: boolean): Float32Array {
+export function linearCurve(length: number, fadeIn: boolean): Float32Array {
   const curve = new Float32Array(length);
   const scale = length - 1;
 
@@ -63,7 +63,7 @@ function linearCurve(length: number, fadeIn: boolean): Float32Array {
 /**
  * Generate an exponential fade curve
  */
-function exponentialCurve(length: number, fadeIn: boolean): Float32Array {
+export function exponentialCurve(length: number, fadeIn: boolean): Float32Array {
   const curve = new Float32Array(length);
   const scale = length - 1;
 
@@ -79,7 +79,7 @@ function exponentialCurve(length: number, fadeIn: boolean): Float32Array {
 /**
  * Generate an S-curve (sine-based smooth curve)
  */
-function sCurveCurve(length: number, fadeIn: boolean): Float32Array {
+export function sCurveCurve(length: number, fadeIn: boolean): Float32Array {
   const curve = new Float32Array(length);
   const phase = fadeIn ? Math.PI / 2 : -Math.PI / 2;
 
@@ -93,7 +93,7 @@ function sCurveCurve(length: number, fadeIn: boolean): Float32Array {
 /**
  * Generate a logarithmic fade curve
  */
-function logarithmicCurve(length: number, fadeIn: boolean, base: number = 10): Float32Array {
+export function logarithmicCurve(length: number, fadeIn: boolean, base: number = 10): Float32Array {
   const curve = new Float32Array(length);
 
   for (let i = 0; i < length; i++) {
@@ -108,7 +108,7 @@ function logarithmicCurve(length: number, fadeIn: boolean, base: number = 10): F
 /**
  * Generate a fade curve of the specified type
  */
-function generateCurve(type: FadeType, length: number, fadeIn: boolean): Float32Array {
+export function generateCurve(type: FadeType, length: number, fadeIn: boolean): Float32Array {
   switch (type) {
     case 'linear':
       return linearCurve(length, fadeIn);

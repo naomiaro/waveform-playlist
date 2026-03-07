@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "keywords": [
     "waveform",
@@ -48,6 +49,7 @@
     "@types/styled-components": "^5.1.26",
     "@waveform-playlist/browser": "workspace:*",
     "tsup": "^8.0.1",
+    "vitest": "^3.0.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {

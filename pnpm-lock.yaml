@@ -75,6 +75,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.25)(jsdom@28.1.0)
 
   packages/browser:
     dependencies:
@@ -197,6 +200,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.25)(jsdom@28.1.0)
 
   packages/media-element-playout:
     dependencies:
@@ -303,6 +309,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.25)(jsdom@28.1.0)
 
   packages/spectrogram:
     dependencies:
@@ -334,6 +343,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.6.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.25)(jsdom@28.1.0)
 
   packages/ui-components:
     dependencies:
@@ -429,6 +441,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.25)(jsdom@28.1.0)
 
   website:
     dependencies:

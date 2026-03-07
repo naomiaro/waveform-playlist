@@ -33,7 +33,7 @@ export interface SoundFontSample {
  * SF2 formula: seconds = 2^(timecents / 1200)
  * Default -12000 timecents ≈ 0.001s (effectively instant).
  */
-function timecentsToSeconds(tc: number): number {
+export function timecentsToSeconds(tc: number): number {
   return Math.pow(2, tc / 1200);
 }
 
@@ -43,7 +43,7 @@ const MAX_RELEASE_SECONDS = 5;
 /**
  * Get a numeric generator value from a zone map.
  */
-function getGeneratorValue(
+export function getGeneratorValue(
   generators: ZoneMap<Generator>,
   type: GeneratorType
 ): number | undefined {

@@ -5,7 +5,7 @@ import type { Peaks, Bits, PeakData } from '@waveform-playlist/core';
 /**
  * Find minimum and maximum values in a typed array
  */
-function findMinMax(array: Float32Array): { min: number; max: number } {
+export function findMinMax(array: Float32Array): { min: number; max: number } {
   let min = Infinity;
   let max = -Infinity;
 
@@ -25,7 +25,7 @@ function findMinMax(array: Float32Array): { min: number; max: number } {
 /**
  * Convert a float peak to an integer based on bit depth
  */
-function convert(n: number, bits: Bits): number {
+export function convert(n: number, bits: Bits): number {
   const maxValue = Math.pow(2, bits - 1);
   const v = n < 0 ? n * maxValue : n * (maxValue - 1);
   return Math.max(-maxValue, Math.min(maxValue - 1, v));
@@ -34,7 +34,7 @@ function convert(n: number, bits: Bits): number {
 /**
  * Create a typed array based on bit depth
  */
-function makeTypedArray(bits: Bits, length: number): Peaks {
+export function makeTypedArray(bits: Bits, length: number): Peaks {
   switch (bits) {
     case 8:
       return new Int8Array(length);
@@ -46,7 +46,7 @@ function makeTypedArray(bits: Bits, length: number): Peaks {
 /**
  * Extract peaks from a single audio channel
  */
-function extractPeaks(channel: Float32Array, samplesPerPixel: number, bits: Bits): Peaks {
+export function extractPeaks(channel: Float32Array, samplesPerPixel: number, bits: Bits): Peaks {
   const chanLength = channel.length;
   const numPeaks = Math.ceil(chanLength / samplesPerPixel);
 
@@ -72,7 +72,7 @@ function extractPeaks(channel: Float32Array, samplesPerPixel: number, bits: Bits
 /**
  * Merge multiple channel peaks into a mono peak array
  */
-function makeMono(channelPeaks: Peaks[], bits: Bits): Peaks[] {
+export function makeMono(channelPeaks: Peaks[], bits: Bits): Peaks[] {
   const numChan = channelPeaks.length;
   const weight = 1 / numChan;
   const numPeaks = channelPeaks[0].length / 2;
