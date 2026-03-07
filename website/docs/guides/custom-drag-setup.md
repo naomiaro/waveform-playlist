@@ -179,7 +179,7 @@ function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
 }
 ```
 
-### Temporal Snap
+### Timescale Snap
 
 For time-based grid snapping (derived from the current zoom level):
 
@@ -342,7 +342,7 @@ This uses delay-based activation for touch events (distinguishes drag from scrol
 | `samplesPerPixel` | `number` | Current zoom level |
 | `sampleRate` | `number` | Audio sample rate |
 
-**Temporal mode:**
+**Timescale mode:**
 
 | Option | Type | Description |
 |--------|------|-------------|

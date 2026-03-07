@@ -794,6 +794,16 @@ interface ClipInteractionProviderProps {
 
 Declarative wrapper that encapsulates all clip drag/move/trim/snap/collision setup. Replaces manual `DragDropProvider` + `useClipDragHandlers` + `useDragSensors` + modifier configuration. When present, `interactiveClips` is auto-enabled on descendant `Waveform` components via `ClipInteractionContext`. When `snap` is enabled, reads `BeatsAndBarsProvider` context: if `scaleMode="beats"` and `snapTo!="off"`, clips snap to beats/bars; otherwise falls back to timescale-based snapping.
 
+#### `useClipInteractionEnabled()`
+
+```typescript
+import { useClipInteractionEnabled } from '@waveform-playlist/browser';
+
+function useClipInteractionEnabled(): boolean;
+```
+
+Returns `true` when the component is inside a `ClipInteractionProvider`. Used internally by `Waveform` to auto-enable `interactiveClips`.
+
 ### PlaylistErrorBoundary
 
 ```typescript

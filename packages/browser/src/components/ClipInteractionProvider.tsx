@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import type { Modifiers } from '@dnd-kit/abstract';
@@ -51,13 +51,15 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     beatsAndBars.snapTo !== 'off';
   const useTimescaleSnap = snap && !useBeatsSnap;
 
-  // Warn if onTracksChange is missing — drag/trim edits will be lost
-  if (onTracksChange == null) {
-    console.warn(
-      '[waveform-playlist] ClipInteractionProvider: onTracksChange is not set on ' +
-        'WaveformPlaylistProvider. Drag and trim edits will not be persisted.'
-    );
-  }
+  // Warn once if onTracksChange is missing — drag/trim edits will be lost
+  useEffect(() => {
+    if (onTracksChange == null) {
+      console.warn(
+        '[waveform-playlist] ClipInteractionProvider: onTracksChange is not set on ' +
+          'WaveformPlaylistProvider. Drag and trim edits will not be persisted.'
+      );
+    }
+  }, [onTracksChange]);
 
   // Build snapSamplePosition for boundary trim snapping
   const snapSamplePosition = useMemo(() => {

@@ -113,7 +113,7 @@ Both providers use React Context with 4 split contexts for performance.
 - `WaveformPlaylistProvider` — Multi-track provider (Web Audio API / Tone.js). Props: tracks, timescale, controls, theme, effects, annotationList, onAnnotationsChange, onTracksChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel, zoomLevels, mono
 - `MediaElementPlaylistProvider` — Single-track provider (HTMLAudioElement). Props: track, playbackRate, timescale, controls, theme, annotationList, onAnnotationsChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel. Use for language learning, podcasts, single-track viewers.
 - `Waveform` — Main visualization. Props: showClipHeaders, interactiveClips, renderPlayhead, renderTrackControls, showFades, touchOptimized
-- `ClipInteractionProvider` — Declarative wrapper for clip drag/move/trim/snap/collision. Props: snap (boolean, auto-detects beats vs timescale from BeatsAndBarsProvider context), touchOptimized. Auto-enables interactiveClips on descendant Waveform. Replaces manual DragDropProvider + useClipDragHandlers + modifier setup.
+- `ClipInteractionProvider` — Declarative wrapper for clip drag/move/trim/snap/collision. Props: snap (boolean, auto-detects beats vs timescale from BeatsAndBarsProvider context), touchOptimized. Auto-enables interactiveClips on descendant Waveform. Replaces manual DragDropProvider + useClipDragHandlers + modifier setup. `useClipInteractionEnabled()` hook returns true when inside this provider.
 - Buttons: PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton, LoopButton, SetLoopRegionButton, ZoomInButton, ZoomOutButton, ExportWavButton
 - Controls: MasterVolumeControl, TimeFormatSelect, AudioPosition, SelectionTimeInputs, AutomaticScrollCheckbox, ContinuousPlayCheckbox
 

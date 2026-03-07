@@ -22,13 +22,13 @@ interface SnapToGridBeatsOptions {
   sampleRate: number;
 }
 
-interface SnapToGridTemporalOptions {
+interface SnapToGridTimescaleOptions {
   mode: 'timescale';
   gridSamples: number;
   samplesPerPixel: number;
 }
 
-type SnapToGridOptions = SnapToGridBeatsOptions | SnapToGridTemporalOptions;
+type SnapToGridOptions = SnapToGridBeatsOptions | SnapToGridTimescaleOptions;
 
 /**
  * dnd-kit modifier that quantizes clip drag movement to a grid.

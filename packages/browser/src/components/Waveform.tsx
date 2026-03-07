@@ -40,7 +40,7 @@ export interface WaveformProps {
   scrollActiveContainer?: 'nearest' | 'all';
   className?: string;
   showClipHeaders?: boolean; // Show headers on clips for visual organization
-  interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (requires @dnd-kit setup)
+  interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (auto-enabled by ClipInteractionProvider)
   showFades?: boolean; // Show fade in/out overlays on clips
   /**
    * Enable mobile-optimized touch interactions.
