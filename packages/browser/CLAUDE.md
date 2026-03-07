@@ -296,7 +296,7 @@ if (derived !== prevRef.current) {
 
 **Problem:** Calling a render prop function (e.g., `renderPlayhead({...})`) directly in a conditional branch merges its hooks into the parent's hook count. If the prop toggles, React throws "Rendered more hooks than during the previous render."
 
-**Fix:** Wrap in a dedicated component (`CustomMediaElementPlayhead`) that always calls the render prop, isolating its hooks in its own component boundary. See `MediaElementPlaylist.tsx`.
+**Fix:** Wrap in a dedicated component that always calls the render prop, isolating its hooks in its own component boundary. Applied in both `PlaylistVisualization.tsx` (`CustomPlayhead`) and `MediaElementPlaylist.tsx` (`CustomMediaElementPlayhead`).
 
 **Stable stub refs:** When MediaElement components pass `PlayheadProps` to render functions, Tone.js-specific refs (`playbackStartTimeRef`, `audioStartPositionRef`) are stubbed as `ZERO_REF` (module-level constant). Never create `{ current: 0 }` inline — it causes useEffect dep churn on every render.
 
