@@ -258,7 +258,7 @@ export function MultiClipExample() {
             <PauseButton />
             <StopButton />
             <LoopButton />
-            {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+            {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{audioFiles.length}</span>}
           </ControlGroup>
           <ControlGroup>
             <ZoomInButton />
