@@ -181,6 +181,7 @@ export interface PlaylistDataContextValue {
   /** Ref set by useClipDragHandlers during boundary trim drags.
    *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
   isDraggingRef: React.MutableRefObject<boolean>;
+  onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
 // Create the 4 separate contexts
@@ -1391,6 +1392,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isReady,
       mono,
       isDraggingRef,
+      onTracksChange,
     }),
     [
       duration,
@@ -1415,6 +1417,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isReady,
       mono,
       isDraggingRef,
+      onTracksChange,
     ]
   );
 
