@@ -13,18 +13,11 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
-  usePlaylistData,
-  usePlaylistControls,
-  useClipDragHandlers,
-  useDragSensors,
-  ClipCollisionModifier,
-  noDropAnimationPlugins,
+  ClipInteractionProvider,
   loadWaveformData,
   Waveform,
   PlayButton,
@@ -144,65 +137,6 @@ const trackConfigs = [
     ],
   },
 ];
-
-interface PlaylistWithDragProps {
-  tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
-}
-
-const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({ tracks, onTracksChange }) => {
-  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
-  const { setSelectedTrackId } = usePlaylistControls();
-
-  // Use touch-optimized sensors with 250ms delay to distinguish drag from scroll
-  const sensors = useDragSensors({ touchOptimized: true });
-
-  const { onDragStart: handleDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
-    tracks,
-    onTracksChange,
-    samplesPerPixel,
-    sampleRate,
-    engineRef: playoutRef,
-    isDraggingRef,
-  });
-
-  const onDragStart = (event: Parameters<typeof handleDragStart>[0]) => {
-    const trackIndex = event.operation?.source?.data?.trackIndex as number | undefined;
-    if (trackIndex !== undefined && tracks[trackIndex]) {
-      setSelectedTrackId(tracks[trackIndex].id);
-    }
-    handleDragStart(event);
-  };
-
-  return (
-    <DragDropProvider
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
-      plugins={noDropAnimationPlugins}
-    >
-      <Controls>
-        <ControlGroup>
-          <PlayButton />
-          <PauseButton />
-          <StopButton />
-        </ControlGroup>
-        <ControlGroup>
-          <ZoomInButton />
-          <ZoomOutButton />
-        </ControlGroup>
-        <ControlGroup>
-          <AudioPosition />
-        </ControlGroup>
-      </Controls>
-
-      {/* touchOptimized enables larger touch targets for clip boundaries */}
-      <Waveform showClipHeaders interactiveClips touchOptimized />
-    </DragDropProvider>
-  );
-};
 
 // Helper to get required file IDs for a track
 const getRequiredFileIds = (trackConfig: typeof trackConfigs[0]): string[] => {
@@ -342,7 +276,25 @@ export function MobileMultiClipExample() {
         barWidth={4}
         barGap={0}
       >
-        <PlaylistWithDrag tracks={tracks} onTracksChange={setTracks} />
+        <ClipInteractionProvider snapMode="off" touchOptimized>
+          <Controls>
+            <ControlGroup>
+              <PlayButton />
+              <PauseButton />
+              <StopButton />
+            </ControlGroup>
+            <ControlGroup>
+              <ZoomInButton />
+              <ZoomOutButton />
+            </ControlGroup>
+            <ControlGroup>
+              <AudioPosition />
+            </ControlGroup>
+          </Controls>
+
+          {/* touchOptimized enables larger touch targets for clip boundaries */}
+          <Waveform showClipHeaders touchOptimized />
+        </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>
   );
