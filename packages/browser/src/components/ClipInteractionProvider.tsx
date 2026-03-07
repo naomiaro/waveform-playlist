@@ -22,7 +22,7 @@ import { ClipInteractionContextProvider } from '../contexts/ClipInteractionConte
 // Stable noop to avoid creating a new function reference on every render
 const NOOP_TRACKS_CHANGE = () => {};
 
-export type ClipInteractionSnapMode = 'beats' | 'temporal' | 'off';
+export type ClipInteractionSnapMode = 'beats' | 'timescale' | 'off';
 
 export interface ClipInteractionProviderProps {
   snapMode: ClipInteractionSnapMode;
@@ -47,6 +47,14 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     );
   }
 
+  // Warn if snapMode="beats" but snap is disabled in BeatsAndBarsProvider
+  if (snapMode === 'beats' && beatsAndBars && beatsAndBars.snapTo === 'off') {
+    console.warn(
+      '[waveform-playlist] ClipInteractionProvider: snapMode="beats" but BeatsAndBarsProvider ' +
+        'has snapTo="off". Clips will not snap to the grid. Set snapTo="beat" or "bar" to enable snapping.'
+    );
+  }
+
   // Warn if onTracksChange is missing — drag/trim edits will be lost
   if (onTracksChange == null) {
     console.warn(
@@ -66,7 +74,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         return ticksToSamples(snapped, bpm, sampleRate);
       };
     }
-    if (snapMode === 'temporal') {
+    if (snapMode === 'timescale') {
       const gridSamples = Math.round((getScaleInfo(samplesPerPixel).smallStep / 1000) * sampleRate);
       return (samplePos: number) => Math.round(samplePos / gridSamples) * gridSamples;
     }
@@ -118,10 +126,10 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
           sampleRate,
         })
       );
-    } else if (snapMode === 'temporal') {
+    } else if (snapMode === 'timescale') {
       mods.push(
         SnapToGridModifier.configure({
-          mode: 'temporal',
+          mode: 'timescale',
           gridSamples: Math.round((getScaleInfo(samplesPerPixel).smallStep / 1000) * sampleRate),
           samplesPerPixel,
         })

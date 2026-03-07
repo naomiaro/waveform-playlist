@@ -238,7 +238,7 @@ export function BeatsAndBarsExample() {
   }
 
   const snapMode: ClipInteractionSnapMode =
-    scaleMode === 'beats' ? 'beats' : temporalSnap ? 'temporal' : 'off';
+    scaleMode === 'beats' ? 'beats' : temporalSnap ? 'timescale' : 'off';
 
   if (loadError) {
     return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {loadError}</div>;

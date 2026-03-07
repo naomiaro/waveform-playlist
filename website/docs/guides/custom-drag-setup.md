@@ -193,7 +193,7 @@ const gridSamples = Math.round(
 
 // Snap modifier for clip moves
 SnapToGridModifier.configure({
-  mode: 'temporal',
+  mode: 'timescale',
   gridSamples,
   samplesPerPixel,
 })
@@ -346,7 +346,7 @@ This uses delay-based activation for touch events (distinguishes drag from scrol
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `mode` | `'temporal'` | Snap by sample count |
+| `mode` | `'timescale'` | Snap by sample count |
 | `gridSamples` | `number` | Samples per grid line |
 | `samplesPerPixel` | `number` | Current zoom level |
 

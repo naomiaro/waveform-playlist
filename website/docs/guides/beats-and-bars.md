@@ -53,7 +53,7 @@ import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `snapMode` | `'beats' \| 'temporal' \| 'off'` | — | Snap behavior for clip moves |
+| `snapMode` | `'beats' \| 'timescale' \| 'off'` | — | Snap behavior for clip moves |
 | `touchOptimized` | `boolean` | `false` | 250ms delay activation for touch input |
 
 :::info Advanced: Manual DragDropProvider Setup

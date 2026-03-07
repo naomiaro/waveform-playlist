@@ -77,7 +77,7 @@ Both providers use React Context with 4 split contexts for performance.
 - `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip()
 - `useDragSensors(opts?)` — Configures PointerSensor activation constraints for DragDropProvider (distance-based default, optional touch-optimized mode)
 - `ClipCollisionModifier` — Collision detection modifier for clip moves, prevents overlapping clips
-- `SnapToGridModifier` — Snap-to-grid modifier for clip moves. Two modes: `'beats'` (PPQN tick grid) and `'temporal'` (sample-based grid). Snaps absolute position, not delta.
+- `SnapToGridModifier` — Snap-to-grid modifier for clip moves. Two modes: `'beats'` (PPQN tick grid) and `'timescale'` (sample-based grid). Snaps absolute position, not delta.
 - `noDropAnimationPlugins` — Disables Feedback plugin drop animation for clip moves
 - `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip()
 - `useExportWav()` — Offline WAV export with effects support
@@ -113,7 +113,7 @@ Both providers use React Context with 4 split contexts for performance.
 - `WaveformPlaylistProvider` — Multi-track provider (Web Audio API / Tone.js). Props: tracks, timescale, controls, theme, effects, annotationList, onAnnotationsChange, onTracksChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel, zoomLevels, mono
 - `MediaElementPlaylistProvider` — Single-track provider (HTMLAudioElement). Props: track, playbackRate, timescale, controls, theme, annotationList, onAnnotationsChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel. Use for language learning, podcasts, single-track viewers.
 - `Waveform` — Main visualization. Props: showClipHeaders, interactiveClips, renderPlayhead, renderTrackControls, showFades, touchOptimized
-- `ClipInteractionProvider` — Declarative wrapper for clip drag/move/trim/snap/collision. Props: snapMode ('beats' | 'temporal' | 'off'), touchOptimized. Auto-enables interactiveClips on descendant Waveform. Use snapMode="beats" with BeatsAndBarsProvider ancestor for beat/bar snapping. Replaces manual DragDropProvider + useClipDragHandlers + modifier setup.
+- `ClipInteractionProvider` — Declarative wrapper for clip drag/move/trim/snap/collision. Props: snapMode ('beats' | 'timescale' | 'off'), touchOptimized. Auto-enables interactiveClips on descendant Waveform. Use snapMode="beats" with BeatsAndBarsProvider ancestor for beat/bar snapping. Replaces manual DragDropProvider + useClipDragHandlers + modifier setup.
 - Buttons: PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton, LoopButton, SetLoopRegionButton, ZoomInButton, ZoomOutButton, ExportWavButton
 - Controls: MasterVolumeControl, TimeFormatSelect, AudioPosition, SelectionTimeInputs, AutomaticScrollCheckbox, ContinuousPlayCheckbox
 

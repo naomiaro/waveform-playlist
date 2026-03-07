@@ -23,7 +23,7 @@ interface SnapToGridBeatsOptions {
 }
 
 interface SnapToGridTemporalOptions {
-  mode: 'temporal';
+  mode: 'timescale';
   gridSamples: number;
   samplesPerPixel: number;
 }
@@ -35,7 +35,7 @@ type SnapToGridOptions = SnapToGridBeatsOptions | SnapToGridTemporalOptions;
  *
  * Two modes:
  * - "beats": Snaps to beat/bar grid using PPQN tick space for exact musical timing.
- * - "temporal": Snaps to a sample-based grid derived from timescale markers.
+ * - "timescale": Snaps to a sample-based grid derived from timescale markers.
  *
  * Designed to compose with ClipCollisionModifier — snap first,
  * then collision constrains the snapped position.
@@ -61,7 +61,7 @@ export class SnapToGridModifier extends Modifier<
 
     // Snap the absolute position (not just the delta) so clips land exactly
     // on grid lines even if they started off-grid.
-    if (this.options.mode === 'temporal') {
+    if (this.options.mode === 'timescale') {
       const { gridSamples } = this.options;
       if (startSample !== undefined) {
         const proposedPosition = startSample + transform.x * samplesPerPixel;

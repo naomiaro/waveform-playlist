@@ -274,7 +274,7 @@ if (derived !== prevRef.current) {
 
 **Two modes via discriminated union:**
 - `mode: 'beats'` — Quantizes in PPQN tick space (bar or beat grid). Uses `samplesToTicks` → `snapToGrid` → `ticksToSamples` round-trip.
-- `mode: 'temporal'` — Quantizes by `gridSamples` (consumer typically derives this from `getScaleInfo(samplesPerPixel).smallStep * sampleRate / 1000`).
+- `mode: 'timescale'` — Quantizes by `gridSamples` (consumer typically derives this from `getScaleInfo(samplesPerPixel).smallStep * sampleRate / 1000`).
 
 **Boundary trims:** Modifier skips trims (returns `transform` unchanged). Trim snapping is handled in `useClipDragHandlers` via optional `snapSamplePosition` callback.
 

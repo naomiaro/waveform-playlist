@@ -145,6 +145,7 @@ export type {
   ClipInteractionProviderProps,
   ClipInteractionSnapMode,
 } from './components/ClipInteractionProvider';
+export { useClipInteractionEnabled } from './contexts/ClipInteractionContext';
 
 // Export modifiers and plugins for drag-and-drop
 export { ClipCollisionModifier } from './modifiers/ClipCollisionModifier';

@@ -472,14 +472,14 @@ type SnapTo = 'bar' | 'beat' | 'off';
 
 type SnapToGridOptions =
   | { mode: 'beats'; snapTo: SnapTo; bpm: number; timeSignature: [number, number]; samplesPerPixel: number; sampleRate: number }
-  | { mode: 'temporal'; gridSamples: number; samplesPerPixel: number };
+  | { mode: 'timescale'; gridSamples: number; samplesPerPixel: number };
 
 class SnapToGridModifier extends Modifier {
   static configure(options: SnapToGridOptions): PluginDescriptor;
 }
 ```
 
-Snap-to-grid modifier for clip moves. `'beats'` mode quantizes in PPQN tick space; `'temporal'` mode quantizes by `gridSamples`. Snaps the clip's absolute timeline position to the grid (not the drag delta). Skips boundary trims (handled separately by `useClipDragHandlers`). Compose: snap first, then `ClipCollisionModifier` constrains the snapped position.
+Snap-to-grid modifier for clip moves. `'beats'` mode quantizes in PPQN tick space; `'timescale'` mode quantizes by `gridSamples`. Snaps the clip's absolute timeline position to the grid (not the drag delta). Skips boundary trims (handled separately by `useClipDragHandlers`). Compose: snap first, then `ClipCollisionModifier` constrains the snapped position.
 
 ### noDropAnimationPlugins
 
@@ -785,7 +785,7 @@ All button/control components connect to context automatically. No props require
 ```typescript
 import { ClipInteractionProvider } from '@waveform-playlist/browser';
 
-type ClipInteractionSnapMode = 'beats' | 'temporal' | 'off';
+type ClipInteractionSnapMode = 'beats' | 'timescale' | 'off';
 
 interface ClipInteractionProviderProps {
   snapMode: ClipInteractionSnapMode;   // Required — snap behavior for clip moves
