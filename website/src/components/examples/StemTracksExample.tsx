@@ -14,6 +14,7 @@ import {
   useAudioTracks,
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
+import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
@@ -155,7 +156,7 @@ export function StemTracksExample() {
 
         </Controls>
 
-        <Waveform />
+        <Waveform renderPlayhead={PlayheadWithMarker} />
       </WaveformPlaylistProvider>
     </Container>
   );
