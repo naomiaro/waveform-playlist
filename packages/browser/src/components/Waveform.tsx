@@ -6,6 +6,7 @@ import type {
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
 import { usePlaylistState } from '../WaveformPlaylistContext';
+import { useClipInteractionEnabled } from '../contexts/ClipInteractionContext';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
 import { PlaylistAnnotationList } from './PlaylistAnnotationList';
@@ -86,6 +87,8 @@ export const Waveform: React.FC<WaveformProps> = ({
   recordingState,
 }) => {
   const { annotations } = usePlaylistState();
+  const clipInteractionEnabled = useClipInteractionEnabled();
+  const effectiveInteractiveClips = interactiveClips || clipInteractionEnabled;
 
   return (
     <>
@@ -102,7 +105,7 @@ export const Waveform: React.FC<WaveformProps> = ({
         getAnnotationBoxLabel={getAnnotationBoxLabel}
         className={className}
         showClipHeaders={showClipHeaders}
-        interactiveClips={interactiveClips}
+        interactiveClips={effectiveInteractiveClips}
         showFades={showFades}
         touchOptimized={touchOptimized}
         onRemoveTrack={onRemoveTrack}
