@@ -98,10 +98,10 @@ const ClickOverlay = styled.div<ClickOverlayProps>`
 
 export interface PlaylistProps {
   readonly theme: DefaultTheme;
-  readonly children?: JSX.Element | JSX.Element[];
+  readonly children?: React.ReactNode;
   readonly backgroundColor?: string;
   readonly timescaleBackgroundColor?: string;
-  readonly timescale?: JSX.Element;
+  readonly timescale?: React.ReactElement;
   readonly timescaleWidth?: number;
   readonly tracksWidth?: number;
   readonly controlsWidth?: number;
