@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
@@ -123,12 +123,36 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Controls component that uses the context hooks
+// Controls component that uses the context hooks.
+// currentTimeRef is updated at 60fps by the provider's animation loop,
+// but currentTime (React state) only updates on pause/stop/seek.
+// We use a local rAF loop to update a DOM ref directly for smooth time display.
 function PlaybackControls() {
-  const { isPlaying, currentTime } = useMediaElementAnimation();
+  const { isPlaying, currentTimeRef } = useMediaElementAnimation();
   const { playbackRate } = useMediaElementState();
   const { play, pause, stop, setPlaybackRate } = useMediaElementControls();
   const { duration } = useMediaElementData();
+
+  const timeDisplayRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    let rafId: number;
+    const update = () => {
+      if (timeDisplayRef.current) {
+        const time = currentTimeRef.current ?? 0;
+        timeDisplayRef.current.textContent = `${formatTime(time)} / ${formatTime(duration)}`;
+      }
+      if (isPlaying) {
+        rafId = requestAnimationFrame(update);
+      }
+    };
+    if (isPlaying) {
+      rafId = requestAnimationFrame(update);
+    } else {
+      update();
+    }
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, currentTimeRef, duration]);
 
   return (
     <Controls>
@@ -145,8 +169,8 @@ function PlaybackControls() {
       </ControlGroup>
 
       <ControlGroup>
-        <TimeDisplay>
-          {formatTime(currentTime)} / {formatTime(duration)}
+        <TimeDisplay ref={timeDisplayRef}>
+          {formatTime(currentTimeRef.current ?? 0)} / {formatTime(duration)}
         </TimeDisplay>
       </ControlGroup>
 
