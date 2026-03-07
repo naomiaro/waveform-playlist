@@ -22,16 +22,18 @@ import { ClipInteractionContextProvider } from '../contexts/ClipInteractionConte
 // Stable noop to avoid creating a new function reference on every render
 const NOOP_TRACKS_CHANGE = () => {};
 
-export type ClipInteractionSnapMode = 'beats' | 'timescale' | 'off';
-
 export interface ClipInteractionProviderProps {
-  snapMode: ClipInteractionSnapMode;
+  /** Enable snap-to-grid for clip moves and boundary trims. When true,
+   *  auto-detects beats snapping from BeatsAndBarsProvider context
+   *  (if present with scaleMode="beats" and snapTo!="off"), otherwise
+   *  falls back to timescale-based snapping. Default: false. */
+  snap?: boolean;
   touchOptimized?: boolean;
   children: React.ReactNode;
 }
 
 export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = ({
-  snapMode,
+  snap = false,
   touchOptimized = false,
   children,
 }) => {
@@ -40,20 +42,14 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   const { setSelectedTrackId } = usePlaylistControls();
   const beatsAndBars = useBeatsAndBars();
 
-  // Validate: snapMode="beats" requires BeatsAndBarsProvider
-  if (snapMode === 'beats' && beatsAndBars == null) {
-    throw new Error(
-      'ClipInteractionProvider: snapMode="beats" requires a BeatsAndBarsProvider ancestor.'
-    );
-  }
-
-  // Warn if snapMode="beats" but snap is disabled in BeatsAndBarsProvider
-  if (snapMode === 'beats' && beatsAndBars && beatsAndBars.snapTo === 'off') {
-    console.warn(
-      '[waveform-playlist] ClipInteractionProvider: snapMode="beats" but BeatsAndBarsProvider ' +
-        'has snapTo="off". Clips will not snap to the grid. Set snapTo="beat" or "bar" to enable snapping.'
-    );
-  }
+  // Derive snap mode from context: beats if provider is in beats mode with snap enabled,
+  // timescale otherwise, off when snap prop is false.
+  const useBeatsSnap =
+    snap &&
+    beatsAndBars != null &&
+    beatsAndBars.scaleMode === 'beats' &&
+    beatsAndBars.snapTo !== 'off';
+  const useTimescaleSnap = snap && !useBeatsSnap;
 
   // Warn if onTracksChange is missing — drag/trim edits will be lost
   if (onTracksChange == null) {
@@ -65,7 +61,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
 
   // Build snapSamplePosition for boundary trim snapping
   const snapSamplePosition = useMemo(() => {
-    if (snapMode === 'beats' && beatsAndBars && beatsAndBars.snapTo !== 'off') {
+    if (useBeatsSnap && beatsAndBars) {
       const { bpm, timeSignature, snapTo } = beatsAndBars;
       const gridTicks = snapTo === 'bar' ? ticksPerBar(timeSignature) : ticksPerBeat(timeSignature);
       return (samplePos: number) => {
@@ -74,12 +70,12 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         return ticksToSamples(snapped, bpm, sampleRate);
       };
     }
-    if (snapMode === 'timescale') {
+    if (useTimescaleSnap) {
       const gridSamples = Math.round((getScaleInfo(samplesPerPixel).smallStep / 1000) * sampleRate);
       return (samplePos: number) => Math.round(samplePos / gridSamples) * gridSamples;
     }
     return undefined;
-  }, [snapMode, beatsAndBars, sampleRate, samplesPerPixel]);
+  }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, sampleRate, samplesPerPixel]);
 
   // Sensors
   const sensors = useDragSensors({ touchOptimized });
@@ -115,7 +111,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   const modifiers = useMemo(() => {
     const mods: Modifiers = [RestrictToHorizontalAxis];
 
-    if (snapMode === 'beats' && beatsAndBars && beatsAndBars.snapTo !== 'off') {
+    if (useBeatsSnap && beatsAndBars) {
       mods.push(
         SnapToGridModifier.configure({
           mode: 'beats',
@@ -126,7 +122,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
           sampleRate,
         })
       );
-    } else if (snapMode === 'timescale') {
+    } else if (useTimescaleSnap) {
       mods.push(
         SnapToGridModifier.configure({
           mode: 'timescale',
@@ -138,7 +134,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
 
     mods.push(ClipCollisionModifier.configure({ tracks, samplesPerPixel }));
     return mods;
-  }, [snapMode, beatsAndBars, tracks, samplesPerPixel, sampleRate]);
+  }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, tracks, samplesPerPixel, sampleRate]);
 
   return (
     <ClipInteractionContextProvider value={true}>

@@ -34,7 +34,7 @@ When `BeatsAndBarsProvider` is present, the timescale automatically switches fro
 
 ## Snap-to-Grid
 
-Wrap your `Waveform` with `ClipInteractionProvider` to enable drag/move/trim with snap-to-grid. Set `snapMode="beats"` to snap clips to the beat or bar grid (determined by `BeatsAndBarsProvider`'s `snapTo` prop):
+Wrap your `Waveform` with `ClipInteractionProvider` to enable drag/move/trim with snap-to-grid. Set `snap` to enable snapping — it auto-detects beats mode from `BeatsAndBarsProvider` context:
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform, ClipInteractionProvider } from '@waveform-playlist/browser';
@@ -42,7 +42,7 @@ import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
 <WaveformPlaylistProvider tracks={tracks} timescale>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
-    <ClipInteractionProvider snapMode="beats">
+    <ClipInteractionProvider snap>
       <Waveform showClipHeaders />
     </ClipInteractionProvider>
   </BeatsAndBarsProvider>
@@ -51,9 +51,13 @@ import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
 `ClipInteractionProvider` handles all the drag sensors, collision detection, snap modifiers, and drag handlers internally. The `interactiveClips` prop on `Waveform` is auto-enabled when inside a `ClipInteractionProvider`.
 
+When `snap` is enabled, the provider reads from `BeatsAndBarsProvider` context:
+- If `scaleMode="beats"` and `snapTo` is `"beat"` or `"bar"` → clips snap to the beat/bar grid
+- Otherwise → clips snap to the timescale grid (derived from zoom level)
+
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `snapMode` | `'beats' \| 'timescale' \| 'off'` | — | Snap behavior for clip moves |
+| `snap` | `boolean` | `false` | Enable snap-to-grid (auto-detects beats vs timescale from context) |
 | `touchOptimized` | `boolean` | `false` | 250ms delay activation for touch input |
 
 :::info Advanced: Manual DragDropProvider Setup

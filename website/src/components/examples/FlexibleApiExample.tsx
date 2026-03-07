@@ -439,7 +439,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
         </Flex>
       </Card>
 
-      <ClipInteractionProvider snapMode="off">
+      <ClipInteractionProvider>
         <KeyboardShortcuts tracks={tracks} />
         <Waveform
           renderTrackControls={(trackIndex) => (

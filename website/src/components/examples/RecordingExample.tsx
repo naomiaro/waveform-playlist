@@ -342,7 +342,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         </Flex>
       </Card>
 
-      <ClipInteractionProvider snapMode="off">
+      <ClipInteractionProvider>
         <Waveform
           showClipHeaders
           onRemoveTrack={handleRemoveTrack}

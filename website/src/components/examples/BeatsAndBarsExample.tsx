@@ -6,7 +6,6 @@ import {
   WaveformPlaylistProvider,
   usePlaylistData,
   ClipInteractionProvider,
-  type ClipInteractionSnapMode,
   useClipSplitting,
   usePlaybackShortcuts,
   Waveform,
@@ -237,8 +236,7 @@ export function BeatsAndBarsExample() {
     setTracks(tracks);
   }
 
-  const snapMode: ClipInteractionSnapMode =
-    scaleMode === 'beats' ? 'beats' : temporalSnap ? 'timescale' : 'off';
+  const snap = scaleMode === 'beats' ? snapTo !== 'off' : temporalSnap;
 
   if (loadError) {
     return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {loadError}</div>;
@@ -260,7 +258,7 @@ export function BeatsAndBarsExample() {
       deferEngineRebuild={loading}
     >
       <BeatsAndBarsProvider bpm={bpm} timeSignature={timeSignature} snapTo={snapTo} scaleMode={scaleMode}>
-        <ClipInteractionProvider snapMode={snapMode}>
+        <ClipInteractionProvider snap={snap}>
           <KeyboardShortcuts tracks={tracksState} />
           <Controls>
             <ControlGroup>

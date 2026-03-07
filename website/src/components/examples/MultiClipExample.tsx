@@ -250,7 +250,7 @@ export function MultiClipExample() {
       barWidth={4}
       barGap={0}
     >
-      <ClipInteractionProvider snapMode="off">
+      <ClipInteractionProvider>
         <KeyboardShortcuts tracks={tracks} />
         <Controls>
           <ControlGroup>

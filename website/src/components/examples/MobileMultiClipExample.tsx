@@ -276,7 +276,7 @@ export function MobileMultiClipExample() {
         barWidth={4}
         barGap={0}
       >
-        <ClipInteractionProvider snapMode="off" touchOptimized>
+        <ClipInteractionProvider touchOptimized>
           <Controls>
             <ControlGroup>
               <PlayButton />
