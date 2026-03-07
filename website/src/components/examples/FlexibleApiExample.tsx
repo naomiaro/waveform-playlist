@@ -38,14 +38,10 @@ import {
   usePlaylistState,
   usePlaybackShortcuts,
   useClipSplitting,
-  useClipDragHandlers,
-  useDragSensors,
+  ClipInteractionProvider,
   type TimeFormat,
   type ClipTrack,
 } from '@waveform-playlist/browser';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
-import { ClipCollisionModifier, noDropAnimationPlugins } from '@waveform-playlist/browser';
 import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -293,29 +289,11 @@ const CustomSelectionInputs: React.FC = () => {
 
 interface FlexibleApiContentProps {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
 }
 
-// Main Example Content Component - Using individual hooks with Radix UI
-const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTracksChange }) => {
-  const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
-  const { currentTimeRef } = usePlaybackAnimation();
-  const { duration, masterVolume, timeFormat, sampleRate, samplesPerPixel, playoutRef, isDraggingRef } = usePlaylistData();
-  const { isAutomaticScroll, selectionStart, selectionEnd, isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
-  const format = timeFormat as TimeFormat;
-
-  // Setup drag sensors and handlers for clip movement/trimming
-  const sensors = useDragSensors();
-  const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
-    tracks,
-    onTracksChange,
-    samplesPerPixel,
-    sampleRate,
-    engineRef: playoutRef,
-    isDraggingRef,
-  });
-
-  // Enable clip splitting
+/** Inner component for keyboard shortcuts that require playlist context */
+const KeyboardShortcuts: React.FC<{ tracks: ClipTrack[] }> = ({ tracks }) => {
+  const { samplesPerPixel, sampleRate, playoutRef } = usePlaylistData();
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
     sampleRate,
@@ -323,7 +301,6 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
     engineRef: playoutRef,
   });
 
-  // Enable keyboard shortcuts (Space=play/pause, Escape=stop, 0=rewind, S=split)
   usePlaybackShortcuts({
     additionalShortcuts: [
       {
@@ -334,6 +311,17 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
       },
     ],
   });
+
+  return null;
+};
+
+// Main Example Content Component - Using individual hooks with Radix UI
+const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
+  const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
+  const { currentTimeRef } = usePlaybackAnimation();
+  const { duration, masterVolume, timeFormat } = usePlaylistData();
+  const { isAutomaticScroll, selectionStart, selectionEnd, isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const format = timeFormat as TimeFormat;
 
   // Navigation handlers using seekTo
   const handleRewind = () => seekTo(0);
@@ -451,14 +439,8 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
         </Flex>
       </Card>
 
-      <DragDropProvider
-        sensors={sensors}
-        onDragStart={onDragStart}
-        onDragMove={onDragMove}
-        onDragEnd={onDragEnd}
-        modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
-        plugins={noDropAnimationPlugins}
-      >
+      <ClipInteractionProvider snapMode="off">
+        <KeyboardShortcuts tracks={tracks} />
         <Waveform
           renderTrackControls={(trackIndex) => (
             <CustomTrackControls trackIndex={trackIndex} />
@@ -468,9 +450,8 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks, onTrack
             return <GrungyTimestamp $left={pixelPosition}>{label}</GrungyTimestamp>;
           }}
           showClipHeaders
-          interactiveClips
         />
-      </DragDropProvider>
+      </ClipInteractionProvider>
 
       {/* Time Controls Bar */}
       <Card>
@@ -611,7 +592,7 @@ export function FlexibleApiExample() {
           theme={customTheme}
           timescale
         >
-          <FlexibleApiContent tracks={tracks} onTracksChange={setTracks} />
+          <FlexibleApiContent tracks={tracks} />
         </WaveformPlaylistProvider>
 
         <Card style={{ marginTop: '2rem', background: 'var(--gray-2)' }}>

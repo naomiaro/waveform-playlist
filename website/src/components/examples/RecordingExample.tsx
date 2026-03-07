@@ -14,8 +14,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
@@ -29,14 +27,11 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
   ExportWavButton,
+  ClipInteractionProvider,
   usePlaybackAnimation,
   usePlaylistData,
   usePlaylistControls,
   usePlaylistState,
-  useClipDragHandlers,
-  useDragSensors,
-  ClipCollisionModifier,
-  noDropAnimationPlugins,
 } from '@waveform-playlist/browser';
 import {
   RecordButton,
@@ -104,7 +99,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   onAddTrack,
 }) => {
   const { currentTime } = usePlaybackAnimation();
-  const { sampleRate, samplesPerPixel, controls, playoutRef, isDraggingRef } = usePlaylistData();
+  const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
   const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId } = usePlaylistControls();
   const { isAutomaticScroll } = usePlaylistState();
 
@@ -112,17 +107,6 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   useEffect(() => {
     setProviderSelectedTrackId(selectedTrackId);
   }, [selectedTrackId, setProviderSelectedTrackId]);
-
-  // Configure sensors and drag handlers
-  const sensors = useDragSensors();
-  const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
-    tracks,
-    onTracksChange: setTracks,
-    samplesPerPixel,
-    sampleRate,
-    engineRef: playoutRef,
-    isDraggingRef,
-  });
 
   // Flag to auto-start recording after creating a new track
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false);
@@ -358,17 +342,9 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         </Flex>
       </Card>
 
-      <DragDropProvider
-        sensors={sensors}
-        onDragStart={onDragStart}
-        onDragMove={onDragMove}
-        onDragEnd={onDragEnd}
-        modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
-        plugins={noDropAnimationPlugins}
-      >
+      <ClipInteractionProvider snapMode="off">
         <Waveform
           showClipHeaders
-          interactiveClips
           onRemoveTrack={handleRemoveTrack}
           recordingState={
             isRecording && selectedTrackId
@@ -382,7 +358,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               : undefined
           }
         />
-      </DragDropProvider>
+      </ClipInteractionProvider>
 
       {tracks.length === 0 && (
         <Flex justify="center" style={{ padding: '3rem', color: 'var(--gray-9)' }}>
