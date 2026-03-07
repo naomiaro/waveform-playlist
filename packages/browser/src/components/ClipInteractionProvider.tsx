@@ -19,6 +19,9 @@ import { SnapToGridModifier } from '../modifiers/SnapToGridModifier';
 import { noDropAnimationPlugins } from '../plugins/noDropAnimationPlugins';
 import { ClipInteractionContextProvider } from '../contexts/ClipInteractionContext';
 
+// Stable noop to avoid creating a new function reference on every render
+const NOOP_TRACKS_CHANGE = () => {};
+
 export type ClipInteractionSnapMode = 'beats' | 'temporal' | 'off';
 
 export interface ClipInteractionProviderProps {
@@ -41,6 +44,14 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   if (snapMode === 'beats' && beatsAndBars == null) {
     throw new Error(
       'ClipInteractionProvider: snapMode="beats" requires a BeatsAndBarsProvider ancestor.'
+    );
+  }
+
+  // Warn if onTracksChange is missing — drag/trim edits will be lost
+  if (onTracksChange == null) {
+    console.warn(
+      '[waveform-playlist] ClipInteractionProvider: onTracksChange is not set on ' +
+        'WaveformPlaylistProvider. Drag and trim edits will not be persisted.'
     );
   }
 
@@ -72,7 +83,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragEnd,
   } = useClipDragHandlers({
     tracks,
-    onTracksChange: onTracksChange ?? (() => {}),
+    onTracksChange: onTracksChange ?? NOOP_TRACKS_CHANGE,
     samplesPerPixel,
     sampleRate,
     engineRef: playoutRef,
