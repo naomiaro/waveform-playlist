@@ -1,27 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import {
-  createTrack,
-  createClipFromSeconds,
-  ticksPerBeat,
-  ticksPerBar,
-  samplesToTicks,
-  ticksToSamples,
-  snapToGrid,
-  type ClipTrack,
-} from '@waveform-playlist/core';
+import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   usePlaylistData,
-  usePlaylistControls,
-  useClipDragHandlers,
-  useDragSensors,
-  ClipCollisionModifier,
-  SnapToGridModifier,
-  noDropAnimationPlugins,
+  ClipInteractionProvider,
+  type ClipInteractionSnapMode,
   useClipSplitting,
   usePlaybackShortcuts,
   Waveform,
@@ -37,7 +22,6 @@ import {
 } from '@waveform-playlist/browser';
 import {
   BeatsAndBarsProvider,
-  getScaleInfo,
   BaseSelectSmall,
   BaseInputSmall,
   InlineLabel,
@@ -129,86 +113,9 @@ const trackConfigs = [
   },
 ];
 
-interface PlaylistWithDragProps {
-  tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
-  scaleMode: ScaleMode;
-  setScaleMode: (mode: ScaleMode) => void;
-  bpm: number;
-  setBpm: (bpm: number) => void;
-  timeSignature: [number, number];
-  setTimeSignature: (ts: [number, number]) => void;
-  snapTo: SnapTo;
-  setSnapTo: (snap: SnapTo) => void;
-  temporalSnap: boolean;
-  setTemporalSnap: (snap: boolean) => void;
-  loading?: boolean;
-  loadedCount?: number;
-  totalCount?: number;
-}
-
-const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({
-  tracks,
-  onTracksChange,
-  scaleMode,
-  setScaleMode,
-  bpm,
-  setBpm,
-  timeSignature,
-  setTimeSignature,
-  snapTo,
-  setSnapTo,
-  temporalSnap,
-  setTemporalSnap,
-  loading,
-  loadedCount,
-  totalCount,
-}) => {
-  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
-  const { setSelectedTrackId } = usePlaylistControls();
-
-  // Snap function for boundary trims — snaps a sample position to the nearest grid line
-  const snapSamplePosition = React.useMemo(() => {
-    if (scaleMode === 'beats' && snapTo !== 'off') {
-      const gridTicks = snapTo === 'bar' ? ticksPerBar(timeSignature) : ticksPerBeat(timeSignature);
-      return (samplePos: number) => {
-        const ticks = samplesToTicks(samplePos, bpm, sampleRate);
-        const snapped = snapToGrid(ticks, gridTicks);
-        return ticksToSamples(snapped, bpm, sampleRate);
-      };
-    }
-    if (scaleMode === 'temporal' && temporalSnap) {
-      const gridSamples = Math.round(
-        (getScaleInfo(samplesPerPixel).smallStep / 1000) * sampleRate
-      );
-      return (samplePos: number) => Math.round(samplePos / gridSamples) * gridSamples;
-    }
-    return undefined;
-  }, [scaleMode, snapTo, temporalSnap, bpm, timeSignature, sampleRate, samplesPerPixel]);
-
-  const sensors = useDragSensors();
-  const {
-    onDragStart: handleDragStart,
-    onDragMove,
-    onDragEnd,
-  } = useClipDragHandlers({
-    tracks,
-    onTracksChange,
-    samplesPerPixel,
-    sampleRate,
-    engineRef: playoutRef,
-    isDraggingRef,
-    snapSamplePosition,
-  });
-
-  const onDragStart = (event: Parameters<typeof handleDragStart>[0]) => {
-    const trackIndex = event.operation?.source?.data?.trackIndex as number | undefined;
-    if (trackIndex !== undefined && tracks[trackIndex]) {
-      setSelectedTrackId(tracks[trackIndex].id);
-    }
-    handleDragStart(event);
-  };
-
+/** Inner component for keyboard shortcuts that require playlist context */
+const KeyboardShortcuts: React.FC<{ tracks: ClipTrack[] }> = ({ tracks }) => {
+  const { samplesPerPixel, sampleRate, playoutRef } = usePlaylistData();
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
     sampleRate,
@@ -216,7 +123,6 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({
     engineRef: playoutRef,
   });
 
-  // Enable default playback shortcuts (0 = rewind to start) plus split shortcut
   usePlaybackShortcuts({
     additionalShortcuts: [
       {
@@ -228,151 +134,7 @@ const PlaylistWithDrag: React.FC<PlaylistWithDragProps> = ({
     ],
   });
 
-  return (
-    <DragDropProvider
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      modifiers={[
-        RestrictToHorizontalAxis,
-        ...(scaleMode === 'beats'
-          ? snapTo !== 'off'
-            ? [
-                SnapToGridModifier.configure({
-                  mode: 'beats',
-                  snapTo,
-                  bpm,
-                  timeSignature,
-                  samplesPerPixel,
-                  sampleRate,
-                }),
-              ]
-            : []
-          : temporalSnap
-            ? [
-                SnapToGridModifier.configure({
-                  mode: 'temporal',
-                  gridSamples: Math.round(
-                    (getScaleInfo(samplesPerPixel).smallStep / 1000) * sampleRate
-                  ),
-                  samplesPerPixel,
-                }),
-              ]
-            : []),
-        ClipCollisionModifier.configure({ tracks, samplesPerPixel }),
-      ]}
-      plugins={noDropAnimationPlugins}
-    >
-      <Controls>
-        <ControlGroup>
-          <PlayButton />
-          <PauseButton />
-          <StopButton />
-          <LoopButton />
-          {loading && (
-            <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>
-              Loading: {loadedCount}/{totalCount}
-            </span>
-          )}
-        </ControlGroup>
-        <ControlGroup>
-          <ZoomInButton />
-          <ZoomOutButton />
-        </ControlGroup>
-        <ControlGroup>
-          <AudioPosition />
-        </ControlGroup>
-        <ControlGroup>
-          <AutomaticScrollCheckbox />
-        </ControlGroup>
-        <ControlGroup>
-          <MasterVolumeControl />
-        </ControlGroup>
-      </Controls>
-      <Controls>
-        <ControlGroup>
-          <InlineLabel>
-            Scale{' '}
-            <BaseSelectSmall
-              value={scaleMode}
-              onChange={(e) => setScaleMode(e.target.value as ScaleMode)}
-            >
-              <option value="beats">Beats &amp; Bars</option>
-              <option value="temporal">Temporal</option>
-            </BaseSelectSmall>
-          </InlineLabel>
-        </ControlGroup>
-        {scaleMode === 'beats' ? (
-          <>
-            <ControlGroup>
-              <InlineLabel>
-                BPM{' '}
-                <BaseInputSmall
-                  type="number"
-                  min={20}
-                  max={300}
-                  value={bpm}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (val >= 20 && val <= 300) setBpm(val);
-                  }}
-                  style={{ width: 60 }}
-                />
-              </InlineLabel>
-            </ControlGroup>
-            <ControlGroup>
-              <InlineLabel>
-                Time Sig{' '}
-                <BaseSelectSmall
-                  value={`${timeSignature[0]}/${timeSignature[1]}`}
-                  onChange={(e) => {
-                    const [num, den] = e.target.value.split('/').map(Number);
-                    setTimeSignature([num, den]);
-                  }}
-                >
-                  <option value="4/4">4/4</option>
-                  <option value="3/4">3/4</option>
-                  <option value="6/8">6/8</option>
-                  <option value="2/2">2/2</option>
-                  <option value="5/4">5/4</option>
-                  <option value="7/8">7/8</option>
-                </BaseSelectSmall>
-              </InlineLabel>
-            </ControlGroup>
-            <ControlGroup>
-              <InlineLabel>
-                Snap{' '}
-                <BaseSelectSmall
-                  value={snapTo}
-                  onChange={(e) => setSnapTo(e.target.value as SnapTo)}
-                >
-                  <option value="bar">Bar</option>
-                  <option value="beat">Beat</option>
-                  <option value="off">Off</option>
-                </BaseSelectSmall>
-              </InlineLabel>
-            </ControlGroup>
-          </>
-        ) : (
-          <ControlGroup>
-            <InlineLabel>
-              Snap{' '}
-              <BaseSelectSmall
-                value={temporalSnap ? 'on' : 'off'}
-                onChange={(e) => setTemporalSnap(e.target.value === 'on')}
-              >
-                <option value="on">On</option>
-                <option value="off">Off</option>
-              </BaseSelectSmall>
-            </InlineLabel>
-          </ControlGroup>
-        )}
-      </Controls>
-
-      <Waveform showClipHeaders interactiveClips />
-    </DragDropProvider>
-  );
+  return null;
 };
 
 // Default sample rate for placeholder clips (before audio loads)
@@ -475,6 +237,9 @@ export function BeatsAndBarsExample() {
     setTracks(tracks);
   }
 
+  const snapMode: ClipInteractionSnapMode =
+    scaleMode === 'beats' ? 'beats' : temporalSnap ? 'temporal' : 'off';
+
   if (loadError) {
     return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {loadError}</div>;
   }
@@ -495,23 +260,116 @@ export function BeatsAndBarsExample() {
       deferEngineRebuild={loading}
     >
       <BeatsAndBarsProvider bpm={bpm} timeSignature={timeSignature} snapTo={snapTo} scaleMode={scaleMode}>
-        <PlaylistWithDrag
-          tracks={tracksState}
-          onTracksChange={setTracks}
-          scaleMode={scaleMode}
-          setScaleMode={setScaleMode}
-          bpm={bpm}
-          setBpm={setBpm}
-          timeSignature={timeSignature}
-          setTimeSignature={setTimeSignature}
-          snapTo={snapTo}
-          setSnapTo={setSnapTo}
-          temporalSnap={temporalSnap}
-          setTemporalSnap={setTemporalSnap}
-          loading={loading}
-          loadedCount={loadedCount}
-          totalCount={audioFiles.length}
-        />
+        <ClipInteractionProvider snapMode={snapMode}>
+          <KeyboardShortcuts tracks={tracksState} />
+          <Controls>
+            <ControlGroup>
+              <PlayButton />
+              <PauseButton />
+              <StopButton />
+              <LoopButton />
+              {loading && (
+                <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>
+                  Loading: {loadedCount}/{audioFiles.length}
+                </span>
+              )}
+            </ControlGroup>
+            <ControlGroup>
+              <ZoomInButton />
+              <ZoomOutButton />
+            </ControlGroup>
+            <ControlGroup>
+              <AudioPosition />
+            </ControlGroup>
+            <ControlGroup>
+              <AutomaticScrollCheckbox />
+            </ControlGroup>
+            <ControlGroup>
+              <MasterVolumeControl />
+            </ControlGroup>
+          </Controls>
+          <Controls>
+            <ControlGroup>
+              <InlineLabel>
+                Scale{' '}
+                <BaseSelectSmall
+                  value={scaleMode}
+                  onChange={(e) => setScaleMode(e.target.value as ScaleMode)}
+                >
+                  <option value="beats">Beats &amp; Bars</option>
+                  <option value="temporal">Temporal</option>
+                </BaseSelectSmall>
+              </InlineLabel>
+            </ControlGroup>
+            {scaleMode === 'beats' ? (
+              <>
+                <ControlGroup>
+                  <InlineLabel>
+                    BPM{' '}
+                    <BaseInputSmall
+                      type="number"
+                      min={20}
+                      max={300}
+                      value={bpm}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (val >= 20 && val <= 300) setBpm(val);
+                      }}
+                      style={{ width: 60 }}
+                    />
+                  </InlineLabel>
+                </ControlGroup>
+                <ControlGroup>
+                  <InlineLabel>
+                    Time Sig{' '}
+                    <BaseSelectSmall
+                      value={`${timeSignature[0]}/${timeSignature[1]}`}
+                      onChange={(e) => {
+                        const [num, den] = e.target.value.split('/').map(Number);
+                        setTimeSignature([num, den]);
+                      }}
+                    >
+                      <option value="4/4">4/4</option>
+                      <option value="3/4">3/4</option>
+                      <option value="6/8">6/8</option>
+                      <option value="2/2">2/2</option>
+                      <option value="5/4">5/4</option>
+                      <option value="7/8">7/8</option>
+                    </BaseSelectSmall>
+                  </InlineLabel>
+                </ControlGroup>
+                <ControlGroup>
+                  <InlineLabel>
+                    Snap{' '}
+                    <BaseSelectSmall
+                      value={snapTo}
+                      onChange={(e) => setSnapTo(e.target.value as SnapTo)}
+                    >
+                      <option value="bar">Bar</option>
+                      <option value="beat">Beat</option>
+                      <option value="off">Off</option>
+                    </BaseSelectSmall>
+                  </InlineLabel>
+                </ControlGroup>
+              </>
+            ) : (
+              <ControlGroup>
+                <InlineLabel>
+                  Snap{' '}
+                  <BaseSelectSmall
+                    value={temporalSnap ? 'on' : 'off'}
+                    onChange={(e) => setTemporalSnap(e.target.value === 'on')}
+                  >
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </BaseSelectSmall>
+                </InlineLabel>
+              </ControlGroup>
+            )}
+          </Controls>
+
+          <Waveform showClipHeaders />
+        </ClipInteractionProvider>
       </BeatsAndBarsProvider>
     </WaveformPlaylistProvider>
   );
