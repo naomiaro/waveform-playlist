@@ -1,5 +1,10 @@
 /**
  * Window functions for spectral analysis.
+ *
+ * Uses periodic (DFT-even) windows where the denominator is N, not N-1.
+ * Periodic windows tile perfectly over consecutive FFT frames, giving better
+ * frequency resolution in STFT/spectrogram computation. This matches the
+ * convention used by Audacity, SciPy (sym=False), and MATLAB ('periodic').
  */
 
 export function getWindowFunction(name: string, size: number, alpha?: number): Float32Array {
