@@ -291,3 +291,15 @@ if (derived !== prevRef.current) {
 **Trim snapping (useClipDragHandlers):** Optional `snapSamplePosition` callback. After `calculateBoundaryTrim`, snaps the boundary's absolute position (left → snap `startSample`, right → snap end position). Stored in ref to avoid dependency churn. `lastBoundaryDeltaRef` uses the effective (snapped) delta so `engine.trimClip()` gets the correct value.
 
 **Draggable data:** `Clip.tsx` includes `startSample` and `durationSamples` in all draggable `data` objects (clip move + both boundary handles) so modifiers can compute absolute positions.
+
+## Hook Isolation for Render Props
+
+**Problem:** Calling a render prop function (e.g., `renderPlayhead({...})`) directly in a conditional branch merges its hooks into the parent's hook count. If the prop toggles, React throws "Rendered more hooks than during the previous render."
+
+**Fix:** Wrap in a dedicated component (`CustomMediaElementPlayhead`) that always calls the render prop, isolating its hooks in its own component boundary. See `MediaElementPlaylist.tsx`.
+
+**Stable stub refs:** When MediaElement components pass `PlayheadProps` to render functions, Tone.js-specific refs (`playbackStartTimeRef`, `audioStartPositionRef`) are stubbed as `ZERO_REF` (module-level constant). Never create `{ current: 0 }` inline — it causes useEffect dep churn on every render.
+
+## MediaElement currentTime vs currentTimeRef
+
+`currentTime` (React state from `useMediaElementAnimation`) only updates on pause/stop/seek/playback-end — NOT during playback. For smooth real-time display, use `currentTimeRef` with a local `requestAnimationFrame` loop and direct DOM manipulation (e.g., `ref.current.textContent = ...`). Never use `currentTime` for time displays that should update during playback.
