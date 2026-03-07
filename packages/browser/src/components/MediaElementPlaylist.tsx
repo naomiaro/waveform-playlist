@@ -33,9 +33,13 @@ import type {
 
 /**
  * Wrapper that isolates the custom playhead's hooks from MediaElementPlaylist.
- * Calling renderPlayhead() as a function would merge its hooks into the parent,
- * causing "Rendered more hooks" errors when renderPlayhead toggles.
+ * Calling renderPlayhead() directly inside MediaElementPlaylist's render would
+ * merge its hooks into MediaElementPlaylist's hook count, causing "Rendered more
+ * hooks" errors if renderPlayhead is conditionally provided.
  */
+// Stable refs for MediaElement playback (no AudioContext, so these are always 0)
+const ZERO_REF: React.RefObject<number> = { current: 0 };
+
 const CustomMediaElementPlayhead: React.FC<{
   renderPlayhead: RenderPlayheadFunction;
   color: string;
@@ -44,21 +48,17 @@ const CustomMediaElementPlayhead: React.FC<{
 }> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
   const { isPlaying, currentTimeRef } = useMediaElementAnimation();
 
-  return (
-    <>
-      {renderPlayhead({
-        position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
-        color,
-        isPlaying,
-        currentTimeRef,
-        playbackStartTimeRef: { current: 0 } as React.RefObject<number>,
-        audioStartPositionRef: { current: 0 } as React.RefObject<number>,
-        samplesPerPixel,
-        sampleRate,
-        controlsOffset: 0,
-      })}
-    </>
-  );
+  return renderPlayhead({
+    position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
+    color,
+    isPlaying,
+    currentTimeRef,
+    playbackStartTimeRef: ZERO_REF,
+    audioStartPositionRef: ZERO_REF,
+    samplesPerPixel,
+    sampleRate,
+    controlsOffset: 0,
+  }) as React.ReactElement;
 };
 
 export interface MediaElementPlaylistProps {

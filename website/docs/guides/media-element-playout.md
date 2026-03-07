@@ -55,7 +55,7 @@ function MyPlayer() {
 }
 
 function PlaybackControls() {
-  const { isPlaying, currentTime } = useMediaElementAnimation();
+  const { isPlaying } = useMediaElementAnimation();
   const { play, pause, setPlaybackRate } = useMediaElementControls();
 
   return (
@@ -80,18 +80,18 @@ import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 <MediaElementWaveform renderPlayhead={PlayheadWithMarker} />
 ```
 
-`PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` with `isPlaying`, `currentTimeRef`, `samplesPerPixel`, and `sampleRate` for smooth 60fps animation.
+`PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` (see [API reference](/docs/api/llm-reference)). In the MediaElement context, use `currentTimeRef` for animation; `playbackStartTimeRef` and `audioStartPositionRef` are not applicable.
 
 ## Context Hooks
 
 `MediaElementPlaylistProvider` uses 4 split contexts, matching the pattern of `WaveformPlaylistProvider`:
 
-| Hook | Frequency | Returns |
-|------|-----------|---------|
-| `useMediaElementAnimation()` | 60fps | `isPlaying`, `currentTime`, `currentTimeRef` |
-| `useMediaElementState()` | Medium | `playbackRate`, `annotations`, `activeAnnotationId`, `continuousPlay` |
-| `useMediaElementControls()` | Stable | `play`, `pause`, `stop`, `seekTo`, `setPlaybackRate`, `setAnnotations` |
-| `useMediaElementData()` | Stable | `duration`, `peaksDataArray`, `sampleRate`, `samplesPerPixel` |
+| Hook | Frequency | Key returns |
+|------|-----------|-------------|
+| `useMediaElementAnimation()` | On play/pause/stop/seek | `isPlaying`, `currentTime`, `currentTimeRef` (ref updates at 60fps) |
+| `useMediaElementState()` | Medium | `playbackRate`, `annotations`, `activeAnnotationId`, `continuousPlay`, `isAutomaticScroll` |
+| `useMediaElementControls()` | Stable | `play`, `pause`, `stop`, `seekTo`, `setPlaybackRate`, `setAnnotations`, `setActiveAnnotationId`, `setContinuousPlay` |
+| `useMediaElementData()` | Stable | `duration`, `peaksDataArray`, `sampleRate`, `samplesPerPixel`, `waveHeight`, `barWidth`, `barGap` |
 
 ## Live Example
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
@@ -15,14 +15,14 @@ import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 // Audio files with pre-computed peaks
 const AUDIO_CONFIGS = [
   {
-    name: 'Bass',
-    audioSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+    source: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
     peaksSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.dat',
+    name: 'Bass',
   },
   {
-    name: 'Kick',
-    audioSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+    source: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
     peaksSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.dat',
+    name: 'Kick',
   },
 ];
 
@@ -125,7 +125,7 @@ function formatTime(seconds: number): string {
 
 // Controls component that uses the context hooks.
 // currentTimeRef is updated at 60fps by the provider's animation loop,
-// but currentTime (React state) only updates on pause/stop/seek.
+// but currentTime (React state) only updates on pause/stop/seek/playback-end.
 // We use a local rAF loop to update a DOM ref directly for smooth time display.
 function PlaybackControls() {
   const { isPlaying, currentTimeRef } = useMediaElementAnimation();
@@ -202,22 +202,24 @@ function PlaybackControls() {
  */
 export function MediaElementExample() {
   const { theme } = useDocusaurusTheme();
-  const [waveformDataMap, setWaveformDataMap] = useState<Record<string, any>>({});
+  const [trackConfigs, setTrackConfigs] = useState<Array<{ source: string; waveformData: any; name: string } | null>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load BBC peaks files for both tracks
+  // Load BBC peaks files and build track configs
   useEffect(() => {
     const loadAllPeaks = async () => {
       try {
         const results = await Promise.all(
           AUDIO_CONFIGS.map(config => loadWaveformData(config.peaksSrc))
         );
-        const map: Record<string, any> = {};
-        AUDIO_CONFIGS.forEach((config, i) => {
-          map[config.name] = results[i];
-        });
-        setWaveformDataMap(map);
+        setTrackConfigs(
+          AUDIO_CONFIGS.map((config, i) => ({
+            source: config.source,
+            waveformData: results[i],
+            name: config.name,
+          }))
+        );
         setLoading(false);
       } catch (err) {
         console.error('Error loading peaks:', err);
@@ -228,19 +230,6 @@ export function MediaElementExample() {
 
     loadAllPeaks();
   }, []);
-
-  // Build track configs
-  const trackConfigs = useMemo(() => {
-    return AUDIO_CONFIGS.map(config => {
-      const data = waveformDataMap[config.name];
-      if (!data) return null;
-      return {
-        source: config.audioSrc,
-        waveformData: data,
-        name: config.name,
-      };
-    });
-  }, [waveformDataMap]);
 
   if (loading) {
     return (
