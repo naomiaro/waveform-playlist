@@ -41,24 +41,23 @@ describe('formatTime', () => {
 
   describe('hh:mm:ss format', () => {
     it('formats zero', () => {
-      // decimals=0, padStart(3, '0') => 3-char seconds field
-      expect(formatTime(0, 'hh:mm:ss')).toBe('00:00:000');
+      expect(formatTime(0, 'hh:mm:ss')).toBe('00:00:00');
     });
 
     it('formats seconds only', () => {
-      expect(formatTime(5, 'hh:mm:ss')).toBe('00:00:005');
+      expect(formatTime(5, 'hh:mm:ss')).toBe('00:00:05');
     });
 
     it('formats minutes and seconds', () => {
-      expect(formatTime(65, 'hh:mm:ss')).toBe('00:01:005');
+      expect(formatTime(65, 'hh:mm:ss')).toBe('00:01:05');
     });
 
     it('formats hours, minutes, and seconds', () => {
-      expect(formatTime(3661, 'hh:mm:ss')).toBe('01:01:001');
+      expect(formatTime(3661, 'hh:mm:ss')).toBe('01:01:01');
     });
 
     it('rounds fractional seconds', () => {
-      expect(formatTime(1.7, 'hh:mm:ss')).toBe('00:00:002');
+      expect(formatTime(1.7, 'hh:mm:ss')).toBe('00:00:02');
     });
   });
 
@@ -102,11 +101,11 @@ describe('formatTime', () => {
 
   describe('wraps hours at 24', () => {
     it('wraps 86400 seconds (24h) to 00', () => {
-      expect(formatTime(86400, 'hh:mm:ss')).toBe('00:00:000');
+      expect(formatTime(86400, 'hh:mm:ss')).toBe('00:00:00');
     });
 
     it('wraps 90061 seconds (25h 1m 1s) to 01:01:01', () => {
-      expect(formatTime(90061, 'hh:mm:ss')).toBe('01:01:001');
+      expect(formatTime(90061, 'hh:mm:ss')).toBe('01:01:01');
     });
   });
 });
@@ -210,7 +209,7 @@ describe('round-trip: formatTime(parseTime(str)) === str', () => {
   });
 
   it('round-trips hh:mm:ss format', () => {
-    const str = '01:02:003';
+    const str = '01:02:03';
     expect(formatTime(parseTime(str, 'hh:mm:ss'), 'hh:mm:ss')).toBe(str);
   });
 

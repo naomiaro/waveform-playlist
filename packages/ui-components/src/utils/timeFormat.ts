@@ -23,7 +23,7 @@ function clockFormat(seconds: number, decimals: number): string {
     ':' +
     String(minutes).padStart(2, '0') +
     ':' +
-    secs.padStart(decimals + 3, '0')
+    secs.padStart(decimals > 0 ? decimals + 3 : 2, '0')
   );
 }
 

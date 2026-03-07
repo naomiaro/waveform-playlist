@@ -67,11 +67,10 @@ describe('generatePeaks', () => {
     const result = generatePeaks(samples, 4, 16);
 
     const maxValue = 2 ** 15; // 32768
-    // min: Math.floor(-1 * 32768) = -32768
+    // min: Math.floor(-1 * 32768) = -32768 (valid Int16 min)
     expect(result[0]).toBe(-maxValue);
-    // max: Math.floor(1 * 32768) = 32768, but Int16Array wraps to -32768
-    // This is a known overflow behavior for full-scale positive signals
-    expect(result[1]).toBe(new Int16Array([maxValue])[0]);
+    // max: clamped to 32767 (Int16 max) instead of overflowing
+    expect(result[1]).toBe(maxValue - 1);
   });
 
   it('produces correct interleaved format: [min0, max0, min1, max1, ...]', () => {

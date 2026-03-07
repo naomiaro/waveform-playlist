@@ -34,8 +34,9 @@ export function generatePeaks(
     }
 
     // Store as min/max pairs scaled to bit depth
-    peakArray[i * 2] = Math.floor(min * maxValue);
-    peakArray[i * 2 + 1] = Math.floor(max * maxValue);
+    // Clamp to valid range: Int16 is [-32768, 32767], Int8 is [-128, 127]
+    peakArray[i * 2] = Math.max(-maxValue, Math.floor(min * maxValue));
+    peakArray[i * 2 + 1] = Math.min(maxValue - 1, Math.floor(max * maxValue));
   }
 
   return peakArray;
@@ -77,8 +78,8 @@ export function appendPeaks(
     // Update last peak
     const updated = new (bits === 8 ? Int8Array : Int16Array)(existingPeaks.length);
     updated.set(existingPeaks);
-    updated[existingPeaks.length - 2] = Math.floor(min * maxValue);
-    updated[existingPeaks.length - 1] = Math.floor(max * maxValue);
+    updated[existingPeaks.length - 2] = Math.max(-maxValue, Math.floor(min * maxValue));
+    updated[existingPeaks.length - 1] = Math.min(maxValue - 1, Math.floor(max * maxValue));
 
     offset = endIndex;
 
