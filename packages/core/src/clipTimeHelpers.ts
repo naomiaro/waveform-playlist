@@ -22,8 +22,9 @@ export function clipDurationTime(clip: AudioClip): number {
 
 /**
  * Clip width in pixels at a given samplesPerPixel.
- * Uses the same floor-based formula as Clip.tsx to ensure pixel-perfect
- * alignment between clip container and progress overlay.
+ * Shared by Clip.tsx (container sizing) and ChannelWithProgress.tsx (progress overlay)
+ * to ensure pixel-perfect alignment. Floor-based endpoint subtraction guarantees
+ * adjacent clips have no pixel gaps.
  */
 export function clipPixelWidth(
   startSample: number,

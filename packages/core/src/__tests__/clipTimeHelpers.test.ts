@@ -118,6 +118,16 @@ describe('clipPixelWidth', () => {
     expect(clipPixelWidth(50, 100, 1)).toBe(100);
   });
 
+  it('adjacent clips have no gap with default spp=1000', () => {
+    const spp = 1000;
+    const w1 = clipPixelWidth(0, 44100, spp);
+    const w2 = clipPixelWidth(44100, 44100, spp);
+    const left1 = Math.floor(0 / spp);
+    const left2 = Math.floor(44100 / spp);
+    expect(left1 + w1).toBe(left2);
+    expect(w1 + w2).toBe(clipPixelWidth(0, 88200, spp));
+  });
+
   it('handles large samplesPerPixel (zoomed out)', () => {
     // spp=4096, 20s at 48kHz = 960000 samples
     // floor(960000/4096) - floor(0/4096) = 234 - 0 = 234
@@ -137,7 +147,7 @@ describe('clipPixelWidth', () => {
 
     // clipWidth should be larger than peaksWidth
     expect(clipWidth).toBeGreaterThan(peaksWidth);
-    // Progress overlay must use clipWidth (938), not peaksWidth (750)
+    // Progress overlay must use clipWidth (937), not peaksWidth (750)
     expect(clipWidth).toBe(Math.floor(960000 / 1024));
     expect(peaksWidth).toBe(Math.floor(768000 / 1024));
   });

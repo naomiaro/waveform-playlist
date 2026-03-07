@@ -156,7 +156,6 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   }, [
     isPlaying,
     sampleRate,
-    samplesPerPixel,
     clipStartSample,
     clipDurationSamples,
     clipPixelWidth,
