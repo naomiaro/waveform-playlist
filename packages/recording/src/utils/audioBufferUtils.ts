@@ -19,19 +19,24 @@ export function concatenateAudioData(chunks: Float32Array[]): Float32Array {
 }
 
 /**
- * Convert per-channel Float32Arrays to AudioBuffer
+ * Convert channel data to AudioBuffer.
+ * Accepts either per-channel Float32Array[] or a single Float32Array (mono, backwards compatible).
  */
 export function createAudioBuffer(
   audioContext: AudioContext,
-  channelData: Float32Array[],
+  channelData: Float32Array[] | Float32Array,
   sampleRate: number,
   channelCount: number = 1
 ): AudioBuffer {
-  const length = channelData[0]?.length ?? 0;
+  // Backwards compatibility: single Float32Array → wrap as mono
+  const channels: Float32Array[] =
+    channelData instanceof Float32Array ? [channelData] : channelData;
+
+  const length = channels[0]?.length ?? 0;
   const buffer = audioContext.createBuffer(channelCount, length, sampleRate);
 
-  for (let ch = 0; ch < Math.min(channelCount, channelData.length); ch++) {
-    buffer.copyToChannel(new Float32Array(channelData[ch]), ch);
+  for (let ch = 0; ch < Math.min(channelCount, channels.length); ch++) {
+    buffer.copyToChannel(new Float32Array(channels[ch]), ch);
   }
 
   return buffer;

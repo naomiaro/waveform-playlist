@@ -137,10 +137,9 @@ export function useRecording(
           }
           recordedChunksRef.current[ch].push(channels[ch]);
         }
+        // Capture sample offset before incrementing — used by peak alignment
+        const samplesProcessedBefore = totalSamplesRef.current;
         totalSamplesRef.current += channels[0].length;
-
-        // Update per-channel peaks for live waveform visualization
-        const samplesProcessedBefore = totalSamplesRef.current - channels[0].length;
         setPeaks((prevPeaks) => {
           // Ensure we have an entry per channel
           const updated: (Int8Array | Int16Array)[] = [];
