@@ -23,8 +23,9 @@ export interface MicrophoneDevice {
 
 export interface RecordingOptions {
   /**
-   * Number of channels to record (1 = mono, 2 = stereo)
-   * Default: 1 (mono)
+   * Number of channels to record (1 = mono, 2 = stereo).
+   * Auto-detected from the microphone stream when not specified.
+   * Falls back to 1 (mono) if the stream doesn't report channel count.
    * Note: Sample rate is determined by the global AudioContext
    */
   channelCount?: number;

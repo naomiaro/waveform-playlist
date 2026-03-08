@@ -85,14 +85,19 @@ export function useRecording(
       // Load worklet module
       await loadWorklet();
 
+      // Detect actual channel count from the stream's audio track settings.
+      // Falls back to the user-provided channelCount option.
+      const streamChannelCount =
+        stream.getAudioTracks()[0]?.getSettings().channelCount ?? channelCount;
+
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
       const source = context.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
 
-      // Create AudioWorklet node — set channelCount so stereo streams aren't downmixed
+      // Create AudioWorklet node — set channelCount to match the stream
       const workletNode = context.createAudioWorkletNode('recording-processor', {
-        channelCount,
+        channelCount: streamChannelCount,
         channelCountMode: 'explicit',
       });
       workletNodeRef.current = workletNode;
@@ -135,14 +140,14 @@ export function useRecording(
       workletNode.port.postMessage({
         command: 'start',
         sampleRate: context.sampleRate,
-        channelCount,
+        channelCount: streamChannelCount,
       });
 
       // Reset state
-      recordedChunksRef.current = Array.from({ length: channelCount }, () => []);
+      recordedChunksRef.current = Array.from({ length: streamChannelCount }, () => []);
       totalSamplesRef.current = 0;
       setPeaks(
-        Array.from({ length: channelCount }, () =>
+        Array.from({ length: streamChannelCount }, () =>
           bits === 8 ? new Int8Array(0) : new Int16Array(0)
         )
       );
