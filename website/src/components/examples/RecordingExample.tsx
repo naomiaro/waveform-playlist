@@ -352,7 +352,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                   isRecording: true,
                   trackId: selectedTrackId,
                   startSample: recordingStartSample,
-                  durationSamples: Math.floor(duration * sampleRate),
+                  durationSamples: Math.floor(recordingPeaks.length / 2) * samplesPerPixel,
                   peaks: recordingPeaks,
                 }
               : undefined

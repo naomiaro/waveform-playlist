@@ -111,23 +111,33 @@ class RecordingProcessor extends AudioWorkletProcessor {
     }
 
     const frameCount = input[0].length;
+    let offset = 0;
 
-    // Process each channel
-    for (let channel = 0; channel < Math.min(input.length, this.channelCount); channel++) {
-      const inputChannel = input[channel];
-      const buffer = this.buffers[channel];
+    // Process samples in chunks that fit within the buffer.
+    // The AudioWorklet quantum (128 samples) may not divide evenly into
+    // bufferSize (e.g., 705 at 44100Hz), so a single frame can cross
+    // the buffer boundary. Without this loop, samples beyond bufferSize
+    // are silently dropped by the typed array, causing audio gaps.
+    while (offset < frameCount) {
+      const remaining = this.bufferSize - this.samplesCollected;
+      const toCopy = Math.min(remaining, frameCount - offset);
 
-      // Copy samples to buffer
-      for (let i = 0; i < frameCount; i++) {
-        buffer[this.samplesCollected + i] = inputChannel[i];
+      for (let channel = 0; channel < Math.min(input.length, this.channelCount); channel++) {
+        const inputChannel = input[channel];
+        const buffer = this.buffers[channel];
+
+        for (let i = 0; i < toCopy; i++) {
+          buffer[this.samplesCollected + i] = inputChannel[offset + i];
+        }
       }
-    }
 
-    this.samplesCollected += frameCount;
+      this.samplesCollected += toCopy;
+      offset += toCopy;
 
-    // When buffer is full, send to main thread
-    if (this.samplesCollected >= this.bufferSize) {
-      this.flushBuffers();
+      // When buffer is full, send to main thread
+      if (this.samplesCollected >= this.bufferSize) {
+        this.flushBuffers();
+      }
     }
 
     return true; // Keep processor alive

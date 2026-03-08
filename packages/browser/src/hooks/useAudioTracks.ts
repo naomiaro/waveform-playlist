@@ -72,19 +72,19 @@ export interface UseAudioTracksOptions {
   progressive?: boolean;
 }
 
-const DEFAULT_SAMPLE_RATE = 48000;
-
 /** Build a ClipTrack from config + optional audioBuffer, preserving stable IDs. */
 function buildTrackFromConfig(
   config: AudioTrackConfig,
   index: number,
   audioBuffer: AudioBuffer | undefined,
-  stableIds: Map<number, { trackId: string; clipId: string }>
+  stableIds: Map<number, { trackId: string; clipId: string }>,
+  contextSampleRate: number = 48000
 ): ClipTrack | null {
   const buffer = audioBuffer ?? config.audioBuffer;
 
   // Determine if we have enough info to create the track
-  const sampleRate = buffer?.sampleRate ?? config.waveformData?.sample_rate ?? DEFAULT_SAMPLE_RATE;
+  // Prefer buffer/waveformData sample rate; fall back to the AudioContext's rate
+  const sampleRate = buffer?.sampleRate ?? config.waveformData?.sample_rate ?? contextSampleRate;
   const sourceDuration =
     buffer?.duration ??
     config.waveformData?.duration ??
@@ -208,6 +208,10 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
   // Stable track/clip IDs across rebuilds (immediate mode)
   const stableIdsRef = useRef<Map<number, { trackId: string; clipId: string }>>(new Map());
 
+  // AudioContext sample rate, populated once loadTracks runs.
+  // Used as fallback when neither buffer nor waveformData provides a sample rate.
+  const contextSampleRateRef = useRef<number>(48000);
+
   // For immediate mode: derive tracks from configs + loaded buffers.
   // Runs on mount (creates placeholders) and each time a buffer loads (attaches audioBuffer).
   const derivedTracks = useMemo(() => {
@@ -215,7 +219,13 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
 
     const result: ClipTrack[] = [];
     for (let i = 0; i < configs.length; i++) {
-      const track = buildTrackFromConfig(configs[i], i, loadedBuffers.get(i), stableIdsRef.current);
+      const track = buildTrackFromConfig(
+        configs[i],
+        i,
+        loadedBuffers.get(i),
+        stableIdsRef.current,
+        contextSampleRateRef.current
+      );
       if (track) result.push(track);
     }
     return result;
@@ -256,6 +266,7 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
         }
 
         const audioContext = Tone.getContext().rawContext as AudioContext;
+        contextSampleRateRef.current = audioContext.sampleRate;
 
         // Process each config
         const loadPromises = configs.map(async (config, index) => {
@@ -271,7 +282,13 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
               return;
             }
 
-            return buildTrackFromConfig(config, index, config.audioBuffer, stableIdsRef.current);
+            return buildTrackFromConfig(
+              config,
+              index,
+              config.audioBuffer,
+              stableIdsRef.current,
+              audioContext.sampleRate
+            );
           }
 
           // Case 2: Have waveformData but no src - peaks-only (no audio to load)
@@ -282,7 +299,13 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
               return;
             }
 
-            return buildTrackFromConfig(config, index, undefined, stableIdsRef.current);
+            return buildTrackFromConfig(
+              config,
+              index,
+              undefined,
+              stableIdsRef.current,
+              audioContext.sampleRate
+            );
           }
 
           // Case 3: Need to fetch and decode audio from src
@@ -314,7 +337,13 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
             return;
           }
 
-          return buildTrackFromConfig(config, index, audioBuffer, stableIdsRef.current);
+          return buildTrackFromConfig(
+            config,
+            index,
+            audioBuffer,
+            stableIdsRef.current,
+            audioContext.sampleRate
+          );
         });
 
         const loadedTracks = await Promise.all(loadPromises);

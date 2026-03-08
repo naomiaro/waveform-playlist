@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useEffect } from 'react';
+import React, { FunctionComponent, useLayoutEffect } from 'react';
 import styled from 'styled-components';
 import type { Peaks, Bits } from '@waveform-playlist/core';
 import {
@@ -138,10 +138,9 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
 
   // Draw waveform bars on visible canvas chunks.
   // visibleChunkIndices changes only when chunks mount/unmount, not on every scroll pixel.
-  // useEffect (not useLayoutEffect) so the browser paints the track layout
-  // (controls + empty canvas containers) before heavy canvas drawing starts.
-  // This prevents browser-initiated scrollLeft shifts and main-thread blocking.
-  useEffect(() => {
+  // useLayoutEffect so canvas drawing completes before the browser paints —
+  // prevents flicker from clearRect being visible for one frame.
+  useLayoutEffect(() => {
     const step = barWidth + barGap;
 
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
