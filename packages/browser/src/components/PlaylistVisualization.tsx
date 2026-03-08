@@ -33,6 +33,7 @@ import {
   usePlaylistState,
   usePlaylistControls,
   usePlaylistData,
+  type ClipPeaks,
 } from '../WaveformPlaylistContext';
 import type { Peaks } from '@waveform-playlist/core';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
@@ -95,6 +96,7 @@ export interface PlaylistVisualizationProps {
     startSample: number;
     durationSamples: number;
     peaks: (Int8Array | Int16Array)[];
+    bits: 8 | 16;
   };
 }
 
@@ -131,6 +133,26 @@ const CustomPlayhead: React.FC<{
     getPlaybackTime,
   }) as React.ReactElement;
 };
+
+/** Compute the maximum channel count for a track, considering both clip peaks and live recording. */
+function getTrackChannelCount(
+  trackClipPeaks: ClipPeaks[],
+  recordingState: PlaylistVisualizationProps['recordingState'],
+  trackId: string | undefined,
+  mono: boolean
+): number {
+  const clipChannels =
+    trackClipPeaks.length > 0
+      ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
+      : 1;
+  const recordingChannels =
+    recordingState?.isRecording && recordingState.trackId === trackId
+      ? mono
+        ? 1
+        : recordingState.peaks.length
+      : 0;
+  return Math.max(clipChannels, recordingChannels);
+}
 
 /**
  * Standalone playlist visualization component (WebAudio version).
@@ -336,15 +358,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
     for (let i = 0; i < peaksDataArray.length; i++) {
       const trackClipPeaks = peaksDataArray[i];
-      const clipCh =
-        trackClipPeaks.length > 0
-          ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
-          : 1;
-      const recCh =
-        recordingState?.isRecording && recordingState.trackId === tracks[i]?.id
-          ? recordingState.peaks.length
-          : 0;
-      const rawCh = Math.max(clipCh, recCh);
+      const rawCh = getTrackChannelCount(trackClipPeaks, recordingState, tracks[i]?.id, mono);
       const trackMode =
         spectrogram?.trackSpectrogramOverrides.get(tracks[i]?.id)?.renderMode ??
         tracks[i]?.renderMode ??
@@ -440,19 +454,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
           track.renderMode ??
           (hasMidiNotes ? 'piano-roll' : 'waveform');
 
-        const clipChannels =
-          trackClipPeaks.length > 0
-            ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
-            : 1;
-        // Include recording channel count for the active recording track
-        // Respect mono flag — mono collapses multi-channel to 1
-        const recordingChannels =
-          recordingState?.isRecording && recordingState.trackId === track.id
-            ? mono
-              ? 1
-              : recordingState.peaks.length
-            : 0;
-        const maxChannels = Math.max(clipChannels, recordingChannels);
+        const maxChannels = getTrackChannelCount(trackClipPeaks, recordingState, track.id, mono);
 
         // Height must match Track component: waveHeight * numChannels + clipHeaderHeight
         const slotHeight = waveHeight * maxChannels + (showClipHeaders ? CLIP_HEADER_HEIGHT : 0);
@@ -614,17 +616,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                 track.renderMode ??
                 (hasMidiNotes ? 'piano-roll' : 'waveform');
 
-              const clipChannels =
-                trackClipPeaks.length > 0
-                  ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
-                  : 1;
-              const recordingChannels =
-                recordingState?.isRecording && recordingState.trackId === track.id
-                  ? mono
-                    ? 1
-                    : recordingState.peaks.length
-                  : 0;
-              const maxChannels = Math.max(clipChannels, recordingChannels);
+              const maxChannels = getTrackChannelCount(
+                trackClipPeaks,
+                recordingState,
+                track.id,
+                mono
+              );
 
               return (
                 <TrackComponent
@@ -768,7 +765,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                               key={`${track.id}-recording-${chIdx}`}
                               index={chIdx}
                               data={channelPeaks}
-                              bits={16}
+                              bits={recordingState.bits}
                               length={Math.floor(channelPeaks.length / 2)}
                               isSelected={track.id === selectedTrackId}
                               clipStartSample={recordingState.startSample}

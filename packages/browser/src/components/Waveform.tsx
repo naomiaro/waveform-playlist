@@ -57,6 +57,7 @@ export interface WaveformProps {
     startSample: number; // Where recording started
     durationSamples: number; // Current recording length
     peaks: (Int8Array | Int16Array)[]; // Per-channel live peaks data
+    bits: 8 | 16; // Bit depth of peak values
   };
 }
 

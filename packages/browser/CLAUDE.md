@@ -86,6 +86,16 @@ Three approaches for detecting when tracks finish loading:
 
 **Applied in:** `WaveformPlaylistContext.tsx`, `Playlist.tsx`, all E2E tests
 
+## Recording Preview Rendering Path
+
+**Two paths for recording data:**
+1. **Live preview** — `PlaylistVisualization` renders `recordingState.peaks` directly, one `ChannelWithProgress` per channel. Bypasses the `WaveformPlaylistContext` peak generation pipeline entirely.
+2. **Post-recording** — clips go through the peak effect (Path A/B/C), which applies `mono` merge via `extractPeaksFromWaveformDataFull`.
+
+Both paths must respect `mono` flag consistently. Live preview slices to first channel when `mono` is true. `recordingState.bits` flows through to the renderer (not hardcoded).
+
+**`durationSamples` must be zoom-independent:** Use `duration * sampleRate`, not peaks-derived calculations that depend on `samplesPerPixel` (which changes on zoom).
+
 ## Refs for Dynamic Audio Callbacks
 
 **Problem:** useCallback with state dependencies creates stale closures when callbacks are stored and called later.

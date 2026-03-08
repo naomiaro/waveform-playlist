@@ -8,6 +8,10 @@ import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUti
 import { appendPeaks } from '../utils/peaksGenerator';
 import { getContext } from 'tone';
 
+function emptyPeaks(bits: 8 | 16): Int8Array | Int16Array {
+  return bits === 8 ? new Int8Array(0) : new Int16Array(0);
+}
+
 export function useRecording(
   stream: MediaStream | null,
   options: RecordingOptions = {}
@@ -19,9 +23,7 @@ export function useRecording(
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
   // Per-channel peaks for multi-channel live preview
-  const [peaks, setPeaks] = useState<(Int8Array | Int16Array)[]>([
-    bits === 8 ? new Int8Array(0) : new Int16Array(0),
-  ]);
+  const [peaks, setPeaks] = useState<(Int8Array | Int16Array)[]>([emptyPeaks(bits)]);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [level, setLevel] = useState(0); // Current RMS level (0-1)
@@ -87,8 +89,13 @@ export function useRecording(
 
       // Detect actual channel count from the stream's audio track settings.
       // Falls back to the user-provided channelCount option.
-      const streamChannelCount =
-        stream.getAudioTracks()[0]?.getSettings().channelCount ?? channelCount;
+      const detectedChannelCount = stream.getAudioTracks()[0]?.getSettings().channelCount;
+      if (detectedChannelCount === undefined) {
+        console.warn(
+          `[waveform-playlist] Could not detect stream channel count, using fallback: ${channelCount}`
+        );
+      }
+      const streamChannelCount = detectedChannelCount ?? channelCount;
 
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
@@ -102,16 +109,30 @@ export function useRecording(
       });
       workletNodeRef.current = workletNode;
 
-      // Connect source to worklet (but not to destination - no monitoring)
-      source.connect(workletNode);
+      // Reset state before connecting — prevents race where a worklet message
+      // arrives before refs are cleared, corrupting samplesProcessedBefore calculations
+      recordedChunksRef.current = Array.from({ length: streamChannelCount }, () => []);
+      totalSamplesRef.current = 0;
+      setPeaks(Array.from({ length: streamChannelCount }, () => emptyPeaks(bits)));
+      setAudioBuffer(null);
+      setLevel(0);
+      setPeakLevel(0);
 
-      //Listen for audio data from worklet
+      // Listen for audio data from worklet
       workletNode.port.onmessage = (event: MessageEvent) => {
         const { channels } = event.data as { channels: Float32Array[] };
+
+        if (!channels || channels.length === 0) {
+          console.warn('[waveform-playlist] Recording worklet sent empty or missing channels data');
+          return;
+        }
 
         // Accumulate per-channel samples
         for (let ch = 0; ch < channels.length; ch++) {
           if (!recordedChunksRef.current[ch]) {
+            console.warn(
+              `[waveform-playlist] Unexpected channel ${ch} from worklet (expected ${recordedChunksRef.current.length})`
+            );
             recordedChunksRef.current[ch] = [];
           }
           recordedChunksRef.current[ch].push(channels[ch]);
@@ -124,7 +145,7 @@ export function useRecording(
           // Ensure we have an entry per channel
           const updated: (Int8Array | Int16Array)[] = [];
           for (let ch = 0; ch < channels.length; ch++) {
-            const prev = prevPeaks[ch] ?? (bits === 8 ? new Int8Array(0) : new Int16Array(0));
+            const prev = prevPeaks[ch] ?? emptyPeaks(bits);
             updated.push(
               appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
             );
@@ -136,24 +157,13 @@ export function useRecording(
         // We don't update level/peakLevel here to avoid conflicting state updates
       };
 
-      // Start the worklet processor
+      // Connect and start — after state reset and handler setup
+      source.connect(workletNode);
       workletNode.port.postMessage({
         command: 'start',
         sampleRate: context.sampleRate,
         channelCount: streamChannelCount,
       });
-
-      // Reset state
-      recordedChunksRef.current = Array.from({ length: streamChannelCount }, () => []);
-      totalSamplesRef.current = 0;
-      setPeaks(
-        Array.from({ length: streamChannelCount }, () =>
-          bits === 8 ? new Int8Array(0) : new Int16Array(0)
-        )
-      );
-      setAudioBuffer(null);
-      setLevel(0);
-      setPeakLevel(0);
       isRecordingRef.current = true;
       isPausedRef.current = false;
       setIsRecording(true);
@@ -190,9 +200,8 @@ export function useRecording(
         if (mediaStreamSourceRef.current) {
           try {
             mediaStreamSourceRef.current.disconnect(workletNodeRef.current);
-          } catch {
-            // Source may have already been disconnected when stream changed
-            // This is fine - just ignore the error
+          } catch (err) {
+            console.warn('[waveform-playlist] Source disconnect during stop:', String(err));
           }
         }
         workletNodeRef.current.disconnect();
@@ -268,9 +277,8 @@ export function useRecording(
         if (mediaStreamSourceRef.current) {
           try {
             mediaStreamSourceRef.current.disconnect(workletNodeRef.current);
-          } catch {
-            // Source may have already been disconnected when stream changed
-            // This is fine - just ignore the error
+          } catch (err) {
+            console.warn('[waveform-playlist] Source disconnect during cleanup:', String(err));
           }
         }
         workletNodeRef.current.disconnect();
