@@ -269,8 +269,20 @@ export class TonePlayout {
       this._loopHandler = null;
     }
     // Stop all native sources explicitly
-    this.tracks.forEach((track) => track.stopAllSources());
-    this.tracks.forEach((track) => track.cancelFades());
+    this.tracks.forEach((track) => {
+      try {
+        track.stopAllSources();
+      } catch (err) {
+        console.warn(`[waveform-playlist] Error stopping sources for track "${track.id}":`, err);
+      }
+    });
+    this.tracks.forEach((track) => {
+      try {
+        track.cancelFades();
+      } catch (err) {
+        console.warn(`[waveform-playlist] Error canceling fades for track "${track.id}":`, err);
+      }
+    });
     this.clearCompletionEvent();
   }
 
@@ -385,7 +397,11 @@ export class TonePlayout {
     // Without this, the global Transport singleton keeps firing scheduled
     // callbacks and native AudioBufferSourceNodes continue playing through
     // the shared AudioContext (e.g., during Docusaurus client-side navigation).
-    this.stop();
+    try {
+      this.stop();
+    } catch (err) {
+      console.warn('[waveform-playlist] Error stopping Transport during dispose:', err);
+    }
 
     this.tracks.forEach((track) => {
       try {
