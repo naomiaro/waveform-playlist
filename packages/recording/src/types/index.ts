@@ -36,6 +36,12 @@ export interface RecordingOptions {
   samplesPerPixel?: number;
 
   /**
+   * Bit depth for peak values (8 or 16)
+   * Default: 16
+   */
+  bits?: 8 | 16;
+
+  /**
    * Specific device ID to use for recording
    */
   deviceId?: string;

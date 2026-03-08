@@ -12,20 +12,20 @@ export function useRecording(
   stream: MediaStream | null,
   options: RecordingOptions = {}
 ): UseRecordingReturn {
-  const { channelCount = 1, samplesPerPixel = 1024 } = options;
+  const { channelCount = 1, samplesPerPixel = 1024, bits = 16 } = options;
 
   // State
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
   // Per-channel peaks for multi-channel live preview
-  const [peaks, setPeaks] = useState<(Int8Array | Int16Array)[]>([new Int16Array(0)]);
+  const [peaks, setPeaks] = useState<(Int8Array | Int16Array)[]>([
+    bits === 8 ? new Int8Array(0) : new Int16Array(0),
+  ]);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [level, setLevel] = useState(0); // Current RMS level (0-1)
   const [peakLevel, setPeakLevel] = useState(0); // Peak level since recording started (0-1)
-
-  const bits: 8 | 16 = 16; // Match the bit depth used by the final waveform
 
   // Global flag to prevent loading worklet multiple times
   // (AudioWorklet processors can only be registered once per AudioContext)
@@ -116,7 +116,7 @@ export function useRecording(
           // Ensure we have an entry per channel
           const updated: (Int8Array | Int16Array)[] = [];
           for (let ch = 0; ch < channels.length; ch++) {
-            const prev = prevPeaks[ch] ?? new Int16Array(0);
+            const prev = prevPeaks[ch] ?? (bits === 8 ? new Int8Array(0) : new Int16Array(0));
             updated.push(
               appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
             );
@@ -138,7 +138,11 @@ export function useRecording(
       // Reset state
       recordedChunksRef.current = Array.from({ length: channelCount }, () => []);
       totalSamplesRef.current = 0;
-      setPeaks(Array.from({ length: channelCount }, () => new Int16Array(0)));
+      setPeaks(
+        Array.from({ length: channelCount }, () =>
+          bits === 8 ? new Int8Array(0) : new Int16Array(0)
+        )
+      );
       setAudioBuffer(null);
       setLevel(0);
       setPeakLevel(0);
@@ -161,7 +165,7 @@ export function useRecording(
       console.error('Failed to start recording:', err);
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
     }
-  }, [stream, channelCount, samplesPerPixel, loadWorklet]);
+  }, [stream, channelCount, samplesPerPixel, bits, loadWorklet]);
 
   // Stop recording
   const stopRecording = useCallback(async (): Promise<AudioBuffer | null> => {
