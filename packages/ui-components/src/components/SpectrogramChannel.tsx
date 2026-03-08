@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useRef, useEffect } from 'react';
+import React, { FunctionComponent, useRef, useEffect, useLayoutEffect } from 'react';
 import styled from 'styled-components';
 import type { SpectrogramData } from '@waveform-playlist/core';
 import { useVisibleChunkIndices } from '../contexts/ScrollViewport';
@@ -235,9 +235,9 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   }, []);
 
   // Main-thread rendering (skipped in worker mode).
-  // useEffect (not useLayoutEffect) so the browser paints the track layout
-  // (controls + empty canvas containers) before heavy canvas drawing starts.
-  useEffect(() => {
+  // useLayoutEffect so canvas drawing completes before the browser paints —
+  // prevents flicker from clearRect being visible for one frame.
+  useLayoutEffect(() => {
     if (isWorkerMode || !data) return;
 
     const {

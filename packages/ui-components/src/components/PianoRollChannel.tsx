@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useEffect, useMemo } from 'react';
+import React, { FunctionComponent, useLayoutEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import type { MidiNoteData } from '@waveform-playlist/core';
 import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
@@ -95,9 +95,9 @@ export const PianoRollChannel: FunctionComponent<PianoRollChannelProps> = ({
 
   const color = isSelected ? selectedNoteColor : noteColor;
 
-  // useEffect (not useLayoutEffect) so the browser paints the track layout
-  // (controls + empty canvas containers) before heavy canvas drawing starts.
-  useEffect(() => {
+  // useLayoutEffect so canvas drawing completes before the browser paints —
+  // prevents flicker from clearRect being visible for one frame.
+  useLayoutEffect(() => {
     const noteRange = maxMidi - minMidi + 1;
     const noteHeight = Math.max(2, waveHeight / noteRange);
     const pixelsPerSecond = sampleRate / samplesPerPixel;

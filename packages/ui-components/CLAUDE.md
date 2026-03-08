@@ -83,11 +83,11 @@
 - Prevents unnecessary redraw/recompute caused by new inline default references each render
 - Reduces stale-closure risk in worker canvas registration effect
 
-## Canvas Drawing Timing (Channel.tsx)
+## Canvas Drawing Timing (All Channel Components)
 
-**Decision:** `useLayoutEffect` for canvas drawing (not `useEffect`).
+**Decision:** `useLayoutEffect` for canvas drawing (not `useEffect`) in Channel, PianoRollChannel, and SpectrogramChannel.
 
-**Why:** `useEffect` runs after browser paint. Since canvas drawing calls `clearRect` first, users see one frame of blank canvas before the redraw. This causes visible flicker on initial load, zoom changes, and during recording (~60fps peak updates).
+**Why:** `useEffect` runs after browser paint. Since canvas drawing calls `clearRect` first, users see one frame of blank canvas before the redraw. This causes visible flicker on initial load, zoom changes, and during recording (~60fps peak updates). Layout thrashing is not a concern because ClipContainer and channel Wrapper both set explicit `width`/`height` via `.attrs()` — the browser knows container dimensions before canvases mount.
 
 ## Horizontal Virtual Scrolling (Phase 4)
 
