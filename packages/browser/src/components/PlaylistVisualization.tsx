@@ -200,6 +200,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     barWidth,
     barGap,
     isReady,
+    mono,
   } = usePlaylistData();
 
   // Optional spectrogram integration (only available when SpectrogramProvider is present)
@@ -444,9 +445,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
             ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
             : 1;
         // Include recording channel count for the active recording track
+        // Respect mono flag — mono collapses multi-channel to 1
         const recordingChannels =
           recordingState?.isRecording && recordingState.trackId === track.id
-            ? recordingState.peaks.length
+            ? mono
+              ? 1
+              : recordingState.peaks.length
             : 0;
         const maxChannels = Math.max(clipChannels, recordingChannels);
 
@@ -616,7 +620,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                   : 1;
               const recordingChannels =
                 recordingState?.isRecording && recordingState.trackId === track.id
-                  ? recordingState.peaks.length
+                  ? mono
+                    ? 1
+                    : recordingState.peaks.length
                   : 0;
               const maxChannels = Math.max(clipChannels, recordingChannels);
 
@@ -756,18 +762,20 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                         isSelected={track.id === selectedTrackId}
                         trackId={track.id}
                       >
-                        {recordingState.peaks.map((channelPeaks, chIdx) => (
-                          <ChannelWithProgress
-                            key={`${track.id}-recording-${chIdx}`}
-                            index={chIdx}
-                            data={channelPeaks}
-                            bits={16}
-                            length={Math.floor(channelPeaks.length / 2)}
-                            isSelected={track.id === selectedTrackId}
-                            clipStartSample={recordingState.startSample}
-                            clipDurationSamples={recordingState.durationSamples}
-                          />
-                        ))}
+                        {(mono ? recordingState.peaks.slice(0, 1) : recordingState.peaks).map(
+                          (channelPeaks, chIdx) => (
+                            <ChannelWithProgress
+                              key={`${track.id}-recording-${chIdx}`}
+                              index={chIdx}
+                              data={channelPeaks}
+                              bits={16}
+                              length={Math.floor(channelPeaks.length / 2)}
+                              isSelected={track.id === selectedTrackId}
+                              clipStartSample={recordingState.startSample}
+                              clipDurationSamples={recordingState.durationSamples}
+                            />
+                          )
+                        )}
                       </Clip>
                     )}
                 </TrackComponent>
