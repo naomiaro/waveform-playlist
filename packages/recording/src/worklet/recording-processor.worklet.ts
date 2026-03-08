@@ -8,9 +8,9 @@
  *
  * Message Format (to main thread):
  * {
- *   samples: Float32Array,  // Audio samples for this chunk
- *   sampleRate: number,     // Sample rate of the audio
- *   channelCount: number    // Number of channels
+ *   channels: Float32Array[],  // Per-channel audio samples for this chunk
+ *   sampleRate: number,        // Sample rate of the audio
+ *   channelCount: number       // Number of channels
  * }
  *
  * Note: VU meter levels are handled by AnalyserNode in useMicrophoneLevel hook,
@@ -44,7 +44,7 @@ declare function registerProcessor(
 ): void;
 
 interface RecordingProcessorMessage {
-  samples: Float32Array;
+  channels: Float32Array[];
   sampleRate: number;
   channelCount: number;
 }
@@ -149,13 +149,14 @@ class RecordingProcessor extends AudioWorkletProcessor {
   }
 
   private flushBuffers(): void {
-    // For now, we'll mix down to mono or send the first channel
-    // This simplifies peak generation and waveform display
-    const samples = this.buffers[0].slice(0, this.samplesCollected);
+    // Send all channel buffers to main thread
+    const channels: Float32Array[] = [];
+    for (let i = 0; i < this.channelCount; i++) {
+      channels.push(this.buffers[i].slice(0, this.samplesCollected));
+    }
 
-    // Send to main thread
     this.port.postMessage({
-      samples: samples,
+      channels,
       sampleRate: sampleRate,
       channelCount: this.channelCount,
     } as RecordingProcessorMessage);

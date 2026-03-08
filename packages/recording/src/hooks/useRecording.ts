@@ -33,7 +33,8 @@ export function useRecording(
   // Refs for AudioWorklet and data accumulation
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const recordedChunksRef = useRef<Float32Array[]>([]);
+  // Per-channel sample accumulation: recordedChunksRef[channelIndex] = Float32Array[]
+  const recordedChunksRef = useRef<Float32Array[][]>([]);
   const totalSamplesRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -97,19 +98,24 @@ export function useRecording(
 
       //Listen for audio data from worklet
       workletNode.port.onmessage = (event: MessageEvent) => {
-        const { samples } = event.data;
+        const { channels } = event.data as { channels: Float32Array[] };
 
-        // Accumulate samples
-        recordedChunksRef.current.push(samples);
-        totalSamplesRef.current += samples.length;
+        // Accumulate per-channel samples
+        for (let ch = 0; ch < channels.length; ch++) {
+          if (!recordedChunksRef.current[ch]) {
+            recordedChunksRef.current[ch] = [];
+          }
+          recordedChunksRef.current[ch].push(channels[ch]);
+        }
+        totalSamplesRef.current += channels[0].length;
 
-        // Update peaks incrementally for live waveform visualization
+        // Update peaks from first channel for live waveform visualization
         setPeaks((prevPeaks) =>
           appendPeaks(
             prevPeaks,
-            samples,
+            channels[0],
             samplesPerPixel,
-            totalSamplesRef.current - samples.length,
+            totalSamplesRef.current - channels[0].length,
             bits
           )
         );
@@ -126,7 +132,7 @@ export function useRecording(
       });
 
       // Reset state
-      recordedChunksRef.current = [];
+      recordedChunksRef.current = Array.from({ length: channelCount }, () => []);
       totalSamplesRef.current = 0;
       setPeaks(new Int16Array(0));
       setAudioBuffer(null);
@@ -182,12 +188,12 @@ export function useRecording(
         animationFrameRef.current = null;
       }
 
-      // Create final AudioBuffer from accumulated chunks
-      const allSamples = concatenateAudioData(recordedChunksRef.current);
+      // Create final AudioBuffer from accumulated per-channel chunks
       const context = getContext();
-      // Use rawContext for createBuffer (native AudioContext method)
       const rawContext = context.rawContext as AudioContext;
-      const buffer = createAudioBuffer(rawContext, allSamples, rawContext.sampleRate, channelCount);
+      const numChannels = recordedChunksRef.current.length || channelCount;
+      const channelData = recordedChunksRef.current.map((chunks) => concatenateAudioData(chunks));
+      const buffer = createAudioBuffer(rawContext, channelData, rawContext.sampleRate, numChannels);
 
       setAudioBuffer(buffer);
       setDuration(buffer.duration);

@@ -19,26 +19,26 @@ export function concatenateAudioData(chunks: Float32Array[]): Float32Array {
 }
 
 /**
- * Convert Float32Array to AudioBuffer
+ * Convert per-channel Float32Arrays to AudioBuffer
  */
 export function createAudioBuffer(
   audioContext: AudioContext,
-  samples: Float32Array,
+  channelData: Float32Array[],
   sampleRate: number,
   channelCount: number = 1
 ): AudioBuffer {
-  const buffer = audioContext.createBuffer(channelCount, samples.length, sampleRate);
+  const length = channelData[0]?.length ?? 0;
+  const buffer = audioContext.createBuffer(channelCount, length, sampleRate);
 
-  // Copy samples to buffer (for now, just mono)
-  // Create a new Float32Array to ensure correct type
-  const typedSamples = new Float32Array(samples);
-  buffer.copyToChannel(typedSamples, 0);
+  for (let ch = 0; ch < Math.min(channelCount, channelData.length); ch++) {
+    buffer.copyToChannel(new Float32Array(channelData[ch]), ch);
+  }
 
   return buffer;
 }
 
 /**
- * Append new samples to an existing AudioBuffer
+ * Append new samples to an existing AudioBuffer (mono convenience)
  */
 export function appendToAudioBuffer(
   audioContext: AudioContext,
@@ -47,7 +47,7 @@ export function appendToAudioBuffer(
   sampleRate: number
 ): AudioBuffer {
   if (!existingBuffer) {
-    return createAudioBuffer(audioContext, newSamples, sampleRate);
+    return createAudioBuffer(audioContext, [newSamples], sampleRate);
   }
 
   // Get existing samples
@@ -57,7 +57,7 @@ export function appendToAudioBuffer(
   const combined = concatenateAudioData([existingData, newSamples]);
 
   // Create new buffer
-  return createAudioBuffer(audioContext, combined, sampleRate);
+  return createAudioBuffer(audioContext, [combined], sampleRate);
 }
 
 /**
