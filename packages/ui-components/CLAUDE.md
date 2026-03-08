@@ -83,6 +83,12 @@
 - Prevents unnecessary redraw/recompute caused by new inline default references each render
 - Reduces stale-closure risk in worker canvas registration effect
 
+## Canvas Drawing Timing (Channel.tsx)
+
+**Decision:** `useLayoutEffect` for canvas drawing (not `useEffect`).
+
+**Why:** `useEffect` runs after browser paint. Since canvas drawing calls `clearRect` first, users see one frame of blank canvas before the redraw. This causes visible flicker on initial load, zoom changes, and during recording (~60fps peak updates).
+
 ## Horizontal Virtual Scrolling (Phase 4)
 
 **Decision:** Viewport-aware canvas rendering — only mount canvas chunks visible in the scroll container + buffer.

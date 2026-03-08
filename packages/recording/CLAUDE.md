@@ -57,6 +57,10 @@ const normalized = Math.max(0, Math.min(1, (dbValue + 100) / 100));
 
 **Why -100dB floor:** Firefox reports lower dB values than Chrome (e.g., -70 to -85 dB for quiet input). Using -60dB floor caused all quiet signals to map to 0.
 
+## AudioWorklet Buffer Boundary Handling
+
+**Critical:** The AudioWorklet quantum is always 128 samples. Buffer sizes derived from `sampleRate * duration` (e.g., 705 at 44100Hz) may not be multiples of 128. The `process()` method must loop to handle frames that cross the buffer boundary — writing beyond a typed array's length silently drops samples.
+
 ## Peak Value Clamping
 
 **Rule:** Always clamp scaled peak values to the valid typed array range before assignment. `Math.floor(1.0 * 32768) = 32768` overflows Int16 (max 32767) and wraps to -32768. Use `Math.min(maxValue - 1, ...)` for max and `Math.max(-maxValue, ...)` for min.

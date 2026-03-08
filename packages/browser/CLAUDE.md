@@ -169,6 +169,12 @@ const rebuildChain = useCallback(() => {
 - **`engine.play()` try-catch in play callback** — `engine.play()` is synchronous but can throw (adapter failures). Wrap in try-catch; on error, `stopAnimationLoop()` and return early to avoid `setIsPlaying(true)` with no audio.
 - **Fire-and-forget async `.catch()` handlers** — `reschedulePlayback()` and `resumePlayback()` are async functions called without `await` in useEffect callbacks. Without `.catch()`, throws become unhandled promise rejections. Each `.catch()` resets UI state (`setIsPlaying(false)`, `stopAnimationLoop()`).
 
+## useAudioTracks Real Sample Rate
+
+**Decision:** `buildTrackFromConfig` receives the actual `audioContext.sampleRate` from `loadTracks`, cached in `contextSampleRateRef` for immediate-mode `useMemo`. Static fallback is 48000 (worst case before AudioContext exists).
+
+**Why:** Hardcoded 48000 caused sample-to-second conversion errors on systems with 44100Hz AudioContext.
+
 ## Aligned Peak Resampling (waveformDataLoader.ts)
 
 **Decision:** When slicing WaveformData before resampling to a different scale, source slice indices must align to the resampling ratio.
