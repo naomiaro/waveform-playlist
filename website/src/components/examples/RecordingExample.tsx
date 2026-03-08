@@ -126,7 +126,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     changeDevice,
     error,
     recordingPeaks,
-  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime, channelCount: 2 });
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {

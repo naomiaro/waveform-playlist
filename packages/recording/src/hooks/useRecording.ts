@@ -90,8 +90,11 @@ export function useRecording(
       const source = context.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
 
-      // Create AudioWorklet node using Tone's method
-      const workletNode = context.createAudioWorkletNode('recording-processor');
+      // Create AudioWorklet node — set channelCount so stereo streams aren't downmixed
+      const workletNode = context.createAudioWorkletNode('recording-processor', {
+        channelCount,
+        channelCountMode: 'explicit',
+      });
       workletNodeRef.current = workletNode;
 
       // Connect source to worklet (but not to destination - no monitoring)
