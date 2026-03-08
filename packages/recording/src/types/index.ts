@@ -11,7 +11,7 @@ export interface RecordingState {
 
 export interface RecordingData {
   buffer: AudioBuffer | null;
-  peaks: Int8Array | Int16Array;
+  peaks: (Int8Array | Int16Array)[];
   duration: number;
 }
 
@@ -53,7 +53,7 @@ export interface UseRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
   duration: number;
-  peaks: Int8Array | Int16Array;
+  peaks: (Int8Array | Int16Array)[];
   audioBuffer: AudioBuffer | null;
   level: number; // Current RMS level (0-1)
   peakLevel: number; // Peak RMS level since recording started (0-1)

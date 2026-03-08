@@ -94,7 +94,7 @@ export interface PlaylistVisualizationProps {
     trackId: string;
     startSample: number;
     durationSamples: number;
-    peaks: Int8Array | Int16Array;
+    peaks: (Int8Array | Int16Array)[];
   };
 }
 
@@ -335,10 +335,15 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
     for (let i = 0; i < peaksDataArray.length; i++) {
       const trackClipPeaks = peaksDataArray[i];
-      const rawCh =
+      const clipCh =
         trackClipPeaks.length > 0
           ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
           : 1;
+      const recCh =
+        recordingState?.isRecording && recordingState.trackId === tracks[i]?.id
+          ? recordingState.peaks.length
+          : 0;
+      const rawCh = Math.max(clipCh, recCh);
       const trackMode =
         spectrogram?.trackSpectrogramOverrides.get(tracks[i]?.id)?.renderMode ??
         tracks[i]?.renderMode ??
@@ -434,10 +439,16 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
           track.renderMode ??
           (hasMidiNotes ? 'piano-roll' : 'waveform');
 
-        const maxChannels =
+        const clipChannels =
           trackClipPeaks.length > 0
             ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
             : 1;
+        // Include recording channel count for the active recording track
+        const recordingChannels =
+          recordingState?.isRecording && recordingState.trackId === track.id
+            ? recordingState.peaks.length
+            : 0;
+        const maxChannels = Math.max(clipChannels, recordingChannels);
 
         // Height must match Track component: waveHeight * numChannels + clipHeaderHeight
         const slotHeight = waveHeight * maxChannels + (showClipHeaders ? CLIP_HEADER_HEIGHT : 0);
@@ -599,10 +610,15 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                 track.renderMode ??
                 (hasMidiNotes ? 'piano-roll' : 'waveform');
 
-              const maxChannels =
+              const clipChannels =
                 trackClipPeaks.length > 0
                   ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
                   : 1;
+              const recordingChannels =
+                recordingState?.isRecording && recordingState.trackId === track.id
+                  ? recordingState.peaks.length
+                  : 0;
+              const maxChannels = Math.max(clipChannels, recordingChannels);
 
               return (
                 <TrackComponent
@@ -725,7 +741,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                   })}
                   {recordingState?.isRecording &&
                     recordingState.trackId === track.id &&
-                    recordingState.peaks.length > 0 && (
+                    recordingState.peaks[0]?.length > 0 && (
                       <Clip
                         key={`${track.id}-recording`}
                         clipId="recording-preview"
@@ -740,16 +756,18 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                         isSelected={track.id === selectedTrackId}
                         trackId={track.id}
                       >
-                        <ChannelWithProgress
-                          key={`${track.id}-recording-0`}
-                          index={0}
-                          data={recordingState.peaks}
-                          bits={16}
-                          length={Math.floor(recordingState.peaks.length / 2)}
-                          isSelected={track.id === selectedTrackId}
-                          clipStartSample={recordingState.startSample}
-                          clipDurationSamples={recordingState.durationSamples}
-                        />
+                        {recordingState.peaks.map((channelPeaks, chIdx) => (
+                          <ChannelWithProgress
+                            key={`${track.id}-recording-${chIdx}`}
+                            index={chIdx}
+                            data={channelPeaks}
+                            bits={16}
+                            length={Math.floor(channelPeaks.length / 2)}
+                            isSelected={track.id === selectedTrackId}
+                            clipStartSample={recordingState.startSample}
+                            clipDurationSamples={recordingState.durationSamples}
+                          />
+                        ))}
                       </Clip>
                     )}
                 </TrackComponent>

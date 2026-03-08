@@ -61,7 +61,7 @@ export interface UseIntegratedRecordingReturn {
   changeDevice: (deviceId: string) => Promise<void>;
 
   // Track state (for live waveform during recording)
-  recordingPeaks: Int8Array | Int16Array;
+  recordingPeaks: (Int8Array | Int16Array)[];
 }
 
 export function useIntegratedRecording(

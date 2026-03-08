@@ -56,7 +56,7 @@ export interface WaveformProps {
     trackId: string; // Which track is being recorded into
     startSample: number; // Where recording started
     durationSamples: number; // Current recording length
-    peaks: Int8Array | Int16Array; // Live peaks data
+    peaks: (Int8Array | Int16Array)[]; // Per-channel live peaks data
   };
 }
 

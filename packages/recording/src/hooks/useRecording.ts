@@ -18,7 +18,8 @@ export function useRecording(
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
-  const [peaks, setPeaks] = useState<Int8Array | Int16Array>(new Int16Array(0));
+  // Per-channel peaks for multi-channel live preview
+  const [peaks, setPeaks] = useState<(Int8Array | Int16Array)[]>([new Int16Array(0)]);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [level, setLevel] = useState(0); // Current RMS level (0-1)
@@ -109,16 +110,19 @@ export function useRecording(
         }
         totalSamplesRef.current += channels[0].length;
 
-        // Update peaks from first channel for live waveform visualization
-        setPeaks((prevPeaks) =>
-          appendPeaks(
-            prevPeaks,
-            channels[0],
-            samplesPerPixel,
-            totalSamplesRef.current - channels[0].length,
-            bits
-          )
-        );
+        // Update per-channel peaks for live waveform visualization
+        const samplesProcessedBefore = totalSamplesRef.current - channels[0].length;
+        setPeaks((prevPeaks) => {
+          // Ensure we have an entry per channel
+          const updated: (Int8Array | Int16Array)[] = [];
+          for (let ch = 0; ch < channels.length; ch++) {
+            const prev = prevPeaks[ch] ?? new Int16Array(0);
+            updated.push(
+              appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
+            );
+          }
+          return updated;
+        });
 
         // Note: VU meter levels come from useMicrophoneLevel (AnalyserNode)
         // We don't update level/peakLevel here to avoid conflicting state updates
@@ -134,7 +138,7 @@ export function useRecording(
       // Reset state
       recordedChunksRef.current = Array.from({ length: channelCount }, () => []);
       totalSamplesRef.current = 0;
-      setPeaks(new Int16Array(0));
+      setPeaks(Array.from({ length: channelCount }, () => new Int16Array(0)));
       setAudioBuffer(null);
       setLevel(0);
       setPeakLevel(0);
