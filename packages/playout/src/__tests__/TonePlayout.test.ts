@@ -253,9 +253,7 @@ describe('TonePlayout', () => {
       playout.stop();
 
       expect(mockTransport.off).toHaveBeenCalledWith('loop', handler);
-      expect(
-        (playout as unknown as { _loopHandler: (() => void) | null })._loopHandler
-      ).toBeNull();
+      expect((playout as unknown as { _loopHandler: (() => void) | null })._loopHandler).toBeNull();
     });
 
     it('skips loop handler removal when none is set', () => {
