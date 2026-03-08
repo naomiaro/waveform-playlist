@@ -111,6 +111,11 @@ class RecordingProcessor extends AudioWorkletProcessor {
     }
 
     const frameCount = input[0].length;
+
+    if (this.bufferSize <= 0) {
+      return true; // Not yet configured via 'start' command
+    }
+
     let offset = 0;
 
     // Process samples in chunks that fit within the buffer.
