@@ -33,6 +33,7 @@ import {
   usePlaylistControls,
   usePlaylistState,
   useOutputMeter,
+  KeyboardShortcuts,
 } from '@waveform-playlist/browser';
 import {
   RecordButton,
@@ -425,6 +426,7 @@ export function RecordingExample() {
           barWidth={1}
           barGap={0}
         >
+          <KeyboardShortcuts playback />
           <RecordingControlsInner
             tracks={tracks}
             setTracks={setTracks}

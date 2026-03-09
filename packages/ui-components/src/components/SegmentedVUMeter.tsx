@@ -32,7 +32,7 @@ const DEFAULT_COLOR_STOPS: ColorStop[] = [
   { dB: -50, color: '#85c1e9' },
 ];
 
-const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.06)';
+const INACTIVE_OPACITY = 0.15;
 const PEAK_COLOR = '#ffffff';
 
 function getDefaultLabels(channelCount: number): string[] {
@@ -121,7 +121,8 @@ const Segment = styled.div.attrs<SegmentStyleProps>((props) => ({
     ...(props.$orientation === 'horizontal'
       ? { marginRight: `${props.$gap}px` }
       : { marginBottom: `${props.$gap}px` }),
-    backgroundColor: props.$isPeak ? PEAK_COLOR : props.$active ? props.$color : INACTIVE_COLOR,
+    backgroundColor: props.$isPeak ? PEAK_COLOR : props.$color,
+    opacity: props.$isPeak || props.$active ? 1 : INACTIVE_OPACITY,
     boxShadow:
       props.$active || props.$isPeak
         ? `0 0 4px ${props.$isPeak ? PEAK_COLOR : props.$color}40`
