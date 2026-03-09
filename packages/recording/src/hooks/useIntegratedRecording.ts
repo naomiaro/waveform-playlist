@@ -44,6 +44,10 @@ export interface UseIntegratedRecordingReturn {
   duration: number;
   level: number;
   peakLevel: number;
+  /** Per-channel levels (0-1). Array length matches channelCount. */
+  levels: number[];
+  /** Per-channel peak levels (0-1). Array length matches channelCount. */
+  peakLevels: number[];
   error: Error | null;
 
   // Microphone state
@@ -81,7 +85,9 @@ export function useIntegratedRecording(
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
 
   // Microphone level (for VU meter)
-  const { level, peakLevel } = useMicrophoneLevel(stream);
+  const { level, peakLevel, levels, peakLevels } = useMicrophoneLevel(stream, {
+    channelCount: recordingOptions.channelCount,
+  });
 
   // Recording
   const {
@@ -230,6 +236,8 @@ export function useIntegratedRecording(
     duration,
     level,
     peakLevel,
+    levels,
+    peakLevels,
     error: hookError || micError || recError,
 
     // Microphone state

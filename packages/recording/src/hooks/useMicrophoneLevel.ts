@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { Meter, getContext, connect } from 'tone';
+import { dBToNormalized } from '@waveform-playlist/core';
 
 export interface UseMicrophoneLevelOptions {
   /**
@@ -26,17 +27,27 @@ export interface UseMicrophoneLevelOptions {
    * Default: 0.8
    */
   smoothingTimeConstant?: number;
+
+  /**
+   * Number of channels to meter (1 = mono, 2 = stereo)
+   * Default: 1
+   */
+  channelCount?: number;
 }
 
 export interface UseMicrophoneLevelReturn {
   /**
    * Current audio level (0-1)
    * 0 = silence, 1 = maximum level
+   * For single channel: channel 0 level
+   * For multi-channel: max across all channels
    */
   level: number;
 
   /**
    * Peak level since last reset (0-1)
+   * For single channel: channel 0 peak
+   * For multi-channel: max across all channels
    */
   peakLevel: number;
 
@@ -44,6 +55,16 @@ export interface UseMicrophoneLevelReturn {
    * Reset the peak level
    */
   resetPeak: () => void;
+
+  /**
+   * Per-channel levels (0-1). Array length matches channelCount.
+   */
+  levels: number[];
+
+  /**
+   * Per-channel peak levels (0-1). Array length matches channelCount.
+   */
+  peakLevels: number[];
 }
 
 /**
@@ -65,21 +86,21 @@ export function useMicrophoneLevel(
   stream: MediaStream | null,
   options: UseMicrophoneLevelOptions = {}
 ): UseMicrophoneLevelReturn {
-  const { updateRate = 60, smoothingTimeConstant = 0.8 } = options;
+  const { updateRate = 60, smoothingTimeConstant = 0.8, channelCount = 1 } = options;
 
-  const [level, setLevel] = useState(0);
-  const [peakLevel, setPeakLevel] = useState(0);
+  const [levels, setLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
+  const [peakLevels, setPeakLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
 
   const meterRef = useRef<Meter | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const resetPeak = () => setPeakLevel(0);
+  const resetPeak = () => setPeakLevels(new Array(channelCount).fill(0));
 
   useEffect(() => {
     if (!stream) {
-      setLevel(0);
-      setPeakLevel(0);
+      setLevels(new Array(channelCount).fill(0));
+      setPeakLevels(new Array(channelCount).fill(0));
       return;
     }
 
@@ -99,7 +120,7 @@ export function useMicrophoneLevel(
 
       // Create Tone.js Meter for level monitoring
       // Pass context to ensure it's created in the same context as the source
-      const meter = new Meter({ smoothing: smoothingTimeConstant, context });
+      const meter = new Meter({ smoothing: smoothingTimeConstant, context, channelCount });
       meterRef.current = meter;
 
       // Create MediaStreamSource from the SAME context as the meter
@@ -121,15 +142,22 @@ export function useMicrophoneLevel(
         if (timestamp - lastUpdateTime >= updateInterval) {
           lastUpdateTime = timestamp;
 
-          // Meter.getValue() returns dB, convert to 0-1 range
+          // Meter.getValue() returns dB (number for single channel, number[] for multi)
           const db = meterRef.current.getValue();
-          const dbValue = typeof db === 'number' ? db : db[0];
-          // dB is typically -Infinity to 0, map -100dB..0dB to 0..1
-          // Using -100dB as floor since Firefox seems to report lower values
-          const normalized = Math.max(0, Math.min(1, (dbValue + 100) / 100));
 
-          setLevel(normalized);
-          setPeakLevel((prev) => Math.max(prev, normalized));
+          if (typeof db === 'number') {
+            // Single channel
+            const normalized = dBToNormalized(db);
+            setLevels([normalized]);
+            setPeakLevels((prev) => [Math.max(prev[0], normalized)]);
+          } else {
+            // Multi-channel: db is number[]
+            const normalizedLevels = db.map((dbValue) => dBToNormalized(dbValue));
+            setLevels(normalizedLevels);
+            setPeakLevels((prev) =>
+              normalizedLevels.map((val, i) => Math.max(prev[i] ?? 0, val))
+            );
+          }
         }
 
         animationFrameRef.current = requestAnimationFrame(updateLevel);
@@ -164,11 +192,17 @@ export function useMicrophoneLevel(
         meterRef.current = null;
       }
     };
-  }, [stream, smoothingTimeConstant, updateRate]);
+  }, [stream, smoothingTimeConstant, updateRate, channelCount]);
+
+  // Backwards-compatible scalar values
+  const level = channelCount === 1 ? levels[0] ?? 0 : Math.max(...levels);
+  const peakLevel = channelCount === 1 ? peakLevels[0] ?? 0 : Math.max(...peakLevels);
 
   return {
     level,
     peakLevel,
     resetPeak,
+    levels,
+    peakLevels,
   };
 }
