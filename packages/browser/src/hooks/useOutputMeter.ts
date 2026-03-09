@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Meter, getDestination, getContext } from 'tone';
+import { Meter, getDestination, getContext, connect as toneConnect } from 'tone';
 import { dBToNormalized } from '@waveform-playlist/core';
 
 export interface UseOutputMeterOptions {
@@ -66,8 +66,11 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
     });
     meterRef.current = meter;
 
-    // Connect: Destination -> Meter (Meter is a pass-through, won't affect audio)
-    getDestination().connect(meter);
+    // Fan out from Destination's input (Volume node that receives all audio)
+    // to the Meter. Destination.output is audioContext.destination (a sink with
+    // no outputs), so connecting FROM it produces no signal.
+    const destination = getDestination();
+    toneConnect(destination.input, meter);
 
     // Start level monitoring
     const updateInterval = 1000 / updateRate;
@@ -101,11 +104,6 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       }
 
       if (meterRef.current) {
-        try {
-          getDestination().disconnect(meterRef.current);
-        } catch {
-          console.warn('[waveform-playlist] Failed to disconnect output meter');
-        }
         meterRef.current.dispose();
         meterRef.current = null;
       }
