@@ -44,6 +44,18 @@ describe('normalizedToDb', () => {
     expect(normalizedToDb(0, -60)).toBe(-60);
     expect(normalizedToDb(0.5, -60)).toBe(-30);
   });
+  it('clamps values above 1 to 0 dB', () => {
+    expect(normalizedToDb(2)).toBe(0);
+  });
+  it('clamps values below 0 to floor', () => {
+    expect(normalizedToDb(-1)).toBe(-100);
+  });
+  it('handles NaN as floor', () => {
+    expect(normalizedToDb(NaN)).toBe(-100);
+  });
+  it('handles Infinity as 0 dB', () => {
+    expect(normalizedToDb(Infinity)).toBe(-100);
+  });
   it('round-trips with dBToNormalized', () => {
     const original = -42;
     expect(normalizedToDb(dBToNormalized(original))).toBeCloseTo(original, 10);
