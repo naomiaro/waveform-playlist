@@ -107,6 +107,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     peakLevel,
     levels: inputLevels,
     peakLevels: inputPeaks,
+    rmsLevels: inputRmsLevels,
     devices,
     hasPermission,
     selectedDevice,
@@ -119,7 +120,11 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime, channelCount: 2 });
 
   // Output meter for master bus
-  const { levels: outputLevels, peakLevels: outputPeaks } = useOutputMeter({ channelCount: 2 });
+  const {
+    levels: outputLevels,
+    peakLevels: outputPeaks,
+    rmsLevels: outputRmsLevels,
+  } = useOutputMeter({ channelCount: 2 });
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {
@@ -315,32 +320,64 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           <Separator orientation="vertical" />
 
           {/* Inline VU Meters — always visible */}
-          <Flex gap="3" align="center">
-            <Flex gap="1" align="center">
-              <MicrophoneIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
-              <SegmentedVUMeter
-                levels={inputLevels}
-                peakLevels={inputPeaks}
-                orientation="horizontal"
-                segmentCount={40}
-                segmentWidth={14}
-                segmentHeight={4}
-                segmentGap={1}
-                coloredInactive
-              />
+          <Flex direction="column" gap="1">
+            {/* Peak meters */}
+            <Flex gap="3" align="center">
+              <Flex gap="1" align="center">
+                <MicrophoneIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+                <SegmentedVUMeter
+                  levels={inputLevels}
+                  peakLevels={inputPeaks}
+                  orientation="horizontal"
+                  segmentCount={40}
+                  segmentWidth={14}
+                  segmentHeight={4}
+                  segmentGap={1}
+                  coloredInactive
+                />
+              </Flex>
+              <Flex gap="1" align="center">
+                <SpeakerHighIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+                <SegmentedVUMeter
+                  levels={outputLevels}
+                  peakLevels={outputPeaks}
+                  orientation="horizontal"
+                  segmentCount={40}
+                  segmentWidth={14}
+                  segmentHeight={4}
+                  segmentGap={1}
+                  coloredInactive
+                />
+              </Flex>
+              <span style={{ fontSize: '9px', color: 'var(--gray-8)', fontFamily: 'monospace' }}>PEAK</span>
             </Flex>
-            <Flex gap="1" align="center">
-              <SpeakerHighIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
-              <SegmentedVUMeter
-                levels={outputLevels}
-                peakLevels={outputPeaks}
-                orientation="horizontal"
-                segmentCount={40}
-                segmentWidth={14}
-                segmentHeight={4}
-                segmentGap={1}
-                coloredInactive
-              />
+            {/* RMS meters */}
+            <Flex gap="3" align="center">
+              <Flex gap="1" align="center">
+                <MicrophoneIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+                <SegmentedVUMeter
+                  levels={inputRmsLevels}
+                  orientation="horizontal"
+                  segmentCount={40}
+                  segmentWidth={14}
+                  segmentHeight={4}
+                  segmentGap={1}
+                  coloredInactive
+                />
+              </Flex>
+              <Flex gap="1" align="center">
+                <SpeakerHighIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+                <SegmentedVUMeter
+                  levels={outputRmsLevels}
+                  orientation="horizontal"
+                  segmentCount={40}
+                  segmentWidth={14}
+                  segmentHeight={4}
+                  segmentGap={1}
+                  coloredInactive
+                />
+              </Flex>
+              <span style={{ fontSize: '9px', color: 'var(--gray-8)', fontFamily: 'monospace' }}>RMS</span>
             </Flex>
           </Flex>
         </Flex>
