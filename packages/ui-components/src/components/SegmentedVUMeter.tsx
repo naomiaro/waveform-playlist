@@ -137,6 +137,7 @@ const ScaleColumn = styled.div`
   display: flex;
   flex-direction: column;
   position: relative;
+  min-width: 28px;
 `;
 
 interface ScaleLabelStyleProps {
@@ -149,13 +150,13 @@ const ScaleLabel = styled.div.attrs<ScaleLabelStyleProps>((props) => ({
   },
 }))<ScaleLabelStyleProps>`
   position: absolute;
+  left: 50%;
   color: #888;
   font-size: 9px;
   font-family: 'Courier New', monospace;
   white-space: nowrap;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   user-select: none;
-  padding: 0 4px;
 `;
 
 // --- Component ---

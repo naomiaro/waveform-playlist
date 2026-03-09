@@ -118,9 +118,17 @@ export function useMicrophoneLevel(
 
       if (!isMounted) return;
 
+      // Auto-detect actual mic channel count from stream
+      const trackSettings = stream.getAudioTracks()[0]?.getSettings();
+      const actualChannels = trackSettings?.channelCount ?? channelCount;
+
       // Create Tone.js Meter for level monitoring
       // Pass context to ensure it's created in the same context as the source
-      const meter = new Meter({ smoothing: smoothingTimeConstant, context, channelCount });
+      const meter = new Meter({
+        smoothing: smoothingTimeConstant,
+        context,
+        channelCount: actualChannels,
+      });
       meterRef.current = meter;
 
       // Create MediaStreamSource from the SAME context as the meter
