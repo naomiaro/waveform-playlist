@@ -32,14 +32,15 @@ import {
   usePlaylistData,
   usePlaylistControls,
   usePlaylistState,
+  useOutputMeter,
 } from '@waveform-playlist/browser';
 import {
   RecordButton,
   MicrophoneSelector,
-  VUMeter,
   RecordingIndicator,
   useIntegratedRecording,
 } from '@waveform-playlist/recording';
+import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { MicrophoneIcon } from '@phosphor-icons/react';
 import { FileDropZone } from '../FileDropZone';
@@ -51,15 +52,6 @@ const Container = styled.div`
 
 const StyledDropZone = styled(FileDropZone)`
   margin-bottom: 1.5rem;
-`;
-
-const VUMeterWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--gray-3);
-  border-radius: var(--radius-2);
 `;
 
 const RecordingControlsRow = styled.div`
@@ -117,6 +109,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     duration,
     level,
     peakLevel,
+    levels: inputLevels,
+    peakLevels: inputPeaks,
     devices,
     hasPermission,
     selectedDevice,
@@ -126,7 +120,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     changeDevice,
     error,
     recordingPeaks,
-  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime, channelCount: 2 });
+
+  // Output meter for master bus
+  const { levels: outputLevels, peakLevels: outputPeaks } = useOutputMeter({ channelCount: 2 });
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {
@@ -280,11 +277,33 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                   duration={duration}
                 />
               )}
-              <VUMeterWrapper>
-                <Label>Input:</Label>
-                <VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
-              </VUMeterWrapper>
             </RecordingControlsRow>
+          )}
+          {hasPermission && (
+            <Flex gap="4" align="start" style={{ marginTop: '0.75rem' }}>
+              <div>
+                <Label style={{ display: 'block', marginBottom: '0.25rem' }}>Input</Label>
+                <SegmentedVUMeter
+                  levels={inputLevels}
+                  peakLevels={inputPeaks}
+                  segmentCount={20}
+                  segmentWidth={16}
+                  segmentHeight={6}
+                  segmentGap={1}
+                />
+              </div>
+              <div>
+                <Label style={{ display: 'block', marginBottom: '0.25rem' }}>Output</Label>
+                <SegmentedVUMeter
+                  levels={outputLevels}
+                  peakLevels={outputPeaks}
+                  segmentCount={20}
+                  segmentWidth={16}
+                  segmentHeight={6}
+                  segmentGap={1}
+                />
+              </div>
+            </Flex>
           )}
         </Flex>
       </Card>
