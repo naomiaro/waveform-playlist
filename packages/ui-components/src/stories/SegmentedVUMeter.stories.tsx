@@ -26,10 +26,7 @@ export const StereoVertical: StoryObj = {
   name: 'Stereo Vertical',
   render: () => (
     <Wrapper>
-      <SegmentedVUMeter
-        levels={[0.65, 0.45]}
-        peakLevels={[0.8, 0.6]}
-      />
+      <SegmentedVUMeter levels={[0.65, 0.45]} peakLevels={[0.8, 0.6]} />
     </Wrapper>
   ),
   parameters: {
@@ -45,11 +42,7 @@ export const MonoVertical: StoryObj = {
   name: 'Mono Vertical',
   render: () => (
     <Wrapper>
-      <SegmentedVUMeter
-        levels={[0.55]}
-        peakLevels={[0.75]}
-        channelLabels={['M']}
-      />
+      <SegmentedVUMeter levels={[0.55]} peakLevels={[0.75]} channelLabels={['M']} />
     </Wrapper>
   ),
   parameters: {
@@ -77,7 +70,8 @@ export const Horizontal: StoryObj = {
   parameters: {
     docs: {
       description: {
-        story: 'Horizontal orientation with adjusted segment dimensions (wider segments, shorter height).',
+        story:
+          'Horizontal orientation with adjusted segment dimensions (wider segments, shorter height).',
       },
     },
   },
@@ -135,12 +129,7 @@ const AnimatedMeterDemo: React.FC = () => {
     return () => clearInterval(interval);
   }, [levels]);
 
-  return (
-    <SegmentedVUMeter
-      levels={levels}
-      peakLevels={peakLevels}
-    />
-  );
+  return <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
 };
 
 export const Animated: StoryObj = {
@@ -186,11 +175,7 @@ export const NoScale: StoryObj = {
   name: 'No Scale',
   render: () => (
     <Wrapper>
-      <SegmentedVUMeter
-        levels={[0.6, 0.45]}
-        peakLevels={[0.8, 0.6]}
-        showScale={false}
-      />
+      <SegmentedVUMeter levels={[0.6, 0.45]} peakLevels={[0.8, 0.6]} showScale={false} />
     </Wrapper>
   ),
   parameters: {

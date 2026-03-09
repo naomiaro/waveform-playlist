@@ -22,9 +22,7 @@ describe('SegmentedVUMeter', () => {
   });
 
   it('renders channel labels', () => {
-    renderWithTheme(
-      <SegmentedVUMeter levels={[0.5, 0.3]} channelLabels={['L', 'R']} />
-    );
+    renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} channelLabels={['L', 'R']} />);
     expect(screen.getByText('L')).toBeTruthy();
     expect(screen.getByText('R')).toBeTruthy();
   });
@@ -45,16 +43,12 @@ describe('SegmentedVUMeter', () => {
   });
 
   it('renders dB scale labels when showScale is true', () => {
-    renderWithTheme(
-      <SegmentedVUMeter levels={[0.5, 0.3]} showScale />
-    );
+    renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} showScale />);
     expect(screen.getByText('0')).toBeTruthy();
   });
 
   it('hides dB scale labels when showScale is false', () => {
-    renderWithTheme(
-      <SegmentedVUMeter levels={[0.5, 0.3]} showScale={false} />
-    );
+    renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} showScale={false} />);
     // Should not have scale column
     expect(screen.queryByText('-20')).toBeNull();
   });

@@ -154,9 +154,7 @@ export function useMicrophoneLevel(
             // Multi-channel: db is number[]
             const normalizedLevels = db.map((dbValue) => dBToNormalized(dbValue));
             setLevels(normalizedLevels);
-            setPeakLevels((prev) =>
-              normalizedLevels.map((val, i) => Math.max(prev[i] ?? 0, val))
-            );
+            setPeakLevels((prev) => normalizedLevels.map((val, i) => Math.max(prev[i] ?? 0, val)));
           }
         }
 
@@ -195,8 +193,8 @@ export function useMicrophoneLevel(
   }, [stream, smoothingTimeConstant, updateRate, channelCount]);
 
   // Backwards-compatible scalar values
-  const level = channelCount === 1 ? levels[0] ?? 0 : Math.max(...levels);
-  const peakLevel = channelCount === 1 ? peakLevels[0] ?? 0 : Math.max(...peakLevels);
+  const level = channelCount === 1 ? (levels[0] ?? 0) : Math.max(...levels);
+  const peakLevel = channelCount === 1 ? (peakLevels[0] ?? 0) : Math.max(...peakLevels);
 
   return {
     level,
