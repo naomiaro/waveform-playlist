@@ -3,10 +3,16 @@
  *
  * Connects a Tone.js Meter to the Destination node for real-time
  * output level monitoring. Used for playback VU meters.
+ *
+ * IMPORTANT: Uses getGlobalContext() from playout to ensure the meter
+ * is created on the same AudioContext as the audio engine. Tone.js's
+ * getContext()/getDestination() return the DEFAULT context, which is
+ * replaced when getGlobalContext() calls setContext() on first audio init.
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Meter, getDestination, getContext } from 'tone';
+import { Meter } from 'tone';
+import { getGlobalContext } from '@waveform-playlist/playout';
 import { dBToNormalized } from '@waveform-playlist/core';
 
 export interface UseOutputMeterOptions {
@@ -56,9 +62,12 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
   useEffect(() => {
     let isMounted = true;
 
-    const context = getContext();
+    // Use getGlobalContext() to ensure we're on the SAME context as the audio engine.
+    // Tone's getContext() returns the default context which gets replaced by setContext()
+    // when getGlobalContext() initializes — causing a context mismatch.
+    const context = getGlobalContext();
 
-    // Create Meter connected to Destination
+    // Create Meter on the global context
     const meter = new Meter({
       smoothing: smoothingTimeConstant,
       context,
@@ -69,7 +78,7 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
     // Insert Meter into Destination's internal chain using the official chain() API.
     // Destination.chain(meter) routes: Volume → Meter → Gain → rawContext.destination.
     // Meter is a pass-through (Analyser is both input and output) so audio is unaffected.
-    const destination = getDestination();
+    const destination = context.destination;
     destination.chain(meter);
 
     // Start level monitoring
@@ -106,7 +115,7 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       if (meterRef.current) {
         // Restore default chain: Volume → Gain (removes meter from path)
         try {
-          getDestination().chain();
+          destination.chain();
         } catch {
           console.warn('[waveform-playlist] Failed to restore destination chain');
         }
