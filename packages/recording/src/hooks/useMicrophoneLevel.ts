@@ -154,10 +154,11 @@ export function useMicrophoneLevel(
           const db = meterRef.current.getValue();
 
           if (typeof db === 'number') {
-            // Single channel
+            // Single channel — mirror to fill requested channelCount
             const normalized = dBToNormalized(db);
-            setLevels([normalized]);
-            setPeakLevels((prev) => [Math.max(prev[0], normalized)]);
+            const mirrored = new Array(channelCount).fill(normalized);
+            setLevels(mirrored);
+            setPeakLevels((prev) => mirrored.map((val, i) => Math.max(prev[i] ?? 0, val)));
           } else {
             // Multi-channel: db is number[]
             const normalizedLevels = db.map((dbValue) => dBToNormalized(dbValue));
