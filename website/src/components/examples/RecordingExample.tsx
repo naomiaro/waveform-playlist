@@ -42,7 +42,7 @@ import {
 } from '@waveform-playlist/recording';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
-import { MicrophoneIcon } from '@phosphor-icons/react';
+import { MicrophoneIcon, SpeakerHighIcon } from '@phosphor-icons/react';
 import { FileDropZone } from '../FileDropZone';
 
 const Container = styled.div`
@@ -61,17 +61,12 @@ const RecordingControlsRow = styled.div`
   flex-wrap: wrap;
 `;
 
-const Label = styled.span`
-  font-size: 0.875rem;
-  color: var(--gray-11);
-  font-weight: 500;
-`;
-
 const ErrorCard = styled(Card)`
   background: var(--red-3);
   border: 1px solid var(--red-6);
   margin-bottom: 1rem;
 `;
+
 
 
 // Inner component that uses playlist context
@@ -251,15 +246,16 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         </ErrorCard>
       )}
 
-      {/* Recording Controls */}
+      {/* Controls Bar */}
       <Card style={{ marginBottom: '1.5rem' }}>
-        <Flex direction="column" gap="3">
+        <Flex gap="3" align="center" wrap="wrap">
+          {/* Recording Controls */}
           {!hasPermission ? (
-            <Button size="3" variant="solid" color="blue" onClick={requestMicAccess}>
-              <MicrophoneIcon size={18} weight="light" style={{ marginRight: '6px' }} /> Enable Microphone
+            <Button size="2" variant="solid" color="blue" onClick={requestMicAccess}>
+              <MicrophoneIcon size={18} weight="light" style={{ marginRight: '6px' }} /> Enable Mic
             </Button>
           ) : (
-            <RecordingControlsRow>
+            <>
               <MicrophoneSelector
                 devices={devices}
                 selectedDeviceId={selectedDevice || undefined}
@@ -277,56 +273,12 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                   duration={duration}
                 />
               )}
-            </RecordingControlsRow>
+            </>
           )}
-          {hasPermission && (
-            <Flex gap="4" align="start" style={{ marginTop: '0.75rem' }}>
-              <div>
-                <Label style={{ display: 'block', marginBottom: '0.25rem' }}>Input</Label>
-                <SegmentedVUMeter
-                  levels={inputLevels}
-                  peakLevels={inputPeaks}
-                  segmentCount={20}
-                  segmentWidth={16}
-                  segmentHeight={6}
-                  segmentGap={1}
-                />
-              </div>
-              <div>
-                <Label style={{ display: 'block', marginBottom: '0.25rem' }}>Output</Label>
-                <SegmentedVUMeter
-                  levels={outputLevels}
-                  peakLevels={outputPeaks}
-                  segmentCount={20}
-                  segmentWidth={16}
-                  segmentHeight={6}
-                  segmentGap={1}
-                />
-              </div>
-            </Flex>
-          )}
-        </Flex>
-      </Card>
 
-      {/* Drop Zone */}
-      <StyledDropZone
-        accept="audio/*"
-        onFiles={handleFiles}
-        fileFilter={(f) => f.type.startsWith('audio/')}
-        label="Drop audio files or click to browse"
-        dragLabel="Drop audio files here"
-      >
-        <Button size="2" variant="solid" color="blue" style={{ marginTop: '0.5rem' }} onClick={(e) => {
-          e.stopPropagation();
-          onAddTrack();
-        }}>
-          + New Track
-        </Button>
-      </StyledDropZone>
+          <Separator orientation="vertical" />
 
-      {/* Playback Controls */}
-      <Card style={{ marginBottom: '1.5rem' }}>
-        <Flex gap="3" align="center" wrap="wrap">
+          {/* Playback Controls */}
           <Flex gap="2">
             <PlayButton />
             <PauseButton />
@@ -355,12 +307,43 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           <Separator orientation="vertical" />
 
           <ExportWavButton
-            label="Export Recording"
+            label="Export"
             filename="recording"
           />
+
+          <Separator orientation="vertical" />
+
+          {/* Inline VU Meters — always visible */}
+          <Flex gap="3" align="center">
+            <Flex gap="1" align="center">
+              <MicrophoneIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+              <SegmentedVUMeter
+                levels={inputLevels}
+                peakLevels={inputPeaks}
+                orientation="horizontal"
+                segmentCount={40}
+                segmentWidth={14}
+                segmentHeight={4}
+                segmentGap={1}
+              />
+            </Flex>
+            <Flex gap="1" align="center">
+              <SpeakerHighIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+              <SegmentedVUMeter
+                levels={outputLevels}
+                peakLevels={outputPeaks}
+                orientation="horizontal"
+                segmentCount={40}
+                segmentWidth={14}
+                segmentHeight={4}
+                segmentGap={1}
+              />
+            </Flex>
+          </Flex>
         </Flex>
       </Card>
 
+      {/* Waveform */}
       <ClipInteractionProvider>
         <Waveform
           showClipHeaders
@@ -383,10 +366,26 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       {tracks.length === 0 && (
         <Flex justify="center" style={{ padding: '3rem', color: 'var(--gray-9)' }}>
           <Text size="2">
-            Click "+ New Track" to add a track, then start recording!
+            Click &quot;+ New Track&quot; to add a track, then start recording!
           </Text>
         </Flex>
       )}
+
+      {/* Drop Zone */}
+      <StyledDropZone
+        accept="audio/*"
+        onFiles={handleFiles}
+        fileFilter={(f) => f.type.startsWith('audio/')}
+        label="Drop audio files or click to browse"
+        dragLabel="Drop audio files here"
+      >
+        <Button size="2" variant="solid" color="blue" style={{ marginTop: '0.5rem' }} onClick={(e) => {
+          e.stopPropagation();
+          onAddTrack();
+        }}>
+          + New Track
+        </Button>
+      </StyledDropZone>
     </>
   );
 };

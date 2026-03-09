@@ -69,6 +69,10 @@ const normalized = Math.max(0, Math.min(1, (dbValue + 100) / 100));
 
 **State reset ordering:** In `startRecording`, reset `recordedChunksRef` and `totalSamplesRef` BEFORE calling `source.connect(workletNode)` and posting the `start` command. This prevents a race where a worklet message arrives before refs are cleared.
 
+## Mic Channel Auto-Detection
+
+**Rule:** `useMicrophoneLevel` auto-detects actual mic channel count from `stream.getAudioTracks()[0].getSettings().channelCount`. Do not hardcode `channelCount` when a stream is available — a mono mic with `channelCount: 2` creates a 2-channel Meter where only one channel receives signal.
+
 ## Peak Value Clamping
 
 **Rule:** Always clamp scaled peak values to the valid typed array range before assignment. `Math.floor(1.0 * 32768) = 32768` overflows Int16 (max 32767) and wraps to -32768. Use `Math.min(maxValue - 1, ...)` for max and `Math.max(-maxValue, ...)` for min.

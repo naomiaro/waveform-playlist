@@ -60,15 +60,16 @@ function selectScaleLabels(
   thresholds: number[],
   targetCount: number
 ): { index: number; label: string }[] {
-  if (thresholds.length <= targetCount) {
+  const count = Math.min(targetCount, thresholds.length);
+  if (thresholds.length <= count) {
     return thresholds.map((t, i) => ({
       index: i,
       label: formatDbLabel(t),
     }));
   }
-  const step = (thresholds.length - 1) / (targetCount - 1);
+  const step = (thresholds.length - 1) / (count - 1);
   const labels: { index: number; label: string }[] = [];
-  for (let i = 0; i < targetCount; i++) {
+  for (let i = 0; i < count; i++) {
     const idx = Math.round(i * step);
     labels.push({ index: idx, label: formatDbLabel(thresholds[idx]) });
   }
@@ -81,8 +82,9 @@ function formatDbLabel(dB: number): string {
 
 // --- Styled Components ---
 
-const MeterContainer = styled.div`
+const MeterContainer = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
   display: inline-flex;
+  flex-direction: ${(props) => (props.$orientation === 'horizontal' ? 'column' : 'row')};
   background: #1a1a2e;
   padding: 12px;
   border-radius: 6px;
@@ -90,9 +92,9 @@ const MeterContainer = styled.div`
   font-family: 'Courier New', monospace;
 `;
 
-const ChannelColumn = styled.div`
+const ChannelColumn = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
   display: flex;
-  flex-direction: column;
+  flex-direction: ${(props) => (props.$orientation === 'horizontal' ? 'row' : 'column')};
   align-items: center;
   gap: 4px;
 `;
@@ -109,13 +111,16 @@ interface SegmentStyleProps {
   $active: boolean;
   $color: string;
   $isPeak: boolean;
+  $orientation: 'vertical' | 'horizontal';
 }
 
 const Segment = styled.div.attrs<SegmentStyleProps>((props) => ({
   style: {
     width: `${props.$width}px`,
     height: `${props.$height}px`,
-    marginBottom: `${props.$gap}px`,
+    ...(props.$orientation === 'horizontal'
+      ? { marginRight: `${props.$gap}px` }
+      : { marginBottom: `${props.$gap}px` }),
     backgroundColor: props.$isPeak ? PEAK_COLOR : props.$active ? props.$color : INACTIVE_COLOR,
     boxShadow:
       props.$active || props.$isPeak
@@ -159,6 +164,39 @@ const ScaleLabel = styled.div.attrs<ScaleLabelStyleProps>((props) => ({
   user-select: none;
 `;
 
+const HorizontalScaleWrapper = styled.div`
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+`;
+
+const ScaleRow = styled.div`
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  min-height: 16px;
+`;
+
+interface ScaleLabelHorizontalStyleProps {
+  $left: number;
+}
+
+const ScaleLabelHorizontal = styled.div.attrs<ScaleLabelHorizontalStyleProps>((props) => ({
+  style: {
+    left: `${props.$left}px`,
+  },
+}))<ScaleLabelHorizontalStyleProps>`
+  position: absolute;
+  top: 50%;
+  color: #888;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  user-select: none;
+`;
+
 // --- Component ---
 
 const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
@@ -177,28 +215,50 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
 }) => {
   const labels = channelLabels ?? getDefaultLabels(levels.length);
 
+  const channelCount = levels.length;
+  const isMultiChannel = channelCount >= 2;
+  const segmentTotalHeight = segmentHeight + segmentGap;
+
   const thresholds = useMemo(
     () => computeThresholds(segmentCount, dBRange),
     [segmentCount, dBRange]
   );
 
-  const scaleLabels = useMemo(() => selectScaleLabels(thresholds, 12), [thresholds]);
+  const scaleLabels = useMemo(() => {
+    let labelCount: number;
+    if (orientation === 'horizontal') {
+      // Auto-calculate: ~35px per label at 9px monospace to prevent overlap
+      const totalWidth = segmentCount * segmentTotalHeight - segmentGap;
+      labelCount = Math.max(2, Math.floor(totalWidth / 35));
+    } else {
+      labelCount = 12;
+    }
+    const selected = selectScaleLabels(thresholds, labelCount);
+    if (orientation === 'horizontal') {
+      // Reverse index positions to match reversed thresholds
+      const lastIdx = thresholds.length - 1;
+      return selected.map((l) => ({ ...l, index: lastIdx - l.index }));
+    }
+    return selected;
+  }, [thresholds, orientation, segmentCount, segmentTotalHeight, segmentGap]);
 
-  const channelCount = levels.length;
-  const isMultiChannel = channelCount >= 2;
-  const segmentTotalHeight = segmentHeight + segmentGap;
+  // For horizontal, reverse thresholds so low dB is on left, high dB on right
+  const renderThresholds = useMemo(
+    () => (orientation === 'horizontal' ? [...thresholds].reverse() : thresholds),
+    [thresholds, orientation]
+  );
 
   const renderChannel = (channelIndex: number) => {
     const level = levels[channelIndex];
     const levelDb = normalizedToDb(level);
     const peakDb = peakLevels != null ? normalizedToDb(peakLevels[channelIndex]) : null;
 
-    // Find closest threshold index for peak
+    // Find closest threshold index for peak (in render order)
     let peakSegmentIndex = -1;
     if (peakDb != null) {
       let minDist = Infinity;
-      for (let i = 0; i < thresholds.length; i++) {
-        const dist = Math.abs(thresholds[i] - peakDb);
+      for (let i = 0; i < renderThresholds.length; i++) {
+        const dist = Math.abs(renderThresholds[i] - peakDb);
         if (dist < minDist) {
           minDist = dist;
           peakSegmentIndex = i;
@@ -207,9 +267,10 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
     }
 
     return (
-      <ChannelColumn key={channelIndex} data-channel>
+      <ChannelColumn key={channelIndex} $orientation={orientation} data-channel>
+        {orientation === 'horizontal' && <ChannelLabel>{labels[channelIndex]}</ChannelLabel>}
         <SegmentStack $orientation={orientation}>
-          {thresholds.map((threshold, segIdx) => {
+          {renderThresholds.map((threshold, segIdx) => {
             const active = levelDb >= threshold;
             const isPeak = segIdx === peakSegmentIndex;
             const color = getColorForDb(threshold, colorStops);
@@ -217,24 +278,43 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
             return (
               <Segment
                 key={segIdx}
-                $width={segmentWidth}
-                $height={segmentHeight}
+                $width={orientation === 'horizontal' ? segmentHeight : segmentWidth}
+                $height={orientation === 'horizontal' ? segmentWidth : segmentHeight}
                 $gap={segmentGap}
                 $active={active}
                 $color={color}
                 $isPeak={isPeak}
+                $orientation={orientation}
                 data-segment
                 {...(isPeak ? { 'data-peak': true } : {})}
               />
             );
           })}
         </SegmentStack>
-        <ChannelLabel>{labels[channelIndex]}</ChannelLabel>
+        {orientation === 'vertical' && <ChannelLabel>{labels[channelIndex]}</ChannelLabel>}
       </ChannelColumn>
     );
   };
 
   const renderScale = () => {
+    if (orientation === 'horizontal') {
+      const totalWidth = segmentCount * segmentTotalHeight - segmentGap;
+      return (
+        <HorizontalScaleWrapper>
+          <ChannelLabel style={{ visibility: 'hidden' }}>L</ChannelLabel>
+          <ScaleRow style={{ width: `${totalWidth}px` }}>
+            {scaleLabels.map(({ index, label }) => {
+              const left = index * segmentTotalHeight + segmentHeight / 2;
+              return (
+                <ScaleLabelHorizontal key={index} $left={left}>
+                  {label}
+                </ScaleLabelHorizontal>
+              );
+            })}
+          </ScaleRow>
+        </HorizontalScaleWrapper>
+      );
+    }
     const totalHeight = segmentCount * segmentTotalHeight - segmentGap;
     return (
       <ScaleColumn style={{ height: `${totalHeight}px` }}>
@@ -251,13 +331,30 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   };
 
   if (isMultiChannel) {
-    // For multi-channel: channels on sides, scale in middle
+    if (orientation === 'horizontal') {
+      // Horizontal: channels stacked vertically, scale below
+      return (
+        <MeterContainer
+          className={className}
+          $orientation={orientation}
+          data-meter-orientation={orientation}
+        >
+          {Array.from({ length: channelCount }, (_, i) => renderChannel(i))}
+          {showScale && renderScale()}
+        </MeterContainer>
+      );
+    }
+    // Vertical: channels on sides, scale in middle
     const midpoint = Math.ceil(channelCount / 2);
     const leftChannels = Array.from({ length: midpoint }, (_, i) => i);
     const rightChannels = Array.from({ length: channelCount - midpoint }, (_, i) => midpoint + i);
 
     return (
-      <MeterContainer className={className} data-meter-orientation={orientation}>
+      <MeterContainer
+        className={className}
+        $orientation={orientation}
+        data-meter-orientation={orientation}
+      >
         {leftChannels.map(renderChannel)}
         {showScale && renderScale()}
         {rightChannels.map(renderChannel)}
@@ -265,9 +362,13 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
     );
   }
 
-  // Single channel: channel on left, scale on right
+  // Single channel: channel on left, scale on right (vertical) or below (horizontal)
   return (
-    <MeterContainer className={className} data-meter-orientation={orientation}>
+    <MeterContainer
+      className={className}
+      $orientation={orientation}
+      data-meter-orientation={orientation}
+    >
       {renderChannel(0)}
       {showScale && renderScale()}
     </MeterContainer>

@@ -322,6 +322,14 @@ if (derived !== prevRef.current) {
 
 **Stable stub refs:** When MediaElement components pass `PlayheadProps` to render functions, Tone.js-specific refs (`playbackStartTimeRef`, `audioStartPositionRef`) are stubbed as `ZERO_REF` (module-level constant). Never create `{ current: 0 }` inline — it causes useEffect dep churn on every render.
 
+## Output Metering (useOutputMeter)
+
+**Critical: Context mismatch gotcha.** Always use `getGlobalContext()` from `@waveform-playlist/playout` — never `getContext()`/`getDestination()` from Tone.js. `getGlobalContext()` creates a new Context via `setContext()`, replacing the default. Nodes created with `getContext()` before that happens end up on a dead audio graph.
+
+**Destination.chain(meter)** inserts the Meter as a pass-through in the master output: `Volume → Meter → Gain → rawContext.destination`. Meter's Analyser is both input and output, so audio flows through unchanged. Cleanup: `destination.chain()` restores the default `Volume → Gain` path.
+
+**context.destination vs getDestination():** Use `context.destination` (where `context = getGlobalContext()`) to get the Destination for the correct context. `getDestination()` from Tone returns the destination for whatever `getContext()` returns at call time.
+
 ## MediaElement currentTime vs currentTimeRef
 
 `currentTime` (React state from `useMediaElementAnimation`) only updates on pause/stop/seek/playback-end — NOT during playback. For smooth real-time display, use `currentTimeRef` with a local `requestAnimationFrame` loop and direct DOM manipulation (e.g., `ref.current.textContent = ...`). Never use `currentTime` for time displays that should update during playback.
