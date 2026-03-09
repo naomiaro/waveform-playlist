@@ -40,6 +40,16 @@ const config: StorybookConfig = {
     // Ensure .ts and .tsx extensions are resolved
     config.resolve.extensions = ['.ts', '.tsx', '.js', '.jsx', '.json', ...(config.resolve.extensions || [])];
 
+    // Watch sibling packages for live reload across the monorepo
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: /node_modules/,
+    };
+    config.snapshot = {
+      ...config.snapshot,
+      managedPaths: [],
+    };
+
     return config;
   },
 };

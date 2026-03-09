@@ -17,6 +17,7 @@
     "format": "prettier --write \"packages/**/src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"packages/**/src/**/*.{ts,tsx}\"",
     "lint": "prettier --check \"packages/**/src/**/*.{ts,tsx}\" && eslint \"packages/**/src/**/*.{ts,tsx}\"",
+    "storybook": "pnpm --filter @waveform-playlist/ui-components storybook",
     "website": "pnpm --filter website start",
     "test:unit": "pnpm -r --filter './packages/*' --if-present run test",
     "website:build": "pnpm --filter website build",

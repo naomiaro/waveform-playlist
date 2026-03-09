@@ -44,7 +44,8 @@ describe('SegmentedVUMeter', () => {
 
   it('renders dB scale labels when showScale is true', () => {
     renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} showScale />);
-    expect(screen.getByText('0')).toBeTruthy();
+    // Check that at least one numeric dB label is rendered
+    expect(screen.getByText('5')).toBeTruthy();
   });
 
   it('hides dB scale labels when showScale is false', () => {

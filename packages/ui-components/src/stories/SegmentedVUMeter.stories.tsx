@@ -62,8 +62,6 @@ export const Horizontal: StoryObj = {
         levels={[0.7, 0.5]}
         peakLevels={[0.85, 0.65]}
         orientation="horizontal"
-        segmentWidth={5}
-        segmentHeight={20}
       />
     </Wrapper>
   ),
@@ -71,7 +69,32 @@ export const Horizontal: StoryObj = {
     docs: {
       description: {
         story:
-          'Horizontal orientation with adjusted segment dimensions (wider segments, shorter height).',
+          'Horizontal orientation with dB scale below. Segments render left-to-right (low→high dB).',
+      },
+    },
+  },
+};
+
+export const HorizontalCompact: StoryObj = {
+  name: 'Horizontal Compact (DAW-style)',
+  render: () => (
+    <Wrapper>
+      <SegmentedVUMeter
+        levels={[0.7, 0.5]}
+        peakLevels={[0.85, 0.65]}
+        orientation="horizontal"
+        segmentCount={40}
+        segmentWidth={14}
+        segmentHeight={4}
+        segmentGap={1}
+      />
+    </Wrapper>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Compact horizontal meter suitable for toolbars. 40 segments, thin bars, auto-spaced labels.',
       },
     },
   },

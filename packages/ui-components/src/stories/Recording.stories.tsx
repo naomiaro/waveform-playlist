@@ -2,11 +2,13 @@ import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import {
-  VUMeter,
   RecordButton,
   RecordingIndicator,
   MicrophoneSelector,
 } from '@waveform-playlist/recording';
+import { ThemeProvider } from 'styled-components';
+import { defaultTheme } from '../wfpl-theme';
+import { SegmentedVUMeter } from '../components/SegmentedVUMeter';
 
 /**
  * Recording Components
@@ -60,7 +62,7 @@ Components for implementing audio recording functionality in waveform-playlist.
 
 ## Components
 
-- **VUMeter** - Displays real-time audio input levels with color-coded zones
+- **SegmentedVUMeter** - Displays real-time audio levels with segmented LED-style bars
 - **RecordButton** - Toggle button for starting/stopping recording
 - **RecordingIndicator** - Shows recording status and duration
 - **MicrophoneSelector** - Dropdown for selecting input device
@@ -69,7 +71,6 @@ Components for implementing audio recording functionality in waveform-playlist.
 
 \`\`\`tsx
 import {
-  VUMeter,
   RecordButton,
   RecordingIndicator,
   MicrophoneSelector,
@@ -77,6 +78,7 @@ import {
   useMicrophoneLevel,
   useRecording,
 } from '@waveform-playlist/recording';
+import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 \`\`\`
         `,
       },
@@ -87,23 +89,36 @@ import {
 
 export default meta;
 
-// VUMeter Stories
+// SegmentedVUMeter Stories
+
+const MeterWrapper = ({ children }: { children: React.ReactNode }) => (
+  <ThemeProvider theme={defaultTheme}>
+    <div style={{ background: '#111', padding: '1rem', borderRadius: '8px' }}>{children}</div>
+  </ThemeProvider>
+);
+
 export const VUMeterDefault: StoryObj = {
-  name: 'VU Meter - Default',
+  name: 'VU Meter - Stereo',
   render: () => (
     <DemoContainer>
-      <h3 style={{ margin: '0 0 1rem 0' }}>VU Meter</h3>
+      <h3 style={{ margin: '0 0 1rem 0' }}>Segmented VU Meter</h3>
       <DemoRow>
         <Label>Low level:</Label>
-        <VUMeter level={0.3} />
+        <MeterWrapper>
+          <SegmentedVUMeter levels={[0.3, 0.25]} peakLevels={[0.4, 0.35]} />
+        </MeterWrapper>
       </DemoRow>
       <DemoRow>
         <Label>Medium level:</Label>
-        <VUMeter level={0.6} />
+        <MeterWrapper>
+          <SegmentedVUMeter levels={[0.6, 0.5]} peakLevels={[0.7, 0.6]} />
+        </MeterWrapper>
       </DemoRow>
       <DemoRow>
         <Label>High level:</Label>
-        <VUMeter level={0.9} />
+        <MeterWrapper>
+          <SegmentedVUMeter levels={[0.9, 0.85]} peakLevels={[0.95, 0.9]} />
+        </MeterWrapper>
       </DemoRow>
     </DemoContainer>
   ),
@@ -111,59 +126,34 @@ export const VUMeterDefault: StoryObj = {
     docs: {
       description: {
         story:
-          'VU Meter displaying different audio levels with color-coded zones (green, yellow, red).',
+          'Segmented VU Meter at different levels with colour-coded segments and peak indicators.',
       },
     },
   },
 };
 
-export const VUMeterWithPeak: StoryObj = {
-  name: 'VU Meter - With Peak',
+export const VUMeterHorizontal: StoryObj = {
+  name: 'VU Meter - Horizontal (DAW-style)',
   render: () => (
     <DemoContainer>
-      <h3 style={{ margin: '0 0 1rem 0' }}>VU Meter with Peak Indicator</h3>
-      <DemoRow>
-        <Label>With peak:</Label>
-        <VUMeter level={0.4} peakLevel={0.7} />
-      </DemoRow>
-      <DemoRow>
-        <Label>Peak at max:</Label>
-        <VUMeter level={0.5} peakLevel={0.95} />
-      </DemoRow>
+      <h3 style={{ margin: '0 0 1rem 0' }}>Horizontal VU Meter</h3>
+      <MeterWrapper>
+        <SegmentedVUMeter
+          levels={[0.65, 0.45]}
+          peakLevels={[0.8, 0.6]}
+          orientation="horizontal"
+          segmentCount={40}
+          segmentWidth={14}
+          segmentHeight={4}
+          segmentGap={1}
+        />
+      </MeterWrapper>
     </DemoContainer>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'VU Meter showing both current level and peak indicator.',
-      },
-    },
-  },
-};
-
-export const VUMeterSizes: StoryObj = {
-  name: 'VU Meter - Sizes',
-  render: () => (
-    <DemoContainer>
-      <h3 style={{ margin: '0 0 1rem 0' }}>VU Meter Sizes</h3>
-      <DemoRow>
-        <Label>Small:</Label>
-        <VUMeter level={0.5} width={100} height={12} />
-      </DemoRow>
-      <DemoRow>
-        <Label>Default:</Label>
-        <VUMeter level={0.5} width={200} height={20} />
-      </DemoRow>
-      <DemoRow>
-        <Label>Large:</Label>
-        <VUMeter level={0.5} width={300} height={30} />
-      </DemoRow>
-    </DemoContainer>
-  ),
-  parameters: {
-    docs: {
-      description: {
-        story: 'VU Meter in different sizes.',
+        story: 'Compact horizontal meter for toolbar use, with auto-spaced dB labels.',
       },
     },
   },
@@ -171,15 +161,24 @@ export const VUMeterSizes: StoryObj = {
 
 // Animated VU Meter demo
 const AnimatedVUMeterDemo: React.FC = () => {
-  const [level, setLevel] = useState(0);
-  const [peakLevel, setPeakLevel] = useState(0);
+  const [levels, setLevels] = useState([0.3, 0.3]);
+  const [peakLevels, setPeakLevels] = useState([0.3, 0.3]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      // Simulate varying audio levels
-      const newLevel = 0.2 + Math.random() * 0.6;
-      setLevel(newLevel);
-      setPeakLevel((current) => Math.max(newLevel, current * 0.98));
+      setLevels((prev) => {
+        const walk = (v: number) => {
+          const delta = (Math.random() - 0.5) * 0.15;
+          return Math.max(0.01, Math.min(0.95, v + delta));
+        };
+        return prev.map(walk);
+      });
+      setPeakLevels((prev) =>
+        prev.map((peak) => {
+          const simulated = 0.2 + Math.random() * 0.6;
+          return simulated > peak ? simulated : peak * 0.995;
+        })
+      );
     }, 50);
 
     return () => clearInterval(interval);
@@ -191,7 +190,9 @@ const AnimatedVUMeterDemo: React.FC = () => {
       <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
         Simulating real-time audio input levels
       </p>
-      <VUMeter level={level} peakLevel={peakLevel} width={300} height={24} />
+      <MeterWrapper>
+        <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+      </MeterWrapper>
     </DemoContainer>
   );
 };
@@ -202,7 +203,7 @@ export const VUMeterAnimated: StoryObj = {
   parameters: {
     docs: {
       description: {
-        story: 'Animated VU Meter simulating real-time audio input.',
+        story: 'Animated VU Meter simulating real-time audio input with peak decay.',
       },
     },
   },
@@ -401,8 +402,8 @@ const CompleteRecordingDemo: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [selectedDevice, setSelectedDevice] = useState('default');
-  const [level, setLevel] = useState(0);
-  const [peakLevel, setPeakLevel] = useState(0);
+  const [levels, setLevels] = useState([0, 0]);
+  const [peakLevels, setPeakLevels] = useState([0, 0]);
 
   useEffect(() => {
     if (!isRecording) return;
@@ -416,15 +417,25 @@ const CompleteRecordingDemo: React.FC = () => {
 
   useEffect(() => {
     if (!isRecording) {
-      setLevel(0);
-      setPeakLevel(0);
+      setLevels([0, 0]);
+      setPeakLevels([0, 0]);
       return;
     }
 
     const levelInterval = setInterval(() => {
-      const newLevel = 0.2 + Math.random() * 0.6;
-      setLevel(newLevel);
-      setPeakLevel((current) => Math.max(newLevel, current * 0.98));
+      setLevels((prev) => {
+        const walk = (v: number) => {
+          const delta = (Math.random() - 0.5) * 0.15;
+          return Math.max(0.01, Math.min(0.95, v + delta));
+        };
+        return prev.map(walk);
+      });
+      setPeakLevels((prev) =>
+        prev.map((peak) => {
+          const simulated = 0.2 + Math.random() * 0.6;
+          return simulated > peak ? simulated : peak * 0.98;
+        })
+      );
     }, 50);
 
     return () => clearInterval(levelInterval);
@@ -459,7 +470,17 @@ const CompleteRecordingDemo: React.FC = () => {
 
       <DemoRow>
         <Label>Input Level:</Label>
-        <VUMeter level={level} peakLevel={peakLevel} width={250} height={20} />
+        <MeterWrapper>
+          <SegmentedVUMeter
+            levels={levels}
+            peakLevels={peakLevels}
+            orientation="horizontal"
+            segmentCount={40}
+            segmentWidth={14}
+            segmentHeight={4}
+            segmentGap={1}
+          />
+        </MeterWrapper>
       </DemoRow>
     </DemoContainer>
   );
