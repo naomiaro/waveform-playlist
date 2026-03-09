@@ -215,3 +215,7 @@ For programmatic `.click()` on file inputs, use `opacity: 0; width: 0; height: 0
 ## Clip Draggable Data Shape
 
 All three draggables in `Clip.tsx` include `startSample` and `durationSamples` in their `data` object (alongside `clipId`, `trackIndex`, `clipIndex`, and optional `boundary`). This allows modifiers like `SnapToGridModifier` to compute absolute timeline positions for grid snapping.
+
+## SegmentedVUMeter Color Stops
+
+**Gotcha:** `normalizedToDb` maps `[0, 1]` → `[floor, 0]` dB. Web Audio AnalyserNode never exceeds 0 dB, so all default color stops must be ≤ 0 dB. The `dBRange` default is `[-50, 0]`. Color stops above 0 dB are unreachable and will never light up.
