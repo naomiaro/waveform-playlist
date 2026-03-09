@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Meter, getDestination, getContext, connect as toneConnect } from 'tone';
+import { Meter, getDestination, getContext } from 'tone';
 import { dBToNormalized } from '@waveform-playlist/core';
 
 export interface UseOutputMeterOptions {
@@ -66,11 +66,11 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
     });
     meterRef.current = meter;
 
-    // Fan out from Destination's input (Volume node that receives all audio)
-    // to the Meter. Destination.output is audioContext.destination (a sink with
-    // no outputs), so connecting FROM it produces no signal.
+    // Insert Meter into Destination's internal chain using the official chain() API.
+    // Destination.chain(meter) routes: Volume → Meter → Gain → rawContext.destination.
+    // Meter is a pass-through (Analyser is both input and output) so audio is unaffected.
     const destination = getDestination();
-    toneConnect(destination.input, meter);
+    destination.chain(meter);
 
     // Start level monitoring
     const updateInterval = 1000 / updateRate;
@@ -104,6 +104,12 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       }
 
       if (meterRef.current) {
+        // Restore default chain: Volume → Gain (removes meter from path)
+        try {
+          getDestination().chain();
+        } catch {
+          console.warn('[waveform-playlist] Failed to restore destination chain');
+        }
         meterRef.current.dispose();
         meterRef.current = null;
       }
