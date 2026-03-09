@@ -50,16 +50,10 @@ function getColorForDb(dB: number, colorStops: ColorStop[]): string {
   return colorStops[colorStops.length - 1].color;
 }
 
-function computeThresholds(
-  segmentCount: number,
-  dBRange: [number, number]
-): number[] {
+function computeThresholds(segmentCount: number, dBRange: [number, number]): number[] {
   const [minDb, maxDb] = dBRange;
   const step = (maxDb - minDb) / (segmentCount - 1);
-  return Array.from(
-    { length: segmentCount },
-    (_, i) => maxDb - i * step
-  );
+  return Array.from({ length: segmentCount }, (_, i) => maxDb - i * step);
 }
 
 function selectScaleLabels(
@@ -105,8 +99,7 @@ const ChannelColumn = styled.div`
 
 const SegmentStack = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
   display: flex;
-  flex-direction: ${(props) =>
-    props.$orientation === 'horizontal' ? 'row' : 'column'};
+  flex-direction: ${(props) => (props.$orientation === 'horizontal' ? 'row' : 'column')};
 `;
 
 interface SegmentStyleProps {
@@ -123,14 +116,11 @@ const Segment = styled.div.attrs<SegmentStyleProps>((props) => ({
     width: `${props.$width}px`,
     height: `${props.$height}px`,
     marginBottom: `${props.$gap}px`,
-    backgroundColor: props.$isPeak
-      ? PEAK_COLOR
-      : props.$active
-        ? props.$color
-        : INACTIVE_COLOR,
-    boxShadow: props.$active || props.$isPeak
-      ? `0 0 4px ${props.$isPeak ? PEAK_COLOR : props.$color}40`
-      : 'none',
+    backgroundColor: props.$isPeak ? PEAK_COLOR : props.$active ? props.$color : INACTIVE_COLOR,
+    boxShadow:
+      props.$active || props.$isPeak
+        ? `0 0 4px ${props.$isPeak ? PEAK_COLOR : props.$color}40`
+        : 'none',
   },
 }))<SegmentStyleProps>`
   border-radius: 1px;
@@ -188,13 +178,10 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
 
   const thresholds = useMemo(
     () => computeThresholds(segmentCount, dBRange),
-    [segmentCount, dBRange[0], dBRange[1]]
+    [segmentCount, dBRange]
   );
 
-  const scaleLabels = useMemo(
-    () => selectScaleLabels(thresholds, 12),
-    [thresholds]
-  );
+  const scaleLabels = useMemo(() => selectScaleLabels(thresholds, 12), [thresholds]);
 
   const channelCount = levels.length;
   const isMultiChannel = channelCount >= 2;
@@ -203,8 +190,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   const renderChannel = (channelIndex: number) => {
     const level = levels[channelIndex];
     const levelDb = normalizedToDb(level);
-    const peakDb =
-      peakLevels != null ? normalizedToDb(peakLevels[channelIndex]) : null;
+    const peakDb = peakLevels != null ? normalizedToDb(peakLevels[channelIndex]) : null;
 
     // Find closest threshold index for peak
     let peakSegmentIndex = -1;
@@ -267,16 +253,10 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
     // For multi-channel: channels on sides, scale in middle
     const midpoint = Math.ceil(channelCount / 2);
     const leftChannels = Array.from({ length: midpoint }, (_, i) => i);
-    const rightChannels = Array.from(
-      { length: channelCount - midpoint },
-      (_, i) => midpoint + i
-    );
+    const rightChannels = Array.from({ length: channelCount - midpoint }, (_, i) => midpoint + i);
 
     return (
-      <MeterContainer
-        className={className}
-        data-meter-orientation={orientation}
-      >
+      <MeterContainer className={className} data-meter-orientation={orientation}>
         {leftChannels.map(renderChannel)}
         {showScale && renderScale()}
         {rightChannels.map(renderChannel)}
@@ -286,10 +266,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
 
   // Single channel: channel on left, scale on right
   return (
-    <MeterContainer
-      className={className}
-      data-meter-orientation={orientation}
-    >
+    <MeterContainer className={className} data-meter-orientation={orientation}>
       {renderChannel(0)}
       {showScale && renderScale()}
     </MeterContainer>
