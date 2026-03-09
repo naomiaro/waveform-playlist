@@ -11,7 +11,7 @@ waveform-playlist is a React component library for building browser-based audio 
 - Click-to-seek, drag-to-select, clip drag/trim/split
 - 20 real-time audio effects (reverb, delay, EQ, compression, etc.) via Tone.js
 - Time-synchronized annotations with drag editing
-- Recording with live waveform preview
+- Recording with live waveform preview and VU level metering (input and output)
 - WAV export with offline rendering
 - BBC audiowaveform support for instant rendering of large files
 - Theming via styled-components
@@ -107,7 +107,8 @@ Both providers use React Context with 4 split contexts for performance.
 - `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: mic access, VU meter, start/stop/pause recording, auto-adds clips to selected track
 - `useRecording(stream, options)` — Low-level recording via AudioWorklet with live peaks
 - `useMicrophoneAccess()` — Request mic permission, enumerate devices, get MediaStream
-- `useMicrophoneLevel(stream)` — Real-time VU meter level from mic stream
+- `useMicrophoneLevel(stream, options?)` — Real-time VU meter levels from mic stream (supports multi-channel via `channelCount` option)
+- `useOutputMeter(options?)` — Real-time master output VU meter levels (from `@waveform-playlist/browser`). Returns per-channel `levels`, `peakLevels`, and `resetPeak()`
 
 ## Key Components
 

@@ -670,6 +670,63 @@ interface UseIntegratedRecordingReturn {
 }
 ```
 
+### useMicrophoneLevel
+
+```typescript
+function useMicrophoneLevel(options?: {
+  channelCount?: number;  // Default: 1
+}): UseMicrophoneLevelReturn;
+
+interface UseMicrophoneLevelReturn {
+  level: number;        // 0-1 RMS level (first channel)
+  peak: number;         // 0-1 peak with decay (first channel)
+  levels: number[];     // Per-channel RMS levels (0-1)
+  peakLevels: number[]; // Per-channel peak levels with decay (0-1)
+}
+```
+
+### useOutputMeter
+
+```typescript
+function useOutputMeter(options?: UseOutputMeterOptions): UseOutputMeterReturn;
+
+interface UseOutputMeterOptions {
+  channelCount?: number;             // Default: 2
+  smoothingTimeConstant?: number;    // Default: 0.8
+  updateRate?: number;               // Default: 60
+}
+
+interface UseOutputMeterReturn {
+  levels: number[];       // Per-channel RMS levels (0-1)
+  peakLevels: number[];   // Per-channel peak levels with hold/decay (0-1)
+  resetPeak: () => void;  // Reset all peak hold indicators
+}
+```
+
+### SegmentedVUMeter
+
+```typescript
+interface ColorStop {
+  dB: number;
+  color: string;
+}
+
+interface SegmentedVUMeterProps {
+  levels: number[];
+  peakLevels?: number[];
+  channelLabels?: string[];
+  orientation?: 'vertical' | 'horizontal';
+  segmentCount?: number;
+  dBRange?: [number, number];
+  showScale?: boolean;
+  colorStops?: ColorStop[];
+  segmentWidth?: number;
+  segmentHeight?: number;
+  segmentGap?: number;
+  className?: string;
+}
+```
+
 ---
 
 ## Export

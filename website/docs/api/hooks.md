@@ -924,10 +924,66 @@ function useRecording(): {
 ### useMicrophoneLevel
 
 ```typescript
-function useMicrophoneLevel(): {
-  level: number;  // 0-1 RMS level
-  peak: number;   // 0-1 peak with decay
+function useMicrophoneLevel(options?: {
+  channelCount?: number;  // Default: 1 (mono). Set to 2 for stereo.
+}): {
+  level: number;        // 0-1 RMS level (first channel, for backwards compatibility)
+  peak: number;         // 0-1 peak with decay (first channel, for backwards compatibility)
+  levels: number[];     // Per-channel RMS levels (0-1)
+  peakLevels: number[]; // Per-channel peak levels with decay (0-1)
 };
+```
+
+### useOutputMeter
+
+*From `@waveform-playlist/browser`*
+
+Monitor the master output level of the playlist. Must be used inside `WaveformPlaylistProvider`.
+
+```typescript
+function useOutputMeter(options?: UseOutputMeterOptions): UseOutputMeterReturn;
+```
+
+#### Options
+
+```typescript
+interface UseOutputMeterOptions {
+  channelCount?: number;             // Default: 2
+  smoothingTimeConstant?: number;    // Default: 0.8
+  updateRate?: number;               // Default: 60 (Hz)
+}
+```
+
+#### Returns
+
+```typescript
+interface UseOutputMeterReturn {
+  levels: number[];       // Per-channel RMS levels (0-1)
+  peakLevels: number[];   // Per-channel peak levels with hold/decay (0-1)
+  resetPeak: () => void;  // Reset all peak hold indicators
+}
+```
+
+#### Example
+
+```tsx
+import { useOutputMeter } from '@waveform-playlist/browser';
+
+function OutputMeter() {
+  const { levels, peakLevels, resetPeak } = useOutputMeter({ channelCount: 2 });
+
+  return (
+    <div>
+      {levels.map((level, ch) => (
+        <div key={ch}>
+          <span>{ch === 0 ? 'L' : 'R'}: {(level * 100).toFixed(0)}%</span>
+          <span>Peak: {(peakLevels[ch] * 100).toFixed(0)}%</span>
+        </div>
+      ))}
+      <button onClick={resetPeak}>Reset Peak</button>
+    </div>
+  );
+}
 ```
 
 ---
