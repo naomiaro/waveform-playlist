@@ -1,11 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import {
-  RecordButton,
-  RecordingIndicator,
-  MicrophoneSelector,
-} from '@waveform-playlist/recording';
+import { RecordButton, RecordingIndicator, MicrophoneSelector } from '@waveform-playlist/recording';
 import { ThemeProvider } from 'styled-components';
 import { defaultTheme } from '../wfpl-theme';
 import { SegmentedVUMeter } from '../components/SegmentedVUMeter';
