@@ -68,3 +68,6 @@ export type { UseWaveformDataCacheReturn } from './useWaveformDataCache';
 
 export { useDynamicTracks } from './useDynamicTracks';
 export type { TrackSource, TrackLoadError, UseDynamicTracksReturn } from './useDynamicTracks';
+
+export { useOutputMeter } from './useOutputMeter';
+export type { UseOutputMeterOptions, UseOutputMeterReturn } from './useOutputMeter';

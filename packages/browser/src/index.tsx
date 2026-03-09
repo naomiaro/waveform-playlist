@@ -48,6 +48,7 @@ export {
   useTrackDynamicEffects,
   useExportWav,
   useDynamicTracks,
+  useOutputMeter,
 } from './hooks';
 export type {
   AudioTrackConfig,
@@ -67,6 +68,8 @@ export type {
   TrackSource,
   TrackLoadError,
   UseDynamicTracksReturn,
+  UseOutputMeterOptions,
+  UseOutputMeterReturn,
 } from './hooks';
 
 // Export effect definitions and factory
