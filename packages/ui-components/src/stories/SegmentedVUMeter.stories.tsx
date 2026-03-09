@@ -33,6 +33,7 @@ const meta: Meta<typeof SegmentedVUMeter> = {
     segmentHeight: { control: { type: 'range', min: 2, max: 20, step: 1 } },
     segmentGap: { control: { type: 'range', min: 0, max: 5, step: 1 } },
     showScale: { control: 'boolean' },
+    coloredInactive: { control: 'boolean' },
     colorStops: { control: false },
   },
 };

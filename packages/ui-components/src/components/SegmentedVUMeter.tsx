@@ -19,6 +19,7 @@ export interface SegmentedVUMeterProps {
   segmentWidth?: number;
   segmentHeight?: number;
   segmentGap?: number;
+  coloredInactive?: boolean;
   className?: string;
 }
 
@@ -33,6 +34,7 @@ const DEFAULT_COLOR_STOPS: ColorStop[] = [
 ];
 
 const INACTIVE_OPACITY = 0.15;
+const INACTIVE_COLOR = '#2a2a3e';
 const PEAK_COLOR = '#ffffff';
 
 function getDefaultLabels(channelCount: number): string[] {
@@ -112,6 +114,7 @@ interface SegmentStyleProps {
   $color: string;
   $isPeak: boolean;
   $orientation: 'vertical' | 'horizontal';
+  $coloredInactive: boolean;
 }
 
 const Segment = styled.div.attrs<SegmentStyleProps>((props) => ({
@@ -121,8 +124,12 @@ const Segment = styled.div.attrs<SegmentStyleProps>((props) => ({
     ...(props.$orientation === 'horizontal'
       ? { marginRight: `${props.$gap}px` }
       : { marginBottom: `${props.$gap}px` }),
-    backgroundColor: props.$isPeak ? PEAK_COLOR : props.$color,
-    opacity: props.$isPeak || props.$active ? 1 : INACTIVE_OPACITY,
+    backgroundColor: props.$isPeak
+      ? PEAK_COLOR
+      : props.$active || props.$coloredInactive
+        ? props.$color
+        : INACTIVE_COLOR,
+    opacity: props.$isPeak || props.$active ? 1 : props.$coloredInactive ? INACTIVE_OPACITY : 1,
     boxShadow:
       props.$active || props.$isPeak
         ? `0 0 4px ${props.$isPeak ? PEAK_COLOR : props.$color}40`
@@ -212,6 +219,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   segmentWidth = 20,
   segmentHeight = 8,
   segmentGap = 2,
+  coloredInactive = false,
   className,
 }) => {
   const labels = channelLabels ?? getDefaultLabels(levels.length);
@@ -287,6 +295,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
                 $color={color}
                 $isPeak={isPeak}
                 $orientation={orientation}
+                $coloredInactive={coloredInactive}
                 data-segment
                 {...(isPeak ? { 'data-peak': true } : {})}
               />

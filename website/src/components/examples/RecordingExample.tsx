@@ -326,6 +326,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                 segmentWidth={14}
                 segmentHeight={4}
                 segmentGap={1}
+                coloredInactive
               />
             </Flex>
             <Flex gap="1" align="center">
@@ -338,6 +339,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                 segmentWidth={14}
                 segmentHeight={4}
                 segmentGap={1}
+                coloredInactive
               />
             </Flex>
           </Flex>
