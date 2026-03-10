@@ -155,12 +155,16 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     setProviderSelectedTrackId(selectedTrackId);
   }, [selectedTrackId, setProviderSelectedTrackId]);
 
-  // Sync provider → local when user clicks a track in the waveform area
+  // Sync provider → local when user clicks a track in the waveform area.
+  // Only react to provider changes (not local), to avoid overwriting local
+  // state with stale provider values during auto-create track flows.
+  const prevProviderTrackIdRef = useRef(providerSelectedTrackId);
   useEffect(() => {
-    if (providerSelectedTrackId !== selectedTrackId) {
+    if (providerSelectedTrackId !== prevProviderTrackIdRef.current) {
+      prevProviderTrackIdRef.current = providerSelectedTrackId;
       setSelectedTrackId(providerSelectedTrackId);
     }
-  }, [providerSelectedTrackId, selectedTrackId, setSelectedTrackId]);
+  }, [providerSelectedTrackId, setSelectedTrackId]);
 
   // Flag to auto-start recording after creating a new track
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false);
@@ -275,10 +279,41 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     startRecordingWithPlayback();
   }, [isRecording, hasPermission, selectedTrackId, onAddTrack, startRecordingWithPlayback]);
 
-  const recordingShortcuts = useMemo(() => [
+  // Toggle play/pause
+  const handleTogglePlayPause = useCallback(() => {
+    if (isPlaying) {
+      pause();
+    } else {
+      handlePlay();
+    }
+  }, [isPlaying, pause, handlePlay]);
+
+  // All keyboard shortcuts — no presets, fully recording-aware
+  const allShortcuts = useMemo(() => [
+    {
+      key: ' ',
+      action: handleTogglePlayPause,
+      description: 'Play/Pause',
+      preventDefault: true,
+    },
+    {
+      key: 'Escape',
+      action: handleStop,
+      description: 'Stop playback and recording',
+      preventDefault: true,
+    },
+    {
+      key: '0',
+      action: handleRewind,
+      description: 'Rewind to start',
+      preventDefault: true,
+    },
     {
       key: 'r',
       shiftKey: true,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
       action: handleForceNewTrackRecord,
       description: 'Create new track and record',
       preventDefault: true,
@@ -286,11 +321,14 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     {
       key: 'r',
       shiftKey: false,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
       action: handleRecordShortcut,
       description: 'Record on selected track',
       preventDefault: true,
     },
-  ], [handleRecordShortcut, handleForceNewTrackRecord]);
+  ], [handleTogglePlayPause, handleStop, handleRewind, handleRecordShortcut, handleForceNewTrackRecord]);
 
   // Calculate recording start position for live preview
   // Uses captured start time (not live currentTime which advances during overdub)
@@ -387,7 +425,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   return (
     <>
-      <KeyboardShortcuts playback additionalShortcuts={recordingShortcuts} />
+      <KeyboardShortcuts additionalShortcuts={allShortcuts} />
       {error && (
         <ErrorBanner>
           <Text size="2" color="red">
