@@ -59,25 +59,6 @@ function computeThresholds(segmentCount: number, dBRange: [number, number]): num
   return Array.from({ length: segmentCount }, (_, i) => maxDb - i * step);
 }
 
-function selectScaleLabels(
-  thresholds: number[],
-  targetCount: number
-): { index: number; label: string }[] {
-  const count = Math.min(targetCount, thresholds.length);
-  if (thresholds.length <= count) {
-    return thresholds.map((t, i) => ({
-      index: i,
-      label: formatDbLabel(t),
-    }));
-  }
-  const step = (thresholds.length - 1) / (count - 1);
-  const labels: { index: number; label: string }[] = [];
-  for (let i = 0; i < count; i++) {
-    const idx = Math.round(i * step);
-    labels.push({ index: idx, label: formatDbLabel(thresholds[idx]) });
-  }
-  return labels;
-}
 
 function formatDbLabel(dB: number): string {
   return Math.round(dB).toString();
@@ -236,24 +217,28 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
 
   const scaleLabels = useMemo(() => {
     const totalSize = segmentCount * segmentTotalHeight - segmentGap;
-    let labelCount: number;
+    const [minDb, maxDb] = dBRange;
+    let minSpacing: number;
     if (orientation === 'horizontal') {
-      // Auto-calculate: ~35px per label at 9px monospace to prevent overlap
-      labelCount = Math.max(2, Math.floor(totalSize / 35));
+      minSpacing = 35;
     } else {
-      // Auto-calculate: use segment height as minimum spacing between labels
-      // (each segment is segmentTotalHeight px, labels need at least that much room)
-      const minLabelSpacing = Math.max(14, segmentTotalHeight * 2);
-      labelCount = Math.max(2, Math.floor(totalSize / minLabelSpacing));
+      minSpacing = Math.max(14, segmentTotalHeight * 2);
     }
-    const selected = selectScaleLabels(thresholds, labelCount);
-    if (orientation === 'horizontal') {
-      // Reverse index positions to match reversed thresholds
-      const lastIdx = thresholds.length - 1;
-      return selected.map((l) => ({ ...l, index: lastIdx - l.index }));
+    const labelCount = Math.max(2, Math.floor(totalSize / minSpacing));
+
+    // Position labels at evenly-spaced pixel positions (not snapped to segments)
+    const labels: { position: number; label: string }[] = [];
+    for (let i = 0; i < labelCount; i++) {
+      const t = i / (labelCount - 1);
+      const position = t * totalSize;
+      // Vertical: top=0 is maxDb, bottom is minDb
+      // Horizontal: left=0 is minDb, right is maxDb
+      const db =
+        orientation === 'horizontal' ? minDb + t * (maxDb - minDb) : maxDb - t * (maxDb - minDb);
+      labels.push({ position, label: formatDbLabel(db) });
     }
-    return selected;
-  }, [thresholds, orientation, segmentCount, segmentTotalHeight, segmentGap]);
+    return labels;
+  }, [orientation, segmentCount, segmentTotalHeight, segmentGap, dBRange]);
 
   // For horizontal, reverse thresholds so low dB is on left, high dB on right
   const renderThresholds = useMemo(
@@ -317,14 +302,11 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
         <HorizontalScaleWrapper>
           <ChannelLabel style={{ visibility: 'hidden' }}>L</ChannelLabel>
           <ScaleRow style={{ width: `${totalWidth}px` }}>
-            {scaleLabels.map(({ index, label }) => {
-              const left = index * segmentTotalHeight + segmentHeight / 2;
-              return (
-                <ScaleLabelHorizontal key={index} $left={left}>
-                  {label}
-                </ScaleLabelHorizontal>
-              );
-            })}
+            {scaleLabels.map(({ position, label }, i) => (
+              <ScaleLabelHorizontal key={i} $left={position}>
+                {label}
+              </ScaleLabelHorizontal>
+            ))}
           </ScaleRow>
         </HorizontalScaleWrapper>
       );
@@ -332,14 +314,11 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
     const totalHeight = segmentCount * segmentTotalHeight - segmentGap;
     return (
       <ScaleColumn style={{ height: `${totalHeight}px` }}>
-        {scaleLabels.map(({ index, label }) => {
-          const top = index * segmentTotalHeight + segmentHeight / 2;
-          return (
-            <ScaleLabel key={index} $top={top}>
-              {label}
-            </ScaleLabel>
-          );
-        })}
+        {scaleLabels.map(({ position, label }, i) => (
+          <ScaleLabel key={i} $top={position}>
+            {label}
+          </ScaleLabel>
+        ))}
       </ScaleColumn>
     );
   };
