@@ -18,15 +18,6 @@ export type {
   IntegratedRecordingOptions,
 } from './hooks';
 
-// Components
-export { RecordButton, MicrophoneSelector, RecordingIndicator, VUMeter } from './components';
-export type {
-  RecordButtonProps,
-  MicrophoneSelectorProps,
-  RecordingIndicatorProps,
-  VUMeterProps,
-} from './components';
-
 // Types
 export type {
   RecordingState,

@@ -25,25 +25,6 @@ By default, the `SegmentedVUMeter` component displays peak levels. Pass `rmsLeve
 
 ## Built-In Components
 
-### VUMeter
-
-A simple horizontal bar meter for single-channel level display:
-
-```tsx
-import { VUMeter } from '@waveform-playlist/recording';
-
-<VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
-```
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `level` | `number` | — | Current audio level (0–1) |
-| `peakLevel` | `number` | — | Peak level with indicator (0–1) |
-| `width` | `number` | `200` | Meter width in pixels |
-| `height` | `number` | `20` | Meter height in pixels |
-
-The meter uses color-coded zones: green below 60%, yellow from 60–85%, and red above 85%.
-
 ### SegmentedVUMeter
 
 A professional LED-segment style meter with multi-channel support:

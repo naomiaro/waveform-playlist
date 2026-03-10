@@ -662,8 +662,8 @@ function RecordingControls() {
   const {
     isRecording,
     duration,
-    level,
-    peakLevel,
+    levels,
+    peakLevels,
     devices,
     hasPermission,
     startRecording,
@@ -687,7 +687,7 @@ function RecordingControls() {
         {isRecording ? 'Stop' : 'Record'}
       </button>
       {isRecording && <span>Recording: {duration.toFixed(1)}s</span>}
-      <VUMeter level={level} peakLevel={peakLevel} />
+      <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
     </div>
   );
 }

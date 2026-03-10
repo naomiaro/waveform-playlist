@@ -59,7 +59,6 @@ function computeThresholds(segmentCount: number, dBRange: [number, number]): num
   return Array.from({ length: segmentCount }, (_, i) => maxDb - i * step);
 }
 
-
 function formatDbLabel(dB: number): string {
   return Math.round(dB).toString();
 }

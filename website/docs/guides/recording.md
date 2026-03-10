@@ -483,7 +483,8 @@ import {
   ExportWavButton,
   usePlaybackAnimation,
 } from '@waveform-playlist/browser';
-import { useIntegratedRecording, VUMeter } from '@waveform-playlist/recording';
+import { useIntegratedRecording } from '@waveform-playlist/recording';
+import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 
 function RecordingControls({
@@ -502,8 +503,8 @@ function RecordingControls({
   const {
     isRecording,
     duration,
-    level,
-    peakLevel,
+    levels,
+    peakLevels,
     hasPermission,
     startRecording,
     stopRecording,
@@ -542,7 +543,7 @@ function RecordingControls({
       </button>
       <button onClick={handleAddTrack}>+ Add Track</button>
       {hasPermission && (
-        <VUMeter level={level} peakLevel={peakLevel} width={200} height={20} />
+        <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
       )}
     </div>
   );

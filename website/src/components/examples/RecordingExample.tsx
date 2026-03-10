@@ -35,12 +35,8 @@ import {
   useOutputMeter,
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
-import {
-  RecordButton,
-  MicrophoneSelector,
-  RecordingIndicator,
-  useIntegratedRecording,
-} from '@waveform-playlist/recording';
+import { useIntegratedRecording } from '@waveform-playlist/recording';
+import { RecordButton, MicrophoneSelector, RecordingIndicator } from './RecordingControls';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { MicrophoneIcon, SpeakerHighIcon } from '@phosphor-icons/react';

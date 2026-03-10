@@ -197,7 +197,6 @@ export const CustomColors: StoryObj = {
   },
 };
 
-
 export const CompactSize: StoryWithLevels = {
   name: 'Compact Size',
   argTypes: {

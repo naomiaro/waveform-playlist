@@ -62,17 +62,20 @@ npm install @waveform-playlist/recording
 Use `useIntegratedRecording` inside a `WaveformPlaylistProvider` to combine mic access, recording, and track management:
 
 ```tsx
-import { useIntegratedRecording, RecordButton, VUMeter } from '@waveform-playlist/recording';
+import { useIntegratedRecording } from '@waveform-playlist/recording';
+import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 function RecordingControls({ tracks, setTracks, selectedTrackId }) {
-  const { isRecording, startRecording, stopRecording, requestMicAccess, level } =
+  const { isRecording, levels, peakLevels, startRecording, stopRecording, requestMicAccess } =
     useIntegratedRecording(tracks, setTracks, selectedTrackId);
 
   return (
     <>
       <button onClick={requestMicAccess}>Enable Mic</button>
-      <RecordButton isRecording={isRecording} onStart={startRecording} onStop={stopRecording} />
-      <VUMeter level={level} />
+      <button onClick={isRecording ? stopRecording : startRecording}>
+        {isRecording ? 'Stop' : 'Record'}
+      </button>
+      <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
     </>
   );
 }
