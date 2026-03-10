@@ -8,6 +8,19 @@ description: Real-time audio level monitoring with built-in and custom VU meter 
 
 Waveform-playlist provides VU metering for both recording input and playback output, with built-in components and hooks for custom visualizations.
 
+## Peak vs RMS Metering
+
+Both metering hooks provide **true peak** and **RMS** (root mean square) levels. They measure different things and are useful in different contexts:
+
+| Meter | Measures | Use for |
+|-------|----------|---------|
+| **Peak** (`levels`) | Highest sample value per frame | Clipping detection, setting compressor thresholds, recording levels |
+| **RMS** (`rmsLevels`) | Average signal power over time | Perceived loudness, mix balance, identifying instruments eating headroom |
+
+Peak responds instantly to transients — if a drum hit clips, you'll see it. RMS is smoother and closer to how loud something *sounds*. A large gap between peak and RMS indicates dynamic audio; a small gap indicates heavy compression.
+
+By default, the `SegmentedVUMeter` component displays peak levels. Pass `rmsLevels` instead of `levels` if you want an RMS meter.
+
 ## Built-In Components
 
 ### VUMeter
@@ -46,11 +59,13 @@ import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 | `channelLabels` | `string[]` | Auto | Labels per channel (auto: M, L/R, 1/2/3...) |
 | `orientation` | `'vertical' \| 'horizontal'` | `'vertical'` | Meter orientation |
 | `segmentCount` | `number` | `24` | Number of LED segments |
-| `dBRange` | `[number, number]` | `[-50, 5]` | dB scale range |
+| `dBRange` | `[number, number]` | `[-50, 0]` | dB scale range |
 | `showScale` | `boolean` | `true` | Show dB scale labels |
 | `colorStops` | `ColorStop[]` | Built-in | Custom color scheme |
 | `segmentWidth` | `number` | `20` | Segment width in pixels |
 | `segmentHeight` | `number` | `8` | Segment height in pixels |
+| `segmentGap` | `number` | `2` | Gap between segments in pixels |
+| `coloredInactive` | `boolean` | `false` | Show inactive segments in dimmed color instead of flat dark |
 
 ## Input Metering
 
@@ -87,11 +102,12 @@ function InputMeter() {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `levels` | `number[]` | Per-channel levels (0–1), array length matches `channelCount` |
-| `peakLevels` | `number[]` | Per-channel peak levels (0–1) |
-| `level` | `number` | Single scalar level (channel 0 for mono, max across channels for multi) |
-| `peakLevel` | `number` | Single scalar peak level |
-| `resetPeak` | `() => void` | Reset all peak levels to 0 |
+| `levels` | `number[]` | Per-channel true peak levels (0–1) |
+| `peakLevels` | `number[]` | Per-channel held peak levels (0–1) — highest value seen since last reset |
+| `rmsLevels` | `number[]` | Per-channel RMS levels (0–1) — average signal power |
+| `level` | `number` | Single scalar peak level (channel 0 for mono, max across channels for multi) |
+| `peakLevel` | `number` | Single scalar held peak level |
+| `resetPeak` | `() => void` | Reset all held peak levels to 0 |
 
 ## Output Metering
 
@@ -115,7 +131,25 @@ function OutputMeter() {
 | `updateRate` | `number` | `60` | Update frequency in Hz |
 | `smoothingTimeConstant` | `number` | `0.8` | Smoothing (0–1, higher = smoother) |
 
-The hook connects a Tone.js Meter to the audio Destination node. It returns `levels`, `peakLevels`, and `resetPeak` with the same shape as `useMicrophoneLevel`.
+The hook returns `levels` (true peak), `peakLevels` (held peak), `rmsLevels`, and `resetPeak` with the same shape as `useMicrophoneLevel`.
+
+## Choosing Peak vs RMS
+
+Both hooks expose peak and RMS — choose based on your use case:
+
+```tsx
+// Peak meter (default) — best for recording and clipping detection
+<SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+
+// RMS meter — best for showing perceived loudness
+<SegmentedVUMeter levels={rmsLevels} />
+
+// Both side by side — useful for dynamics processing UI
+<div style={{ display: 'flex', gap: '1rem' }}>
+  <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+  <SegmentedVUMeter levels={rmsLevels} />
+</div>
+```
 
 ## Building a Custom Meter
 
@@ -175,12 +209,24 @@ Override the default color stops with your own:
   levels={levels}
   peakLevels={peakLevels}
   colorStops={[
-    { dB: 0, color: '#ff0000' },
+    { dB: -1, color: '#ff0000' },
     { dB: -6, color: '#ffaa00' },
     { dB: -18, color: '#00ff00' },
     { dB: -50, color: '#004400' },
   ]}
 />
+```
+
+:::caution
+All color stop dB values must be ≤ 0. Web Audio `AnalyserNode` values are normalized to `[0, 1]`, which maps to `[-100, 0]` dB. Color stops above 0 dB will never light up.
+:::
+
+### Colored Inactive Segments
+
+By default, inactive segments are a flat dark color. Enable `coloredInactive` to show them in their dimmed color at 15% opacity — this gives a visual preview of the full color scale:
+
+```tsx
+<SegmentedVUMeter levels={levels} coloredInactive />
 ```
 
 ### Horizontal Orientation
@@ -202,14 +248,16 @@ Override the default color stops with your own:
   segmentCount={16}
   segmentWidth={30}
   segmentHeight={6}
-  dBRange={[-60, 3]}
+  dBRange={[-60, 0]}
   showScale={false}
 />
 ```
 
 ## Multi-Channel
 
-The `channelCount` option maps directly to Tone.js Meter channels. The default is `1` for input metering (most microphones are mono) and `2` for output metering (stereo playback).
+The `channelCount` option controls how many channels to meter. The default is `1` for input metering (most microphones are mono) and `2` for output metering (stereo playback).
+
+When a mono microphone is used with `channelCount: 2`, the single channel level is automatically mirrored to both L/R channels for consistent visual display.
 
 For multi-channel audio interfaces, set `channelCount` higher:
 
