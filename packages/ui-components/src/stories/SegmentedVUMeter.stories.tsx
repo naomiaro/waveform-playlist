@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from 'styled-components';
 import { defaultTheme } from '../wfpl-theme';
 import { SegmentedVUMeter } from '../components/SegmentedVUMeter';
+import { dBToNormalized } from '@waveform-playlist/core';
 
 /**
  * SegmentedVUMeter
@@ -41,18 +42,24 @@ const meta: Meta<typeof SegmentedVUMeter> = {
 export default meta;
 
 type StoryWithLevels = StoryObj<
-  typeof SegmentedVUMeter & { leftLevel: number; rightLevel: number }
+  typeof SegmentedVUMeter & { leftLevelDb: number; rightLevelDb: number }
 >;
 
 export const StereoVertical: StoryWithLevels = {
   name: 'Stereo Vertical',
   argTypes: {
-    leftLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
-    rightLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
+    leftLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Left (dB)',
+    },
+    rightLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Right (dB)',
+    },
   },
   args: {
-    leftLevel: 0.65,
-    rightLevel: 0.45,
+    leftLevelDb: -6,
+    rightLevelDb: -12,
     segmentCount: 24,
     segmentWidth: 20,
     segmentHeight: 8,
@@ -60,8 +67,11 @@ export const StereoVertical: StoryWithLevels = {
     showScale: true,
     orientation: 'vertical',
   },
-  render: ({ leftLevel, rightLevel, ...props }) => (
-    <SegmentedVUMeter levels={[leftLevel, rightLevel]} {...props} />
+  render: ({ leftLevelDb, rightLevelDb, ...props }) => (
+    <SegmentedVUMeter
+      levels={[dBToNormalized(leftLevelDb), dBToNormalized(rightLevelDb)]}
+      {...props}
+    />
   ),
   parameters: {
     docs: {
@@ -76,15 +86,18 @@ export const StereoVertical: StoryWithLevels = {
 export const MonoVertical: StoryWithLevels = {
   name: 'Mono Vertical',
   argTypes: {
-    leftLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 }, name: 'level' },
-    rightLevel: { table: { disable: true } },
+    leftLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Level (dB)',
+    },
+    rightLevelDb: { table: { disable: true } },
   },
   args: {
-    leftLevel: 0.55,
+    leftLevelDb: -10,
     showScale: true,
   },
-  render: ({ leftLevel, ...props }) => (
-    <SegmentedVUMeter levels={[leftLevel]} channelLabels={['M']} {...props} />
+  render: ({ leftLevelDb, ...props }) => (
+    <SegmentedVUMeter levels={[dBToNormalized(leftLevelDb)]} channelLabels={['M']} {...props} />
   ),
   parameters: {
     docs: { description: { story: 'Single channel mono meter with "M" label.' } },
@@ -94,17 +107,26 @@ export const MonoVertical: StoryWithLevels = {
 export const Horizontal: StoryWithLevels = {
   name: 'Horizontal',
   argTypes: {
-    leftLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
-    rightLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
+    leftLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Left (dB)',
+    },
+    rightLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Right (dB)',
+    },
   },
   args: {
-    leftLevel: 0.7,
-    rightLevel: 0.5,
+    leftLevelDb: -4,
+    rightLevelDb: -10,
     orientation: 'horizontal',
     showScale: true,
   },
-  render: ({ leftLevel, rightLevel, ...props }) => (
-    <SegmentedVUMeter levels={[leftLevel, rightLevel]} {...props} />
+  render: ({ leftLevelDb, rightLevelDb, ...props }) => (
+    <SegmentedVUMeter
+      levels={[dBToNormalized(leftLevelDb), dBToNormalized(rightLevelDb)]}
+      {...props}
+    />
   ),
   parameters: {
     docs: {
@@ -119,12 +141,18 @@ export const Horizontal: StoryWithLevels = {
 export const HorizontalCompact: StoryWithLevels = {
   name: 'Horizontal Compact (DAW-style)',
   argTypes: {
-    leftLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
-    rightLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
+    leftLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Left (dB)',
+    },
+    rightLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Right (dB)',
+    },
   },
   args: {
-    leftLevel: 0.7,
-    rightLevel: 0.5,
+    leftLevelDb: -4,
+    rightLevelDb: -10,
     orientation: 'horizontal',
     segmentCount: 40,
     segmentWidth: 14,
@@ -132,8 +160,11 @@ export const HorizontalCompact: StoryWithLevels = {
     segmentGap: 1,
     showScale: true,
   },
-  render: ({ leftLevel, rightLevel, ...props }) => (
-    <SegmentedVUMeter levels={[leftLevel, rightLevel]} {...props} />
+  render: ({ leftLevelDb, rightLevelDb, ...props }) => (
+    <SegmentedVUMeter
+      levels={[dBToNormalized(leftLevelDb), dBToNormalized(rightLevelDb)]}
+      {...props}
+    />
   ),
   parameters: {
     docs: {
@@ -206,20 +237,29 @@ export const Animated: StoryObj = {
 export const CompactSize: StoryWithLevels = {
   name: 'Compact Size',
   argTypes: {
-    leftLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
-    rightLevel: { control: { type: 'range', min: 0, max: 1, step: 0.01 } },
+    leftLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Left (dB)',
+    },
+    rightLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Right (dB)',
+    },
   },
   args: {
-    leftLevel: 0.6,
-    rightLevel: 0.4,
+    leftLevelDb: -8,
+    rightLevelDb: -15,
     segmentWidth: 12,
     segmentHeight: 5,
     segmentGap: 1,
     segmentCount: 16,
     showScale: true,
   },
-  render: ({ leftLevel, rightLevel, ...props }) => (
-    <SegmentedVUMeter levels={[leftLevel, rightLevel]} {...props} />
+  render: ({ leftLevelDb, rightLevelDb, ...props }) => (
+    <SegmentedVUMeter
+      levels={[dBToNormalized(leftLevelDb), dBToNormalized(rightLevelDb)]}
+      {...props}
+    />
   ),
   parameters: {
     docs: {
