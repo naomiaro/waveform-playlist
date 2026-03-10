@@ -115,7 +115,7 @@ export const TransportStopButton: React.FC<TransportButtonProps> = ({ onClick, d
 
 export interface RecordButtonProps {
   isRecording: boolean;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
 }
 

@@ -245,8 +245,15 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     stop();
   }, [isRecording, stopRecording, stop]);
 
-  const handleRecordClick = () => {
+  const handleRecordClick = (e: React.MouseEvent) => {
     if (isRecording) return;
+
+    // Shift+click: always create a new track (like Shift+R)
+    if (e.shiftKey) {
+      setShouldAutoStartRecording(true);
+      onAddTrack();
+      return;
+    }
 
     // Auto-create track if none selected
     if (!selectedTrackId) {
