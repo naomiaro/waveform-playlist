@@ -180,6 +180,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   // Start recording and playback together (overdub)
   const startRecordingWithPlayback = useCallback(async () => {
+    // Reset auto-stop guard before starting — prevents stale wasPlayingRef=true
+    // from a previous session triggering auto-stop if play() causes a brief
+    // isPlaying flicker during engine rebuild
+    wasPlayingRef.current = false;
     recordStartTimeRef.current = currentTime;
     await startRecording();
     // Start playback from current position so user hears existing tracks
