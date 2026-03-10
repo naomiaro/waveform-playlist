@@ -193,6 +193,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     loopStart,
     loopEnd,
     isLoopEnabled,
+    indefinitePlayback,
   } = usePlaylistState();
   const annotationIntegration = useContext(AnnotationIntegrationContext);
   const {
@@ -306,10 +307,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
       return Math.max(clipMax, end);
     }, max);
   }, 0);
-  // Minimum duration that fills the visible scroll container
-  const containerWidth = scrollContainerRef.current?.clientWidth ?? 0;
-  const minContainerDuration = (containerWidth * samplesPerPixel) / sampleRate;
-
   let displayDuration =
     tracksMaxDuration > 0
       ? tracksMaxDuration
@@ -317,8 +314,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         ? duration
         : DEFAULT_EMPTY_TRACK_DURATION;
 
-  // Always fill at least the visible container
-  displayDuration = Math.max(displayDuration, minContainerDuration);
+  // When indefinitePlayback is enabled, ensure the timeline fills the visible scroll container
+  if (indefinitePlayback) {
+    const containerWidth = scrollContainerRef.current?.clientWidth ?? 0;
+    const minContainerDuration = (containerWidth * samplesPerPixel) / sampleRate;
+    displayDuration = Math.max(displayDuration, minContainerDuration);
+  }
 
   if (recordingState?.isRecording) {
     const recordingEndSample = recordingState.startSample + recordingState.durationSamples;

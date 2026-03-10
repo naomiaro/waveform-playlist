@@ -103,6 +103,8 @@ export interface PlaylistStateContextValue {
   // Loop region (separate from selection) - Audacity-style loop points
   loopStart: number;
   loopEnd: number;
+  /** Whether playback continues past the end of loaded audio */
+  indefinitePlayback: boolean;
 }
 
 export interface PlaylistControlsContextValue {
@@ -1267,6 +1269,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       selectedTrackId,
       loopStart,
       loopEnd,
+      indefinitePlayback,
     }),
     [
       continuousPlay,
@@ -1281,6 +1284,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       selectedTrackId,
       loopStart,
       loopEnd,
+      indefinitePlayback,
     ]
   );
 
