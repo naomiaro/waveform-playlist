@@ -171,6 +171,7 @@ const config: Config = {
                     /packages[\\/]ui-components[\\/]src/,
                     /packages[\\/]annotations[\\/]src/,
                     /packages[\\/]midi[\\/]src/,
+                    /packages[\\/]recording[\\/]src/,
                   ],
                   use: [
                     {
@@ -199,7 +200,8 @@ const config: Config = {
                 '@waveform-playlist/annotations': path.resolve(__dirname, '../packages/annotations/src'),
                 '@waveform-playlist/spectrogram': path.resolve(__dirname, '../packages/spectrogram/src'),
                 '@waveform-playlist/midi': path.resolve(__dirname, '../packages/midi/src'),
-                // recording, loaders, and webaudio-peaks use their built dist versions via node_modules
+                '@waveform-playlist/recording': path.resolve(__dirname, '../packages/recording/src'),
+                // worklets, loaders, and webaudio-peaks use their built dist versions via node_modules
 
                 // Force single instance of styled-components to avoid "several instances" warning
                 // and ensure styles work correctly across all packages
