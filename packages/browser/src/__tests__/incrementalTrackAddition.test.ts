@@ -235,10 +235,7 @@ describe('engine.addTrack incremental path', () => {
     const existingClip = { startSample: 0, durationSamples: 44100, sampleRate: 44100 };
     const newClip = { startSample: 44100, durationSamples: 88200, sampleRate: 44100 };
 
-    const tracks = [
-      { clips: [existingClip] },
-      { clips: [newClip] },
-    ];
+    const tracks = [{ clips: [existingClip] }, { clips: [newClip] }];
 
     let maxDuration = 0;
     tracks.forEach((track) => {

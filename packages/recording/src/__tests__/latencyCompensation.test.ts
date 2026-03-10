@@ -32,7 +32,14 @@ interface LatencyCompensationResult {
  * useIntegratedRecording.stopRecording (lines 188-208)
  */
 function computeLatencyCompensation(input: LatencyCompensationInput): LatencyCompensationResult {
-  const { bufferLength, sampleRate, outputLatency, lookAhead, recordingStartTime, lastClipEndSample } = input;
+  const {
+    bufferLength,
+    sampleRate,
+    outputLatency,
+    lookAhead,
+    recordingStartTime,
+    lastClipEndSample,
+  } = input;
 
   const recordStartTimeSamples = Math.floor(recordingStartTime * sampleRate);
   const startSample = Math.max(recordStartTimeSamples, lastClipEndSample);

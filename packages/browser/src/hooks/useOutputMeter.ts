@@ -110,7 +110,7 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       workletNodeRef.current = workletNode;
 
       workletNode.onprocessorerror = (event) => {
-        console.warn('[waveform-playlist] Output meter worklet processor error:', event);
+        console.warn('[waveform-playlist] Output meter worklet processor error:', String(event));
       };
 
       // Insert as pass-through in destination chain:

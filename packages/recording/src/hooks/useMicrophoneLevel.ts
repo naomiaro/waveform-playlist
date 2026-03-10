@@ -150,7 +150,7 @@ export function useMicrophoneLevel(
       workletNodeRef.current = workletNode;
 
       workletNode.onprocessorerror = (event) => {
-        console.warn('[waveform-playlist] Mic meter worklet processor error:', event);
+        console.warn('[waveform-playlist] Mic meter worklet processor error:', String(event));
       };
 
       // Create source and connect: source → meter

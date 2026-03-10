@@ -532,7 +532,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // audio nodes when dropping a file or finishing a recording.
     if (isIncrementalAdd && engineRef.current) {
       try {
-        const prevIds = new Set(prevTracksRef.current.map((t) => t.id));
+        // Use prevTracks captured during render (not prevTracksRef.current) to ensure
+        // the guard condition and inner logic operate on the same snapshot.
+        const prevIds = new Set(prevTracks.map((t) => t.id));
         const addedTracks = tracks.filter((t) => !prevIds.has(t.id));
 
         // Merge current UI state into new tracks before adding to engine
@@ -576,12 +578,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           return newStates;
         });
 
-        // Extract audio buffers for new tracks
+        // Extract audio buffers from all clips across all tracks
         const buffers: AudioBuffer[] = [];
         tracks.forEach((track) => {
-          if (track.clips.length > 0 && track.clips[0].audioBuffer) {
-            buffers.push(track.clips[0].audioBuffer);
-          }
+          track.clips.forEach((clip) => {
+            if (clip.audioBuffer) {
+              buffers.push(clip.audioBuffer);
+            }
+          });
         });
         setAudioBuffers(buffers);
 
@@ -644,15 +648,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     const loadAudio = async () => {
       try {
-        // Extract all audio buffers from clips (only those that have audioBuffer)
-        // For now, collect the first clip's buffer from each track
+        // Extract all audio buffers from all clips across all tracks
         const buffers: AudioBuffer[] = [];
 
         tracks.forEach((track) => {
-          if (track.clips.length > 0 && track.clips[0].audioBuffer) {
-            // Use first clip's buffer for now (full multi-clip support comes in next phase)
-            buffers.push(track.clips[0].audioBuffer);
-          }
+          track.clips.forEach((clip) => {
+            if (clip.audioBuffer) {
+              buffers.push(clip.audioBuffer);
+            }
+          });
         });
 
         // Calculate total timeline duration from all clips across all tracks

@@ -30,8 +30,9 @@ export function useRecording(
   const [level, setLevel] = useState(0); // Current RMS level (0-1)
   const [peakLevel, setPeakLevel] = useState(0); // Peak level since recording started (0-1)
 
-  // Global flag to prevent loading worklet multiple times
-  // (AudioWorklet processors can only be registered once per AudioContext)
+  // Per-instance flag to prevent loading worklet multiple times within the same hook instance.
+  // Note: Multiple hook instances each have their own ref — see "Multi-Instance Worklet
+  // Registration Gap" in recording/CLAUDE.md for the known limitation and planned fix.
   const workletLoadedRef = useRef<boolean>(false);
 
   // Refs for AudioWorklet and data accumulation
@@ -110,8 +111,13 @@ export function useRecording(
       // Use the stream track's actual channel count from getSettings().
       // source.channelCount defaults to 2 per Web Audio spec (not the mic's
       // real count). Fall back to user-provided channelCount if unavailable.
-      const streamChannelCount =
-        stream.getAudioTracks()[0]?.getSettings().channelCount ?? channelCount;
+      const detectedChannelCount = stream.getAudioTracks()[0]?.getSettings().channelCount;
+      if (detectedChannelCount === undefined) {
+        console.warn(
+          `[waveform-playlist] Could not detect stream channel count, using fallback: ${channelCount}`
+        );
+      }
+      const streamChannelCount = detectedChannelCount ?? channelCount;
 
       const workletNode = context.createAudioWorkletNode('recording-processor', {
         channelCount: streamChannelCount,
@@ -120,7 +126,7 @@ export function useRecording(
       workletNodeRef.current = workletNode;
 
       workletNode.onprocessorerror = (event) => {
-        console.warn('[waveform-playlist] Recording worklet processor error:', event);
+        console.warn('[waveform-playlist] Recording worklet processor error:', String(event));
         setError(new Error('Recording processor encountered an error'));
       };
 
@@ -167,7 +173,7 @@ export function useRecording(
           return updated;
         });
 
-        // Note: VU meter levels come from useMicrophoneLevel (AnalyserNode)
+        // Note: VU meter levels come from useMicrophoneLevel (meter-processor worklet)
         // We don't update level/peakLevel here to avoid conflicting state updates
       };
 

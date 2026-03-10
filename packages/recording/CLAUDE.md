@@ -8,15 +8,15 @@ Recording uses the global shared AudioContext from `@waveform-playlist/playout` 
 
 ## MediaStreamSource Per Hook (Firefox Compatibility)
 
-**Pattern:** Each recording hook creates its own `MediaStreamSource` from Tone.js `getContext()` and connects it to an AudioWorklet node (not Tone.js `Meter`).
+**Pattern:** Each recording hook creates its own `MediaStreamSource` from the global shared context and connects it to an AudioWorklet node (not Tone.js `Meter`).
 
 ```typescript
-const context = getContext();  // Tone.js shared context
+const context = getGlobalContext();  // shared Tone.js context from playout
 const source = context.createMediaStreamSource(stream);
 source.connect(workletNode);  // AudioWorklet-based metering/recording
 ```
 
-**Why:** Firefox throws "Can't connect nodes from different AudioContexts" when source and destination nodes are created from different context instances. Both `useRecording` and `useMicrophoneLevel` create their own source from `getContext()` to ensure the source and connected worklet share the exact same context.
+**Why:** Firefox throws "Can't connect nodes from different AudioContexts" when source and destination nodes are created from different context instances. Both `useRecording` and `useMicrophoneLevel` create their own source from `getGlobalContext()` to ensure the source and connected worklet share the exact same context.
 
 **Note:** Creating multiple `MediaStreamAudioSourceNode` instances from the same `MediaStream` is valid — they independently read from the same underlying stream.
 
@@ -100,7 +100,7 @@ const normalized = gainToNormalized(rawPeak);
 **Pattern:** `useIntegratedRecording` captures timeline position at record start (not stop) via `recordingStartTimeRef`. During overdub, `currentTime` advances with playback — using it at stop time would place the clip at the wrong position.
 
 **Latency compensation:** Two sources of delay between worklet capture and audible playback:
-1. `getContext().lookAhead` (~100ms) — Tone.js Transport schedules audio ahead of real time
+1. `getGlobalContext().lookAhead` (~100ms) — Tone.js Transport schedules audio ahead of real time
 2. `getGlobalAudioContext().outputLatency` — hardware DAC delay before audio reaches speakers
 
 The clip's `offsetSamples` skips this combined latency period. `durationSamples` is reduced by the same amount. This aligns the user's performance (timed to what they hear) with the timeline.

@@ -151,7 +151,7 @@ AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
 
 **`addTrackToPlayout()` helper:** Extracted from `buildPlayout`'s per-track loop. Shared by both `buildPlayout` (full rebuild) and `adapter.addTrack()` (incremental). Handles audio clips, MIDI clips, and SoundFont routing.
 
-**`adapter.addTrack(track)`:** Adds a single track to the existing playout without disposing/recreating. Calls `addTrackToPlayout()` then `playout.applyInitialSoloState()`. Warns if called before `setTracks()` (no playout exists yet).
+**`adapter.addTrack(track)`:** Adds a single track to the existing playout without disposing/recreating. Calls `addTrackToPlayout()` then `playout.applyInitialSoloState()`. Throws if called before `setTracks()` (no playout exists yet) — this is a programming error, not a recoverable condition.
 
 ## Firefox Compatibility (standardized-audio-context)
 

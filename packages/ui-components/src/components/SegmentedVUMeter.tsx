@@ -233,14 +233,20 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   const isMultiChannel = channelCount >= 2;
   const segmentTotalHeight = segmentHeight + segmentGap;
 
+  // Destructure dBRange into stable primitives for useMemo deps.
+  // Inline array literals like dBRange={[-50, 5]} create a new reference
+  // each render, which would cause useMemo to recompute at 60fps.
+  const [dBMin, dBMax] = dBRange;
+
   const thresholds = useMemo(
-    () => computeThresholds(segmentCount, dBRange),
-    [segmentCount, dBRange]
+    () => computeThresholds(segmentCount, [dBMin, dBMax]),
+    [segmentCount, dBMin, dBMax]
   );
 
   const scaleLabels = useMemo(() => {
     const totalSize = segmentCount * segmentTotalHeight - segmentGap;
-    const [minDb, maxDb] = dBRange;
+    const minDb = dBMin;
+    const maxDb = dBMax;
     let minSpacing: number;
     if (orientation === 'horizontal') {
       minSpacing = 35;
@@ -261,7 +267,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
       labels.push({ position, label: formatDbLabel(db) });
     }
     return labels;
-  }, [orientation, segmentCount, segmentTotalHeight, segmentGap, dBRange]);
+  }, [orientation, segmentCount, segmentTotalHeight, segmentGap, dBMin, dBMax]);
 
   // For horizontal, reverse thresholds so low dB is on left, high dB on right
   const renderThresholds = useMemo(

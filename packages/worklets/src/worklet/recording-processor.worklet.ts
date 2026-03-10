@@ -13,8 +13,8 @@
  *   channelCount: number       // Number of channels
  * }
  *
- * Note: VU meter levels are handled by AnalyserNode in useMicrophoneLevel hook,
- * not by this worklet.
+ * Note: VU meter levels are handled by the meter-processor worklet in
+ * useMicrophoneLevel hook, not by this worklet.
  */
 
 // Type declarations for AudioWorklet context

@@ -101,9 +101,7 @@ describe('SegmentedVUMeter segment activation', () => {
   });
 
   it('multi-channel activation is independent per channel', () => {
-    const { container } = renderWithTheme(
-      <SegmentedVUMeter levels={[1.0, 0]} segmentCount={12} />
-    );
+    const { container } = renderWithTheme(<SegmentedVUMeter levels={[1.0, 0]} segmentCount={12} />);
     const channels = container.querySelectorAll('[data-channel]');
     expect(channels.length).toBe(2);
 

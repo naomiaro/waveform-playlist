@@ -90,10 +90,13 @@ export function useIntegratedRecording(
   // Capture timeline position when recording starts (not at stop time)
   const recordingStartTimeRef = useRef(0);
 
-  // Keep selectedTrackId in a ref for use in callbacks
-  // Avoids stale closures when auto-create track + start recording in same render cycle
+  // Keep selectedTrackId and currentTime in refs for use in callbacks.
+  // Avoids stale closures and prevents 60fps useCallback recreation
+  // (currentTime updates at animation-frame rate during playback).
   const selectedTrackIdRef = useRef(selectedTrackId);
   selectedTrackIdRef.current = selectedTrackId;
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
 
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
@@ -147,13 +150,13 @@ export function useIntegratedRecording(
       // Capture timeline position NOW — before recording starts.
       // Using currentTime at stop time would be wrong during overdub
       // (playback advances currentTime while recording).
-      recordingStartTimeRef.current = currentTime;
+      recordingStartTimeRef.current = currentTimeRef.current;
 
       await startRec();
     } catch (err) {
       setHookError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [isMonitoring, startRec, currentTime]);
+  }, [isMonitoring, startRec]);
 
   // Stop recording and add clip to selected track
   const stopRecording = useCallback(async () => {

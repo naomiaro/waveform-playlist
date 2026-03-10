@@ -1,7 +1,7 @@
 import React, { useContext, useRef, useState, useMemo, type ReactNode, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { getContext } from 'tone';
+import { getGlobalContext } from '@waveform-playlist/playout';
 import {
   Playlist,
   Track as TrackComponent,
@@ -129,7 +129,7 @@ const CustomPlayhead: React.FC<{
     samplesPerPixel,
     sampleRate,
     controlsOffset: 0,
-    getAudioContextTime: () => getContext().currentTime,
+    getAudioContextTime: () => getGlobalContext().rawContext.currentTime,
     getPlaybackTime,
   }) as React.ReactElement;
 };
