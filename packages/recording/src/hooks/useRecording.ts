@@ -7,6 +7,7 @@ import { UseRecordingReturn, RecordingOptions } from '../types';
 import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUtils';
 import { appendPeaks } from '../utils/peaksGenerator';
 import { getContext } from 'tone';
+import { recordingProcessorUrl } from '@waveform-playlist/worklets';
 
 function emptyPeaks(bits: 8 | 16): Int8Array | Int16Array {
   return bits === 8 ? new Int8Array(0) : new Int16Array(0);
@@ -55,7 +56,7 @@ export function useRecording(
       const context = getContext();
       // Load the worklet module
       // Use a relative path that works when bundled
-      const workletUrl = new URL('./worklet/recording-processor.worklet.js', import.meta.url).href;
+      const workletUrl = recordingProcessorUrl;
 
       // Use Tone's addAudioWorkletModule for cross-browser compatibility
       await context.addAudioWorkletModule(workletUrl);

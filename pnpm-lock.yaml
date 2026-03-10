@@ -287,6 +287,9 @@ importers:
       '@waveform-playlist/ui-components':
         specifier: workspace:*
         version: link:../ui-components
+      '@waveform-playlist/worklets':
+        specifier: workspace:*
+        version: link:../worklets
       react:
         specifier: ^18.0.0
         version: 18.3.1
