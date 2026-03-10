@@ -185,13 +185,9 @@ export function useMicrophoneLevel(
 
         // Mirror mono to fill requested channelCount
         const mirroredPeaks =
-          peak.length < channelCount
-            ? new Array(channelCount).fill(peakValues[0])
-            : peakValues;
+          peak.length < channelCount ? new Array(channelCount).fill(peakValues[0]) : peakValues;
         const mirroredRms =
-          peak.length < channelCount
-            ? new Array(channelCount).fill(rmsValues[0])
-            : rmsValues;
+          peak.length < channelCount ? new Array(channelCount).fill(rmsValues[0]) : rmsValues;
 
         setLevels(mirroredPeaks);
         setRmsLevels(mirroredRms);
