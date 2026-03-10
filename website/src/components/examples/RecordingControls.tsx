@@ -78,11 +78,11 @@ export const RecordButton: React.FC<RecordButtonProps> = ({
   <StyledButton
     $isRecording={isRecording}
     onClick={onClick}
-    disabled={disabled}
-    aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+    disabled={disabled || isRecording}
+    aria-label={isRecording ? 'Recording' : 'Start recording'}
   >
     {isRecording && <PulsingDot />}
-    {isRecording ? 'Stop Recording' : 'Record'}
+    {isRecording ? 'Recording' : 'Record'}
   </StyledButton>
 );
 

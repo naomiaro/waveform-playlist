@@ -10,7 +10,7 @@
  * - Auto-scroll keeps recording in view
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
@@ -140,7 +140,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 }) => {
   const { currentTime, isPlaying } = usePlaybackAnimation();
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
-  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId } = usePlaylistControls();
+  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop } = usePlaylistControls();
   const { isAutomaticScroll } = usePlaylistState();
 
   // Sync provider's selectedTrackId with local state
@@ -150,6 +150,9 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   // Flag to auto-start recording after creating a new track
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false);
+
+  // Capture timeline position at record start for live preview positioning
+  const recordStartTimeRef = useRef(0);
 
   // Integrated recording hook
   const {
@@ -180,19 +183,38 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Start recording and playback together (overdub)
+  const startRecordingWithPlayback = useCallback(async () => {
+    recordStartTimeRef.current = currentTime;
+    await startRecording();
+    // Start playback from current position so user hears existing tracks
+    if (tracks.length > 0) {
+      await play(currentTime);
+    }
+  }, [startRecording, play, currentTime, tracks.length]);
+
+  // Auto-stop recording when playback stops (user hit Stop button)
+  const wasPlayingRef = useRef(false);
+  useEffect(() => {
+    if (isPlaying) {
+      wasPlayingRef.current = true;
+    } else if (wasPlayingRef.current && isRecording) {
+      // Playback just stopped while recording — stop recording too
+      wasPlayingRef.current = false;
+      stopRecording();
+    }
+  }, [isPlaying, isRecording, stopRecording]);
+
   // Auto-start recording when a new track is created and selected
   useEffect(() => {
     if (shouldAutoStartRecording && selectedTrackId) {
       setShouldAutoStartRecording(false);
-      startRecording();
+      startRecordingWithPlayback();
     }
-  }, [shouldAutoStartRecording, selectedTrackId, startRecording]);
+  }, [shouldAutoStartRecording, selectedTrackId, startRecordingWithPlayback]);
 
   const handleRecordClick = () => {
-    if (isRecording) {
-      stopRecording();
-      return;
-    }
+    if (isRecording) return;
 
     // Auto-create track if none selected
     if (!selectedTrackId) {
@@ -202,15 +224,16 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     }
 
     // Track is selected, start recording immediately
-    startRecording();
+    startRecordingWithPlayback();
   };
 
   // Calculate recording start position for live preview
+  // Uses captured start time (not live currentTime which advances during overdub)
   let recordingStartSample = 0;
   if (isRecording && selectedTrackId) {
     const selectedTrack = tracks.find(t => t.id === selectedTrackId);
     if (selectedTrack) {
-      const currentTimeSamples = Math.floor(currentTime * sampleRate);
+      const startTimeSamples = Math.floor(recordStartTimeRef.current * sampleRate);
       let lastClipEndSample = 0;
       if (selectedTrack.clips.length > 0) {
         const endSamples = selectedTrack.clips.map(clip =>
@@ -218,7 +241,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         );
         lastClipEndSample = Math.max(...endSamples);
       }
-      recordingStartSample = Math.max(currentTimeSamples, lastClipEndSample);
+      recordingStartSample = Math.max(startTimeSamples, lastClipEndSample);
     }
   }
 
@@ -284,6 +307,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       // Must await so the recorded clip is saved before the track is removed
       if (isRecording && trackToRemove.id === selectedTrackId) {
         await stopRecording();
+        stop();
       }
 
       // Clear selection if removed track was selected
@@ -293,7 +317,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
       setTracks(tracks.filter((_, i) => i !== trackIndex));
     },
-    [tracks, setTracks, selectedTrackId, setSelectedTrackId, isRecording, stopRecording]
+    [tracks, setTracks, selectedTrackId, setSelectedTrackId, isRecording, stopRecording, stop]
   );
 
   return (

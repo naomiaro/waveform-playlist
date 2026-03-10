@@ -3,13 +3,14 @@
  * Combines recording functionality with track management
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRecording } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
 import type { MicrophoneDevice } from '../types';
 import { type ClipTrack, type AudioClip } from '@waveform-playlist/core';
-import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
+import { resumeGlobalAudioContext, getGlobalAudioContext } from '@waveform-playlist/playout';
+import { getContext } from 'tone';
 
 export interface IntegratedRecordingOptions {
   /**
@@ -83,13 +84,19 @@ export function useIntegratedRecording(
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [hookError, setHookError] = useState<Error | null>(null);
 
+  // Capture timeline position when recording starts (not at stop time)
+  const recordingStartTimeRef = useRef(0);
+
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
 
   // Microphone level (for VU meter)
-  const { level, peakLevel, levels, peakLevels, rmsLevels, resetPeak } = useMicrophoneLevel(stream, {
-    channelCount: recordingOptions.channelCount,
-  });
+  const { level, peakLevel, levels, peakLevels, rmsLevels, resetPeak } = useMicrophoneLevel(
+    stream,
+    {
+      channelCount: recordingOptions.channelCount,
+    }
+  );
 
   // Recording
   const {
@@ -122,11 +129,16 @@ export function useIntegratedRecording(
         setIsMonitoring(true);
       }
 
+      // Capture timeline position NOW — before recording starts.
+      // Using currentTime at stop time would be wrong during overdub
+      // (playback advances currentTime while recording).
+      recordingStartTimeRef.current = currentTime;
+
       await startRec();
     } catch (err) {
       setHookError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [selectedTrackId, isMonitoring, startRec]);
+  }, [selectedTrackId, isMonitoring, startRec, currentTime]);
 
   // Stop recording and add clip to selected track
   const stopRecording = useCallback(async () => {
@@ -152,28 +164,39 @@ export function useIntegratedRecording(
 
       const selectedTrack = tracks[selectedTrackIndex];
 
-      // Calculate start position: max(currentTime, lastClipEndTime)
-      const currentTimeSamples = Math.floor(currentTime * buffer.sampleRate);
+      // Use the captured start time (not live currentTime which advances during overdub)
+      const recordStartTimeSamples = Math.floor(recordingStartTimeRef.current * buffer.sampleRate);
 
       let lastClipEndSample = 0;
       if (selectedTrack.clips.length > 0) {
-        // Find the end time of the last clip (in samples)
         const endSamples = selectedTrack.clips.map(
           (clip) => clip.startSample + clip.durationSamples
         );
         lastClipEndSample = Math.max(...endSamples);
       }
 
-      // Use whichever is greater: cursor position or last clip end
-      const startSample = Math.max(currentTimeSamples, lastClipEndSample);
+      const startSample = Math.max(recordStartTimeSamples, lastClipEndSample);
+
+      // Latency compensation:
+      // Two sources of delay between recording start and audible playback:
+      // 1. Tone.js lookAhead (~100ms) — Transport schedules audio ahead of real time
+      // 2. Output latency — hardware DAC delay before audio reaches speakers
+      // The user hears playback delayed by both, so they perform late relative
+      // to the timeline. Skip that duration at the start of the recorded audio.
+      const audioContext = getGlobalAudioContext();
+      const outputLatency = audioContext.outputLatency ?? 0;
+      const toneContext = getContext();
+      const lookAhead = toneContext.lookAhead ?? 0;
+      const totalLatency = outputLatency + lookAhead;
+      const latencyOffsetSamples = Math.floor(totalLatency * buffer.sampleRate);
 
       // Create new clip from recording
       const newClip: AudioClip = {
         id: `clip-${Date.now()}`,
         audioBuffer: buffer,
         startSample,
-        durationSamples: buffer.length,
-        offsetSamples: 0,
+        durationSamples: buffer.length - latencyOffsetSamples,
+        offsetSamples: latencyOffsetSamples,
         sampleRate: buffer.sampleRate,
         sourceDurationSamples: buffer.length,
         gain: 1.0,
@@ -193,7 +216,7 @@ export function useIntegratedRecording(
 
       setTracks(newTracks);
     }
-  }, [selectedTrackId, tracks, setTracks, currentTime, stopRec]);
+  }, [selectedTrackId, tracks, setTracks, stopRec]);
 
   // Auto-select the first device when devices become available
   useEffect(() => {
