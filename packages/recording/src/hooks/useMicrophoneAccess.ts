@@ -87,13 +87,17 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     }
   }, [stream]);
 
-  // Check initial permission state and enumerate devices
+  // Check initial permission state, enumerate devices, and listen for hot-plug changes
   useEffect(() => {
     // Try to enumerate devices (labels won't be available without permission)
     enumerateDevices();
 
+    // Re-enumerate when devices are plugged in or removed
+    navigator.mediaDevices.addEventListener('devicechange', enumerateDevices);
+
     // Cleanup on unmount
     return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', enumerateDevices);
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }

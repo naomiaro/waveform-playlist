@@ -114,3 +114,7 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 ## Peak Reset on Device Switch
 
 **Pattern:** `useIntegratedRecording.changeDevice()` calls `resetPeak()` from `useMicrophoneLevel` before requesting the new device. This clears held peak indicators so the VU meter doesn't show stale peaks from the previous microphone.
+
+## Device Hot-Plug Detection
+
+**Pattern:** `useMicrophoneAccess` listens for `navigator.mediaDevices.devicechange` to re-enumerate devices on plug/unplug. `useIntegratedRecording` auto-falls back to the first available device if the selected device disappears from the list.

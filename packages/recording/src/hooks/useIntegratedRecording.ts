@@ -247,13 +247,21 @@ export function useIntegratedRecording(
     }
   }, [tracks, setTracks, stopRec]);
 
-  // Auto-select the first device when devices become available
+  // Auto-select first device when available, or fallback if selected device was unplugged
   useEffect(() => {
-    // Only auto-select if we have permission, devices are available, and nothing is selected yet
-    if (hasPermission && devices.length > 0 && selectedDevice === null) {
+    if (!hasPermission || devices.length === 0) return;
+
+    if (selectedDevice === null) {
+      // First-time selection
       setSelectedDevice(devices[0].deviceId);
+    } else if (!devices.some((d) => d.deviceId === selectedDevice)) {
+      // Selected device was removed — fall back to first available
+      const fallbackId = devices[0].deviceId;
+      setSelectedDevice(fallbackId);
+      resetPeak();
+      requestAccess(fallbackId, audioConstraints);
     }
-  }, [hasPermission, devices, selectedDevice]);
+  }, [hasPermission, devices, selectedDevice, resetPeak, requestAccess, audioConstraints]);
 
   // Request microphone access
   const requestMicAccess = useCallback(async () => {
