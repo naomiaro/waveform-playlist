@@ -10,7 +10,7 @@
  * - Auto-scroll keeps recording in view
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import styled from 'styled-components';
 import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
@@ -229,6 +229,43 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     startRecordingWithPlayback();
   };
 
+  // Shift+R: always create a new track and record on it
+  const handleForceNewTrackRecord = useCallback(() => {
+    if (isRecording || !hasPermission) return;
+    setShouldAutoStartRecording(true);
+    onAddTrack();
+  }, [isRecording, hasPermission, onAddTrack]);
+
+  // R: record on selected track (auto-create if none selected)
+  const handleRecordShortcut = useCallback(() => {
+    if (isRecording || !hasPermission) return;
+
+    if (!selectedTrackId) {
+      setShouldAutoStartRecording(true);
+      onAddTrack();
+      return;
+    }
+
+    startRecordingWithPlayback();
+  }, [isRecording, hasPermission, selectedTrackId, onAddTrack, startRecordingWithPlayback]);
+
+  const recordingShortcuts = useMemo(() => [
+    {
+      key: 'r',
+      shiftKey: true,
+      action: handleForceNewTrackRecord,
+      description: 'Create new track and record',
+      preventDefault: true,
+    },
+    {
+      key: 'r',
+      shiftKey: false,
+      action: handleRecordShortcut,
+      description: 'Record on selected track',
+      preventDefault: true,
+    },
+  ], [handleRecordShortcut, handleForceNewTrackRecord]);
+
   // Calculate recording start position for live preview
   // Uses captured start time (not live currentTime which advances during overdub)
   let recordingStartSample = 0;
@@ -324,6 +361,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   return (
     <>
+      <KeyboardShortcuts playback additionalShortcuts={recordingShortcuts} />
       {error && (
         <ErrorBanner>
           <Text size="2" color="red">
@@ -489,7 +527,6 @@ export function RecordingExample() {
           barWidth={1}
           barGap={0}
         >
-          <KeyboardShortcuts playback />
           <RecordingControlsInner
             tracks={tracks}
             setTracks={setTracks}
