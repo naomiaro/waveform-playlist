@@ -759,7 +759,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           }
         });
 
-        console.log('[waveform-playlist] loadAudio: engine.setTracks(' + tracksWithState.length + ' tracks)', tracksWithState.map(function(t) { return { id: t.id, clips: t.clips.length, hasAudioBuffer: t.clips.map(function(c) { return !!c.audioBuffer; }), soloed: t.soloed, muted: t.muted, volume: t.volume }; }));
+        console.log('[waveform-playlist] loadAudio: engine.setTracks(' + tracksWithState.length + ' tracks) ' + tracksWithState.map(function(t) { return t.id + ':' + t.clips.length + 'clips(hasBuffer=' + t.clips.map(function(c) { return !!c.audioBuffer; }).join(',') + ') solo=' + t.soloed + ' mute=' + t.muted + ' vol=' + t.volume; }).join(' | '));
         engine.setTracks(tracksWithState);
         suppressTracksMirroring = false;
         lastTracksVersionRef.current = engine.getState().tracksVersion;

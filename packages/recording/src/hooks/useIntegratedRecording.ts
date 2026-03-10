@@ -220,19 +220,19 @@ export function useIntegratedRecording(
         name: `Recording ${new Date().toLocaleTimeString()}`,
       };
 
-      console.log('[waveform-playlist] Recording clip created:', {
-        clipId: newClip.id,
-        trackId,
-        trackIndex: selectedTrackIndex,
-        startSample,
-        durationSamples: effectiveDuration,
-        offsetSamples: latencyOffsetSamples,
-        bufferLength: buffer.length,
-        bufferDuration: buffer.duration,
-        sampleRate: buffer.sampleRate,
-        channelCount: buffer.numberOfChannels,
-        totalLatency,
-      });
+      console.log(
+        '[waveform-playlist] Recording clip created: clipId=' + newClip.id +
+        ' trackId=' + trackId +
+        ' trackIndex=' + selectedTrackIndex +
+        ' startSample=' + startSample +
+        ' durationSamples=' + effectiveDuration +
+        ' offsetSamples=' + latencyOffsetSamples +
+        ' bufferLength=' + buffer.length +
+        ' bufferDuration=' + buffer.duration +
+        ' sampleRate=' + buffer.sampleRate +
+        ' channelCount=' + buffer.numberOfChannels +
+        ' totalLatency=' + totalLatency
+      );
 
       // Add clip to track
       const newTracks = tracks.map((track, index) => {

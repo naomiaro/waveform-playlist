@@ -152,7 +152,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     for (const track of tracks) {
       addTrackToPlayout(playout, track);
     }
-    console.log('[waveform-playlist] buildPlayout: added ' + tracks.length + ' tracks', tracks.map(function(t) { return { id: t.id, clips: t.clips.length, hasAudioBuffer: t.clips.map(function(c) { return !!c.audioBuffer; }), soloed: t.soloed, muted: t.muted }; }));
+    console.log('[waveform-playlist] buildPlayout: added ' + tracks.length + ' tracks ' + tracks.map(function(t) { return t.id + ':' + t.clips.length + 'clips(hasBuffer=' + t.clips.map(function(c) { return !!c.audioBuffer; }).join(',') + ') solo=' + t.soloed + ' mute=' + t.muted; }).join(' | '));
 
     playout.applyInitialSoloState();
     playout.setLoop(_loopEnabled, _loopStart, _loopEnd);
