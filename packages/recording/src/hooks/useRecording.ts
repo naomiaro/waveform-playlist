@@ -58,7 +58,7 @@ export function useRecording(
       // Tone.js's addAudioWorkletModule only loads ONE module per context
       // (caches _workletPromise). If meter-processor was loaded first by
       // useMicrophoneLevel, recording-processor is silently skipped.
-      const rawCtx = (context as any).rawContext as AudioContext;
+      const rawCtx = context.rawContext as AudioContext;
       await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
       workletLoadedRef.current = true;
     } catch (err) {

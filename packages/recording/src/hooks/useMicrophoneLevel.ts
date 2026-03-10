@@ -126,7 +126,7 @@ export function useMicrophoneLevel(
       // Load worklet directly on rawContext — Tone.js's addAudioWorkletModule
       // only loads ONE module per context (caches _workletPromise), silently
       // skipping subsequent calls with different URLs.
-      const rawCtx = (context as any).rawContext as AudioContext;
+      const rawCtx = context.rawContext as AudioContext;
       await rawCtx.audioWorklet.addModule(meterProcessorUrl);
       if (!isMounted) return;
 

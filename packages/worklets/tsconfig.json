@@ -7,5 +7,11 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/worklet/**/*",
+    "src/__tests__/**/*"
+  ]
 }

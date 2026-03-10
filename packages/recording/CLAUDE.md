@@ -48,7 +48,7 @@ await context.addAudioWorkletModule(meterProcessorUrl);     // loads
 await context.addAudioWorkletModule(recordingProcessorUrl);  // silently skipped!
 
 // CORRECT — both modules loaded
-const rawCtx = (context as any).rawContext as AudioContext;
+const rawCtx = context.rawContext as AudioContext;
 await rawCtx.audioWorklet.addModule(meterProcessorUrl);
 await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
 ```

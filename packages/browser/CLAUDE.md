@@ -330,6 +330,14 @@ if (derived !== prevRef.current) {
 
 **Sample-accurate metering:** Uses `meter-processor` AudioWorklet from `@waveform-playlist/worklets`. The worklet accumulates peak and RMS across all 128-sample quantums and posts results at ~60Hz — no transient is missed between animation frames.
 
+## indefinitePlayback Prop
+
+**Decision:** `indefinitePlayback` controls whether the timeline fills the visible scroll container and whether playback auto-stops at the end of audio.
+
+**Wiring:** Prop on `WaveformPlaylistProvider` → stored in ref for animation loop → exposed via `usePlaylistState()` (in `PlaylistStateContextValue`) → consumed by `PlaylistVisualization` to gate min container width calculation.
+
+**Min container width:** Only when `indefinitePlayback` is true does `displayDuration` get floored to fill the viewport. Without it, the timeline ends at the natural audio duration.
+
 ## Output Meter Clearing (isPlaying Prop)
 
 **Problem:** When playback stops, browsers stop calling the worklet's `process()` (tail-time optimization — no active upstream sources). The last non-zero levels freeze in React state.

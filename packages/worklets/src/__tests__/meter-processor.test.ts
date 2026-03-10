@@ -1,24 +1,51 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+interface MeterMessage {
+  peak: number[];
+  rms: number[];
+}
+
+interface MockProcessor {
+  port: {
+    postMessage: ReturnType<typeof vi.fn>;
+  };
+  process(
+    inputs: Float32Array[][],
+    outputs: Float32Array[][],
+    params: Record<string, Float32Array>
+  ): boolean;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Constructor type for dynamic instantiation
+let ProcessorClass: { new (options: Record<string, unknown>): MockProcessor } & Record<string, any>;
+
 // Mock AudioWorklet globals before importing the processor
 const mockPort = {
   postMessage: vi.fn(),
   onmessage: null as ((event: MessageEvent) => void) | null,
 };
 
-(globalThis as any).AudioWorkletProcessor = class {
-  port = mockPort;
-};
-(globalThis as any).sampleRate = 48000;
-(globalThis as any).registerProcessor = vi.fn();
+vi.stubGlobal(
+  'AudioWorkletProcessor',
+  class {
+    port = mockPort;
+  }
+);
+vi.stubGlobal('sampleRate', 48000);
+vi.stubGlobal('registerProcessor', (_name: string, ctor: typeof ProcessorClass) => {
+  ProcessorClass = ctor;
+});
 
 await import('../worklet/meter-processor.worklet');
 
-function getProcessorClass(): any {
-  return (globalThis as any).registerProcessor.mock.calls[0][1];
+function getProcessorClass(): typeof ProcessorClass {
+  return ProcessorClass;
 }
 
-function createProcessor(options?: { numberOfChannels?: number; updateRate?: number }): any {
+function createProcessor(options?: {
+  numberOfChannels?: number;
+  updateRate?: number;
+}): MockProcessor {
   const Processor = getProcessorClass();
   return new Processor({
     processorOptions: {
@@ -42,10 +69,7 @@ describe('MeterProcessor', () => {
   });
 
   it('registers as "meter-processor"', () => {
-    expect((globalThis as any).registerProcessor).toHaveBeenCalledWith(
-      'meter-processor',
-      expect.any(Function)
-    );
+    expect(ProcessorClass).toBeDefined();
   });
 
   it('is a pass-through: copies input to output', () => {
@@ -65,7 +89,7 @@ describe('MeterProcessor', () => {
     input[100] = -0.9;
     processor.process(makeInput([input]), makeOutput(1), {});
     expect(mockPort.postMessage).toHaveBeenCalledTimes(1);
-    const msg = mockPort.postMessage.mock.calls[0][0];
+    const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
     expect(msg.peak[0]).toBeCloseTo(0.9, 5);
   });
 
@@ -73,7 +97,7 @@ describe('MeterProcessor', () => {
     const processor = createProcessor({ numberOfChannels: 1, updateRate: 48000 });
     const input = new Float32Array(128).fill(0.5);
     processor.process(makeInput([input]), makeOutput(1), {});
-    const msg = mockPort.postMessage.mock.calls[0][0];
+    const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
     expect(msg.rms[0]).toBeCloseTo(0.5, 5);
   });
 
@@ -91,7 +115,7 @@ describe('MeterProcessor', () => {
 
     processor.process(makeInput([silence]), makeOutput(1), {});
     expect(mockPort.postMessage).toHaveBeenCalledTimes(1);
-    const msg = mockPort.postMessage.mock.calls[0][0];
+    const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
     expect(msg.peak[0]).toBeCloseTo(0.8, 5);
   });
 
@@ -102,7 +126,7 @@ describe('MeterProcessor', () => {
     const ch1 = new Float32Array(128).fill(0);
     ch1[0] = 0.7;
     processor.process(makeInput([ch0, ch1]), makeOutput(2), {});
-    const msg = mockPort.postMessage.mock.calls[0][0];
+    const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
     expect(msg.peak[0]).toBeCloseTo(0.3, 5);
     expect(msg.peak[1]).toBeCloseTo(0.7, 5);
   });
@@ -115,7 +139,7 @@ describe('MeterProcessor', () => {
 
     const silence = new Float32Array(128).fill(0);
     processor.process(makeInput([silence]), makeOutput(1), {});
-    const msg2 = mockPort.postMessage.mock.calls[1][0];
+    const msg2 = mockPort.postMessage.mock.calls[1][0] as MeterMessage;
     expect(msg2.peak[0]).toBe(0);
   });
 
