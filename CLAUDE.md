@@ -383,6 +383,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 - `packages/ui-components/CLAUDE.md` — Theming, virtual scrolling, ClipViewportOrigin
 - `packages/recording/CLAUDE.md` — AudioWorklets, Firefox compat, VU meter, mic access
 - `packages/annotations/CLAUDE.md` — Integration context, annotation provider pattern
+- `packages/worklets/CLAUDE.md` — AudioWorklet processors (metering, recording)
 - `packages/spectrogram/CLAUDE.md` — Integration context, SpectrogramChannel index
 - `website/CLAUDE.md` — Docusaurus site, CSS pitfalls, custom pages
 

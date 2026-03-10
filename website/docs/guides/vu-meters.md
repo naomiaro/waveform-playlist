@@ -19,6 +19,8 @@ Both metering hooks provide **true peak** and **RMS** (root mean square) levels.
 
 Peak responds instantly to transients — if a drum hit clips, you'll see it. RMS is smoother and closer to how loud something *sounds*. A large gap between peak and RMS indicates dynamic audio; a small gap indicates heavy compression.
 
+Both hooks use an AudioWorklet processor that measures every audio sample — no transient is missed, even between animation frames. This guarantees accurate clipping detection for recording.
+
 By default, the `SegmentedVUMeter` component displays peak levels. Pass `rmsLevels` instead of `levels` if you want an RMS meter.
 
 ## Built-In Components
@@ -96,7 +98,6 @@ function InputMeter() {
 |--------|------|---------|-------------|
 | `channelCount` | `number` | `1` | Number of channels to meter |
 | `updateRate` | `number` | `60` | Update frequency in Hz |
-| `smoothingTimeConstant` | `number` | `0.8` | Smoothing (0–1, higher = smoother) |
 
 ### Return Values
 
@@ -129,7 +130,6 @@ function OutputMeter() {
 |--------|------|---------|-------------|
 | `channelCount` | `number` | `2` | Number of channels to meter |
 | `updateRate` | `number` | `60` | Update frequency in Hz |
-| `smoothingTimeConstant` | `number` | `0.8` | Smoothing (0–1, higher = smoother) |
 
 The hook returns `levels` (true peak), `peakLevels` (held peak), `rmsLevels`, and `resetPeak` with the same shape as `useMicrophoneLevel`.
 

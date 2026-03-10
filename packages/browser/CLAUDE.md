@@ -326,9 +326,9 @@ if (derived !== prevRef.current) {
 
 **Critical: Context mismatch gotcha.** Always use `getGlobalContext()` from `@waveform-playlist/playout` — never `getContext()`/`getDestination()` from Tone.js. `getGlobalContext()` creates a new Context via `setContext()`, replacing the default. Nodes created with `getContext()` before that happens end up on a dead audio graph.
 
-**Destination.chain(meter)** inserts the Meter as a pass-through in the master output: `Volume → Meter → Gain → rawContext.destination`. Meter's Analyser is both input and output, so audio flows through unchanged. Cleanup: `destination.chain()` restores the default `Volume → Gain` path.
+**Destination.chain(workletNode)** inserts the meter worklet as a pass-through in the master output. Audio flows through unchanged while the worklet measures every sample. Cleanup: `destination.chain()` restores the default path.
 
-**context.destination vs getDestination():** Use `context.destination` (where `context = getGlobalContext()`) to get the Destination for the correct context. `getDestination()` from Tone returns the destination for whatever `getContext()` returns at call time.
+**Sample-accurate metering:** Uses `meter-processor` AudioWorklet from `@waveform-playlist/worklets`. The worklet accumulates peak and RMS across all 128-sample quantums and posts results at ~60Hz — no transient is missed between animation frames.
 
 ## MediaElement currentTime vs currentTimeRef
 

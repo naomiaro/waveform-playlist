@@ -44,18 +44,18 @@ connect(source, meter);
 
 Users can override via `audioConstraints` parameter.
 
-## VU Meter Level Normalization
+## VU Meter Level Monitoring
 
-**Implementation:** `useMicrophoneLevel` uses Tone.js `Meter` which returns dB values.
+**Implementation:** `useMicrophoneLevel` uses the `meter-processor` AudioWorklet from `@waveform-playlist/worklets` for sample-accurate peak and RMS measurement. Every audio sample is measured — no transient is missed between animation frames.
 
 **dB to 0-1 Conversion:**
 ```typescript
-// Meter returns -Infinity to 0 dB
-// Map -100dB..0dB to 0..1 (using -100dB floor for Firefox compatibility)
-const normalized = Math.max(0, Math.min(1, (dbValue + 100) / 100));
+// Worklet posts raw gain values (0-1+)
+// Hook converts via: gain → dB (20*log10) → normalized (dBToNormalized)
+const normalized = gainToNormalized(rawPeak);
 ```
 
-**Why -100dB floor:** Firefox reports lower dB values than Chrome (e.g., -70 to -85 dB for quiet input). Using -60dB floor caused all quiet signals to map to 0.
+**Worklet location:** All AudioWorklet processors now live in `@waveform-playlist/worklets`. The recording package imports `recordingProcessorUrl` and `meterProcessorUrl` from there.
 
 ## AudioWorklet Buffer Boundary Handling
 
