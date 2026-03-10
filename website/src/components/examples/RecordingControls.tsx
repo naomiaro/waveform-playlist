@@ -50,14 +50,14 @@ const StyledButton = styled.button<{ $isRecording: boolean }>`
   }
 `;
 
-const PulsingDot = styled.span`
+const RecordDot = styled.span<{ $active: boolean }>`
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: white;
   margin-right: 0.5rem;
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: ${(props) => (props.$active ? 'pulse 1.5s ease-in-out infinite' : 'none')};
 
   @keyframes pulse {
     0%,
@@ -81,8 +81,8 @@ export const RecordButton: React.FC<RecordButtonProps> = ({
     disabled={disabled || isRecording}
     aria-label={isRecording ? 'Recording' : 'Start recording'}
   >
-    {isRecording && <PulsingDot />}
-    {isRecording ? 'Recording' : 'Record'}
+    <RecordDot $active={isRecording} />
+    Record
   </StyledButton>
 );
 

@@ -21,10 +21,7 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  ZoomInButton,
-  ZoomOutButton,
   AudioPosition,
-  MasterVolumeControl,
   ExportWavButton,
   ClipInteractionProvider,
   usePlaybackAnimation,
@@ -35,8 +32,8 @@ import {
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
-import { RecordButton, MicrophoneSelector, RecordingIndicator } from './RecordingControls';
-import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
+import { RecordButton, MicrophoneSelector } from './RecordingControls';
+import { SegmentedVUMeter, BaseControlButton } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { MicrophoneIcon, SpeakerHighIcon } from '@phosphor-icons/react';
 import { FileDropZone } from '../FileDropZone';
@@ -57,14 +54,10 @@ const Toolbar = styled.div`
   border: 1px solid var(--gray-6);
   border-radius: 6px;
   margin-bottom: 1.5rem;
-  overflow: hidden;
-`;
-
-const ToolbarRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 0;
   min-height: 44px;
+  overflow: hidden;
 `;
 
 const ToolbarSection = styled.div<{ $grow?: boolean; $noBorder?: boolean }>`
@@ -73,18 +66,10 @@ const ToolbarSection = styled.div<{ $grow?: boolean; $noBorder?: boolean }>`
   gap: 4px;
   padding: 6px 8px;
   border-right: ${(props) => (props.$noBorder ? 'none' : '1px solid var(--gray-5)')};
-  ${(props) => props.$grow && 'flex: 1;'}
+  ${(props) => props.$grow && 'flex: 1; min-width: 0; overflow: hidden;'}
   white-space: nowrap;
-`;
-
-const MeterBridge = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 5px 12px;
-  border-top: 1px solid var(--gray-5);
-  background: var(--gray-2);
+  flex-shrink: 0;
+  ${(props) => props.$grow && 'flex-shrink: 1;'}
 `;
 
 const MeterLabel = styled.span`
@@ -102,7 +87,6 @@ const MeterChannel = styled.div`
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
 `;
 
 const MeterGroup = styled.div`
@@ -110,6 +94,17 @@ const MeterGroup = styled.div`
   flex-direction: column;
   gap: 2px;
   flex-shrink: 0;
+`;
+
+const BottomBar = styled.div`
+  background: var(--color-surface);
+  border: 1px solid var(--gray-6);
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const ErrorBanner = styled.div`
@@ -188,7 +183,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     recordStartTimeRef.current = currentTime;
     await startRecording();
     // Start playback from current position so user hears existing tracks
-    if (tracks.length > 0) {
+    // Only play when there are actual clips — playing an empty playlist
+    // causes immediate stop, which triggers the auto-stop effect
+    const hasClips = tracks.some(t => t.clips.length > 0);
+    if (hasClips) {
       await play(currentTime);
     }
   }, [startRecording, play, currentTime, tracks.length]);
@@ -330,54 +328,22 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         </ErrorBanner>
       )}
 
-      {/* DAW Toolbar */}
+      {/* DAW Toolbar — single row */}
       <Toolbar>
-        <ToolbarRow>
-          {/* Transport: Record + Playback */}
-          <ToolbarSection>
-            <RecordButton
-              isRecording={isRecording}
-              onClick={handleRecordClick}
-              disabled={!hasPermission}
-            />
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-          </ToolbarSection>
+        {/* Transport */}
+        <ToolbarSection>
+          <RecordButton
+            isRecording={isRecording}
+            onClick={handleRecordClick}
+            disabled={!hasPermission}
+          />
+          <PlayButton />
+          <PauseButton />
+          <StopButton />
+        </ToolbarSection>
 
-          {/* Time Display */}
-          <ToolbarSection>
-            <AudioPosition />
-            {isRecording && (
-              <RecordingIndicator
-                isRecording={isRecording}
-                duration={duration}
-              />
-            )}
-          </ToolbarSection>
-
-          {/* Zoom */}
-          <ToolbarSection $grow>
-            <ZoomInButton disabled={isRecording} />
-            <ZoomOutButton disabled={isRecording} />
-          </ToolbarSection>
-
-          {/* Master Output + Export (pushed right) */}
-          <ToolbarSection>
-            <MasterVolumeControl />
-          </ToolbarSection>
-
-          <ToolbarSection $noBorder>
-            <ExportWavButton
-              label="Export"
-              filename="recording"
-            />
-          </ToolbarSection>
-        </ToolbarRow>
-
-        {/* Meter Bridge */}
-        <MeterBridge>
-          {/* Mic input on left */}
+        {/* Mic selector */}
+        <ToolbarSection>
           {!hasPermission ? (
             <Button size="1" variant="soft" color="blue" onClick={requestMicAccess}>
               <MicrophoneIcon size={14} weight="light" /> Enable Mic
@@ -390,8 +356,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               disabled={isRecording}
             />
           )}
+        </ToolbarSection>
 
-          {/* Meters packed on right */}
+        {/* Meters */}
+        <ToolbarSection $grow>
           <MeterGroup>
             <MeterChannel>
               <MicrophoneIcon size={12} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
@@ -424,7 +392,17 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               />
             </MeterChannel>
           </MeterGroup>
-        </MeterBridge>
+        </ToolbarSection>
+
+        <ToolbarSection $noBorder>
+          <BaseControlButton onClick={onAddTrack}>
+            + New Track
+          </BaseControlButton>
+          <ExportWavButton
+            label="Export"
+            filename="recording"
+          />
+        </ToolbarSection>
       </Toolbar>
 
       {/* Waveform */}
@@ -447,10 +425,15 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         />
       </ClipInteractionProvider>
 
+      {/* Position display — bottom bar */}
+      <BottomBar>
+        <AudioPosition />
+      </BottomBar>
+
       {tracks.length === 0 && (
         <div style={{ padding: '3rem', color: 'var(--gray-9)', textAlign: 'center' }}>
           <Text size="2">
-            Click &quot;+ New Track&quot; to add a track, then start recording!
+            Click &quot;+ New Track&quot; in the toolbar to add a track, then start recording!
           </Text>
         </div>
       )}
@@ -462,14 +445,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         fileFilter={(f) => f.type.startsWith('audio/')}
         label="Drop audio files or click to browse"
         dragLabel="Drop audio files here"
-      >
-        <Button size="2" variant="solid" color="blue" style={{ marginTop: '0.5rem' }} onClick={(e) => {
-          e.stopPropagation();
-          onAddTrack();
-        }}>
-          + New Track
-        </Button>
-      </StyledDropZone>
+      />
     </>
   );
 };

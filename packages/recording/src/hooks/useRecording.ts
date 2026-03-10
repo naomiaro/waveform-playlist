@@ -213,6 +213,20 @@ export function useRecording(
       const rawContext = context.rawContext as AudioContext;
       const numChannels = recordedChunksRef.current.length || channelCount;
       const channelData = recordedChunksRef.current.map((chunks) => concatenateAudioData(chunks));
+      const totalSamples = channelData[0]?.length ?? 0;
+
+      // Guard: if no samples were captured (e.g., stop called immediately after start),
+      // return null instead of creating a 0-length AudioBuffer which throws
+      if (totalSamples === 0) {
+        console.warn('[waveform-playlist] Recording stopped with 0 samples captured — discarding');
+        isRecordingRef.current = false;
+        isPausedRef.current = false;
+        setIsRecording(false);
+        setIsPaused(false);
+        setLevel(0);
+        return null;
+      }
+
       const buffer = createAudioBuffer(rawContext, channelData, rawContext.sampleRate, numChannels);
 
       setAudioBuffer(buffer);

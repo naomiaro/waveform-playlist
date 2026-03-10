@@ -99,3 +99,23 @@ const normalized = gainToNormalized(rawPeak);
 ## Peak Value Clamping
 
 **Rule:** Always clamp scaled peak values to the valid typed array range before assignment. `Math.floor(1.0 * 32768) = 32768` overflows Int16 (max 32767) and wraps to -32768. Use `Math.min(maxValue - 1, ...)` for max and `Math.max(-maxValue, ...)` for min.
+
+## Overdub Recording & Latency Compensation
+
+**Pattern:** `useIntegratedRecording` captures timeline position at record start (not stop) via `recordingStartTimeRef`. During overdub, `currentTime` advances with playback — using it at stop time would place the clip at the wrong position.
+
+**Latency compensation:** Two sources of delay between worklet capture and audible playback:
+1. `toneContext.lookAhead` (~100ms) — Tone.js schedules Transport audio ahead of real time
+2. `audioContext.outputLatency` — hardware DAC delay before audio reaches speakers
+
+The clip's `offsetSamples` skips this combined latency period. `durationSamples` is reduced by the same amount. This aligns the user's performance (timed to what they hear) with the timeline.
+
+**Overdub flow (in RecordingExample):** `startRecordingWithPlayback()` starts recording first, then calls `play(currentTime)`. Stop button stops playback, which auto-triggers recording stop via `wasPlayingRef` effect. Record button is start-only (not a toggle).
+
+## Multi-Instance Worklet Registration Gap
+
+**Known issue:** `workletLoadedRef` in `useRecording` and `useMicrophoneLevel` is per-component-instance (`useRef`). Multiple instances would each try `addModule()` → `registerProcessor()` throws on the already-registered name. Fix when multi-mic is needed: promote to module-level variable or `Map<AudioContext, boolean>`.
+
+## Peak Reset on Device Switch
+
+**Pattern:** `useIntegratedRecording.changeDevice()` calls `resetPeak()` from `useMicrophoneLevel` before requesting the new device. This clears held peak indicators so the VU meter doesn't show stale peaks from the previous microphone.
