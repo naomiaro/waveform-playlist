@@ -356,6 +356,23 @@ if (derived !== prevRef.current) {
 
 **`prevTracksRef`:** Updated in all `loadAudio` exit paths (engine tracks guard, incremental add, clear state, full rebuild) to keep detection accurate.
 
+## Rewind / Seek Without Playback
+
+**Rule:** Use `seekTo(time)` to move the cursor without starting audio. Never use `play(time, 0)` — `playDuration=0` is truthy (`!== undefined`), so the Transport starts but the animation loop immediately stops at `endTime=0`. This causes ghost audio playback with no visual indication. The built-in `RewindButton` uses `setCurrentTime(0)` + conditional `play(0)` only if already playing.
+
+## Debugging State Changes with console.trace
+
+**Technique:** Wrap `useState` setter with a traced version to pinpoint which code path modifies state. Useful for controlled state like `tracks` where multiple sources (`onTracksChange`, recording hooks, file drops) can call `setTracks`.
+
+```typescript
+const [state, setStateRaw] = useState(initial);
+const setState = useCallback((v) => {
+  console.log('[Component] setState: ' + summarize(v));
+  console.trace('[Component] setState trace');
+  setStateRaw(v);
+}, []);
+```
+
 ## MediaElement currentTime vs currentTimeRef
 
 `currentTime` (React state from `useMediaElementAnimation`) only updates on pause/stop/seek/playback-end — NOT during playback. For smooth real-time display, use `currentTimeRef` with a local `requestAnimationFrame` loop and direct DOM manipulation (e.g., `ref.current.textContent = ...`). Never use `currentTime` for time displays that should update during playback.

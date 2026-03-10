@@ -509,7 +509,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // Also skip during active boundary trim drags — visual updates flow via
     // React state only; engine.trimClip() commits the final delta on drag end.
     if (isEngineTracks || isDraggingRef.current) {
-      console.log('[waveform-playlist] loadAudio: SKIP (isEngineTracks=' + isEngineTracks + ', isDragging=' + isDraggingRef.current + ')');
       if (isEngineTracks) {
         engineTracksRef.current = null;
       }
@@ -532,7 +531,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // tearing down the playout. This avoids disposing and recreating all
     // audio nodes when dropping a file or finishing a recording.
     if (isIncrementalAdd && engineRef.current) {
-      console.log('[waveform-playlist] loadAudio: INCREMENTAL ADD (' + prevTracksRef.current.length + ' → ' + tracks.length + ' tracks)');
       const prevIds = new Set(prevTracksRef.current.map((t) => t.id));
       const addedTracks = tracks.filter((t) => !prevIds.has(t.id));
 
@@ -594,7 +592,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // (controls, clip shapes, peaks via worker) but the engine isn't built yet.
     // When deferEngineRebuild flips to false, this effect re-runs and builds once.
     if (deferEngineRebuild) {
-      console.log('[waveform-playlist] loadAudio: DEFERRED (deferEngineRebuild=true)');
       // Still update duration so the timeline renders at the correct width
       let maxDuration = 0;
       tracks.forEach((track) => {
@@ -609,7 +606,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     // Reset ready state for full rebuild
     setIsReady(false);
-    console.log('[waveform-playlist] loadAudio: FULL REBUILD (' + tracks.length + ' tracks, ' + tracks.map(function(t) { return t.id + ':' + t.clips.length + 'clips'; }).join(', ') + ')');
 
     if (tracks.length === 0) {
       // Clear state when all tracks are removed
@@ -759,7 +755,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           }
         });
 
-        console.log('[waveform-playlist] loadAudio: engine.setTracks(' + tracksWithState.length + ' tracks) ' + tracksWithState.map(function(t) { return t.id + ':' + t.clips.length + 'clips(hasBuffer=' + t.clips.map(function(c) { return !!c.audioBuffer; }).join(',') + ') solo=' + t.soloed + ' mute=' + t.muted + ' vol=' + t.volume; }).join(' | '));
         engine.setTracks(tracksWithState);
         suppressTracksMirroring = false;
         lastTracksVersionRef.current = engine.getState().tracksVersion;
@@ -790,11 +785,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Skip disposal when the next render's guard will keep the engine alive.
       // skipEngineDisposeRef is set during the render phase (before this cleanup runs).
       if (skipEngineDisposeRef.current) {
-        console.log('[waveform-playlist] loadAudio cleanup: SKIP dispose (skipEngineDisposeRef=true)');
         skipEngineDisposeRef.current = false;
         return;
       }
-      console.log('[waveform-playlist] loadAudio cleanup: DISPOSING engine');
       stopAnimationFrameLoop();
       if (engineRef.current) {
         engineRef.current.dispose();
@@ -1101,10 +1094,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Playback controls
   const play = useCallback(
     async (startTime?: number, playDuration?: number) => {
-      if (!engineRef.current || duration === 0) {
-        console.log('[waveform-playlist] play: BLOCKED (engine=' + !!engineRef.current + ', duration=' + duration + ')');
-        return;
-      }
+      if (!engineRef.current || duration === 0) return;
 
       const actualStartTime = startTime ?? currentTimeRef.current;
       playStartPositionRef.current = actualStartTime;

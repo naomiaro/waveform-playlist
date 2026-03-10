@@ -570,16 +570,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 // Main component
 export function RecordingExample() {
   const { theme, isDarkMode: isDark } = useDocusaurusTheme();
-  const [tracks, setTracksRaw] = useState<ClipTrack[]>([]);
-  const setTracks = useCallback((newTracks: ClipTrack[] | ((prev: ClipTrack[]) => ClipTrack[])) => {
-    if (typeof newTracks === 'function') {
-      setTracksRaw(newTracks);
-    } else {
-      console.log('[RecordingExample] setTracks: ' + newTracks.length + ' tracks ' + newTracks.map(t => t.id + ':' + t.clips.length + 'clips').join(', '));
-      console.trace('[RecordingExample] setTracks trace');
-      setTracksRaw(newTracks);
-    }
-  }, []);
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   const handleAddTrack = () => {
