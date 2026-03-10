@@ -195,6 +195,12 @@ const analyser = context.createAnalyser();
 **References:**
 - [Tone.js Issue #681](https://github.com/Tonejs/Tone.js/issues/681) - AudioListener Firefox error
 
+## Tone.js Panner Stereo Downmix Gotcha
+
+**Critical:** `new Panner(pan)` defaults to `channelCount: 1` + `channelCountMode: "explicit"` (for standardized-audio-context compat). This forces stereo→mono downmix at 1/√2 gain before panning. Stereo recordings play back ~3dB quieter with identical L/R channels.
+
+**Fix:** `new Panner({ pan, channelCount: 2 })` for `ToneTrack` (audio playback). MidiToneTrack/SoundFontToneTrack use mono synth sources, so `channelCount: 1` is correct there.
+
 ## Context Singleton Warning
 
 **`getGlobalContext()` replaces Tone's default context.** Any Tone.js node created via `getContext()` BEFORE `getGlobalContext()` first runs will be on a different (orphaned) audio graph. This affects hooks that run on mount (useEffect with `[]` deps) — they may capture the default context before audio init. Always import and use `getGlobalContext()` for nodes that must be in the playback signal path.

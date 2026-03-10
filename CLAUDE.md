@@ -348,7 +348,8 @@ const LazyExample = createLazyExample(() =>
 25. **Grep Comments When Renaming APIs** — When renaming an option or prop across files (e.g., `progressive` → `immediate`), also grep for the old name in comments. Mechanical find-replace on code misses adjacent comments that describe the old behavior.
 26. **Prefer Props Over Mount/Unmount for Optional Providers** — If a provider controls both data (e.g., snap config) and rendering (e.g., timescale mode), add a mode prop instead of conditionally mounting/unmounting. Unmounting tears down the subtree and loses state; a prop switch is cheaper and keeps context consumers stable.
 27. **Stop Before Clear** — Always call `stop()` before clearing tracks. Clearing React state without stopping Tone.js Transport leaves orphaned audio playing. Use `ClearAllButton` (from `@waveform-playlist/browser`) which handles this automatically via `usePlaylistControls().stop()`.
-28. **Never Use Tone.js `addAudioWorkletModule`** — Tone.js caches a single `_workletPromise` per context. Only the first URL is loaded; subsequent calls with different URLs are silently skipped. Always use `rawContext.audioWorklet.addModule(url)` directly. `context.createAudioWorkletNode()` is still fine for node creation.
+28. **Tone.js Panner Stereo Preservation** — `new Panner(pan)` defaults to `channelCount: 1`, downmixing stereo to mono at 1/√2 gain. Use `new Panner({ pan, channelCount: 2 })` for audio tracks with stereo content. MIDI/SoundFont tracks use mono synths so `channelCount: 1` is fine.
+29. **Never Use Tone.js `addAudioWorkletModule`** — Tone.js caches a single `_workletPromise` per context. Only the first URL is loaded; subsequent calls with different URLs are silently skipped. Always use `rawContext.audioWorklet.addModule(url)` directly. `context.createAudioWorkletNode()` is still fine for node creation.
 
 ---
 

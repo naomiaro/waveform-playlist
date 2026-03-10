@@ -88,6 +88,14 @@ const normalized = gainToNormalized(rawPeak);
 
 **Rule:** `useMicrophoneLevel` auto-detects actual mic channel count from `stream.getAudioTracks()[0].getSettings().channelCount`. Do not hardcode `channelCount` when a stream is available — a mono mic with `channelCount: 2` creates a 2-channel Meter where only one channel receives signal.
 
+## MediaStreamAudioSourceNode.channelCount Is Misleading
+
+**Rule:** Never use `source.channelCount` to detect mic channels — it defaults to 2 per Web Audio spec, regardless of the mic's actual capability. Use `stream.getAudioTracks()[0].getSettings().channelCount` instead.
+
+## No UI Component Exports
+
+**Decision:** Recording package exports only hooks and types — no presentational components. `RecordButton`, `RecordingIndicator`, `MicrophoneSelector` are example-specific UI in `website/src/components/examples/RecordingControls.tsx`. `VUMeter` is replaced by `SegmentedVUMeter` from `@waveform-playlist/ui-components`.
+
 ## Peak Value Clamping
 
 **Rule:** Always clamp scaled peak values to the valid typed array range before assignment. `Math.floor(1.0 * 32768) = 32768` overflows Int16 (max 32767) and wraps to -32768. Use `Math.min(maxValue - 1, ...)` for max and `Math.max(-maxValue, ...)` for min.

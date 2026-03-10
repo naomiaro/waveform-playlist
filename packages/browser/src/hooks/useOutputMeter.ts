@@ -41,6 +41,16 @@ export interface UseOutputMeterOptions {
    * Default: 60 (60fps)
    */
   updateRate?: number;
+
+  /**
+   * Whether audio is currently playing. When this transitions to false,
+   * all levels (current, peak, RMS) and smoothed state are reset to zero.
+   * Without this, the browser's tail-time optimization stops calling the
+   * worklet's process() when no audio flows, leaving the last non-zero
+   * levels frozen in state.
+   * Default: false
+   */
+  isPlaying?: boolean;
 }
 
 export interface UseOutputMeterReturn {
@@ -64,7 +74,7 @@ function gainToNormalized(gain: number): number {
 }
 
 export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMeterReturn {
-  const { channelCount = 2, updateRate = 60 } = options;
+  const { channelCount = 2, updateRate = 60, isPlaying = false } = options;
 
   const [levels, setLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
   const [peakLevels, setPeakLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
@@ -77,6 +87,17 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
     () => setPeakLevels(new Array(channelCount).fill(0)),
     [channelCount]
   );
+
+  // Reset all levels when playback stops
+  useEffect(() => {
+    if (!isPlaying) {
+      const zeros = new Array(channelCount).fill(0);
+      smoothedPeakRef.current = new Array(channelCount).fill(0);
+      setLevels(zeros);
+      setRmsLevels(zeros);
+      setPeakLevels(zeros);
+    }
+  }, [isPlaying, channelCount]);
 
   useEffect(() => {
     let isMounted = true;

@@ -62,7 +62,10 @@ export class ToneTrack {
 
     // Create shared track-level Tone.js nodes
     this.volumeNode = new Volume(this.gainToDb(options.track.gain));
-    this.panNode = new Panner(options.track.stereoPan);
+    // Tone.js Panner defaults to channelCount: 1 + channelCountMode: 'explicit',
+    // which forces stereo→mono downmix (1/√2 attenuation) before panning.
+    // Override to channelCount: 2 to preserve stereo recordings.
+    this.panNode = new Panner({ pan: options.track.stereoPan, channelCount: 2 });
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
     // Chain shared Tone.js nodes: Volume → Pan → MuteGain

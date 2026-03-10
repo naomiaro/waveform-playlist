@@ -219,3 +219,7 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 ## SegmentedVUMeter Color Stops
 
 **Above-0 dB support:** `dBRange` defaults to `[-50, 5]`. Output meters can exceed 0 dB when mixed tracks sum hot. Input meters (microphone) are clamped to 0 dB by the audio driver. Default color stops include `{ dB: 2, color: '#ff0000' }` as an "over" indicator for output signals. Red zone starts at -1 dB.
+
+## SegmentedVUMeter Theming
+
+**Decision:** Transparent background, no padding/border-radius — consumers control container styling. `labelColor` prop (not theme) controls scale/channel label color for light/dark mode. Inactive segments use `rgba(128, 128, 128, 0.2)` to work on any background. Use transient `$props` for color, not CSS variables.

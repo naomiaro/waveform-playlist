@@ -82,7 +82,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   setSelectedTrackId,
   onAddTrack,
 }) => {
-  const { currentTime } = usePlaybackAnimation();
+  const { currentTime, isPlaying } = usePlaybackAnimation();
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
   const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId } = usePlaylistControls();
   const { isAutomaticScroll } = usePlaylistState();
@@ -115,7 +115,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime, channelCount: 2 });
 
   // Output meter for master bus
-  const { levels: outputLevels, peakLevels: outputPeaks } = useOutputMeter({ channelCount: 2 });
+  const { levels: outputLevels, peakLevels: outputPeaks } = useOutputMeter({ channelCount: 2, isPlaying });
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {

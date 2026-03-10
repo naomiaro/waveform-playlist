@@ -330,6 +330,12 @@ if (derived !== prevRef.current) {
 
 **Sample-accurate metering:** Uses `meter-processor` AudioWorklet from `@waveform-playlist/worklets`. The worklet accumulates peak and RMS across all 128-sample quantums and posts results at ~60Hz — no transient is missed between animation frames.
 
+## Output Meter Clearing (isPlaying Prop)
+
+**Problem:** When playback stops, browsers stop calling the worklet's `process()` (tail-time optimization — no active upstream sources). The last non-zero levels freeze in React state.
+
+**Fix:** `useOutputMeter({ isPlaying })` — a separate `useEffect` resets all levels (current, peak, RMS) and smoothed state when `isPlaying` transitions to `false`. Prefer state-driven cleanup over staleness timers.
+
 ## MediaElement currentTime vs currentTimeRef
 
 `currentTime` (React state from `useMediaElementAnimation`) only updates on pause/stop/seek/playback-end — NOT during playback. For smooth real-time display, use `currentTimeRef` with a local `requestAnimationFrame` loop and direct DOM manipulation (e.g., `ref.current.textContent = ...`). Never use `currentTime` for time displays that should update during playback.
