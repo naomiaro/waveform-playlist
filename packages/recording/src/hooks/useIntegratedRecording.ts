@@ -87,6 +87,11 @@ export function useIntegratedRecording(
   // Capture timeline position when recording starts (not at stop time)
   const recordingStartTimeRef = useRef(0);
 
+  // Keep selectedTrackId in a ref for use in callbacks
+  // Avoids stale closures when auto-create track + start recording in same render cycle
+  const selectedTrackIdRef = useRef(selectedTrackId);
+  selectedTrackIdRef.current = selectedTrackId;
+
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
 
@@ -113,8 +118,10 @@ export function useIntegratedRecording(
   } = useRecording(stream, recordingOptions);
 
   // Start recording handler
+  // Reads selectedTrackId from ref to avoid stale closures when
+  // auto-create track + start recording happen in the same render cycle
   const startRecording = useCallback(async () => {
-    if (!selectedTrackId) {
+    if (!selectedTrackIdRef.current) {
       setHookError(
         new Error('Cannot start recording: no track selected. Select or create a track first.')
       );
@@ -138,7 +145,7 @@ export function useIntegratedRecording(
     } catch (err) {
       setHookError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [selectedTrackId, isMonitoring, startRec, currentTime]);
+  }, [isMonitoring, startRec, currentTime]);
 
   // Stop recording and add clip to selected track
   const stopRecording = useCallback(async () => {
@@ -151,11 +158,12 @@ export function useIntegratedRecording(
     }
 
     // Add clip to track after recording completes
-    if (buffer && selectedTrackId) {
-      const selectedTrackIndex = tracks.findIndex((t) => t.id === selectedTrackId);
+    const trackId = selectedTrackIdRef.current;
+    if (buffer && trackId) {
+      const selectedTrackIndex = tracks.findIndex((t) => t.id === trackId);
       if (selectedTrackIndex === -1) {
         const err = new Error(
-          `Recording completed but track "${selectedTrackId}" no longer exists. The recorded audio could not be saved.`
+          `Recording completed but track "${trackId}" no longer exists. The recorded audio could not be saved.`
         );
         console.error(`[waveform-playlist] ${err.message}`);
         setHookError(err);
@@ -216,7 +224,7 @@ export function useIntegratedRecording(
 
       setTracks(newTracks);
     }
-  }, [selectedTrackId, tracks, setTracks, stopRec]);
+  }, [tracks, setTracks, stopRec]);
 
   // Auto-select the first device when devices become available
   useEffect(() => {
