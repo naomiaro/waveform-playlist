@@ -87,7 +87,7 @@ export function useIntegratedRecording(
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
 
   // Microphone level (for VU meter)
-  const { level, peakLevel, levels, peakLevels, rmsLevels } = useMicrophoneLevel(stream, {
+  const { level, peakLevel, levels, peakLevels, rmsLevels, resetPeak } = useMicrophoneLevel(stream, {
     channelCount: recordingOptions.channelCount,
   });
 
@@ -221,6 +221,7 @@ export function useIntegratedRecording(
       try {
         setHookError(null);
         setSelectedDevice(deviceId);
+        resetPeak();
         await requestAccess(deviceId, audioConstraints);
         await resumeGlobalAudioContext();
         setIsMonitoring(true);
@@ -228,7 +229,7 @@ export function useIntegratedRecording(
         setHookError(err instanceof Error ? err : new Error(String(err)));
       }
     },
-    [requestAccess, audioConstraints]
+    [requestAccess, audioConstraints, resetPeak]
   );
 
   return {

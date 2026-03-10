@@ -12,7 +12,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { Theme, Button, Flex, Card, Text, Separator } from '@radix-ui/themes';
+import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
@@ -24,7 +24,6 @@ import {
   ZoomInButton,
   ZoomOutButton,
   AudioPosition,
-  AutomaticScrollCheckbox,
   MasterVolumeControl,
   ExportWavButton,
   ClipInteractionProvider,
@@ -51,16 +50,73 @@ const StyledDropZone = styled(FileDropZone)`
   margin-bottom: 1.5rem;
 `;
 
-const RecordingControlsRow = styled.div`
-  display: flex;
-  align-items: flex-end;
-  gap: 1rem;
-  flex-wrap: wrap;
+// --- DAW Toolbar ---
+
+const Toolbar = styled.div`
+  background: var(--color-surface);
+  border: 1px solid var(--gray-6);
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
 `;
 
-const ErrorCard = styled(Card)`
+const ToolbarRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 44px;
+`;
+
+const ToolbarSection = styled.div<{ $grow?: boolean; $noBorder?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-right: ${(props) => (props.$noBorder ? 'none' : '1px solid var(--gray-5)')};
+  ${(props) => props.$grow && 'flex: 1;'}
+  white-space: nowrap;
+`;
+
+const MeterBridge = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--gray-5);
+  background: var(--gray-2);
+`;
+
+const MeterLabel = styled.span`
+  font-family: 'Courier New', Monaco, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--gray-9);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 28px;
+  user-select: none;
+`;
+
+const MeterChannel = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+`;
+
+const MeterGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+`;
+
+const ErrorBanner = styled.div`
   background: var(--red-3);
   border: 1px solid var(--red-6);
+  border-radius: 6px;
+  padding: 8px 12px;
   margin-bottom: 1rem;
 `;
 
@@ -116,6 +172,13 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   // Output meter for master bus
   const { levels: outputLevels, peakLevels: outputPeaks } = useOutputMeter({ channelCount: 2, isPlaying });
+
+  // Auto-request mic access on mount
+  useEffect(() => {
+    if (!hasPermission) {
+      requestMicAccess();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {
@@ -236,84 +299,79 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   return (
     <>
       {error && (
-        <ErrorCard>
+        <ErrorBanner>
           <Text size="2" color="red">
             Error: {error.message}
           </Text>
-        </ErrorCard>
+        </ErrorBanner>
       )}
 
-      {/* Controls Bar */}
-      <Card style={{ marginBottom: '1.5rem' }}>
-        <Flex gap="3" align="center" wrap="wrap">
-          {/* Recording Controls */}
-          {!hasPermission ? (
-            <Button size="2" variant="solid" color="blue" onClick={requestMicAccess}>
-              <MicrophoneIcon size={18} weight="light" style={{ marginRight: '6px' }} /> Enable Mic
-            </Button>
-          ) : (
-            <>
-              <MicrophoneSelector
-                devices={devices}
-                selectedDeviceId={selectedDevice || undefined}
-                onDeviceChange={changeDevice}
-                disabled={isRecording}
-              />
-              <RecordButton
-                isRecording={isRecording}
-                onClick={handleRecordClick}
-                disabled={false}
-              />
-              {isRecording && (
-                <RecordingIndicator
-                  isRecording={isRecording}
-                  duration={duration}
-                />
-              )}
-            </>
-          )}
-
-          <Separator orientation="vertical" />
-
-          {/* Playback Controls */}
-          <Flex gap="2">
+      {/* DAW Toolbar */}
+      <Toolbar>
+        <ToolbarRow>
+          {/* Transport: Record + Playback */}
+          <ToolbarSection>
+            <RecordButton
+              isRecording={isRecording}
+              onClick={handleRecordClick}
+              disabled={!hasPermission}
+            />
             <PlayButton />
             <PauseButton />
             <StopButton />
-          </Flex>
+          </ToolbarSection>
 
-          <Separator orientation="vertical" />
+          {/* Time Display */}
+          <ToolbarSection>
+            <AudioPosition />
+            {isRecording && (
+              <RecordingIndicator
+                isRecording={isRecording}
+                duration={duration}
+              />
+            )}
+          </ToolbarSection>
 
-          <Flex gap="2">
+          {/* Zoom */}
+          <ToolbarSection $grow>
             <ZoomInButton disabled={isRecording} />
             <ZoomOutButton disabled={isRecording} />
-          </Flex>
+          </ToolbarSection>
 
-          <Separator orientation="vertical" />
+          {/* Master Output + Export (pushed right) */}
+          <ToolbarSection>
+            <MasterVolumeControl />
+          </ToolbarSection>
 
-          <AudioPosition />
+          <ToolbarSection $noBorder>
+            <ExportWavButton
+              label="Export"
+              filename="recording"
+            />
+          </ToolbarSection>
+        </ToolbarRow>
 
-          <Separator orientation="vertical" />
+        {/* Meter Bridge */}
+        <MeterBridge>
+          {/* Mic input on left */}
+          {!hasPermission ? (
+            <Button size="1" variant="soft" color="blue" onClick={requestMicAccess}>
+              <MicrophoneIcon size={14} weight="light" /> Enable Mic
+            </Button>
+          ) : (
+            <MicrophoneSelector
+              devices={devices}
+              selectedDeviceId={selectedDevice || undefined}
+              onDeviceChange={changeDevice}
+              disabled={isRecording}
+            />
+          )}
 
-          <AutomaticScrollCheckbox />
-
-          <Separator orientation="vertical" />
-
-          <MasterVolumeControl />
-
-          <Separator orientation="vertical" />
-
-          <ExportWavButton
-            label="Export"
-            filename="recording"
-          />
-
-          <Separator orientation="vertical" />
-
-          {/* Inline VU Meters — always visible */}
-          <Flex gap="3" align="center">
-            <Flex gap="1" align="center">
-              <MicrophoneIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+          {/* Meters packed on right */}
+          <MeterGroup>
+            <MeterChannel>
+              <MicrophoneIcon size={12} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+              <MeterLabel>In</MeterLabel>
               <SegmentedVUMeter
                 levels={inputLevels}
                 peakLevels={inputPeaks}
@@ -326,9 +384,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                 coloredInactive
                 labelColor="var(--gray-9)"
               />
-            </Flex>
-            <Flex gap="1" align="center">
-              <SpeakerHighIcon size={14} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+            </MeterChannel>
+            <MeterChannel>
+              <SpeakerHighIcon size={12} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
+              <MeterLabel>Out</MeterLabel>
               <SegmentedVUMeter
                 levels={outputLevels}
                 peakLevels={outputPeaks}
@@ -339,10 +398,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                 segmentGap={1}
                 coloredInactive
               />
-            </Flex>
-          </Flex>
-        </Flex>
-      </Card>
+            </MeterChannel>
+          </MeterGroup>
+        </MeterBridge>
+      </Toolbar>
 
       {/* Waveform */}
       <ClipInteractionProvider>
@@ -365,11 +424,11 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       </ClipInteractionProvider>
 
       {tracks.length === 0 && (
-        <Flex justify="center" style={{ padding: '3rem', color: 'var(--gray-9)' }}>
+        <div style={{ padding: '3rem', color: 'var(--gray-9)', textAlign: 'center' }}>
           <Text size="2">
             Click &quot;+ New Track&quot; to add a track, then start recording!
           </Text>
-        </Flex>
+        </div>
       )}
 
       {/* Drop Zone */}
