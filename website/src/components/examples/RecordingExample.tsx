@@ -197,7 +197,9 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // Auto-request mic access on mount
   useEffect(() => {
     if (!hasPermission) {
-      requestMicAccess();
+      requestMicAccess().catch(() => {
+        // Error already surfaced via useIntegratedRecording's error state
+      });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -210,7 +212,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     if (hasClips) {
       await play(currentTime);
     }
-  }, [startRecording, play, currentTime, tracks.length]);
+  }, [startRecording, play, currentTime, tracks]);
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {

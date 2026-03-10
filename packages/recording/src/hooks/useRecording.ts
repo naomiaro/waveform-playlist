@@ -290,7 +290,11 @@ export function useRecording(
             console.warn('[waveform-playlist] Source disconnect during cleanup:', String(err));
           }
         }
-        workletNodeRef.current.disconnect();
+        try {
+          workletNodeRef.current.disconnect();
+        } catch (err) {
+          console.warn('[waveform-playlist] Worklet disconnect during cleanup:', String(err));
+        }
       }
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);

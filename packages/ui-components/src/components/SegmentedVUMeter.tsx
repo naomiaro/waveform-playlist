@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import styled from 'styled-components';
 import { normalizedToDb } from '@waveform-playlist/core';
 
-interface ColorStop {
+export interface ColorStop {
   dB: number;
   color: string;
 }
@@ -47,6 +47,7 @@ function getDefaultLabels(channelCount: number): string[] {
 }
 
 function getColorForDb(dB: number, colorStops: ColorStop[]): string {
+  if (colorStops.length === 0) return INACTIVE_COLOR;
   for (const stop of colorStops) {
     if (dB >= stop.dB) {
       return stop.color;
@@ -56,9 +57,10 @@ function getColorForDb(dB: number, colorStops: ColorStop[]): string {
 }
 
 function computeThresholds(segmentCount: number, dBRange: [number, number]): number[] {
+  const safeCount = Math.max(2, segmentCount);
   const [minDb, maxDb] = dBRange;
-  const step = (maxDb - minDb) / (segmentCount - 1);
-  return Array.from({ length: segmentCount }, (_, i) => maxDb - i * step);
+  const step = (maxDb - minDb) / (safeCount - 1);
+  return Array.from({ length: safeCount }, (_, i) => maxDb - i * step);
 }
 
 function formatDbLabel(dB: number): string {
@@ -217,6 +219,17 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   const resolvedLabelColor = labelColor ?? DEFAULT_LABEL_COLOR;
 
   const channelCount = levels.length;
+
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    peakLevels != null &&
+    peakLevels.length !== channelCount
+  ) {
+    console.warn(
+      `[waveform-playlist] SegmentedVUMeter: peakLevels length (${peakLevels.length}) does not match levels length (${channelCount})`
+    );
+  }
+
   const isMultiChannel = channelCount >= 2;
   const segmentTotalHeight = segmentHeight + segmentGap;
 

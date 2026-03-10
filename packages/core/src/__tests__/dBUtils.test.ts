@@ -1,7 +1,19 @@
-import { describe, it, expect } from 'vitest';
-import { dBToNormalized, normalizedToDb } from '../utils/dBUtils';
+import { describe, it, expect, vi } from 'vitest';
+import { dBToNormalized, normalizedToDb, gainToNormalized } from '../utils/dBUtils';
 
 describe('dBToNormalized', () => {
+  it('warns and returns 0 for NaN input', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(dBToNormalized(NaN)).toBe(0);
+    expect(spy).toHaveBeenCalledWith('[waveform-playlist] dBToNormalized received NaN');
+    spy.mockRestore();
+  });
+  it('warns and returns 0 for non-negative floor', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(dBToNormalized(-50, 0)).toBe(0);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
   it('maps 0 dB to 1.0', () => {
     expect(dBToNormalized(0)).toBe(1);
   });
@@ -31,6 +43,12 @@ describe('dBToNormalized', () => {
 });
 
 describe('normalizedToDb', () => {
+  it('warns and returns default floor for non-negative floor', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(normalizedToDb(0.5, 0)).toBe(-100);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
   it('maps 1.0 to 0 dB', () => {
     expect(normalizedToDb(1)).toBe(0);
   });
@@ -63,5 +81,36 @@ describe('normalizedToDb', () => {
   it('round-trips above 0 dB', () => {
     const original = 3;
     expect(normalizedToDb(dBToNormalized(original))).toBeCloseTo(original, 10);
+  });
+});
+
+describe('gainToNormalized', () => {
+  it('maps gain 1.0 (0 dB) to normalized 1.0', () => {
+    expect(gainToNormalized(1.0)).toBe(1);
+  });
+  it('maps gain 0 to normalized 0', () => {
+    expect(gainToNormalized(0)).toBe(0);
+  });
+  it('maps negative gain to 0', () => {
+    expect(gainToNormalized(-0.5)).toBe(0);
+  });
+  it('maps gain > 1 to normalized > 1', () => {
+    // gain 1.122 ≈ +1 dB → normalized ~1.01
+    expect(gainToNormalized(1.122)).toBeCloseTo(1.01, 1);
+  });
+  it('maps typical mic level (gain 0.1 ≈ -20 dB) to 0.8', () => {
+    expect(gainToNormalized(0.1)).toBeCloseTo(0.8, 1);
+  });
+  it('maps very quiet signal (gain 0.00001 ≈ -100 dB) to 0', () => {
+    expect(gainToNormalized(0.00001)).toBeCloseTo(0, 1);
+  });
+  it('accepts custom floor', () => {
+    // With floor -60, gain 0.001 ≈ -60 dB → normalized 0
+    expect(gainToNormalized(0.001, -60)).toBeCloseTo(0, 1);
+  });
+  it('is consistent with dBToNormalized pipeline', () => {
+    const gain = 0.5;
+    const db = 20 * Math.log10(gain);
+    expect(gainToNormalized(gain)).toBe(dBToNormalized(db));
   });
 });

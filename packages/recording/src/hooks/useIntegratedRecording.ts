@@ -198,12 +198,21 @@ export function useIntegratedRecording(
       const totalLatency = outputLatency + lookAhead;
       const latencyOffsetSamples = Math.floor(totalLatency * buffer.sampleRate);
 
+      // Guard: very short recordings (< latency compensation) would produce negative duration
+      const effectiveDuration = Math.max(0, buffer.length - latencyOffsetSamples);
+      if (effectiveDuration === 0) {
+        console.warn(
+          '[waveform-playlist] Recording too short for latency compensation — discarding'
+        );
+        return;
+      }
+
       // Create new clip from recording
       const newClip: AudioClip = {
         id: `clip-${Date.now()}`,
         audioBuffer: buffer,
         startSample,
-        durationSamples: buffer.length - latencyOffsetSamples,
+        durationSamples: effectiveDuration,
         offsetSamples: latencyOffsetSamples,
         sampleRate: buffer.sampleRate,
         sourceDurationSamples: buffer.length,

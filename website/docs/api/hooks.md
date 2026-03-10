@@ -613,10 +613,11 @@ function useIntegratedRecording(
 
 ```typescript
 interface IntegratedRecordingOptions {
-  currentTime?: number;       // Current playhead position for recording start
-  channelCount?: number;      // Default: 1 (auto-detected from stream; fallback)
-  samplesPerPixel?: number;   // Default: 1024
-  bits?: 8 | 16;             // Default: 16
+  currentTime?: number;                  // Current playhead position for recording start
+  audioConstraints?: MediaTrackConstraints; // Override recording-optimized defaults
+  channelCount?: number;                 // Default: 1 (auto-detected from stream; fallback)
+  samplesPerPixel?: number;              // Default: 1024
+  bits?: 8 | 16;                         // Default: 16
 }
 ```
 
@@ -629,8 +630,8 @@ interface UseIntegratedRecordingReturn {
   duration: number;
 
   // Microphone levels
-  level: number;      // Current RMS level (0-1)
-  peakLevel: number;  // Peak level with decay (0-1)
+  level: number;      // Current peak level (0-1)
+  peakLevel: number;  // Held peak level with decay (0-1)
 
   // Device management
   devices: MediaDeviceInfo[];
@@ -894,43 +895,55 @@ From `@waveform-playlist/recording`:
 ### useMicrophoneAccess
 
 ```typescript
-function useMicrophoneAccess(options?: {
-  audioConstraints?: MediaTrackConstraints;
-}): {
-  hasAccess: boolean;
-  isRequesting: boolean;
-  error: string | null;
-  requestAccess: () => Promise<void>;
-  revokeAccess: () => void;
+function useMicrophoneAccess(): {
+  stream: MediaStream | null;
+  devices: MicrophoneDevice[];
+  hasPermission: boolean;
+  isLoading: boolean;
+  error: Error | null;
+  requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>;
+  stopStream: () => void;
 };
 ```
 
 ### useRecording
 
 ```typescript
-function useRecording(): {
+function useRecording(
+  stream: MediaStream | null,
+  options?: RecordingOptions
+): {
   isRecording: boolean;
   isPaused: boolean;
   duration: number;
-  recordedBlob: Blob | null;
-  startRecording: () => void;
-  stopRecording: () => void;
+  peaks: (Int8Array | Int16Array)[];
+  audioBuffer: AudioBuffer | null;
+  level: number;
+  peakLevel: number;
+  startRecording: () => Promise<void>;
+  stopRecording: () => Promise<AudioBuffer | null>;
   pauseRecording: () => void;
   resumeRecording: () => void;
-  clearRecording: () => void;
+  error: Error | null;
 };
 ```
 
 ### useMicrophoneLevel
 
 ```typescript
-function useMicrophoneLevel(options?: {
-  channelCount?: number;  // Default: 1 (mono). Set to 2 for stereo.
-}): {
-  level: number;        // 0-1 RMS level (first channel, for backwards compatibility)
-  peak: number;         // 0-1 peak with decay (first channel, for backwards compatibility)
-  levels: number[];     // Per-channel RMS levels (0-1)
-  peakLevels: number[]; // Per-channel peak levels with decay (0-1)
+function useMicrophoneLevel(
+  stream: MediaStream | null,
+  options?: {
+    channelCount?: number;  // Default: 1 (mono). Set to 2 for stereo.
+    updateRate?: number;    // Default: 60 (Hz)
+  }
+): {
+  level: number;          // 0-1 peak level (max across channels, for backwards compatibility)
+  peakLevel: number;      // 0-1 held peak with decay (max across channels)
+  levels: number[];       // Per-channel peak levels (0-1)
+  peakLevels: number[];   // Per-channel held peak levels with decay (0-1)
+  rmsLevels: number[];    // Per-channel RMS levels (0-1)
+  resetPeak: () => void;  // Reset all held peak levels
 };
 ```
 
@@ -948,9 +961,9 @@ function useOutputMeter(options?: UseOutputMeterOptions): UseOutputMeterReturn;
 
 ```typescript
 interface UseOutputMeterOptions {
-  channelCount?: number;             // Default: 2
-  smoothingTimeConstant?: number;    // Default: 0.8
-  updateRate?: number;               // Default: 60 (Hz)
+  channelCount?: number;   // Default: 2
+  updateRate?: number;     // Default: 60 (Hz)
+  isPlaying?: boolean;     // Reset levels when false (prevents frozen meters)
 }
 ```
 
@@ -958,8 +971,9 @@ interface UseOutputMeterOptions {
 
 ```typescript
 interface UseOutputMeterReturn {
-  levels: number[];       // Per-channel RMS levels (0-1)
-  peakLevels: number[];   // Per-channel peak levels with hold/decay (0-1)
+  levels: number[];       // Per-channel peak output levels (0-1)
+  peakLevels: number[];   // Per-channel held peak levels with decay (0-1)
+  rmsLevels: number[];    // Per-channel RMS output levels (0-1)
   resetPeak: () => void;  // Reset all peak hold indicators
 }
 ```

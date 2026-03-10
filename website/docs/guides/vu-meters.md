@@ -49,6 +49,7 @@ import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 | `segmentHeight` | `number` | `8` | Segment height in pixels |
 | `segmentGap` | `number` | `2` | Gap between segments in pixels |
 | `coloredInactive` | `boolean` | `false` | Show inactive segments in dimmed color instead of flat dark |
+| `labelColor` | `string` | `'#888'` | Color for scale labels and channel labels |
 
 ## Input Metering
 

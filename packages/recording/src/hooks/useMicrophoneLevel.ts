@@ -5,12 +5,12 @@
  * peak and RMS metering without requestAnimationFrame overhead.
  */
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { getContext } from 'tone';
-import { dBToNormalized } from '@waveform-playlist/core';
-import { meterProcessorUrl } from '@waveform-playlist/worklets';
+import { gainToNormalized } from '@waveform-playlist/core';
+import { meterProcessorUrl, type MeterMessage } from '@waveform-playlist/worklets';
 
-/** Peak decay constant — matches openDAW's 250ms exponential decay */
+/** Peak decay constant — exponential decay for smooth peak hold (~800ms to 1/e at 60fps) */
 const PEAK_DECAY = 0.98;
 
 export interface UseMicrophoneLevelOptions {
@@ -19,16 +19,6 @@ export interface UseMicrophoneLevelOptions {
    * Default: 60 (60fps)
    */
   updateRate?: number;
-
-  /**
-   * Smoothing time constant (0-1)
-   * Higher values = smoother but slower response
-   * Default: 0.8
-   *
-   * @deprecated No longer used internally (worklet handles its own timing).
-   * Kept for backwards compatibility.
-   */
-  smoothingTimeConstant?: number;
 
   /**
    * Number of channels to meter (1 = mono, 2 = stereo)
@@ -76,16 +66,6 @@ export interface UseMicrophoneLevelReturn {
 }
 
 /**
- * Convert a linear gain value (0-1+) to normalized 0-1 via dB.
- * Uses gainToDb then dBToNormalized for consistent mapping.
- */
-function gainToNormalized(gain: number): number {
-  if (gain <= 0) return 0;
-  const db = 20 * Math.log10(gain);
-  return dBToNormalized(db);
-}
-
-/**
  * Monitor microphone input levels in real-time
  *
  * @param stream - MediaStream from getUserMedia
@@ -114,7 +94,10 @@ export function useMicrophoneLevel(
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const smoothedPeakRef = useRef<number[]>(new Array(channelCount).fill(0));
 
-  const resetPeak = () => setPeakLevels(new Array(channelCount).fill(0));
+  const resetPeak = useCallback(
+    () => setPeakLevels(new Array(channelCount).fill(0)),
+    [channelCount]
+  );
 
   useEffect(() => {
     if (!stream) {
@@ -159,6 +142,10 @@ export function useMicrophoneLevel(
       });
       workletNodeRef.current = workletNode;
 
+      workletNode.onprocessorerror = (event) => {
+        console.warn('[waveform-playlist] Mic meter worklet processor error:', event);
+      };
+
       // Create source and connect: source → meter
       // Don't connect output to destination — mic monitoring would cause feedback
       const source = context.createMediaStreamSource(stream);
@@ -171,7 +158,7 @@ export function useMicrophoneLevel(
       workletNode.port.onmessage = (event: MessageEvent) => {
         if (!isMounted) return;
 
-        const { peak, rms } = event.data as { peak: number[]; rms: number[] };
+        const { peak, rms } = event.data as MeterMessage;
         const smoothed = smoothedPeakRef.current;
 
         const peakValues: number[] = [];
@@ -195,7 +182,9 @@ export function useMicrophoneLevel(
       };
     };
 
-    setupMonitoring();
+    setupMonitoring().catch((err) => {
+      console.warn('[waveform-playlist] Failed to set up mic level monitoring:', String(err));
+    });
 
     return () => {
       isMounted = false;
@@ -203,8 +192,8 @@ export function useMicrophoneLevel(
       if (sourceRef.current) {
         try {
           sourceRef.current.disconnect();
-        } catch {
-          // Ignore disconnect errors
+        } catch (err) {
+          console.warn('[waveform-playlist] Mic source disconnect during cleanup:', String(err));
         }
         sourceRef.current = null;
       }
@@ -213,8 +202,8 @@ export function useMicrophoneLevel(
         try {
           workletNodeRef.current.disconnect();
           workletNodeRef.current.port.close();
-        } catch {
-          // Ignore disconnect errors
+        } catch (err) {
+          console.warn('[waveform-playlist] Mic meter disconnect during cleanup:', String(err));
         }
         workletNodeRef.current = null;
       }

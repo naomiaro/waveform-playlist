@@ -13,10 +13,10 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getGlobalContext } from '@waveform-playlist/playout';
-import { dBToNormalized } from '@waveform-playlist/core';
-import { meterProcessorUrl } from '@waveform-playlist/worklets';
+import { gainToNormalized } from '@waveform-playlist/core';
+import { meterProcessorUrl, type MeterMessage } from '@waveform-playlist/worklets';
 
-/** Peak decay constant — matches openDAW's 250ms exponential decay */
+/** Peak decay constant — exponential decay for smooth peak hold (~800ms to 1/e at 60fps) */
 const PEAK_DECAY = 0.98;
 
 export interface UseOutputMeterOptions {
@@ -25,16 +25,6 @@ export interface UseOutputMeterOptions {
    * Default: 2 (stereo output)
    */
   channelCount?: number;
-
-  /**
-   * Smoothing time constant (0-1).
-   * Higher values = smoother but slower response.
-   * Default: 0.8
-   *
-   * @deprecated No longer used internally (worklet handles its own timing).
-   * Kept for backwards compatibility.
-   */
-  smoothingTimeConstant?: number;
 
   /**
    * How often to update the levels (in Hz).
@@ -62,15 +52,6 @@ export interface UseOutputMeterReturn {
   rmsLevels: number[];
   /** Reset all held peak levels to 0 */
   resetPeak: () => void;
-}
-
-/**
- * Convert a linear gain value (0-1+) to normalized 0-1 via dB.
- */
-function gainToNormalized(gain: number): number {
-  if (gain <= 0) return 0;
-  const db = 20 * Math.log10(gain);
-  return dBToNormalized(db);
 }
 
 export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMeterReturn {
@@ -125,6 +106,10 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       });
       workletNodeRef.current = workletNode;
 
+      workletNode.onprocessorerror = (event) => {
+        console.warn('[waveform-playlist] Output meter worklet processor error:', event);
+      };
+
       // Insert as pass-through in destination chain:
       // Volume → WorkletNode → Gain → rawContext.destination
       const destination = context.destination;
@@ -136,7 +121,7 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       workletNode.port.onmessage = (event: MessageEvent) => {
         if (!isMounted) return;
 
-        const { peak, rms } = event.data as { peak: number[]; rms: number[] };
+        const { peak, rms } = event.data as MeterMessage;
         const smoothed = smoothedPeakRef.current;
 
         const peakValues: number[] = [];
@@ -155,7 +140,9 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       };
     };
 
-    setup();
+    setup().catch((err) => {
+      console.warn('[waveform-playlist] Failed to set up output meter:', String(err));
+    });
 
     return () => {
       isMounted = false;
@@ -165,14 +152,14 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
         try {
           const context = getGlobalContext();
           context.destination.chain();
-        } catch {
-          console.warn('[waveform-playlist] Failed to restore destination chain');
+        } catch (err) {
+          console.warn('[waveform-playlist] Failed to restore destination chain:', String(err));
         }
         try {
           workletNodeRef.current.disconnect();
           workletNodeRef.current.port.close();
-        } catch {
-          // Ignore disconnect errors
+        } catch (err) {
+          console.warn('[waveform-playlist] Output meter disconnect during cleanup:', String(err));
         }
         workletNodeRef.current = null;
       }

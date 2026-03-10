@@ -291,13 +291,14 @@ For WAV file export, use the `useExportWav` hook or `ExportWavButton` component 
 Display real-time input levels. Pass `channelCount: 2` to monitor stereo inputs:
 
 ```tsx
-import { useMicrophoneLevel } from '@waveform-playlist/recording';
+import { useMicrophoneAccess, useMicrophoneLevel } from '@waveform-playlist/recording';
 
 function LevelMeter() {
-  const { levels, peakLevels } = useMicrophoneLevel({ channelCount: 2 });
+  const { stream } = useMicrophoneAccess();
+  const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
 
-  // levels: number[] (per-channel RMS levels, 0-1)
-  // peakLevels: number[] (per-channel peak levels with decay, 0-1)
+  // levels: number[] (per-channel peak levels, 0-1)
+  // peakLevels: number[] (per-channel held peak levels with decay, 0-1)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -337,8 +338,8 @@ For advanced metering including output meters and custom visualizations, see the
 Warn users when audio is too loud:
 
 ```tsx
-function ClippingIndicator() {
-  const { peakLevels } = useMicrophoneLevel();
+function ClippingIndicator({ stream }: { stream: MediaStream | null }) {
+  const { peakLevels } = useMicrophoneLevel(stream);
   const isClipping = peakLevels.some((peak) => peak > 0.95);
 
   return (
