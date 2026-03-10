@@ -1,13 +1,14 @@
 /**
  * Hook for monitoring microphone input levels
  *
- * Uses Tone.js Analyser for real-time audio level monitoring.
- * Computes both true peak and RMS from raw waveform data.
+ * Uses an AudioWorklet-based meter processor for sample-accurate
+ * peak and RMS metering without requestAnimationFrame overhead.
  */
 
 import { useEffect, useState, useRef } from 'react';
-import { Analyser, getContext, connect } from 'tone';
+import { getContext } from 'tone';
 import { dBToNormalized } from '@waveform-playlist/core';
+import { meterProcessorUrl } from '@waveform-playlist/worklets';
 
 /** Peak decay constant — matches openDAW's 250ms exponential decay */
 const PEAK_DECAY = 0.98;
@@ -23,6 +24,9 @@ export interface UseMicrophoneLevelOptions {
    * Smoothing time constant (0-1)
    * Higher values = smoother but slower response
    * Default: 0.8
+   *
+   * @deprecated No longer used internally (worklet handles its own timing).
+   * Kept for backwards compatibility.
    */
   smoothingTimeConstant?: number;
 
@@ -72,29 +76,6 @@ export interface UseMicrophoneLevelReturn {
 }
 
 /**
- * Compute true peak (max absolute value) from a Float32Array of samples.
- */
-function computePeak(samples: Float32Array): number {
-  let max = 0;
-  for (let i = 0; i < samples.length; i++) {
-    const abs = Math.abs(samples[i]);
-    if (abs > max) max = abs;
-  }
-  return max;
-}
-
-/**
- * Compute RMS (root mean square) from a Float32Array of samples.
- */
-function computeRms(samples: Float32Array): number {
-  let sum = 0;
-  for (let i = 0; i < samples.length; i++) {
-    sum += samples[i] * samples[i];
-  }
-  return Math.sqrt(sum / samples.length);
-}
-
-/**
  * Convert a linear gain value (0-1+) to normalized 0-1 via dB.
  * Uses gainToDb then dBToNormalized for consistent mapping.
  */
@@ -123,16 +104,14 @@ export function useMicrophoneLevel(
   stream: MediaStream | null,
   options: UseMicrophoneLevelOptions = {}
 ): UseMicrophoneLevelReturn {
-  const { updateRate = 60, smoothingTimeConstant = 0.8, channelCount = 1 } = options;
+  const { updateRate = 60, channelCount = 1 } = options;
 
   const [levels, setLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
   const [peakLevels, setPeakLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
   const [rmsLevels, setRmsLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
 
-  const analyserRef = useRef<Analyser | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  // Track smoothed peak per channel for decay between frames
   const smoothedPeakRef = useRef<number[]>(new Array(channelCount).fill(0));
 
   const resetPeak = () => setPeakLevels(new Array(channelCount).fill(0));
@@ -148,108 +127,83 @@ export function useMicrophoneLevel(
 
     let isMounted = true;
 
-    // Setup audio monitoring
     const setupMonitoring = async () => {
       if (!isMounted) return;
 
-      // Get Tone's context and resume if needed
       const context = getContext();
       if (context.state === 'suspended') {
         await context.resume();
       }
-
       if (!isMounted) return;
+
+      const rawContext = context.rawContext as AudioContext;
 
       // Auto-detect actual mic channel count from stream
       const trackSettings = stream.getAudioTracks()[0]?.getSettings();
       const actualChannels = trackSettings?.channelCount ?? channelCount;
 
-      // Create Tone.js Analyser for raw waveform data
-      const analyser = new Analyser({
-        context,
-        size: 256,
-        type: 'waveform',
-        channels: actualChannels,
-        smoothing: smoothingTimeConstant,
+      // Load the meter worklet module (idempotent — browser ignores duplicate addModule)
+      await rawContext.audioWorklet.addModule(meterProcessorUrl);
+      if (!isMounted) return;
+
+      // Create the meter worklet node
+      const workletNode = new AudioWorkletNode(rawContext, 'meter-processor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        channelCount: actualChannels,
+        channelCountMode: 'explicit',
+        processorOptions: {
+          numberOfChannels: actualChannels,
+          updateRate,
+        },
       });
-      analyserRef.current = analyser;
+      workletNodeRef.current = workletNode;
 
-      // Create MediaStreamSource from the SAME context as the analyser
-      // Note: This creates a separate source from useRecording, but that's OK
-      // since we're only using it for level monitoring (not recording)
-      const source = context.createMediaStreamSource(stream);
+      // Create source and connect: source → meter
+      // Don't connect output to destination — mic monitoring would cause feedback
+      const source = rawContext.createMediaStreamSource(stream);
       sourceRef.current = source;
-
-      // Connect source to analyser using Tone's connect function
-      connect(source, analyser);
+      source.connect(workletNode);
 
       smoothedPeakRef.current = new Array(actualChannels).fill(0);
 
-      // Start level monitoring
-      const updateInterval = 1000 / updateRate;
-      let lastUpdateTime = 0;
+      // Listen for meter data from worklet
+      workletNode.port.onmessage = (event: MessageEvent) => {
+        if (!isMounted) return;
 
-      const updateLevel = (timestamp: number) => {
-        if (!isMounted || !analyserRef.current) return;
+        const { peak, rms } = event.data as { peak: number[]; rms: number[] };
+        const smoothed = smoothedPeakRef.current;
 
-        if (timestamp - lastUpdateTime >= updateInterval) {
-          lastUpdateTime = timestamp;
+        const peakValues: number[] = [];
+        const rmsValues: number[] = [];
 
-          const rawValues = analyserRef.current.getValue();
-
-          // Normalize to array of Float32Arrays (single channel returns Float32Array directly)
-          const channelData: Float32Array[] =
-            rawValues instanceof Float32Array ? [rawValues] : (rawValues as Float32Array[]);
-
-          const peakValues: number[] = [];
-          const rmsValues: number[] = [];
-          const smoothed = smoothedPeakRef.current;
-
-          for (let ch = 0; ch < channelData.length; ch++) {
-            const samples = channelData[ch];
-            const peak = computePeak(samples);
-            const rms = computeRms(samples);
-
-            // Smoothed peak: jump up instantly, decay slowly
-            smoothed[ch] = Math.max(peak, (smoothed[ch] ?? 0) * PEAK_DECAY);
-
-            peakValues.push(gainToNormalized(smoothed[ch]));
-            rmsValues.push(gainToNormalized(rms));
-          }
-
-          // Mirror mono to fill requested channelCount
-          const mirroredPeaks =
-            channelData.length < channelCount
-              ? new Array(channelCount).fill(peakValues[0])
-              : peakValues;
-          const mirroredRms =
-            channelData.length < channelCount
-              ? new Array(channelCount).fill(rmsValues[0])
-              : rmsValues;
-
-          setLevels(mirroredPeaks);
-          setRmsLevels(mirroredRms);
-          setPeakLevels((prev) => mirroredPeaks.map((val, i) => Math.max(prev[i] ?? 0, val)));
+        for (let ch = 0; ch < peak.length; ch++) {
+          smoothed[ch] = Math.max(peak[ch], (smoothed[ch] ?? 0) * PEAK_DECAY);
+          peakValues.push(gainToNormalized(smoothed[ch]));
+          rmsValues.push(gainToNormalized(rms[ch]));
         }
 
-        animationFrameRef.current = requestAnimationFrame(updateLevel);
-      };
+        // Mirror mono to fill requested channelCount
+        const mirroredPeaks =
+          peak.length < channelCount
+            ? new Array(channelCount).fill(peakValues[0])
+            : peakValues;
+        const mirroredRms =
+          peak.length < channelCount
+            ? new Array(channelCount).fill(rmsValues[0])
+            : rmsValues;
 
-      animationFrameRef.current = requestAnimationFrame(updateLevel);
+        setLevels(mirroredPeaks);
+        setRmsLevels(mirroredRms);
+        setPeakLevels((prev) => mirroredPeaks.map((val, i) => Math.max(prev[i] ?? 0, val)));
+      };
     };
 
     setupMonitoring();
 
-    // Cleanup
     return () => {
       isMounted = false;
 
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-
-      // Disconnect and clean up
       if (sourceRef.current) {
         try {
           sourceRef.current.disconnect();
@@ -259,12 +213,17 @@ export function useMicrophoneLevel(
         sourceRef.current = null;
       }
 
-      if (analyserRef.current) {
-        analyserRef.current.dispose();
-        analyserRef.current = null;
+      if (workletNodeRef.current) {
+        try {
+          workletNodeRef.current.disconnect();
+          workletNodeRef.current.port.close();
+        } catch {
+          // Ignore disconnect errors
+        }
+        workletNodeRef.current = null;
       }
     };
-  }, [stream, smoothingTimeConstant, updateRate, channelCount]);
+  }, [stream, updateRate, channelCount]);
 
   // Backwards-compatible scalar values
   const level = channelCount === 1 ? (levels[0] ?? 0) : Math.max(...levels);
