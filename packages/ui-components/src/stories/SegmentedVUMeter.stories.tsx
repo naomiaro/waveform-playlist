@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { ThemeProvider } from 'styled-components';
 import { defaultTheme } from '../wfpl-theme';
 import { SegmentedVUMeter } from '../components/SegmentedVUMeter';
@@ -197,42 +197,6 @@ export const CustomColors: StoryObj = {
   },
 };
 
-const AnimatedMeterDemo: React.FC = () => {
-  const [levels, setLevels] = useState([0.3, 0.3]);
-  const [peakLevels, setPeakLevels] = useState([0.3, 0.3]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLevels((prev) => {
-        const walk = (v: number) => {
-          const delta = (Math.random() - 0.5) * 0.15;
-          return Math.max(0.01, Math.min(0.95, v + delta));
-        };
-        return prev.map(walk);
-      });
-      setPeakLevels((prev) =>
-        prev.map((peak) => {
-          const simulated = 0.2 + Math.random() * 0.6;
-          return simulated > peak ? simulated : peak * 0.995;
-        })
-      );
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
-};
-
-export const Animated: StoryObj = {
-  name: 'Animated',
-  render: () => <AnimatedMeterDemo />,
-  parameters: {
-    docs: {
-      description: { story: 'Simulated real-time levels using a random walk with peak decay.' },
-    },
-  },
-};
 
 export const CompactSize: StoryWithLevels = {
   name: 'Compact Size',
