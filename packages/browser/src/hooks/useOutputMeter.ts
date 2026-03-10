@@ -1,20 +1,20 @@
 /**
  * Hook for monitoring master output levels
  *
- * Connects a Tone.js Analyser to the Destination node for real-time
- * output level monitoring. Computes both true peak and RMS from raw
- * waveform data.
+ * Connects an AudioWorklet meter processor to the Destination node for
+ * real-time output level monitoring. Computes sample-accurate peak and
+ * RMS via the meter worklet — no transient is missed.
  *
- * IMPORTANT: Uses getGlobalContext() from playout to ensure the analyser
+ * IMPORTANT: Uses getGlobalContext() from playout to ensure the meter
  * is created on the same AudioContext as the audio engine. Tone.js's
  * getContext()/getDestination() return the DEFAULT context, which is
  * replaced when getGlobalContext() calls setContext() on first audio init.
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Analyser } from 'tone';
 import { getGlobalContext } from '@waveform-playlist/playout';
 import { dBToNormalized } from '@waveform-playlist/core';
+import { meterProcessorUrl } from '@waveform-playlist/worklets';
 
 /** Peak decay constant — matches openDAW's 250ms exponential decay */
 const PEAK_DECAY = 0.98;
@@ -30,6 +30,9 @@ export interface UseOutputMeterOptions {
    * Smoothing time constant (0-1).
    * Higher values = smoother but slower response.
    * Default: 0.8
+   *
+   * @deprecated No longer used internally (worklet handles its own timing).
+   * Kept for backwards compatibility.
    */
   smoothingTimeConstant?: number;
 
@@ -52,29 +55,6 @@ export interface UseOutputMeterReturn {
 }
 
 /**
- * Compute true peak (max absolute value) from a Float32Array of samples.
- */
-function computePeak(samples: Float32Array): number {
-  let max = 0;
-  for (let i = 0; i < samples.length; i++) {
-    const abs = Math.abs(samples[i]);
-    if (abs > max) max = abs;
-  }
-  return max;
-}
-
-/**
- * Compute RMS (root mean square) from a Float32Array of samples.
- */
-function computeRms(samples: Float32Array): number {
-  let sum = 0;
-  for (let i = 0; i < samples.length; i++) {
-    sum += samples[i] * samples[i];
-  }
-  return Math.sqrt(sum / samples.length);
-}
-
-/**
  * Convert a linear gain value (0-1+) to normalized 0-1 via dB.
  */
 function gainToNormalized(gain: number): number {
@@ -84,14 +64,13 @@ function gainToNormalized(gain: number): number {
 }
 
 export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMeterReturn {
-  const { channelCount = 2, smoothingTimeConstant = 0.8, updateRate = 60 } = options;
+  const { channelCount = 2, updateRate = 60 } = options;
 
   const [levels, setLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
   const [peakLevels, setPeakLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
   const [rmsLevels, setRmsLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
 
-  const analyserRef = useRef<Analyser | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const smoothedPeakRef = useRef<number[]>(new Array(channelCount).fill(0));
 
   const resetPeak = useCallback(
@@ -102,89 +81,81 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
   useEffect(() => {
     let isMounted = true;
 
-    // Use getGlobalContext() to ensure we're on the SAME context as the audio engine.
-    const context = getGlobalContext();
+    const setup = async () => {
+      // Use getGlobalContext() to ensure we're on the SAME context as the audio engine.
+      const context = getGlobalContext();
+      const rawContext = context.rawContext as AudioContext;
 
-    // Create Analyser for raw waveform data on the global context
-    const analyser = new Analyser({
-      context,
-      size: 256,
-      type: 'waveform',
-      channels: channelCount,
-      smoothing: smoothingTimeConstant,
-    });
-    analyserRef.current = analyser;
+      // Load the meter worklet module (idempotent — browser ignores duplicate addModule)
+      await rawContext.audioWorklet.addModule(meterProcessorUrl);
+      if (!isMounted) return;
 
-    // Insert Analyser into Destination's internal chain using the official chain() API.
-    // Destination.chain(analyser) routes: Volume → Analyser → Gain → rawContext.destination.
-    // Analyser is a pass-through so audio is unaffected.
-    const destination = context.destination;
-    destination.chain(analyser);
+      // Create the meter worklet node
+      const workletNode = new AudioWorkletNode(rawContext, 'meter-processor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        channelCount,
+        channelCountMode: 'explicit',
+        processorOptions: {
+          numberOfChannels: channelCount,
+          updateRate,
+        },
+      });
+      workletNodeRef.current = workletNode;
 
-    smoothedPeakRef.current = new Array(channelCount).fill(0);
+      // Insert as pass-through in destination chain:
+      // Volume → WorkletNode → Gain → rawContext.destination
+      const destination = context.destination;
+      destination.chain(workletNode);
 
-    // Start level monitoring
-    const updateInterval = 1000 / updateRate;
-    let lastUpdateTime = 0;
+      smoothedPeakRef.current = new Array(channelCount).fill(0);
 
-    const updateLevel = (timestamp: number) => {
-      if (!isMounted || !analyserRef.current) return;
+      // Listen for meter data from worklet
+      workletNode.port.onmessage = (event: MessageEvent) => {
+        if (!isMounted) return;
 
-      if (timestamp - lastUpdateTime >= updateInterval) {
-        lastUpdateTime = timestamp;
-
-        const rawValues = analyserRef.current.getValue();
-
-        // Normalize to array of Float32Arrays
-        const channelData: Float32Array[] =
-          rawValues instanceof Float32Array ? [rawValues] : (rawValues as Float32Array[]);
+        const { peak, rms } = event.data as { peak: number[]; rms: number[] };
+        const smoothed = smoothedPeakRef.current;
 
         const peakValues: number[] = [];
         const rmsValues: number[] = [];
-        const smoothed = smoothedPeakRef.current;
 
-        for (let ch = 0; ch < channelData.length; ch++) {
-          const samples = channelData[ch];
-          const peak = computePeak(samples);
-          const rms = computeRms(samples);
-
+        for (let ch = 0; ch < peak.length; ch++) {
           // Smoothed peak: jump up instantly, decay slowly
-          smoothed[ch] = Math.max(peak, (smoothed[ch] ?? 0) * PEAK_DECAY);
-
+          smoothed[ch] = Math.max(peak[ch], (smoothed[ch] ?? 0) * PEAK_DECAY);
           peakValues.push(gainToNormalized(smoothed[ch]));
-          rmsValues.push(gainToNormalized(rms));
+          rmsValues.push(gainToNormalized(rms[ch]));
         }
 
         setLevels(peakValues);
         setRmsLevels(rmsValues);
         setPeakLevels((prev) => peakValues.map((val, i) => Math.max(prev[i] ?? 0, val)));
-      }
-
-      animationFrameRef.current = requestAnimationFrame(updateLevel);
+      };
     };
 
-    animationFrameRef.current = requestAnimationFrame(updateLevel);
+    setup();
 
     return () => {
       isMounted = false;
 
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-
-      if (analyserRef.current) {
-        // Restore default chain: Volume → Gain (removes analyser from path)
+      if (workletNodeRef.current) {
+        // Restore default chain: Volume → Gain (removes worklet from path)
         try {
-          destination.chain();
+          const context = getGlobalContext();
+          context.destination.chain();
         } catch {
           console.warn('[waveform-playlist] Failed to restore destination chain');
         }
-        analyserRef.current.dispose();
-        analyserRef.current = null;
+        try {
+          workletNodeRef.current.disconnect();
+          workletNodeRef.current.port.close();
+        } catch {
+          // Ignore disconnect errors
+        }
+        workletNodeRef.current = null;
       }
     };
-  }, [channelCount, smoothingTimeConstant, updateRate]);
+  }, [channelCount, updateRate]);
 
   return { levels, peakLevels, rmsLevels, resetPeak };
 }
