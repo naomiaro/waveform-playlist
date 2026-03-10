@@ -59,7 +59,7 @@ import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 | `channelLabels` | `string[]` | Auto | Labels per channel (auto: M, L/R, 1/2/3...) |
 | `orientation` | `'vertical' \| 'horizontal'` | `'vertical'` | Meter orientation |
 | `segmentCount` | `number` | `24` | Number of LED segments |
-| `dBRange` | `[number, number]` | `[-50, 0]` | dB scale range |
+| `dBRange` | `[number, number]` | `[-50, 5]` | dB scale range (supports above 0 dB for output meters) |
 | `showScale` | `boolean` | `true` | Show dB scale labels |
 | `colorStops` | `ColorStop[]` | Built-in | Custom color scheme |
 | `segmentWidth` | `number` | `20` | Segment width in pixels |
@@ -217,8 +217,8 @@ Override the default color stops with your own:
 />
 ```
 
-:::caution
-All color stop dB values must be ≤ 0. Web Audio `AnalyserNode` values are normalized to `[0, 1]`, which maps to `[-100, 0]` dB. Color stops above 0 dB will never light up.
+:::tip
+The default `dBRange` is `[-50, 5]`, allowing above-0 dB display for output meters where mixed tracks can exceed 0 dB. Microphone input is clamped to 0 dB by the audio driver, so input meters won't show above-0 values. The default color stops include a +2 dB "over" indicator in bright red.
 :::
 
 ### Colored Inactive Segments
@@ -248,7 +248,7 @@ By default, inactive segments are a flat dark color. Enable `coloredInactive` to
   segmentCount={16}
   segmentWidth={30}
   segmentHeight={6}
-  dBRange={[-60, 0]}
+  dBRange={[-60, 5]}
   showScale={false}
 />
 ```

@@ -218,4 +218,4 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 
 ## SegmentedVUMeter Color Stops
 
-**Gotcha:** `normalizedToDb` maps `[0, 1]` → `[floor, 0]` dB. Web Audio AnalyserNode never exceeds 0 dB, so all default color stops must be ≤ 0 dB. The `dBRange` default is `[-50, 0]`. Color stops above 0 dB are unreachable and will never light up.
+**Above-0 dB support:** `dBRange` defaults to `[-50, 5]`. Output meters can exceed 0 dB when mixed tracks sum hot. Input meters (microphone) are clamped to 0 dB by the audio driver. Default color stops include `{ dB: 2, color: '#ff0000' }` as an "over" indicator for output signals. Red zone starts at -1 dB.

@@ -14,8 +14,8 @@ describe('dBToNormalized', () => {
   it('clamps below floor to 0', () => {
     expect(dBToNormalized(-120)).toBe(0);
   });
-  it('clamps above 0 dB to 1', () => {
-    expect(dBToNormalized(5)).toBe(1);
+  it('maps above 0 dB to values > 1', () => {
+    expect(dBToNormalized(5)).toBe(1.05);
   });
   it('handles -Infinity as 0', () => {
     expect(dBToNormalized(-Infinity)).toBe(0);
@@ -44,8 +44,8 @@ describe('normalizedToDb', () => {
     expect(normalizedToDb(0, -60)).toBe(-60);
     expect(normalizedToDb(0.5, -60)).toBe(-30);
   });
-  it('clamps values above 1 to 0 dB', () => {
-    expect(normalizedToDb(2)).toBe(0);
+  it('maps values above 1 to positive dB', () => {
+    expect(normalizedToDb(1.05)).toBe(5);
   });
   it('clamps values below 0 to floor', () => {
     expect(normalizedToDb(-1)).toBe(-100);
@@ -53,11 +53,15 @@ describe('normalizedToDb', () => {
   it('handles NaN as floor', () => {
     expect(normalizedToDb(NaN)).toBe(-100);
   });
-  it('handles Infinity as 0 dB', () => {
+  it('handles Infinity as floor', () => {
     expect(normalizedToDb(Infinity)).toBe(-100);
   });
   it('round-trips with dBToNormalized', () => {
     const original = -42;
+    expect(normalizedToDb(dBToNormalized(original))).toBeCloseTo(original, 10);
+  });
+  it('round-trips above 0 dB', () => {
+    const original = 3;
     expect(normalizedToDb(dBToNormalized(original))).toBeCloseTo(original, 10);
   });
 });

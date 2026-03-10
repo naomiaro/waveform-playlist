@@ -152,8 +152,8 @@ export const CustomColors: StoryObj = {
       levels={[0.7, 0.5]}
       peakLevels={[0.85, 0.65]}
       colorStops={[
-        { dB: -1, color: '#ff0055' },
-        { dB: -3, color: '#ff6600' },
+        { dB: 2, color: '#ff0055' },
+        { dB: 0, color: '#ff3300' },
         { dB: -6, color: '#ffcc00' },
         { dB: -12, color: '#00ff88' },
         { dB: -25, color: '#00ccff' },

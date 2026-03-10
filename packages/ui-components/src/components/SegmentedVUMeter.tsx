@@ -24,6 +24,7 @@ export interface SegmentedVUMeterProps {
 }
 
 const DEFAULT_COLOR_STOPS: ColorStop[] = [
+  { dB: 2, color: '#ff0000' },
   { dB: -1, color: '#e74c3c' },
   { dB: -3, color: '#e67e22' },
   { dB: -6, color: '#f1c40f' },
@@ -213,7 +214,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   channelLabels,
   orientation = 'vertical',
   segmentCount = 24,
-  dBRange = [-50, 0],
+  dBRange = [-50, 5],
   showScale = true,
   colorStops = DEFAULT_COLOR_STOPS,
   segmentWidth = 20,
