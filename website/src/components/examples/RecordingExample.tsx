@@ -322,6 +322,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                 segmentWidth={14}
                 segmentHeight={4}
                 segmentGap={1}
+                dBRange={[-50, 0]}
                 coloredInactive
                 labelColor="var(--gray-9)"
               />
