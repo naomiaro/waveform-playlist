@@ -70,6 +70,7 @@ export interface WaveformPlaylistTheme {
   selectedWaveOutlineColor: WaveformColor;
   selectedWaveFillColor: WaveformColor;
   selectedTrackControlsBackground: string;
+  selectedTrackBackground: string;
 
   // Timescale colors
   timeColor: string;
@@ -154,6 +155,7 @@ export const defaultTheme: WaveformPlaylistTheme = {
   selectedWaveOutlineColor: '#ffffff',
   selectedWaveFillColor: '#00b4d8', // Selected: brighter cyan
   selectedTrackControlsBackground: '#d9e9ff', // Light blue background for selected track controls
+  selectedTrackBackground: '#e8f0fe', // Light blue tint for selected track waveform area
   timeColor: '#000',
   timescaleBackgroundColor: '#fff',
   playheadColor: '#f00',
@@ -227,6 +229,7 @@ export const darkTheme: WaveformPlaylistTheme = {
   selectedWaveFillColor: '#241c14', // Slightly lighter warm brown bars when selected
   selectedWaveOutlineColor: '#e8c090', // Brighter amber background when selected
   selectedTrackControlsBackground: '#2a2218', // Dark warm brown for selected track controls
+  selectedTrackBackground: '#e8c090', // Amber for selected track waveform area (matches selected clip)
   timeColor: '#d8c0a8', // Warm amber for timescale text
   timescaleBackgroundColor: '#1a1612', // Dark warm brown background
   playheadColor: '#3a8838', // Darker Ampelmännchen green playhead

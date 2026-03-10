@@ -18,9 +18,8 @@ import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-pl
 import {
   WaveformPlaylistProvider,
   Waveform,
-  PlayButton,
-  PauseButton,
-  StopButton,
+  // PlayButton, PauseButton, StopButton omitted — recording example uses
+  // custom versions that are disabled during recording
   AudioPosition,
   ExportWavButton,
   ClipInteractionProvider,
@@ -32,7 +31,14 @@ import {
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
-import { RecordButton, MicrophoneSelector } from './RecordingControls';
+import {
+  RecordButton,
+  TransportPlayButton,
+  TransportPauseButton,
+  TransportStopButton,
+  RewindButton,
+  MicrophoneSelector,
+} from './RecordingControls';
 import { SegmentedVUMeter, BaseControlButton } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { MicrophoneIcon, SpeakerHighIcon } from '@phosphor-icons/react';
@@ -133,15 +139,28 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   setSelectedTrackId,
   onAddTrack,
 }) => {
-  const { currentTime, isPlaying } = usePlaybackAnimation();
+  const { currentTime, isPlaying, currentTimeRef } = usePlaybackAnimation();
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
-  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop } = usePlaylistControls();
-  const { isAutomaticScroll } = usePlaylistState();
+  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause } = usePlaylistControls();
+  const {
+    isAutomaticScroll,
+    selectionStart,
+    selectionEnd,
+    isLoopEnabled,
+    selectedTrackId: providerSelectedTrackId,
+  } = usePlaylistState();
 
-  // Sync provider's selectedTrackId with local state
+  // Sync local → provider when local state changes (e.g. auto-create track)
   useEffect(() => {
     setProviderSelectedTrackId(selectedTrackId);
   }, [selectedTrackId, setProviderSelectedTrackId]);
+
+  // Sync provider → local when user clicks a track in the waveform area
+  useEffect(() => {
+    if (providerSelectedTrackId !== selectedTrackId) {
+      setSelectedTrackId(providerSelectedTrackId);
+    }
+  }, [providerSelectedTrackId, selectedTrackId, setSelectedTrackId]);
 
   // Flag to auto-start recording after creating a new track
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false);
@@ -214,6 +233,31 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       startRecordingWithPlayback();
     }
   }, [shouldAutoStartRecording, selectedTrackId, startRecordingWithPlayback]);
+
+  // Rewind to start
+  const handleRewind = useCallback(() => {
+    stop();
+    play(0, 0); // seek to 0
+  }, [stop, play]);
+
+  // Play with selection/loop awareness (mirrors PlayButton logic)
+  const handlePlay = useCallback(async () => {
+    const hasSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;
+    if (hasSelection && !isLoopEnabled) {
+      const duration = selectionEnd - selectionStart;
+      await play(selectionStart, duration);
+    } else {
+      await play(currentTimeRef.current ?? 0);
+    }
+  }, [selectionStart, selectionEnd, isLoopEnabled, play, currentTimeRef]);
+
+  // Stop both playback and recording
+  const handleStop = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    }
+    stop();
+  }, [isRecording, stopRecording, stop]);
 
   const handleRecordClick = () => {
     if (isRecording) return;
@@ -374,14 +418,15 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       <Toolbar>
         {/* Transport */}
         <ToolbarSection>
+          <RewindButton onClick={handleRewind} disabled={isRecording} />
+          <TransportPlayButton onClick={handlePlay} disabled={isPlaying || isRecording} active={isPlaying} />
           <RecordButton
             isRecording={isRecording}
             onClick={handleRecordClick}
             disabled={!hasPermission}
           />
-          <PlayButton />
-          <PauseButton />
-          <StopButton />
+          <TransportPauseButton onClick={pause} disabled={!isPlaying} />
+          <TransportStopButton onClick={handleStop} disabled={!isPlaying && !isRecording} />
         </ToolbarSection>
 
         {/* Mic selector */}

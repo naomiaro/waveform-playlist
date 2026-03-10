@@ -6,11 +6,112 @@
  */
 
 import React from 'react';
-import styled from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
 import type { MicrophoneDevice } from '@waveform-playlist/recording';
 import { BaseSelectSmall } from '@waveform-playlist/ui-components';
+import {
+  Play as PlayIcon,
+  Pause as PauseIcon,
+  Stop as StopIcon,
+  Record as RecordIcon,
+  SkipBack as SkipBackIcon,
+} from '@phosphor-icons/react';
 
-// --- RecordButton ---
+// --- Transport Buttons (icon-only, Audacity-style) ---
+
+const ICON_SIZE = 18;
+
+const TransportButton = styled.button<{ $active?: boolean; $danger?: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--gray-5);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--gray-11);
+  background: var(--gray-2);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+  ${(props) =>
+    props.$active &&
+    css`
+      background: var(--gray-4);
+      border-color: var(--gray-7);
+    `}
+
+  ${(props) =>
+    props.$danger &&
+    css`
+      color: #dc3545;
+    `}
+
+  &:hover:not(:disabled) {
+    background: var(--gray-4);
+    border-color: var(--gray-7);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--gray-5);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-8);
+    outline-offset: 1px;
+  }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+`;
+
+const RecordCircle = styled.span<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: ${(props) => (props.$active ? css`${pulse} 1.5s ease-in-out infinite` : 'none')};
+`;
+
+export interface TransportButtonProps {
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+export const RewindButton: React.FC<TransportButtonProps> = ({ onClick, disabled }) => (
+  <TransportButton onClick={onClick} disabled={disabled} aria-label="Rewind to start" title="Rewind to start">
+    <SkipBackIcon size={ICON_SIZE} weight="fill" />
+  </TransportButton>
+);
+
+export const TransportPlayButton: React.FC<TransportButtonProps & { active?: boolean }> = ({
+  onClick,
+  disabled,
+  active,
+}) => (
+  <TransportButton onClick={onClick} disabled={disabled} $active={active} aria-label="Play" title="Play">
+    <PlayIcon size={ICON_SIZE} weight="fill" />
+  </TransportButton>
+);
+
+export const TransportPauseButton: React.FC<TransportButtonProps> = ({ onClick, disabled }) => (
+  <TransportButton onClick={onClick} disabled={disabled} aria-label="Pause" title="Pause">
+    <PauseIcon size={ICON_SIZE} weight="fill" />
+  </TransportButton>
+);
+
+export const TransportStopButton: React.FC<TransportButtonProps> = ({ onClick, disabled }) => (
+  <TransportButton onClick={onClick} disabled={disabled} aria-label="Stop" title="Stop">
+    <StopIcon size={ICON_SIZE} weight="fill" />
+  </TransportButton>
+);
 
 export interface RecordButtonProps {
   isRecording: boolean;
@@ -18,72 +119,23 @@ export interface RecordButtonProps {
   disabled?: boolean;
 }
 
-const StyledButton = styled.button<{ $isRecording: boolean }>`
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  background: ${(props) => (props.$isRecording ? '#dc3545' : '#e74c3c')};
-  color: white;
-
-  &:hover:not(:disabled) {
-    background: ${(props) => (props.$isRecording ? '#c82333' : '#c0392b')};
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  &:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.3);
-  }
-`;
-
-const RecordDot = styled.span<{ $active: boolean }>`
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: white;
-  margin-right: 0.5rem;
-  animation: ${(props) => (props.$active ? 'pulse 1.5s ease-in-out infinite' : 'none')};
-
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.3;
-    }
-  }
-`;
-
 export const RecordButton: React.FC<RecordButtonProps> = ({
   isRecording,
   onClick,
   disabled = false,
 }) => (
-  <StyledButton
-    $isRecording={isRecording}
+  <TransportButton
     onClick={onClick}
     disabled={disabled || isRecording}
+    $active={isRecording}
+    $danger
     aria-label={isRecording ? 'Recording' : 'Start recording'}
+    title={isRecording ? 'Recording...' : 'Record (R)'}
   >
-    <RecordDot $active={isRecording} />
-    Record
-  </StyledButton>
+    <RecordCircle $active={isRecording}>
+      <RecordIcon size={ICON_SIZE} weight="fill" />
+    </RecordCircle>
+  </TransportButton>
 );
 
 // --- RecordingIndicator ---

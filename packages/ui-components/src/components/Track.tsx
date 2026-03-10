@@ -25,6 +25,7 @@ const Container = styled.div.attrs<ContainerWithHeaderProps>((props) => ({
 interface ChannelContainerProps {
   readonly $backgroundColor?: string;
   readonly $offset?: number;
+  readonly $isSelected?: boolean;
 }
 const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   style: {
@@ -32,7 +33,12 @@ const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
   },
 }))<ChannelContainerProps>`
   position: relative;
-  background: ${(props) => props.$backgroundColor || 'transparent'};
+  background: ${(props) => {
+    if (props.$isSelected) {
+      return props.theme.selectedTrackBackground || props.$backgroundColor || 'transparent';
+    }
+    return props.$backgroundColor || 'transparent';
+  }};
   height: 100%;
 `;
 
@@ -59,7 +65,7 @@ export const Track: FunctionComponent<TrackProps> = ({
   hasClipHeaders = false,
   onClick,
   trackId,
-  isSelected: _isSelected = false,
+  isSelected = false,
 }) => {
   const { waveHeight } = usePlaylistInfo();
   return (
@@ -73,6 +79,7 @@ export const Track: FunctionComponent<TrackProps> = ({
       <ChannelContainer
         $backgroundColor={backgroundColor}
         $offset={offset}
+        $isSelected={isSelected}
         onClick={onClick}
         data-track-id={trackId}
       >
