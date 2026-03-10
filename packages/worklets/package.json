@@ -1,0 +1,41 @@
+{
+  "name": "@waveform-playlist/worklets",
+  "version": "9.5.2",
+  "description": "AudioWorklet processors for waveform-playlist (metering, recording)",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["waveform", "audio", "audioworklet", "metering", "waveform-playlist"],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/worklets"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": ["dist", "README.md"],
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
+  }
+}
