@@ -83,6 +83,26 @@ export const StereoVertical: StoryWithLevels = {
   },
 };
 
+export const MonoVertical: StoryWithLevels = {
+  name: 'Mono Vertical',
+  argTypes: {
+    leftLevelDb: {
+      control: { type: 'range', min: -50, max: 5, step: 0.5 },
+      name: 'Level (dB)',
+    },
+    rightLevelDb: { table: { disable: true } },
+  },
+  args: {
+    leftLevelDb: -10,
+    showScale: true,
+  },
+  render: ({ leftLevelDb, ...props }) => (
+    <SegmentedVUMeter levels={[dBToNormalized(leftLevelDb)]} channelLabels={['M']} {...props} />
+  ),
+  parameters: {
+    docs: { description: { story: 'Single channel mono meter with "M" label.' } },
+  },
+};
 
 export const Horizontal: StoryWithLevels = {
   name: 'Horizontal',
