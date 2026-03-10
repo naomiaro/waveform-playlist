@@ -241,8 +241,10 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
       // Auto-calculate: ~35px per label at 9px monospace to prevent overlap
       labelCount = Math.max(2, Math.floor(totalSize / 35));
     } else {
-      // Auto-calculate: ~14px per label vertically (9px font + spacing)
-      labelCount = Math.max(2, Math.floor(totalSize / 14));
+      // Auto-calculate: use segment height as minimum spacing between labels
+      // (each segment is segmentTotalHeight px, labels need at least that much room)
+      const minLabelSpacing = Math.max(14, segmentTotalHeight * 2);
+      labelCount = Math.max(2, Math.floor(totalSize / minLabelSpacing));
     }
     const selected = selectScaleLabels(thresholds, labelCount);
     if (orientation === 'horizontal') {
