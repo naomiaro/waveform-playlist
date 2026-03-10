@@ -45,6 +45,19 @@ export function useRecording(
   const isRecordingRef = useRef<boolean>(false);
   const isPausedRef = useRef<boolean>(false);
 
+  // Shared duration update loop — starts a rAF loop that updates duration
+  // from performance.now(). Used by both startRecording and resumeRecording.
+  const startDurationLoop = useCallback(() => {
+    const tick = () => {
+      if (isRecordingRef.current && !isPausedRef.current) {
+        const elapsed = (performance.now() - startTimeRef.current) / 1000;
+        setDuration(elapsed);
+        animationFrameRef.current = requestAnimationFrame(tick);
+      }
+    };
+    tick();
+  }, []);
+
   // Load AudioWorklet module
   const loadWorklet = useCallback(async () => {
     // Skip if already loaded to prevent "already registered" error
@@ -164,21 +177,12 @@ export function useRecording(
       setIsRecording(true);
       setIsPaused(false);
       startTimeRef.current = performance.now();
-
-      // Start duration update loop
-      const updateDuration = () => {
-        if (isRecordingRef.current && !isPausedRef.current) {
-          const elapsed = (performance.now() - startTimeRef.current) / 1000;
-          setDuration(elapsed);
-          animationFrameRef.current = requestAnimationFrame(updateDuration);
-        }
-      };
-      updateDuration();
+      startDurationLoop();
     } catch (err) {
       console.error('Failed to start recording:', err);
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
     }
-  }, [stream, channelCount, samplesPerPixel, bits, loadWorklet]);
+  }, [stream, channelCount, samplesPerPixel, bits, loadWorklet, startDurationLoop]);
 
   // Stop recording
   const stopRecording = useCallback(async (): Promise<AudioBuffer | null> => {
@@ -264,17 +268,9 @@ export function useRecording(
       isPausedRef.current = false;
       setIsPaused(false);
       startTimeRef.current = performance.now() - duration * 1000;
-
-      const updateDuration = () => {
-        if (isRecordingRef.current && !isPausedRef.current) {
-          const elapsed = (performance.now() - startTimeRef.current) / 1000;
-          setDuration(elapsed);
-          animationFrameRef.current = requestAnimationFrame(updateDuration);
-        }
-      };
-      updateDuration();
+      startDurationLoop();
     }
-  }, [isRecording, isPaused, duration]);
+  }, [isRecording, isPaused, duration, startDurationLoop]);
 
   // Cleanup on unmount
   useEffect(() => {

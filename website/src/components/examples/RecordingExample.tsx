@@ -15,6 +15,7 @@ import styled from 'styled-components';
 import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -383,7 +384,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       const audioFiles = files.filter(file => file.type.startsWith('audio/'));
       if (audioFiles.length === 0) return;
 
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = getGlobalAudioContext();
 
       for (const file of audioFiles) {
         const arrayBuffer = await file.arrayBuffer();
@@ -594,7 +595,7 @@ export function RecordingExample() {
           samplesPerPixel={1024}
           zoomLevels={[256, 512, 1024, 2048, 4096]}
           waveHeight={100}
-          automaticScroll={true}
+          automaticScroll
           indefinitePlayback
           controls={{ show: true, width: 200 }}
           theme={theme}
