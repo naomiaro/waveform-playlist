@@ -142,7 +142,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 }) => {
   const { currentTime, isPlaying, currentTimeRef } = usePlaybackAnimation();
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
-  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause } = usePlaylistControls();
+  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause, seekTo } = usePlaylistControls();
   const {
     isAutomaticScroll,
     selectionStart,
@@ -226,8 +226,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // Rewind to start
   const handleRewind = useCallback(() => {
     stop();
-    play(0, 0); // seek to 0
-  }, [stop, play]);
+    seekTo(0);
+  }, [stop, seekTo]);
 
   // Play with selection/loop awareness (mirrors PlayButton logic)
   const handlePlay = useCallback(async () => {
@@ -570,7 +570,16 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 // Main component
 export function RecordingExample() {
   const { theme, isDarkMode: isDark } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const [tracks, setTracksRaw] = useState<ClipTrack[]>([]);
+  const setTracks = useCallback((newTracks: ClipTrack[] | ((prev: ClipTrack[]) => ClipTrack[])) => {
+    if (typeof newTracks === 'function') {
+      setTracksRaw(newTracks);
+    } else {
+      console.log('[RecordingExample] setTracks: ' + newTracks.length + ' tracks ' + newTracks.map(t => t.id + ':' + t.clips.length + 'clips').join(', '));
+      console.trace('[RecordingExample] setTracks trace');
+      setTracksRaw(newTracks);
+    }
+  }, []);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   const handleAddTrack = () => {
