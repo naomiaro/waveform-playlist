@@ -238,6 +238,9 @@ export interface WaveformPlaylistProviderProps {
    *  Use this during progressive loading to avoid rebuilding the engine for
    *  each track — flip to false when all tracks are ready for a single build. */
   deferEngineRebuild?: boolean;
+  /** Disable automatic stop when the cursor reaches the end of the longest
+   *  track. Useful for DAW-style recording beyond existing audio. */
+  indefinitePlayback?: boolean;
   children: ReactNode;
 }
 
@@ -262,10 +265,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   onTracksChange,
   soundFontCache,
   deferEngineRebuild = false,
+  indefinitePlayback = false,
   children,
 }) => {
   // Default progressBarWidth to barWidth + barGap (fills gaps)
   const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
+
+  // Ref for animation loop access (avoids adding prop to useCallback deps)
+  const indefinitePlaybackRef = useRef(indefinitePlayback);
+  indefinitePlaybackRef.current = indefinitePlayback;
 
   // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
   // create a new reference every render, which would trigger engine rebuild via
@@ -912,7 +920,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Transport.seconds auto-wraps at loop boundaries, so getPlaybackTime() returns
       // the correct position without manual detection here.
 
-      if (time >= duration) {
+      if (time >= duration && !indefinitePlaybackRef.current) {
         // Stop playback - inline to avoid circular dependency
         if (engineRef.current) {
           engineRef.current.stop();

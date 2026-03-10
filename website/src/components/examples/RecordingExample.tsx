@@ -199,32 +199,14 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   // Start recording and playback together (overdub)
   const startRecordingWithPlayback = useCallback(async () => {
-    // Reset auto-stop guard before starting — prevents stale wasPlayingRef=true
-    // from a previous session triggering auto-stop if play() causes a brief
-    // isPlaying flicker during engine rebuild
-    wasPlayingRef.current = false;
     recordStartTimeRef.current = currentTime;
     await startRecording();
     // Start playback from current position so user hears existing tracks
-    // Only play when there are actual clips — playing an empty playlist
-    // causes immediate stop, which triggers the auto-stop effect
     const hasClips = tracks.some(t => t.clips.length > 0);
     if (hasClips) {
       await play(currentTime);
     }
   }, [startRecording, play, currentTime, tracks.length]);
-
-  // Auto-stop recording when playback stops (user hit Stop button)
-  const wasPlayingRef = useRef(false);
-  useEffect(() => {
-    if (isPlaying) {
-      wasPlayingRef.current = true;
-    } else if (wasPlayingRef.current && isRecording) {
-      // Playback just stopped while recording — stop recording too
-      wasPlayingRef.current = false;
-      stopRecording();
-    }
-  }, [isPlaying, isRecording, stopRecording]);
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {
@@ -566,6 +548,7 @@ export function RecordingExample() {
           zoomLevels={[256, 512, 1024, 2048, 4096]}
           waveHeight={100}
           automaticScroll={true}
+          indefinitePlayback
           controls={{ show: true, width: 200 }}
           theme={theme}
           timescale
