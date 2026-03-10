@@ -136,22 +136,19 @@ export function useMicrophoneLevel(
       }
       if (!isMounted) return;
 
-      const rawContext = context.rawContext as AudioContext;
-
       // Auto-detect actual mic channel count from stream
       const trackSettings = stream.getAudioTracks()[0]?.getSettings();
       const actualChannels = trackSettings?.channelCount ?? channelCount;
 
-      // Load the meter worklet module (idempotent — browser ignores duplicate addModule)
-      await rawContext.audioWorklet.addModule(meterProcessorUrl);
+      // Use Tone.js's addAudioWorkletModule for cross-browser/bundler compatibility
+      await context.addAudioWorkletModule(meterProcessorUrl);
       if (!isMounted) return;
 
-      // Create the meter worklet node
-      const workletNode = new AudioWorkletNode(rawContext, 'meter-processor', {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
+      // Use Tone.js's createAudioWorkletNode — avoids rawContext identity issues
+      // in webpack-aliased environments (Docusaurus)
+      const workletNode = context.createAudioWorkletNode('meter-processor', {
         channelCount: actualChannels,
-        channelCountMode: 'explicit',
+        channelCountMode: 'explicit' as globalThis.ChannelCountMode,
         processorOptions: {
           numberOfChannels: actualChannels,
           updateRate,
@@ -161,7 +158,7 @@ export function useMicrophoneLevel(
 
       // Create source and connect: source → meter
       // Don't connect output to destination — mic monitoring would cause feedback
-      const source = rawContext.createMediaStreamSource(stream);
+      const source = context.createMediaStreamSource(stream);
       sourceRef.current = source;
       source.connect(workletNode);
 

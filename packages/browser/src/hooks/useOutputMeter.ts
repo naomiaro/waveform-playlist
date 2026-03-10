@@ -84,18 +84,16 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
     const setup = async () => {
       // Use getGlobalContext() to ensure we're on the SAME context as the audio engine.
       const context = getGlobalContext();
-      const rawContext = context.rawContext as AudioContext;
 
-      // Load the meter worklet module (idempotent — browser ignores duplicate addModule)
-      await rawContext.audioWorklet.addModule(meterProcessorUrl);
+      // Use Tone.js's addAudioWorkletModule for cross-browser/bundler compatibility
+      await context.addAudioWorkletModule(meterProcessorUrl);
       if (!isMounted) return;
 
-      // Create the meter worklet node
-      const workletNode = new AudioWorkletNode(rawContext, 'meter-processor', {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
+      // Use Tone.js's createAudioWorkletNode — avoids rawContext identity issues
+      // in webpack-aliased environments (Docusaurus)
+      const workletNode = context.createAudioWorkletNode('meter-processor', {
         channelCount,
-        channelCountMode: 'explicit',
+        channelCountMode: 'explicit' as globalThis.ChannelCountMode,
         processorOptions: {
           numberOfChannels: channelCount,
           updateRate,
