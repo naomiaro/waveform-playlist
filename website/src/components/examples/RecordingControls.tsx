@@ -86,7 +86,7 @@ export interface TransportButtonProps {
 }
 
 export const RewindButton: React.FC<TransportButtonProps> = ({ onClick, disabled }) => (
-  <TransportButton onClick={onClick} disabled={disabled} aria-label="Rewind to start" title="Rewind to start">
+  <TransportButton onClick={onClick} disabled={disabled} aria-label="Rewind to start" title="Rewind to start (0)">
     <SkipBackIcon size={ICON_SIZE} weight="fill" />
   </TransportButton>
 );
@@ -96,7 +96,7 @@ export const TransportPlayButton: React.FC<TransportButtonProps & { active?: boo
   disabled,
   active,
 }) => (
-  <TransportButton onClick={onClick} disabled={disabled} $active={active} aria-label="Play" title="Play">
+  <TransportButton onClick={onClick} disabled={disabled} $active={active} aria-label="Play" title="Play (Space)">
     <PlayIcon size={ICON_SIZE} weight="fill" />
   </TransportButton>
 );
@@ -108,7 +108,7 @@ export const TransportPauseButton: React.FC<TransportButtonProps> = ({ onClick, 
 );
 
 export const TransportStopButton: React.FC<TransportButtonProps> = ({ onClick, disabled }) => (
-  <TransportButton onClick={onClick} disabled={disabled} aria-label="Stop" title="Stop">
+  <TransportButton onClick={onClick} disabled={disabled} aria-label="Stop" title="Stop (Esc)">
     <StopIcon size={ICON_SIZE} weight="fill" />
   </TransportButton>
 );
@@ -130,7 +130,7 @@ export const RecordButton: React.FC<RecordButtonProps> = ({
     $active={isRecording}
     $danger
     aria-label={isRecording ? 'Recording' : 'Start recording'}
-    title={isRecording ? 'Recording...' : 'Record (R)'}
+    title={isRecording ? 'Recording...' : 'Record (R) / New track (Shift+R)'}
   >
     <RecordCircle $active={isRecording}>
       <RecordIcon size={ICON_SIZE} weight="fill" />
