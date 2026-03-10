@@ -140,8 +140,11 @@ export function useMicrophoneLevel(
       const trackSettings = stream.getAudioTracks()[0]?.getSettings();
       const actualChannels = trackSettings?.channelCount ?? channelCount;
 
-      // Use Tone.js's addAudioWorkletModule for cross-browser/bundler compatibility
-      await context.addAudioWorkletModule(meterProcessorUrl);
+      // Load worklet directly on rawContext — Tone.js's addAudioWorkletModule
+      // only loads ONE module per context (caches _workletPromise), silently
+      // skipping subsequent calls with different URLs.
+      const rawCtx = (context as any).rawContext as AudioContext;
+      await rawCtx.audioWorklet.addModule(meterProcessorUrl);
       if (!isMounted) return;
 
       // Use Tone.js's createAudioWorkletNode — avoids rawContext identity issues

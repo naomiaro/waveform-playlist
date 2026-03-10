@@ -19,7 +19,7 @@ const meta: Meta<typeof SegmentedVUMeter> = {
   decorators: [
     (Story) => (
       <ThemeProvider theme={defaultTheme}>
-        <div style={{ padding: '2rem', background: '#111' }}>
+        <div style={{ padding: '2rem' }}>
           <Story />
         </div>
       </ThemeProvider>
@@ -35,6 +35,7 @@ const meta: Meta<typeof SegmentedVUMeter> = {
     segmentGap: { control: { type: 'range', min: 0, max: 5, step: 1 } },
     showScale: { control: 'boolean' },
     coloredInactive: { control: 'boolean' },
+    labelColor: { control: 'color' },
     colorStops: { control: false },
   },
 };

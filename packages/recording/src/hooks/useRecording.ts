@@ -54,12 +54,12 @@ export function useRecording(
 
     try {
       const context = getContext();
-      // Load the worklet module
-      // Use a relative path that works when bundled
-      const workletUrl = recordingProcessorUrl;
-
-      // Use Tone's addAudioWorkletModule for cross-browser compatibility
-      await context.addAudioWorkletModule(workletUrl);
+      // Load the worklet module directly on the raw AudioContext.
+      // Tone.js's addAudioWorkletModule only loads ONE module per context
+      // (caches _workletPromise). If meter-processor was loaded first by
+      // useMicrophoneLevel, recording-processor is silently skipped.
+      const rawCtx = (context as any).rawContext as AudioContext;
+      await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
       workletLoadedRef.current = true;
     } catch (err) {
       console.error('Failed to load AudioWorklet module:', err);
@@ -88,25 +88,20 @@ export function useRecording(
       // Load worklet module
       await loadWorklet();
 
-      // Detect actual channel count from the stream's audio track settings.
-      // Falls back to the user-provided channelCount option.
-      const detectedChannelCount = stream.getAudioTracks()[0]?.getSettings().channelCount;
-      if (detectedChannelCount === undefined) {
-        console.warn(
-          `[waveform-playlist] Could not detect stream channel count, using fallback: ${channelCount}`
-        );
-      }
-      const streamChannelCount = detectedChannelCount ?? channelCount;
-
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
       const source = context.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
 
-      // Create AudioWorklet node — set channelCount to match the stream
+      // Use the stream track's actual channel count from getSettings().
+      // source.channelCount defaults to 2 per Web Audio spec (not the mic's
+      // real count). Fall back to user-provided channelCount if unavailable.
+      const streamChannelCount =
+        stream.getAudioTracks()[0]?.getSettings().channelCount ?? channelCount;
+
       const workletNode = context.createAudioWorkletNode('recording-processor', {
         channelCount: streamChannelCount,
-        channelCountMode: 'explicit',
+        channelCountMode: 'explicit' as globalThis.ChannelCountMode,
       });
       workletNodeRef.current = workletNode;
 

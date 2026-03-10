@@ -20,6 +20,8 @@ export interface SegmentedVUMeterProps {
   segmentHeight?: number;
   segmentGap?: number;
   coloredInactive?: boolean;
+  /** Color for scale labels and channel labels. Defaults to '#888'. */
+  labelColor?: string;
   className?: string;
 }
 
@@ -35,7 +37,7 @@ const DEFAULT_COLOR_STOPS: ColorStop[] = [
 ];
 
 const INACTIVE_OPACITY = 0.15;
-const INACTIVE_COLOR = '#2a2a3e';
+const INACTIVE_COLOR = 'rgba(128, 128, 128, 0.2)';
 const PEAK_COLOR = '#ffffff';
 
 function getDefaultLabels(channelCount: number): string[] {
@@ -68,9 +70,6 @@ function formatDbLabel(dB: number): string {
 const MeterContainer = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
   display: inline-flex;
   flex-direction: ${(props) => (props.$orientation === 'horizontal' ? 'column' : 'row')};
-  background: #1a1a2e;
-  padding: 12px;
-  border-radius: 6px;
   gap: 4px;
   font-family: 'Courier New', monospace;
 `;
@@ -120,8 +119,10 @@ const Segment = styled.div.attrs<SegmentStyleProps>((props) => ({
   border-radius: 1px;
 `;
 
-const ChannelLabel = styled.div`
-  color: #aaa;
+const DEFAULT_LABEL_COLOR = '#888';
+
+const ChannelLabel = styled.div<{ $labelColor: string }>`
+  color: ${(props) => props.$labelColor};
   font-size: 10px;
   text-align: center;
   user-select: none;
@@ -138,14 +139,18 @@ interface ScaleLabelStyleProps {
   $top: number;
 }
 
-const ScaleLabel = styled.div.attrs<ScaleLabelStyleProps>((props) => ({
+interface ScaleLabelAllProps extends ScaleLabelStyleProps {
+  $labelColor: string;
+}
+
+const ScaleLabel = styled.div.attrs<ScaleLabelAllProps>((props) => ({
   style: {
     top: `${props.$top}px`,
+    color: props.$labelColor,
   },
-}))<ScaleLabelStyleProps>`
+}))<ScaleLabelAllProps>`
   position: absolute;
   left: 50%;
-  color: #888;
   font-size: 9px;
   font-family: 'Courier New', monospace;
   white-space: nowrap;
@@ -171,14 +176,18 @@ interface ScaleLabelHorizontalStyleProps {
   $left: number;
 }
 
-const ScaleLabelHorizontal = styled.div.attrs<ScaleLabelHorizontalStyleProps>((props) => ({
+interface ScaleLabelHorizontalAllProps extends ScaleLabelHorizontalStyleProps {
+  $labelColor: string;
+}
+
+const ScaleLabelHorizontal = styled.div.attrs<ScaleLabelHorizontalAllProps>((props) => ({
   style: {
     left: `${props.$left}px`,
+    color: props.$labelColor,
   },
-}))<ScaleLabelHorizontalStyleProps>`
+}))<ScaleLabelHorizontalAllProps>`
   position: absolute;
   top: 50%;
-  color: #888;
   font-size: 9px;
   font-family: 'Courier New', monospace;
   white-space: nowrap;
@@ -201,9 +210,11 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   segmentHeight = 8,
   segmentGap = 2,
   coloredInactive = false,
+  labelColor,
   className,
 }) => {
   const labels = channelLabels ?? getDefaultLabels(levels.length);
+  const resolvedLabelColor = labelColor ?? DEFAULT_LABEL_COLOR;
 
   const channelCount = levels.length;
   const isMultiChannel = channelCount >= 2;
@@ -265,7 +276,9 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
 
     return (
       <ChannelColumn key={channelIndex} $orientation={orientation} data-channel>
-        {orientation === 'horizontal' && <ChannelLabel>{labels[channelIndex]}</ChannelLabel>}
+        {orientation === 'horizontal' && (
+          <ChannelLabel $labelColor={resolvedLabelColor}>{labels[channelIndex]}</ChannelLabel>
+        )}
         <SegmentStack $orientation={orientation}>
           {renderThresholds.map((threshold, segIdx) => {
             const active = levelDb >= threshold;
@@ -289,7 +302,9 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
             );
           })}
         </SegmentStack>
-        {orientation === 'vertical' && <ChannelLabel>{labels[channelIndex]}</ChannelLabel>}
+        {orientation === 'vertical' && (
+          <ChannelLabel $labelColor={resolvedLabelColor}>{labels[channelIndex]}</ChannelLabel>
+        )}
       </ChannelColumn>
     );
   };
@@ -299,10 +314,12 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
       const totalWidth = segmentCount * segmentTotalHeight - segmentGap;
       return (
         <HorizontalScaleWrapper>
-          <ChannelLabel style={{ visibility: 'hidden' }}>L</ChannelLabel>
+          <ChannelLabel $labelColor={resolvedLabelColor} style={{ visibility: 'hidden' }}>
+            L
+          </ChannelLabel>
           <ScaleRow style={{ width: `${totalWidth}px` }}>
             {scaleLabels.map(({ position, label }, i) => (
-              <ScaleLabelHorizontal key={i} $left={position}>
+              <ScaleLabelHorizontal key={i} $left={position} $labelColor={resolvedLabelColor}>
                 {label}
               </ScaleLabelHorizontal>
             ))}
@@ -314,7 +331,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
     return (
       <ScaleColumn style={{ height: `${totalHeight}px` }}>
         {scaleLabels.map(({ position, label }, i) => (
-          <ScaleLabel key={i} $top={position}>
+          <ScaleLabel key={i} $top={position} $labelColor={resolvedLabelColor}>
             {label}
           </ScaleLabel>
         ))}

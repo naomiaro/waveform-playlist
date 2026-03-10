@@ -36,7 +36,22 @@ connect(source, meter);
 2. Update React state/UI to display values
 3. Use live waveform visualization
 
-**See:** `DEBUGGING.md` in repo root for complete worklet debugging guide.
+## Tone.js addAudioWorkletModule — Single Module Gotcha
+
+**Critical:** `context.addAudioWorkletModule(url)` only loads the **first** URL. Tone.js caches a single `_workletPromise` — all subsequent calls with different URLs silently return the cached promise and skip `addModule`. If `meter-processor` loads first, `recording-processor` is never registered, causing `NotSupportedError` on `createAudioWorkletNode`.
+
+**Fix:** Always use `rawContext.audioWorklet.addModule(url)` directly. The native API supports multiple `addModule` calls. `createAudioWorkletNode` (Tone's wrapper) is still safe to use for node creation.
+
+```typescript
+// WRONG — second call silently skipped
+await context.addAudioWorkletModule(meterProcessorUrl);     // loads
+await context.addAudioWorkletModule(recordingProcessorUrl);  // silently skipped!
+
+// CORRECT — both modules loaded
+const rawCtx = (context as any).rawContext as AudioContext;
+await rawCtx.audioWorklet.addModule(meterProcessorUrl);
+await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
+```
 
 ## Recording-Optimized Audio Constraints
 

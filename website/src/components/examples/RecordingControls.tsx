@@ -8,6 +8,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import type { MicrophoneDevice } from '@waveform-playlist/recording';
+import { BaseSelectSmall } from '@waveform-playlist/ui-components';
 
 // --- RecordButton ---
 
@@ -167,21 +168,11 @@ const SelectorLabel = styled.label`
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.875rem;
-  color: #666;
+  color: var(--gray-9);
 `;
 
-const SelectorSelect = styled.select`
+const MicSelect = styled(BaseSelectSmall)`
   min-width: 200px;
-  padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
-  border: 1px solid #ced4da;
-  border-radius: 0.25rem;
-  background: white;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 `;
 
 export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
@@ -195,7 +186,7 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
   return (
     <SelectorLabel>
       Microphone
-      <SelectorSelect
+      <MicSelect
         value={currentValue}
         onChange={(e) => onDeviceChange(e.target.value)}
         disabled={disabled || devices.length === 0}
@@ -209,7 +200,7 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
             </option>
           ))
         )}
-      </SelectorSelect>
+      </MicSelect>
     </SelectorLabel>
   );
 };
