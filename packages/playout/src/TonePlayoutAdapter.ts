@@ -176,11 +176,10 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
     addTrack(track: ClipTrack): void {
       if (!playout) {
-        console.warn(
+        throw new Error(
           '[waveform-playlist] adapter.addTrack() called but no playout exists. ' +
             'Call setTracks() first to initialize the playout.'
         );
-        return;
       }
       addTrackToPlayout(playout, track);
       playout.applyInitialSoloState();

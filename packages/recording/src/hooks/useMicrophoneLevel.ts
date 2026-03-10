@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { getContext } from 'tone';
+import { getGlobalContext } from '@waveform-playlist/playout';
 import { gainToNormalized } from '@waveform-playlist/core';
 import { meterProcessorUrl, type MeterMessage } from '@waveform-playlist/worklets';
 
@@ -63,6 +63,12 @@ export interface UseMicrophoneLevelReturn {
    * RMS: root mean square of samples per analysis frame.
    */
   rmsLevels: number[];
+
+  /**
+   * Error from meter setup (worklet load failure, context issues, etc.)
+   * Null when metering is working normally.
+   */
+  error: Error | null;
 }
 
 /**
@@ -89,6 +95,7 @@ export function useMicrophoneLevel(
   const [levels, setLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
   const [peakLevels, setPeakLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
   const [rmsLevels, setRmsLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
+  const [meterError, setMeterError] = useState<Error | null>(null);
 
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -113,7 +120,7 @@ export function useMicrophoneLevel(
     const setupMonitoring = async () => {
       if (!isMounted) return;
 
-      const context = getContext();
+      const context = getGlobalContext();
       if (context.state === 'suspended') {
         await context.resume();
       }
@@ -184,6 +191,9 @@ export function useMicrophoneLevel(
 
     setupMonitoring().catch((err) => {
       console.warn('[waveform-playlist] Failed to set up mic level monitoring:', String(err));
+      if (isMounted) {
+        setMeterError(err instanceof Error ? err : new Error(String(err)));
+      }
     });
 
     return () => {
@@ -221,5 +231,6 @@ export function useMicrophoneLevel(
     levels,
     peakLevels,
     rmsLevels,
+    error: meterError,
   };
 }

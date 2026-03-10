@@ -9,8 +9,11 @@ import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
 import type { MicrophoneDevice } from '../types';
 import { type ClipTrack, type AudioClip } from '@waveform-playlist/core';
-import { resumeGlobalAudioContext, getGlobalAudioContext } from '@waveform-playlist/playout';
-import { getContext } from 'tone';
+import {
+  resumeGlobalAudioContext,
+  getGlobalAudioContext,
+  getGlobalContext,
+} from '@waveform-playlist/playout';
 
 export interface IntegratedRecordingOptions {
   /**
@@ -96,12 +99,17 @@ export function useIntegratedRecording(
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
 
   // Microphone level (for VU meter)
-  const { level, peakLevel, levels, peakLevels, rmsLevels, resetPeak } = useMicrophoneLevel(
-    stream,
-    {
-      channelCount: recordingOptions.channelCount,
-    }
-  );
+  const {
+    level,
+    peakLevel,
+    levels,
+    peakLevels,
+    rmsLevels,
+    resetPeak,
+    error: meterError,
+  } = useMicrophoneLevel(stream, {
+    channelCount: recordingOptions.channelCount,
+  });
 
   // Recording
   const {
@@ -165,7 +173,7 @@ export function useIntegratedRecording(
         const err = new Error(
           `Recording completed but track "${trackId}" no longer exists. The recorded audio could not be saved.`
         );
-        console.error(`[waveform-playlist] ${err.message}`);
+        console.warn(`[waveform-playlist] ${err.message}`);
         setHookError(err);
         return;
       }
@@ -193,7 +201,7 @@ export function useIntegratedRecording(
       // to the timeline. Skip that duration at the start of the recorded audio.
       const audioContext = getGlobalAudioContext();
       const outputLatency = audioContext.outputLatency ?? 0;
-      const toneContext = getContext();
+      const toneContext = getGlobalContext();
       const lookAhead = toneContext.lookAhead ?? 0;
       const totalLatency = outputLatency + lookAhead;
       const latencyOffsetSamples = Math.floor(totalLatency * buffer.sampleRate);
@@ -204,6 +212,7 @@ export function useIntegratedRecording(
         console.warn(
           '[waveform-playlist] Recording too short for latency compensation — discarding'
         );
+        setHookError(new Error('Recording was too short to save. Try recording for longer.'));
         return;
       }
 
@@ -282,7 +291,7 @@ export function useIntegratedRecording(
     levels,
     peakLevels,
     rmsLevels,
-    error: hookError || micError || recError,
+    error: hookError || micError || meterError || recError,
 
     // Microphone state
     stream,

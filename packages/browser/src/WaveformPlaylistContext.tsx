@@ -531,61 +531,69 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // tearing down the playout. This avoids disposing and recreating all
     // audio nodes when dropping a file or finishing a recording.
     if (isIncrementalAdd && engineRef.current) {
-      const prevIds = new Set(prevTracksRef.current.map((t) => t.id));
-      const addedTracks = tracks.filter((t) => !prevIds.has(t.id));
+      try {
+        const prevIds = new Set(prevTracksRef.current.map((t) => t.id));
+        const addedTracks = tracks.filter((t) => !prevIds.has(t.id));
 
-      // Merge current UI state into new tracks before adding to engine
-      const currentTrackStates = trackStatesRef.current;
-      for (const track of addedTracks) {
-        const trackIndex = tracks.indexOf(track);
-        const trackState = currentTrackStates[trackIndex];
-        const trackWithState = {
-          ...track,
-          volume: trackState?.volume ?? track.volume,
-          muted: trackState?.muted ?? track.muted,
-          soloed: trackState?.soloed ?? track.soloed,
-          pan: trackState?.pan ?? track.pan,
-        };
-        engineRef.current.addTrack(trackWithState);
-      }
-
-      // Update duration from all tracks (including newly added)
-      let maxDuration = 0;
-      tracks.forEach((track) => {
-        track.clips.forEach((clip) => {
-          const clipEnd = (clip.startSample + clip.durationSamples) / clip.sampleRate;
-          maxDuration = Math.max(maxDuration, clipEnd);
-        });
-      });
-      setDuration(maxDuration);
-
-      // Initialize track states for the new tracks (preserve existing)
-      setTrackStates((prev) => {
-        if (prev.length === tracks.length) return prev;
-        const newStates = [...prev];
+        // Merge current UI state into new tracks before adding to engine
+        const currentTrackStates = trackStatesRef.current;
         for (const track of addedTracks) {
-          newStates.push({
-            name: track.name,
-            muted: track.muted,
-            soloed: track.soloed,
-            volume: track.volume,
-            pan: track.pan,
+          const trackIndex = tracks.indexOf(track);
+          const trackState = currentTrackStates[trackIndex];
+          const trackWithState = {
+            ...track,
+            volume: trackState?.volume ?? track.volume,
+            muted: trackState?.muted ?? track.muted,
+            soloed: trackState?.soloed ?? track.soloed,
+            pan: trackState?.pan ?? track.pan,
+          };
+          engineRef.current!.addTrack(trackWithState);
+        }
+
+        // Update duration from all tracks (including newly added)
+        let maxDuration = 0;
+        tracks.forEach((track) => {
+          track.clips.forEach((clip) => {
+            const clipEnd = (clip.startSample + clip.durationSamples) / clip.sampleRate;
+            maxDuration = Math.max(maxDuration, clipEnd);
           });
-        }
-        return newStates;
-      });
+        });
+        setDuration(maxDuration);
 
-      // Extract audio buffers for new tracks
-      const buffers: AudioBuffer[] = [];
-      tracks.forEach((track) => {
-        if (track.clips.length > 0 && track.clips[0].audioBuffer) {
-          buffers.push(track.clips[0].audioBuffer);
-        }
-      });
-      setAudioBuffers(buffers);
+        // Initialize track states for the new tracks (preserve existing)
+        setTrackStates((prev) => {
+          if (prev.length === tracks.length) return prev;
+          const newStates = [...prev];
+          for (const track of addedTracks) {
+            newStates.push({
+              name: track.name,
+              muted: track.muted,
+              soloed: track.soloed,
+              volume: track.volume,
+              pan: track.pan,
+            });
+          }
+          return newStates;
+        });
 
-      prevTracksRef.current = tracks;
-      return;
+        // Extract audio buffers for new tracks
+        const buffers: AudioBuffer[] = [];
+        tracks.forEach((track) => {
+          if (track.clips.length > 0 && track.clips[0].audioBuffer) {
+            buffers.push(track.clips[0].audioBuffer);
+          }
+        });
+        setAudioBuffers(buffers);
+
+        prevTracksRef.current = tracks;
+        return;
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] Incremental add failed, falling through to full rebuild:',
+          String(err)
+        );
+        // Fall through to full loadAudio path
+      }
     }
 
     // Defer engine rebuild during progressive loading — tracks render visually
@@ -775,7 +783,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         onReady?.();
       } catch (error) {
-        console.error('Error loading audio:', error);
+        console.warn('[waveform-playlist] Error loading audio:', String(error));
       }
     };
 

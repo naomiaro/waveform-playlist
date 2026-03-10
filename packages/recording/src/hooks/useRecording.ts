@@ -6,7 +6,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { UseRecordingReturn, RecordingOptions } from '../types';
 import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUtils';
 import { appendPeaks } from '../utils/peaksGenerator';
-import { getContext } from 'tone';
+import { getGlobalContext } from '@waveform-playlist/playout';
 import { recordingProcessorUrl } from '@waveform-playlist/worklets';
 
 function emptyPeaks(bits: 8 | 16): Int8Array | Int16Array {
@@ -66,7 +66,7 @@ export function useRecording(
     }
 
     try {
-      const context = getContext();
+      const context = getGlobalContext();
       // Load the worklet module directly on the raw AudioContext.
       // Tone.js's addAudioWorkletModule only loads ONE module per context
       // (caches _workletPromise). If meter-processor was loaded first by
@@ -75,8 +75,9 @@ export function useRecording(
       await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
       workletLoadedRef.current = true;
     } catch (err) {
-      console.error('Failed to load AudioWorklet module:', err);
-      throw new Error('Failed to load recording processor');
+      console.warn('[waveform-playlist] Failed to load AudioWorklet module:', String(err));
+      const error = new Error('Failed to load recording processor: ' + String(err));
+      throw error;
     }
   }, []);
 
@@ -91,7 +92,7 @@ export function useRecording(
       setError(null);
 
       // Use Tone.js Context for cross-browser compatibility
-      const context = getContext();
+      const context = getGlobalContext();
 
       // Resume AudioContext if suspended
       if (context.state === 'suspended') {
@@ -117,6 +118,11 @@ export function useRecording(
         channelCountMode: 'explicit' as globalThis.ChannelCountMode,
       });
       workletNodeRef.current = workletNode;
+
+      workletNode.onprocessorerror = (event) => {
+        console.warn('[waveform-playlist] Recording worklet processor error:', event);
+        setError(new Error('Recording processor encountered an error'));
+      };
 
       // Reset state before connecting — prevents race where a worklet message
       // arrives before refs are cleared, corrupting samplesProcessedBefore calculations
@@ -179,7 +185,7 @@ export function useRecording(
       startTimeRef.current = performance.now();
       startDurationLoop();
     } catch (err) {
-      console.error('Failed to start recording:', err);
+      console.warn('[waveform-playlist] Failed to start recording:', String(err));
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
     }
   }, [stream, channelCount, samplesPerPixel, bits, loadWorklet, startDurationLoop]);
@@ -213,7 +219,7 @@ export function useRecording(
       }
 
       // Create final AudioBuffer from accumulated per-channel chunks
-      const context = getContext();
+      const context = getGlobalContext();
       const rawContext = context.rawContext as AudioContext;
       const numChannels = recordedChunksRef.current.length || channelCount;
       const channelData = recordedChunksRef.current.map((chunks) => concatenateAudioData(chunks));
@@ -244,7 +250,7 @@ export function useRecording(
 
       return buffer;
     } catch (err) {
-      console.error('Failed to stop recording:', err);
+      console.warn('[waveform-playlist] Failed to stop recording:', String(err));
       setError(err instanceof Error ? err : new Error('Failed to stop recording'));
       return null;
     }

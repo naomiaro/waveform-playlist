@@ -52,6 +52,8 @@ export interface UseOutputMeterReturn {
   rmsLevels: number[];
   /** Reset all held peak levels to 0 */
   resetPeak: () => void;
+  /** Error from meter setup (worklet load failure, context issues, etc.) */
+  error: Error | null;
 }
 
 export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMeterReturn {
@@ -63,6 +65,7 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
 
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const smoothedPeakRef = useRef<number[]>(new Array(channelCount).fill(0));
+  const [meterError, setMeterError] = useState<Error | null>(null);
 
   const resetPeak = useCallback(
     () => setPeakLevels(new Array(channelCount).fill(0)),
@@ -142,6 +145,9 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
 
     setup().catch((err) => {
       console.warn('[waveform-playlist] Failed to set up output meter:', String(err));
+      if (isMounted) {
+        setMeterError(err instanceof Error ? err : new Error(String(err)));
+      }
     });
 
     return () => {
@@ -166,5 +172,5 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
     };
   }, [channelCount, updateRate]);
 
-  return { levels, peakLevels, rmsLevels, resetPeak };
+  return { levels, peakLevels, rmsLevels, resetPeak, error: meterError };
 }

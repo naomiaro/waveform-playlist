@@ -528,15 +528,12 @@ describe('createToneAdapter', () => {
       expect(TonePlayout).toHaveBeenCalledTimes(1);
     });
 
-    it('warns if called before setTracks', () => {
+    it('throws if called before setTracks', () => {
       const adapter = createToneAdapter();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
-      adapter.addTrack!(makeTrack('t1', [clip]));
 
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no playout exists'));
-      warnSpy.mockRestore();
+      expect(() => adapter.addTrack!(makeTrack('t1', [clip]))).toThrow('no playout exists');
     });
   });
 });
