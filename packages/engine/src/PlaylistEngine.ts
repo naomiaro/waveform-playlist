@@ -109,7 +109,12 @@ export class PlaylistEngine {
   addTrack(track: ClipTrack): void {
     this._tracks = [...this._tracks, track];
     this._tracksVersion++;
-    this._adapter?.setTracks(this._tracks);
+    // Use incremental addTrack when the adapter supports it (avoids full rebuild)
+    if (this._adapter?.addTrack) {
+      this._adapter.addTrack(track);
+    } else {
+      this._adapter?.setTracks(this._tracks);
+    }
     this._emitStateChange();
   }
 

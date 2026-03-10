@@ -344,6 +344,18 @@ if (derived !== prevRef.current) {
 
 **Fix:** `useOutputMeter({ isPlaying })` — a separate `useEffect` resets all levels (current, peak, RMS) and smoothed state when `isPlaying` transitions to `false`. Prefer state-driven cleanup over staleness timers.
 
+## Incremental Track Addition (loadAudio optimization)
+
+**Detection:** `isIncrementalAdd` is computed during render by comparing `prevTracksRef` with current tracks. Uses reference equality on individual track objects — if all previous tracks are unchanged and only new ones were appended, the incremental path is used.
+
+**When incremental:** File drops, new empty tracks, any append where existing tracks are untouched. Calls `engine.addTrack()` per new track, updates duration/trackStates/audioBuffers. No engine dispose/rebuild.
+
+**When full rebuild:** Recording adds clip to existing track (modifies track object), effects change, any existing track modified.
+
+**`skipEngineDisposeRef` integration:** `isIncrementalAdd` joins `isEngineTracks` and `isDraggingRef` in preventing the effect cleanup from disposing the engine.
+
+**`prevTracksRef`:** Updated in all `loadAudio` exit paths (engine tracks guard, incremental add, clear state, full rebuild) to keep detection accurate.
+
 ## MediaElement currentTime vs currentTimeRef
 
 `currentTime` (React state from `useMediaElementAnimation`) only updates on pause/stop/seek/playback-end — NOT during playback. For smooth real-time display, use `currentTimeRef` with a local `requestAnimationFrame` loop and direct DOM manipulation (e.g., `ref.current.textContent = ...`). Never use `currentTime` for time displays that should update during playback.

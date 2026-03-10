@@ -127,6 +127,40 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it('addTrack uses adapter.addTrack when available', () => {
+      const mockAddTrack = vi.fn();
+      const mockSetTracks = vi.fn();
+      const adapter = {
+        init: vi.fn().mockResolvedValue(undefined),
+        setTracks: mockSetTracks,
+        addTrack: mockAddTrack,
+        play: vi.fn(),
+        pause: vi.fn(),
+        stop: vi.fn(),
+        seek: vi.fn(),
+        getCurrentTime: vi.fn().mockReturnValue(0),
+        isPlaying: vi.fn().mockReturnValue(false),
+        setMasterVolume: vi.fn(),
+        setTrackVolume: vi.fn(),
+        setTrackMute: vi.fn(),
+        setTrackSolo: vi.fn(),
+        setTrackPan: vi.fn(),
+        setLoop: vi.fn(),
+        dispose: vi.fn(),
+      };
+      const eng = new PlaylistEngine({ adapter });
+      eng.setTracks([makeTrack('t1', [])]);
+      mockSetTracks.mockClear();
+
+      eng.addTrack(makeTrack('t2', []));
+
+      // Uses incremental addTrack, not setTracks
+      expect(mockAddTrack).toHaveBeenCalledTimes(1);
+      expect(mockSetTracks).not.toHaveBeenCalled();
+      expect(eng.getState().tracks).toHaveLength(2);
+      eng.dispose();
+    });
+
     it('removes a track', () => {
       engine.setTracks([makeTrack('t1', [])]);
       engine.removeTrack('t1');

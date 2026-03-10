@@ -147,6 +147,12 @@ AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
 
 **Dependency:** `soundfont2` (MIT) in `package.json`. SF2 files have separate licenses — not bundled in npm package, users provide via URL.
 
+## Incremental Track Addition
+
+**`addTrackToPlayout()` helper:** Extracted from `buildPlayout`'s per-track loop. Shared by both `buildPlayout` (full rebuild) and `adapter.addTrack()` (incremental). Handles audio clips, MIDI clips, and SoundFont routing.
+
+**`adapter.addTrack(track)`:** Adds a single track to the existing playout without disposing/recreating. Calls `addTrackToPlayout()` then `playout.applyInitialSoloState()`. Warns if called before `setTracks()` (no playout exists yet).
+
 ## Firefox Compatibility (standardized-audio-context)
 
 **Problem 1: AudioListener Error**

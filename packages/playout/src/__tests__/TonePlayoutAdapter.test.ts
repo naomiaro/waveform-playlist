@@ -489,4 +489,54 @@ describe('createToneAdapter', () => {
       expect(() => adapter.dispose()).not.toThrow();
     });
   });
+
+  describe('addTrack (incremental)', () => {
+    it('adds a track to existing playout without rebuilding', () => {
+      const adapter = createToneAdapter();
+      const clip1 = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([makeTrack('t1', [clip1])]);
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      expect(mockInstance.addTrack).toHaveBeenCalledTimes(1);
+
+      // Incrementally add a second track
+      const clip2 = makeClip({ id: 'c2', startSample: 0, durationSamples: 22050 });
+      adapter.addTrack!(makeTrack('t2', [clip2]));
+
+      // addTrack called twice total (once from setTracks, once from addTrack)
+      expect(mockInstance.addTrack).toHaveBeenCalledTimes(2);
+      // applyInitialSoloState called on addTrack
+      expect(mockInstance.applyInitialSoloState).toHaveBeenCalled();
+
+      const addTrackArg = mockInstance.addTrack.mock.calls[1][0];
+      expect(addTrackArg.track.id).toBe('t2');
+    });
+
+    it('does not create a new TonePlayout instance', () => {
+      const adapter = createToneAdapter();
+      const clip1 = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([makeTrack('t1', [clip1])]);
+
+      // One TonePlayout created by setTracks
+      expect(TonePlayout).toHaveBeenCalledTimes(1);
+
+      const clip2 = makeClip({ id: 'c2', startSample: 0, durationSamples: 22050 });
+      adapter.addTrack!(makeTrack('t2', [clip2]));
+
+      // Still only one TonePlayout — no rebuild
+      expect(TonePlayout).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns if called before setTracks', () => {
+      const adapter = createToneAdapter();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.addTrack!(makeTrack('t1', [clip]));
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no playout exists'));
+      warnSpy.mockRestore();
+    });
+  });
 });

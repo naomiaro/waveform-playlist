@@ -8,24 +8,17 @@ Recording uses the global shared AudioContext from `@waveform-playlist/playout` 
 
 ## MediaStreamSource Per Hook (Firefox Compatibility)
 
-**Pattern:** Each recording hook creates its own `MediaStreamSource` directly from Tone's `getContext()`.
+**Pattern:** Each recording hook creates its own `MediaStreamSource` from Tone.js `getContext()` and connects it to an AudioWorklet node (not Tone.js `Meter`).
 
 ```typescript
-// CORRECT - Create source from same context as other audio nodes
 const context = getContext();  // Tone.js shared context
 const source = context.createMediaStreamSource(stream);
-const meter = new Meter({ smoothing, context });
-connect(source, meter);
+source.connect(workletNode);  // AudioWorklet-based metering/recording
 ```
 
-**Why:** Firefox throws "Can't connect nodes from different AudioContexts" when:
-- A shared `MediaStreamSource` is created in one module (e.g., playout package)
-- Audio nodes (Meter, AudioWorklet) are created in another module (recording package)
-- Even though both use `getContext()` from Tone.js, bundler module resolution can cause different context instances
+**Why:** Firefox throws "Can't connect nodes from different AudioContexts" when source and destination nodes are created from different context instances. Both `useRecording` and `useMicrophoneLevel` create their own source from `getContext()` to ensure the source and connected worklet share the exact same context.
 
-**Solution:** Both `useRecording` and `useMicrophoneLevel` create their own source directly from `getContext()`. This ensures the source and connected nodes share the exact same context instance.
-
-**Note:** Creating multiple `MediaStreamAudioSourceNode` instances from the same `MediaStream` is valid - they independently read from the same underlying stream.
+**Note:** Creating multiple `MediaStreamAudioSourceNode` instances from the same `MediaStream` is valid — they independently read from the same underlying stream.
 
 ## Debugging AudioWorklets
 
@@ -36,22 +29,20 @@ connect(source, meter);
 2. Update React state/UI to display values
 3. Use live waveform visualization
 
-## Tone.js addAudioWorkletModule — Single Module Gotcha
+## AudioWorklet Module Loading
 
-**Critical:** `context.addAudioWorkletModule(url)` only loads the **first** URL. Tone.js caches a single `_workletPromise` — all subsequent calls with different URLs silently return the cached promise and skip `addModule`. If `meter-processor` loads first, `recording-processor` is never registered, causing `NotSupportedError` on `createAudioWorkletNode`.
+**Rule:** Always use `rawContext.audioWorklet.addModule(url)` — never Tone.js's `context.addAudioWorkletModule(url)`.
 
-**Fix:** Always use `rawContext.audioWorklet.addModule(url)` directly. The native API supports multiple `addModule` calls. `createAudioWorkletNode` (Tone's wrapper) is still safe to use for node creation.
+**Why:** Tone.js caches a single `_workletPromise` per context. Only the first URL is loaded; subsequent calls with different URLs silently return the cached promise. If `meter-processor` loads first, `recording-processor` is never registered.
 
 ```typescript
-// WRONG — second call silently skipped
-await context.addAudioWorkletModule(meterProcessorUrl);     // loads
-await context.addAudioWorkletModule(recordingProcessorUrl);  // silently skipped!
-
-// CORRECT — both modules loaded
+// CORRECT — both modules loaded via native API
 const rawCtx = context.rawContext as AudioContext;
 await rawCtx.audioWorklet.addModule(meterProcessorUrl);
 await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
 ```
+
+`context.createAudioWorkletNode()` (Tone.js wrapper) is still used for node creation — avoids `rawContext` identity issues in webpack-aliased environments (Docusaurus).
 
 ## Recording-Optimized Audio Constraints
 
@@ -92,6 +83,10 @@ const normalized = gainToNormalized(rawPeak);
 
 **Rule:** Never use `source.channelCount` to detect mic channels — it defaults to 2 per Web Audio spec, regardless of the mic's actual capability. Use `stream.getAudioTracks()[0].getSettings().channelCount` instead.
 
+## Shared Duration Loop (useRecording)
+
+**Pattern:** `startDurationLoop` is a stable `useCallback([], [])` that runs a rAF loop reading from refs (`isRecordingRef`, `isPausedRef`, `startTimeRef`). Called by both `startRecording` (fresh start) and `resumeRecording` (adjusts `startTimeRef` before calling). Callers set `startTimeRef.current` before invoking.
+
 ## No UI Component Exports
 
 **Decision:** Recording package exports only hooks and types — no presentational components. `RecordButton`, `RecordingIndicator`, `MicrophoneSelector` are example-specific UI in `website/src/components/examples/RecordingControls.tsx`. `VUMeter` is replaced by `SegmentedVUMeter` from `@waveform-playlist/ui-components`.
@@ -105,8 +100,8 @@ const normalized = gainToNormalized(rawPeak);
 **Pattern:** `useIntegratedRecording` captures timeline position at record start (not stop) via `recordingStartTimeRef`. During overdub, `currentTime` advances with playback — using it at stop time would place the clip at the wrong position.
 
 **Latency compensation:** Two sources of delay between worklet capture and audible playback:
-1. `toneContext.lookAhead` (~100ms) — Tone.js schedules Transport audio ahead of real time
-2. `audioContext.outputLatency` — hardware DAC delay before audio reaches speakers
+1. `getContext().lookAhead` (~100ms) — Tone.js Transport schedules audio ahead of real time
+2. `getGlobalAudioContext().outputLatency` — hardware DAC delay before audio reaches speakers
 
 The clip's `offsetSamples` skips this combined latency period. `durationSamples` is reduced by the same amount. This aligns the user's performance (timed to what they hear) with the timeline.
 

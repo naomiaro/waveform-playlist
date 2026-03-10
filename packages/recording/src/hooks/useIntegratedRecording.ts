@@ -220,6 +220,20 @@ export function useIntegratedRecording(
         name: `Recording ${new Date().toLocaleTimeString()}`,
       };
 
+      console.log('[waveform-playlist] Recording clip created:', {
+        clipId: newClip.id,
+        trackId,
+        trackIndex: selectedTrackIndex,
+        startSample,
+        durationSamples: effectiveDuration,
+        offsetSamples: latencyOffsetSamples,
+        bufferLength: buffer.length,
+        bufferDuration: buffer.duration,
+        sampleRate: buffer.sampleRate,
+        channelCount: buffer.numberOfChannels,
+        totalLatency,
+      });
+
       // Add clip to track
       const newTracks = tracks.map((track, index) => {
         if (index === selectedTrackIndex) {
@@ -231,6 +245,12 @@ export function useIntegratedRecording(
         return track;
       });
 
+      console.log(
+        '[waveform-playlist] setTracks after recording:',
+        newTracks.length,
+        'tracks,',
+        newTracks.map((t) => t.id + ':' + t.clips.length + 'clips')
+      );
       setTracks(newTracks);
     }
   }, [tracks, setTracks, stopRec]);
