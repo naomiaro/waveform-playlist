@@ -597,4 +597,4 @@ React users install `@dawcore/react` for a familiar props + callbacks API that w
 2. **Custom Elements Manifest** — Generate with `@custom-elements-manifest/analyzer` for IDE autocomplete and Storybook integration?
 3. **SSR** — Declarative Shadow DOM support needed? Audio editors are inherently client-side, but some frameworks expect SSR compatibility.
 4. **Backwards compatibility period** — Maintain waveform-playlist v10 alongside dawcore 1.0 for a transition period?
-5. **Monorepo or new repo?** — Start fresh at github.com/dawcore, or develop in the existing waveform-playlist repo and publish under the new scope?
+5. **Repo migration** — Recommend transferring `naomiaro/waveform-playlist` to `dawcore` org via GitHub's transfer ownership feature (Settings → Danger Zone). Preserves stars, watchers, forks, issues, PRs, and git history. Old URLs redirect automatically. Then rename to desired repo name (e.g., `dawcore/editor`). GitHub Sponsors stays on `github.com/sponsors/naomiaro` (per-user, not per-repo).
