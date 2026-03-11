@@ -130,7 +130,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
 | `<daw-pan-slider>` | setTrackPan() | Per-track pan control. |
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
-| `<daw-timescale>` | Time ruler | Renders time ruler above tracks. |
+| `<daw-ruler>` | Time ruler | Renders time ruler above tracks. |
 | `<daw-playhead>` | Playhead | Animated playhead line. |
 
 ### Multi-Track Record Arming
@@ -311,8 +311,8 @@ daw-editor {
   --daw-selection-color: rgba(99, 199, 95, 0.3);
   --daw-background: #1a1a2e;
   --daw-track-background: #16213e;
-  --daw-timescale-color: #c49a6c;
-  --daw-timescale-background: #0f0f1a;
+  --daw-ruler-color: #c49a6c;
+  --daw-ruler-background: #0f0f1a;
   --daw-controls-background: #1a1a2e;
   --daw-controls-text: #e0d4c8;
   --daw-clip-header-background: rgba(0,0,0,0.4);
@@ -653,7 +653,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-track>` — track declaration via attributes, audio loading
 - [ ] `<daw-canvas>` — canvas waveform rendering (port existing canvas code)
 - [ ] `<daw-playhead>` — animated playhead
-- [ ] `<daw-timescale>` — time ruler
+- [ ] `<daw-ruler>` — time ruler
 - [ ] CSS custom properties theme system
 - [ ] Playback: play/pause/stop/seek via element methods
 - [ ] Recording: record/arm via element methods, mic access, live waveform preview
