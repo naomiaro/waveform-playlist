@@ -348,6 +348,64 @@ daw-vu-meter::part(segment) { border-radius: 2px; }
 </daw-editor>
 ```
 
+### Custom Controls & Event Bubbling
+
+Slotted content lives in the light DOM and can't access shadow DOM internals directly. Instead of React-style context hooks, custom controls use **DOM event bubbling** — the natural Web Components pattern.
+
+**Built-in control elements** auto-wire to their parent track via `closest()`:
+
+```html
+<daw-track src="vocals.mp3" name="Vocals">
+  <div slot="controls">
+    <daw-mute-button></daw-mute-button>
+    <daw-volume-slider></daw-volume-slider>
+    <daw-pan-slider></daw-pan-slider>
+    <daw-vu-meter></daw-vu-meter>
+  </div>
+</daw-track>
+```
+
+**Custom controls** dispatch bubbling events that any ancestor can handle:
+
+```html
+<daw-editor id="my-editor">
+  <daw-track src="vocals.mp3" name="Vocals">
+    <div slot="controls">
+      <daw-volume-slider></daw-volume-slider>
+      <button class="fx-btn">FX</button>
+      <button class="delete-btn">Delete</button>
+    </div>
+  </daw-track>
+</daw-editor>
+
+<script>
+  const editor = document.getElementById('my-editor');
+
+  // Custom events bubble up through the DOM tree.
+  // Use composed: true to cross shadow DOM boundaries.
+  document.querySelector('.fx-btn').addEventListener('click', (e) => {
+    e.target.dispatchEvent(new CustomEvent('open-fx', {
+      bubbles: true,
+      composed: true,
+    }));
+  });
+
+  // Ancestor catches the event — closest() identifies which track
+  editor.addEventListener('open-fx', (e) => {
+    const track = e.target.closest('daw-track');
+    console.log('open FX for', track.getAttribute('name'));
+  });
+
+  // Delete track via editor method
+  document.querySelector('.delete-btn').addEventListener('click', (e) => {
+    const track = e.target.closest('daw-track');
+    editor.removeTrack(track.id);
+  });
+</script>
+```
+
+**Key pattern:** Instead of pulling state down via hooks (React), navigate up via `closest()` and read properties from elements. Elements are the state containers — the DOM tree is the context.
+
 ---
 
 ## Drag & Drop
