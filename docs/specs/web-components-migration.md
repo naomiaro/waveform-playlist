@@ -118,13 +118,13 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | Element | Wraps | Responsibilities |
 |---------|-------|-----------------|
 | `<daw-editor>` | PlaylistEngine + ToneAdapter | Root element. Manages engine, audio context, tracks, state. |
-| `<daw-track>` | Track state | Declares a track. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`. |
+| `<daw-track>` | Track state | Declares a track. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`. |
 | `<daw-canvas>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
 | `<daw-transport>` | Transport controls container | Groups transport buttons, links to an editor via `for` attribute. |
 | `<daw-play-button>` | play() | Triggers playback. If recording is armed, starts overdub recording simultaneously. |
 | `<daw-pause-button>` | pause() | Pauses playback and recording. |
 | `<daw-stop-button>` | stop() | Stops playback and recording. Finalizes any in-progress recording into a new clip. |
-| `<daw-record-button>` | record() | Arms/starts recording. When armed, play triggers overdub. When clicked during stop, starts record + play together. |
+| `<daw-record-button>` | record() | Arms/starts recording on all armed tracks. When clicked during stop, arms the selected track (or first track). When clicked during play, starts overdub on armed tracks. |
 | `<daw-time-display>` | currentTime | Shows formatted playback time. |
 | `<daw-zoom-controls>` | zoomIn()/zoomOut() | Zoom in/out buttons. |
 | `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
@@ -132,6 +132,62 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
 | `<daw-timescale>` | Time ruler | Renders time ruler above tracks. |
 | `<daw-cursor>` | Playhead | Animated playhead line. |
+
+### Multi-Track Record Arming
+
+```html
+<!-- Arm individual tracks for recording -->
+<daw-editor id="my-editor">
+  <daw-track src="/audio/drums.mp3" name="Drums"></daw-track>
+  <daw-track name="Vocal Take" record-armed></daw-track>
+  <daw-track name="Guitar Take" record-armed input-device="abc123"></daw-track>
+</daw-editor>
+
+<daw-transport for="my-editor">
+  <daw-record-button></daw-record-button>
+  <daw-play-button></daw-play-button>
+  <daw-stop-button></daw-stop-button>
+</daw-transport>
+```
+
+**Behavior:**
+
+- Tracks with `record-armed` attribute will record simultaneously when recording starts
+- Each armed track can have its own `input-device` for different mic inputs
+- Clicking `<daw-record-button>` during stop arms the selected track if none are armed, then starts record + play
+- Clicking `<daw-record-button>` during play starts overdub recording on all armed tracks
+- `<daw-stop-button>` stops playback and finalizes all in-progress recordings into new clips
+- Tracks without `record-armed` play back normally during overdub
+- `<daw-vu-meter>` on an armed track shows input level from the mic stream before and during recording
+
+```javascript
+// Programmatic multi-track arming
+const editor = document.getElementById('my-editor');
+const tracks = editor.querySelectorAll('daw-track');
+
+// Arm specific tracks
+tracks[1].arm();                    // Default mic
+tracks[2].arm('specific-device-id'); // Specific mic
+
+// Check armed state
+console.log(editor.armedTrackIds);  // ['track-2', 'track-3']
+console.log(editor.isRecordArmed);  // true
+
+// Listen for recording events
+editor.addEventListener('daw-record', (e) => {
+  console.log('Recording on tracks:', e.detail.trackIds);
+});
+
+editor.addEventListener('daw-record-stop', (e) => {
+  console.log('Recorded clips:', e.detail.clips);
+  // Each clip includes the trackId it was recorded on
+});
+
+// Disarm all
+editor.armedTrackIds.forEach(id => {
+  editor.querySelector(`daw-track[id="${id}"]`).disarm();
+});
+```
 
 ### Optional Elements
 
@@ -163,8 +219,9 @@ bar-gap              Number    0        Waveform bar gap
 ```typescript
 editor.tracks: ClipTrack[]           // Current track state
 editor.isPlaying: boolean            // Playback state
-editor.isRecording: boolean          // Recording state
-editor.isRecordArmed: boolean        // Record armed (waiting for play)
+editor.isRecording: boolean          // Recording state (any track recording)
+editor.armedTrackIds: string[]       // Track IDs with record-armed attribute
+editor.isRecordArmed: boolean        // Derived: armedTrackIds.length > 0
 editor.currentTime: number           // Current playback time
 editor.duration: number              // Total duration
 editor.selection: {start, end}       // Selection range
@@ -178,7 +235,9 @@ editor.engine: PlaylistEngine        // Direct engine access
 editor.play(startTime?, duration?): Promise<void>  // Starts overdub if record is armed
 editor.pause(): void                               // Pauses both playback and recording
 editor.stop(): void                                // Stops both, finalizes recording to clip
-editor.record(): Promise<void>                     // Arms or starts recording
+editor.record(): Promise<void>                     // Starts recording on all armed tracks
+editor.armTrack(trackId: string, deviceId?: string): Promise<void>  // Arm a track
+editor.disarmTrack(trackId: string): void           // Disarm a track
 editor.seekTo(time: number): void
 editor.setSelection(start: number, end: number): void
 editor.setTrackVolume(trackId: string, volume: number): void
@@ -196,15 +255,45 @@ editor.setMasterVolume(volume: number): void
 'daw-play'          // Playback started
 'daw-pause'         // Playback paused
 'daw-stop'          // Playback stopped
-'daw-record'        // Recording started: detail: {trackId}
-'daw-record-stop'   // Recording stopped: detail: {trackId, clip}
-'daw-record-arm'    // Record armed/disarmed: detail: {armed}
+'daw-record'        // Recording started: detail: {trackIds: string[]}
+'daw-record-stop'   // Recording stopped: detail: {trackIds: string[], clips: ClipInfo[]}
+'daw-record-arm'    // Track armed/disarmed: detail: {trackId, armed, armedTrackIds}
 'daw-timeupdate'    // Playback time changed (RAF)
 'daw-selection'     // Selection changed: detail: {start, end}
 'daw-track-select'  // Track selected: detail: {trackId}
 'daw-tracks-change' // Tracks mutated (move/trim/split): detail: {tracks}
 'daw-zoom'          // Zoom changed: detail: {samplesPerPixel}
 ```
+
+### `<daw-track>` API
+
+**Attributes (reflected):**
+```
+src              String    —        Audio source URL
+name             String    —        Track display name
+volume           Number    1        Track volume (0–1)
+pan              Number    0        Stereo pan (-1 to 1)
+muted            Boolean   false    Track is muted
+soloed           Boolean   false    Track is soloed
+record-armed     Boolean   false    Track is armed for recording
+input-device     String    —        MediaDeviceInfo.deviceId for mic input
+```
+
+**Properties (JS only):**
+```typescript
+track.recordArmed: boolean       // Reflects record-armed attribute
+track.inputDevice: string|null   // Reflects input-device attribute
+track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording)
+track.inputStream: MediaStream   // Read-only: active mic stream when recording
+```
+
+**Methods:**
+```typescript
+track.arm(deviceId?: string): Promise<void>   // Arm for recording, request mic access
+track.disarm(): void                          // Disarm, release mic stream
+```
+
+When `arm()` is called without a `deviceId`, it uses the default input device. The method requests mic permission via `getUserMedia()` and stores the stream for use when recording starts. Calling `arm()` on an already-armed track with a different `deviceId` switches the input device.
 
 ---
 
