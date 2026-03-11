@@ -594,8 +594,7 @@ React users install `@dawcore/react` for a familiar props + callbacks API that w
 ## Open Questions
 
 1. **Lit or vanilla?** — Lit adds ~6KB but provides reactive properties, efficient re-rendering, and `@property` decorators. Vanilla `HTMLElement` subclasses are lighter but more boilerplate. Recommend Lit for productivity.
-2. **Canvas rendering strategy** — Keep multi-canvas chunk approach. Single-canvas consolidation would hit browser max canvas width limits on long timelines and lose virtual scrolling benefits. Decided: keep chunks.
-3. **Custom Elements Manifest** — Generate with `@custom-elements-manifest/analyzer` for IDE autocomplete and Storybook integration?
-4. **SSR** — Declarative Shadow DOM support needed? Audio editors are inherently client-side, but some frameworks expect SSR compatibility.
-5. **Backwards compatibility period** — Maintain waveform-playlist v10 alongside dawcore 1.0 for a transition period?
-6. **Monorepo or new repo?** — Start fresh at github.com/dawcore, or develop in the existing waveform-playlist repo and publish under the new scope?
+2. **Custom Elements Manifest** — Generate with `@custom-elements-manifest/analyzer` for IDE autocomplete and Storybook integration?
+3. **SSR** — Declarative Shadow DOM support needed? Audio editors are inherently client-side, but some frameworks expect SSR compatibility.
+4. **Backwards compatibility period** — Maintain waveform-playlist v10 alongside dawcore 1.0 for a transition period?
+5. **Monorepo or new repo?** — Start fresh at github.com/dawcore, or develop in the existing waveform-playlist repo and publish under the new scope?
