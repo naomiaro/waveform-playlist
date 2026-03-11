@@ -392,12 +392,40 @@ The existing `SnapToGridModifier` and `ClipCollisionModifier` from the browser p
 
 ---
 
-## React 19+ Usage (No Wrapper Needed)
+## Framework Usage
 
-React 19+ has native Custom Elements interop — properties are set directly (not stringified to attributes) and custom events work via `onEventName` props. No `@dawcore/react` wrapper package needed.
+All frameworks just need `import '@dawcore/components'` to register the custom elements. No wrapper packages needed.
+
+### Vanilla JS
+
+```html
+<script type="module">
+  import '@dawcore/components';
+
+  const editor = document.querySelector('daw-editor');
+  editor.addEventListener('daw-ready', () => console.log('loaded'));
+  editor.addEventListener('daw-record', (e) => {
+    console.log('recording', e.detail.trackIds);
+  });
+
+  document.querySelector('#play').addEventListener('click', () => {
+    editor.play();
+  });
+</script>
+
+<button id="play">Play</button>
+<daw-editor id="my-editor" samples-per-pixel="1024" wave-height="128" timescale>
+  <daw-track src="/audio/vocals.mp3" name="Vocals"></daw-track>
+  <daw-track src="/audio/guitar.mp3" name="Guitar" record-armed></daw-track>
+</daw-editor>
+```
+
+### React 19+
+
+React 19+ has native Custom Elements interop — properties are set directly (not stringified to attributes) and custom events work via `onEventName` props. No wrapper package needed. React 18 is not supported.
 
 ```tsx
-import '@dawcore/components'; // Registers custom elements
+import '@dawcore/components';
 
 function App() {
   const editorRef = useRef<DawEditorElement>(null);
@@ -436,7 +464,107 @@ declare namespace JSX {
 }
 ```
 
-**React 18 is not supported** — it stringifies all custom element properties and cannot listen to custom events in JSX. Minimum React version: 19.
+### Vue 3
+
+```vue
+<template>
+  <button @click="play">Play</button>
+  <daw-editor
+    :samples-per-pixel="1024"
+    :wave-height="128"
+    timescale
+    @daw-ready="onReady"
+    @daw-tracks-change="onTracksChange"
+    @daw-record="onRecord"
+  >
+    <daw-track src="/audio/vocals.mp3" name="Vocals" />
+    <daw-track src="/audio/guitar.mp3" name="Guitar" record-armed />
+  </daw-editor>
+</template>
+
+<script setup>
+import '@dawcore/components';
+import { ref } from 'vue';
+
+const editorRef = ref(null);
+function play() { editorRef.value?.play(); }
+function onReady() { console.log('loaded'); }
+function onTracksChange(e) { console.log(e.detail.tracks); }
+function onRecord(e) { console.log('recording', e.detail.trackIds); }
+</script>
+```
+
+One config line tells the Vue compiler which tags are custom elements:
+
+```typescript
+// vite.config.ts
+vue({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('daw-') } } })
+```
+
+### Svelte
+
+```svelte
+<script>
+  import '@dawcore/components';
+
+  let editorEl;
+</script>
+
+<button on:click={() => editorEl?.play()}>Play</button>
+<daw-editor
+  bind:this={editorEl}
+  samplesPerPixel={1024}
+  waveHeight={128}
+  timescale
+  on:daw-ready={() => console.log('loaded')}
+  on:daw-tracks-change={(e) => console.log(e.detail.tracks)}
+  on:daw-record={(e) => console.log('recording', e.detail.trackIds)}
+>
+  <daw-track src="/audio/vocals.mp3" name="Vocals" />
+  <daw-track src="/audio/guitar.mp3" name="Guitar" record-armed />
+</daw-editor>
+```
+
+No configuration needed — Svelte treats unknown tags as custom elements automatically.
+
+### Angular
+
+```typescript
+// app.module.ts
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+
+@NgModule({
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+})
+export class AppModule {}
+```
+
+```html
+<!-- app.component.html -->
+<button (click)="play()">Play</button>
+<daw-editor
+  #editor
+  [attr.samples-per-pixel]="1024"
+  [attr.wave-height]="128"
+  timescale
+  (daw-ready)="onReady()"
+  (daw-tracks-change)="onTracksChange($event)"
+  (daw-record)="onRecord($event)"
+>
+  <daw-track src="/audio/vocals.mp3" name="Vocals"></daw-track>
+  <daw-track src="/audio/guitar.mp3" name="Guitar" record-armed></daw-track>
+</daw-editor>
+```
+
+### Framework Compatibility
+
+| Framework | Properties | Custom Events | Config Needed | Extra Types |
+|-----------|-----------|---------------|---------------|-------------|
+| Vanilla JS | `.property =` | `addEventListener()` | None | None |
+| React 19+ | Native | `onDawReady` | None | JSX `IntrinsicElements` (shipped) |
+| Vue 3 | `:prop` binding | `@event` | `isCustomElement` | Optional Volar types |
+| Svelte | `prop={value}` | `on:event` | None | None |
+| Angular | `[prop]` binding | `(event)` | `CUSTOM_ELEMENTS_SCHEMA` | None |
 
 ---
 
