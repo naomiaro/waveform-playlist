@@ -1,6 +1,6 @@
 # Web Components Migration Spec
 
-Migrate to native Web Components under the **dawcore** brand, making the library framework-agnostic while providing a thin React wrapper for React users.
+Migrate to native Web Components under the **dawcore** brand, making the library truly framework-agnostic — works with vanilla JS, React 19+, Vue, Svelte, Angular, or any framework that supports Custom Elements.
 
 **Status:** Draft
 **Target:** dawcore 1.0.0
