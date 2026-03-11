@@ -102,11 +102,12 @@ Extract framework-agnostic logic, add Web Component wrappers.
   <daw-track src="/audio/guitar.mp3" name="Guitar"></daw-track>
 </daw-editor>
 
-<!-- With transport -->
+<!-- With transport (recording-aware by default) -->
 <daw-transport for="my-editor">
   <daw-play-button></daw-play-button>
   <daw-pause-button></daw-pause-button>
   <daw-stop-button></daw-stop-button>
+  <daw-record-button></daw-record-button>
   <daw-time-display></daw-time-display>
   <daw-zoom-controls></daw-zoom-controls>
 </daw-transport>
@@ -120,9 +121,10 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-track>` | Track state | Declares a track. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`. |
 | `<daw-canvas>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
 | `<daw-transport>` | Transport controls container | Groups transport buttons, links to an editor via `for` attribute. |
-| `<daw-play-button>` | play() | Triggers playback. |
-| `<daw-pause-button>` | pause() | Pauses playback. |
-| `<daw-stop-button>` | stop() | Stops and resets. |
+| `<daw-play-button>` | play() | Triggers playback. If recording is armed, starts overdub recording simultaneously. |
+| `<daw-pause-button>` | pause() | Pauses playback and recording. |
+| `<daw-stop-button>` | stop() | Stops playback and recording. Finalizes any in-progress recording into a new clip. |
+| `<daw-record-button>` | record() | Arms/starts recording. When armed, play triggers overdub. When clicked during stop, starts record + play together. |
 | `<daw-time-display>` | currentTime | Shows formatted playback time. |
 | `<daw-zoom-controls>` | zoomIn()/zoomOut() | Zoom in/out buttons. |
 | `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
@@ -135,7 +137,6 @@ Extract framework-agnostic logic, add Web Component wrappers.
 
 | Element | Package | Responsibilities |
 |---------|---------|-----------------|
-| `<daw-record-button>` | recording | Start/stop recording. |
 | `<daw-annotation>` | annotations | Time-synced text annotation. |
 | `<daw-spectrogram>` | spectrogram | FFT visualization overlay. |
 | `<daw-piano-roll>` | midi | MIDI note visualization. |
@@ -162,6 +163,8 @@ bar-gap              Number    0        Waveform bar gap
 ```typescript
 editor.tracks: ClipTrack[]           // Current track state
 editor.isPlaying: boolean            // Playback state
+editor.isRecording: boolean          // Recording state
+editor.isRecordArmed: boolean        // Record armed (waiting for play)
 editor.currentTime: number           // Current playback time
 editor.duration: number              // Total duration
 editor.selection: {start, end}       // Selection range
@@ -172,9 +175,10 @@ editor.engine: PlaylistEngine        // Direct engine access
 
 **Methods:**
 ```typescript
-editor.play(startTime?, duration?): Promise<void>
-editor.pause(): void
-editor.stop(): void
+editor.play(startTime?, duration?): Promise<void>  // Starts overdub if record is armed
+editor.pause(): void                               // Pauses both playback and recording
+editor.stop(): void                                // Stops both, finalizes recording to clip
+editor.record(): Promise<void>                     // Arms or starts recording
 editor.seekTo(time: number): void
 editor.setSelection(start: number, end: number): void
 editor.setTrackVolume(trackId: string, volume: number): void
@@ -192,6 +196,9 @@ editor.setMasterVolume(volume: number): void
 'daw-play'          // Playback started
 'daw-pause'         // Playback paused
 'daw-stop'          // Playback stopped
+'daw-record'        // Recording started: detail: {trackId}
+'daw-record-stop'   // Recording stopped: detail: {trackId, clip}
+'daw-record-arm'    // Record armed/disarmed: detail: {armed}
 'daw-timeupdate'    // Playback time changed (RAF)
 'daw-selection'     // Selection changed: detail: {start, end}
 'daw-track-select'  // Track selected: detail: {trackId}
@@ -307,6 +314,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 export function DawEditor({
   tracks, samplesPerPixel, waveHeight, timescale,
   onReady, onTracksChange, onSelectionChange,
+  onRecord, onRecordStop,
   theme, children, ...props
 }: DawEditorProps) {
   const ref = useRef<DawEditorElement>(null);
@@ -327,11 +335,13 @@ export function DawEditor({
       ['daw-ready', onReady],
       ['daw-tracks-change', (e) => onTracksChange?.(e.detail.tracks)],
       ['daw-selection', (e) => onSelectionChange?.(e.detail)],
+      ['daw-record', (e) => onRecord?.(e.detail)],
+      ['daw-record-stop', (e) => onRecordStop?.(e.detail)],
     ].filter(([, fn]) => fn);
 
     handlers.forEach(([evt, fn]) => el.addEventListener(evt, fn));
     return () => handlers.forEach(([evt, fn]) => el.removeEventListener(evt, fn));
-  }, [onReady, onTracksChange, onSelectionChange]);
+  }, [onReady, onTracksChange, onSelectionChange, onRecord, onRecordStop]);
 
   return (
     <daw-editor
@@ -401,9 +411,10 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-timescale>` — time ruler
 - [ ] CSS custom properties theme system
 - [ ] Playback: play/pause/stop/seek via element methods
-- [ ] Custom events for state changes
+- [ ] Recording: record/arm via element methods, mic access, live waveform preview
+- [ ] Custom events for state changes (including `daw-record`, `daw-record-stop`, `daw-record-arm`)
 
-**Deliverable:** Read-only multi-track waveform player with playback.
+**Deliverable:** Multi-track waveform player with playback and recording.
 
 ### Phase 2: Interactions
 
@@ -429,7 +440,6 @@ Create `@dawcore/components` package with core elements:
 
 ### Phase 4: Optional Features
 
-- [ ] `<daw-record-button>` + recording integration
 - [ ] `<daw-annotation>` + annotation rendering
 - [ ] `<daw-spectrogram>` + FFT visualization
 - [ ] `<daw-piano-roll>` + MIDI rendering
