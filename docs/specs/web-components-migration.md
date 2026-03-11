@@ -52,8 +52,7 @@ Migrate to native Web Components under the **dawcore** brand, making the library
 
 | Package | Description |
 |---------|-------------|
-| `@dawcore/components` | Web Components UI layer — Custom Elements with Shadow DOM |
-| `@dawcore/react` | Thin React wrapper — refs, props, event bindings |
+| `@dawcore/components` | Web Components UI layer — Custom Elements with Shadow DOM. Includes JSX type declarations for React 19+. |
 
 ### Renamed Packages (framework-agnostic, scope change only)
 
@@ -72,7 +71,7 @@ Migrate to native Web Components under the **dawcore** brand, making the library
 | Current | Replaced By |
 |---------|------------|
 | `@waveform-playlist/ui-components` (React + styled-components) | `@dawcore/components` (Web Components + CSS) |
-| `@waveform-playlist/browser` (React providers + hooks) | `@dawcore/components` (elements + events) + `@dawcore/react` (wrapper) |
+| `@waveform-playlist/browser` (React providers + hooks) | `@dawcore/components` (elements + events) |
 
 ### Optional Packages (migrated)
 
@@ -393,98 +392,51 @@ The existing `SnapToGridModifier` and `ClipCollisionModifier` from the browser p
 
 ---
 
-## React Wrapper (`@dawcore/react`)
+## React 19+ Usage (No Wrapper Needed)
 
-Thin wrapper that makes Web Components feel native in React:
-
-```tsx
-// @dawcore/react
-import { useRef, useEffect, useState, useCallback } from 'react';
-
-export function DawEditor({
-  tracks, samplesPerPixel, waveHeight, timescale,
-  onReady, onTracksChange, onSelectionChange,
-  onRecord, onRecordStop,
-  theme, children, ...props
-}: DawEditorProps) {
-  const ref = useRef<DawEditorElement>(null);
-
-  // Sync props to element properties
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (tracks) el.tracks = tracks;
-    if (theme) el.theme = theme;
-  }, [tracks, theme]);
-
-  // Forward custom events to React callbacks
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const handlers: [string, Function][] = [
-      ['daw-ready', onReady],
-      ['daw-tracks-change', (e) => onTracksChange?.(e.detail.tracks)],
-      ['daw-selection', (e) => onSelectionChange?.(e.detail)],
-      ['daw-record', (e) => onRecord?.(e.detail)],
-      ['daw-record-stop', (e) => onRecordStop?.(e.detail)],
-    ].filter(([, fn]) => fn);
-
-    handlers.forEach(([evt, fn]) => el.addEventListener(evt, fn));
-    return () => handlers.forEach(([evt, fn]) => el.removeEventListener(evt, fn));
-  }, [onReady, onTracksChange, onSelectionChange, onRecord, onRecordStop]);
-
-  return (
-    <daw-editor
-      ref={ref}
-      samples-per-pixel={samplesPerPixel}
-      wave-height={waveHeight}
-      timescale={timescale || undefined}
-      {...props}
-    >
-      {children}
-    </daw-editor>
-  );
-}
-
-// Convenience hook for imperative access
-export function useDawEditor() {
-  const ref = useRef<DawEditorElement>(null);
-  return {
-    ref,
-    play: (...args) => ref.current?.play(...args),
-    pause: () => ref.current?.pause(),
-    stop: () => ref.current?.stop(),
-    get isPlaying() { return ref.current?.isPlaying ?? false },
-    get currentTime() { return ref.current?.currentTime ?? 0 },
-  };
-}
-```
-
-**React usage:**
+React 19+ has native Custom Elements interop — properties are set directly (not stringified to attributes) and custom events work via `onEventName` props. No `@dawcore/react` wrapper package needed.
 
 ```tsx
-import { DawEditor, useDawEditor } from '@dawcore/react';
+import '@dawcore/components'; // Registers custom elements
 
 function App() {
-  const editor = useDawEditor();
+  const editorRef = useRef<DawEditorElement>(null);
 
   return (
     <>
-      <button onClick={() => editor.play()}>Play</button>
-      <DawEditor
-        ref={editor.ref}
-        samples-per-pixel={1024}
-        wave-height={128}
+      <button onClick={() => editorRef.current?.play()}>Play</button>
+      <daw-editor
+        ref={editorRef}
+        samplesPerPixel={1024}
+        waveHeight={128}
         timescale
-        onReady={() => console.log('loaded')}
+        onDawReady={() => console.log('loaded')}
+        onDawTracksChange={(e) => console.log(e.detail.tracks)}
+        onDawRecord={(e) => console.log('recording', e.detail.trackIds)}
       >
         <daw-track src="/audio/vocals.mp3" name="Vocals" />
-        <daw-track src="/audio/guitar.mp3" name="Guitar" />
-      </DawEditor>
+        <daw-track src="/audio/guitar.mp3" name="Guitar" recordArmed />
+      </daw-editor>
     </>
   );
 }
 ```
+
+**JSX type declarations** ship inside `@dawcore/components` so TypeScript knows the valid attributes:
+
+```typescript
+// @dawcore/components/jsx.d.ts
+declare namespace JSX {
+  interface IntrinsicElements {
+    'daw-editor': DawEditorAttributes & React.HTMLAttributes<DawEditorElement>;
+    'daw-track': DawTrackAttributes & React.HTMLAttributes<DawTrackElement>;
+    'daw-transport': DawTransportAttributes & React.HTMLAttributes<HTMLElement>;
+    // ... all elements
+  }
+}
+```
+
+**React 18 is not supported** — it stringifies all custom element properties and cannot listen to custom events in JSX. Minimum React version: 19.
 
 ---
 
@@ -537,16 +489,14 @@ Create `@dawcore/components` package with core elements:
 
 **Deliverable:** Feature parity with current React version.
 
-### Phase 5: React Wrapper
+### Phase 5: React 19+ & JSX Types
 
-- [ ] `@dawcore/react` package
-- [ ] Props → attributes/properties sync
-- [ ] Custom events → React callbacks
-- [ ] `useDawEditor()` hook for imperative access
-- [ ] TypeScript declarations for JSX (`IntrinsicElements`)
+- [ ] JSX `IntrinsicElements` type declarations for all `<daw-*>` elements
+- [ ] Ship types inside `@dawcore/components` (no separate React package)
+- [ ] React 19+ example app verifying native Custom Elements interop
 - [ ] Storybook stories (shared between vanilla and React)
 
-**Deliverable:** Drop-in React package consuming Web Components.
+**Deliverable:** React 19+ users consume Web Components directly in JSX with full type safety.
 
 ### Phase 6: Documentation & Migration Guide
 
@@ -587,7 +537,7 @@ Create `@dawcore/components` package with core elements:
 | styled-components theme | CSS custom properties |
 | `@dnd-kit/react` | `@dnd-kit/dom` |
 
-React users install `@dawcore/react` for a familiar props + callbacks API that wraps the Web Components internally.
+React 19+ users consume `@dawcore/components` directly in JSX — no wrapper package needed. React 18 is not supported.
 
 ---
 
