@@ -550,7 +550,7 @@ Create `@dawcore/components` package with core elements:
 
 ### Phase 6: Documentation & Migration Guide
 
-- [ ] Website at dawcore.dev or similar
+- [ ] Website at dawcore.com
 - [ ] React migration guide (waveform-playlist v10 → dawcore 1.0)
 - [ ] Vanilla JS getting started guide
 - [ ] API reference for all elements
