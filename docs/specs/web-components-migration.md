@@ -594,7 +594,7 @@ React users install `@dawcore/react` for a familiar props + callbacks API that w
 ## Open Questions
 
 1. **Lit or vanilla?** — Decided: **Lit**. Adds ~6KB but provides reactive properties, efficient re-rendering, and `@property` decorators. Reduces boilerplate significantly compared to vanilla `HTMLElement` subclasses. Well-maintained by Google, widely adopted, and has first-class Storybook support.
-2. **Custom Elements Manifest** — Generate with `@custom-elements-manifest/analyzer` for IDE autocomplete and Storybook integration?
+2. **Custom Elements Manifest** — Decided: **yes**. Generate with `@custom-elements-manifest/analyzer` from Lit source. Provides IDE autocomplete (VS Code suggests attributes in HTML), Storybook auto-generated controls, and machine-readable API docs. No manual maintenance — reads `@property()` decorators and JSDoc automatically.
 3. **SSR** — Declarative Shadow DOM support needed? Audio editors are inherently client-side, but some frameworks expect SSR compatibility.
 4. **Backwards compatibility period** — Maintain waveform-playlist v10 alongside dawcore 1.0 for a transition period?
 5. **Repo migration** — Recommend transferring `naomiaro/waveform-playlist` to `dawcore` org via GitHub's transfer ownership feature (Settings → Danger Zone). Preserves stars, watchers, forks, issues, PRs, and git history. Old URLs redirect automatically. Then rename to desired repo name (e.g., `dawcore/editor`). GitHub Sponsors stays on `github.com/sponsors/naomiaro` (per-user, not per-repo).
