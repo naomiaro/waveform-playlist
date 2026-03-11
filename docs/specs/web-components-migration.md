@@ -119,7 +119,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 |---------|-------|-----------------|
 | `<daw-editor>` | PlaylistEngine + ToneAdapter | Root element. Manages engine, audio context, tracks, state. |
 | `<daw-track>` | Track state | Declares a track. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`. |
-| `<daw-canvas>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
+| `<daw-waveform>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
 | `<daw-transport>` | Transport controls container | Groups transport buttons, links to an editor via `for` attribute. |
 | `<daw-play-button>` | play() | Triggers playback. If recording is armed, starts overdub recording simultaneously. |
 | `<daw-pause-button>` | pause() | Pauses playback and recording. |
@@ -651,7 +651,7 @@ Create `@dawcore/components` package with core elements:
 
 - [ ] `<daw-editor>` — engine + audio context lifecycle, track management
 - [ ] `<daw-track>` — track declaration via attributes, audio loading
-- [ ] `<daw-canvas>` — canvas waveform rendering (port existing canvas code)
+- [ ] `<daw-waveform>` — canvas waveform rendering (port existing canvas code)
 - [ ] `<daw-playhead>` — animated playhead
 - [ ] `<daw-ruler>` — time ruler
 - [ ] CSS custom properties theme system
