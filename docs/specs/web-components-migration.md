@@ -404,6 +404,23 @@ Slotted content lives in the light DOM and can't access shadow DOM internals dir
 </script>
 ```
 
+**Built-in elements use the same event contract.** `<daw-mute-button>` dispatches `daw-mute`, `<daw-solo-button>` dispatches `daw-solo` — the parent `<daw-track>` listens and toggles state. Since events keep bubbling, `<daw-editor>` also sees them (needed for solo logic which spans all tracks).
+
+```html
+<daw-track src="vocals.mp3" name="Vocals">
+  <div slot="controls">
+    <!-- Built-in: fires daw-mute event -->
+    <daw-mute-button></daw-mute-button>
+    <!-- Custom: fires the same event, same behavior -->
+    <button onclick="this.dispatchEvent(new CustomEvent('daw-mute', { bubbles: true, composed: true }))">
+      My Custom Mute
+    </button>
+  </div>
+</daw-track>
+```
+
+The track doesn't care what fired the event — any element that dispatches `daw-mute` triggers the same toggle. This makes every built-in control replaceable with a custom implementation.
+
 **Key pattern:** Instead of pulling state down via hooks (React), navigate up via `closest()` and read properties from elements. Elements are the state containers — the DOM tree is the context.
 
 ---
