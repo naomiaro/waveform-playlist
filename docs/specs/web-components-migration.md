@@ -1,9 +1,11 @@
 # Web Components Migration Spec
 
-Migrate waveform-playlist's UI layer from React to native Web Components, making the library framework-agnostic while providing a thin React wrapper for React users.
+Migrate to native Web Components under the **dawcore** brand, making the library framework-agnostic while providing a thin React wrapper for React users.
 
 **Status:** Draft
-**Target:** v11.0.0
+**Target:** dawcore 1.0.0
+**npm:** `@dawcore/*`
+**GitHub:** [github.com/dawcore](https://github.com/dawcore)
 
 ---
 
@@ -50,23 +52,38 @@ Migrate waveform-playlist's UI layer from React to native Web Components, making
 
 | Package | Description |
 |---------|-------------|
-| `@waveform-playlist/components` | Web Components UI layer — Custom Elements with Shadow DOM |
-| `@waveform-playlist/react` | Thin React wrapper — refs, props, event bindings |
+| `@dawcore/components` | Web Components UI layer — Custom Elements with Shadow DOM |
+| `@dawcore/react` | Thin React wrapper — refs, props, event bindings |
+
+### Renamed Packages (framework-agnostic, scope change only)
+
+| Current | New |
+|---------|-----|
+| `@waveform-playlist/core` | `@dawcore/core` |
+| `@waveform-playlist/engine` | `@dawcore/engine` |
+| `@waveform-playlist/playout` | `@dawcore/playout` |
+| `@waveform-playlist/worklets` | `@dawcore/worklets` |
+| `@waveform-playlist/webaudio-peaks` | `@dawcore/webaudio-peaks` |
+| `@waveform-playlist/loaders` | `@dawcore/loaders` |
+| `@waveform-playlist/media-element-playout` | `@dawcore/media-element-playout` |
 
 ### Replaced Packages
 
 | Current | Replaced By |
 |---------|------------|
-| `ui-components` (React + styled-components) | `components` (Web Components + CSS) |
-| `browser` (React providers + hooks) | `components` (elements + events) + `react` (wrapper) |
-
-### Unchanged Packages
-
-core, engine, playout, worklets, webaudio-peaks, loaders, media-element-playout
+| `@waveform-playlist/ui-components` (React + styled-components) | `@dawcore/components` (Web Components + CSS) |
+| `@waveform-playlist/browser` (React providers + hooks) | `@dawcore/components` (elements + events) + `@dawcore/react` (wrapper) |
 
 ### Optional Packages (migrated)
 
-recording, annotations, spectrogram, midi — extract framework-agnostic logic, add Web Component wrappers.
+| Current | New |
+|---------|-----|
+| `@waveform-playlist/recording` | `@dawcore/recording` |
+| `@waveform-playlist/annotations` | `@dawcore/annotations` |
+| `@waveform-playlist/spectrogram` | `@dawcore/spectrogram` |
+| `@waveform-playlist/midi` | `@dawcore/midi` |
+
+Extract framework-agnostic logic, add Web Component wrappers.
 
 ---
 
@@ -76,58 +93,58 @@ recording, annotations, spectrogram, midi — extract framework-agnostic logic, 
 
 ```html
 <!-- Minimal setup -->
-<waveform-playlist
+<daw-editor
   samples-per-pixel="1024"
   wave-height="128"
   timescale
 >
-  <waveform-track src="/audio/vocals.mp3" name="Vocals"></waveform-track>
-  <waveform-track src="/audio/guitar.mp3" name="Guitar"></waveform-track>
-</waveform-playlist>
+  <daw-track src="/audio/vocals.mp3" name="Vocals"></daw-track>
+  <daw-track src="/audio/guitar.mp3" name="Guitar"></daw-track>
+</daw-editor>
 
 <!-- With transport -->
-<waveform-transport for="my-playlist">
-  <waveform-play-button></waveform-play-button>
-  <waveform-pause-button></waveform-pause-button>
-  <waveform-stop-button></waveform-stop-button>
-  <waveform-time-display></waveform-time-display>
-  <waveform-zoom-controls></waveform-zoom-controls>
-</waveform-transport>
+<daw-transport for="my-editor">
+  <daw-play-button></daw-play-button>
+  <daw-pause-button></daw-pause-button>
+  <daw-stop-button></daw-stop-button>
+  <daw-time-display></daw-time-display>
+  <daw-zoom-controls></daw-zoom-controls>
+</daw-transport>
 ```
 
 ### Element Registry
 
 | Element | Wraps | Responsibilities |
 |---------|-------|-----------------|
-| `<waveform-playlist>` | PlaylistEngine + ToneAdapter | Root element. Manages engine, audio context, tracks, state. |
-| `<waveform-track>` | Track state | Declares a track. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`. |
-| `<waveform-canvas>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
-| `<waveform-transport>` | Transport controls container | Groups transport buttons, links to a playlist via `for` attribute. |
-| `<waveform-play-button>` | play() | Triggers playback. |
-| `<waveform-pause-button>` | pause() | Pauses playback. |
-| `<waveform-stop-button>` | stop() | Stops and resets. |
-| `<waveform-time-display>` | currentTime | Shows formatted playback time. |
-| `<waveform-zoom-controls>` | zoomIn()/zoomOut() | Zoom in/out buttons. |
-| `<waveform-volume-slider>` | setTrackVolume() | Per-track or master volume. |
-| `<waveform-pan-slider>` | setTrackPan() | Per-track pan control. |
-| `<waveform-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
-| `<waveform-timescale>` | Time ruler | Renders time ruler above tracks. |
-| `<waveform-cursor>` | Playhead | Animated playhead line. |
+| `<daw-editor>` | PlaylistEngine + ToneAdapter | Root element. Manages engine, audio context, tracks, state. |
+| `<daw-track>` | Track state | Declares a track. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`. |
+| `<daw-canvas>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
+| `<daw-transport>` | Transport controls container | Groups transport buttons, links to an editor via `for` attribute. |
+| `<daw-play-button>` | play() | Triggers playback. |
+| `<daw-pause-button>` | pause() | Pauses playback. |
+| `<daw-stop-button>` | stop() | Stops and resets. |
+| `<daw-time-display>` | currentTime | Shows formatted playback time. |
+| `<daw-zoom-controls>` | zoomIn()/zoomOut() | Zoom in/out buttons. |
+| `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
+| `<daw-pan-slider>` | setTrackPan() | Per-track pan control. |
+| `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
+| `<daw-timescale>` | Time ruler | Renders time ruler above tracks. |
+| `<daw-cursor>` | Playhead | Animated playhead line. |
 
 ### Optional Elements
 
 | Element | Package | Responsibilities |
 |---------|---------|-----------------|
-| `<waveform-record-button>` | recording | Start/stop recording. |
-| `<waveform-annotation>` | annotations | Time-synced text annotation. |
-| `<waveform-spectrogram>` | spectrogram | FFT visualization overlay. |
-| `<waveform-piano-roll>` | midi | MIDI note visualization. |
+| `<daw-record-button>` | recording | Start/stop recording. |
+| `<daw-annotation>` | annotations | Time-synced text annotation. |
+| `<daw-spectrogram>` | spectrogram | FFT visualization overlay. |
+| `<daw-piano-roll>` | midi | MIDI note visualization. |
 
 ---
 
 ## Properties, Attributes & Events
 
-### `<waveform-playlist>` API
+### `<daw-editor>` API
 
 **Attributes (reflected):**
 ```
@@ -143,43 +160,43 @@ bar-gap              Number    0        Waveform bar gap
 
 **Properties (JS only):**
 ```typescript
-playlist.tracks: ClipTrack[]           // Current track state
-playlist.isPlaying: boolean            // Playback state
-playlist.currentTime: number           // Current playback time
-playlist.duration: number              // Total duration
-playlist.selection: {start, end}       // Selection range
-playlist.selectedTrackId: string|null  // Selected track
-playlist.theme: WaveformPlaylistTheme  // Theme object
-playlist.engine: PlaylistEngine        // Direct engine access
+editor.tracks: ClipTrack[]           // Current track state
+editor.isPlaying: boolean            // Playback state
+editor.currentTime: number           // Current playback time
+editor.duration: number              // Total duration
+editor.selection: {start, end}       // Selection range
+editor.selectedTrackId: string|null  // Selected track
+editor.theme: DawcoreTheme           // Theme object
+editor.engine: PlaylistEngine        // Direct engine access
 ```
 
 **Methods:**
 ```typescript
-playlist.play(startTime?, duration?): Promise<void>
-playlist.pause(): void
-playlist.stop(): void
-playlist.seekTo(time: number): void
-playlist.setSelection(start: number, end: number): void
-playlist.setTrackVolume(trackId: string, volume: number): void
-playlist.setTrackPan(trackId: string, pan: number): void
-playlist.setTrackMute(trackId: string, muted: boolean): void
-playlist.setTrackSolo(trackId: string, soloed: boolean): void
-playlist.zoomIn(): void
-playlist.zoomOut(): void
-playlist.setMasterVolume(volume: number): void
+editor.play(startTime?, duration?): Promise<void>
+editor.pause(): void
+editor.stop(): void
+editor.seekTo(time: number): void
+editor.setSelection(start: number, end: number): void
+editor.setTrackVolume(trackId: string, volume: number): void
+editor.setTrackPan(trackId: string, pan: number): void
+editor.setTrackMute(trackId: string, muted: boolean): void
+editor.setTrackSolo(trackId: string, soloed: boolean): void
+editor.zoomIn(): void
+editor.zoomOut(): void
+editor.setMasterVolume(volume: number): void
 ```
 
 **Events:**
 ```typescript
-'waveform-ready'         // All tracks loaded
-'waveform-play'          // Playback started
-'waveform-pause'         // Playback paused
-'waveform-stop'          // Playback stopped
-'waveform-timeupdate'    // Playback time changed (RAF)
-'waveform-selection'     // Selection changed: detail: {start, end}
-'waveform-track-select'  // Track selected: detail: {trackId}
-'waveform-tracks-change' // Tracks mutated (move/trim/split): detail: {tracks}
-'waveform-zoom'          // Zoom changed: detail: {samplesPerPixel}
+'daw-ready'         // All tracks loaded
+'daw-play'          // Playback started
+'daw-pause'         // Playback paused
+'daw-stop'          // Playback stopped
+'daw-timeupdate'    // Playback time changed (RAF)
+'daw-selection'     // Selection changed: detail: {start, end}
+'daw-track-select'  // Track selected: detail: {trackId}
+'daw-tracks-change' // Tracks mutated (move/trim/split): detail: {tracks}
+'daw-zoom'          // Zoom changed: detail: {samplesPerPixel}
 ```
 
 ---
@@ -191,19 +208,19 @@ playlist.setMasterVolume(volume: number): void
 Replace styled-components theme with CSS custom properties:
 
 ```css
-waveform-playlist {
-  --waveform-wave-color: #c49a6c;
-  --waveform-progress-color: #63C75F;
-  --waveform-cursor-color: #d08070;
-  --waveform-selection-color: rgba(99, 199, 95, 0.3);
-  --waveform-background: #1a1a2e;
-  --waveform-track-background: #16213e;
-  --waveform-timescale-color: #c49a6c;
-  --waveform-timescale-background: #0f0f1a;
-  --waveform-controls-background: #1a1a2e;
-  --waveform-controls-text: #e0d4c8;
-  --waveform-clip-header-background: rgba(0,0,0,0.4);
-  --waveform-clip-header-text: #e0d4c8;
+daw-editor {
+  --daw-wave-color: #c49a6c;
+  --daw-progress-color: #63C75F;
+  --daw-cursor-color: #d08070;
+  --daw-selection-color: rgba(99, 199, 95, 0.3);
+  --daw-background: #1a1a2e;
+  --daw-track-background: #16213e;
+  --daw-timescale-color: #c49a6c;
+  --daw-timescale-background: #0f0f1a;
+  --daw-controls-background: #1a1a2e;
+  --daw-controls-text: #e0d4c8;
+  --daw-clip-header-background: rgba(0,0,0,0.4);
+  --daw-clip-header-text: #e0d4c8;
 }
 ```
 
@@ -211,28 +228,28 @@ waveform-playlist {
 
 ```css
 /* Style internal parts from outside */
-waveform-playlist::part(timescale) { font-family: 'Courier New'; }
-waveform-playlist::part(track) { border-bottom: 1px solid #333; }
-waveform-playlist::part(cursor) { width: 2px; }
-waveform-track::part(controls) { width: 200px; }
-waveform-track::part(waveform) { background: #111; }
-waveform-vu-meter::part(segment) { border-radius: 2px; }
+daw-editor::part(timescale) { font-family: 'Courier New'; }
+daw-editor::part(track) { border-bottom: 1px solid #333; }
+daw-editor::part(cursor) { width: 2px; }
+daw-track::part(controls) { width: 200px; }
+daw-track::part(waveform) { background: #111; }
+daw-vu-meter::part(segment) { border-radius: 2px; }
 ```
 
 ### Slots
 
 ```html
-<waveform-playlist>
+<daw-editor>
   <!-- Default slot: tracks -->
-  <waveform-track src="vocals.mp3" name="Vocals">
+  <daw-track src="vocals.mp3" name="Vocals">
     <!-- Named slot: custom track controls -->
     <div slot="controls">
-      <waveform-volume-slider></waveform-volume-slider>
-      <waveform-pan-slider></waveform-pan-slider>
+      <daw-volume-slider></daw-volume-slider>
+      <daw-pan-slider></daw-pan-slider>
       <button slot="controls">FX</button>
     </div>
-  </waveform-track>
-</waveform-playlist>
+  </daw-track>
+</daw-editor>
 ```
 
 ---
@@ -242,7 +259,7 @@ waveform-vu-meter::part(segment) { border-radius: 2px; }
 Replace `@dnd-kit/react` with `@dnd-kit/dom` (vanilla):
 
 ```typescript
-// Inside <waveform-playlist> connectedCallback
+// Inside <daw-editor> connectedCallback
 import { DragDropManager, Draggable, Droppable } from '@dnd-kit/dom';
 
 this.dragManager = new DragDropManager({
@@ -279,20 +296,20 @@ The existing `SnapToGridModifier` and `ClipCollisionModifier` from the browser p
 
 ---
 
-## React Wrapper (`@waveform-playlist/react`)
+## React Wrapper (`@dawcore/react`)
 
 Thin wrapper that makes Web Components feel native in React:
 
 ```tsx
-// @waveform-playlist/react
+// @dawcore/react
 import { useRef, useEffect, useState, useCallback } from 'react';
 
-export function WaveformPlaylist({
+export function DawEditor({
   tracks, samplesPerPixel, waveHeight, timescale,
   onReady, onTracksChange, onSelectionChange,
   theme, children, ...props
-}: WaveformPlaylistProps) {
-  const ref = useRef<WaveformPlaylistElement>(null);
+}: DawEditorProps) {
+  const ref = useRef<DawEditorElement>(null);
 
   // Sync props to element properties
   useEffect(() => {
@@ -307,9 +324,9 @@ export function WaveformPlaylist({
     const el = ref.current;
     if (!el) return;
     const handlers: [string, Function][] = [
-      ['waveform-ready', onReady],
-      ['waveform-tracks-change', (e) => onTracksChange?.(e.detail.tracks)],
-      ['waveform-selection', (e) => onSelectionChange?.(e.detail)],
+      ['daw-ready', onReady],
+      ['daw-tracks-change', (e) => onTracksChange?.(e.detail.tracks)],
+      ['daw-selection', (e) => onSelectionChange?.(e.detail)],
     ].filter(([, fn]) => fn);
 
     handlers.forEach(([evt, fn]) => el.addEventListener(evt, fn));
@@ -317,7 +334,7 @@ export function WaveformPlaylist({
   }, [onReady, onTracksChange, onSelectionChange]);
 
   return (
-    <waveform-playlist
+    <daw-editor
       ref={ref}
       samples-per-pixel={samplesPerPixel}
       wave-height={waveHeight}
@@ -325,13 +342,13 @@ export function WaveformPlaylist({
       {...props}
     >
       {children}
-    </waveform-playlist>
+    </daw-editor>
   );
 }
 
 // Convenience hook for imperative access
-export function usePlaylistRef() {
-  const ref = useRef<WaveformPlaylistElement>(null);
+export function useDawEditor() {
+  const ref = useRef<DawEditorElement>(null);
   return {
     ref,
     play: (...args) => ref.current?.play(...args),
@@ -346,24 +363,24 @@ export function usePlaylistRef() {
 **React usage:**
 
 ```tsx
-import { WaveformPlaylist, usePlaylistRef } from '@waveform-playlist/react';
+import { DawEditor, useDawEditor } from '@dawcore/react';
 
 function App() {
-  const playlist = usePlaylistRef();
+  const editor = useDawEditor();
 
   return (
     <>
-      <button onClick={() => playlist.play()}>Play</button>
-      <WaveformPlaylist
-        ref={playlist.ref}
+      <button onClick={() => editor.play()}>Play</button>
+      <DawEditor
+        ref={editor.ref}
         samples-per-pixel={1024}
         wave-height={128}
         timescale
         onReady={() => console.log('loaded')}
       >
-        <waveform-track src="/audio/vocals.mp3" name="Vocals" />
-        <waveform-track src="/audio/guitar.mp3" name="Guitar" />
-      </WaveformPlaylist>
+        <daw-track src="/audio/vocals.mp3" name="Vocals" />
+        <daw-track src="/audio/guitar.mp3" name="Guitar" />
+      </DawEditor>
     </>
   );
 }
@@ -375,13 +392,13 @@ function App() {
 
 ### Phase 1: Foundation
 
-Create `@waveform-playlist/components` package with core elements:
+Create `@dawcore/components` package with core elements:
 
-- [ ] `<waveform-playlist>` — engine + audio context lifecycle, track management
-- [ ] `<waveform-track>` — track declaration via attributes, audio loading
-- [ ] `<waveform-canvas>` — canvas waveform rendering (port existing canvas code)
-- [ ] `<waveform-cursor>` — animated playhead
-- [ ] `<waveform-timescale>` — time ruler
+- [ ] `<daw-editor>` — engine + audio context lifecycle, track management
+- [ ] `<daw-track>` — track declaration via attributes, audio loading
+- [ ] `<daw-canvas>` — canvas waveform rendering (port existing canvas code)
+- [ ] `<daw-cursor>` — animated playhead
+- [ ] `<daw-timescale>` — time ruler
 - [ ] CSS custom properties theme system
 - [ ] Playback: play/pause/stop/seek via element methods
 - [ ] Custom events for state changes
@@ -395,37 +412,37 @@ Create `@waveform-playlist/components` package with core elements:
 - [ ] Clip splitting (keyboard shortcut)
 - [ ] Selection (click + drag on timeline)
 - [ ] Track selection
-- [ ] `<waveform-transport>` with button elements
+- [ ] `<daw-transport>` with button elements
 
 **Deliverable:** Interactive editor with drag/trim/split.
 
 ### Phase 3: Track Controls
 
-- [ ] `<waveform-volume-slider>` — per-track and master
-- [ ] `<waveform-pan-slider>`
+- [ ] `<daw-volume-slider>` — per-track and master
+- [ ] `<daw-pan-slider>`
 - [ ] Mute/solo buttons
-- [ ] `<waveform-vu-meter>` — port SegmentedVUMeter to Custom Element
-- [ ] `<waveform-zoom-controls>`
-- [ ] `<waveform-time-display>`
+- [ ] `<daw-vu-meter>` — port SegmentedVUMeter to Custom Element
+- [ ] `<daw-zoom-controls>`
+- [ ] `<daw-time-display>`
 
 **Deliverable:** Full mixing controls.
 
 ### Phase 4: Optional Features
 
-- [ ] `<waveform-record-button>` + recording integration
-- [ ] `<waveform-annotation>` + annotation rendering
-- [ ] `<waveform-spectrogram>` + FFT visualization
-- [ ] `<waveform-piano-roll>` + MIDI rendering
+- [ ] `<daw-record-button>` + recording integration
+- [ ] `<daw-annotation>` + annotation rendering
+- [ ] `<daw-spectrogram>` + FFT visualization
+- [ ] `<daw-piano-roll>` + MIDI rendering
 - [ ] Loop region UI
 
 **Deliverable:** Feature parity with current React version.
 
 ### Phase 5: React Wrapper
 
-- [ ] `@waveform-playlist/react` package
+- [ ] `@dawcore/react` package
 - [ ] Props → attributes/properties sync
 - [ ] Custom events → React callbacks
-- [ ] `usePlaylistRef()` hook for imperative access
+- [ ] `useDawEditor()` hook for imperative access
 - [ ] TypeScript declarations for JSX (`IntrinsicElements`)
 - [ ] Storybook stories (shared between vanilla and React)
 
@@ -433,8 +450,8 @@ Create `@waveform-playlist/components` package with core elements:
 
 ### Phase 6: Documentation & Migration Guide
 
-- [ ] Update website examples to use Web Components
-- [ ] React migration guide (v10 → v11)
+- [ ] Website at dawcore.dev or similar
+- [ ] React migration guide (waveform-playlist v10 → dawcore 1.0)
 - [ ] Vanilla JS getting started guide
 - [ ] API reference for all elements
 - [ ] Storybook for component catalog
@@ -451,26 +468,26 @@ Create `@waveform-playlist/components` package with core elements:
 | **Testing** | Vitest + @open-wc/testing or vanilla DOM assertions |
 | **Storybook** | @storybook/web-components with lit-html |
 | **Drag & Drop** | @dnd-kit/dom (vanilla) |
-| **Docs** | Docusaurus (unchanged) |
+| **Docs** | Docusaurus or Starlight |
 
 ---
 
-## Breaking Changes (v10 → v11)
+## Breaking Changes (waveform-playlist v10 → dawcore 1.0)
 
-| v10 | v11 |
-|-----|-----|
-| `@waveform-playlist/browser` (React) | `@waveform-playlist/components` (Web Components) |
-| `@waveform-playlist/ui-components` (React) | Merged into `components` |
-| `WaveformPlaylistProvider` (React context) | `<waveform-playlist>` element |
+| waveform-playlist v10 | dawcore 1.0 |
+|-----------------------|-------------|
+| `@waveform-playlist/browser` (React) | `@dawcore/components` (Web Components) |
+| `@waveform-playlist/ui-components` (React) | Merged into `@dawcore/components` |
+| `WaveformPlaylistProvider` (React context) | `<daw-editor>` element |
 | `usePlaylistControls()` | `element.play()`, `element.stop()`, etc. |
 | `usePlaylistState()` | `element.isPlaying`, `element.selection`, etc. |
 | `usePlaylistData()` | `element.tracks`, `element.duration`, etc. |
-| `usePlaybackAnimation()` | `waveform-timeupdate` event |
-| `onTracksChange` prop | `waveform-tracks-change` event |
+| `usePlaybackAnimation()` | `daw-timeupdate` event |
+| `onTracksChange` prop | `daw-tracks-change` event |
 | styled-components theme | CSS custom properties |
 | `@dnd-kit/react` | `@dnd-kit/dom` |
 
-React users install `@waveform-playlist/react` for a familiar props + callbacks API that wraps the Web Components internally.
+React users install `@dawcore/react` for a familiar props + callbacks API that wraps the Web Components internally.
 
 ---
 
@@ -480,4 +497,5 @@ React users install `@waveform-playlist/react` for a familiar props + callbacks 
 2. **Canvas rendering strategy** — Keep current multi-canvas chunk approach, or consolidate? Current approach works well for virtual scrolling.
 3. **Custom Elements Manifest** — Generate with `@custom-elements-manifest/analyzer` for IDE autocomplete and Storybook integration?
 4. **SSR** — Declarative Shadow DOM support needed? Audio editors are inherently client-side, but some frameworks expect SSR compatibility.
-5. **Backwards compatibility period** — Maintain v10 React packages alongside v11 Web Components for a transition period?
+5. **Backwards compatibility period** — Maintain waveform-playlist v10 alongside dawcore 1.0 for a transition period?
+6. **Monorepo or new repo?** — Start fresh at github.com/dawcore, or develop in the existing waveform-playlist repo and publish under the new scope?
