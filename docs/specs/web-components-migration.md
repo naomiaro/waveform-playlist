@@ -94,6 +94,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 ```html
 <!-- Minimal setup -->
 <daw-editor
+  id="my-editor"
   samples-per-pixel="1024"
   wave-height="128"
   timescale
