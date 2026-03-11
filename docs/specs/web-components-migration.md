@@ -193,7 +193,9 @@ editor.armedTrackIds.forEach(id => {
 
 | Element | Package | Responsibilities |
 |---------|---------|-----------------|
-| `<daw-annotation>` | annotations | Time-synced text annotation. |
+| `<daw-annotation-track>` | annotations | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. |
+| `<daw-annotation>` | annotations | Single annotation with `start`, `end` attributes and text content. Renders as a box in the track. |
+| `<daw-annotation-list>` | annotations | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data. |
 | `<daw-spectrogram>` | spectrogram | FFT visualization overlay. |
 | `<daw-piano-roll>` | midi | MIDI note visualization. |
 
@@ -685,7 +687,7 @@ Create `@dawcore/components` package with core elements:
 
 ### Phase 4: Optional Features
 
-- [ ] `<daw-annotation>` + annotation rendering
+- [ ] `<daw-annotation-track>`, `<daw-annotation>`, `<daw-annotation-list>` — single source of truth, dual view
 - [ ] `<daw-spectrogram>` + FFT visualization
 - [ ] `<daw-piano-roll>` + MIDI rendering
 - [ ] Loop region UI
