@@ -131,7 +131,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-pan-slider>` | setTrackPan() | Per-track pan control. |
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
 | `<daw-timescale>` | Time ruler | Renders time ruler above tracks. |
-| `<daw-cursor>` | Playhead | Animated playhead line. |
+| `<daw-playhead>` | Playhead | Animated playhead line. |
 
 ### Multi-Track Record Arming
 
@@ -307,7 +307,7 @@ Replace styled-components theme with CSS custom properties:
 daw-editor {
   --daw-wave-color: #c49a6c;
   --daw-progress-color: #63C75F;
-  --daw-cursor-color: #d08070;
+  --daw-playhead-color: #d08070;
   --daw-selection-color: rgba(99, 199, 95, 0.3);
   --daw-background: #1a1a2e;
   --daw-track-background: #16213e;
@@ -652,7 +652,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-editor>` — engine + audio context lifecycle, track management
 - [ ] `<daw-track>` — track declaration via attributes, audio loading
 - [ ] `<daw-canvas>` — canvas waveform rendering (port existing canvas code)
-- [ ] `<daw-cursor>` — animated playhead
+- [ ] `<daw-playhead>` — animated playhead
 - [ ] `<daw-timescale>` — time ruler
 - [ ] CSS custom properties theme system
 - [ ] Playback: play/pause/stop/seek via element methods
