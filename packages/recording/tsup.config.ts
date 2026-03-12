@@ -9,5 +9,4 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  external: ['tone', 'react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'styled-components'],
 });

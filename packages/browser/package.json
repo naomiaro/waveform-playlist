@@ -14,8 +14,8 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "pnpm typecheck && vite build",
-    "dev": "vite build --watch",
+    "build": "pnpm typecheck && tsup",
+    "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -47,10 +47,8 @@
     "@types/node": "^20.10.6",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
-    "@vitejs/plugin-react": "^5.1.1",
+    "tsup": "^8.0.1",
     "typescript": "^5.3.3",
-    "vite": "^7.2.4",
-    "vite-plugin-dts": "^4.5.0",
     "vitest": "^3.0.0"
   },
   "dependencies": {
