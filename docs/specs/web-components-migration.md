@@ -110,6 +110,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
   <daw-record-button></daw-record-button>
   <daw-rewind-button></daw-rewind-button>
   <daw-fast-forward-button></daw-fast-forward-button>
+  <daw-loop-button></daw-loop-button>
   <daw-time-display></daw-time-display>
   <daw-selection-start></daw-selection-start>
   <daw-selection-end></daw-selection-end>
@@ -132,6 +133,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-record-button>` | record() | Arms/starts recording on all armed tracks. When clicked during stop, arms the selected track (or first track). When clicked during play, starts overdub on armed tracks. |
 | `<daw-rewind-button>` | seekTo(0) | Rewinds playhead to the start of the timeline. |
 | `<daw-fast-forward-button>` | seekTo(duration) | Jumps playhead to the end of the timeline. |
+| `<daw-loop-button>` | toggleLoop() | Toggles loop playback for the current selection. Reflects `aria-pressed` state. |
 | `<daw-time-display>` | currentTime | Shows formatted playback time. |
 | `<daw-selection-start>` | setSelection() | Editable input showing selection start time. Updates selection on change. |
 | `<daw-selection-end>` | setSelection() | Editable input showing selection end time. Updates selection on change. |
@@ -691,6 +693,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] Mute/solo buttons
 - [ ] `<daw-vu-meter>` — port SegmentedVUMeter to Custom Element
 - [ ] `<daw-rewind-button>` / `<daw-fast-forward-button>`
+- [ ] `<daw-loop-button>`
 - [ ] `<daw-zoom-in>` / `<daw-zoom-out>`
 - [ ] `<daw-time-display>`
 - [ ] `<daw-selection-start>` / `<daw-selection-end>`
