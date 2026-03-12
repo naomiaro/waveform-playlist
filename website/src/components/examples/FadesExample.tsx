@@ -5,9 +5,9 @@
  * each showcasing a different fade curve type.
  *
  * Uses MediaElementPlaylistProvider with Web Audio routing for isolated
- * playback with fade effects. Each player has its own HTMLAudioElement
- * and AudioContext — no shared Tone.js Transport, so pressing play on
- * one player doesn't affect the others.
+ * playback with fade effects. All players share a single AudioContext
+ * (each has its own HTMLAudioElement/MediaElementSourceNode). No shared
+ * Tone.js Transport, so pressing play on one doesn't affect the others.
  */
 
 import React from 'react';
@@ -167,24 +167,16 @@ export function FadesExample() {
   const [error, setError] = React.useState<string | null>(null);
   const [showFades, setShowFades] = React.useState(true);
 
-  // Each FadePlayer needs its own AudioContext because createMediaElementSource
-  // can only be called once per audio element, and each provider creates its own element.
-  // Multiple AudioContexts on the same page is fine — the browser manages them.
-  // Lazily created via ref to avoid creating 4 suspended contexts on mount.
-  const audioContextsRef = React.useRef<AudioContext[]>([]);
-  const getAudioContext = React.useCallback((index: number): AudioContext => {
-    if (!audioContextsRef.current[index]) {
-      audioContextsRef.current[index] = new AudioContext();
-    }
-    return audioContextsRef.current[index];
-  }, []);
+  // Single shared AudioContext for all fade players. Each provider creates its
+  // own HTMLAudioElement + MediaElementSourceNode, which is fine — multiple
+  // source nodes can share one context.
+  const [audioContext] = React.useState(() => new AudioContext());
 
   React.useEffect(() => {
-    const contexts = audioContextsRef.current;
     return () => {
-      contexts.forEach((ctx) => ctx.close().catch(() => {}));
+      audioContext.close().catch(() => {});
     };
-  }, []);
+  }, [audioContext]);
 
   // Load peaks once — all 4 players use the same audio file
   React.useEffect(() => {
@@ -259,7 +251,7 @@ export function FadesExample() {
           title={title}
           description={description}
           waveformData={waveformData}
-          audioContext={getAudioContext(index)}
+          audioContext={audioContext}
           showFades={showFades}
         />
       ))}

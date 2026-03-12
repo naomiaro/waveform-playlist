@@ -6,9 +6,8 @@
  * - Custom theme colors
  * - Different visual styles for waveforms
  *
- * Uses MediaElementPlaylistProvider for isolated playback.
- * Each player has its own HTMLAudioElement — no shared Tone.js Transport,
- * so pressing play on one player doesn't affect the others.
+ * Uses MediaElementPlaylistProvider for isolated playback — no shared
+ * Tone.js Transport, so pressing play on one doesn't affect the others.
  */
 
 import React from 'react';
