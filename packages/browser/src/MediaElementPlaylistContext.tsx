@@ -9,7 +9,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { ThemeProvider } from 'styled-components';
-import { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { MediaElementPlayout, type FadeConfig } from '@waveform-playlist/media-element-playout';
 import { type WaveformDataObject } from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
 import type { AnnotationData } from '@waveform-playlist/core';
@@ -27,6 +27,10 @@ export interface MediaElementTrackConfig {
   waveformData: WaveformDataObject;
   /** Track name for display */
   name?: string;
+  /** Fade in configuration (requires audioContext on provider) */
+  fadeIn?: FadeConfig;
+  /** Fade out configuration (requires audioContext on provider) */
+  fadeOut?: FadeConfig;
 }
 
 // Context values for animation (high-frequency updates)
@@ -111,6 +115,16 @@ export interface MediaElementPlaylistProviderProps {
   progressBarWidth?: number;
   /** Callback when annotations are changed (drag, edit, etc.) */
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
+  /**
+   * AudioContext for Web Audio routing (fades, effects).
+   * When provided, audio routes through Web Audio nodes:
+   *   HTMLAudioElement → MediaElementSourceNode → fadeGain → volumeGain → destination
+   *
+   * Without this, playback uses HTMLAudioElement directly (no fades or effects).
+   * Each provider instance should use its own AudioContext or share one —
+   * createMediaElementSource() is called once per audio element.
+   */
+  audioContext?: AudioContext;
   /** Callback when audio is ready */
   onReady?: () => void;
   children: ReactNode;
@@ -145,6 +159,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   barWidth = 1,
   barGap = 0,
   progressBarWidth: progressBarWidthProp,
+  audioContext,
   onAnnotationsChange,
   onReady,
   children,
@@ -235,6 +250,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       source: track.source,
       peaks: track.waveformData,
       name: track.name,
+      audioContext,
+      fadeIn: track.fadeIn,
+      fadeOut: track.fadeOut,
     });
 
     // Set up time update callback
@@ -266,6 +284,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     track.source,
     track.waveformData,
     track.name,
+    track.fadeIn,
+    track.fadeOut,
+    audioContext,
     initialPlaybackRate,
     onReady,
     stopAnimationFrameLoop,

@@ -28,52 +28,11 @@ export default function StylingExamplePage(): React.ReactElement {
         <h1>Waveform Styling</h1>
         <p>
           Customize the visual appearance of waveforms using <code>barWidth</code> and <code>barGap</code> props,
-          combined with theme colors. These props are passed to <code>WaveformPlaylistProvider</code>.
+          combined with theme colors.
         </p>
 
         <div style={{ marginTop: '2rem' }}>
           <LazyStylingExample />
-        </div>
-
-        <div style={{ marginTop: '2rem' }}>
-          <h2>Configuration</h2>
-          <pre style={{
-            background: 'var(--ifm-code-background)',
-            padding: '1rem',
-            borderRadius: '8px',
-            overflow: 'auto'
-          }}>
-{`<WaveformPlaylistProvider
-  tracks={tracks}
-  barWidth={3}    // Width of each bar in pixels
-  barGap={1}      // Gap between bars in pixels
-  theme={{
-    // Solid color (string)
-    waveOutlineColor: '#E0EFF1',
-    waveFillColor: '#4a9eff',
-
-    // Or use a gradient for waveOutlineColor / waveFillColor:
-    waveOutlineColor: {
-      type: 'linear',
-      direction: 'vertical',  // or 'horizontal'
-      stops: [
-        { offset: 0, color: '#00ffcc' },
-        { offset: 0.5, color: '#ff00aa' },
-        { offset: 1, color: '#00ffcc' },
-      ],
-    },
-
-    waveProgressColor: 'rgba(0, 0, 0, 0.15)',  // Overlay on played portion
-    playheadColor: '#ff4444',                   // Vertical playhead line
-
-    // Selected track colors (when track is clicked)
-    selectedWaveOutlineColor: '#E0EFF1',  // Also supports gradients
-    selectedWaveFillColor: '#4a9eff',
-  }}
->
-  <Waveform />
-</WaveformPlaylistProvider>`}
-          </pre>
         </div>
 
         <div style={{ marginTop: '2rem' }}>

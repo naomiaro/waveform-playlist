@@ -33,14 +33,11 @@ export {
   hasMediaStreamSource,
 } from './mediaStreamSourceManager';
 
-// Export fade utilities
-export {
-  applyFadeIn,
-  applyFadeOut,
-  getUnderlyingAudioParam,
-  type FadeConfig,
-  type FadeType,
-} from './fades';
+// Export fade utilities (pure functions re-exported from @waveform-playlist/core)
+export { applyFadeIn, applyFadeOut, type FadeConfig, type FadeType } from './fades';
+
+// Export Tone.js-specific fade helper
+export { getUnderlyingAudioParam } from './fades';
 
 // Export Tone.js adapter for engine integration
 export { createToneAdapter } from './TonePlayoutAdapter';

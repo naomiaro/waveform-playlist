@@ -3,21 +3,25 @@
  *
  * Demonstrates fade in/out functionality with 4 individual mini players,
  * each showcasing a different fade curve type.
+ *
+ * Uses MediaElementPlaylistProvider with Web Audio routing for isolated
+ * playback with fade effects. Each player has its own HTMLAudioElement
+ * and AudioContext — no shared Tone.js Transport, so pressing play on
+ * one player doesn't affect the others.
  */
 
 import React from 'react';
 import styled from 'styled-components';
 import {
-  WaveformPlaylistProvider,
-  Waveform,
-  PlayButton,
-  PauseButton,
-  StopButton,
-  useAudioTracks,
-  type AudioTrackConfig,
+  MediaElementPlaylistProvider,
+  MediaElementWaveform,
+  useMediaElementControls,
+  useMediaElementAnimation,
+  loadWaveformData,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import type { FadeType } from '@waveform-playlist/core';
+import type WaveformData from 'waveform-data';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -56,116 +60,182 @@ const WaveformWrapper = styled.div`
   overflow: hidden;
 `;
 
-const Checkbox = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  user-select: none;
-  font-size: 0.9rem;
+const ControlButton = styled.button`
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--ifm-color-emphasis-300, #dee2e6);
+  border-radius: 0.25rem;
+  background: var(--ifm-background-color, #fff);
   color: var(--ifm-font-color-base, #1c1e21);
+  cursor: pointer;
+  font-size: 0.875rem;
 
-  input {
-    width: 1rem;
-    height: 1rem;
-    cursor: pointer;
+  &:hover:not(:disabled) {
+    background: var(--ifm-color-emphasis-100, #f0f0f0);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
+
+const AUDIO_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus';
+const PEAKS_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat';
+const FADE_DURATION = 1.5;
+
+/**
+ * Playback controls that read state from the MediaElement provider context.
+ */
+function PlaybackControls() {
+  const { play, pause, stop } = useMediaElementControls();
+  const { isPlaying } = useMediaElementAnimation();
+
+  return (
+    <Controls>
+      <ControlButton onClick={() => play()} disabled={isPlaying}>
+        Play
+      </ControlButton>
+      <ControlButton onClick={() => pause()} disabled={!isPlaying}>
+        Pause
+      </ControlButton>
+      <ControlButton onClick={() => stop()} disabled={!isPlaying}>
+        Stop
+      </ControlButton>
+    </Controls>
+  );
+}
 
 interface FadePlayerProps {
   fadeType: FadeType;
   title: string;
   description: string;
+  waveformData: WaveformData;
+  audioContext: AudioContext;
 }
 
-function FadePlayer({ fadeType, title, description }: FadePlayerProps) {
+function FadePlayer({ fadeType, title, description, waveformData, audioContext }: FadePlayerProps) {
   const { theme } = useDocusaurusTheme();
-  const [showFades, setShowFades] = React.useState(true);
 
-  // Use 5.85 seconds of vocals with 1.5 second fades
-  const audioConfigs: AudioTrackConfig[] = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
+  const trackConfig = React.useMemo(
+    () => ({
+      source: AUDIO_SRC,
+      waveformData,
       name: title,
-      duration: 5.85,
-      fadeIn: { duration: 1.5, type: fadeType },
-      fadeOut: { duration: 1.5, type: fadeType },
-    },
-  ], [fadeType, title]);
-
-  const { tracks, loading, error } = useAudioTracks(audioConfigs, { immediate: true });
-
-  if (error) {
-    return (
-      <FadeCard>
-        <FadeTitle>{title}</FadeTitle>
-        <FadeDescription>{description}</FadeDescription>
-        <div style={{ padding: '1rem', color: 'red' }}>
-          Error: {error}
-        </div>
-      </FadeCard>
-    );
-  }
+      fadeIn: { duration: FADE_DURATION, type: fadeType },
+      fadeOut: { duration: FADE_DURATION, type: fadeType },
+    }),
+    [waveformData, title, fadeType]
+  );
 
   return (
     <FadeCard>
       <FadeTitle>{title}</FadeTitle>
       <FadeDescription>{description}</FadeDescription>
-      <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={512} mono theme={theme} barWidth={4} barGap={0}>
-        <Controls>
-          <PlayButton />
-          <PauseButton />
-          <StopButton />
-          <Checkbox>
-            <input
-              type="checkbox"
-              checked={showFades}
-              onChange={(e) => setShowFades(e.target.checked)}
-            />
-            Show Fades
-          </Checkbox>
-          {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-font-color-secondary)' }}>Loading...</span>}
-        </Controls>
+      <MediaElementPlaylistProvider
+        track={trackConfig}
+        audioContext={audioContext}
+        samplesPerPixel={512}
+        waveHeight={80}
+        theme={theme}
+        barWidth={4}
+        barGap={0}
+      >
+        <PlaybackControls />
         <WaveformWrapper>
-          <Waveform showFades={showFades} />
+          <MediaElementWaveform />
         </WaveformWrapper>
-      </WaveformPlaylistProvider>
+      </MediaElementPlaylistProvider>
     </FadeCard>
   );
 }
 
 export function FadesExample() {
+  const [waveformData, setWaveformData] = React.useState<WaveformData | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Each FadePlayer needs its own AudioContext because createMediaElementSource
+  // can only be called once per audio element, and each provider creates its own element.
+  // Multiple AudioContexts on the same page is fine — the browser manages them.
+  const [audioContexts] = React.useState(() => [
+    new AudioContext(),
+    new AudioContext(),
+    new AudioContext(),
+    new AudioContext(),
+  ]);
+
+  React.useEffect(() => {
+    return () => {
+      audioContexts.forEach((ctx) => ctx.close().catch(() => {}));
+    };
+  }, [audioContexts]);
+
+  // Load peaks once — all 4 players use the same audio file
+  React.useEffect(() => {
+    loadWaveformData(PEAKS_SRC)
+      .then((data) => {
+        setWaveformData(data as WaveformData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load peaks');
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading waveform data...</div>
+      </Container>
+    );
+  }
+
+  if (error || !waveformData) {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', color: 'red' }}>Error: {error}</div>
+      </Container>
+    );
+  }
+
   const fadeTypes: Array<{ type: FadeType; title: string; description: string }> = [
     {
       type: 'linear',
       title: 'Linear Fade',
-      description: 'Volume changes at a constant rate, creating a straight-line transition. Predictable and mechanical.',
+      description:
+        'Volume changes at a constant rate, creating a straight-line transition. Predictable and mechanical.',
     },
     {
       type: 'logarithmic',
       title: 'Logarithmic Fade',
-      description: 'Fast initial change that gradually slows down. Mimics human hearing perception - sounds natural for fade-outs.',
+      description:
+        'Fast initial change that gradually slows down. Mimics human hearing perception - sounds natural for fade-outs.',
     },
     {
       type: 'exponential',
       title: 'Exponential Fade',
-      description: 'Slow initial change that accelerates toward the end. Great for dramatic fade-ins and builds.',
+      description:
+        'Slow initial change that accelerates toward the end. Great for dramatic fade-ins and builds.',
     },
     {
       type: 'sCurve',
       title: 'S-Curve Fade',
-      description: 'Smooth, gradual start and end with faster transition in the middle. Provides the smoothest perceived transition.',
+      description:
+        'Smooth, gradual start and end with faster transition in the middle. Provides the smoothest perceived transition.',
     },
   ];
 
   return (
     <Container>
-      {fadeTypes.map(({ type, title, description }) => (
+      {fadeTypes.map(({ type, title, description }, index) => (
         <FadePlayer
           key={type}
           fadeType={type}
           title={title}
           description={description}
+          waveformData={waveformData}
+          audioContext={audioContexts[index]}
         />
       ))}
     </Container>
