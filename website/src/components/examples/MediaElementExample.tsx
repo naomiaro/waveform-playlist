@@ -211,24 +211,34 @@ function EffectWiring({ audioContext }: { audioContext: AudioContext }) {
     let disposed = false;
 
     const wireEffect = async () => {
-      const Tone = await import('tone');
-      if (disposed) return;
+      try {
+        const Tone = await import('tone');
+        if (disposed) return;
 
-      // Tell Tone.js to use the same AudioContext as the provider
-      Tone.setContext(new Tone.Context(audioContext));
+        // Tell Tone.js to use the same AudioContext as the provider
+        Tone.setContext(new Tone.Context(audioContext));
 
-      // Create bridge and effect on the shared context
-      bridge = new Tone.Gain(1);
-      crusher = new Tone.BitCrusher({ bits: 4, wet: 1 });
+        // Create bridge and effect on the shared context
+        bridge = new Tone.Gain(1);
+        crusher = new Tone.BitCrusher({ bits: 4, wet: 1 });
 
-      // Disconnect native output from default destination
-      outputNode.disconnect();
+        // Disconnect native output from default destination
+        outputNode.disconnect();
 
-      // Native → native connection (outputNode → bridge.input)
-      outputNode.connect(bridge.input);
+        // Native → native connection (outputNode → bridge.input)
+        outputNode.connect(bridge.input);
 
-      // Tone → Tone chain (bridge → crusher → destination)
-      bridge.chain(crusher, Tone.getDestination());
+        // Tone → Tone chain (bridge → crusher → destination)
+        bridge.chain(crusher, Tone.getDestination());
+      } catch (err) {
+        console.warn('[waveform-playlist] EffectWiring: wireEffect() failed: ' + String(err));
+        // Reconnect to default destination so audio isn't lost
+        try {
+          outputNode.connect(audioContext.destination);
+        } catch {
+          // Already connected or disposed
+        }
+      }
     };
 
     // Wait for user gesture (Play click) to resume the AudioContext.
@@ -248,13 +258,17 @@ function EffectWiring({ audioContext }: { audioContext: AudioContext }) {
     return () => {
       disposed = true;
       audioContext.removeEventListener('statechange', onStateChange);
-      try {
-        if (bridge) {
+      if (bridge) {
+        try {
           outputNode.disconnect();
-          outputNode.connect(audioContext.destination);
+        } catch (err) {
+          console.warn('[waveform-playlist] EffectWiring cleanup: disconnect failed: ' + String(err));
         }
-      } catch {
-        // May already be disconnected during disposal
+        try {
+          outputNode.connect(audioContext.destination);
+        } catch (err) {
+          console.warn('[waveform-playlist] EffectWiring cleanup: reconnect failed: ' + String(err));
+        }
       }
       crusher?.dispose();
       bridge?.dispose();
@@ -273,7 +287,7 @@ function EffectWiring({ audioContext }: { audioContext: AudioContext }) {
  * Shows three independent players:
  * 1. Default playhead (simple vertical line)
  * 2. Custom playhead with triangle marker (PlayheadWithMarker)
- * 3. Tone.js PingPongDelay effect via native→Tone bridge
+ * 3. Tone.js BitCrusher effect via native→Tone bridge
  */
 export function MediaElementExample() {
   const { theme } = useDocusaurusTheme();

@@ -170,18 +170,21 @@ export function FadesExample() {
   // Each FadePlayer needs its own AudioContext because createMediaElementSource
   // can only be called once per audio element, and each provider creates its own element.
   // Multiple AudioContexts on the same page is fine — the browser manages them.
-  const [audioContexts] = React.useState(() => [
-    new AudioContext(),
-    new AudioContext(),
-    new AudioContext(),
-    new AudioContext(),
-  ]);
+  // Lazily created via ref to avoid creating 4 suspended contexts on mount.
+  const audioContextsRef = React.useRef<AudioContext[]>([]);
+  const getAudioContext = React.useCallback((index: number): AudioContext => {
+    if (!audioContextsRef.current[index]) {
+      audioContextsRef.current[index] = new AudioContext();
+    }
+    return audioContextsRef.current[index];
+  }, []);
 
   React.useEffect(() => {
+    const contexts = audioContextsRef.current;
     return () => {
-      audioContexts.forEach((ctx) => ctx.close().catch(() => {}));
+      contexts.forEach((ctx) => ctx.close().catch(() => {}));
     };
-  }, [audioContexts]);
+  }, []);
 
   // Load peaks once — all 4 players use the same audio file
   React.useEffect(() => {
@@ -256,7 +259,7 @@ export function FadesExample() {
           title={title}
           description={description}
           waveformData={waveformData}
-          audioContext={audioContexts[index]}
+          audioContext={getAudioContext(index)}
           showFades={showFades}
         />
       ))}

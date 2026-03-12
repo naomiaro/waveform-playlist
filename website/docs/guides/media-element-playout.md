@@ -162,6 +162,10 @@ function EffectWiring({ audioContext }: { audioContext: AudioContext }) {
 
     return () => {
       disposed = true;
+      if (bridge) {
+        try { outputNode.disconnect(); } catch { /* may already be disconnected */ }
+        try { outputNode.connect(audioContext.destination); } catch { /* fallback */ }
+      }
       crusher?.dispose();
       bridge?.dispose();
     };

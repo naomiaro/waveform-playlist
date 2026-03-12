@@ -20,7 +20,6 @@ export interface MediaElementPlayoutOptions {
  *
  * Limitations:
  * - Single track only - will warn if multiple tracks added
- * - No clip-level effects or crossfades
  * - No multi-track mixing
  *
  * For multi-track editing, use TonePlayout from @waveform-playlist/playout instead.
@@ -39,11 +38,12 @@ export class MediaElementPlayout {
 
   /**
    * Initialize the playout engine.
-   * For MediaElementPlayout this is a no-op (no AudioContext to start).
+   * For MediaElementPlayout this is a no-op — HTMLAudioElement doesn't require
+   * explicit initialization. When an AudioContext is provided for fades/effects,
+   * it resumes automatically on first play via MediaElementTrack.
    */
   async init(): Promise<void> {
-    // No initialization needed for HTMLAudioElement
-    // AudioContext requires user gesture, but audio element just works
+    // No initialization needed — audio element handles autoplay policy automatically
   }
 
   /**

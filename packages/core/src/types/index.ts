@@ -65,6 +65,11 @@ export interface Fade {
 
 export type FadeType = 'logarithmic' | 'linear' | 'sCurve' | 'exponential';
 
+/**
+ * Alias for Fade — used by media-element-playout and playout packages
+ */
+export type FadeConfig = Fade;
+
 export interface PlaylistConfig {
   samplesPerPixel?: number;
   waveHeight?: number;

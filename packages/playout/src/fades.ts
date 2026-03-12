@@ -14,17 +14,7 @@ export {
   applyFadeOut,
 } from '@waveform-playlist/core';
 
-export type { FadeType } from '@waveform-playlist/core';
-
-/**
- * Simple fade configuration - just duration and type
- */
-export interface FadeConfig {
-  /** Duration of the fade in seconds */
-  duration: number;
-  /** Type of fade curve (default: 'linear') */
-  type?: import('@waveform-playlist/core').FadeType;
-}
+export type { FadeType, FadeConfig } from '@waveform-playlist/core';
 
 /**
  * Access the underlying Web Audio AudioParam from a Tone.js Signal/Param wrapper.

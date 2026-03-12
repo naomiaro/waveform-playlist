@@ -1,5 +1,7 @@
-import type { WaveformDataObject, FadeType } from '@waveform-playlist/core';
-import { applyFadeIn, applyFadeOut } from '@waveform-playlist/core';
+import type { WaveformDataObject, FadeConfig } from '@waveform-playlist/core';
+import { applyFadeIn, applyFadeOut, generateCurve } from '@waveform-playlist/core';
+
+export type { FadeConfig } from '@waveform-playlist/core';
 
 /**
  * Extended HTMLAudioElement with vendor-prefixed preservesPitch properties.
@@ -9,13 +11,6 @@ interface VendorPrefixedPitch {
   preservesPitch?: boolean;
   mozPreservesPitch?: boolean;
   webkitPreservesPitch?: boolean;
-}
-
-export interface FadeConfig {
-  /** Duration of the fade in seconds */
-  duration: number;
-  /** Type of fade curve (default: 'linear') */
-  type?: FadeType;
 }
 
 export interface MediaElementTrackOptions {
@@ -117,7 +112,17 @@ export class MediaElementTrack {
     // Set up Web Audio routing if AudioContext provided
     if (options.audioContext) {
       this._audioContext = options.audioContext;
-      this._sourceNode = options.audioContext.createMediaElementSource(this.audioElement);
+      try {
+        this._sourceNode = options.audioContext.createMediaElementSource(this.audioElement);
+      } catch (err) {
+        throw new Error(
+          '[waveform-playlist] MediaElementTrack: createMediaElementSource() failed. ' +
+            'This can happen if the audio element is already connected to another AudioContext. ' +
+            'Each audio element can only have one MediaElementSourceNode. ' +
+            'Original error: ' +
+            String(err)
+        );
+      }
       this._fadeGain = options.audioContext.createGain();
       this._volumeGain = options.audioContext.createGain();
       this._volumeGain.gain.value = this._volume;
@@ -172,9 +177,13 @@ export class MediaElementTrack {
       const fadeInEnd = this._fadeIn.duration;
       if (offset < fadeInEnd) {
         const remainingFade = fadeInEnd - offset;
-        const fadeProgress = offset / this._fadeIn.duration;
-        fadeGain.setValueAtTime(fadeProgress, now);
-        applyFadeIn(fadeGain, now, remainingFade, this._fadeIn.type ?? 'linear', fadeProgress, 1);
+        const fadeType = this._fadeIn.type ?? 'linear';
+        // Evaluate the actual curve shape at the offset position
+        const curve = generateCurve(fadeType, 1000, true);
+        const curveIndex = Math.round((offset / this._fadeIn.duration) * (curve.length - 1));
+        const startValue = curve[curveIndex];
+        fadeGain.setValueAtTime(startValue, now);
+        applyFadeIn(fadeGain, now, remainingFade, fadeType, startValue, 1);
       }
     }
 
@@ -185,17 +194,13 @@ export class MediaElementTrack {
         if (offset > fadeOutStart) {
           // Already past the fade-out start — partial fade
           const elapsed = offset - fadeOutStart;
-          const fadeProgress = elapsed / this._fadeOut.duration;
-          const startValue = 1 - fadeProgress;
+          const fadeType = this._fadeOut.type ?? 'linear';
+          // Evaluate the actual curve shape at the elapsed position
+          const curve = generateCurve(fadeType, 1000, false);
+          const curveIndex = Math.round((elapsed / this._fadeOut.duration) * (curve.length - 1));
+          const startValue = curve[curveIndex];
           const remainingDuration = this._fadeOut.duration - elapsed;
-          applyFadeOut(
-            fadeGain,
-            now,
-            remainingDuration,
-            this._fadeOut.type ?? 'linear',
-            startValue,
-            0
-          );
+          applyFadeOut(fadeGain, now, remainingDuration, fadeType, startValue, 0);
         } else {
           // Schedule full fade-out at the right time
           const delayUntilFadeOut = fadeOutStart - offset;
@@ -228,13 +233,17 @@ export class MediaElementTrack {
   play(offset: number = 0): void {
     // Resume AudioContext if suspended (browser autoplay policy)
     if (this._audioContext && this._audioContext.state === 'suspended') {
-      this._audioContext.resume();
+      this._audioContext.resume().catch((err) => {
+        console.warn(
+          '[waveform-playlist] MediaElementTrack: AudioContext.resume() failed: ' + String(err)
+        );
+      });
     }
 
     this._scheduleFades(offset);
     this.audioElement.currentTime = offset;
     this.audioElement.play().catch((err) => {
-      console.warn('[waveform-playlist] MediaElementTrack: play() failed:', err);
+      console.warn('[waveform-playlist] MediaElementTrack: play() failed: ' + String(err));
     });
   }
 
@@ -332,7 +341,14 @@ export class MediaElementTrack {
       );
       return;
     }
-    this._volumeGain.disconnect();
+    try {
+      this._volumeGain.disconnect();
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] MediaElementTrack: disconnect before connectOutput failed: ' +
+          String(err)
+      );
+    }
     this._volumeGain.connect(destination);
   }
 
@@ -341,7 +357,14 @@ export class MediaElementTrack {
    */
   disconnectOutput(): void {
     if (!this._volumeGain || !this._audioContext) return;
-    this._volumeGain.disconnect();
+    try {
+      this._volumeGain.disconnect();
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] MediaElementTrack: disconnect before disconnectOutput failed: ' +
+          String(err)
+      );
+    }
     this._volumeGain.connect(this._audioContext.destination);
   }
 
@@ -357,22 +380,28 @@ export class MediaElementTrack {
     if (this._sourceNode) {
       try {
         this._sourceNode.disconnect();
-      } catch {
-        // Source may already be disconnected
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] MediaElementTrack: sourceNode disconnect failed: ' + String(err)
+        );
       }
     }
     if (this._fadeGain) {
       try {
         this._fadeGain.disconnect();
-      } catch {
-        // May already be disconnected
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] MediaElementTrack: fadeGain disconnect failed: ' + String(err)
+        );
       }
     }
     if (this._volumeGain) {
       try {
         this._volumeGain.disconnect();
-      } catch {
-        // May already be disconnected
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] MediaElementTrack: volumeGain disconnect failed: ' + String(err)
+        );
       }
     }
 
