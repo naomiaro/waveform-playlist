@@ -149,7 +149,9 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-scale-mode>` | setScaleMode() | Select for ruler display mode (`beats`, `temporal`). Switches between bar:beat and minutes:seconds ruler. |
 | `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
 | `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
-| `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
+| `<daw-mute-button>` | mute toggle | Dispatches `daw-mute` event. Auto-wires to parent `<daw-track>` via `closest()`. Reflects `aria-pressed` state. |
+| `<daw-solo-button>` | solo toggle | Dispatches `daw-solo` event. Auto-wires to parent `<daw-track>`. Reflects `aria-pressed` state. |
+| `<daw-volume-slider>` | setTrackVolume() / setMasterVolume() | Volume control. When inside a `<daw-track>`, controls that track. When inside `<daw-transport>`, controls master volume. |
 | `<daw-pan-slider>` | setTrackPan() | Per-track pan control. |
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
 | `<daw-ruler>` | Time ruler | Renders time ruler above tracks. |
@@ -235,6 +237,9 @@ editor.armedTrackIds.forEach(id => {
 ```
 
 Annotations are defined once as `<daw-annotation>` children. The `<daw-annotation-list>` reads from the same elements — edits in either view (dragging a box or editing text) update the shared `<daw-annotation>` attributes.
+
+| Element | Package | Responsibilities |
+|---------|---------|-----------------|
 | `<daw-spectrogram>` | spectrogram | FFT visualization overlay. |
 | `<daw-piano-roll>` | midi | MIDI note visualization. |
 
@@ -254,6 +259,7 @@ automatic-scroll     Boolean   false    Follow playhead
 indefinite-playback  Boolean   false    Play past end of audio
 bar-width            Number    1        Waveform bar width
 bar-gap              Number    0        Waveform bar gap
+show-clip-headers    Boolean   false    Show clip name headers
 ```
 
 **Properties (JS only):**
@@ -288,6 +294,16 @@ editor.setTrackSolo(trackId: string, soloed: boolean): void
 editor.zoomIn(): void
 editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
+editor.addTrack(config: TrackConfig): void             // Add track programmatically
+editor.removeTrack(trackId: string): void              // Remove track by ID
+editor.setTimeFormat(format: string): void             // 'hh:mm:ss.sss' | 'hh:mm:ss' | 'seconds'
+editor.setAutomaticScroll(enabled: boolean): void      // Toggle auto-scroll
+editor.setBpm(bpm: number): void                       // Set tempo
+editor.setTimeSignature(numerator: number, denominator: number): void
+editor.setSnapTo(snap: string): void                   // 'bar' | 'beat' | 'off'
+editor.setScaleMode(mode: string): void                // 'beats' | 'temporal'
+editor.setLoopEnabled(enabled: boolean): void          // Toggle loop playback
+editor.setLoopRegion(start: number, end: number): void // Set loop boundaries
 ```
 
 **Events:**
@@ -728,7 +744,7 @@ Create `@dawcore/components` package with core elements:
 
 - [ ] `<daw-volume-slider>` — per-track and master
 - [ ] `<daw-pan-slider>`
-- [ ] Mute/solo buttons
+- [ ] `<daw-mute-button>` / `<daw-solo-button>`
 - [ ] `<daw-vu-meter>` — port SegmentedVUMeter to Custom Element
 - [ ] `<daw-rewind-button>` / `<daw-fast-forward-button>`
 - [ ] `<daw-loop-button>`
