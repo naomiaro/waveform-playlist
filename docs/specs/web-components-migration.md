@@ -114,6 +114,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
   <daw-time-display></daw-time-display>
   <daw-selection-start></daw-selection-start>
   <daw-selection-end></daw-selection-end>
+  <daw-time-format></daw-time-format>
   <daw-zoom-in></daw-zoom-in>
   <daw-zoom-out></daw-zoom-out>
 </daw-transport>
@@ -137,6 +138,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-time-display>` | currentTime | Shows formatted playback time. |
 | `<daw-selection-start>` | setSelection() | Editable input showing selection start time. Updates selection on change. |
 | `<daw-selection-end>` | setSelection() | Editable input showing selection end time. Updates selection on change. |
+| `<daw-time-format>` | setTimeFormat() | Select for time display format (`hh:mm:ss.sss`, `hh:mm:ss`, `seconds`). Affects time display and selection inputs. |
 | `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
 | `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
 | `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
@@ -697,6 +699,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-zoom-in>` / `<daw-zoom-out>`
 - [ ] `<daw-time-display>`
 - [ ] `<daw-selection-start>` / `<daw-selection-end>`
+- [ ] `<daw-time-format>`
 
 **Deliverable:** Full mixing controls.
 
