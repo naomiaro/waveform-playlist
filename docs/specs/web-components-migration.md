@@ -109,7 +109,8 @@ Extract framework-agnostic logic, add Web Component wrappers.
   <daw-stop-button></daw-stop-button>
   <daw-record-button></daw-record-button>
   <daw-time-display></daw-time-display>
-  <daw-zoom-controls></daw-zoom-controls>
+  <daw-zoom-in></daw-zoom-in>
+  <daw-zoom-out></daw-zoom-out>
 </daw-transport>
 ```
 
@@ -126,7 +127,8 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-stop-button>` | stop() | Stops playback and recording. Finalizes any in-progress recording into a new clip. |
 | `<daw-record-button>` | record() | Arms/starts recording on all armed tracks. When clicked during stop, arms the selected track (or first track). When clicked during play, starts overdub on armed tracks. |
 | `<daw-time-display>` | currentTime | Shows formatted playback time. |
-| `<daw-zoom-controls>` | zoomIn()/zoomOut() | Zoom in/out buttons. |
+| `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
+| `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
 | `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
 | `<daw-pan-slider>` | setTrackPan() | Per-track pan control. |
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
@@ -680,7 +682,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-pan-slider>`
 - [ ] Mute/solo buttons
 - [ ] `<daw-vu-meter>` — port SegmentedVUMeter to Custom Element
-- [ ] `<daw-zoom-controls>`
+- [ ] `<daw-zoom-in>` / `<daw-zoom-out>`
 - [ ] `<daw-time-display>`
 
 **Deliverable:** Full mixing controls.
