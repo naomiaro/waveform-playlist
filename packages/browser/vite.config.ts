@@ -2,7 +2,16 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import dts from 'vite-plugin-dts';
 import { resolve } from 'path';
+import { readFileSync } from 'fs';
 import { visualizer } from 'rollup-plugin-visualizer';
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
+const peerDeps = Object.keys(pkg.peerDependencies || {});
+
+// Externalize all peerDependencies and their deep imports (e.g. @dnd-kit/abstract/modifiers).
+// This prevents bundling peer deps, which causes duplicate instances at runtime.
+const isExternal = (id: string) =>
+  peerDeps.some((dep) => id === dep || id.startsWith(dep + '/'));
 
 export default defineConfig({
   plugins: [
@@ -26,18 +35,7 @@ export default defineConfig({
       fileName: (format) => `index.${format === 'es' ? 'mjs' : 'js'}`,
     },
     rollupOptions: {
-      external: [
-          '@dnd-kit/abstract',
-          '@dnd-kit/abstract/modifiers',
-          '@dnd-kit/dom',
-          '@dnd-kit/react',
-          'react',
-          'react-dom',
-          'react/jsx-runtime',
-          'react/jsx-dev-runtime',
-          'styled-components',
-          'tone',
-        ],
+      external: isExternal,
       output: {
         exports: 'named',
         globals: {
