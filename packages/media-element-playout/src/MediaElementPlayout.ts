@@ -244,4 +244,15 @@ export class MediaElementPlayout {
     // Return a common default - peaks will have the actual sample rate
     return this.track?.peaks.sample_rate ?? 44100;
   }
+
+  /**
+   * Get the volume GainNode output for connecting external effects chains.
+   * Returns null if no AudioContext was provided to the track.
+   *
+   * Usage: disconnect from default destination, connect to effect input,
+   * then connect effect output to audioContext.destination.
+   */
+  get outputNode(): GainNode | null {
+    return this.track?.outputNode ?? null;
+  }
 }

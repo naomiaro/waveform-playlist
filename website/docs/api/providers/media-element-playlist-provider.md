@@ -16,7 +16,7 @@ A simplified playlist provider for single-track playback using `HTMLAudioElement
 | Waveform data | Pre-computed (`WaveformDataObject`) | Decoded from AudioBuffer |
 | Playback rate | Pitch-preserving (0.5x - 2.0x) | Not built-in |
 | Editing | View only | Drag, trim, split |
-| Effects | None | 20 Tone.js effects |
+| Effects | Via Tone.js bridge (see [guide](/docs/guides/media-element-playout#tonejs-effects)) | 20 built-in Tone.js effects |
 
 ## Import
 
@@ -61,6 +61,17 @@ interface MediaElementTrackConfig {
   waveformData: WaveformDataObject;
   /** Track name for display */
   name?: string;
+  /** Fade in configuration (requires audioContext on provider) */
+  fadeIn?: FadeConfig;
+  /** Fade out configuration (requires audioContext on provider) */
+  fadeOut?: FadeConfig;
+}
+
+interface FadeConfig {
+  /** Duration of the fade in seconds */
+  duration: number;
+  /** Type of fade curve (default: 'linear') */
+  type?: 'linear' | 'logarithmic' | 'exponential' | 'sCurve';
 }
 ```
 
@@ -93,6 +104,14 @@ Show the time ruler at the top of the playlist.
 **Default:** `{ show: false, width: 0 }`
 
 Track controls panel configuration.
+
+### Web Audio
+
+#### `audioContext`
+
+**Type:** `AudioContext`
+
+When provided, audio routes through a Web Audio graph enabling fades and effects. Required for `fadeIn`/`fadeOut` on the track config and for bridging into Tone.js effects. Each provider instance should use its own `AudioContext` — `createMediaElementSource()` is called once per audio element.
 
 ### Playback
 
@@ -229,8 +248,12 @@ interface MediaElementDataContextValue {
   barWidth: number;
   barGap: number;
   progressBarWidth: number;
+  fadeIn?: FadeConfig;
+  fadeOut?: FadeConfig;
 }
 ```
+
+`playoutRef.current.outputNode` returns the native `GainNode` output — use it to bridge into Tone.js effect chains (see [guide](/docs/guides/media-element-playout#tonejs-effects)).
 
 ## TypeScript
 
@@ -247,6 +270,9 @@ interface MediaElementPlaylistProviderProps {
   waveHeight?: number;
   timescale?: boolean;
   controls?: { show: boolean; width: number };
+
+  // Web Audio
+  audioContext?: AudioContext;
 
   // Playback
   playbackRate?: number;

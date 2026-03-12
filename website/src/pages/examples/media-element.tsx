@@ -30,6 +30,7 @@ export default function MediaElementExamplePage(): React.ReactElement {
           Single-track playback using <code>HTMLAudioElement</code> instead of Tone.js.
           Streams audio without downloading the entire file, with pitch-preserving playback rate control.
           The second player demonstrates a custom playhead with a triangle marker and timescale.
+          The third player shows how to bridge into a Tone.js effect chain via a native GainNode.
         </p>
 
         <LazyMediaElementExample />

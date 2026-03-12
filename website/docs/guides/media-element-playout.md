@@ -16,7 +16,7 @@ Choose `MediaElementPlaylistProvider` over `WaveformPlaylistProvider` when you n
 - **Playback rate control** — 0.5x to 2.0x speed with pitch preservation
 - **Single-track playback** — simpler API, smaller bundle (no Tone.js)
 
-Use `WaveformPlaylistProvider` (Tone.js) when you need multi-track mixing, audio effects, sample-accurate timing, or recording.
+Use `WaveformPlaylistProvider` (Tone.js) when you need multi-track mixing, sample-accurate timing, or recording. For audio effects, the MediaElement provider supports bridging into Tone.js — see [Web Audio Routing](#web-audio-routing) below.
 
 ## Basic Usage
 
@@ -82,6 +82,97 @@ import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 
 `PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` (see [API reference](/docs/api/llm-reference)). In the MediaElement context, use `currentTimeRef` for animation; `playbackStartTimeRef` and `audioStartPositionRef` are not applicable.
 
+## Web Audio Routing
+
+Pass an `AudioContext` to enable Web Audio routing. This routes audio through a gain chain (`HTMLAudioElement → MediaElementSourceNode → fadeGain → volumeGain → destination`) enabling fades and effects.
+
+### Fades
+
+Configure fade in/out on the track config. Requires `audioContext`:
+
+```tsx
+<MediaElementPlaylistProvider
+  track={{
+    source: '/audio/track.mp3',
+    waveformData,
+    name: 'My Track',
+    fadeIn: { duration: 1.5, type: 'logarithmic' },
+    fadeOut: { duration: 1.5, type: 'sCurve' },
+  }}
+  audioContext={audioContext}
+>
+  <MediaElementWaveform showFades />
+</MediaElementPlaylistProvider>
+```
+
+Fade types: `'linear'`, `'logarithmic'`, `'exponential'`, `'sCurve'`. See the [Fades example](/examples/fades) for a comparison of all four curves.
+
+### Tone.js Effects
+
+Bridge the MediaElement output into a Tone.js effect chain using a `Tone.Gain` node. Pass an `AudioContext` to the provider, then tell Tone.js to use the same context with `setContext` so native nodes and Tone.js nodes share the same audio graph:
+
+```tsx
+// Pass audioContext to <MediaElementPlaylistProvider audioContext={audioContext}>
+const audioContext = new AudioContext();
+
+// Inside a child component of MediaElementPlaylistProvider:
+function EffectWiring({ audioContext }: { audioContext: AudioContext }) {
+  const { playoutRef, duration } = useMediaElementData();
+
+  useEffect(() => {
+    const outputNode = playoutRef.current?.outputNode;
+    if (!outputNode) return;
+
+    let bridge, crusher, disposed = false;
+
+    const wireEffect = async () => {
+      // Dynamic import avoids AudioWorklet errors on page load.
+      // Tone.js must be imported after a user gesture (AudioContext running).
+      const Tone = await import('tone');
+      if (disposed) return;
+
+      // Share the same AudioContext between provider and Tone.js
+      Tone.setContext(new Tone.Context(audioContext));
+
+      bridge = new Tone.Gain(1);
+      crusher = new Tone.BitCrusher({ bits: 4, wet: 1 });
+
+      // Disconnect from default destination
+      outputNode.disconnect();
+
+      // Native → native (outputNode → bridge.input is a native GainNode)
+      outputNode.connect(bridge.input);
+
+      // Tone → Tone chain (bridge → crusher → destination)
+      bridge.chain(crusher, Tone.getDestination());
+    };
+
+    // Wait for AudioContext to be running (after user gesture)
+    if (audioContext.state === 'running') {
+      wireEffect();
+    } else {
+      const onRunning = () => {
+        if (audioContext.state === 'running') {
+          audioContext.removeEventListener('statechange', onRunning);
+          wireEffect();
+        }
+      };
+      audioContext.addEventListener('statechange', onRunning);
+    }
+
+    return () => {
+      disposed = true;
+      crusher?.dispose();
+      bridge?.dispose();
+    };
+  }, [playoutRef, audioContext, duration]);
+
+  return null;
+}
+```
+
+The key insight: `Tone.Gain.input` is a native `GainNode`, so `outputNode.connect(bridge.input)` is a standard Web Audio native-to-native connection. From the bridge onward, Tone.js manages the effect chain. Tone.js must be dynamically imported (`await import('tone')`) after the `AudioContext` is running to avoid AudioWorklet errors on suspended contexts. See the [Media Element example](/examples/media-element) for a working demo.
+
 ## Context Hooks
 
 `MediaElementPlaylistProvider` uses 4 split contexts, matching the pattern of `WaveformPlaylistProvider`:
@@ -91,7 +182,7 @@ import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 | `useMediaElementAnimation()` | On play/pause/stop/seek | `isPlaying`, `currentTime`, `currentTimeRef` (ref updates at 60fps) |
 | `useMediaElementState()` | Medium | `playbackRate`, `annotations`, `activeAnnotationId`, `continuousPlay`, `isAutomaticScroll` |
 | `useMediaElementControls()` | Stable | `play`, `pause`, `stop`, `seekTo`, `setPlaybackRate`, `setAnnotations`, `setActiveAnnotationId`, `setContinuousPlay`, `setAutomaticScroll` |
-| `useMediaElementData()` | Stable | `duration`, `peaksDataArray`, `sampleRate`, `samplesPerPixel`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap` |
+| `useMediaElementData()` | Stable | `duration`, `peaksDataArray`, `sampleRate`, `samplesPerPixel`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `fadeIn`, `fadeOut`, `playoutRef` |
 
 ## Live Example
 

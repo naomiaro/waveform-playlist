@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
+import type * as ToneNs from 'tone';
 import {
   MediaElementPlaylistProvider,
   useMediaElementAnimation,
@@ -191,20 +192,105 @@ function PlaybackControls() {
 }
 
 /**
+ * Child component that wires the MediaElement output into a Tone.js effect chain.
+ * Must be rendered inside MediaElementPlaylistProvider to access playoutRef.
+ *
+ * Bridge pattern: native GainNode → Tone.Gain.input (native→native) → Tone effect chain
+ */
+function EffectWiring({ audioContext }: { audioContext: AudioContext }) {
+  const { playoutRef, duration } = useMediaElementData();
+
+  // Wire the effect chain after the AudioContext is running (user gesture).
+  // Tone.js is dynamically imported to avoid AudioWorklet errors on page load.
+  useEffect(() => {
+    const outputNode = playoutRef.current?.outputNode;
+    if (!outputNode) return;
+
+    let bridge: ToneNs.Gain | undefined;
+    let crusher: ToneNs.BitCrusher | undefined;
+    let disposed = false;
+
+    const wireEffect = async () => {
+      const Tone = await import('tone');
+      if (disposed) return;
+
+      // Tell Tone.js to use the same AudioContext as the provider
+      Tone.setContext(new Tone.Context(audioContext));
+
+      // Create bridge and effect on the shared context
+      bridge = new Tone.Gain(1);
+      crusher = new Tone.BitCrusher({ bits: 4, wet: 1 });
+
+      // Disconnect native output from default destination
+      outputNode.disconnect();
+
+      // Native → native connection (outputNode → bridge.input)
+      outputNode.connect(bridge.input);
+
+      // Tone → Tone chain (bridge → crusher → destination)
+      bridge.chain(crusher, Tone.getDestination());
+    };
+
+    // Wait for user gesture (Play click) to resume the AudioContext.
+    const onStateChange = () => {
+      if (audioContext.state === 'running') {
+        audioContext.removeEventListener('statechange', onStateChange);
+        wireEffect();
+      }
+    };
+
+    if (audioContext.state === 'running') {
+      wireEffect();
+    } else {
+      audioContext.addEventListener('statechange', onStateChange);
+    }
+
+    return () => {
+      disposed = true;
+      audioContext.removeEventListener('statechange', onStateChange);
+      try {
+        if (bridge) {
+          outputNode.disconnect();
+          outputNode.connect(audioContext.destination);
+        }
+      } catch {
+        // May already be disconnected during disposal
+      }
+      crusher?.dispose();
+      bridge?.dispose();
+    };
+  }, [playoutRef, audioContext, duration]);
+
+  return null;
+}
+
+/**
  * MediaElementExample
  *
  * Demonstrates the MediaElementPlaylistProvider for single-track playback
  * with pitch-preserving playback rate control.
  *
- * Shows two independent players:
+ * Shows three independent players:
  * 1. Default playhead (simple vertical line)
  * 2. Custom playhead with triangle marker (PlayheadWithMarker)
+ * 3. Tone.js PingPongDelay effect via native→Tone bridge
  */
 export function MediaElementExample() {
   const { theme } = useDocusaurusTheme();
   const [trackConfigs, setTrackConfigs] = useState<Array<{ source: string; waveformData: any; name: string } | null>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Native AudioContext created eagerly for the provider's audioContext prop.
+  // Tone.Context created lazily in EffectWiring (after user gesture) to avoid
+  // "No execution context available" from Tone.js AudioWorklet setup.
+  const [effectAudioContext] = useState(() => new AudioContext());
+
+  useEffect(() => {
+    return () => {
+      effectAudioContext.close();
+    };
+  }, [effectAudioContext]);
 
   // Load BBC peaks files and build track configs
   useEffect(() => {
@@ -284,6 +370,25 @@ export function MediaElementExample() {
           >
             <PlaybackControls />
             <MediaElementWaveform renderPlayhead={PlayheadWithMarker} />
+          </MediaElementPlaylistProvider>
+        </Section>
+      )}
+
+      {trackConfigs[0] && (
+        <Section>
+          <SectionLabel>Tone.js Effect (BitCrusher via native→Tone bridge)</SectionLabel>
+          <MediaElementPlaylistProvider
+            track={trackConfigs[0]}
+            audioContext={effectAudioContext}
+            samplesPerPixel={512}
+            waveHeight={120}
+            theme={theme}
+            barWidth={2}
+            barGap={0}
+          >
+            <EffectWiring audioContext={effectAudioContext} />
+            <PlaybackControls />
+            <MediaElementWaveform />
           </MediaElementPlaylistProvider>
         </Section>
       )}

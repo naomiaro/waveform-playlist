@@ -55,15 +55,23 @@ interface WaveformPlaylistProviderProps {
 ## Provider Props (MediaElementPlaylistProvider)
 
 ```typescript
+interface FadeConfig {
+  duration: number;                      // Duration of the fade in seconds
+  type?: FadeType;                       // 'linear' | 'logarithmic' | 'exponential' | 'sCurve'
+}
+
 interface MediaElementTrackConfig {
   source: string;                        // Audio source URL or Blob URL
   waveformData: WaveformDataObject;      // Pre-computed waveform data (required)
   name?: string;                         // Track name for display
+  fadeIn?: FadeConfig;                   // Fade in (requires audioContext)
+  fadeOut?: FadeConfig;                  // Fade out (requires audioContext)
 }
 
 interface MediaElementPlaylistProviderProps {
   track: MediaElementTrackConfig;
   children: ReactNode;
+  audioContext?: AudioContext;            // Enables Web Audio routing (fades, effects)
   samplesPerPixel?: number;              // Default: 1024
   waveHeight?: number;                   // Default: 100
   timescale?: boolean;                   // Default: false
@@ -137,11 +145,13 @@ interface MediaElementDataContextValue {
   waveHeight: number;
   timeScaleHeight: number;
   samplesPerPixel: number;
-  playoutRef: RefObject<MediaElementPlayout | null>;
+  playoutRef: RefObject<MediaElementPlayout | null>; // .outputNode for effects bridge
   controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
   progressBarWidth: number;
+  fadeIn?: FadeConfig;
+  fadeOut?: FadeConfig;
 }
 ```
 
