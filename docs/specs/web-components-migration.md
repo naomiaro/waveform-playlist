@@ -215,7 +215,7 @@ editor.armedTrackIds.forEach(id => {
 
 | Element | Package | Responsibilities |
 |---------|---------|-----------------|
-| `<daw-annotation-track>` | annotations | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. |
+| `<daw-annotation-track>` | annotations | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`. |
 | `<daw-annotation>` | annotations | Single annotation with `start`, `end` attributes and text content. Renders as a box in the track. |
 | `<daw-annotation-list>` | annotations | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data. |
 | `<daw-spectrogram>` | spectrogram | FFT visualization overlay. |
@@ -318,6 +318,17 @@ track.disarm(): void                          // Disarm, release mic stream
 ```
 
 When `arm()` is called without a `deviceId`, it uses the default input device. The method requests mic permission via `getUserMedia()` and stores the stream for use when recording starts. Calling `arm()` on an already-armed track with a different `deviceId` switches the input device.
+
+### `<daw-annotation-track>` API
+
+**Attributes (reflected):**
+```
+editable         Boolean   false    Allow drag/resize of annotation boxes
+link-endpoints   Boolean   false    Snap adjacent annotation boundaries together
+continuous-play  Boolean   false    Auto-advance playback through annotations
+```
+
+These map directly to `AnnotationListOptions` from `@waveform-playlist/core`. Configuration lives on the element, not as standalone toggle components.
 
 ---
 
