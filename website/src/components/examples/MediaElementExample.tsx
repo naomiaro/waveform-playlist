@@ -295,7 +295,8 @@ export function MediaElementExample() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Native AudioContext created eagerly for the provider's audioContext prop.
+  // Single AudioContext for the effect-bridged player — always needed since
+  // the third player always renders. useState gives stable identity across renders.
   // Tone.Context created lazily in EffectWiring (after user gesture) to avoid
   // "No execution context available" from Tone.js AudioWorklet setup.
   const [effectAudioContext] = useState(() => new AudioContext());

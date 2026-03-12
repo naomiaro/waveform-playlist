@@ -148,20 +148,22 @@ function EffectWiring({ audioContext }: { audioContext: AudioContext }) {
     };
 
     // Wait for AudioContext to be running (after user gesture)
+    const onStateChange = () => {
+      if (audioContext.state === 'running') {
+        audioContext.removeEventListener('statechange', onStateChange);
+        wireEffect();
+      }
+    };
+
     if (audioContext.state === 'running') {
       wireEffect();
     } else {
-      const onRunning = () => {
-        if (audioContext.state === 'running') {
-          audioContext.removeEventListener('statechange', onRunning);
-          wireEffect();
-        }
-      };
-      audioContext.addEventListener('statechange', onRunning);
+      audioContext.addEventListener('statechange', onStateChange);
     }
 
     return () => {
       disposed = true;
+      audioContext.removeEventListener('statechange', onStateChange);
       if (bridge) {
         try { outputNode.disconnect(); } catch { /* may already be disconnected */ }
         try { outputNode.connect(audioContext.destination); } catch { /* fallback */ }

@@ -178,12 +178,17 @@ export class MediaElementTrack {
       if (offset < fadeInEnd) {
         const remainingFade = fadeInEnd - offset;
         const fadeType = this._fadeIn.type ?? 'linear';
-        // Evaluate the actual curve shape at the offset position
-        const curve = generateCurve(fadeType, 1000, true);
-        const curveIndex = Math.round((offset / this._fadeIn.duration) * (curve.length - 1));
-        const startValue = curve[curveIndex];
-        fadeGain.setValueAtTime(startValue, now);
-        applyFadeIn(fadeGain, now, remainingFade, fadeType, startValue, 1);
+        if (offset === 0) {
+          // Full fade from beginning
+          applyFadeIn(fadeGain, now, remainingFade, fadeType, 0, 1);
+        } else {
+          // Partial fade — slice the original curve to preserve shape
+          const curve = generateCurve(fadeType, 1000, true);
+          const startIndex = Math.round((offset / this._fadeIn.duration) * (curve.length - 1));
+          const sliced = curve.slice(startIndex);
+          fadeGain.setValueAtTime(sliced[0], now);
+          fadeGain.setValueCurveAtTime(sliced, now, remainingFade);
+        }
       }
     }
 
@@ -192,15 +197,15 @@ export class MediaElementTrack {
       const fadeOutStart = totalDuration - this._fadeOut.duration;
       if (offset < totalDuration && fadeOutStart < totalDuration) {
         if (offset > fadeOutStart) {
-          // Already past the fade-out start — partial fade
+          // Already past the fade-out start — slice original curve to preserve shape
           const elapsed = offset - fadeOutStart;
           const fadeType = this._fadeOut.type ?? 'linear';
-          // Evaluate the actual curve shape at the elapsed position
           const curve = generateCurve(fadeType, 1000, false);
-          const curveIndex = Math.round((elapsed / this._fadeOut.duration) * (curve.length - 1));
-          const startValue = curve[curveIndex];
+          const startIndex = Math.round((elapsed / this._fadeOut.duration) * (curve.length - 1));
+          const sliced = curve.slice(startIndex);
           const remainingDuration = this._fadeOut.duration - elapsed;
-          applyFadeOut(fadeGain, now, remainingDuration, fadeType, startValue, 0);
+          fadeGain.setValueAtTime(sliced[0], now);
+          fadeGain.setValueCurveAtTime(sliced, now, remainingDuration);
         } else {
           // Schedule full fade-out at the right time
           const delayUntilFadeOut = fadeOutStart - offset;
@@ -228,23 +233,34 @@ export class MediaElementTrack {
   }
 
   /**
-   * Start playback from a specific time
+   * Start playback from a specific time.
+   * Resumes the AudioContext first if suspended, then schedules fades
+   * (fades depend on audioContext.currentTime being non-zero).
    */
   play(offset: number = 0): void {
-    // Resume AudioContext if suspended (browser autoplay policy)
-    if (this._audioContext && this._audioContext.state === 'suspended') {
-      this._audioContext.resume().catch((err) => {
-        console.warn(
-          '[waveform-playlist] MediaElementTrack: AudioContext.resume() failed: ' + String(err)
-        );
+    const startPlayback = () => {
+      this._scheduleFades(offset);
+      this.audioElement.currentTime = offset;
+      this.audioElement.play().catch((err) => {
+        console.warn('[waveform-playlist] MediaElementTrack: play() failed: ' + String(err));
       });
-    }
+    };
 
-    this._scheduleFades(offset);
-    this.audioElement.currentTime = offset;
-    this.audioElement.play().catch((err) => {
-      console.warn('[waveform-playlist] MediaElementTrack: play() failed: ' + String(err));
-    });
+    // Resume AudioContext if suspended (browser autoplay policy).
+    // Must await resume before scheduling fades — audioContext.currentTime
+    // is 0 while suspended, which would schedule all fades in the past.
+    if (this._audioContext && this._audioContext.state === 'suspended') {
+      this._audioContext
+        .resume()
+        .then(startPlayback)
+        .catch((err) => {
+          console.warn(
+            '[waveform-playlist] MediaElementTrack: AudioContext.resume() failed: ' + String(err)
+          );
+        });
+    } else {
+      startPlayback();
+    }
   }
 
   /**
