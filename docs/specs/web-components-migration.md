@@ -108,7 +108,11 @@ Extract framework-agnostic logic, add Web Component wrappers.
   <daw-pause-button></daw-pause-button>
   <daw-stop-button></daw-stop-button>
   <daw-record-button></daw-record-button>
+  <daw-rewind-button></daw-rewind-button>
+  <daw-fast-forward-button></daw-fast-forward-button>
   <daw-time-display></daw-time-display>
+  <daw-selection-start></daw-selection-start>
+  <daw-selection-end></daw-selection-end>
   <daw-zoom-in></daw-zoom-in>
   <daw-zoom-out></daw-zoom-out>
 </daw-transport>
@@ -126,7 +130,11 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-pause-button>` | pause() | Pauses playback and recording. |
 | `<daw-stop-button>` | stop() | Stops playback and recording. Finalizes any in-progress recording into a new clip. |
 | `<daw-record-button>` | record() | Arms/starts recording on all armed tracks. When clicked during stop, arms the selected track (or first track). When clicked during play, starts overdub on armed tracks. |
+| `<daw-rewind-button>` | seekTo(0) | Rewinds playhead to the start of the timeline. |
+| `<daw-fast-forward-button>` | seekTo(duration) | Jumps playhead to the end of the timeline. |
 | `<daw-time-display>` | currentTime | Shows formatted playback time. |
+| `<daw-selection-start>` | setSelection() | Editable input showing selection start time. Updates selection on change. |
+| `<daw-selection-end>` | setSelection() | Editable input showing selection end time. Updates selection on change. |
 | `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
 | `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
 | `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
@@ -682,8 +690,10 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-pan-slider>`
 - [ ] Mute/solo buttons
 - [ ] `<daw-vu-meter>` — port SegmentedVUMeter to Custom Element
+- [ ] `<daw-rewind-button>` / `<daw-fast-forward-button>`
 - [ ] `<daw-zoom-in>` / `<daw-zoom-out>`
 - [ ] `<daw-time-display>`
+- [ ] `<daw-selection-start>` / `<daw-selection-end>`
 
 **Deliverable:** Full mixing controls.
 
