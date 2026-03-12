@@ -85,6 +85,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 - [ ] **Time signature changes** — Allow time signature to change mid-timeline (e.g., 4/4 → 3/4 → 6/8).
 - [ ] **Sub-beat snap granularities** — Snap to 1/8, 1/16, triplets, and other subdivisions when editing clips.
 - [ ] **Metronome / click track** — Built-in click track that follows tempo and time signature settings.
+- [ ] **Musical time formats** — Add `bar:beat` and `bar:beat:tick` options to `<daw-time-format>` / `setTimeFormat()`. Requires tempo map and time signature data. Follows Audacity's approach where the time format selector offers both absolute (hh:mm:ss) and musical (bar:beat) formats.
 
 ### WAM Plugin Support
 
