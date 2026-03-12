@@ -129,7 +129,8 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | Element | Wraps | Responsibilities |
 |---------|-------|-----------------|
 | `<daw-editor>` | PlaylistEngine + ToneAdapter | Root element. Manages engine, audio context, tracks, state. |
-| `<daw-track>` | Track state | Declares a track. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`. |
+| `<daw-track>` | Track state | Declares a track. Contains `<daw-clip>` children. Attributes: `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`. `src` is shorthand for a track with a single implicit clip. |
+| `<daw-clip>` | AudioClip | Audio or MIDI clip within a track. Attributes: `src`, `peaks-src`, `midi-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `fade-in`, `fade-out`, `fade-type`. Multiple clips sharing the same `src` share one decoded AudioBuffer. |
 | `<daw-waveform>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
 | `<daw-transport>` | Transport controls container | Groups transport buttons, links to an editor via `for` attribute. |
 | `<daw-play-button>` | play() | Triggers playback. If recording is armed, starts overdub recording simultaneously. |
@@ -351,6 +352,75 @@ track.disarm(): void                          // Disarm, release mic stream
 ```
 
 When `arm()` is called without a `deviceId`, it uses the default input device. The method requests mic permission via `getUserMedia()` and stores the stream for use when recording starts. Calling `arm()` on an already-armed track with a different `deviceId` switches the input device.
+
+### `<daw-clip>` API
+
+**Attributes (reflected):**
+```
+src              String    —        Audio file URL
+peaks-src        String    —        Pre-computed BBC audiowaveform peaks URL (.dat/.json)
+midi-src         String    —        MIDI file URL
+start            Number    0        Position on timeline (seconds)
+duration         Number    —        Clip duration (seconds). Defaults to source length.
+offset           Number    0        Start offset within source audio (seconds) — trim start
+gain             Number    1        Clip volume (0.0 to 1.0+)
+name             String    —        Clip label
+color            String    —        Clip color for visual distinction
+fade-in          Number    0        Fade in duration (seconds)
+fade-out         Number    0        Fade out duration (seconds)
+fade-type        String    linear   Fade curve: 'linear' | 'logarithmic' | 'sCurve' | 'exponential'
+midi-channel     Number    —        MIDI channel (0-indexed, 9 = percussion)
+midi-program     Number    —        MIDI program number (0-127)
+```
+
+**Properties (JS only):**
+```typescript
+clip.audioBuffer: AudioBuffer | null        // Decoded audio (set after load, or programmatically)
+clip.waveformData: WaveformDataObject | null // BBC peaks data
+clip.midiNotes: MidiNoteData[] | null        // Parsed MIDI notes
+```
+
+Attributes use seconds for human readability. The element converts to the internal sample-based model (`startSample`, `offsetSamples`, `durationSamples`) automatically.
+
+```html
+<!-- Single clip shorthand: <daw-track src="..."> expands to one implicit clip -->
+<daw-track name="Vocals" src="/audio/vocals.mp3"></daw-track>
+
+<!-- Equivalent explicit form -->
+<daw-track name="Vocals">
+  <daw-clip src="/audio/vocals.mp3"></daw-clip>
+</daw-track>
+
+<!-- Multi-clip with positioning, fades, and shared audio source -->
+<daw-track name="Chorus Repeats">
+  <daw-clip src="/audio/chorus.mp3" start="0" duration="8"
+            fade-in="0.5" fade-out="1.0" fade-type="sCurve">
+  </daw-clip>
+  <daw-clip src="/audio/chorus.mp3" start="20" duration="8">
+  </daw-clip>
+  <daw-clip src="/audio/chorus.mp3" start="40" duration="4"
+            offset="2.0" fade-in="0.3">
+  </daw-clip>
+</daw-track>
+
+<!-- Pre-computed peaks for large files (render before decode) -->
+<daw-track name="Full Mix">
+  <daw-clip src="/audio/full-mix.mp3" peaks-src="/peaks/full-mix.dat">
+  </daw-clip>
+</daw-track>
+```
+
+### Resource Caching
+
+`<daw-editor>` maintains a URL-keyed cache for each resource type, deduplicating fetch + decode across clips:
+
+```
+Map<string, Promise<AudioBuffer>>     // src → decoded audio
+Map<string, Promise<WaveformData>>    // peaks-src → parsed peaks
+Map<string, Promise<MidiNoteData[]>>  // midi-src → parsed MIDI
+```
+
+Multiple `<daw-clip>` elements with the same `src` share one `AudioBuffer` — each clip is an independent window (start/offset/duration/fades) into the same underlying data. The same applies to `peaks-src` and `midi-src`. Cache is scoped to the editor instance and cleared when the editor is disconnected.
 
 ### `<daw-annotation-track>` API
 
@@ -718,7 +788,9 @@ export class AppModule {}
 Create `@dawcore/components` package with core elements:
 
 - [ ] `<daw-editor>` — engine + audio context lifecycle, track management
-- [ ] `<daw-track>` — track declaration via attributes, audio loading
+- [ ] `<daw-track>` — track declaration via attributes
+- [ ] `<daw-clip>` — clip element with src/peaks-src/midi-src, positioning, fades
+- [ ] Resource cache — URL-keyed dedup for AudioBuffer, peaks, and MIDI across clips
 - [ ] `<daw-waveform>` — canvas waveform rendering (port existing canvas code)
 - [ ] `<daw-playhead>` — animated playhead
 - [ ] `<daw-ruler>` — time ruler
