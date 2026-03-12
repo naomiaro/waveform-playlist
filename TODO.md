@@ -82,9 +82,12 @@ Multi-track audio editor roadmap for waveform-playlist.
 ### Timeline
 
 - [ ] **Tempo automation / tempo maps** — Support multiple BPMs across the timeline for projects with tempo changes.
-- [ ] **Time signature changes** — Allow time signature to change mid-timeline (e.g., 4/4 → 3/4 → 6/8).
+  - Current v1: `BeatsAndBarsProvider` accepts a single global `bpm` and `timeSignature`. `<daw-tempo>` and `<daw-time-signature>` web components reflect/edit these values. PPQN-based integer math in the ruler and snap grid is correct and carries forward.
+  - v2 (tempo map): Engine owns a `TempoMap` (sorted `TempoEvent[]` with sample position, BPM, time signature, curve type). Exposes `getBpmAt(sample)`, `sampleToMusicalTime(sample)`, `musicalTimeToSample(bar, beat, tick)`. Provider subscribes via `statechange`. `<daw-tempo>` / `<daw-time-signature>` show/edit the value at the current playhead position.
+  - Key change: sample ↔ musical time conversion becomes non-linear (must integrate across tempo segments). Affects ruler tick spacing, snap grid, time format display, and Tone.js Transport automation (`bpm.setValueAtTime()`).
+- [ ] **Time signature changes** — Allow time signature to change mid-timeline (e.g., 4/4 → 3/4 → 6/8). Folded into `TempoEvent` so tempo and time signature share the same position-indexed map.
 - [ ] **Sub-beat snap granularities** — Snap to 1/8, 1/16, triplets, and other subdivisions when editing clips.
-- [ ] **Metronome / click track** — Built-in click track that follows tempo and time signature settings.
+- [ ] **Metronome / click track** — Built-in click track that follows tempo and time signature settings. Use `Transport.scheduleRepeat` with musical time subdivisions — scheduling auto-follows BPM changes.
 - [ ] **Musical time formats** — Add `bar:beat` and `bar:beat:tick` options to `<daw-time-format>` / `setTimeFormat()`. Requires tempo map and time signature data. Follows Audacity's approach where the time format selector offers both absolute (hh:mm:ss) and musical (bar:beat) formats.
 
 ### WAM Plugin Support
