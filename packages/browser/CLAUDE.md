@@ -1,5 +1,9 @@
 # Browser Package (`@waveform-playlist/browser`)
 
+## Vite Externals
+
+`vite.config.ts` derives `external` from `peerDependencies` in `package.json` via `isExternal()`. This prevents bundling peer deps (which causes duplicate React contexts and broken modifiers at runtime — see #317). Deep imports like `@dnd-kit/abstract/modifiers` are matched automatically. Never replace `isExternal` with a manual list.
+
 ## Custom Hooks Architecture
 
 **Pattern:** Extract complex logic into reusable custom hooks.
