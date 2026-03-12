@@ -117,6 +117,8 @@ Extract framework-agnostic logic, add Web Component wrappers.
   <daw-time-format></daw-time-format>
   <daw-tempo></daw-tempo>
   <daw-time-signature></daw-time-signature>
+  <daw-snap-to></daw-snap-to>
+  <daw-scale-mode></daw-scale-mode>
   <daw-zoom-in></daw-zoom-in>
   <daw-zoom-out></daw-zoom-out>
 </daw-transport>
@@ -143,6 +145,8 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-time-format>` | setTimeFormat() | Select for time display format (`hh:mm:ss.sss`, `hh:mm:ss`, `seconds`). Affects time display and selection inputs. |
 | `<daw-tempo>` | setBpm() | Editable BPM input. Reflects current tempo. Drives `BeatsAndBarsProvider` bpm, metronome, and musical time formats. |
 | `<daw-time-signature>` | setTimeSignature() | Editable time signature (e.g., `4/4`, `3/4`, `6/8`). Drives `BeatsAndBarsProvider` timeSignature, ruler subdivisions, and snap grid. |
+| `<daw-snap-to>` | setSnapTo() | Select for snap granularity (`bar`, `beat`, `off`). Controls clip drag/trim snapping. |
+| `<daw-scale-mode>` | setScaleMode() | Select for ruler display mode (`beats`, `temporal`). Switches between bar:beat and minutes:seconds ruler. |
 | `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
 | `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
 | `<daw-volume-slider>` | setTrackVolume() | Per-track or master volume. |
@@ -705,6 +709,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-selection-start>` / `<daw-selection-end>`
 - [ ] `<daw-time-format>`
 - [ ] `<daw-tempo>` / `<daw-time-signature>`
+- [ ] `<daw-snap-to>` / `<daw-scale-mode>`
 
 **Deliverable:** Full mixing controls.
 
