@@ -6,6 +6,7 @@ import {
   Track as TrackComponent,
   Clip,
   Selection,
+  FadeOverlay,
   PlaylistInfoContext,
   DevicePixelRatioProvider,
   SmartScale,
@@ -75,6 +76,8 @@ export interface MediaElementPlaylistProps {
   onAnnotationUpdate?: OnAnnotationUpdateFn;
   /** Custom playhead render function. Receives position, color, and animation refs for smooth 60fps animation. */
   renderPlayhead?: RenderPlayheadFunction;
+  /** Show fade in/out overlays on the waveform. Defaults to false. */
+  showFades?: boolean;
   className?: string;
 }
 
@@ -96,6 +99,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   linkEndpoints: linkEndpointsProp = false,
   onAnnotationUpdate,
   renderPlayhead,
+  showFades = false,
   className,
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
@@ -117,6 +121,8 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     playoutRef,
     barWidth,
     barGap,
+    fadeIn,
+    fadeOut,
   } = useMediaElementData();
 
   const [selectionStart, setSelectionStart] = useState(0);
@@ -327,6 +333,24 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
                             clipDurationSamples={clip.durationSamples}
                           />
                         ))}
+                        {showFades && fadeIn && fadeIn.duration > 0 && (
+                          <FadeOverlay
+                            left={0}
+                            width={Math.floor((fadeIn.duration * sampleRate) / samplesPerPixel)}
+                            type="fadeIn"
+                            curveType={fadeIn.type}
+                          />
+                        )}
+                        {showFades && fadeOut && fadeOut.duration > 0 && (
+                          <FadeOverlay
+                            left={
+                              width - Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)
+                            }
+                            width={Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)}
+                            type="fadeOut"
+                            curveType={fadeOut.type}
+                          />
+                        )}
                       </Clip>
                     );
                   })}

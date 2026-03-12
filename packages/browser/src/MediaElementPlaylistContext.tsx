@@ -77,6 +77,8 @@ export interface MediaElementDataContextValue {
   barWidth: number;
   barGap: number;
   progressBarWidth: number;
+  fadeIn?: FadeConfig;
+  fadeOut?: FadeConfig;
 }
 
 // Create contexts
@@ -518,6 +520,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       barWidth,
       barGap,
       progressBarWidth,
+      fadeIn: track.fadeIn,
+      fadeOut: track.fadeOut,
     }),
     [
       duration,
@@ -530,6 +534,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       barWidth,
       barGap,
       progressBarWidth,
+      track.fadeIn,
+      track.fadeOut,
     ]
   );
 

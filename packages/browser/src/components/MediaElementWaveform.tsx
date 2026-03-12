@@ -35,6 +35,8 @@ export interface MediaElementWaveformProps {
   scrollActiveContainer?: 'nearest' | 'all';
   /** Custom playhead render function. Receives position, color, and animation refs for smooth 60fps animation. */
   renderPlayhead?: RenderPlayheadFunction;
+  /** Show fade in/out overlays on the waveform. Defaults to false. */
+  showFades?: boolean;
   className?: string;
 }
 
@@ -60,6 +62,7 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
   renderPlayhead,
+  showFades = false,
   className,
 }) => {
   const { annotations } = useMediaElementState();
@@ -72,6 +75,7 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
         linkEndpoints={linkEndpoints}
         onAnnotationUpdate={onAnnotationUpdate}
         renderPlayhead={renderPlayhead}
+        showFades={showFades}
         className={className}
       />
       {annotations.length > 0 && (

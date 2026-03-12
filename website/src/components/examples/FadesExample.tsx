@@ -82,6 +82,7 @@ const ControlButton = styled.button`
 const AUDIO_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus';
 const PEAKS_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat';
 const FADE_DURATION = 1.5;
+const SAMPLES_PER_PIXEL = 1024;
 
 /**
  * Playback controls that read state from the MediaElement provider context.
@@ -111,9 +112,10 @@ interface FadePlayerProps {
   description: string;
   waveformData: WaveformData;
   audioContext: AudioContext;
+  showFades: boolean;
 }
 
-function FadePlayer({ fadeType, title, description, waveformData, audioContext }: FadePlayerProps) {
+function FadePlayer({ fadeType, title, description, waveformData, audioContext, showFades }: FadePlayerProps) {
   const { theme } = useDocusaurusTheme();
 
   const trackConfig = React.useMemo(
@@ -134,7 +136,7 @@ function FadePlayer({ fadeType, title, description, waveformData, audioContext }
       <MediaElementPlaylistProvider
         track={trackConfig}
         audioContext={audioContext}
-        samplesPerPixel={512}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
         waveHeight={80}
         theme={theme}
         barWidth={4}
@@ -142,17 +144,28 @@ function FadePlayer({ fadeType, title, description, waveformData, audioContext }
       >
         <PlaybackControls />
         <WaveformWrapper>
-          <MediaElementWaveform />
+          <MediaElementWaveform showFades={showFades} />
         </WaveformWrapper>
       </MediaElementPlaylistProvider>
     </FadeCard>
   );
 }
 
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--ifm-font-color-base, #1c1e21);
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+`;
+
 export function FadesExample() {
   const [waveformData, setWaveformData] = React.useState<WaveformData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [showFades, setShowFades] = React.useState(true);
 
   // Each FadePlayer needs its own AudioContext because createMediaElementSource
   // can only be called once per audio element, and each provider creates its own element.
@@ -228,6 +241,14 @@ export function FadesExample() {
 
   return (
     <Container>
+      <CheckboxLabel>
+        <input
+          type="checkbox"
+          checked={showFades}
+          onChange={(e) => setShowFades(e.target.checked)}
+        />
+        Show fade overlays
+      </CheckboxLabel>
       {fadeTypes.map(({ type, title, description }, index) => (
         <FadePlayer
           key={type}
@@ -236,6 +257,7 @@ export function FadesExample() {
           description={description}
           waveformData={waveformData}
           audioContext={audioContexts[index]}
+          showFades={showFades}
         />
       ))}
     </Container>
