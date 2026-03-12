@@ -27,8 +27,10 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-          '@dnd-kit/core',
-          '@dnd-kit/modifiers',
+          '@dnd-kit/abstract',
+          '@dnd-kit/abstract/modifiers',
+          '@dnd-kit/dom',
+          '@dnd-kit/react',
           'react',
           'react-dom',
           'react/jsx-runtime',
