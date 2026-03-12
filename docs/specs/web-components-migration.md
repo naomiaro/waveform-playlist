@@ -218,6 +218,23 @@ editor.armedTrackIds.forEach(id => {
 | `<daw-annotation-track>` | annotations | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`. |
 | `<daw-annotation>` | annotations | Single annotation with `start`, `end` attributes and text content. Renders as a box in the track. |
 | `<daw-annotation-list>` | annotations | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data. |
+
+```html
+<!-- Annotations: single source of truth, dual view -->
+<daw-editor id="my-editor">
+  <daw-annotation-track id="lyrics" editable link-endpoints>
+    <daw-annotation start="0.0" end="2.5">First line of lyrics</daw-annotation>
+    <daw-annotation start="2.5" end="5.1">Second line of lyrics</daw-annotation>
+    <daw-annotation start="5.1" end="8.0">Third line of lyrics</daw-annotation>
+  </daw-annotation-track>
+  <daw-track src="/audio/vocals.mp3" name="Vocals"></daw-track>
+</daw-editor>
+
+<!-- Text list view linked to the same data via for/id -->
+<daw-annotation-list for="lyrics"></daw-annotation-list>
+```
+
+Annotations are defined once as `<daw-annotation>` children. The `<daw-annotation-list>` reads from the same elements — edits in either view (dragging a box or editing text) update the shared `<daw-annotation>` attributes.
 | `<daw-spectrogram>` | spectrogram | FFT visualization overlay. |
 | `<daw-piano-roll>` | midi | MIDI note visualization. |
 
