@@ -11,6 +11,7 @@ A simplified playlist provider for single-track playback using `HTMLAudioElement
 
 | Feature | MediaElementPlaylistProvider | WaveformPlaylistProvider |
 |---------|------------------------------|--------------------------|
+| Instances | Multiple per page | **Single instance only** (shared Tone.js Transport) |
 | Tracks | Single track (`track` prop) | Multiple tracks (`tracks` prop) |
 | Audio engine | HTMLAudioElement | Tone.js / Web Audio API |
 | Waveform data | Pre-computed (`WaveformDataObject`) | Decoded from AudioBuffer |
