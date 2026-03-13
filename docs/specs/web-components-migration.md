@@ -158,7 +158,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
 | `<daw-ruler>` | Time ruler | Renders time ruler above tracks. |
 | `<daw-playhead>` | Playhead | Animated playhead line. |
-| `<daw-keyboard-shortcuts>` | Keyboard handler | Render-less element inside `<daw-editor>`. Boolean attributes: `playback`, `splitting`. Customizable via `customShortcuts` and key remapping properties. |
+| `<daw-keyboard-shortcuts>` | Keyboard handler | Render-less element inside `<daw-editor>`. Boolean attributes: `playback`, `splitting`. Properties: `customShortcuts`, `playbackShortcuts`, `splittingShortcuts` (key remapping), `shortcuts` (read-only, all active). |
 
 ### Multi-Track Record Arming
 
@@ -460,6 +460,24 @@ keyboard-controls  Boolean   false    Enable keyboard navigation and boundary ed
 ```
 
 `editable`, `link-endpoints`, and `continuous-play` map directly to `AnnotationListOptions` from `@waveform-playlist/core`. `keyboard-controls` enables keyboard shortcuts for annotation navigation and boundary editing (see [Keyboard Shortcuts](#keyboard-shortcuts)).
+
+**Properties (JS only):**
+```typescript
+annotationTrack.activeAnnotationId: string | null                  // Currently selected annotation
+annotationTrack.annotationShortcuts: AnnotationShortcutMap | null  // Key remapping (null = defaults)
+```
+
+**Methods:**
+```typescript
+annotationTrack.selectNext(): void
+annotationTrack.selectPrevious(): void
+annotationTrack.selectFirst(): void
+annotationTrack.selectLast(): void
+annotationTrack.clearSelection(): void
+annotationTrack.playActive(): void
+annotationTrack.moveStartBoundary(deltaMs: number): void
+annotationTrack.moveEndBoundary(deltaMs: number): void
+```
 
 ---
 
@@ -1023,6 +1041,8 @@ shortcuts.playbackShortcuts = null;
 - Ignores events from `<input>`, `<textarea>`, and `contentEditable` elements
 - Case-insensitive key matching
 - First match wins
+
+**Priority rule:** When both `<daw-keyboard-shortcuts>` and `<daw-annotation-track keyboard-controls>` are active, annotation shortcuts run first. If an annotation is selected and the key matches an annotation action, the event is consumed (`stopPropagation`). Otherwise it falls through to editor-level shortcuts. This means `Escape` clears the annotation selection first; pressing `Escape` again (with no selection) stops playback.
 
 ### Annotation Keyboard Controls
 
