@@ -275,7 +275,7 @@ editor.duration: number              // Total duration
 editor.selection: {start, end}       // Selection range
 editor.selectedTrackId: string|null  // Selected track
 editor.theme: DawcoreTheme           // Theme object
-editor.effects: EffectState[]        // Master effects chain: [{id, type, params, bypassed}, ...]
+editor.effects: EffectState[]        // Read-only. Master effects chain: [{id, type, params, bypassed}, ...]
 editor.engine: PlaylistEngine        // Direct engine access
 ```
 
@@ -358,7 +358,7 @@ track.recordArmed: boolean       // Reflects record-armed attribute
 track.inputDevice: string|null   // Reflects input-device attribute
 track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording)
 track.inputStream: MediaStream   // Read-only: active mic stream when recording
-track.effects: EffectState[]     // Per-track effects chain: [{id, type, params, bypassed}, ...]
+track.effects: EffectState[]     // Read-only. Per-track effects chain: [{id, type, params, bypassed}, ...]
 ```
 
 **Methods:**
@@ -502,7 +502,7 @@ daw-vu-meter::part(segment) { border-radius: 2px; }
     <div slot="controls">
       <daw-volume-slider></daw-volume-slider>
       <daw-pan-slider></daw-pan-slider>
-      <button slot="controls">FX</button>
+      <button>FX</button>
     </div>
   </daw-track>
 </daw-editor>
@@ -663,15 +663,14 @@ Ship the 20 built-in Tone.js effects and allow registering custom effect factori
 ```typescript
 import { registerEffect, getEffectDefinitions } from '@dawcore/components';
 
-registerEffect('shimmer-verb', {
-  label: 'Shimmer Reverb',
+registerEffect('long-verb', {
+  label: 'Long Reverb',
   category: 'reverb',
-  create: (params) => new Tone.Reverb({ decay: params.decay }),
-  defaults: { decay: 4, wet: 0.5, pitch: 12 },
+  create: (params) => new Tone.Reverb({ decay: params.decay, wet: params.wet }),
+  defaults: { decay: 8, wet: 0.5 },
   params: {
-    decay: { min: 0.1, max: 30, step: 0.1, unit: 's' },
+    decay: { min: 0.1, max: 60, step: 0.1, unit: 's' },
     wet:   { min: 0, max: 1, step: 0.01 },
-    pitch: { min: -24, max: 24, step: 1, unit: 'st' },
   },
 });
 
@@ -685,7 +684,7 @@ const allEffects = getEffectDefinitions();
 interface EffectDefinition {
   label: string;
   category: string;
-  create: (params: Record<string, number>) => ToneAudioNode;
+  create: (params: Record<string, number>) => AudioNode;
   defaults: Record<string, number>;
   params: Record<string, EffectParamDef>;
 }
@@ -714,7 +713,8 @@ const compId = editor.addEffect('tonejs-compressor', { threshold: -24, ratio: 4 
 // Real-time parameter updates (no chain rebuild)
 track.setEffectParams(reverbId, { decay: 3.0, wet: 0.5 });
 
-// Bypass (stores original wet, sets to 0; restore sets wet back)
+// Bypass: wet/dry effects store original wet and set to 0.
+// Effects without wet (compressor, limiter, eq3) are disconnected from chain.
 track.setEffectBypassed(reverbId, true);
 track.setEffectBypassed(reverbId, false);
 
@@ -858,6 +858,7 @@ declare namespace JSX {
 <template>
   <button @click="play">Play</button>
   <daw-editor
+    ref="editorRef"
     :samples-per-pixel="1024"
     :wave-height="128"
     timescale
