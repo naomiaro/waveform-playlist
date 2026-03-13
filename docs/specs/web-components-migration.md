@@ -151,6 +151,8 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-scale-mode>` | setScaleMode() | Select for ruler display mode (`beats`, `temporal`). Switches between bar:beat and minutes:seconds ruler. |
 | `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
 | `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
+| `<daw-undo-button>` | undo() | Undo last structural edit. Auto-disables when `canUndo` is false. |
+| `<daw-redo-button>` | redo() | Redo last undone edit. Auto-disables when `canRedo` is false. |
 | `<daw-playback-rate>` | setPlaybackRate() | Playback speed control. Works with both `<daw-editor>` and `<daw-player>`. |
 | `<daw-player>` | HTMLMediaElement | Lightweight single-track player. Uses `<audio>` element internally — no Tone.js, no engine. Supports waveform, transport, annotations, and optional effects. |
 | `<daw-mute-button>` | mute toggle | Dispatches `daw-mute` event. Auto-wires to parent `<daw-track>` via `closest()`. Reflects `aria-pressed` state. |
@@ -160,7 +162,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
 | `<daw-ruler>` | Time ruler | Renders time ruler above tracks. |
 | `<daw-playhead>` | Playhead | Animated playhead line. |
-| `<daw-keyboard-shortcuts>` | Keyboard handler | Render-less element inside `<daw-editor>`. Boolean attributes: `playback`, `splitting`. Properties: `customShortcuts`, `playbackShortcuts`, `splittingShortcuts` (key remapping), `shortcuts` (read-only, all active). |
+| `<daw-keyboard-shortcuts>` | Keyboard handler | Render-less element inside `<daw-editor>`. Boolean attributes: `playback`, `splitting`, `undo`. Properties: `customShortcuts`, `playbackShortcuts`, `splittingShortcuts`, `undoShortcuts` (key remapping), `shortcuts` (read-only, all active). |
 
 ### Multi-Track Record Arming
 
@@ -279,6 +281,9 @@ editor.selectedTrackId: string|null  // Selected track
 editor.theme: DawcoreTheme           // Theme object
 editor.effects: EffectState[]        // Read-only. Master effects chain: [{id, type, params, bypassed}, ...]
 editor.spectrogramConfig: SpectrogramConfig | null  // Global spectrogram defaults (null = built-in defaults)
+editor.canUndo: boolean              // Has undo history
+editor.canRedo: boolean              // Has redo history
+editor.undoLimit: number             // Max undo steps (default 100)
 editor.engine: PlaylistEngine        // Direct engine access
 ```
 
@@ -319,6 +324,10 @@ editor.moveEffect(effectId: string, newIndex: number): void
 editor.exportAudio(options?: ExportOptions): Promise<AudioBuffer>
 // MIDI loading
 editor.loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiLoadResult>
+// Undo/redo
+editor.undo(): void
+editor.redo(): void
+editor.clearHistory(): void
 // File loading (audio + MIDI auto-detection)
 editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<LoadFilesResult>
 ```
@@ -345,6 +354,8 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 'daw-effect-reorder' // Effect moved: detail: {effectId, fromIndex, toIndex}
 // Spectrogram
 'daw-spectrogram-ready' // Visible viewport FFT complete: detail: {trackId}
+// Undo/redo
+'daw-undo-state'        // canUndo/canRedo changed: detail: {canUndo, canRedo}
 // File loading
 'daw-files-load-error'  // Decode/parse failed: detail: {file: File, error: string}
 ```
@@ -588,6 +599,8 @@ player.addEffect('tonejs-reverb', { decay: 3, wet: 0.4 });
 | `<daw-time-display>` | Yes | Yes | |
 | `<daw-volume-slider>` | Yes | Yes | Master volume in transport context |
 | `<daw-playback-rate>` | Yes | Yes | |
+| `<daw-undo-button>` | Yes | No | Player has no undo stack |
+| `<daw-redo-button>` | Yes | No | Player has no undo stack |
 | `<daw-loop-button>` | Yes | No | Player has no selection-based loop |
 | `<daw-record-button>` | Yes | No | Player doesn't support recording |
 | `<daw-selection-start>` | Yes | No | |
@@ -1437,6 +1450,160 @@ Clip drag, boundary trim, and waveform scrubbing remain mouse-only. Keyboard alt
 
 ---
 
+## Undo/Redo
+
+### Scope
+
+Only structural edits are undoable — operations that change the track/clip document model:
+
+| Undoable | Not Undoable |
+|----------|-------------|
+| Clip move (drop) | Volume, pan, mute, solo |
+| Clip trim | Selection changes |
+| Clip split | Zoom |
+| Add/remove track | Loop region |
+| Add/remove clip | Playback transport (play/pause/stop/seek) |
+
+Volume, pan, mute, and solo are live mixing adjustments — non-destructive and instantly reversible by the user. Selection and zoom are navigation, not edits.
+
+### Snapshot-Based Stack
+
+Each undo step stores a frozen copy of `tracks[]` before the operation. Undo restores the previous snapshot; redo re-applies the undone snapshot. No per-operation inverse logic — eliminates a class of bugs from incorrect reverse operations.
+
+The stack has a fixed default limit of **100 steps**, configurable via `engine.undoLimit` or `editor.undoLimit`. When the limit is reached, the oldest entry is dropped.
+
+Any new structural edit clears the redo stack (standard behavior — you can't redo after making a new change). `clearHistory()` is called automatically when tracks are fully replaced via `setTracks()`, since old snapshots reference a different track set.
+
+### Transactions
+
+`beginTransaction()` / `commitTransaction()` groups multiple mutations into a single undo step. One snapshot is captured at `beginTransaction()` and pushed to the stack at `commitTransaction()`.
+
+**Primary use case: drag and drop.** The drag preview calls `moveClip()` on every tick, but only the final drop position should be an undo step:
+
+```javascript
+// In the drag handler (e.g., @dnd-kit/dom)
+editor.addEventListener('daw-drag-start', () => {
+  editor.engine.beginTransaction();
+});
+
+editor.addEventListener('daw-drag-end', () => {
+  editor.engine.commitTransaction();
+  // One undo step captures the net result
+});
+```
+
+**Multi-step operations:** Transactions also group deliberate multi-step edits:
+
+```javascript
+// Split a clip and remove the left half — one undo step
+editor.engine.beginTransaction();
+editor.engine.splitClip(trackId, clipId, atSample);
+editor.engine.removeClip(trackId, leftClipId);
+editor.engine.commitTransaction();
+```
+
+**Cancellation:** `abortTransaction()` restores the pre-transaction snapshot without pushing to the undo stack. Used for cancelled drags (e.g., Escape key during drag):
+
+```javascript
+editor.addEventListener('daw-drag-cancel', () => {
+  editor.engine.abortTransaction();
+  // State restored, nothing added to undo stack
+});
+```
+
+### Engine API
+
+```typescript
+engine.undo(): void               // Restore previous snapshot
+engine.redo(): void               // Re-apply undone snapshot
+engine.canUndo: boolean            // Has undo history
+engine.canRedo: boolean            // Has redo history
+engine.undoLimit: number           // Max stack size (default 100)
+engine.clearHistory(): void        // Reset both stacks
+engine.beginTransaction(): void    // Start grouping — snapshot captured
+engine.commitTransaction(): void   // End grouping — push one step
+engine.abortTransaction(): void    // Cancel — restore pre-transaction state
+```
+
+### Web Components API
+
+`<daw-editor>` delegates to the engine:
+
+```typescript
+// Properties (read-only)
+editor.canUndo: boolean
+editor.canRedo: boolean
+
+// Properties (read-write)
+editor.undoLimit: number
+
+// Methods
+editor.undo(): void
+editor.redo(): void
+editor.clearHistory(): void
+```
+
+**Transport elements:**
+
+`<daw-undo-button>` and `<daw-redo-button>` auto-wire to the editor via `<daw-transport for="...">`. They reflect disabled state based on `canUndo`/`canRedo`.
+
+```html
+<daw-transport for="my-editor">
+  <daw-undo-button></daw-undo-button>
+  <daw-redo-button></daw-redo-button>
+  <daw-play-button></daw-play-button>
+  <daw-stop-button></daw-stop-button>
+</daw-transport>
+```
+
+**Keyboard shortcut preset:**
+
+```html
+<daw-editor>
+  <daw-keyboard-shortcuts playback splitting undo></daw-keyboard-shortcuts>
+</daw-editor>
+```
+
+Default bindings:
+- **Cmd/Ctrl+Z** — Undo
+- **Cmd/Ctrl+Shift+Z** — Redo
+
+Remappable via the `undoShortcuts` property:
+
+```typescript
+interface UndoShortcutMap {
+  undo?: KeyBinding;
+  redo?: KeyBinding;
+}
+```
+
+### Events
+
+- **`daw-tracks-change`** fires as usual when undo/redo changes tracks (existing event, no special handling needed)
+- **`daw-undo-state`** fires when `canUndo` or `canRedo` changes:
+
+```typescript
+'daw-undo-state'  // detail: {canUndo: boolean, canRedo: boolean}
+```
+
+```javascript
+editor.addEventListener('daw-undo-state', (e) => {
+  undoBtn.disabled = !e.detail.canUndo;
+  redoBtn.disabled = !e.detail.canRedo;
+});
+```
+
+Note: `<daw-undo-button>` and `<daw-redo-button>` handle this automatically — the event is for custom UI.
+
+### Live Region Announcements
+
+| Action | Announcement |
+|--------|-------------|
+| Undo | "Undo" |
+| Redo | "Redo" |
+
+---
+
 ## Framework Usage
 
 All frameworks just need `import '@dawcore/components'` to register the custom elements. No wrapper packages needed.
@@ -1647,8 +1814,9 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-transport>` with button elements
 - [ ] `<daw-keyboard-shortcuts>` — playback and splitting presets, custom shortcuts, key remapping
 - [ ] File drop — `file-drop` attribute on editor, `loadFiles()` method, audio + MIDI auto-detection
+- [ ] Undo/redo — snapshot-based stack in engine, transactions for drag grouping, `<daw-undo-button>` / `<daw-redo-button>`, keyboard shortcut preset
 
-**Deliverable:** Interactive editor with drag/trim/split.
+**Deliverable:** Interactive editor with drag/trim/split and undo/redo.
 
 ### Phase 3: Track Controls
 
@@ -1737,6 +1905,7 @@ Create `@dawcore/components` package with core elements:
 | `<KeyboardShortcuts>` (React component) | `<daw-keyboard-shortcuts>` element |
 | `useAnnotationKeyboardControls()` hook | `<daw-annotation-track keyboard-controls>` attribute |
 | `useDynamicTracks()` hook (file/blob loading) | `editor.loadFiles()` method + `file-drop` attribute |
+| `useUndoRedo()` hook (planned) | `engine.undo()` / `engine.redo()` + `<daw-undo-button>` / `<daw-redo-button>` |
 | `MediaElementPlaylistProvider` (React context) | `<daw-player>` element |
 | `useMediaElementControls()` | `player.play()`, `player.pause()`, etc. |
 
