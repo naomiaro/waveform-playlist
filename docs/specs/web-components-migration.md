@@ -151,6 +151,8 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-scale-mode>` | setScaleMode() | Select for ruler display mode (`beats`, `temporal`). Switches between bar:beat and minutes:seconds ruler. |
 | `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
 | `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
+| `<daw-playback-rate>` | setPlaybackRate() | Playback speed control. Works with both `<daw-editor>` and `<daw-player>`. |
+| `<daw-player>` | HTMLMediaElement | Lightweight single-track player. Uses `<audio>` element internally — no Tone.js, no engine. Supports waveform, transport, annotations, and optional effects. |
 | `<daw-mute-button>` | mute toggle | Dispatches `daw-mute` event. Auto-wires to parent `<daw-track>` via `closest()`. Reflects `aria-pressed` state. |
 | `<daw-solo-button>` | solo toggle | Dispatches `daw-solo` event. Auto-wires to parent `<daw-track>`. Reflects `aria-pressed` state. |
 | `<daw-volume-slider>` | setTrackVolume() / setMasterVolume() | Volume control. When inside a `<daw-track>`, controls that track. When inside `<daw-transport>`, controls master volume. |
@@ -483,6 +485,122 @@ annotationTrack.playActive(): void
 annotationTrack.moveStartBoundary(deltaMs: number): void
 annotationTrack.moveEndBoundary(deltaMs: number): void
 ```
+
+### `<daw-player>` API
+
+A lightweight single-track audio player that uses `HTMLMediaElement` (`<audio>`) internally — no Tone.js, no PlaylistEngine. Ideal for podcast players, music previews, audiobook readers, or any scenario that needs waveform visualization without multi-track editing.
+
+**Attributes (reflected):**
+```
+src              String    —        Audio source URL
+peaks-src        String    —        Pre-computed BBC audiowaveform peaks URL (.dat/.json)
+wave-height      Number    128      Waveform height in px
+timescale        Boolean   false    Show time ruler
+mono             Boolean   false    Mono waveform rendering
+bar-width        Number    1        Waveform bar width
+bar-gap          Number    0        Waveform bar gap
+automatic-scroll Boolean   false    Follow playhead
+playback-rate    Number    1        Playback speed (0.25–4.0)
+```
+
+**Properties (JS only):**
+```typescript
+player.isPlaying: boolean            // Read-only: playback state
+player.currentTime: number           // Current playback position (seconds)
+player.duration: number              // Read-only: total duration (seconds)
+player.volume: number                // Volume (0–1)
+player.effects: EffectState[]        // Read-only: effects chain
+player.audioElement: HTMLAudioElement // Read-only: underlying <audio> element
+player.theme: DawcoreTheme           // Theme object
+```
+
+**Methods:**
+```typescript
+player.play(): void
+player.pause(): void
+player.stop(): void
+player.seekTo(time: number): void
+player.setPlaybackRate(rate: number): void
+player.setVolume(volume: number): void
+// Effects — same API as editor/track
+player.addEffect(type: string, params?: Record<string, number>): string
+player.removeEffect(effectId: string): void
+player.setEffectParams(effectId: string, params: Record<string, number>): void
+player.setEffectBypassed(effectId: string, bypassed: boolean): void
+player.moveEffect(effectId: string, newIndex: number): void
+```
+
+**Events:**
+```typescript
+'daw-ready'       // Audio metadata loaded, waveform rendered
+'daw-play'        // Playback started
+'daw-pause'       // Playback paused
+'daw-stop'        // Playback stopped (reset to 0)
+'daw-timeupdate'  // Playback time changed (RAF)
+'daw-ended'       // Playback reached end of audio
+```
+
+**AudioContext lifecycle:** The player uses `HTMLMediaElement` directly — no AudioContext needed for basic playback. When the first effect is added via `addEffect()`, the player lazily creates an AudioContext, connects the `<audio>` element through a `MediaElementAudioSourceNode`, routes through the effects chain, and connects to the destination. This means zero Web Audio overhead for simple playback use cases.
+
+**Children:** `<daw-player>` accepts `<daw-annotation-track>` and `<daw-annotation>` children for lyric display, chapter markers, or transcription overlays.
+
+```html
+<!-- Simple player -->
+<daw-player src="/audio/episode-42.mp3" wave-height="80" timescale></daw-player>
+
+<!-- Player with transport controls -->
+<daw-player id="my-player" src="/audio/song.mp3" wave-height="64">
+  <daw-annotation-track editable>
+    <daw-annotation start="0" end="30">Intro</daw-annotation>
+    <daw-annotation start="30" end="120">Verse 1</daw-annotation>
+    <daw-annotation start="120" end="180">Chorus</daw-annotation>
+  </daw-annotation-track>
+</daw-player>
+
+<daw-transport for="my-player">
+  <daw-play-button></daw-play-button>
+  <daw-pause-button></daw-pause-button>
+  <daw-stop-button></daw-stop-button>
+  <daw-time-display></daw-time-display>
+  <daw-playback-rate></daw-playback-rate>
+  <daw-volume-slider></daw-volume-slider>
+</daw-transport>
+
+<!-- Player with effects (AudioContext created lazily) -->
+<script>
+const player = document.querySelector('daw-player');
+player.addEffect('tonejs-reverb', { decay: 3, wet: 0.4 });
+// AudioContext now exists, audio routed through reverb
+</script>
+```
+
+### Transport Compatibility
+
+`<daw-transport>` works with both `<daw-editor>` and `<daw-player>` via the `for` attribute. Most transport elements work with either target, but some are editor-only:
+
+| Element | `<daw-editor>` | `<daw-player>` | Notes |
+|---------|:-:|:-:|-------|
+| `<daw-play-button>` | Yes | Yes | |
+| `<daw-pause-button>` | Yes | Yes | |
+| `<daw-stop-button>` | Yes | Yes | |
+| `<daw-rewind-button>` | Yes | Yes | |
+| `<daw-fast-forward-button>` | Yes | Yes | |
+| `<daw-time-display>` | Yes | Yes | |
+| `<daw-volume-slider>` | Yes | Yes | Master volume in transport context |
+| `<daw-playback-rate>` | Yes | Yes | |
+| `<daw-loop-button>` | Yes | No | Player has no selection-based loop |
+| `<daw-record-button>` | Yes | No | Player doesn't support recording |
+| `<daw-selection-start>` | Yes | No | |
+| `<daw-selection-end>` | Yes | No | |
+| `<daw-time-format>` | Yes | Yes | |
+| `<daw-tempo>` | Yes | No | |
+| `<daw-time-signature>` | Yes | No | |
+| `<daw-snap-to>` | Yes | No | |
+| `<daw-scale-mode>` | Yes | No | |
+| `<daw-zoom-in>` | Yes | No | Player has fixed zoom |
+| `<daw-zoom-out>` | Yes | No | |
+
+Transport elements that don't apply to `<daw-player>` render as disabled and log a warning to the console on first interaction.
 
 ---
 
@@ -1514,8 +1632,10 @@ Create `@dawcore/components` package with core elements:
 - [ ] Recording: record/arm via element methods, mic access, live waveform preview
 - [ ] Custom events for state changes (including `daw-record`, `daw-record-stop`, `daw-record-arm`)
 - [ ] Accessibility — built-in ARIA roles/labels, keyboard track navigation, live region announcements, focus indicators
+- [ ] `<daw-player>` — lightweight single-track player using HTMLMediaElement, waveform visualization, optional effects (lazy AudioContext)
+- [ ] `<daw-playback-rate>` — playback speed transport element (works with both editor and player)
 
-**Deliverable:** Multi-track waveform player with playback and recording.
+**Deliverable:** Multi-track waveform editor with playback and recording, plus standalone single-track player.
 
 ### Phase 2: Interactions
 
@@ -1617,6 +1737,8 @@ Create `@dawcore/components` package with core elements:
 | `<KeyboardShortcuts>` (React component) | `<daw-keyboard-shortcuts>` element |
 | `useAnnotationKeyboardControls()` hook | `<daw-annotation-track keyboard-controls>` attribute |
 | `useDynamicTracks()` hook (file/blob loading) | `editor.loadFiles()` method + `file-drop` attribute |
+| `MediaElementPlaylistProvider` (React context) | `<daw-player>` element |
+| `useMediaElementControls()` | `player.play()`, `player.pause()`, etc. |
 
 React 19+ users consume `@dawcore/components` directly in JSX — no wrapper package needed. React 18 is not supported.
 
