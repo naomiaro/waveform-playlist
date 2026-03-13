@@ -316,7 +316,7 @@ editor.moveEffect(effectId: string, newIndex: number): void
 // Offline rendering
 editor.exportAudio(options?: ExportOptions): Promise<AudioBuffer>
 // MIDI loading
-editor.loadMidi(url: string, options?: MidiLoadOptions): Promise<MidiLoadResult>
+editor.loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiLoadResult>
 // File loading (audio + MIDI auto-detection)
 editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<LoadFilesResult>
 ```
@@ -883,7 +883,7 @@ Useful for E2E tests and screenshot tooling.
 MIDI files are loaded imperatively via `editor.loadMidi()` because a `.mid` file can contain multiple tracks — the track count is unknowable at HTML authoring time.
 
 ```typescript
-editor.loadMidi(url: string, options?: MidiLoadOptions): Promise<MidiLoadResult>
+editor.loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiLoadResult>
 
 interface MidiLoadOptions {
   flatten?: boolean;       // Merge all MIDI tracks into one visual track (default: false)
@@ -1154,6 +1154,7 @@ interface LoadFilesOptions {
 
 interface LoadFilesResult {
   trackIds: string[];             // All created track IDs (audio + MIDI)
+  midi?: MidiLoadResult;          // Present when MIDI files were in the drop (bpm, timeSignature, etc.)
 }
 ```
 
@@ -1180,7 +1181,7 @@ dropZone.addEventListener('drop', async (e) => {
 
 ### File Type Detection
 
-`loadFiles()` detects MIDI files by extension (`.mid`, `.midi`) and routes them through `loadMidi()`. All other files are treated as audio and decoded via `AudioContext.decodeAudioData()`. Unrecognizable files emit a `daw-files-load-error` event:
+`loadFiles()` detects MIDI files by extension (`.mid`, `.midi`) and routes them through `loadMidi()`. All other files are treated as audio and passed to `AudioContext.decodeAudioData()` — no upfront MIME type filtering. Non-audio files (`.pdf`, `.txt`, etc.) will fail at decode and emit a `daw-files-load-error` event. This is intentional: the browser's decoder is the most reliable detector of valid audio.
 
 ```typescript
 'daw-files-load-error'  // detail: {file: File, error: string}
