@@ -1127,7 +1127,7 @@ All elements render correct ARIA roles, labels, and states in their Shadow DOM a
 ### ARIA Roles & Semantics
 
 **`<daw-editor>`:**
-- `role="application"` — signals complex widget with custom keyboard handling
+- `role="region"` — preserves standard screen reader browse-mode navigation
 - `aria-label="Audio editor"` (default, overridable)
 - `aria-roledescription="audio editor"`
 
@@ -1138,9 +1138,7 @@ All elements render correct ARIA roles, labels, and states in their Shadow DOM a
 - `aria-selected` reflects track selection state
 
 **`<daw-clip>`:**
-- `role="group"`
-- `aria-label` derived from `name` or generated (e.g., "Clip at 2.5s, 8.0s duration")
-- `aria-roledescription="audio clip"`
+- `aria-hidden="true"` — clips are visual representations within the canvas, not keyboard-navigable in this phase
 
 **Transport buttons** (`<daw-play-button>`, `<daw-stop-button>`, etc.):
 - Render a native `<button>` in Shadow DOM
@@ -1157,6 +1155,22 @@ All elements render correct ARIA roles, labels, and states in their Shadow DOM a
 - `aria-label="Playback time"`
 - `aria-live="off"` — not announced every frame; screen reader users query on demand
 
+**`<daw-vu-meter>`:**
+- `role="meter"` (ARIA 1.2)
+- `aria-valuenow`, `aria-valuemin`, `aria-valuemax` reflect current level
+- `aria-label` set automatically (e.g., "Vocals level", "Master level")
+
+**`<daw-selection-start>`, `<daw-selection-end>`:**
+- Render native `<input>` in Shadow DOM
+- `aria-label="Selection start time"` / `aria-label="Selection end time"`
+
+**`<daw-tempo>`, `<daw-time-signature>`, `<daw-time-format>`, `<daw-snap-to>`, `<daw-scale-mode>`:**
+- Render native `<input>` or `<select>` in Shadow DOM
+- `aria-label` set automatically ("Tempo", "Time signature", "Time format", "Snap to", "Scale mode")
+
+**`<daw-ruler>`, `<daw-playhead>`:**
+- `aria-hidden="true"` — visual-only elements, screen readers skip them
+
 **`<daw-annotation-track>` / `<daw-annotation>`:**
 - Track: `role="list"`, annotations: `role="listitem"`
 - `aria-label` from text content and time range (e.g., "First line, 0.0 to 2.5 seconds")
@@ -1172,7 +1186,9 @@ Arrow keys navigate between tracks when the editor has focus. Standard Tab order
 | `ArrowDown` | Focus next track |
 | `Tab` | Move focus to next focusable element (controls, then next track) |
 | `Shift+Tab` | Move focus backwards |
-| `Enter` / `Space` | Select focused track |
+| `Enter` | Select focused track |
+
+**Note:** `Space` is reserved for play/pause (via `<daw-keyboard-shortcuts playback>`), not track selection. ArrowUp/Down for track navigation only applies when no `<daw-annotation-track keyboard-controls>` has an active selection — annotation shortcuts take priority per the [Keyboard Shortcuts](#keyboard-shortcuts) priority rule.
 
 **Focus order within a track:**
 1. Track itself (group)
@@ -1215,11 +1231,12 @@ daw-track::part(focus-ring) {
 | Track soloed / unsoloed | "Vocals soloed" / "Vocals unsoloed" |
 | Clip split | "Clip split at 5.2 seconds" |
 | Record armed | "Vocals armed for recording" |
+| Loop enabled / disabled | "Loop enabled" / "Loop disabled" |
+| Zoom in / out | "Zoom: 512 samples per pixel" |
 
 **Not announced** (query on demand):
 - Time updates during playback (continuous, would be noisy)
 - Selection changes (visual operation)
-- Zoom level changes
 
 ### Scope & Deferred Work
 
