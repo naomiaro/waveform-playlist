@@ -98,6 +98,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
   wave-height="128"
   timescale
 >
+  <daw-keyboard-shortcuts playback splitting></daw-keyboard-shortcuts>
   <daw-track src="/audio/vocals.mp3" name="Vocals"></daw-track>
   <daw-track src="/audio/guitar.mp3" name="Guitar"></daw-track>
 </daw-editor>
@@ -157,6 +158,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
 | `<daw-ruler>` | Time ruler | Renders time ruler above tracks. |
 | `<daw-playhead>` | Playhead | Animated playhead line. |
+| `<daw-keyboard-shortcuts>` | Keyboard handler | Render-less element inside `<daw-editor>`. Boolean attributes: `playback`, `splitting`. Customizable via `customShortcuts` and key remapping properties. |
 
 ### Multi-Track Record Arming
 
@@ -451,12 +453,13 @@ Multiple `<daw-clip>` elements with the same `src` share one `AudioBuffer` — e
 
 **Attributes (reflected):**
 ```
-editable         Boolean   false    Allow drag/resize of annotation boxes
-link-endpoints   Boolean   false    Snap adjacent annotation boundaries together
-continuous-play  Boolean   false    Auto-advance playback through annotations
+editable           Boolean   false    Allow drag/resize of annotation boxes
+link-endpoints     Boolean   false    Snap adjacent annotation boundaries together
+continuous-play    Boolean   false    Auto-advance playback through annotations
+keyboard-controls  Boolean   false    Enable keyboard navigation and boundary editing
 ```
 
-These map directly to `AnnotationListOptions` from `@waveform-playlist/core`. Configuration lives on the element, not as standalone toggle components.
+`editable`, `link-endpoints`, and `continuous-play` map directly to `AnnotationListOptions` from `@waveform-playlist/core`. `keyboard-controls` enables keyboard shortcuts for annotation navigation and boundary editing (see [Keyboard Shortcuts](#keyboard-shortcuts)).
 
 ---
 
@@ -918,6 +921,185 @@ Velocity maps to opacity (0.3 → 1.0). Pitch range auto-fits to actual note dat
 
 ---
 
+## Keyboard Shortcuts
+
+Keyboard shortcuts are opt-in via two mechanisms: `<daw-keyboard-shortcuts>` for editor-level shortcuts, and `keyboard-controls` attribute on `<daw-annotation-track>` for annotation shortcuts.
+
+### `<daw-keyboard-shortcuts>` Element
+
+Render-less element placed inside `<daw-editor>`. Enables built-in shortcut presets via boolean attributes and supports custom shortcuts via JS property.
+
+```html
+<daw-editor id="my-editor">
+  <daw-keyboard-shortcuts playback splitting></daw-keyboard-shortcuts>
+  <daw-track src="/audio/vocals.mp3" name="Vocals"></daw-track>
+</daw-editor>
+```
+
+**Attributes (reflected):**
+```
+playback         Boolean   false    Space=play/pause, Escape=stop, 0=rewind
+splitting        Boolean   false    S=split clip at playhead on selected track
+```
+
+**Properties (JS only):**
+```typescript
+shortcuts.customShortcuts: KeyboardShortcut[]          // Additional custom shortcuts
+shortcuts.shortcuts: KeyboardShortcut[]                // Read-only. All active shortcuts (built-in + custom)
+shortcuts.playbackShortcuts: PlaybackShortcutMap | null   // Remap playback keys (null = defaults)
+shortcuts.splittingShortcuts: SplittingShortcutMap | null  // Remap splitting keys (null = defaults)
+```
+
+**Shortcut definition shape:**
+```typescript
+interface KeyboardShortcut {
+  key: string;              // 'Space', 's', 'Escape', 'ArrowUp', etc.
+  action: () => void;       // Callback
+  description?: string;     // Human-readable label
+  ctrlKey?: boolean;        // Modifier (optional — if omitted, any state matches)
+  shiftKey?: boolean;
+  metaKey?: boolean;
+  altKey?: boolean;
+  preventDefault?: boolean; // Default: true
+}
+
+interface KeyBinding {
+  key: string;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  metaKey?: boolean;
+  altKey?: boolean;
+}
+```
+
+**Built-in playback shortcuts:**
+
+| Action | Default Key | Description |
+|--------|------------|-------------|
+| `playPause` | `Space` | Play/Pause |
+| `stop` | `Escape` | Stop |
+| `rewindToStart` | `0` | Rewind to start |
+
+**Built-in splitting shortcuts:**
+
+| Action | Default Key | Description |
+|--------|------------|-------------|
+| `splitAtPlayhead` | `S` | Split clip at playhead |
+
+**Remapping built-in shortcuts:**
+```typescript
+interface PlaybackShortcutMap {
+  playPause?: KeyBinding;
+  stop?: KeyBinding;
+  rewindToStart?: KeyBinding;
+}
+
+interface SplittingShortcutMap {
+  splitAtPlayhead?: KeyBinding;
+}
+```
+
+```javascript
+const shortcuts = document.querySelector('daw-keyboard-shortcuts');
+
+// Remap playback keys
+shortcuts.playbackShortcuts = {
+  playPause: { key: 'p' },
+  stop: { key: 'q' },
+};
+
+// Add custom shortcuts
+shortcuts.customShortcuts = [
+  { key: 'c', action: () => editor.stop(), description: 'Clear all' },
+  { key: 'Delete', action: () => editor.removeTrack(id), description: 'Delete track' },
+];
+
+// Reset to defaults
+shortcuts.playbackShortcuts = null;
+```
+
+**Behaviors:**
+- Ignores key repeat (no rapid toggling from held keys)
+- Ignores events from `<input>`, `<textarea>`, and `contentEditable` elements
+- Case-insensitive key matching
+- First match wins
+
+### Annotation Keyboard Controls
+
+Enabled via `keyboard-controls` attribute on `<daw-annotation-track>`. Shortcuts are scoped to the annotation track that owns them — multiple annotation tracks can each have independent keyboard controls.
+
+```html
+<daw-annotation-track id="lyrics" editable link-endpoints keyboard-controls>
+  <daw-annotation start="0.0" end="2.5">First line</daw-annotation>
+  <daw-annotation start="2.5" end="5.1">Second line</daw-annotation>
+</daw-annotation-track>
+```
+
+**Properties (JS only):**
+```typescript
+annotationTrack.activeAnnotationId: string | null              // Currently selected annotation
+annotationTrack.annotationShortcuts: AnnotationShortcutMap | null  // Key remapping (null = defaults)
+```
+
+**Default key bindings:**
+
+| Action | Default Key | Description |
+|--------|------------|-------------|
+| `selectPrevious` | `ArrowUp` / `ArrowLeft` | Select previous (wraps) |
+| `selectNext` | `ArrowDown` / `ArrowRight` | Select next (wraps) |
+| `selectFirst` | `Home` | Select first |
+| `selectLast` | `End` | Select last |
+| `clearSelection` | `Escape` | Deselect |
+| `moveStartEarlier` | `[` | Start −10ms |
+| `moveStartLater` | `]` | Start +10ms |
+| `moveEndEarlier` | `{` (Shift+[) | End −10ms |
+| `moveEndLater` | `}` (Shift+]) | End +10ms |
+| `playActive` | `Enter` | Play selected annotation |
+
+**Remapping:**
+```typescript
+interface AnnotationShortcutMap {
+  selectPrevious?: KeyBinding;
+  selectNext?: KeyBinding;
+  selectFirst?: KeyBinding;
+  selectLast?: KeyBinding;
+  clearSelection?: KeyBinding;
+  moveStartEarlier?: KeyBinding;
+  moveStartLater?: KeyBinding;
+  moveEndEarlier?: KeyBinding;
+  moveEndLater?: KeyBinding;
+  playActive?: KeyBinding;
+}
+```
+
+```javascript
+// Remap to vim-style keys (partial — only override what you want)
+annotationTrack.annotationShortcuts = {
+  selectPrevious: { key: 'k' },
+  selectNext: { key: 'j' },
+};
+```
+
+**Exposed methods** (for programmatic use outside keyboard shortcuts):
+```typescript
+annotationTrack.selectNext(): void
+annotationTrack.selectPrevious(): void
+annotationTrack.selectFirst(): void
+annotationTrack.selectLast(): void
+annotationTrack.clearSelection(): void
+annotationTrack.playActive(): void
+annotationTrack.moveStartBoundary(deltaMs: number): void
+annotationTrack.moveEndBoundary(deltaMs: number): void
+```
+
+**Behaviors:**
+- Auto-scrolls to center the active annotation on keyboard selection change
+- Respects `link-endpoints` — boundary moves cascade to adjacent annotations
+- Boundary constraints: minimum 0.1s duration, end cannot exceed timeline duration
+- Navigation shortcuts always active; boundary editing requires `editable` attribute
+
+---
+
 ## Framework Usage
 
 All frameworks just need `import '@dawcore/components'` to register the custom elements. No wrapper packages needed.
@@ -1123,6 +1305,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] Selection (click + drag on timeline)
 - [ ] Track selection
 - [ ] `<daw-transport>` with button elements
+- [ ] `<daw-keyboard-shortcuts>` — playback and splitting presets, custom shortcuts, key remapping
 
 **Deliverable:** Interactive editor with drag/trim/split.
 
@@ -1150,6 +1333,7 @@ Create `@dawcore/components` package with core elements:
 ### Phase 4: Optional Features
 
 - [ ] `<daw-annotation-track>`, `<daw-annotation>`, `<daw-annotation-list>` — single source of truth, dual view
+- [ ] Annotation keyboard controls — `keyboard-controls` attribute, key remapping, programmatic methods
 - [ ] Spectrogram render mode — `render-mode="spectrogram"` and `render-mode="split"` on `<daw-track>`
 - [ ] Spectrogram config — `SpectrogramConfig` on editor (global) and track (override), lazy worker pool
 - [ ] `editor.loadMidi()` — multi-track MIDI loading, returns `{trackIds, bpm, timeSignature, duration}`
@@ -1209,6 +1393,8 @@ Create `@dawcore/components` package with core elements:
 | `useDynamicEffects()` / `useTrackDynamicEffects()` | `editor.addEffect()` / `track.addEffect()` (imperative) |
 | `SpectrogramProvider` (React context) | `render-mode="spectrogram"` attribute + `spectrogramConfig` property |
 | `useMidiTracks()` hook | `editor.loadMidi()` method |
+| `<KeyboardShortcuts>` (React component) | `<daw-keyboard-shortcuts>` element |
+| `useAnnotationKeyboardControls()` hook | `<daw-annotation-track keyboard-controls>` attribute |
 
 React 19+ users consume `@dawcore/components` directly in JSX — no wrapper package needed. React 18 is not supported.
 
