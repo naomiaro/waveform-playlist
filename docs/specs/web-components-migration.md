@@ -684,7 +684,7 @@ const allEffects = getEffectDefinitions();
 interface EffectDefinition {
   label: string;
   category: string;
-  create: (params: Record<string, number>) => AudioNode;
+  create: (params: Record<string, number>) => AudioNode | ToneAudioNode;
   defaults: Record<string, number>;
   params: Record<string, EffectParamDef>;
 }
