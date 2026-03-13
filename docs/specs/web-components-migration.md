@@ -1120,6 +1120,113 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 ---
 
+## Accessibility
+
+All elements render correct ARIA roles, labels, and states in their Shadow DOM automatically. Consumers can override `aria-label` on host elements. Accessibility is built into each element from Phase 1, not bolted on later.
+
+### ARIA Roles & Semantics
+
+**`<daw-editor>`:**
+- `role="application"` — signals complex widget with custom keyboard handling
+- `aria-label="Audio editor"` (default, overridable)
+- `aria-roledescription="audio editor"`
+
+**`<daw-track>`:**
+- `role="group"`
+- `aria-label` derived from `name` attribute (e.g., "Vocals")
+- `aria-roledescription="audio track"`
+- `aria-selected` reflects track selection state
+
+**`<daw-clip>`:**
+- `role="group"`
+- `aria-label` derived from `name` or generated (e.g., "Clip at 2.5s, 8.0s duration")
+- `aria-roledescription="audio clip"`
+
+**Transport buttons** (`<daw-play-button>`, `<daw-stop-button>`, etc.):
+- Render a native `<button>` in Shadow DOM
+- `aria-label` set automatically ("Play", "Pause", "Stop", etc.)
+- Toggle buttons (`<daw-loop-button>`, `<daw-mute-button>`, `<daw-solo-button>`, `<daw-record-button>`) — `aria-pressed` reflects toggle state
+
+**`<daw-volume-slider>`, `<daw-pan-slider>`:**
+- Render a native `<input type="range">` in Shadow DOM
+- `aria-label` set automatically ("Volume", "Pan", or "Track Vocals volume")
+- `aria-valuemin`, `aria-valuemax`, `aria-valuenow` reflect current range
+
+**`<daw-time-display>`:**
+- `role="status"`
+- `aria-label="Playback time"`
+- `aria-live="off"` — not announced every frame; screen reader users query on demand
+
+**`<daw-annotation-track>` / `<daw-annotation>`:**
+- Track: `role="list"`, annotations: `role="listitem"`
+- `aria-label` from text content and time range (e.g., "First line, 0.0 to 2.5 seconds")
+- `aria-selected` reflects active annotation state
+
+### Keyboard Navigation
+
+Arrow keys navigate between tracks when the editor has focus. Standard Tab order applies within track controls and transport.
+
+| Key | Action |
+|-----|--------|
+| `ArrowUp` | Focus previous track |
+| `ArrowDown` | Focus next track |
+| `Tab` | Move focus to next focusable element (controls, then next track) |
+| `Shift+Tab` | Move focus backwards |
+| `Enter` / `Space` | Select focused track |
+
+**Focus order within a track:**
+1. Track itself (group)
+2. Track controls slot (volume, pan, mute, solo — standard Tab order)
+3. Next track
+
+**Transport focus:** `<daw-transport>` children are standard buttons and inputs — native Tab order applies.
+
+**Focus visibility:** All focusable elements render a visible focus indicator via `:focus-visible` in Shadow DOM, customizable via `::part(focus-ring)`:
+
+```css
+daw-track::part(focus-ring) {
+  outline: 2px solid #63C75F;
+  outline-offset: 2px;
+}
+```
+
+### Live Region Announcements
+
+`<daw-editor>` renders a visually hidden `aria-live="polite"` region in its Shadow DOM. Rapid state changes coalesce into a single announcement.
+
+**Transport state:**
+
+| Event | Announcement |
+|-------|-------------|
+| Play | "Playing" |
+| Pause | "Paused" |
+| Stop | "Stopped" |
+| Record start | "Recording on Vocals, Guitar" |
+| Record stop | "Recording stopped" |
+
+**Track/clip operations:**
+
+| Event | Announcement |
+|-------|-------------|
+| Track selected | "Track Vocals selected" |
+| Track added | "Track Piano added" |
+| Track removed | "Track Piano removed" |
+| Track muted / unmuted | "Vocals muted" / "Vocals unmuted" |
+| Track soloed / unsoloed | "Vocals soloed" / "Vocals unsoloed" |
+| Clip split | "Clip split at 5.2 seconds" |
+| Record armed | "Vocals armed for recording" |
+
+**Not announced** (query on demand):
+- Time updates during playback (continuous, would be noisy)
+- Selection changes (visual operation)
+- Zoom level changes
+
+### Scope & Deferred Work
+
+Clip drag, boundary trim, and waveform scrubbing remain mouse-only. Keyboard alternatives for pixel-level interactions are deferred to a future accessibility phase.
+
+---
+
 ## Framework Usage
 
 All frameworks just need `import '@dawcore/components'` to register the custom elements. No wrapper packages needed.
@@ -1314,6 +1421,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] Playback: play/pause/stop/seek via element methods
 - [ ] Recording: record/arm via element methods, mic access, live waveform preview
 - [ ] Custom events for state changes (including `daw-record`, `daw-record-stop`, `daw-record-arm`)
+- [ ] Accessibility — built-in ARIA roles/labels, keyboard track navigation, live region announcements, focus indicators
 
 **Deliverable:** Multi-track waveform player with playback and recording.
 
