@@ -260,6 +260,7 @@ indefinite-playback  Boolean   false    Play past end of audio
 bar-width            Number    1        Waveform bar width
 bar-gap              Number    0        Waveform bar gap
 show-clip-headers    Boolean   false    Show clip name headers
+file-drop            Boolean   false    Accept dropped audio/MIDI files
 ```
 
 **Properties (JS only):**
@@ -316,6 +317,8 @@ editor.moveEffect(effectId: string, newIndex: number): void
 editor.exportAudio(options?: ExportOptions): Promise<AudioBuffer>
 // MIDI loading
 editor.loadMidi(url: string, options?: MidiLoadOptions): Promise<MidiLoadResult>
+// File loading (audio + MIDI auto-detection)
+editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<LoadFilesResult>
 ```
 
 **Events:**
@@ -340,6 +343,8 @@ editor.loadMidi(url: string, options?: MidiLoadOptions): Promise<MidiLoadResult>
 'daw-effect-reorder' // Effect moved: detail: {effectId, fromIndex, toIndex}
 // Spectrogram
 'daw-spectrogram-ready' // Visible viewport FFT complete: detail: {trackId}
+// File loading
+'daw-files-load-error'  // Decode/parse failed: detail: {file: File, error: string}
 ```
 
 ### `<daw-track>` API
@@ -1120,6 +1125,75 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 ---
 
+## File Drop
+
+### Built-in Drop Zone
+
+Enable with the `file-drop` attribute on `<daw-editor>`:
+
+```html
+<daw-editor file-drop>
+  <daw-track src="/audio/drums.mp3" name="Drums"></daw-track>
+</daw-editor>
+```
+
+Dropping audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, etc.) creates one new track per file. Dropping a MIDI file (`.mid`, `.midi`) routes through the `loadMidi()` pipeline, creating N tracks with `render-mode="piano-roll"`.
+
+Mixed drops work — dropping 2 audio files and 1 MIDI file in a single drop creates tracks for all of them.
+
+### Programmatic File Loading
+
+For custom drop zones, file pickers, or other UIs:
+
+```typescript
+editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<LoadFilesResult>
+
+interface LoadFilesOptions {
+  midiOptions?: MidiLoadOptions;  // Passed through for .mid files (flatten, startTime, etc.)
+}
+
+interface LoadFilesResult {
+  trackIds: string[];             // All created track IDs (audio + MIDI)
+}
+```
+
+```javascript
+// Custom file picker
+const input = document.createElement('input');
+input.type = 'file';
+input.multiple = true;
+input.accept = 'audio/*,.mid,.midi';
+input.onchange = async () => {
+  const { trackIds } = await editor.loadFiles(input.files);
+  console.log('Created tracks:', trackIds);
+};
+input.click();
+
+// Custom drop zone with MIDI options
+dropZone.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  const { trackIds } = await editor.loadFiles(e.dataTransfer.files, {
+    midiOptions: { flatten: true },
+  });
+});
+```
+
+### File Type Detection
+
+`loadFiles()` detects MIDI files by extension (`.mid`, `.midi`) and routes them through `loadMidi()`. All other files are treated as audio and decoded via `AudioContext.decodeAudioData()`. Unrecognizable files emit a `daw-files-load-error` event:
+
+```typescript
+'daw-files-load-error'  // detail: {file: File, error: string}
+```
+
+```javascript
+editor.addEventListener('daw-files-load-error', (e) => {
+  console.warn('Failed to load', e.detail.file.name, ':', e.detail.error);
+});
+```
+
+---
+
 ## Accessibility
 
 All elements render correct ARIA roles, labels, and states in their Shadow DOM automatically. Consumers can override `aria-label` on host elements. Accessibility is built into each element from Phase 1, not bolted on later.
@@ -1451,6 +1525,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] Track selection
 - [ ] `<daw-transport>` with button elements
 - [ ] `<daw-keyboard-shortcuts>` — playback and splitting presets, custom shortcuts, key remapping
+- [ ] File drop — `file-drop` attribute on editor, `loadFiles()` method, audio + MIDI auto-detection
 
 **Deliverable:** Interactive editor with drag/trim/split.
 
@@ -1540,6 +1615,7 @@ Create `@dawcore/components` package with core elements:
 | `useMidiTracks()` hook | `editor.loadMidi()` method |
 | `<KeyboardShortcuts>` (React component) | `<daw-keyboard-shortcuts>` element |
 | `useAnnotationKeyboardControls()` hook | `<daw-annotation-track keyboard-controls>` attribute |
+| `useDynamicTracks()` hook (file/blob loading) | `editor.loadFiles()` method + `file-drop` attribute |
 
 React 19+ users consume `@dawcore/components` directly in JSX — no wrapper package needed. React 18 is not supported.
 
