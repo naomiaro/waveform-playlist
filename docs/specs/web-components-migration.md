@@ -275,6 +275,7 @@ editor.duration: number              // Total duration
 editor.selection: {start, end}       // Selection range
 editor.selectedTrackId: string|null  // Selected track
 editor.theme: DawcoreTheme           // Theme object
+editor.effects: EffectState[]        // Master effects chain: [{id, type, params, bypassed}, ...]
 editor.engine: PlaylistEngine        // Direct engine access
 ```
 
@@ -305,6 +306,14 @@ editor.setSnapTo(snap: string): void                   // 'bar' | 'beat' | 'off'
 editor.setScaleMode(mode: string): void                // 'beats' | 'temporal'
 editor.setLoopEnabled(enabled: boolean): void          // Toggle loop playback
 editor.setLoopRegion(start: number, end: number): void // Set loop boundaries
+// Effects (master chain)
+editor.addEffect(type: string, params?: Record<string, number>): string  // Returns effectId
+editor.removeEffect(effectId: string): void
+editor.setEffectParams(effectId: string, params: Record<string, number>): void
+editor.setEffectBypassed(effectId: string, bypassed: boolean): void
+editor.moveEffect(effectId: string, newIndex: number): void
+// Offline rendering
+editor.exportAudio(options?: ExportOptions): Promise<AudioBuffer>
 ```
 
 **Events:**
@@ -321,6 +330,12 @@ editor.setLoopRegion(start: number, end: number): void // Set loop boundaries
 'daw-track-select'  // Track selected: detail: {trackId}
 'daw-tracks-change' // Tracks mutated (move/trim/split): detail: {tracks}
 'daw-zoom'          // Zoom changed: detail: {samplesPerPixel}
+// Effect events (bubble from <daw-track> for per-track, dispatched on <daw-editor> for master)
+'daw-effect-add'     // Effect added: detail: {effectId, type, params, index}
+'daw-effect-remove'  // Effect removed: detail: {effectId}
+'daw-effect-change'  // Params updated: detail: {effectId, params}
+'daw-effect-bypass'  // Bypass toggled: detail: {effectId, bypassed}
+'daw-effect-reorder' // Effect moved: detail: {effectId, fromIndex, toIndex}
 ```
 
 ### `<daw-track>` API
@@ -343,12 +358,19 @@ track.recordArmed: boolean       // Reflects record-armed attribute
 track.inputDevice: string|null   // Reflects input-device attribute
 track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording)
 track.inputStream: MediaStream   // Read-only: active mic stream when recording
+track.effects: EffectState[]     // Per-track effects chain: [{id, type, params, bypassed}, ...]
 ```
 
 **Methods:**
 ```typescript
 track.arm(deviceId?: string): Promise<void>   // Arm for recording, request mic access
 track.disarm(): void                          // Disarm, release mic stream
+// Effects (per-track chain) — same API as editor master chain
+track.addEffect(type: string, params?: Record<string, number>): string  // Returns effectId
+track.removeEffect(effectId: string): void
+track.setEffectParams(effectId: string, params: Record<string, number>): void
+track.setEffectBypassed(effectId: string, bypassed: boolean): void
+track.moveEffect(effectId: string, newIndex: number): void
 ```
 
 When `arm()` is called without a `deviceId`, it uses the default input device. The method requests mic permission via `getUserMedia()` and stores the stream for use when recording starts. Calling `arm()` on an already-armed track with a different `deviceId` switches the input device.
@@ -605,6 +627,159 @@ The existing `SnapToGridModifier` and `ClipCollisionModifier` from the browser p
 
 ---
 
+## Effects
+
+Effects are **imperative only** — no `<daw-effect>` element. Effects are configuration (how audio sounds), not content (what's in the track). The same API surface is available on both `<daw-editor>` (master chain) and `<daw-track>` (per-track chain).
+
+### Effect State
+
+```typescript
+interface EffectState {
+  id: string;                        // Generated unique ID
+  type: string;                      // Registry key (e.g., 'tonejs-reverb')
+  params: Record<string, number>;    // Current parameter values
+  bypassed: boolean;                 // true = wet set to 0, original stored
+}
+```
+
+### Built-in Effects (Tone.js)
+
+All built-in effects use a `tonejs-` prefix to clarify their audio engine origin and leave unprefixed names available for custom implementations.
+
+| Category | Effects |
+|----------|---------|
+| Reverb | `tonejs-reverb`, `tonejs-freeverb`, `tonejs-jc-reverb` |
+| Delay | `tonejs-feedback-delay`, `tonejs-ping-pong-delay` |
+| Modulation | `tonejs-chorus`, `tonejs-phaser`, `tonejs-tremolo`, `tonejs-vibrato`, `tonejs-auto-filter` |
+| Filter | `tonejs-eq3`, `tonejs-auto-wah`, `tonejs-filter` |
+| Distortion | `tonejs-distortion`, `tonejs-bit-crusher`, `tonejs-chebyshev` |
+| Dynamics | `tonejs-compressor`, `tonejs-limiter`, `tonejs-gate` |
+| Spatial | `tonejs-stereo-widener` |
+
+### Effect Registry
+
+Ship the 20 built-in Tone.js effects and allow registering custom effect factories:
+
+```typescript
+import { registerEffect, getEffectDefinitions } from '@dawcore/components';
+
+registerEffect('shimmer-verb', {
+  label: 'Shimmer Reverb',
+  category: 'reverb',
+  create: (params) => new Tone.Reverb({ decay: params.decay }),
+  defaults: { decay: 4, wet: 0.5, pitch: 12 },
+  params: {
+    decay: { min: 0.1, max: 30, step: 0.1, unit: 's' },
+    wet:   { min: 0, max: 1, step: 0.01 },
+    pitch: { min: -24, max: 24, step: 1, unit: 'st' },
+  },
+});
+
+// Query available effects (built-in + registered)
+const allEffects = getEffectDefinitions();
+```
+
+**Registration shape:**
+
+```typescript
+interface EffectDefinition {
+  label: string;
+  category: string;
+  create: (params: Record<string, number>) => ToneAudioNode;
+  defaults: Record<string, number>;
+  params: Record<string, EffectParamDef>;
+}
+
+interface EffectParamDef {
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;  // 's', 'ms', 'Hz', 'dB', 'st', '%'
+}
+```
+
+The built-in 20 use this same shape internally — `registerEffect` adds to the same map. Calling `addEffect('unknown-type')` throws with a clear error listing available types.
+
+### Usage
+
+```javascript
+// Per-track effects
+const track = document.querySelector('daw-track[name="Vocals"]');
+const reverbId = track.addEffect('tonejs-reverb', { decay: 2.5, wet: 0.3 });
+const delayId = track.addEffect('tonejs-feedback-delay', { delayTime: 0.25, feedback: 0.4 });
+
+// Master effects
+const compId = editor.addEffect('tonejs-compressor', { threshold: -24, ratio: 4 });
+
+// Real-time parameter updates (no chain rebuild)
+track.setEffectParams(reverbId, { decay: 3.0, wet: 0.5 });
+
+// Bypass (stores original wet, sets to 0; restore sets wet back)
+track.setEffectBypassed(reverbId, true);
+track.setEffectBypassed(reverbId, false);
+
+// Reorder and remove
+track.moveEffect(delayId, 0);      // Move delay before reverb
+track.removeEffect(delayId);
+
+// Read current state
+console.log(track.effects);  // [{id, type, params, bypassed}, ...]
+console.log(editor.effects); // Master chain, same shape
+```
+
+### Effect Events
+
+Events are dispatched from the element that owns the chain. Per-track effect events bubble up to `<daw-editor>`, so you can listen on the editor for all effect changes.
+
+```javascript
+// Listen on a specific track
+track.addEventListener('daw-effect-add', (e) => {
+  console.log('Added', e.detail.type, 'at index', e.detail.index);
+});
+
+// Listen on editor to catch ALL effect changes (master + any track)
+editor.addEventListener('daw-effect-bypass', (e) => {
+  const track = e.target.closest('daw-track');
+  if (track) {
+    console.log('Track effect bypassed:', track.name, e.detail.effectId);
+  } else {
+    console.log('Master effect bypassed:', e.detail.effectId);
+  }
+});
+```
+
+### Offline Rendering / WAV Export
+
+`editor.exportAudio()` renders offline through all effect chains (per-track + master), producing identical output to real-time playback:
+
+```typescript
+interface ExportOptions {
+  format?: 'wav';           // Extensible for future formats
+  sampleRate?: number;       // Default: audioContext.sampleRate
+  startTime?: number;        // Default: 0
+  duration?: number;         // Default: editor.duration
+  channels?: 1 | 2;         // Default: 2 (stereo)
+}
+```
+
+```javascript
+// Basic export
+const buffer = await editor.exportAudio();
+
+// Export selection only
+const { start, end } = editor.selection;
+const buffer = await editor.exportAudio({
+  startTime: start,
+  duration: end - start,
+});
+
+// Convert to WAV blob for download
+const wav = audioBufferToWav(buffer);  // utility from @dawcore/core
+const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+```
+
+---
+
 ## Framework Usage
 
 All frameworks just need `import '@dawcore/components'` to register the custom elements. No wrapper packages needed.
@@ -826,8 +1001,12 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-time-format>`
 - [ ] `<daw-tempo>` / `<daw-time-signature>`
 - [ ] `<daw-snap-to>` / `<daw-scale-mode>`
+- [ ] Effects — imperative API on `<daw-editor>` (master) and `<daw-track>` (per-track)
+- [ ] Effect registry — 20 built-in `tonejs-*` effects + `registerEffect()` for custom
+- [ ] Effect bypass, reorder, real-time parameter updates
+- [ ] `exportAudio()` — offline rendering through all effect chains
 
-**Deliverable:** Full mixing controls.
+**Deliverable:** Full mixing controls and effects processing.
 
 ### Phase 4: Optional Features
 
