@@ -294,7 +294,7 @@ editor.setTrackSolo(trackId: string, soloed: boolean): void
 editor.zoomIn(): void
 editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
-editor.addTrack(config: TrackConfig): void             // Add track programmatically
+editor.addTrack(config: TrackConfig): DawTrackElement   // Add track, returns element
 editor.removeTrack(trackId: string): void              // Remove track by ID
 editor.setTimeFormat(format: string): void             // 'hh:mm:ss.sss' | 'hh:mm:ss' | 'seconds'
 editor.setAutomaticScroll(enabled: boolean): void      // Toggle auto-scroll
@@ -1103,8 +1103,8 @@ Create `@dawcore/components` package with core elements:
 
 - [ ] `<daw-editor>` — engine + audio context lifecycle, track management
 - [ ] `<daw-track>` — track declaration via attributes
-- [ ] `<daw-clip>` — clip element with src/peaks-src/midi-src, positioning, fades
-- [ ] Resource cache — URL-keyed dedup for AudioBuffer, peaks, and MIDI across clips
+- [ ] `<daw-clip>` — clip element with src/peaks-src, positioning, fades
+- [ ] Resource cache — URL-keyed dedup for AudioBuffer and peaks across clips
 - [ ] `<daw-waveform>` — canvas waveform rendering (port existing canvas code)
 - [ ] `<daw-playhead>` — animated playhead
 - [ ] `<daw-ruler>` — time ruler
