@@ -292,6 +292,7 @@ export function MediaElementExample() {
   const [trackConfigs, setTrackConfigs] = useState<Array<{ source: string; waveformData: any; name: string } | null>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preservesPitch, setPreservesPitch] = useState(true);
 
   // Load BBC peaks files and build track configs
   useEffect(() => {
@@ -348,10 +349,28 @@ export function MediaElementExample() {
             samplesPerPixel={512}
             waveHeight={120}
             theme={theme}
+            preservesPitch={preservesPitch}
             barWidth={2}
             barGap={0}
           >
             <PlaybackControls />
+            <Controls style={{ marginTop: '-0.5rem' }}>
+              <ControlGroup>
+                <Label>Preserve Pitch:</Label>
+                <SpeedButton
+                  $active={preservesPitch}
+                  onClick={() => setPreservesPitch(true)}
+                >
+                  On
+                </SpeedButton>
+                <SpeedButton
+                  $active={!preservesPitch}
+                  onClick={() => setPreservesPitch(false)}
+                >
+                  Off
+                </SpeedButton>
+              </ControlGroup>
+            </Controls>
             <MediaElementWaveform />
           </MediaElementPlaylistProvider>
         </Section>
