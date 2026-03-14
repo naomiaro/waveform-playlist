@@ -32,7 +32,7 @@ import {
   loadWaveformData,
   MediaElementWaveform,
 } from '@waveform-playlist/browser';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
+import { getGlobalAudioContext, getGlobalContext } from '@waveform-playlist/playout';
 import type { EffectsFunction } from '@waveform-playlist/playout';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -52,6 +52,29 @@ const MEDIA_ELEMENT_CONFIG = {
 };
 
 const SOUNDTOUCH_PROCESSOR_URL = '/waveform-playlist/media/worklets/soundtouch-processor.js';
+
+/**
+ * Register the SoundTouch processor and create a node.
+ *
+ * Registration bypasses SAC's addModule (which wraps the source in an IIFE
+ * and breaks the SoundTouch processor) by calling rawContext.audioWorklet.addModule()
+ * directly — same pattern as the recording package.
+ *
+ * Node creation uses SoundTouchNode normally — the global AudioWorkletNode
+ * patch (patchAudioWorklet.ts) makes it SAC-compatible.
+ */
+let soundTouchRegistered = false;
+async function createSoundTouchNode(audioContext: AudioContext) {
+  const { SoundTouchNode } = await import('@soundtouchjs/audio-worklet');
+
+  if (!soundTouchRegistered) {
+    const rawCtx = getGlobalContext().rawContext as AudioContext;
+    await rawCtx.audioWorklet.addModule(SOUNDTOUCH_PROCESSOR_URL);
+    soundTouchRegistered = true;
+  }
+
+  return new SoundTouchNode(audioContext);
+}
 
 // --- Styled components ---
 
@@ -359,12 +382,11 @@ function SoundTouchWiring({
 
     const wireEffect = async () => {
       try {
-        const { SoundTouchNode } = await import('@soundtouchjs/audio-worklet');
-        if (disposed) return;
-
-        await SoundTouchNode.register(audioContext, SOUNDTOUCH_PROCESSOR_URL);
-
-        stNode = new SoundTouchNode(audioContext);
+        stNode = await createSoundTouchNode(audioContext);
+        if (disposed) {
+          stNode.disconnect();
+          return;
+        }
         soundTouchRef.current = stNode;
 
         outputNode.disconnect();
@@ -502,12 +524,8 @@ function WebAudioSoundTouchSection({ theme }: { theme: any }) {
     // Wire SoundTouch asynchronously, then splice into the chain
     (async () => {
       try {
-        const { SoundTouchNode } = await import('@soundtouchjs/audio-worklet');
         const audioContext = getGlobalAudioContext();
-
-        await SoundTouchNode.register(audioContext, SOUNDTOUCH_PROCESSOR_URL);
-
-        stNode = new SoundTouchNode(audioContext);
+        stNode = await createSoundTouchNode(audioContext);
         soundTouchRef.current = stNode;
 
         // Disconnect direct path, splice in SoundTouch

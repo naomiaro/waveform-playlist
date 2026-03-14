@@ -14,14 +14,8 @@
  * This runs once via Docusaurus clientModules before any component code loads.
  */
 if (typeof window !== 'undefined') {
-  import('standardized-audio-context').then(({ AudioWorkletNode, GainNode }) => {
-    class PatchedAudioWorkletNode extends AudioWorkletNode {
-      get parameters() {
-        return (super.parameters as any)._map;
-      }
-    }
+  import('standardized-audio-context').then(({ AudioWorkletNode }) => {
 
-    (window as any).AudioWorkletNode = PatchedAudioWorkletNode;
-    (window as any).GainNode = GainNode;
+    (window as any).AudioWorkletNode = AudioWorkletNode;
   });
 }
