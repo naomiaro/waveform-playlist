@@ -51,6 +51,12 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 - **Multi-track examples must use `deferEngineRebuild={loading}`** — Without it, the engine rebuilds on every track decode (up to N times for N tracks), creating race conditions that cause duplicate audio on play/pause/play cycles.
 - **Tone.js in example components must use dynamic import** — `import * as Tone from 'tone'` triggers AudioWorklet errors on page load. Use `import type * as ToneNs from 'tone'` for types, then `const Tone = await import('tone')` inside effects after `AudioContext.state === 'running'`.
 
+## SoundTouch AudioWorklet
+
+- Processor file: `static/media/worklets/soundtouch-processor.js` (copied from `@soundtouchjs/audio-worklet/dist/`)
+- Served at: `/waveform-playlist/media/worklets/soundtouch-processor.js`
+- LGPL-2.1 license — fine for npm dependency usage, no source disclosure needed
+
 ## Guide Documentation Drift
 
 Context hooks tables in guide docs (e.g., `media-element-playout.md`) easily drift from source interfaces. Always cross-check guide "Returns" columns against the actual `*ContextValue` interfaces in the provider source file. Use "Key returns" column header (not "Returns") if listing a subset.

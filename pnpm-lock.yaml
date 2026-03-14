@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@soundtouchjs/audio-worklet':
+        specifier: ^1.0.7
+        version: 1.0.7
     devDependencies:
       '@eslint/js':
         specifier: ^9.20.0
@@ -6016,6 +6020,16 @@ packages:
       micromark-factory-space: 1.1.0
       micromark-util-character: 1.2.0
       micromark-util-symbol: 1.1.0
+    dev: false
+
+  /@soundtouchjs/audio-worklet@1.0.7:
+    resolution: {integrity: sha512-g5SVHjRSt2Lp9tOH2TVDXP7ZlWvFQVcRcbgtzH1LoynkD1ac+IX3Z8HYacEN9JNtzUOxASPVB1kHGPGeEHhhXA==}
+    dependencies:
+      '@soundtouchjs/core': 1.0.7
+    dev: false
+
+  /@soundtouchjs/core@1.0.7:
+    resolution: {integrity: sha512-rVcE24VaZrNmYp9mT++Wuw49nENuvXLg2a6cO+jgGSV1zasa7r4aVFnHiFTHqIyTzexD705FRnpuo1MXOE/mVg==}
     dev: false
 
   /@standard-schema/spec@1.0.0:

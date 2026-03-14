@@ -24,8 +24,10 @@ export interface MediaElementTrackOptions {
   name?: string;
   /** Initial volume (0.0 to 1.0) */
   volume?: number;
-  /** Initial playback rate (0.5 to 2.0, pitch preserved) */
+  /** Initial playback rate (0.5 to 2.0) */
   playbackRate?: number;
+  /** Whether to preserve pitch when changing playback rate (default: true) */
+  preservesPitch?: boolean;
   /**
    * AudioContext for Web Audio routing.
    * When provided, audio is routed through Web Audio nodes for fades and effects:
@@ -98,15 +100,18 @@ export class MediaElementTrack {
     this.audioElement.preload = 'auto';
     this.audioElement.playbackRate = this._playbackRate;
 
-    // Preserve pitch when changing playback rate (default in modern browsers)
+    // Set pitch preservation (default: true).
+    // When false, the browser won't apply its own pitch correction — useful
+    // when an external processor like SoundTouch handles pitch compensation.
     // Vendor-prefixed properties are non-standard; cast once for type safety.
+    const shouldPreservePitch = options.preservesPitch ?? true;
     const audio = this.audioElement as unknown as VendorPrefixedPitch;
     if ('preservesPitch' in this.audioElement) {
-      audio.preservesPitch = true;
+      audio.preservesPitch = shouldPreservePitch;
     } else if ('mozPreservesPitch' in this.audioElement) {
-      audio.mozPreservesPitch = true;
+      audio.mozPreservesPitch = shouldPreservePitch;
     } else if ('webkitPreservesPitch' in this.audioElement) {
-      audio.webkitPreservesPitch = true;
+      audio.webkitPreservesPitch = shouldPreservePitch;
     }
 
     // Set up Web Audio routing if AudioContext provided

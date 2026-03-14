@@ -377,6 +377,12 @@ const setState = useCallback((v) => {
 }, []);
 ```
 
+## preservesPitch Prop (MediaElementPlaylistProvider)
+
+**Default:** `true` (backwards compatible). Set to `false` when using an external pitch processor like SoundTouch — disables browser's built-in pitch correction so it doesn't stack with the processor's correction.
+
+**Flows through:** `MediaElementPlaylistProvider` prop → `MediaElementPlayout` constructor → `MediaElementTrack` constructor → `audioElement.preservesPitch`.
+
 ## MediaElement currentTime vs currentTimeRef
 
 `currentTime` (React state from `useMediaElementAnimation`) only updates on pause/stop/seek/playback-end — NOT during playback. For smooth real-time display, use `currentTimeRef` with a local `requestAnimationFrame` loop and direct DOM manipulation (e.g., `ref.current.textContent = ...`). Never use `currentTime` for time displays that should update during playback.

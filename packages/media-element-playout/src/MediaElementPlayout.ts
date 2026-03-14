@@ -5,6 +5,9 @@ export interface MediaElementPlayoutOptions {
   masterVolume?: number;
   /** Initial playback rate (0.5 to 2.0) */
   playbackRate?: number;
+  /** Whether to preserve pitch when changing playback rate (default: true).
+   *  Set to false when using an external pitch processor like SoundTouch. */
+  preservesPitch?: boolean;
 }
 
 /**
@@ -28,12 +31,14 @@ export class MediaElementPlayout {
   private track: MediaElementTrack | null = null;
   private _masterVolume: number;
   private _playbackRate: number;
+  private _preservesPitch: boolean;
   private _isPlaying: boolean = false;
   private onPlaybackCompleteCallback?: () => void;
 
   constructor(options: MediaElementPlayoutOptions = {}) {
     this._masterVolume = options.masterVolume ?? 1;
     this._playbackRate = options.playbackRate ?? 1;
+    this._preservesPitch = options.preservesPitch ?? true;
   }
 
   /**
@@ -63,6 +68,7 @@ export class MediaElementPlayout {
       ...options,
       volume: this._masterVolume * (options.volume ?? 1),
       playbackRate: this._playbackRate,
+      preservesPitch: this._preservesPitch,
     });
 
     // Set up stop callback
