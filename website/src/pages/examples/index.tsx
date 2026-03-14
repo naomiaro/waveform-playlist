@@ -20,6 +20,7 @@ import {
   WaveformIcon,
   MusicNotesIcon,
   MetronomeIcon,
+  SpeakerHighIcon,
 } from '@phosphor-icons/react';
 import styles from './examples.module.css';
 
@@ -66,6 +67,13 @@ const examples = [
     path: 'media-element',
     category: 'playback',
     icon: <GaugeIcon weight="light" aria-hidden="true" />,
+  },
+  {
+    title: 'Pitch Shifting',
+    description: 'SoundTouch AudioWorklet. Pitch preserved.',
+    path: 'pitch-shifting',
+    category: 'playback',
+    icon: <SpeakerHighIcon weight="light" aria-hidden="true" />,
   },
   {
     title: 'Effects',

@@ -26,9 +26,9 @@
   "devDependencies": {
     "@eslint/js": "^9.20.0",
     "@playwright/test": "^1.57.0",
+    "@types/node": "^20.10.6",
     "@typescript-eslint/eslint-plugin": "^8.24.1",
     "@typescript-eslint/parser": "^8.24.1",
-    "@types/node": "^20.10.6",
     "eslint": "^9.20.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^15.15.0",
@@ -62,5 +62,8 @@
     "url": "https://github.com/naomiaro/waveform-playlist/issues"
   },
   "homepage": "http://naomiaro.github.io/waveform-playlist",
-  "packageManager": "pnpm@8.15.0"
+  "packageManager": "pnpm@8.15.0",
+  "dependencies": {
+    "@soundtouchjs/audio-worklet": "^1.0.7"
+  }
 }

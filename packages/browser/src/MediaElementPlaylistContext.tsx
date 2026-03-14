@@ -98,6 +98,9 @@ export interface MediaElementPlaylistProviderProps {
   timescale?: boolean;
   /** Initial playback rate (0.5 to 2.0) */
   playbackRate?: number;
+  /** Whether to preserve pitch when changing playback rate (default: true).
+   *  Set to false when using an external pitch processor like SoundTouch. */
+  preservesPitch?: boolean;
   /** Enable automatic scroll to keep playhead centered */
   automaticScroll?: boolean;
   /** Theme configuration */
@@ -154,6 +157,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   waveHeight = 100,
   timescale = false,
   playbackRate: initialPlaybackRate = 1,
+  preservesPitch = true,
   automaticScroll = false,
   theme: userTheme,
   controls = { show: false, width: 0 },
@@ -246,6 +250,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   useEffect(() => {
     const playout = new MediaElementPlayout({
       playbackRate: initialPlaybackRate,
+      preservesPitch,
     });
 
     playout.addTrack({
@@ -290,6 +295,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     track.fadeOut,
     audioContext,
     initialPlaybackRate,
+    preservesPitch,
     onReady,
     stopAnimationFrameLoop,
     setActiveAnnotationId,
