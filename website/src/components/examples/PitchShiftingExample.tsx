@@ -6,9 +6,11 @@
  * 2. MediaElement + SoundTouchNode — streaming audio through an AudioWorklet
  * 3. WebAudio + SoundTouchNode — decoded audio through an AudioWorklet
  *
- * SoundTouchNode works directly because the website patches global
- * AudioWorkletNode/GainNode with standardized-audio-context versions
- * (see patchAudioWorklet.ts / clientModules in docusaurus.config.ts).
+ * SoundTouch integration uses the same pattern as the recording package:
+ * - Register via rawContext.audioWorklet.addModule() (bypasses SAC wrapping)
+ * - Create node via context.createAudioWorkletNode() (SAC-compatible)
+ * - Access params via node.parameters.get() (SAC ReadOnlyMap)
+ * - WebAudio section uses Tone.js Gain bridges for SAC↔Tone node crossing
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -52,28 +54,43 @@ const MEDIA_ELEMENT_CONFIG = {
 };
 
 const SOUNDTOUCH_PROCESSOR_URL = '/waveform-playlist/media/worklets/soundtouch-processor.js';
+const SOUNDTOUCH_PROCESSOR_NAME = 'soundtouch-processor';
 
 /**
  * Register the SoundTouch processor and create a node.
  *
- * Registration bypasses SAC's addModule (which wraps the source in an IIFE
- * and breaks the SoundTouch processor) by calling rawContext.audioWorklet.addModule()
- * directly — same pattern as the recording package.
- *
- * Node creation uses SoundTouchNode normally — the global AudioWorkletNode
- * patch (patchAudioWorklet.ts) makes it SAC-compatible.
+ * Same pattern as the recording package (useRecording.ts):
+ * 1. Register via rawContext.audioWorklet.addModule() — bypasses Tone.js's
+ *    single-module cache and SAC's source wrapping
+ * 2. Create via context.createAudioWorkletNode() — Tone.js Context method
+ *    that handles SAC wrapping for node creation
  */
 let soundTouchRegistered = false;
-async function createSoundTouchNode(audioContext: AudioContext) {
-  const { SoundTouchNode } = await import('@soundtouchjs/audio-worklet');
+async function createSoundTouchNode(): Promise<AudioWorkletNode> {
+  const context = getGlobalContext();
 
   if (!soundTouchRegistered) {
-    const rawCtx = getGlobalContext().rawContext as AudioContext;
+    const rawCtx = context.rawContext as AudioContext;
     await rawCtx.audioWorklet.addModule(SOUNDTOUCH_PROCESSOR_URL);
     soundTouchRegistered = true;
   }
 
-  return new SoundTouchNode(audioContext);
+  return context.createAudioWorkletNode(SOUNDTOUCH_PROCESSOR_NAME, {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+  } as AudioWorkletNodeOptions);
+}
+
+/**
+ * Set a SoundTouch AudioParam by name.
+ * SAC wraps AudioParams — the .value setter works on the SAC wrapper.
+ */
+function setSoundTouchParam(node: AudioWorkletNode, name: string, value: number): void {
+  const param = node.parameters.get(name);
+  if (param) {
+    (param as any).value = value;
+  }
 }
 
 // --- Styled components ---
@@ -368,7 +385,7 @@ function MediaElementSoundTouchControls({
 function SoundTouchWiring({
   soundTouchRef,
 }: {
-  soundTouchRef: React.MutableRefObject<any | null>;
+  soundTouchRef: React.MutableRefObject<AudioWorkletNode | null>;
 }) {
   const { playoutRef, duration } = useMediaElementData();
   const audioContext = getGlobalAudioContext();
@@ -377,12 +394,12 @@ function SoundTouchWiring({
     const outputNode = playoutRef.current?.outputNode;
     if (!outputNode) return;
 
-    let stNode: any;
+    let stNode: AudioWorkletNode | undefined;
     let disposed = false;
 
     const wireEffect = async () => {
       try {
-        stNode = await createSoundTouchNode(audioContext);
+        stNode = await createSoundTouchNode();
         if (disposed) {
           stNode.disconnect();
           return;
@@ -469,7 +486,7 @@ function BrowserSpeedSection({ theme }: { theme: any }) {
 function MediaElementSoundTouchSection({ theme }: { theme: any }) {
   const { trackConfig, loading, error } = useMediaElementTrack();
   const [tempo, setTempo] = useState(1);
-  const soundTouchRef = useRef<any | null>(null);
+  const soundTouchRef = useRef<AudioWorkletNode | null>(null);
 
   // Tell SoundTouch the source's playback rate so it compensates pitch.
   // The actual speed change comes from audioElement.playbackRate (set by
@@ -477,7 +494,7 @@ function MediaElementSoundTouchSection({ theme }: { theme: any }) {
   const handleTempoChange = useCallback((value: number) => {
     setTempo(value);
     if (soundTouchRef.current) {
-      soundTouchRef.current.playbackRate.value = value;
+      setSoundTouchParam(soundTouchRef.current, 'playbackRate', value);
     }
   }, []);
 
@@ -510,13 +527,14 @@ function WebAudioSoundTouchSection({ theme }: { theme: any }) {
   const { tracks, loading, error } = useAudioTracks(audioConfigs, { immediate: true });
 
   const [tempo, setTempo] = useState(1);
-  const soundTouchRef = useRef<any | null>(null);
+  const soundTouchRef = useRef<AudioWorkletNode | null>(null);
 
   // EffectsFunction: masterGainNode (Tone.js Volume) → SoundTouchNode → destination
-  // SoundTouchNode now extends the SAC AudioWorkletNode (via global patch),
-  // so it connects directly to other SAC/Tone nodes.
+  // Uses Tone.js Gain as bridges to cross between Tone/SAC and the worklet node.
   const masterEffects: EffectsFunction = useCallback((masterGainNode, destination) => {
-    let stNode: any;
+    let stNode: AudioWorkletNode | undefined;
+    let bridgeIn: any;
+    let bridgeOut: any;
 
     // Connect directly first so audio plays immediately
     masterGainNode.connect(destination);
@@ -524,14 +542,26 @@ function WebAudioSoundTouchSection({ theme }: { theme: any }) {
     // Wire SoundTouch asynchronously, then splice into the chain
     (async () => {
       try {
-        const audioContext = getGlobalAudioContext();
-        stNode = await createSoundTouchNode(audioContext);
-        soundTouchRef.current = stNode;
+        const Tone = await import('tone');
+        const node = await createSoundTouchNode();
+        stNode = node;
+        soundTouchRef.current = node;
 
-        // Disconnect direct path, splice in SoundTouch
+        bridgeIn = new Tone.Gain(1);
+        bridgeOut = new Tone.Gain(1);
+
+        // Disconnect direct path
         masterGainNode.disconnect(destination);
-        masterGainNode.connect(stNode);
-        stNode.connect(destination);
+
+        // masterGainNode → bridgeIn (Tone→Tone)
+        masterGainNode.connect(bridgeIn);
+
+        // bridgeIn.input (native GainNode) → SoundTouchNode → bridgeOut.input (native GainNode)
+        bridgeIn.input.connect(node);
+        node.connect(bridgeOut.input);
+
+        // bridgeOut → destination (Tone→Tone)
+        bridgeOut.connect(destination);
       } catch (err) {
         console.warn('[waveform-playlist] WebAudio SoundTouch wiring failed: ' + String(err));
       }
@@ -540,6 +570,8 @@ function WebAudioSoundTouchSection({ theme }: { theme: any }) {
     return () => {
       soundTouchRef.current = null;
       stNode?.disconnect();
+      bridgeIn?.dispose();
+      bridgeOut?.dispose();
     };
   }, []);
 
@@ -548,7 +580,7 @@ function WebAudioSoundTouchSection({ theme }: { theme: any }) {
   const handleTempoChange = useCallback((value: number) => {
     setTempo(value);
     if (soundTouchRef.current) {
-      soundTouchRef.current.tempo.value = value;
+      setSoundTouchParam(soundTouchRef.current, 'tempo', value);
     }
   }, []);
 
