@@ -117,6 +117,10 @@ const config: Config = {
   // Static files are now in website/static (copied from ghpages)
   staticDirectories: ['static'],
 
+  // Patch global AudioWorkletNode/GainNode with standardized-audio-context versions
+  // before any component code loads (needed for SoundTouchNode compatibility with Tone.js)
+  clientModules: [require.resolve('./src/patchAudioWorklet.ts')],
+
   onBrokenLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
