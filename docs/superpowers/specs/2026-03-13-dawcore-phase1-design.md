@@ -3,7 +3,7 @@
 **Date:** 2026-03-13
 **Status:** Approved
 **Branch:** `feat/dawcore-phase1` (from `main`)
-**Spec:** `docs/specs/web-components-migration.md`
+**Spec:** `docs/specs/web-components-migration.md` (on `feat/web-components-spec` branch)
 
 ---
 
@@ -40,6 +40,7 @@ Build a working vertical slice of the dawcore Web Components library: one audio 
 |----------|--------|-----------|
 | Package location | `packages/dawcore` in existing monorepo | Shares tooling, workspace references to engine/core/playout |
 | Package count | Single `@dawcore/components` | Simpler to manage; split later if needed |
+| npm scope | `@dawcore` (new scope, must be claimed on npm) | Rebranding per migration spec; `@waveform-playlist` stays for existing packages |
 | Dependency strategy | Direct `workspace:*` to existing packages | Engine, core, playout are already framework-agnostic |
 | MVP scope | Playback + transport (option C) | Validates architecture and `for` attribute wiring |
 | Implementation approach | Vertical slice (option C) | Working demo early, surfaces integration issues fast |
@@ -90,6 +91,7 @@ packages/dawcore/
 
 ```json
 {
+  "name": "@dawcore/components",
   "dependencies": {
     "lit": "^3.0.0"
   },
@@ -106,7 +108,9 @@ packages/dawcore/
 }
 ```
 
-Engine, core, and playout appear in both `peerDependencies` (for consumers) and `devDependencies` (for pnpm build ordering).
+Engine, core, and playout appear in both `peerDependencies` (for consumers) and `devDependencies` (for pnpm build ordering). tsup auto-externalizes both `dependencies` and `peerDependencies`, including cross-scope packages like `@waveform-playlist/*`.
+
+The existing `pnpm-workspace.yaml` already includes `packages/*`, so `packages/dawcore` is automatically part of the workspace.
 
 ### Build
 
@@ -160,7 +164,7 @@ Shared behavior patterns extracted into composable controllers:
 
 **Responsibilities:**
 
-1. Create `PlaylistEngine` + `TonePlayoutAdapter` in `connectedCallback()`
+1. Create `PlaylistEngine` + playout adapter via `createToneAdapter()` factory in `connectedCallback()`
 2. Discover child `<daw-track>` / `<daw-clip>` elements via `MutationObserver`
 3. Fetch + decode audio from clip `src` attributes (URL-keyed cache)
 4. Generate peaks via Web Worker (AudioBuffer-keyed cache via `WeakMap`)
@@ -168,6 +172,9 @@ Shared behavior patterns extracted into composable controllers:
 6. Expose playback methods: `play()`, `pause()`, `stop()`, `seekTo()`
 7. Dispatch events: `daw-ready`, `daw-play`, `daw-pause`, `daw-stop`, `daw-timeupdate`
 8. Subscribe to engine `statechange` for track mutations
+9. Guard AudioContext initialization — first `play()` call awaits `engine.init()` (resumes AudioContext after user gesture), subsequent calls skip. Uses `_audioInitialized` flag.
+
+**Method naming:** The editor exposes `seekTo(time)` (matching the Web Components spec), which wraps `engine.seek(time)` internally. This follows the existing browser package convention where the consumer-facing name is `seekTo` and the engine method is `seek`.
 
 **Reactive properties (attributes):** `samples-per-pixel`, `wave-height`, `timescale`, `mono`, `bar-width`, `bar-gap`
 
@@ -229,7 +236,7 @@ Attributes use seconds for readability. The editor converts to the internal samp
 
 **Shadow DOM** — renders chunked `<canvas>` elements with virtual scrolling.
 
-**JS properties (not attributes):** `peaks`, `bits`, `length`, `waveHeight`, `barWidth`, `barGap`
+**JS properties (not attributes):** `peaks`, `bits`, `length` (total width in pixels — determines canvas chunk count and container width), `waveHeight`, `barWidth`, `barGap`
 
 **Virtual scrolling:** Uses `ViewportController` to determine which canvas chunks (1000px each) are visible + overscan buffer. Only visible chunks are rendered to the DOM.
 
@@ -342,7 +349,7 @@ Served by Vite's dev server. Tests the vanilla JS experience directly:
 </html>
 ```
 
-Run with: `cd packages/dawcore && npx vite dev/`
+Run with: `cd packages/dawcore && npx vite --root dev`
 
 ---
 
