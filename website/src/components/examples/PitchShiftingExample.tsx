@@ -632,7 +632,7 @@ function WebAudioSoundTouchSection({ theme }: { theme: any }) {
 
 // --- Main example ---
 
-export function PlaybackModesExample() {
+export function PitchShiftingExample() {
   const { theme } = useDocusaurusTheme();
 
   return (

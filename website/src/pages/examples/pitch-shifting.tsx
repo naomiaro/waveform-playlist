@@ -5,8 +5,8 @@ import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 import { AudioCredits } from '../../components/AudioCredits';
 
 const LazyPitchShiftingExample = createLazyExample(() =>
-  import('../../components/examples/PlaybackModesExample').then((m) => ({
-    default: m.PlaybackModesExample,
+  import('../../components/examples/PitchShiftingExample').then((m) => ({
+    default: m.PitchShiftingExample,
   }))
 );
 
