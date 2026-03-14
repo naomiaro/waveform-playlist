@@ -75,7 +75,8 @@ interface MediaElementPlaylistProviderProps {
   samplesPerPixel?: number;              // Default: 1024
   waveHeight?: number;                   // Default: 100
   timescale?: boolean;                   // Default: false
-  playbackRate?: number;                 // Default: 1 (range: 0.5–2.0, pitch-preserving)
+  playbackRate?: number;                 // Default: 1 (range: 0.5–2.0)
+  preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false
   theme?: Partial<WaveformPlaylistTheme>;
   controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }

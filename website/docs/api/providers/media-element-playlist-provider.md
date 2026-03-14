@@ -121,7 +121,14 @@ When provided, audio routes through a Web Audio graph enabling fades and effects
 **Type:** `number`
 **Default:** `1`
 
-Initial playback rate. Range: 0.5 to 2.0. Pitch is preserved automatically by the HTMLAudioElement.
+Initial playback rate. Range: 0.5 to 2.0.
+
+#### `preservesPitch`
+
+**Type:** `boolean`
+**Default:** `true`
+
+Whether to preserve pitch when changing playback rate. When `true`, the browser's built-in time-stretching keeps pitch constant while speed changes. Set to `false` when using an external pitch processor (e.g., SoundTouch AudioWorklet) that handles pitch compensation itself.
 
 #### `automaticScroll`
 
@@ -277,6 +284,7 @@ interface MediaElementPlaylistProviderProps {
 
   // Playback
   playbackRate?: number;
+  preservesPitch?: boolean;
   automaticScroll?: boolean;
 
   // Theming
