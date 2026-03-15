@@ -512,27 +512,87 @@ export class DawEditorElement extends LitElement {
 
   // --- Interaction Handlers ---
 
-  private _onTimelineClick = (e: MouseEvent) => {
+  private _isDragging = false;
+  private _dragStartPx = 0;
+
+  private _onPointerDown = (e: PointerEvent) => {
     const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
     if (!timeline) return;
+
     const rect = timeline.getBoundingClientRect();
-    const px = e.clientX - rect.left + timeline.scrollLeft;
-    const time = pixelsToSeconds(px, this.samplesPerPixel, this._sampleRate);
-    if (this._engine) {
-      this._engine.seek(time);
+    this._dragStartPx = e.clientX - rect.left + timeline.scrollLeft;
+    this._isDragging = false;
+
+    timeline.setPointerCapture(e.pointerId);
+    timeline.addEventListener('pointermove', this._onPointerMove);
+    timeline.addEventListener('pointerup', this._onPointerUp);
+  };
+
+  private _onPointerMove = (e: PointerEvent) => {
+    const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
+    if (!timeline) return;
+
+    const rect = timeline.getBoundingClientRect();
+    const currentPx = e.clientX - rect.left + timeline.scrollLeft;
+
+    // Start drag after 3px threshold
+    if (!this._isDragging && Math.abs(currentPx - this._dragStartPx) > 3) {
+      this._isDragging = true;
+    }
+
+    if (this._isDragging) {
+      const startTime = pixelsToSeconds(this._dragStartPx, this.samplesPerPixel, this._sampleRate);
+      const endTime = pixelsToSeconds(currentPx, this.samplesPerPixel, this._sampleRate);
+      this._selectionStart = Math.min(startTime, endTime);
+      this._selectionEnd = Math.max(startTime, endTime);
+    }
+  };
+
+  private _onPointerUp = (e: PointerEvent) => {
+    const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
+    if (!timeline) return;
+
+    timeline.releasePointerCapture(e.pointerId);
+    timeline.removeEventListener('pointermove', this._onPointerMove);
+    timeline.removeEventListener('pointerup', this._onPointerUp);
+
+    if (this._isDragging) {
+      // Finalize selection
+      if (this._engine) {
+        this._engine.setSelection(this._selectionStart, this._selectionEnd);
+      }
+      this.dispatchEvent(
+        new CustomEvent('daw-selection', {
+          bubbles: true,
+          composed: true,
+          detail: { start: this._selectionStart, end: this._selectionEnd },
+        })
+      );
+    } else {
+      // Click — seek to position, clear selection
+      const rect = timeline.getBoundingClientRect();
+      const px = e.clientX - rect.left + timeline.scrollLeft;
+      const time = pixelsToSeconds(px, this.samplesPerPixel, this._sampleRate);
+      this._selectionStart = 0;
+      this._selectionEnd = 0;
+      if (this._engine) {
+        this._engine.seek(time);
+        this._engine.setSelection(0, 0);
+      }
       this._currentTime = time;
       this._stopPlayhead();
       if (this._isPlaying) {
         this._startPlayhead();
       }
+      this.dispatchEvent(
+        new CustomEvent('daw-seek', {
+          bubbles: true,
+          composed: true,
+          detail: { time },
+        })
+      );
     }
-    this.dispatchEvent(
-      new CustomEvent('daw-seek', {
-        bubbles: true,
-        composed: true,
-        detail: { time },
-      })
-    );
+    this._isDragging = false;
   };
 
   private _onTrackClick(trackId: string) {
@@ -726,7 +786,7 @@ export class DawEditorElement extends LitElement {
         class="timeline ${this._dragOver ? 'drag-over' : ''}"
         style="width: ${Math.max(this._totalWidth, 100)}px;"
         data-playing=${this._isPlaying}
-        @click=${this._onTimelineClick}
+        @pointerdown=${this._onPointerDown}
         @dragover=${this._onDragOver}
         @dragleave=${this._onDragLeave}
         @drop=${this._onDrop}
