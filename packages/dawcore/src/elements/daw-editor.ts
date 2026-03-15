@@ -39,8 +39,8 @@ export class DawEditorElement extends LitElement {
   @property({ type: Number, attribute: 'bar-width' }) barWidth = 1;
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
 
-  @state() private _tracks: TrackDescriptor[] = [];
-  @state() private _engineTracks: ClipTrack[] = [];
+  @state() private _tracks: Map<string, TrackDescriptor> = new Map();
+  @state() private _engineTracks: Map<string, ClipTrack> = new Map();
   @state() private _peaksData: Map<string, { peaks: Int16Array; bits: 16; length: number }> =
     new Map();
   @state() _isPlaying = false;
@@ -49,12 +49,12 @@ export class DawEditorElement extends LitElement {
   @state() private _sampleRate = 48000;
   @state() private _totalWidth = 0;
 
-  // Lazy engine/adapter — only created on first play()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _engine: any = null;
+  private _enginePromise: Promise<any> | null = null;
   private _audioInitialized = false;
+  private _decodeContext: AudioContext | null = null;
   private _audioCache = new Map<string, Promise<AudioBuffer>>();
-  private _observer: MutationObserver | null = null;
-  private _abortController: AbortController | null = null;
 
   static styles = [
     hostStyles,
@@ -82,25 +82,28 @@ export class DawEditorElement extends LitElement {
    * Public accessor for discovered tracks (used in tests and by transport).
    */
   get tracks(): TrackDescriptor[] {
-    return this._tracks;
+    return [...this._tracks.values()];
   }
 
   // --- Lifecycle ---
 
   connectedCallback() {
     super.connectedCallback();
-    this._observer = new MutationObserver(() => this._discoverTracks());
-    this._observer.observe(this, { childList: true, subtree: true });
-    this.addEventListener('daw-track-update', () => this._discoverTracks());
-    this._discoverTracks();
+    this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
+    this.addEventListener('daw-track-disconnected', this._onTrackDisconnected as EventListener);
+    this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
+
+    // Build engine eagerly so it's ready before play
+    this._ensureEngine();
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this._observer?.disconnect();
-    this._observer = null;
-    this._abortController?.abort();
-    this._abortController = null;
+    this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
+    this.removeEventListener('daw-track-disconnected', this._onTrackDisconnected as EventListener);
+    this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
+    this._decodeContext?.close();
+    this._decodeContext = null;
     this._disposeEngine();
   }
 
@@ -110,123 +113,160 @@ export class DawEditorElement extends LitElement {
     }
   }
 
-  // --- Child Discovery ---
+  // --- Event Handlers ---
 
-  private _discoverTracks() {
-    const trackEls = this.querySelectorAll('daw-track') as NodeListOf<DawTrackElement>;
-    const descriptors: TrackDescriptor[] = [];
+  private _onTrackConnected = (e: CustomEvent) => {
+    const trackEl = e.detail.element as DawTrackElement;
+    const trackId = e.detail.trackId as string;
+    const descriptor = this._readTrackDescriptor(trackEl);
 
-    for (const trackEl of trackEls) {
-      const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
-      const clips: ClipDescriptor[] = [];
+    this._tracks = new Map(this._tracks).set(trackId, descriptor);
 
-      // If track has a src attribute but no clip children, treat it as shorthand
-      if (clipEls.length === 0 && trackEl.src) {
-        clips.push({
-          src: trackEl.src,
-          start: 0,
-          duration: 0,
-          offset: 0,
-          gain: 1,
-          name: trackEl.name || '',
-          fadeIn: 0,
-          fadeOut: 0,
-          fadeType: 'linear',
-        });
-      } else {
-        for (const clipEl of clipEls) {
-          clips.push({
-            src: clipEl.src,
-            start: clipEl.start,
-            duration: clipEl.duration,
-            offset: clipEl.offset,
-            gain: clipEl.gain,
-            name: clipEl.name,
-            fadeIn: clipEl.fadeIn,
-            fadeOut: clipEl.fadeOut,
-            fadeType: clipEl.fadeType,
-          });
-        }
-      }
+    // Load audio for this track
+    this._loadTrack(trackId, descriptor);
+  };
 
-      descriptors.push({
-        name: trackEl.name || `Track ${descriptors.length + 1}`,
+  private _onTrackDisconnected = (e: CustomEvent) => {
+    const trackId = e.detail.trackId as string;
+    const nextTracks = new Map(this._tracks);
+    nextTracks.delete(trackId);
+    this._tracks = nextTracks;
+
+    const nextEngine = new Map(this._engineTracks);
+    nextEngine.delete(trackId);
+    this._engineTracks = nextEngine;
+
+    this._recomputeDuration();
+  };
+
+  private _onTrackUpdate = (e: CustomEvent) => {
+    const trackId = e.detail.trackId as string;
+    const trackEl = (e.target as HTMLElement).closest('daw-track') as DawTrackElement | null;
+    if (!trackEl) return;
+
+    const descriptor = this._readTrackDescriptor(trackEl);
+    this._tracks = new Map(this._tracks).set(trackId, descriptor);
+  };
+
+  // --- Track Reading ---
+
+  private _readTrackDescriptor(trackEl: DawTrackElement): TrackDescriptor {
+    const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
+    const clips: ClipDescriptor[] = [];
+
+    // Shorthand: <daw-track src="..."> with no clip children
+    if (clipEls.length === 0 && trackEl.src) {
+      clips.push({
         src: trackEl.src,
-        volume: trackEl.volume,
-        pan: trackEl.pan,
-        muted: trackEl.muted,
-        soloed: trackEl.soloed,
-        clips,
+        start: 0,
+        duration: 0,
+        offset: 0,
+        gain: 1,
+        name: trackEl.name || '',
+        fadeIn: 0,
+        fadeOut: 0,
+        fadeType: 'linear',
       });
-    }
-
-    this._tracks = descriptors;
-  }
-
-  // --- Audio Loading ---
-
-  private async _loadAllAudio(): Promise<ClipTrack[]> {
-    this._abortController?.abort();
-    this._abortController = new AbortController();
-    const { signal } = this._abortController;
-
-    const clipTracks: ClipTrack[] = [];
-
-    for (const trackDesc of this._tracks) {
-      const clips = [];
-
-      for (const clipDesc of trackDesc.clips) {
-        if (!clipDesc.src) continue;
-
-        const audioBuffer = await this._fetchAndDecode(clipDesc.src, signal);
-        if (signal.aborted) return [];
-
-        this._sampleRate = audioBuffer.sampleRate;
-
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: clipDesc.start,
-          duration: clipDesc.duration || audioBuffer.duration,
-          offset: clipDesc.offset,
-          gain: clipDesc.gain,
-          name: clipDesc.name,
-          sampleRate: audioBuffer.sampleRate,
-          sourceDuration: audioBuffer.duration,
+    } else {
+      for (const clipEl of clipEls) {
+        clips.push({
+          src: clipEl.src,
+          start: clipEl.start,
+          duration: clipEl.duration,
+          offset: clipEl.offset,
+          gain: clipEl.gain,
+          name: clipEl.name,
+          fadeIn: clipEl.fadeIn,
+          fadeOut: clipEl.fadeOut,
+          fadeType: clipEl.fadeType,
         });
-
-        // Generate peaks for waveform rendering
-        this._generatePeaks(clip.id, audioBuffer);
-
-        clips.push(clip);
       }
-
-      const track = createTrack({
-        name: trackDesc.name,
-        clips,
-        volume: trackDesc.volume,
-        pan: trackDesc.pan,
-        muted: trackDesc.muted,
-        soloed: trackDesc.soloed,
-      });
-
-      clipTracks.push(track);
     }
 
-    this._engineTracks = clipTracks;
-    this._duration = this._computeDuration(clipTracks);
-    this._totalWidth = this._computeTotalWidth();
-    return clipTracks;
+    return {
+      name: trackEl.name || 'Untitled',
+      src: trackEl.src,
+      volume: trackEl.volume,
+      pan: trackEl.pan,
+      muted: trackEl.muted,
+      soloed: trackEl.soloed,
+      clips,
+    };
   }
 
-  private async _fetchAndDecode(src: string, signal: AbortSignal): Promise<AudioBuffer> {
+  // --- Audio Loading (per-track) ---
+
+  private async _loadTrack(trackId: string, descriptor: TrackDescriptor) {
+    const clips = [];
+
+    for (const clipDesc of descriptor.clips) {
+      if (!clipDesc.src) continue;
+
+      const audioBuffer = await this._fetchAndDecode(clipDesc.src);
+      this._sampleRate = audioBuffer.sampleRate;
+
+      const clip = createClipFromSeconds({
+        audioBuffer,
+        startTime: clipDesc.start,
+        duration: clipDesc.duration || audioBuffer.duration,
+        offset: clipDesc.offset,
+        gain: clipDesc.gain,
+        name: clipDesc.name,
+        sampleRate: audioBuffer.sampleRate,
+        sourceDuration: audioBuffer.duration,
+      });
+
+      this._generatePeaks(clip.id, audioBuffer);
+      clips.push(clip);
+    }
+
+    const track = createTrack({
+      name: descriptor.name,
+      clips,
+      volume: descriptor.volume,
+      pan: descriptor.pan,
+      muted: descriptor.muted,
+      soloed: descriptor.soloed,
+    });
+
+    this._engineTracks = new Map(this._engineTracks).set(trackId, track);
+    this._recomputeDuration();
+
+    // Add to engine incrementally if it's been initialized (post user gesture)
+    if (this._engine && this._audioInitialized) {
+      const addTrack = this._engine.addTrack;
+      if (typeof addTrack === 'function') {
+        this._engine.addTrack(track);
+      } else {
+        this._engine.setTracks([...this._engineTracks.values()]);
+      }
+    }
+
+    this.dispatchEvent(
+      new CustomEvent('daw-track-ready', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId },
+      })
+    );
+  }
+
+  private _getDecodeContext(): AudioContext {
+    if (!this._decodeContext) {
+      this._decodeContext = new AudioContext();
+    }
+    return this._decodeContext;
+  }
+
+  private async _fetchAndDecode(src: string): Promise<AudioBuffer> {
     if (this._audioCache.has(src)) {
       return this._audioCache.get(src)!;
     }
 
     const promise = (async () => {
-      const response = await fetch(src, { signal });
+      const response = await fetch(src);
       const arrayBuffer = await response.arrayBuffer();
-      const audioContext = this._getAudioContext();
+      const audioContext = this._getDecodeContext();
       return audioContext.decodeAudioData(arrayBuffer);
     })();
 
@@ -235,7 +275,6 @@ export class DawEditorElement extends LitElement {
   }
 
   private _generatePeaks(clipId: string, audioBuffer: AudioBuffer) {
-    // Inline peak generation from AudioBuffer channel data
     const channelData = audioBuffer.getChannelData(0);
     const samplesPerPeak = this.samplesPerPixel;
     const peakCount = Math.ceil(channelData.length / samplesPerPeak);
@@ -253,7 +292,6 @@ export class DawEditorElement extends LitElement {
         if (sample > max) max = sample;
       }
 
-      // Scale to 16-bit range
       peaks[i * 2] = Math.round(min * 32768);
       peaks[i * 2 + 1] = Math.round(max * 32768);
     }
@@ -265,15 +303,16 @@ export class DawEditorElement extends LitElement {
     });
   }
 
-  private _computeDuration(tracks: ClipTrack[]): number {
+  private _recomputeDuration() {
     let maxSample = 0;
-    for (const track of tracks) {
+    for (const track of this._engineTracks.values()) {
       for (const clip of track.clips) {
         const endSample = clip.startSample + clip.durationSamples;
         if (endSample > maxSample) maxSample = endSample;
       }
     }
-    return maxSample / this._sampleRate;
+    this._duration = maxSample / this._sampleRate;
+    this._totalWidth = this._computeTotalWidth();
   }
 
   private _computeTotalWidth(): number {
@@ -282,9 +321,16 @@ export class DawEditorElement extends LitElement {
 
   // --- Engine Management ---
 
-  private async _ensureEngine(): Promise<any> {
-    if (this._engine) return this._engine;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _ensureEngine(): Promise<any> {
+    if (this._engine) return Promise.resolve(this._engine);
+    if (this._enginePromise) return this._enginePromise;
 
+    this._enginePromise = this._buildEngine();
+    return this._enginePromise;
+  }
+
+  private async _buildEngine() {
     const [{ PlaylistEngine }, { createToneAdapter }] = await Promise.all([
       import('@waveform-playlist/engine'),
       import('@waveform-playlist/playout'),
@@ -297,6 +343,7 @@ export class DawEditorElement extends LitElement {
       samplesPerPixel: this.samplesPerPixel,
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     engine.on('statechange', (engineState: any) => {
       this._isPlaying = engineState.isPlaying;
       this._currentTime = engineState.currentTime;
@@ -321,12 +368,6 @@ export class DawEditorElement extends LitElement {
       this._engine.dispose();
       this._engine = null;
     }
-    this._audioInitialized = false;
-  }
-
-  private _getAudioContext(): AudioContext {
-    // Use globalThis.AudioContext for flexibility
-    return new AudioContext();
   }
 
   // --- Playback Methods ---
@@ -334,12 +375,9 @@ export class DawEditorElement extends LitElement {
   async play() {
     const engine = await this._ensureEngine();
 
+    // First play: resume AudioContext (requires user gesture)
     if (!this._audioInitialized) {
       await engine.init();
-      const tracks = await this._loadAllAudio();
-      if (tracks.length > 0) {
-        engine.setTracks(tracks);
-      }
       this._audioInitialized = true;
     }
 
@@ -400,6 +438,8 @@ export class DawEditorElement extends LitElement {
   // --- Render ---
 
   render() {
+    const engineTracks = [...this._engineTracks.values()];
+
     return html`
       <div
         class="timeline"
@@ -414,7 +454,7 @@ export class DawEditorElement extends LitElement {
             ></daw-ruler>`
           : ''}
         <daw-playhead></daw-playhead>
-        ${this._engineTracks.map(
+        ${engineTracks.map(
           (track) => html`
             <div class="track-row" style="height: ${this.waveHeight}px;">
               ${track.clips.map((clip) => {

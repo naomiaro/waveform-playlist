@@ -14,9 +14,33 @@ export class DawTrackElement extends LitElement {
   readonly trackId = crypto.randomUUID();
 
   // Light DOM so <daw-clip> children are queryable.
-  // No render() needed — this is a data-only element.
   createRenderRoot() {
     return this;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    // Defer so the editor has time to set up its listener
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent('daw-track-connected', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId: this.trackId, element: this },
+        })
+      );
+    }, 0);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.dispatchEvent(
+      new CustomEvent('daw-track-disconnected', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId: this.trackId },
+      })
+    );
   }
 
   updated(changed: PropertyValues) {
