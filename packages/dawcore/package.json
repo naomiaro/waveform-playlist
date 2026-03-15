@@ -18,7 +18,8 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:page": "vite --config dev/vite.config.ts"
   },
   "author": "Naomi Aro",
   "license": "MIT",
@@ -38,6 +39,7 @@
     "happy-dom": "^17.0.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
+    "vite": "^6.0.0",
     "vitest": "^3.0.0"
   }
 }

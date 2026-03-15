@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore dev</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore — dev</h1>
+
+  <script type="module" src="../src/index.ts"></script>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="128" timescale>
+    <daw-track src="https://ia800905.us.archive.org/19/items/FREE_background_music_dano_songs/file-20.mp3" name="Track 1"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+</body>
+</html>
