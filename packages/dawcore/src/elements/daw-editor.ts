@@ -495,6 +495,9 @@ export class DawEditorElement extends LitElement {
     });
 
     engine.on('stop', () => {
+      // Engine resets currentTime to playStartPosition on stop.
+      // Read it from engine state so playhead returns to where playback began.
+      this._currentTime = engine.getCurrentTime();
       this._stopPlayhead();
     });
 
