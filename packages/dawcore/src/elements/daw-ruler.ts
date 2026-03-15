@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { computeTemporalTicks } from '../utils/smart-scale';
+import { computeTemporalTicks, type TickData } from '../utils/smart-scale';
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -10,6 +10,8 @@ export class DawRulerElement extends LitElement {
   @property({ type: Number, attribute: false }) sampleRate = 48000;
   @property({ type: Number, attribute: false }) duration = 0;
   @property({ type: Number, attribute: false }) rulerHeight = 30;
+
+  private _tickData: TickData | null = null;
 
   static styles = css`
     :host {
@@ -33,25 +35,32 @@ export class DawRulerElement extends LitElement {
     }
   `;
 
+  willUpdate() {
+    // Compute ticks once per update — used by both render() and updated()
+    if (this.duration > 0) {
+      this._tickData = computeTemporalTicks(
+        this.samplesPerPixel,
+        this.sampleRate,
+        this.duration,
+        this.rulerHeight
+      );
+    } else {
+      this._tickData = null;
+    }
+  }
+
   render() {
-    if (this.duration <= 0) return html``;
+    if (!this._tickData) return html``;
 
-    const tickData = computeTemporalTicks(
-      this.samplesPerPixel,
-      this.sampleRate,
-      this.duration,
-      this.rulerHeight
-    );
-
-    const totalWidth = tickData.widthX;
-    const totalChunks = Math.ceil(totalWidth / MAX_CANVAS_WIDTH);
+    const { widthX, labels } = this._tickData;
+    const totalChunks = Math.ceil(widthX / MAX_CANVAS_WIDTH);
     const indices = Array.from({ length: totalChunks }, (_, i) => i);
     const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
 
     return html`
-      <div class="container" style="width: ${totalWidth}px; height: ${this.rulerHeight}px;">
+      <div class="container" style="width: ${widthX}px; height: ${this.rulerHeight}px;">
         ${indices.map((i) => {
-          const width = Math.min(MAX_CANVAS_WIDTH, totalWidth - i * MAX_CANVAS_WIDTH);
+          const width = Math.min(MAX_CANVAS_WIDTH, widthX - i * MAX_CANVAS_WIDTH);
           return html`
             <canvas
               data-index=${i}
@@ -62,7 +71,7 @@ export class DawRulerElement extends LitElement {
             ></canvas>
           `;
         })}
-        ${tickData.labels.map(
+        ${labels.map(
           ({ pix, text }) => html`<span class="label" style="left: ${pix + 4}px;">${text}</span>`
         )}
       </div>
@@ -74,14 +83,7 @@ export class DawRulerElement extends LitElement {
   }
 
   private _drawTicks() {
-    if (this.duration <= 0) return;
-
-    const tickData = computeTemporalTicks(
-      this.samplesPerPixel,
-      this.sampleRate,
-      this.duration,
-      this.rulerHeight
-    );
+    if (!this._tickData) return;
 
     const canvases = this.shadowRoot?.querySelectorAll('canvas');
     if (!canvases) return;
@@ -95,7 +97,10 @@ export class DawRulerElement extends LitElement {
       const ctx = canvas.getContext('2d');
       if (!ctx) continue;
 
-      const canvasWidth = Math.min(MAX_CANVAS_WIDTH, tickData.widthX - idx * MAX_CANVAS_WIDTH);
+      const canvasWidth = Math.min(
+        MAX_CANVAS_WIDTH,
+        this._tickData.widthX - idx * MAX_CANVAS_WIDTH
+      );
       const globalOffset = idx * MAX_CANVAS_WIDTH;
 
       ctx.resetTransform();
@@ -104,7 +109,7 @@ export class DawRulerElement extends LitElement {
       ctx.strokeStyle = rulerColor;
       ctx.lineWidth = 1;
 
-      for (const [pix, height] of tickData.canvasInfo) {
+      for (const [pix, height] of this._tickData.canvasInfo) {
         const localX = pix - globalOffset;
         if (localX < 0 || localX >= canvasWidth) continue;
 

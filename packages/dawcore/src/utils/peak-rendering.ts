@@ -7,7 +7,7 @@ export type WaveformDrawMode = 'normal' | 'inverted';
  *
  * Invariants (assumed from valid waveform input):
  * - min and max are normalized to [-1, 1] by dividing by 2^(bits-1)
- * - min <= max (min-of-mins, max-of-maxes — guaranteed by waveform-data library)
+ * - min <= max (min-of-mins, max-of-maxes — guaranteed by the interleaved min/max peak format)
  * - Values are finite (derived from integer typed arrays)
  *
  * Construct via aggregatePeaks() — do not create directly.

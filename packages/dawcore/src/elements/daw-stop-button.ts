@@ -13,7 +13,14 @@ export class DawStopButtonElement extends DawTransportButton {
   }
 
   private _onClick() {
-    this.target?.stop();
+    const target = this.target;
+    if (!target) {
+      console.warn(
+        '[dawcore] <daw-stop-button> has no target. Check <daw-transport for="..."> references a valid <daw-editor> id.'
+      );
+      return;
+    }
+    target.stop();
   }
 }
 

@@ -13,7 +13,14 @@ export class DawPlayButtonElement extends DawTransportButton {
   }
 
   private _onClick() {
-    this.target?.play();
+    const target = this.target;
+    if (!target) {
+      console.warn(
+        '[dawcore] <daw-play-button> has no target. Check <daw-transport for="..."> references a valid <daw-editor> id.'
+      );
+      return;
+    }
+    target.play();
   }
 }
 

@@ -20,7 +20,9 @@ export class DawTrackElement extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    // Defer so the editor has time to set up its listener
+    // Defer so the editor's connectedCallback (which registers the
+    // daw-track-connected listener) has time to run. Without this,
+    // tracks parsed before the editor would fire events with no listener.
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent('daw-track-connected', {
@@ -32,16 +34,9 @@ export class DawTrackElement extends LitElement {
     }, 0);
   }
 
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this.dispatchEvent(
-      new CustomEvent('daw-track-disconnected', {
-        bubbles: true,
-        composed: true,
-        detail: { trackId: this.trackId },
-      })
-    );
-  }
+  // Track removal is detected by the editor's MutationObserver,
+  // not by dispatching from disconnectedCallback (detached elements
+  // cannot bubble events to ancestors).
 
   updated(changed: PropertyValues) {
     // Notify parent editor when track-relevant attributes change

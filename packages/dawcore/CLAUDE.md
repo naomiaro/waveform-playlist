@@ -14,26 +14,29 @@
 
 **Data elements (light DOM):**
 - `<daw-clip>` — Declarative clip data (src, start, duration, offset, gain, fades). Auto-generated `clipId`.
-- `<daw-track>` — Track data (name, volume, pan, muted, soloed). Dispatches `daw-track-connected` on mount, `daw-track-update` on property change.
+- `<daw-track>` — Track data (name, volume, pan, muted, soloed). Dispatches `daw-track-connected` on mount, `daw-track-update` on property change. Track removal detected by editor's MutationObserver (not events — detached elements can't bubble).
 
 **Visual elements (Shadow DOM):**
 - `<daw-waveform>` — Chunked canvas rendering (1000px chunks). Receives peaks as JS properties.
 - `<daw-playhead>` — RAF-animated vertical line via `AnimationController`.
-- `<daw-ruler>` — Temporal time scale with tick marks. Ported from `SmartScale` (temporal mode only, beats & bars deferred).
+- `<daw-ruler>` — Temporal time scale with tick marks. Ported from `SmartScale` (temporal mode only, beats & bars deferred). Computes ticks once in `willUpdate()`, reused by both `render()` and `updated()`.
 
 **Control elements:**
 - `<daw-editor>` — Core orchestrator. Builds engine eagerly, loads audio per-track on `daw-track-connected`, renders waveforms from decoded peaks.
 - `<daw-transport for="editor-id">` — Container that resolves target via `document.getElementById`. Light DOM.
-- `<daw-play-button>`, `<daw-pause-button>`, `<daw-stop-button>` — Walk up to closest `<daw-transport>` for target resolution.
+- `<daw-play-button>`, `<daw-pause-button>`, `<daw-stop-button>` — Walk up to closest `<daw-transport>` for target resolution. Warn when target is null.
 
 ## Key Patterns
 
-- **Event-driven track loading** — `<daw-track>` dispatches `daw-track-connected` (bubbling, composed); `<daw-editor>` listens and loads audio for that track individually. No MutationObserver bulk discovery.
-- **Eager audio decode** — Audio fetches and decodes on track connect (AudioContext can decode while suspended). Waveforms render immediately without waiting for play.
+- **Event-driven track loading** — `<daw-track>` dispatches `daw-track-connected` (bubbling, composed); `<daw-editor>` listens and loads audio for that track individually. Track removal uses MutationObserver (events from `disconnectedCallback` can't bubble since element is already detached).
+- **Eager audio decode** — Audio fetches and decodes on track connect using `OfflineAudioContext` (no user gesture required, unlike `AudioContext`). Waveforms render immediately without waiting for play.
 - **Engine built eagerly, init deferred** — `PlaylistEngine` + adapter created in `connectedCallback`. `engine.setTracks()` called as tracks load (builds playout structure). `engine.init()` deferred to first `play()` (resumes AudioContext, requires user gesture).
-- **setTracks before addTrack** — `adapter.addTrack()` throws if no playout exists. Always use `setTracks()` for initial load; `addTrack()` only for incremental additions after playout is built.
+- **Engine API note** — `adapter.addTrack()` throws if no playout exists, so the editor always uses `setTracks()` with all tracks. `addTrack()` is not used in Phase 1.
 - **Immutable state updates** — All `@state()` Maps are replaced with `new Map(old).set(...)`, never mutated in place.
-- **Shared decode AudioContext** — Single `_decodeContext` for all fetch+decode operations, separate from Tone.js context.
+- **Derived width, not stored state** — `_totalWidth` is a getter derived from `_duration`, `_sampleRate`, and `samplesPerPixel`. Not a `@state()` property — avoids Lit update loops from setting state in `updated()`.
+- **Error events** — `daw-track-error` dispatched on load failure (with `{ trackId, error }`). `daw-error` dispatched on playback failure (with `{ operation, error }`). Failed fetch promises are removed from cache to allow retry.
+- **Engine promise retry** — `_enginePromise` is cleared on rejection so `_ensureEngine()` can retry instead of caching a permanent failure.
+- **Multi-channel peak aggregation** — `_generatePeaks()` aggregates across all channels (min-of-mins, max-of-maxes). When `mono` is true, only channel 0 is used.
 
 ## CSS Theming
 
@@ -49,9 +52,9 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Reactive Controllers
 
-- `AnimationController` — Start/stop RAF loops, auto-cleanup on `hostDisconnected`.
-- `ViewportController` — Scroll-aware visible range with overscan buffer (1.5x). Scroll threshold debounce (100px).
-- `EngineController` — Walks DOM to find closest `<daw-editor>` via `closest()`.
+- `AnimationController` — Start/stop RAF loops, auto-cleanup on `hostDisconnected`. Used by `<daw-playhead>`.
+- `ViewportController` — (Scaffolded, not yet wired) Scroll-aware visible range with overscan buffer (1.5x). Will be integrated when `<daw-editor>` supports virtual scrolling.
+- `EngineController` — (Scaffolded, not yet wired) DOM traversal to find closest `<daw-editor>`. Will be used by sub-elements that need engine access.
 
 ## Ported Utilities
 
@@ -63,4 +66,4 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 - `experimentalDecorators: true` and `useDefineForClassFields: false` in tsconfig — required for Lit's `@property` and `@customElement` decorators
 - Light DOM elements override `createRenderRoot()` to return `this`
-- `<daw-track>` defers `daw-track-connected` dispatch via `setTimeout(, 0)` so the editor's listeners are set up first
+- `<daw-track>` defers `daw-track-connected` dispatch via `setTimeout(, 0)` so the editor's `connectedCallback` (which registers listeners) has time to run

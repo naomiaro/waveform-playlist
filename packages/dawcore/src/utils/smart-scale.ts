@@ -31,7 +31,7 @@ export interface TickData {
 /**
  * Compute temporal tick data for a ruler.
  *
- * Pure function — no DOM, no React.
+ * Pure function — no DOM dependencies.
  */
 export function computeTemporalTicks(
   samplesPerPixel: number,
