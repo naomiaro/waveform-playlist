@@ -7,6 +7,7 @@ import './elements/daw-play-button';
 import './elements/daw-pause-button';
 import './elements/daw-stop-button';
 import './elements/daw-editor';
+import './elements/daw-ruler';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
@@ -18,3 +19,4 @@ export { DawPlayButtonElement } from './elements/daw-play-button';
 export { DawPauseButtonElement } from './elements/daw-pause-button';
 export { DawStopButtonElement } from './elements/daw-stop-button';
 export { DawEditorElement } from './elements/daw-editor';
+export { DawRulerElement } from './elements/daw-ruler';
