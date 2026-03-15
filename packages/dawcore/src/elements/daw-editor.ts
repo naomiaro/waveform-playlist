@@ -42,6 +42,7 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean }) mono = false;
   @property({ type: Number, attribute: 'bar-width' }) barWidth = 1;
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
+  @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
 
   @state() private _tracks: Map<string, TrackDescriptor> = new Map();
   @state() private _engineTracks: Map<string, ClipTrack> = new Map();
@@ -50,6 +51,10 @@ export class DawEditorElement extends LitElement {
   @state() _isPlaying = false;
   @state() private _duration = 0;
   @state() private _sampleRate = 48000;
+  @state() private _selectedTrackId: string | null = null;
+  @state() private _selectionStart = 0;
+  @state() private _selectionEnd = 0;
+  @state() private _dragOver = false;
 
   // Not @state — updated only in RAF loop, read only in _stopPlayhead
   private _currentTime = 0;
@@ -85,6 +90,14 @@ export class DawEditorElement extends LitElement {
         background: var(--daw-track-background, #16213e);
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
+      .track-row.selected {
+        outline: 1px solid var(--daw-selection-color, rgba(99, 199, 95, 0.3));
+        outline-offset: -1px;
+      }
+      .timeline.drag-over {
+        outline: 2px dashed var(--daw-selection-color, rgba(99, 199, 95, 0.3));
+        outline-offset: -2px;
+      }
     `,
   ];
 
@@ -101,6 +114,33 @@ export class DawEditorElement extends LitElement {
    */
   get tracks(): TrackDescriptor[] {
     return [...this._tracks.values()];
+  }
+
+  get selectedTrackId(): string | null {
+    return this._selectedTrackId;
+  }
+
+  get selection(): { start: number; end: number } | null {
+    if (this._selectionStart === 0 && this._selectionEnd === 0) return null;
+    return {
+      start: Math.min(this._selectionStart, this._selectionEnd),
+      end: Math.max(this._selectionStart, this._selectionEnd),
+    };
+  }
+
+  setSelection(start: number, end: number) {
+    this._selectionStart = start;
+    this._selectionEnd = end;
+    if (this._engine) {
+      this._engine.setSelection(start, end);
+    }
+    this.dispatchEvent(
+      new CustomEvent('daw-selection', {
+        bubbles: true,
+        composed: true,
+        detail: { start: Math.min(start, end), end: Math.max(start, end) },
+      })
+    );
   }
 
   // --- Lifecycle ---
@@ -446,6 +486,7 @@ export class DawEditorElement extends LitElement {
     engine.on('statechange', (engineState: any) => {
       this._isPlaying = engineState.isPlaying;
       this._duration = engineState.duration;
+      this._selectedTrackId = engineState.selectedTrackId;
     });
 
     // timeupdate fires every RAF frame — only update the non-reactive field
@@ -493,6 +534,110 @@ export class DawEditorElement extends LitElement {
       })
     );
   };
+
+  private _onTrackClick(trackId: string) {
+    if (this._engine) {
+      this._engine.selectTrack(trackId);
+    }
+    this._selectedTrackId = trackId;
+    this.dispatchEvent(
+      new CustomEvent('daw-track-select', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId },
+      })
+    );
+  }
+
+  private _onDragOver = (e: DragEvent) => {
+    if (!this.fileDrop) return;
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+    this._dragOver = true;
+  };
+
+  private _onDragLeave = (e: DragEvent) => {
+    const timeline = this.shadowRoot?.querySelector('.timeline');
+    if (timeline && !timeline.contains(e.relatedTarget as Node)) {
+      this._dragOver = false;
+    }
+  };
+
+  private _onDrop = async (e: DragEvent) => {
+    if (!this.fileDrop) return;
+    e.preventDefault();
+    this._dragOver = false;
+
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    await this.loadFiles(files);
+  };
+
+  async loadFiles(files: FileList | File[]): Promise<void> {
+    const fileArray = Array.from(files);
+
+    for (const file of fileArray) {
+      if (!file.type.startsWith('audio/')) {
+        console.warn('[dawcore] Skipping non-audio file:', file.name);
+        continue;
+      }
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const ctx = new OfflineAudioContext(1, 1, 44100);
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        if (this._sampleRate === 48000 && audioBuffer.sampleRate !== 48000) {
+          this._sampleRate = audioBuffer.sampleRate;
+        }
+
+        const clip = createClipFromSeconds({
+          audioBuffer,
+          startTime: 0,
+          duration: audioBuffer.duration,
+          offset: 0,
+          gain: 1,
+          name: file.name.replace(/\.\w+$/, ''),
+          sampleRate: audioBuffer.sampleRate,
+          sourceDuration: audioBuffer.duration,
+        });
+
+        this._generatePeaks(clip.id, audioBuffer);
+
+        const trackId = crypto.randomUUID();
+        const track = createTrack({
+          name: file.name.replace(/\.\w+$/, ''),
+          clips: [clip],
+        });
+
+        this._engineTracks = new Map(this._engineTracks).set(trackId, track);
+        this._recomputeDuration();
+
+        const engine = await this._ensureEngine();
+        engine.setTracks([...this._engineTracks.values()]);
+
+        this.dispatchEvent(
+          new CustomEvent('daw-track-ready', {
+            bubbles: true,
+            composed: true,
+            detail: { trackId },
+          })
+        );
+      } catch (err) {
+        console.warn('[dawcore] Failed to load dropped file:', file.name, err);
+        this.dispatchEvent(
+          new CustomEvent('daw-files-load-error', {
+            bubbles: true,
+            composed: true,
+            detail: { file, error: err },
+          })
+        );
+      }
+    }
+  }
 
   // --- Playback Methods ---
 
@@ -573,14 +718,18 @@ export class DawEditorElement extends LitElement {
   // --- Render ---
 
   render() {
-    const engineTracks = [...this._engineTracks.values()];
+    const selStartPx = (this._selectionStart * this._sampleRate) / this.samplesPerPixel;
+    const selEndPx = (this._selectionEnd * this._sampleRate) / this.samplesPerPixel;
 
     return html`
       <div
-        class="timeline"
+        class="timeline ${this._dragOver ? 'drag-over' : ''}"
         style="width: ${Math.max(this._totalWidth, 100)}px;"
         data-playing=${this._isPlaying}
         @click=${this._onTimelineClick}
+        @dragover=${this._onDragOver}
+        @dragleave=${this._onDragLeave}
+        @drop=${this._onDrop}
       >
         ${this.timescale
           ? html`<daw-ruler
@@ -589,10 +738,15 @@ export class DawEditorElement extends LitElement {
               .duration=${this._duration}
             ></daw-ruler>`
           : ''}
+        <daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
         <daw-playhead></daw-playhead>
-        ${engineTracks.map(
-          (track) => html`
-            <div class="track-row" style="height: ${this.waveHeight}px;">
+        ${[...this._engineTracks.entries()].map(
+          ([trackId, track]) => html`
+            <div
+              class="track-row ${trackId === this._selectedTrackId ? 'selected' : ''}"
+              style="height: ${this.waveHeight}px;"
+              @click=${() => this._onTrackClick(trackId)}
+            >
               ${track.clips.map((clip) => {
                 const peakData = this._peaksData.get(clip.id);
                 const width = clipPixelWidth(

@@ -17,3 +17,34 @@ describe('DawEditorElement interactions', () => {
     expect(pixelsToSeconds(0, 1024, 48000)).toBe(0);
   });
 });
+
+describe('Track selection', () => {
+  it('has selectedTrackId property defaulting to null', () => {
+    const el = document.createElement('daw-editor') as any;
+    expect(el.selectedTrackId).toBeNull();
+  });
+});
+
+describe('File drop', () => {
+  it('has file-drop attribute defaulting to false', () => {
+    const el = document.createElement('daw-editor') as any;
+    expect(el.fileDrop).toBe(false);
+  });
+
+  it('exposes loadFiles method', () => {
+    const el = document.createElement('daw-editor') as any;
+    expect(typeof el.loadFiles).toBe('function');
+  });
+});
+
+describe('Selection', () => {
+  it('has selection property defaulting to null', () => {
+    const el = document.createElement('daw-editor') as any;
+    expect(el.selection).toBeNull();
+  });
+
+  it('has setSelection method', () => {
+    const el = document.createElement('daw-editor') as any;
+    expect(typeof el.setSelection).toBe('function');
+  });
+});
