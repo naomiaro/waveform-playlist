@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 beforeAll(async () => {
   await import('../elements/daw-transport');

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 beforeAll(async () => {
   await import('../elements/daw-playhead');

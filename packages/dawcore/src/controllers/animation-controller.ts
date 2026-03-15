@@ -1,12 +1,10 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
 export class AnimationController implements ReactiveController {
-  private _host: ReactiveControllerHost;
   private _rafId: number | null = null;
   private _callback: (() => void) | null = null;
 
   constructor(host: ReactiveControllerHost) {
-    this._host = host;
     host.addController(this);
   }
 
