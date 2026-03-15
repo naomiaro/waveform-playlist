@@ -1,0 +1,43 @@
+{
+  "name": "@dawcore/components",
+  "version": "0.0.1",
+  "description": "Web Components for multi-track audio editing — framework-agnostic",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "pnpm typecheck && tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "files": ["dist"],
+  "dependencies": {
+    "lit": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@waveform-playlist/engine": ">=7.0.0",
+    "@waveform-playlist/core": ">=7.0.0",
+    "@waveform-playlist/playout": ">=7.0.0"
+  },
+  "devDependencies": {
+    "@waveform-playlist/engine": "workspace:*",
+    "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/playout": "workspace:*",
+    "happy-dom": "^17.0.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
+  }
+}
