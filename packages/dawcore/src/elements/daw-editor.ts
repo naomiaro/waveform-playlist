@@ -580,9 +580,13 @@ export class DawEditorElement extends LitElement {
         this._engine.setSelection(0, 0);
       }
       this._currentTime = time;
-      this._stopPlayhead();
       if (this._isPlaying) {
+        // Tone.js needs stop + play to reschedule audio sources at new position
+        this._engine.stop();
+        this._engine.play(time);
         this._startPlayhead();
+      } else {
+        this._stopPlayhead();
       }
       this.dispatchEvent(
         new CustomEvent('daw-seek', {
