@@ -57,13 +57,13 @@ export class DawRulerElement extends LitElement {
               data-index=${i}
               width=${width * dpr}
               height=${this.rulerHeight * dpr}
-              style="left: ${i * MAX_CANVAS_WIDTH}px; width: ${width}px; height: ${this.rulerHeight}px;"
+              style="left: ${i * MAX_CANVAS_WIDTH}px; width: ${width}px; height: ${this
+                .rulerHeight}px;"
             ></canvas>
           `;
         })}
         ${tickData.labels.map(
-          ({ pix, text }) =>
-            html`<span class="label" style="left: ${pix + 4}px;">${text}</span>`
+          ({ pix, text }) => html`<span class="label" style="left: ${pix + 4}px;">${text}</span>`
         )}
       </div>
     `;

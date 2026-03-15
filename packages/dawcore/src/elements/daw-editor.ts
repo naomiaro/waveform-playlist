@@ -347,9 +347,7 @@ export class DawEditorElement extends LitElement {
     this._isPlaying = true;
     this._startPlayhead();
 
-    this.dispatchEvent(
-      new CustomEvent('daw-play', { bubbles: true, composed: true })
-    );
+    this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
   }
 
   pause() {
@@ -358,9 +356,7 @@ export class DawEditorElement extends LitElement {
     this._isPlaying = false;
     this._stopPlayhead();
 
-    this.dispatchEvent(
-      new CustomEvent('daw-pause', { bubbles: true, composed: true })
-    );
+    this.dispatchEvent(new CustomEvent('daw-pause', { bubbles: true, composed: true }));
   }
 
   stop() {
@@ -370,9 +366,7 @@ export class DawEditorElement extends LitElement {
     this._currentTime = 0;
     this._stopPlayhead();
 
-    this.dispatchEvent(
-      new CustomEvent('daw-stop', { bubbles: true, composed: true })
-    );
+    this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
   }
 
   seekTo(time: number) {
@@ -407,7 +401,18 @@ export class DawEditorElement extends LitElement {
 
   render() {
     return html`
-      <div class="timeline" style="width: ${Math.max(this._totalWidth, 100)}px;" data-playing=${this._isPlaying}>
+      <div
+        class="timeline"
+        style="width: ${Math.max(this._totalWidth, 100)}px;"
+        data-playing=${this._isPlaying}
+      >
+        ${this.timescale
+          ? html`<daw-ruler
+              .samplesPerPixel=${this.samplesPerPixel}
+              .sampleRate=${this._sampleRate}
+              .duration=${this._duration}
+            ></daw-ruler>`
+          : ''}
         <daw-playhead></daw-playhead>
         ${this._engineTracks.map(
           (track) => html`

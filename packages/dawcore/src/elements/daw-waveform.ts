@@ -38,10 +38,7 @@ export class DawWaveformElement extends LitElement {
     const indices = Array.from({ length: totalChunks }, (_, i) => i);
 
     return html`
-      <div
-        class="container"
-        style="width: ${this.length}px; height: ${this.waveHeight}px;"
-      >
+      <div class="container" style="width: ${this.length}px; height: ${this.waveHeight}px;">
         ${indices.map((i) => {
           const width = Math.min(MAX_CANVAS_WIDTH, this.length - i * MAX_CANVAS_WIDTH);
           const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
@@ -50,7 +47,8 @@ export class DawWaveformElement extends LitElement {
               data-index=${i}
               width=${width * dpr}
               height=${this.waveHeight * dpr}
-              style="left: ${i * MAX_CANVAS_WIDTH}px; width: ${width}px; height: ${this.waveHeight}px;"
+              style="left: ${i * MAX_CANVAS_WIDTH}px; width: ${width}px; height: ${this
+                .waveHeight}px;"
             ></canvas>
           `;
         })}

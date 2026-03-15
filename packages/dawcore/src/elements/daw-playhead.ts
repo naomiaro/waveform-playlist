@@ -34,11 +34,7 @@ export class DawPlayheadElement extends LitElement {
     this._line = this.shadowRoot!.querySelector('div');
   }
 
-  startAnimation(
-    getTime: () => number,
-    sampleRate: number,
-    samplesPerPixel: number
-  ) {
+  startAnimation(getTime: () => number, sampleRate: number, samplesPerPixel: number) {
     this._animation.start(() => {
       const time = getTime();
       const px = (time * sampleRate) / samplesPerPixel;
