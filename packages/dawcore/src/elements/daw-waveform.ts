@@ -34,7 +34,7 @@ export class DawWaveformElement extends LitElement {
 
   render() {
     const totalChunks = Math.ceil(this.length / MAX_CANVAS_WIDTH);
-    // For now, render all chunks. ViewportController integration comes with editor.
+    // Renders all chunks — ViewportController integration deferred to future phase.
     const indices = Array.from({ length: totalChunks }, (_, i) => i);
 
     return html`

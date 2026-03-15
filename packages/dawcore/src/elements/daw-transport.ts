@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 @customElement('daw-transport')
@@ -9,13 +9,10 @@ export class DawTransportElement extends LitElement {
     return this.for ? document.getElementById(this.for) : null;
   }
 
-  // Light DOM — button children stay in consumer's DOM
+  // Light DOM — button children stay in consumer's DOM.
+  // No render() needed; light DOM elements don't use <slot>.
   createRenderRoot() {
     return this;
-  }
-
-  render() {
-    return html`<slot></slot>`;
   }
 }
 

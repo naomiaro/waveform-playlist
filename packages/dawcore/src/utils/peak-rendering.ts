@@ -20,7 +20,7 @@ export interface AggregatedPeak {
 /**
  * Canvas fillRect parameters for a single waveform bar.
  * width >= 0 and height >= 0 when peak values are in [-1, 1] (guaranteed by
- * waveform-data library normalization).
+ * the interleaved min/max peak format normalization).
  */
 export interface BarRect {
   x: number;

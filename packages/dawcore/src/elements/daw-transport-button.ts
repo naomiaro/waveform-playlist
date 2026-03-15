@@ -3,7 +3,7 @@ import type { DawTransportElement } from './daw-transport';
 
 /**
  * Base class for transport button elements.
- * Finds target (editor or player) via closest <daw-transport>.
+ * Finds target daw-editor via closest <daw-transport>.
  */
 export class DawTransportButton extends LitElement {
   protected get target(): any {

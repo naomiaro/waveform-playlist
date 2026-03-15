@@ -46,9 +46,11 @@ export function computeTemporalTicks(
   const labels: Array<{ pix: number; text: string }> = [];
   const pixPerSec = sampleRate / samplesPerPixel;
 
-  let counter = 0;
-  for (let i = 0; i < widthX; i += (pixPerSec * smallStep) / 1000) {
-    const pix = Math.floor(i);
+  // Iterate with integer counter (milliseconds) to avoid float precision drift.
+  // Compute pixel position from counter each iteration instead of accumulating.
+  for (let counter = 0; ; counter += smallStep) {
+    const pix = Math.floor((counter / 1000) * pixPerSec);
+    if (pix >= widthX) break;
 
     if (counter % marker === 0) {
       canvasInfo.set(pix, rulerHeight);
@@ -58,8 +60,6 @@ export function computeTemporalTicks(
     } else if (counter % smallStep === 0) {
       canvasInfo.set(pix, Math.floor(rulerHeight / 5));
     }
-
-    counter += smallStep;
   }
 
   return { widthX, canvasInfo, labels };

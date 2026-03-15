@@ -38,8 +38,16 @@ export class DawTrackElement extends LitElement {
   // not by dispatching from disconnectedCallback (detached elements
   // cannot bubble events to ancestors).
 
+  private _hasRendered = false;
+
   updated(changed: PropertyValues) {
-    // Notify parent editor when track-relevant attributes change
+    // Skip the initial render — all properties appear in `changed` on first
+    // update, but the editor handles initial state via daw-track-connected.
+    if (!this._hasRendered) {
+      this._hasRendered = true;
+      return;
+    }
+
     const trackProps = ['volume', 'pan', 'muted', 'soloed', 'src', 'name'];
     const hasTrackChange = trackProps.some((p) => changed.has(p as keyof this));
 

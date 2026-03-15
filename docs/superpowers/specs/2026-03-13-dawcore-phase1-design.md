@@ -96,9 +96,9 @@ packages/dawcore/
     "lit": "^3.0.0"
   },
   "peerDependencies": {
-    "@waveform-playlist/engine": "workspace:*",
-    "@waveform-playlist/core": "workspace:*",
-    "@waveform-playlist/playout": "workspace:*"
+    "@waveform-playlist/engine": ">=7.0.0",
+    "@waveform-playlist/core": ">=7.0.0",
+    "@waveform-playlist/playout": ">=7.0.0"
   },
   "devDependencies": {
     "@waveform-playlist/engine": "workspace:*",

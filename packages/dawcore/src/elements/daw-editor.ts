@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack } from '@waveform-playlist/core';
-import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
+import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
@@ -43,9 +43,11 @@ export class DawEditorElement extends LitElement {
   @state() private _peaksData: Map<string, { peaks: Int16Array; bits: 16; length: number }> =
     new Map();
   @state() _isPlaying = false;
-  @state() private _currentTime = 0;
   @state() private _duration = 0;
   @state() private _sampleRate = 48000;
+
+  // Not @state — updated only in RAF loop, read only in _stopPlayhead
+  private _currentTime = 0;
 
   // Engine is dynamically imported; typed as any to avoid a static import
   // that would defeat code-splitting
@@ -103,21 +105,30 @@ export class DawEditorElement extends LitElement {
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
 
     // Detect track removal via MutationObserver since disconnectedCallback
-    // events from detached elements cannot bubble to ancestors
+    // events from detached elements cannot bubble to ancestors.
+    // subtree: true catches tracks wrapped in container elements.
     this._childObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.removedNodes) {
-          if (node instanceof HTMLElement && node.tagName === 'DAW-TRACK') {
-            const trackId = (node as DawTrackElement).trackId;
-            this._onTrackRemoved(trackId);
+          if (node instanceof HTMLElement) {
+            // Direct daw-track removal
+            if (node.tagName === 'DAW-TRACK') {
+              this._onTrackRemoved((node as DawTrackElement).trackId);
+            }
+            // Nested daw-track removal (wrapper removed)
+            const nested = node.querySelectorAll?.('daw-track');
+            if (nested) {
+              for (const track of nested) {
+                this._onTrackRemoved((track as DawTrackElement).trackId);
+              }
+            }
           }
         }
       }
     });
-    this._childObserver.observe(this, { childList: true });
+    this._childObserver.observe(this, { childList: true, subtree: true });
 
-    // Build engine eagerly so it's ready before play
-    this._ensureEngine();
+    // Engine built lazily on first _loadTrack to use the correct sampleRate
   }
 
   disconnectedCallback() {
@@ -127,11 +138,12 @@ export class DawEditorElement extends LitElement {
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
+    this._audioCache.clear();
 
     try {
       this._disposeEngine();
     } catch (err) {
-      console.warn('[dawcore] Error disposing engine:', String(err));
+      console.warn('[dawcore] Error disposing engine:', err);
     }
   }
 
@@ -165,6 +177,11 @@ export class DawEditorElement extends LitElement {
     this._engineTracks = nextEngine;
 
     this._recomputeDuration();
+
+    // Update the engine so the removed track stops playing
+    if (this._engine) {
+      this._engine.setTracks([...nextEngine.values()]);
+    }
   }
 
   private _onTrackUpdate = (e: CustomEvent) => {
@@ -173,8 +190,30 @@ export class DawEditorElement extends LitElement {
     const trackEl = (e.target as HTMLElement).closest('daw-track') as DawTrackElement | null;
     if (!trackEl) return;
 
+    const oldDescriptor = this._tracks.get(trackId);
     const descriptor = this._readTrackDescriptor(trackEl);
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
+
+    // Forward mix changes to engine
+    if (this._engine) {
+      if (oldDescriptor?.volume !== descriptor.volume) {
+        this._engine.setTrackVolume(trackId, descriptor.volume);
+      }
+      if (oldDescriptor?.pan !== descriptor.pan) {
+        this._engine.setTrackPan(trackId, descriptor.pan);
+      }
+      if (oldDescriptor?.muted !== descriptor.muted) {
+        this._engine.setTrackMute(trackId, descriptor.muted);
+      }
+      if (oldDescriptor?.soloed !== descriptor.soloed) {
+        this._engine.setTrackSolo(trackId, descriptor.soloed);
+      }
+    }
+
+    // Reload audio if src changed
+    if (oldDescriptor?.src !== descriptor.src) {
+      this._loadTrack(trackId, descriptor);
+    }
   };
 
   // --- Track Reading ---
@@ -233,7 +272,11 @@ export class DawEditorElement extends LitElement {
         if (!clipDesc.src) continue;
 
         const audioBuffer = await this._fetchAndDecode(clipDesc.src);
-        this._sampleRate = audioBuffer.sampleRate;
+
+        // Set sampleRate from first decoded buffer — engine uses this
+        if (this._sampleRate === 48000 && audioBuffer.sampleRate !== 48000) {
+          this._sampleRate = audioBuffer.sampleRate;
+        }
 
         const clip = createClipFromSeconds({
           audioBuffer,
@@ -275,10 +318,7 @@ export class DawEditorElement extends LitElement {
         })
       );
     } catch (err) {
-      console.warn(
-        `[dawcore] Failed to load track "${trackId}" (${descriptor.name}):`,
-        String(err)
-      );
+      console.warn(`[dawcore] Failed to load track "${trackId}" (${descriptor.name}):`, err);
       this.dispatchEvent(
         new CustomEvent('daw-track-error', {
           bubbles: true,
@@ -302,7 +342,9 @@ export class DawEditorElement extends LitElement {
         );
       }
       const arrayBuffer = await response.arrayBuffer();
-      // OfflineAudioContext doesn't require user gesture (unlike AudioContext)
+      // OfflineAudioContext doesn't require user gesture (unlike AudioContext).
+      // The sampleRate parameter doesn't affect decodeAudioData output —
+      // the decoded buffer retains its native sample rate.
       const ctx = new OfflineAudioContext(1, 1, 44100);
       return ctx.decodeAudioData(arrayBuffer);
     })();
@@ -329,7 +371,8 @@ export class DawEditorElement extends LitElement {
       let min = 0;
       let max = 0;
 
-      // Aggregate across all channels (min-of-mins, max-of-maxes)
+      // Aggregate across all channels (min-of-mins, max-of-maxes);
+      // channel 0 only when mono=true
       for (let ch = 0; ch < numChannels; ch++) {
         const channelData = audioBuffer.getChannelData(ch);
         for (let j = start; j < end; j++) {
@@ -386,15 +429,20 @@ export class DawEditorElement extends LitElement {
       adapter,
       sampleRate: this._sampleRate,
       samplesPerPixel: this.samplesPerPixel,
+      // Include samplesPerPixel in zoom levels so arbitrary values don't throw
+      zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .sort((a, b) => a - b),
     });
 
+    // statechange fires on play/pause/stop/seek — not every frame
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     engine.on('statechange', (engineState: any) => {
       this._isPlaying = engineState.isPlaying;
-      this._currentTime = engineState.currentTime;
       this._duration = engineState.duration;
     });
 
+    // timeupdate fires every RAF frame — only update the non-reactive field
     engine.on('timeupdate', (time: number) => {
       this._currentTime = time;
     });
@@ -412,6 +460,7 @@ export class DawEditorElement extends LitElement {
       this._engine.dispose();
       this._engine = null;
     }
+    this._enginePromise = null;
   }
 
   // --- Playback Methods ---
@@ -431,7 +480,7 @@ export class DawEditorElement extends LitElement {
 
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
-      console.warn('[dawcore] Playback failed:', String(err));
+      console.warn('[dawcore] Playback failed:', err);
       this.dispatchEvent(
         new CustomEvent('daw-error', {
           bubbles: true,
@@ -514,14 +563,18 @@ export class DawEditorElement extends LitElement {
             <div class="track-row" style="height: ${this.waveHeight}px;">
               ${track.clips.map((clip) => {
                 const peakData = this._peaksData.get(clip.id);
-                const clipWidth = Math.ceil(clip.durationSamples / this.samplesPerPixel);
+                const width = clipPixelWidth(
+                  clip.startSample,
+                  clip.durationSamples,
+                  this.samplesPerPixel
+                );
                 const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
                 return html`
                   <daw-waveform
                     style="position: absolute; left: ${clipLeft}px;"
                     .peaks=${peakData?.peaks ?? new Int16Array(0)}
                     .bits=${16}
-                    .length=${peakData?.length ?? clipWidth}
+                    .length=${peakData?.length ?? width}
                     .waveHeight=${this.waveHeight}
                     .barWidth=${this.barWidth}
                     .barGap=${this.barGap}

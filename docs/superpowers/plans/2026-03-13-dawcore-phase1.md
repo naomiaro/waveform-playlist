@@ -40,7 +40,7 @@
       "require": "./dist/index.js"
     }
   },
-  "sideEffects": false,
+  "sideEffects": true,
   "scripts": {
     "build": "pnpm typecheck && tsup",
     "dev": "tsup --watch",

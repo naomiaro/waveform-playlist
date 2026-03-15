@@ -45,16 +45,19 @@ describe('DawTrackElement', () => {
     expect(track.querySelectorAll('daw-clip').length).toBe(2);
   });
 
-  it('dispatches daw-track-update on attribute change', async () => {
+  it('dispatches daw-track-update on attribute change (not on initial render)', async () => {
     const track = document.createElement('daw-track') as any;
     document.body.appendChild(track);
+
+    // Wait for initial render to complete (skipped by _hasRendered guard)
+    await track.updateComplete;
 
     const events: CustomEvent[] = [];
     track.addEventListener('daw-track-update', (e: CustomEvent) => events.push(e));
 
+    // Now change a property — this should fire the event
     track.volume = 0.5;
-    // Lit batches updates — wait for next microtask
-    await new Promise((r) => setTimeout(r, 0));
+    await track.updateComplete;
 
     expect(events.length).toBeGreaterThanOrEqual(1);
     expect(events[0].detail.trackId).toBe(track.trackId);
