@@ -2,8 +2,17 @@ import './elements/daw-clip';
 import './elements/daw-track';
 import './elements/daw-waveform';
 import './elements/daw-playhead';
+import './elements/daw-transport';
+import './elements/daw-play-button';
+import './elements/daw-pause-button';
+import './elements/daw-stop-button';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
 export { DawWaveformElement } from './elements/daw-waveform';
 export { DawPlayheadElement } from './elements/daw-playhead';
+export { DawTransportElement } from './elements/daw-transport';
+export { DawTransportButton } from './elements/daw-transport-button';
+export { DawPlayButtonElement } from './elements/daw-play-button';
+export { DawPauseButtonElement } from './elements/daw-pause-button';
+export { DawStopButtonElement } from './elements/daw-stop-button';
