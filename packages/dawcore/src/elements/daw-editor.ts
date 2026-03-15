@@ -232,15 +232,10 @@ export class DawEditorElement extends LitElement {
     this._engineTracks = new Map(this._engineTracks).set(trackId, track);
     this._recomputeDuration();
 
-    // Add to engine incrementally if it's been initialized (post user gesture)
-    if (this._engine && this._audioInitialized) {
-      const addTrack = this._engine.addTrack;
-      if (typeof addTrack === 'function') {
-        this._engine.addTrack(track);
-      } else {
-        this._engine.setTracks([...this._engineTracks.values()]);
-      }
-    }
+    // Feed all tracks to engine — setTracks builds the playout,
+    // addTrack requires playout to already exist
+    const engine = await this._ensureEngine();
+    engine.setTracks([...this._engineTracks.values()]);
 
     this.dispatchEvent(
       new CustomEvent('daw-track-ready', {
@@ -355,7 +350,6 @@ export class DawEditorElement extends LitElement {
     });
 
     engine.on('stop', () => {
-      this._isPlaying = false;
       this._stopPlayhead();
     });
 
@@ -382,7 +376,6 @@ export class DawEditorElement extends LitElement {
     }
 
     engine.play();
-    this._isPlaying = true;
     this._startPlayhead();
 
     this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
@@ -391,7 +384,6 @@ export class DawEditorElement extends LitElement {
   pause() {
     if (!this._engine) return;
     this._engine.pause();
-    this._isPlaying = false;
     this._stopPlayhead();
 
     this.dispatchEvent(new CustomEvent('daw-pause', { bubbles: true, composed: true }));
@@ -400,8 +392,6 @@ export class DawEditorElement extends LitElement {
   stop() {
     if (!this._engine) return;
     this._engine.stop();
-    this._isPlaying = false;
-    this._currentTime = 0;
     this._stopPlayhead();
 
     this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
