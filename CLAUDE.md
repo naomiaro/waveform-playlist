@@ -354,6 +354,9 @@ const LazyExample = createLazyExample(() =>
 31. **Dynamic Import Tone.js Outside Playout Package** — `import * as Tone from 'tone'` eagerly creates a default context with AudioWorklet nodes, which fails before user gesture. Outside the playout package (which handles init via `getGlobalContext()`), use `import type` for types and `await import('tone')` inside effects after AudioContext is running. Call `Tone.setContext(new Tone.Context(audioContext))` to share the native AudioContext.
 32. **Tone.js Effect.input Is Not a Native AudioNode** — `Effect` subclasses (BitCrusher, etc.) set `this.input = new Tone.Gain(...)` (a Tone.js wrapper). Native `AudioNode.connect(effect.input)` fails with "Overload resolution failed". Use `Tone.Gain` as a bridge: `outputNode.connect(bridge.input)` works because `Tone.Gain.input` IS a native `GainNode`. Then `bridge.chain(effect, destination)` for the Tone chain.
 33. **Provider Child Effects and playoutRef Timing** — React runs child effects before parent effects. A child component's `useEffect` accessing `playoutRef.current` will find `null` on first run because the provider's effect hasn't created the playout yet. Add `duration` (from `useMediaElementData()`) as a dependency — it changes from 0 to the actual value when the playout is ready, retriggering the effect.
+34. **OfflineAudioContext for Decode-Only Work** — `new AudioContext()` may be blocked before user gesture (Firefox). Use `new OfflineAudioContext(1, 1, 44100)` for `decodeAudioData()` when no audio output is needed (e.g., peak generation). OfflineAudioContext doesn't require user gesture.
+35. **Web Component Packages Need `sideEffects: true`** — Packages that call `customElements.define()` at import time are side-effectful. Setting `"sideEffects": false` in package.json causes bundlers to tree-shake bare imports, silently dropping element registrations.
+36. **Detached Elements Cannot Dispatch Bubbling Events** — In `disconnectedCallback`, the element is already removed from the DOM. Events dispatched with `bubbles: true` will not reach ancestor elements. Use MutationObserver on the parent to detect child removal instead.
 
 ---
 
@@ -391,6 +394,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 - `packages/annotations/CLAUDE.md` — Integration context, annotation provider pattern
 - `packages/worklets/CLAUDE.md` — AudioWorklet processors (metering, recording)
 - `packages/spectrogram/CLAUDE.md` — Integration context, SpectrogramChannel index
+- `packages/dawcore/CLAUDE.md` — Lit Web Components, element types, CSS theming, engine lifecycle
 - `website/CLAUDE.md` — Docusaurus site, CSS pitfalls, custom pages
 
 ---
