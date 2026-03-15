@@ -1,7 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack } from '@waveform-playlist/core';
-import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
+import {
+  createClipFromSeconds,
+  createTrack,
+  clipPixelWidth,
+  pixelsToSeconds,
+} from '@waveform-playlist/core';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
@@ -73,6 +78,7 @@ export class DawEditorElement extends LitElement {
       .timeline {
         position: relative;
         min-height: 50px;
+        cursor: text;
       }
       .track-row {
         position: relative;
@@ -463,6 +469,31 @@ export class DawEditorElement extends LitElement {
     this._enginePromise = null;
   }
 
+  // --- Interaction Handlers ---
+
+  private _onTimelineClick = (e: MouseEvent) => {
+    const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
+    if (!timeline) return;
+    const rect = timeline.getBoundingClientRect();
+    const px = e.clientX - rect.left + timeline.scrollLeft;
+    const time = pixelsToSeconds(px, this.samplesPerPixel, this._sampleRate);
+    if (this._engine) {
+      this._engine.seek(time);
+      this._currentTime = time;
+      this._stopPlayhead();
+      if (this._isPlaying) {
+        this._startPlayhead();
+      }
+    }
+    this.dispatchEvent(
+      new CustomEvent('daw-seek', {
+        bubbles: true,
+        composed: true,
+        detail: { time },
+      })
+    );
+  };
+
   // --- Playback Methods ---
 
   async play() {
@@ -549,6 +580,7 @@ export class DawEditorElement extends LitElement {
         class="timeline"
         style="width: ${Math.max(this._totalWidth, 100)}px;"
         data-playing=${this._isPlaying}
+        @click=${this._onTimelineClick}
       >
         ${this.timescale
           ? html`<daw-ruler
