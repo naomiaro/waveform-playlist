@@ -1,16 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack } from '@waveform-playlist/core';
-import {
-  createClipFromSeconds,
-  createTrack,
-  clipPixelWidth,
-  pixelsToSeconds,
-} from '@waveform-playlist/core';
+import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
 import { hostStyles } from '../styles/theme';
+import { PointerHandler } from '../interactions/pointer-handler';
 
 interface TrackDescriptor {
   name: string;
@@ -50,25 +46,25 @@ export class DawEditorElement extends LitElement {
     new Map();
   @state() _isPlaying = false;
   @state() private _duration = 0;
-  @state() private _sampleRate = 48000;
-  @state() private _selectedTrackId: string | null = null;
-  @state() private _selectionStart = 0;
-  @state() private _selectionEnd = 0;
-  @state() private _dragOver = false;
+  @state() _sampleRate = 48000;
+  @state() _selectedTrackId: string | null = null;
+  @state() _dragOver = false;
 
-  // Not @state — updated only in RAF loop, read only in _stopPlayhead
-  private _currentTime = 0;
+  // Not @state — selection updated directly on <daw-selection> element
+  // during drag to avoid 60fps Lit re-renders (same pattern as _currentTime)
+  _selectionStartTime = 0;
+  _selectionEndTime = 0;
+  _currentTime = 0;
 
-  // Engine is dynamically imported; typed as any to avoid a static import
-  // that would defeat code-splitting
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _engine: any = null;
+  _engine: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _enginePromise: Promise<any> | null = null;
   private _audioInitialized = false;
   private _audioCache = new Map<string, Promise<AudioBuffer>>();
   private _trackElements = new Map<string, DawTrackElement>();
   private _childObserver: MutationObserver | null = null;
+  private _pointer = new PointerHandler(this);
 
   static styles = [
     hostStyles,
@@ -91,11 +87,7 @@ export class DawEditorElement extends LitElement {
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
       .track-row.selected {
-        background: color-mix(
-          in srgb,
-          var(--daw-track-background, #16213e),
-          var(--daw-progress-color, #63c75f) 10%
-        );
+        background: rgba(99, 199, 95, 0.08);
         box-shadow: inset 2px 0 0 var(--daw-progress-color, #63c75f);
       }
       .timeline.drag-over {
@@ -105,17 +97,11 @@ export class DawEditorElement extends LitElement {
     `,
   ];
 
-  /**
-   * Derived pixel width — computed from duration, sampleRate, and samplesPerPixel.
-   * Not stored as @state() to avoid update loops.
-   */
+  /** Derived pixel width from duration. */
   private get _totalWidth(): number {
     return Math.ceil((this._duration * this._sampleRate) / this.samplesPerPixel);
   }
 
-  /**
-   * Public accessor for discovered tracks (used in tests and by transport).
-   */
   get tracks(): TrackDescriptor[] {
     return [...this._tracks.values()];
   }
@@ -125,24 +111,22 @@ export class DawEditorElement extends LitElement {
   }
 
   get selection(): { start: number; end: number } | null {
-    if (this._selectionStart === 0 && this._selectionEnd === 0) return null;
-    return {
-      start: Math.min(this._selectionStart, this._selectionEnd),
-      end: Math.max(this._selectionStart, this._selectionEnd),
-    };
+    if (this._selectionStartTime === 0 && this._selectionEndTime === 0) return null;
+    return { start: this._selectionStartTime, end: this._selectionEndTime };
   }
 
   setSelection(start: number, end: number) {
-    this._selectionStart = Math.min(start, end);
-    this._selectionEnd = Math.max(start, end);
+    this._selectionStartTime = Math.min(start, end);
+    this._selectionEndTime = Math.max(start, end);
     if (this._engine) {
-      this._engine.setSelection(this._selectionStart, this._selectionEnd);
+      this._engine.setSelection(this._selectionStartTime, this._selectionEndTime);
     }
+    this.requestUpdate();
     this.dispatchEvent(
       new CustomEvent('daw-selection', {
         bubbles: true,
         composed: true,
-        detail: { start: this._selectionStart, end: this._selectionEnd },
+        detail: { start: this._selectionStartTime, end: this._selectionEndTime },
       })
     );
   }
@@ -154,18 +138,14 @@ export class DawEditorElement extends LitElement {
     this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
 
-    // Detect track removal via MutationObserver since disconnectedCallback
-    // events from detached elements cannot bubble to ancestors.
-    // subtree: true catches tracks wrapped in container elements.
+    // Detect track removal via MutationObserver (detached elements can't bubble events).
     this._childObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.removedNodes) {
           if (node instanceof HTMLElement) {
-            // Direct daw-track removal
             if (node.tagName === 'DAW-TRACK') {
               this._onTrackRemoved((node as DawTrackElement).trackId);
             }
-            // Nested daw-track removal (wrapper removed)
             const nested = node.querySelectorAll?.('daw-track');
             if (nested) {
               for (const track of nested) {
@@ -177,8 +157,6 @@ export class DawEditorElement extends LitElement {
       }
     });
     this._childObserver.observe(this, { childList: true, subtree: true });
-
-    // Engine built lazily on first _loadTrack to use the correct sampleRate
   }
 
   disconnectedCallback() {
@@ -197,7 +175,7 @@ export class DawEditorElement extends LitElement {
     }
   }
 
-  // --- Event Handlers ---
+  // --- Track Events ---
 
   private _onTrackConnected = (e: CustomEvent) => {
     const trackId = e.detail?.trackId;
@@ -210,8 +188,6 @@ export class DawEditorElement extends LitElement {
     const descriptor = this._readTrackDescriptor(trackEl as DawTrackElement);
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
     this._trackElements.set(trackId, trackEl as DawTrackElement);
-
-    // Load audio for this track
     this._loadTrack(trackId, descriptor);
   };
 
@@ -227,8 +203,6 @@ export class DawEditorElement extends LitElement {
     this._engineTracks = nextEngine;
 
     this._recomputeDuration();
-
-    // Update the engine so the removed track stops playing
     if (this._engine) {
       this._engine.setTracks([...nextEngine.values()]);
     }
@@ -244,35 +218,25 @@ export class DawEditorElement extends LitElement {
     const descriptor = this._readTrackDescriptor(trackEl);
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
 
-    // Forward mix changes to engine
     if (this._engine) {
-      if (oldDescriptor?.volume !== descriptor.volume) {
+      if (oldDescriptor?.volume !== descriptor.volume)
         this._engine.setTrackVolume(trackId, descriptor.volume);
-      }
-      if (oldDescriptor?.pan !== descriptor.pan) {
-        this._engine.setTrackPan(trackId, descriptor.pan);
-      }
-      if (oldDescriptor?.muted !== descriptor.muted) {
+      if (oldDescriptor?.pan !== descriptor.pan) this._engine.setTrackPan(trackId, descriptor.pan);
+      if (oldDescriptor?.muted !== descriptor.muted)
         this._engine.setTrackMute(trackId, descriptor.muted);
-      }
-      if (oldDescriptor?.soloed !== descriptor.soloed) {
+      if (oldDescriptor?.soloed !== descriptor.soloed)
         this._engine.setTrackSolo(trackId, descriptor.soloed);
-      }
     }
 
-    // Reload audio if src changed
     if (oldDescriptor?.src !== descriptor.src) {
       this._loadTrack(trackId, descriptor);
     }
   };
 
-  // --- Track Reading ---
-
   private _readTrackDescriptor(trackEl: DawTrackElement): TrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
     const clips: ClipDescriptor[] = [];
 
-    // Shorthand: <daw-track src="..."> with no clip children
     if (clipEls.length === 0 && trackEl.src) {
       clips.push({
         src: trackEl.src,
@@ -312,18 +276,17 @@ export class DawEditorElement extends LitElement {
     };
   }
 
-  // --- Audio Loading (per-track) ---
+  // --- Audio Loading ---
 
   private async _loadTrack(trackId: string, descriptor: TrackDescriptor) {
     try {
       const clips = [];
-
       for (const clipDesc of descriptor.clips) {
         if (!clipDesc.src) continue;
-
         const audioBuffer = await this._fetchAndDecode(clipDesc.src);
 
-        // Set sampleRate from first decoded buffer — engine uses this
+        // Set sampleRate from first decoded buffer.
+        // TODO: mixed sample rates not supported — first track's rate wins.
         if (this._sampleRate === 48000 && audioBuffer.sampleRate !== 48000) {
           this._sampleRate = audioBuffer.sampleRate;
         }
@@ -355,8 +318,6 @@ export class DawEditorElement extends LitElement {
       this._engineTracks = new Map(this._engineTracks).set(trackId, track);
       this._recomputeDuration();
 
-      // Feed all tracks to engine — setTracks builds the playout,
-      // addTrack requires playout to already exist
       const engine = await this._ensureEngine();
       engine.setTracks([...this._engineTracks.values()]);
 
@@ -368,7 +329,7 @@ export class DawEditorElement extends LitElement {
         })
       );
     } catch (err) {
-      console.warn(`[dawcore] Failed to load track "${trackId}" (${descriptor.name}):`, err);
+      console.warn('[dawcore] Failed to load track "' + trackId + '":', err);
       this.dispatchEvent(
         new CustomEvent('daw-track-error', {
           bubbles: true,
@@ -388,23 +349,21 @@ export class DawEditorElement extends LitElement {
       const response = await fetch(src);
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch audio "${src}": ${response.status} ${response.statusText}`
+          'Failed to fetch audio "' + src + '": ' + response.status + ' ' + response.statusText
         );
       }
       const arrayBuffer = await response.arrayBuffer();
-      // OfflineAudioContext doesn't require user gesture (unlike AudioContext).
-      // The sampleRate parameter doesn't affect decodeAudioData output —
-      // the decoded buffer retains its native sample rate.
-      const ctx = new OfflineAudioContext(1, 1, 44100);
+      // OfflineAudioContext for decode only — no user gesture required.
+      // Channel count 2 preserves stereo; decodeAudioData returns native channel count.
+      const ctx = new OfflineAudioContext(2, 1, 44100);
       return ctx.decodeAudioData(arrayBuffer);
     })();
 
     this._audioCache.set(src, promise);
-
     try {
       return await promise;
     } catch (err) {
-      this._audioCache.delete(src); // Allow retry on failure
+      this._audioCache.delete(src);
       throw err;
     }
   }
@@ -412,17 +371,17 @@ export class DawEditorElement extends LitElement {
   private _generatePeaks(clipId: string, audioBuffer: AudioBuffer) {
     const numChannels = this.mono ? 1 : audioBuffer.numberOfChannels;
     const samplesPerPeak = this.samplesPerPixel;
-    const peakCount = Math.ceil(audioBuffer.getChannelData(0).length / samplesPerPeak);
+    const totalSamples = audioBuffer.getChannelData(0).length;
+    const peakCount = Math.ceil(totalSamples / samplesPerPeak);
     const peaks = new Int16Array(peakCount * 2);
 
     for (let i = 0; i < peakCount; i++) {
       const start = i * samplesPerPeak;
-      const end = Math.min(start + samplesPerPeak, audioBuffer.getChannelData(0).length);
+      const end = Math.min(start + samplesPerPeak, totalSamples);
       let min = 0;
       let max = 0;
 
-      // Aggregate across all channels (min-of-mins, max-of-maxes);
-      // channel 0 only when mono=true
+      // Aggregate across channels; channel 0 only when mono=true
       for (let ch = 0; ch < numChannels; ch++) {
         const channelData = audioBuffer.getChannelData(ch);
         for (let j = start; j < end; j++) {
@@ -454,15 +413,14 @@ export class DawEditorElement extends LitElement {
     this._duration = maxSample / this._sampleRate;
   }
 
-  // --- Engine Management ---
+  // --- Engine ---
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _ensureEngine(): Promise<any> {
     if (this._engine) return Promise.resolve(this._engine);
     if (this._enginePromise) return this._enginePromise;
-
     this._enginePromise = this._buildEngine().catch((err) => {
-      this._enginePromise = null; // Allow retry on failure
+      this._enginePromise = null;
       throw err;
     });
     return this._enginePromise;
@@ -479,13 +437,11 @@ export class DawEditorElement extends LitElement {
       adapter,
       sampleRate: this._sampleRate,
       samplesPerPixel: this.samplesPerPixel,
-      // Include samplesPerPixel in zoom levels so arbitrary values don't throw
       zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b),
     });
 
-    // statechange fires on play/pause/stop/seek — not every frame
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     engine.on('statechange', (engineState: any) => {
       this._isPlaying = engineState.isPlaying;
@@ -493,14 +449,11 @@ export class DawEditorElement extends LitElement {
       this._selectedTrackId = engineState.selectedTrackId;
     });
 
-    // timeupdate fires every RAF frame — only update the non-reactive field
     engine.on('timeupdate', (time: number) => {
       this._currentTime = time;
     });
 
     engine.on('stop', () => {
-      // Engine resets currentTime to playStartPosition on stop.
-      // Read it from engine state so playhead returns to where playback began.
       this._currentTime = engine.getCurrentTime();
       this._stopPlayhead();
     });
@@ -517,155 +470,19 @@ export class DawEditorElement extends LitElement {
     this._enginePromise = null;
   }
 
-  // --- Interaction Handlers ---
-
-  private _isDragging = false;
-  private _dragStartPx = 0;
-
-  /** Pixel position from pointer event, accounting for host scroll. */
-  private _pxFromPointer(e: PointerEvent, timelineRect: DOMRect): number {
-    // Scroll is on :host (overflow-x: auto), not .timeline
-    return e.clientX - timelineRect.left + this.scrollLeft;
-  }
-
-  private _onPointerDown = (e: PointerEvent) => {
-    const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
-    if (!timeline) return;
-
-    const rect = timeline.getBoundingClientRect();
-    this._dragStartPx = this._pxFromPointer(e, rect);
-    this._isDragging = false;
-
-    timeline.setPointerCapture(e.pointerId);
-    timeline.addEventListener('pointermove', this._onPointerMove);
-    timeline.addEventListener('pointerup', this._onPointerUp);
-  };
-
-  private _onPointerMove = (e: PointerEvent) => {
-    const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
-    if (!timeline) return;
-
-    const rect = timeline.getBoundingClientRect();
-    const currentPx = this._pxFromPointer(e, rect);
-
-    // Start drag after 3px threshold
-    if (!this._isDragging && Math.abs(currentPx - this._dragStartPx) > 3) {
-      this._isDragging = true;
-    }
-
-    if (this._isDragging) {
-      const startTime = pixelsToSeconds(this._dragStartPx, this.samplesPerPixel, this._sampleRate);
-      const endTime = pixelsToSeconds(currentPx, this.samplesPerPixel, this._sampleRate);
-      this._selectionStart = Math.min(startTime, endTime);
-      this._selectionEnd = Math.max(startTime, endTime);
-    }
-  };
-
-  private _onPointerUp = (e: PointerEvent) => {
-    const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
-    if (!timeline) return;
-
-    try {
-      timeline.releasePointerCapture(e.pointerId);
-    } catch {
-      // Pointer capture may already be released (element removed, system event)
-    }
-    timeline.removeEventListener('pointermove', this._onPointerMove);
-    timeline.removeEventListener('pointerup', this._onPointerUp);
-
-    try {
-      if (this._isDragging) {
-        // Finalize selection
-        if (this._engine) {
-          this._engine.setSelection(this._selectionStart, this._selectionEnd);
-        }
-        this.dispatchEvent(
-          new CustomEvent('daw-selection', {
-            bubbles: true,
-            composed: true,
-            detail: { start: this._selectionStart, end: this._selectionEnd },
-          })
-        );
-      } else {
-        // Click — seek to position, select track, clear selection
-        const rect = timeline.getBoundingClientRect();
-        const px = this._pxFromPointer(e, rect);
-        const time = pixelsToSeconds(px, this.samplesPerPixel, this._sampleRate);
-        this._selectionStart = 0;
-        this._selectionEnd = 0;
-
-        // Detect which track was clicked by Y position
-        const trackRows = timeline.querySelectorAll('.track-row');
-        for (const row of trackRows) {
-          const rowRect = row.getBoundingClientRect();
-          if (e.clientY >= rowRect.top && e.clientY < rowRect.bottom) {
-            const trackId = (row as HTMLElement).dataset.trackId;
-            if (trackId) {
-              this._onTrackClick(trackId);
-            }
-            break;
-          }
-        }
-
-        if (this._engine) {
-          this._engine.seek(time);
-          this._engine.setSelection(0, 0);
-          if (this._isPlaying) {
-            // Tone.js needs stop + play to reschedule audio sources
-            this._engine.stop();
-            this._engine.play(time);
-            this._startPlayhead();
-          }
-        }
-        this._currentTime = time;
-        if (!this._isPlaying) {
-          this._stopPlayhead();
-        }
-        this.dispatchEvent(
-          new CustomEvent('daw-seek', {
-            bubbles: true,
-            composed: true,
-            detail: { time },
-          })
-        );
-      }
-    } catch (err) {
-      console.warn('[dawcore] Pointer interaction failed: ' + String(err));
-    } finally {
-      this._isDragging = false;
-    }
-  };
-
-  private _onTrackClick(trackId: string) {
-    if (this._engine) {
-      try {
-        this._engine.selectTrack(trackId);
-      } catch (err) {
-        console.warn('[dawcore] selectTrack failed: ' + String(err));
-        return;
-      }
-    }
-    this._selectedTrackId = trackId;
-    this.dispatchEvent(
-      new CustomEvent('daw-track-select', {
-        bubbles: true,
-        composed: true,
-        detail: { trackId },
-      })
-    );
-  }
+  // --- File Drop ---
 
   private _onDragOver = (e: DragEvent) => {
     if (!this.fileDrop) return;
     e.preventDefault();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy';
-    }
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     this._dragOver = true;
   };
 
   private _onDragLeave = (e: DragEvent) => {
     if (!this.fileDrop) return;
+    // relatedTarget is null when cursor leaves the browser window — that's fine,
+    // we still want to clear _dragOver in that case.
     const timeline = this.shadowRoot?.querySelector('.timeline');
     if (timeline && !timeline.contains(e.relatedTarget as Node)) {
       this._dragOver = false;
@@ -701,18 +518,15 @@ export class DawEditorElement extends LitElement {
 
     for (const file of fileArray) {
       // Accept files with empty type (browser may not report MIME for .opus etc.)
-      // Only reject files with an explicitly non-audio type
       if (file.type && !file.type.startsWith('audio/')) {
-        console.warn(
-          '[dawcore] Skipping non-audio file: ' + file.name + ' (type: ' + file.type + ')'
-        );
+        const skipped = new Error('Non-audio MIME type: ' + file.type);
+        failed.push({ file, error: skipped });
+        console.warn('[dawcore] Skipping non-audio file: ' + file.name + ' (' + file.type + ')');
         continue;
       }
 
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const ctx = new OfflineAudioContext(1, 1, 44100);
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const audioBuffer = await this._fetchAndDecode(URL.createObjectURL(file));
 
         if (this._sampleRate === 48000 && audioBuffer.sampleRate !== 48000) {
           this._sampleRate = audioBuffer.sampleRate;
@@ -735,6 +549,28 @@ export class DawEditorElement extends LitElement {
         const trackId = crypto.randomUUID();
         const track = createTrack({ name, clips: [clip] });
 
+        // Add to both maps so editor.tracks includes dropped files
+        this._tracks = new Map(this._tracks).set(trackId, {
+          name,
+          src: '',
+          volume: 1,
+          pan: 0,
+          muted: false,
+          soloed: false,
+          clips: [
+            {
+              src: '',
+              start: 0,
+              duration: audioBuffer.duration,
+              offset: 0,
+              gain: 1,
+              name,
+              fadeIn: 0,
+              fadeOut: 0,
+              fadeType: 'linear',
+            },
+          ],
+        });
         this._engineTracks = new Map(this._engineTracks).set(trackId, track);
         this._recomputeDuration();
 
@@ -765,21 +601,17 @@ export class DawEditorElement extends LitElement {
     return { loaded, failed };
   }
 
-  // --- Playback Methods ---
+  // --- Playback ---
 
   async play() {
     try {
       const engine = await this._ensureEngine();
-
-      // First play: resume AudioContext (requires user gesture)
       if (!this._audioInitialized) {
         await engine.init();
         this._audioInitialized = true;
       }
-
       engine.play();
       this._startPlayhead();
-
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
       console.warn('[dawcore] Playback failed:', err);
@@ -797,7 +629,6 @@ export class DawEditorElement extends LitElement {
     if (!this._engine) return;
     this._engine.pause();
     this._stopPlayhead();
-
     this.dispatchEvent(new CustomEvent('daw-pause', { bubbles: true, composed: true }));
   }
 
@@ -805,7 +636,6 @@ export class DawEditorElement extends LitElement {
     if (!this._engine) return;
     this._engine.stop();
     this._stopPlayhead();
-
     this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
   }
 
@@ -817,62 +647,51 @@ export class DawEditorElement extends LitElement {
 
   // --- Playhead ---
 
-  private _getPlayhead(): DawPlayheadElement | null {
-    return this.shadowRoot?.querySelector('daw-playhead') as DawPlayheadElement | null;
-  }
-
-  private _startPlayhead() {
+  _startPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead || !this._engine) return;
     const engine = this._engine;
     playhead.startAnimation(
-      () => {
-        if (!engine) return 0;
-        return engine.getCurrentTime();
-      },
+      () => (engine ? engine.getCurrentTime() : 0),
       this._sampleRate,
       this.samplesPerPixel
     );
   }
 
-  private _stopPlayhead() {
+  _stopPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead) return;
     playhead.stopAnimation(this._currentTime, this._sampleRate, this.samplesPerPixel);
   }
 
-  /**
-   * Returns engine tracks ordered by the DOM position of their
-   * corresponding <daw-track> elements. Tracks added via loadFiles()
-   * (no DOM element) appear at the end.
-   */
+  private _getPlayhead(): DawPlayheadElement | null {
+    return this.shadowRoot?.querySelector('daw-playhead') as DawPlayheadElement | null;
+  }
+
+  /** Returns engine tracks sorted by DOM order of <daw-track> children. */
   private _getOrderedTracks(): Array<[string, ClipTrack]> {
     const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
       (el) => (el as DawTrackElement).trackId
     );
-    const entries = [...this._engineTracks.entries()];
-    return entries.sort((a, b) => {
+    return [...this._engineTracks.entries()].sort((a, b) => {
       const ai = domOrder.indexOf(a[0]);
       const bi = domOrder.indexOf(b[0]);
-      // Tracks not in DOM (e.g., from file drop) go to the end
-      const aIndex = ai === -1 ? Infinity : ai;
-      const bIndex = bi === -1 ? Infinity : bi;
-      return aIndex - bIndex;
+      return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
     });
   }
 
   // --- Render ---
 
   render() {
-    const selStartPx = (this._selectionStart * this._sampleRate) / this.samplesPerPixel;
-    const selEndPx = (this._selectionEnd * this._sampleRate) / this.samplesPerPixel;
+    const selStartPx = (this._selectionStartTime * this._sampleRate) / this.samplesPerPixel;
+    const selEndPx = (this._selectionEndTime * this._sampleRate) / this.samplesPerPixel;
 
     return html`
       <div
         class="timeline ${this._dragOver ? 'drag-over' : ''}"
         style="width: ${Math.max(this._totalWidth, 100)}px;"
         data-playing=${this._isPlaying}
-        @pointerdown=${this._onPointerDown}
+        @pointerdown=${this._pointer.onPointerDown}
         @dragover=${this._onDragOver}
         @dragleave=${this._onDragLeave}
         @drop=${this._onDrop}
