@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { ClipTrack, FadeType } from '@waveform-playlist/core';
+import type { ClipTrack, FadeType, Peaks, Bits } from '@waveform-playlist/core';
 import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
@@ -59,7 +59,7 @@ export class DawEditorElement extends LitElement {
 
   @state() private _tracks: Map<string, TrackDescriptor> = new Map();
   @state() private _engineTracks: Map<string, ClipTrack> = new Map();
-  @state() private _peaksData: Map<string, { data: Int16Array[]; bits: 16; length: number }> =
+  @state() private _peaksData: Map<string, { data: Peaks[]; bits: Bits; length: number }> =
     new Map();
   @state() _isPlaying = false;
   @state() private _duration = 0;
@@ -758,7 +758,7 @@ export class DawEditorElement extends LitElement {
                     this.samplesPerPixel
                   );
                   const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
-                  const channels = peakData?.data ?? [new Int16Array(0)];
+                  const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
 
                   return channels.map(
                     (channelPeaks, chIdx) => html`
