@@ -1,6 +1,8 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { getVisibleChunkIndices } from '../utils/viewport';
 
+export { getVisibleChunkIndices };
+
 const OVERSCAN_MULTIPLIER = 1.5;
 const SCROLL_THRESHOLD = 100;
 
@@ -9,7 +11,7 @@ export class ViewportController implements ReactiveController {
   private _scrollContainer: HTMLElement | null = null;
   private _lastScrollLeft = 0;
 
-  // Permissive defaults: render everything until attachScrollContainer sets real bounds
+  // Permissive defaults: render everything until scroll container is attached
   visibleStart = -Infinity;
   visibleEnd = Infinity;
   containerWidth = 0;
@@ -19,21 +21,23 @@ export class ViewportController implements ReactiveController {
     host.addController(this);
   }
 
-  attachScrollContainer(container: HTMLElement) {
+  hostConnected() {
+    // Re-attach scroll listener on reconnect (e.g. element moved in DOM).
+    // Use the host element itself as the scroll container (:host has overflow-x: auto).
+    this._attachScrollContainer(this._host);
+  }
+
+  hostDisconnected() {
+    this._scrollContainer?.removeEventListener('scroll', this._onScroll);
+    this._scrollContainer = null;
+  }
+
+  private _attachScrollContainer(container: HTMLElement) {
     this._scrollContainer?.removeEventListener('scroll', this._onScroll);
     this._scrollContainer = container;
     container.addEventListener('scroll', this._onScroll, { passive: true });
     this._update(container.scrollLeft, container.clientWidth);
-  }
-
-  getChunkIndices(totalWidth: number, chunkWidth: number, originX = 0): number[] {
-    return getVisibleChunkIndices(
-      totalWidth,
-      chunkWidth,
-      this.visibleStart,
-      this.visibleEnd,
-      originX
-    );
+    this._host.requestUpdate();
   }
 
   private _onScroll = () => {
@@ -51,12 +55,5 @@ export class ViewportController implements ReactiveController {
     const buffer = containerWidth * OVERSCAN_MULTIPLIER;
     this.visibleStart = scrollLeft - buffer;
     this.visibleEnd = scrollLeft + containerWidth + buffer;
-  }
-
-  hostConnected() {}
-
-  hostDisconnected() {
-    this._scrollContainer?.removeEventListener('scroll', this._onScroll);
-    this._scrollContainer = null;
   }
 }

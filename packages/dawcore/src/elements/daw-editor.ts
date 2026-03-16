@@ -185,11 +185,6 @@ export class DawEditorElement extends LitElement {
     this._childObserver.observe(this, { childList: true, subtree: true });
   }
 
-  firstUpdated() {
-    // :host is the scroll container (overflow-x: auto)
-    this._viewport.attachScrollContainer(this);
-  }
-
   disconnectedCallback() {
     super.disconnectedCallback();
     this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);

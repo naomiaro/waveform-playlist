@@ -107,8 +107,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Virtual Scrolling
 
-- **`ViewportController`** — Lit reactive controller attached to `:host` (scroll container) in `firstUpdated`. Tracks scroll position with 1.5x overscan buffer and 100px threshold.
-- **`getVisibleChunkIndices()`** — Shared pure function in `utils/viewport.ts`. Used by both `ViewportController.getChunkIndices()` and `daw-waveform._getVisibleChunkIndices()`.
+- **`ViewportController`** — Lit reactive controller. Attaches to `:host` (scroll container) via `hostConnected` — auto-reattaches on disconnect/reconnect. Tracks scroll position with 1.5x overscan buffer and 100px threshold. Calls `requestUpdate()` on attach and scroll.
+- **`getVisibleChunkIndices()`** — Shared pure function in `utils/viewport.ts`, re-exported from `viewport-controller.ts`. Used by `daw-waveform._getVisibleChunkIndices()`.
 - **Permissive defaults** — Controller initializes `visibleStart=-Infinity, visibleEnd=Infinity` so all chunks render before scroll container is attached.
 - **`daw-waveform` props** — `visibleStart`, `visibleEnd`, `originX` control which 1000px canvas chunks are rendered. Defaults to all-visible when not set.
 - **File size budget** — `daw-editor.ts` is at 800 lines (the hard max). Extract `loadFiles` (~100 lines) before adding more code.
