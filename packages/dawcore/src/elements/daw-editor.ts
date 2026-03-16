@@ -91,8 +91,12 @@ export class DawEditorElement extends LitElement {
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
       .track-row.selected {
-        outline: 1px solid var(--daw-selection-color, rgba(99, 199, 95, 0.3));
-        outline-offset: -1px;
+        background: color-mix(
+          in srgb,
+          var(--daw-track-background, #16213e),
+          var(--daw-progress-color, #63c75f) 10%
+        );
+        box-shadow: inset 2px 0 0 var(--daw-progress-color, #63c75f);
       }
       .timeline.drag-over {
         outline: 2px dashed var(--daw-selection-color, rgba(99, 199, 95, 0.3));
@@ -572,12 +576,25 @@ export class DawEditorElement extends LitElement {
         })
       );
     } else {
-      // Click — seek to position, clear selection
+      // Click — seek to position, select track, clear selection
       const rect = timeline.getBoundingClientRect();
       const px = e.clientX - rect.left + timeline.scrollLeft;
       const time = pixelsToSeconds(px, this.samplesPerPixel, this._sampleRate);
       this._selectionStart = 0;
       this._selectionEnd = 0;
+
+      // Detect which track was clicked by Y position
+      const trackRows = timeline.querySelectorAll('.track-row');
+      for (const row of trackRows) {
+        const rowRect = row.getBoundingClientRect();
+        if (e.clientY >= rowRect.top && e.clientY < rowRect.bottom) {
+          const trackId = (row as HTMLElement).dataset.trackId;
+          if (trackId) {
+            this._onTrackClick(trackId);
+          }
+          break;
+        }
+      }
       if (this._engine) {
         this._engine.seek(time);
         this._engine.setSelection(0, 0);
@@ -812,7 +829,7 @@ export class DawEditorElement extends LitElement {
             <div
               class="track-row ${trackId === this._selectedTrackId ? 'selected' : ''}"
               style="height: ${this.waveHeight}px;"
-              @click=${() => this._onTrackClick(trackId)}
+              data-track-id=${trackId}
             >
               ${track.clips.map((clip) => {
                 const peakData = this._peaksData.get(clip.id);
