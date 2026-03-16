@@ -133,16 +133,16 @@ export class DawEditorElement extends LitElement {
   }
 
   setSelection(start: number, end: number) {
-    this._selectionStart = start;
-    this._selectionEnd = end;
+    this._selectionStart = Math.min(start, end);
+    this._selectionEnd = Math.max(start, end);
     if (this._engine) {
-      this._engine.setSelection(start, end);
+      this._engine.setSelection(this._selectionStart, this._selectionEnd);
     }
     this.dispatchEvent(
       new CustomEvent('daw-selection', {
         bubbles: true,
         composed: true,
-        detail: { start: Math.min(start, end), end: Math.max(start, end) },
+        detail: { start: this._selectionStart, end: this._selectionEnd },
       })
     );
   }
@@ -522,12 +522,18 @@ export class DawEditorElement extends LitElement {
   private _isDragging = false;
   private _dragStartPx = 0;
 
+  /** Pixel position from pointer event, accounting for host scroll. */
+  private _pxFromPointer(e: PointerEvent, timelineRect: DOMRect): number {
+    // Scroll is on :host (overflow-x: auto), not .timeline
+    return e.clientX - timelineRect.left + this.scrollLeft;
+  }
+
   private _onPointerDown = (e: PointerEvent) => {
     const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
     if (!timeline) return;
 
     const rect = timeline.getBoundingClientRect();
-    this._dragStartPx = e.clientX - rect.left + timeline.scrollLeft;
+    this._dragStartPx = this._pxFromPointer(e, rect);
     this._isDragging = false;
 
     timeline.setPointerCapture(e.pointerId);
@@ -540,7 +546,7 @@ export class DawEditorElement extends LitElement {
     if (!timeline) return;
 
     const rect = timeline.getBoundingClientRect();
-    const currentPx = e.clientX - rect.left + timeline.scrollLeft;
+    const currentPx = this._pxFromPointer(e, rect);
 
     // Start drag after 3px threshold
     if (!this._isDragging && Math.abs(currentPx - this._dragStartPx) > 3) {
@@ -559,69 +565,85 @@ export class DawEditorElement extends LitElement {
     const timeline = this.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
     if (!timeline) return;
 
-    timeline.releasePointerCapture(e.pointerId);
+    try {
+      timeline.releasePointerCapture(e.pointerId);
+    } catch {
+      // Pointer capture may already be released (element removed, system event)
+    }
     timeline.removeEventListener('pointermove', this._onPointerMove);
     timeline.removeEventListener('pointerup', this._onPointerUp);
 
-    if (this._isDragging) {
-      // Finalize selection
-      if (this._engine) {
-        this._engine.setSelection(this._selectionStart, this._selectionEnd);
-      }
-      this.dispatchEvent(
-        new CustomEvent('daw-selection', {
-          bubbles: true,
-          composed: true,
-          detail: { start: this._selectionStart, end: this._selectionEnd },
-        })
-      );
-    } else {
-      // Click — seek to position, select track, clear selection
-      const rect = timeline.getBoundingClientRect();
-      const px = e.clientX - rect.left + timeline.scrollLeft;
-      const time = pixelsToSeconds(px, this.samplesPerPixel, this._sampleRate);
-      this._selectionStart = 0;
-      this._selectionEnd = 0;
-
-      // Detect which track was clicked by Y position
-      const trackRows = timeline.querySelectorAll('.track-row');
-      for (const row of trackRows) {
-        const rowRect = row.getBoundingClientRect();
-        if (e.clientY >= rowRect.top && e.clientY < rowRect.bottom) {
-          const trackId = (row as HTMLElement).dataset.trackId;
-          if (trackId) {
-            this._onTrackClick(trackId);
-          }
-          break;
+    try {
+      if (this._isDragging) {
+        // Finalize selection
+        if (this._engine) {
+          this._engine.setSelection(this._selectionStart, this._selectionEnd);
         }
-      }
-      if (this._engine) {
-        this._engine.seek(time);
-        this._engine.setSelection(0, 0);
-      }
-      this._currentTime = time;
-      if (this._isPlaying) {
-        // Tone.js needs stop + play to reschedule audio sources at new position
-        this._engine.stop();
-        this._engine.play(time);
-        this._startPlayhead();
+        this.dispatchEvent(
+          new CustomEvent('daw-selection', {
+            bubbles: true,
+            composed: true,
+            detail: { start: this._selectionStart, end: this._selectionEnd },
+          })
+        );
       } else {
-        this._stopPlayhead();
+        // Click — seek to position, select track, clear selection
+        const rect = timeline.getBoundingClientRect();
+        const px = this._pxFromPointer(e, rect);
+        const time = pixelsToSeconds(px, this.samplesPerPixel, this._sampleRate);
+        this._selectionStart = 0;
+        this._selectionEnd = 0;
+
+        // Detect which track was clicked by Y position
+        const trackRows = timeline.querySelectorAll('.track-row');
+        for (const row of trackRows) {
+          const rowRect = row.getBoundingClientRect();
+          if (e.clientY >= rowRect.top && e.clientY < rowRect.bottom) {
+            const trackId = (row as HTMLElement).dataset.trackId;
+            if (trackId) {
+              this._onTrackClick(trackId);
+            }
+            break;
+          }
+        }
+
+        if (this._engine) {
+          this._engine.seek(time);
+          this._engine.setSelection(0, 0);
+          if (this._isPlaying) {
+            // Tone.js needs stop + play to reschedule audio sources
+            this._engine.stop();
+            this._engine.play(time);
+            this._startPlayhead();
+          }
+        }
+        this._currentTime = time;
+        if (!this._isPlaying) {
+          this._stopPlayhead();
+        }
+        this.dispatchEvent(
+          new CustomEvent('daw-seek', {
+            bubbles: true,
+            composed: true,
+            detail: { time },
+          })
+        );
       }
-      this.dispatchEvent(
-        new CustomEvent('daw-seek', {
-          bubbles: true,
-          composed: true,
-          detail: { time },
-        })
-      );
+    } catch (err) {
+      console.warn('[dawcore] Pointer interaction failed: ' + String(err));
+    } finally {
+      this._isDragging = false;
     }
-    this._isDragging = false;
   };
 
   private _onTrackClick(trackId: string) {
     if (this._engine) {
-      this._engine.selectTrack(trackId);
+      try {
+        this._engine.selectTrack(trackId);
+      } catch (err) {
+        console.warn('[dawcore] selectTrack failed: ' + String(err));
+        return;
+      }
     }
     this._selectedTrackId = trackId;
     this.dispatchEvent(
@@ -643,6 +665,7 @@ export class DawEditorElement extends LitElement {
   };
 
   private _onDragLeave = (e: DragEvent) => {
+    if (!this.fileDrop) return;
     const timeline = this.shadowRoot?.querySelector('.timeline');
     if (timeline && !timeline.contains(e.relatedTarget as Node)) {
       this._dragOver = false;
@@ -657,15 +680,32 @@ export class DawEditorElement extends LitElement {
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
 
-    await this.loadFiles(files);
+    try {
+      await this.loadFiles(files);
+    } catch (err) {
+      console.warn('[dawcore] File drop failed: ' + String(err));
+    }
   };
 
-  async loadFiles(files: FileList | File[]): Promise<void> {
+  async loadFiles(
+    files: FileList | File[]
+  ): Promise<{ loaded: string[]; failed: Array<{ file: File; error: unknown }> }> {
+    if (!files) {
+      console.warn('[dawcore] loadFiles called with null/undefined');
+      return { loaded: [], failed: [] };
+    }
+
     const fileArray = Array.from(files);
+    const loaded: string[] = [];
+    const failed: Array<{ file: File; error: unknown }> = [];
 
     for (const file of fileArray) {
-      if (!file.type.startsWith('audio/')) {
-        console.warn('[dawcore] Skipping non-audio file:', file.name);
+      // Accept files with empty type (browser may not report MIME for .opus etc.)
+      // Only reject files with an explicitly non-audio type
+      if (file.type && !file.type.startsWith('audio/')) {
+        console.warn(
+          '[dawcore] Skipping non-audio file: ' + file.name + ' (type: ' + file.type + ')'
+        );
         continue;
       }
 
@@ -678,13 +718,14 @@ export class DawEditorElement extends LitElement {
           this._sampleRate = audioBuffer.sampleRate;
         }
 
+        const name = file.name.replace(/\.\w+$/, '');
         const clip = createClipFromSeconds({
           audioBuffer,
           startTime: 0,
           duration: audioBuffer.duration,
           offset: 0,
           gain: 1,
-          name: file.name.replace(/\.\w+$/, ''),
+          name,
           sampleRate: audioBuffer.sampleRate,
           sourceDuration: audioBuffer.duration,
         });
@@ -692,10 +733,7 @@ export class DawEditorElement extends LitElement {
         this._generatePeaks(clip.id, audioBuffer);
 
         const trackId = crypto.randomUUID();
-        const track = createTrack({
-          name: file.name.replace(/\.\w+$/, ''),
-          clips: [clip],
-        });
+        const track = createTrack({ name, clips: [clip] });
 
         this._engineTracks = new Map(this._engineTracks).set(trackId, track);
         this._recomputeDuration();
@@ -703,6 +741,7 @@ export class DawEditorElement extends LitElement {
         const engine = await this._ensureEngine();
         engine.setTracks([...this._engineTracks.values()]);
 
+        loaded.push(trackId);
         this.dispatchEvent(
           new CustomEvent('daw-track-ready', {
             bubbles: true,
@@ -711,7 +750,8 @@ export class DawEditorElement extends LitElement {
           })
         );
       } catch (err) {
-        console.warn('[dawcore] Failed to load dropped file:', file.name, err);
+        console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
+        failed.push({ file, error: err });
         this.dispatchEvent(
           new CustomEvent('daw-files-load-error', {
             bubbles: true,
@@ -721,6 +761,8 @@ export class DawEditorElement extends LitElement {
         );
       }
     }
+
+    return { loaded, failed };
   }
 
   // --- Playback Methods ---
