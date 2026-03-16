@@ -285,6 +285,10 @@ export class DawEditorElement extends LitElement {
         if (!clipDesc.src) continue;
         const audioBuffer = await this._fetchAndDecode(clipDesc.src);
 
+        // Use the buffer's actual sample rate — the global AudioContext
+        // decodes at the hardware rate, which may differ from this.sampleRate
+        this.sampleRate = audioBuffer.sampleRate;
+
         const clip = createClipFromSeconds({
           audioBuffer,
           startTime: clipDesc.start,
@@ -292,7 +296,7 @@ export class DawEditorElement extends LitElement {
           offset: clipDesc.offset,
           gain: clipDesc.gain,
           name: clipDesc.name,
-          sampleRate: this.sampleRate,
+          sampleRate: audioBuffer.sampleRate,
           sourceDuration: audioBuffer.duration,
         });
 
@@ -522,6 +526,8 @@ export class DawEditorElement extends LitElement {
       try {
         const audioBuffer = await this._fetchAndDecode(URL.createObjectURL(file));
 
+        this.sampleRate = audioBuffer.sampleRate;
+
         const name = file.name.replace(/\.\w+$/, '');
         const clip = createClipFromSeconds({
           audioBuffer,
@@ -530,7 +536,7 @@ export class DawEditorElement extends LitElement {
           offset: 0,
           gain: 1,
           name,
-          sampleRate: this.sampleRate,
+          sampleRate: audioBuffer.sampleRate,
           sourceDuration: audioBuffer.duration,
         });
 
