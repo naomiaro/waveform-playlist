@@ -358,6 +358,7 @@ const LazyExample = createLazyExample(() =>
 35. **Web Component Packages Need `sideEffects: true`** — Packages that call `customElements.define()` at import time are side-effectful. Setting `"sideEffects": false` in package.json causes bundlers to tree-shake bare imports, silently dropping element registrations.
 36. **Detached Elements Cannot Dispatch Bubbling Events** — In `disconnectedCallback`, the element is already removed from the DOM. Events dispatched with `bubbles: true` will not reach ancestor elements. Use MutationObserver on the parent to detect child removal instead.
 37. **effectiveSampleRate Pattern in dawcore** — `<daw-editor>` `sampleRate` `@property` is an initial hint. Internal calculations use `effectiveSampleRate` getter which returns `_resolvedSampleRate ?? sampleRate`. The resolved rate is set from decoded audio buffers. `PointerHandlerHost` and all pixel/time conversions use `effectiveSampleRate`.
+38. **WaveformData.resample() Only Upsamples** — `WaveformData.resample({ scale })` can only resample to a coarser (larger) scale than the source. Attempting to resample to a finer scale throws. When caching WaveformData, validate `cached.scale <= requestedScale` before returning cache hits.
 
 ---
 

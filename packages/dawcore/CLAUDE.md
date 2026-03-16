@@ -105,6 +105,14 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **CSP fallback** — Worker creation can fail in CSP-restricted environments blocking blob: URLs. The fallback rejects with actionable error message suggesting `worker-src blob:` directive.
 - **Disconnect guard** — `_loadTrack` catch checks `this.isConnected` before dispatching error events (detached elements can't bubble, CLAUDE.md pattern #36).
 
+## Virtual Scrolling
+
+- **`ViewportController`** — Lit reactive controller attached to `:host` (scroll container) in `firstUpdated`. Tracks scroll position with 1.5x overscan buffer and 100px threshold.
+- **`getVisibleChunkIndices()`** — Shared pure function in `utils/viewport.ts`. Used by both `ViewportController.getChunkIndices()` and `daw-waveform._getVisibleChunkIndices()`.
+- **Permissive defaults** — Controller initializes `visibleStart=-Infinity, visibleEnd=Infinity` so all chunks render before scroll container is attached.
+- **`daw-waveform` props** — `visibleStart`, `visibleEnd`, `originX` control which 1000px canvas chunks are rendered. Defaults to all-visible when not set.
+- **File size budget** — `daw-editor.ts` is at 800 lines (the hard max). Extract `loadFiles` (~100 lines) before adding more code.
+
 ## Lit/TypeScript Requirements
 
 - `experimentalDecorators: true` and `useDefineForClassFields: false` in tsconfig — required for Lit's `@property` and `@customElement` decorators
