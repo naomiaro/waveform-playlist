@@ -174,7 +174,6 @@ self.onmessage = function(e) {
 
 export interface PeaksWorkerApi {
   generate(params: {
-    id: string;
     channels: ArrayBuffer[];
     length: number;
     sampleRate: number;
@@ -190,8 +189,6 @@ interface PendingEntry {
   reject: (reason: unknown) => void;
 }
 
-let idCounter = 0;
-
 export function createPeaksWorker(): PeaksWorkerApi {
   let worker: Worker;
   try {
@@ -201,11 +198,14 @@ export function createPeaksWorker(): PeaksWorkerApi {
     URL.revokeObjectURL(url);
   } catch (err) {
     // Worker creation can fail in CSP-restricted environments that block blob: URLs.
-    // Return a no-op API that rejects all generate calls gracefully.
-    console.warn('[waveform-playlist] Failed to create peaks worker (CSP restriction?):', err);
+    console.warn('[dawcore] Failed to create peaks worker (CSP restriction?): ' + String(err));
     return {
       generate() {
-        return Promise.reject(new Error('Worker creation failed'));
+        return Promise.reject(
+          new Error(
+            'Peaks worker unavailable (CSP may block blob: URLs). Add blob: to worker-src directive.'
+          )
+        );
       },
       terminate() {
         /* no-op */
@@ -215,11 +215,15 @@ export function createPeaksWorker(): PeaksWorkerApi {
 
   const pending = new Map<string, PendingEntry>();
   let terminated = false;
+  let idCounter = 0;
 
   worker.onmessage = (e: MessageEvent) => {
     const msg = e.data;
     const entry = pending.get(msg.id);
-    if (!entry) return;
+    if (!entry) {
+      console.warn('[dawcore] Received worker message for unknown id: ' + String(msg.id));
+      return;
+    }
     pending.delete(msg.id);
 
     if (msg.error) {
@@ -235,10 +239,12 @@ export function createPeaksWorker(): PeaksWorkerApi {
   };
 
   worker.onerror = (e: ErrorEvent) => {
+    const reason = e.error ?? new Error(e.message);
+    console.warn('[dawcore] Peaks worker crashed: ' + String(reason));
     terminated = true;
     worker.terminate();
     for (const [, entry] of pending) {
-      entry.reject(e.error ?? new Error(e.message));
+      entry.reject(reason);
     }
     pending.clear();
   };

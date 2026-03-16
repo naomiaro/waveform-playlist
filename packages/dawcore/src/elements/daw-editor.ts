@@ -2,9 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
-import type WaveformData from 'waveform-data';
-import { createPeaksWorker, type PeaksWorkerApi } from '../workers/peaksWorker';
-import { extractPeaks } from '../workers/waveformDataUtils';
+import { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
@@ -78,9 +76,8 @@ export class DawEditorElement extends LitElement {
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   private _audioInitialized = false;
   private _audioCache = new Map<string, Promise<AudioBuffer>>();
-  private _waveformDataCache = new WeakMap<AudioBuffer, WaveformData>();
-  private _waveformDataInflight = new WeakMap<AudioBuffer, Promise<WaveformData>>();
-  private _peaksWorker: PeaksWorkerApi | null = null;
+  private _clipBuffers = new Map<string, AudioBuffer>();
+  private _peakPipeline = new PeakPipeline();
   private _trackElements = new Map<string, DawTrackElement>();
   private _childObserver: MutationObserver | null = null;
   private _pointer = new PointerHandler(this);
@@ -195,13 +192,31 @@ export class DawEditorElement extends LitElement {
     this._childObserver = null;
     this._trackElements.clear();
     this._audioCache.clear();
-    this._peaksWorker?.terminate();
-    this._peaksWorker = null;
+    this._clipBuffers.clear();
+    this._peakPipeline.terminate();
 
     try {
       this._disposeEngine();
     } catch (err) {
       console.warn('[dawcore] Error disposing engine: ' + String(err));
+    }
+  }
+
+  willUpdate(changedProperties: Map<string, unknown>) {
+    // Re-extract peaks at new zoom level from cached WaveformData (near-instant)
+    if (changedProperties.has('samplesPerPixel') && this._clipBuffers.size > 0) {
+      const reextracted = this._peakPipeline.reextractPeaks(
+        this._clipBuffers,
+        this.samplesPerPixel,
+        this.mono
+      );
+      if (reextracted.size > 0) {
+        const next = new Map(this._peaksData);
+        for (const [clipId, peakData] of reextracted) {
+          next.set(clipId, peakData);
+        }
+        this._peaksData = next;
+      }
     }
   }
 
@@ -330,7 +345,13 @@ export class DawEditorElement extends LitElement {
           sourceDuration: audioBuffer.duration,
         });
 
-        await this._generatePeaks(clip.id, audioBuffer);
+        this._clipBuffers.set(clip.id, audioBuffer);
+        const peakData = await this._peakPipeline.generatePeaks(
+          audioBuffer,
+          this.samplesPerPixel,
+          this.mono
+        );
+        this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
         clips.push(clip);
       }
 
@@ -357,6 +378,8 @@ export class DawEditorElement extends LitElement {
         })
       );
     } catch (err) {
+      // Guard against dispatching on a disconnected element (CLAUDE.md pattern #36)
+      if (!this.isConnected) return;
       console.warn('[dawcore] Failed to load track "' + trackId + '": ' + String(err));
       this.dispatchEvent(
         new CustomEvent<DawTrackErrorDetail>('daw-track-error', {
@@ -394,62 +417,6 @@ export class DawEditorElement extends LitElement {
       this._audioCache.delete(src);
       throw err;
     }
-  }
-
-  /**
-   * Generate WaveformData via web worker, then extract PeakData at current zoom.
-   * Caches WaveformData per AudioBuffer for near-instant zoom changes via resample().
-   */
-  private async _generatePeaks(clipId: string, audioBuffer: AudioBuffer) {
-    const waveformData = await this._getWaveformData(audioBuffer);
-    const peakData = extractPeaks(waveformData, this.samplesPerPixel, this.mono);
-    this._peaksData = new Map(this._peaksData).set(clipId, peakData);
-  }
-
-  private async _getWaveformData(audioBuffer: AudioBuffer): Promise<WaveformData> {
-    // Cache hit
-    const cached = this._waveformDataCache.get(audioBuffer);
-    if (cached) return cached;
-
-    // Inflight dedup
-    const inflight = this._waveformDataInflight.get(audioBuffer);
-    if (inflight) return inflight;
-
-    // Generate via worker at base scale (finest zoom level for resample)
-    if (!this._peaksWorker) {
-      this._peaksWorker = createPeaksWorker();
-    }
-
-    const baseScale = Math.min(this.samplesPerPixel, 256);
-    // .slice() channel buffers to avoid detaching the original AudioBuffer views
-    const channels: ArrayBuffer[] = [];
-    for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
-      channels.push(audioBuffer.getChannelData(c).slice().buffer as ArrayBuffer);
-    }
-
-    const id = 'buffer-' + Math.random().toString(36).slice(2, 11);
-    const promise = this._peaksWorker
-      .generate({
-        id,
-        channels,
-        length: audioBuffer.length,
-        sampleRate: audioBuffer.sampleRate,
-        scale: baseScale,
-        bits: 16,
-        splitChannels: true,
-      })
-      .then((waveformData) => {
-        this._waveformDataCache.set(audioBuffer, waveformData);
-        this._waveformDataInflight.delete(audioBuffer);
-        return waveformData;
-      })
-      .catch((err) => {
-        this._waveformDataInflight.delete(audioBuffer);
-        throw err;
-      });
-
-    this._waveformDataInflight.set(audioBuffer, promise);
-    return promise;
   }
 
   private _recomputeDuration() {
@@ -592,7 +559,13 @@ export class DawEditorElement extends LitElement {
           sourceDuration: audioBuffer.duration,
         });
 
-        await this._generatePeaks(clip.id, audioBuffer);
+        this._clipBuffers.set(clip.id, audioBuffer);
+        const peakData = await this._peakPipeline.generatePeaks(
+          audioBuffer,
+          this.samplesPerPixel,
+          this.mono
+        );
+        this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
 
         const trackId = crypto.randomUUID();
         const track = createTrack({ name, clips: [clip] });

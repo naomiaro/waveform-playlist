@@ -25,7 +25,7 @@ function sliceAndResample(
       const targetStart = Math.floor(offsetSamples / samplesPerPixel);
       const targetEnd = Math.ceil((offsetSamples + durationSamples) / samplesPerPixel);
 
-      const sourceStart = Math.floor(targetStart * ratio);
+      const sourceStart = Math.max(0, Math.floor(targetStart * ratio));
       const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
       if (sourceStart >= sourceEnd) {
@@ -69,7 +69,11 @@ export function extractPeaks(
 
   if (processedData === null) {
     const bits = waveformData.bits as 8 | 16;
-    return { length: 0, data: [], bits };
+    const numChannels = isMono ? 1 : waveformData.channels;
+    const emptyData: Peaks[] = Array.from({ length: numChannels }, () =>
+      bits === 8 ? new Int8Array(0) : new Int16Array(0)
+    );
+    return { length: 0, data: emptyData, bits };
   }
 
   const numChannels = processedData.channels;
