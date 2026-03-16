@@ -1,4 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
+import { getVisibleChunkIndices } from '../utils/viewport';
 
 const OVERSCAN_MULTIPLIER = 1.5;
 const SCROLL_THRESHOLD = 100;
@@ -8,8 +9,9 @@ export class ViewportController implements ReactiveController {
   private _scrollContainer: HTMLElement | null = null;
   private _lastScrollLeft = 0;
 
-  visibleStart = 0;
-  visibleEnd = 0;
+  // Permissive defaults: render everything until attachScrollContainer sets real bounds
+  visibleStart = -Infinity;
+  visibleEnd = Infinity;
   containerWidth = 0;
 
   constructor(host: ReactiveControllerHost & HTMLElement) {
@@ -24,17 +26,14 @@ export class ViewportController implements ReactiveController {
     this._update(container.scrollLeft, container.clientWidth);
   }
 
-  getVisibleChunkIndices(totalWidth: number, chunkWidth: number, originX = 0): number[] {
-    const totalChunks = Math.ceil(totalWidth / chunkWidth);
-    const indices: number[] = [];
-    for (let i = 0; i < totalChunks; i++) {
-      const chunkStart = originX + i * chunkWidth;
-      const chunkEnd = chunkStart + chunkWidth;
-      if (chunkEnd > this.visibleStart && chunkStart < this.visibleEnd) {
-        indices.push(i);
-      }
-    }
-    return indices;
+  getChunkIndices(totalWidth: number, chunkWidth: number, originX = 0): number[] {
+    return getVisibleChunkIndices(
+      totalWidth,
+      chunkWidth,
+      this.visibleStart,
+      this.visibleEnd,
+      originX
+    );
   }
 
   private _onScroll = () => {

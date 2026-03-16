@@ -6,6 +6,7 @@ import {
   calculateBarRects,
   calculateFirstBarPosition,
 } from '../utils/peak-rendering';
+import { getVisibleChunkIndices } from '../utils/viewport';
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -39,16 +40,13 @@ export class DawWaveformElement extends LitElement {
   `;
 
   private _getVisibleChunkIndices(): number[] {
-    const totalChunks = Math.ceil(this.length / MAX_CANVAS_WIDTH);
-    const indices: number[] = [];
-    for (let i = 0; i < totalChunks; i++) {
-      const chunkStart = this.originX + i * MAX_CANVAS_WIDTH;
-      const chunkEnd = chunkStart + MAX_CANVAS_WIDTH;
-      if (chunkEnd > this.visibleStart && chunkStart < this.visibleEnd) {
-        indices.push(i);
-      }
-    }
-    return indices;
+    return getVisibleChunkIndices(
+      this.length,
+      MAX_CANVAS_WIDTH,
+      this.visibleStart,
+      this.visibleEnd,
+      this.originX
+    );
   }
 
   render() {
