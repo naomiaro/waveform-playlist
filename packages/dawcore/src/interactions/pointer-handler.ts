@@ -10,7 +10,7 @@ export interface PointerHandlerHost {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _engine: any;
   readonly _isPlaying: boolean;
-  readonly _sampleRate: number;
+  readonly sampleRate: number;
   _currentTime: number;
   _selectionStartTime: number;
   _selectionEndTime: number;
@@ -63,15 +63,15 @@ export class PointerHandler {
 
     if (this._isDragging) {
       const h = this._host;
-      const startTime = pixelsToSeconds(this._dragStartPx, h.samplesPerPixel, h._sampleRate);
-      const endTime = pixelsToSeconds(currentPx, h.samplesPerPixel, h._sampleRate);
+      const startTime = pixelsToSeconds(this._dragStartPx, h.samplesPerPixel, h.sampleRate);
+      const endTime = pixelsToSeconds(currentPx, h.samplesPerPixel, h.sampleRate);
       h._selectionStartTime = Math.min(startTime, endTime);
       h._selectionEndTime = Math.max(startTime, endTime);
       // Direct update on selection element to avoid @state 60fps re-renders
       const sel = h.shadowRoot?.querySelector('daw-selection') as any;
       if (sel) {
-        sel.startPx = (h._selectionStartTime * h._sampleRate) / h.samplesPerPixel;
-        sel.endPx = (h._selectionEndTime * h._sampleRate) / h.samplesPerPixel;
+        sel.startPx = (h._selectionStartTime * h.sampleRate) / h.samplesPerPixel;
+        sel.endPx = (h._selectionEndTime * h.sampleRate) / h.samplesPerPixel;
       }
     }
   };
@@ -119,7 +119,7 @@ export class PointerHandler {
   private _handleSeekClick(e: PointerEvent) {
     const h = this._host;
     const px = this._pxFromPointer(e);
-    const time = pixelsToSeconds(px, h.samplesPerPixel, h._sampleRate);
+    const time = pixelsToSeconds(px, h.samplesPerPixel, h.sampleRate);
 
     // Clear selection
     h._selectionStartTime = 0;

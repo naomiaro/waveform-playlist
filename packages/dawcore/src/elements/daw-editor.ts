@@ -39,6 +39,7 @@ export class DawEditorElement extends LitElement {
   @property({ type: Number, attribute: 'bar-width' }) barWidth = 1;
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
   @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
+  @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
 
   @state() private _tracks: Map<string, TrackDescriptor> = new Map();
   @state() private _engineTracks: Map<string, ClipTrack> = new Map();
@@ -46,7 +47,6 @@ export class DawEditorElement extends LitElement {
     new Map();
   @state() _isPlaying = false;
   @state() private _duration = 0;
-  @state() _sampleRate = 48000;
   @state() _selectedTrackId: string | null = null;
   @state() _dragOver = false;
 
@@ -99,7 +99,7 @@ export class DawEditorElement extends LitElement {
 
   /** Derived pixel width from duration. */
   private get _totalWidth(): number {
-    return Math.ceil((this._duration * this._sampleRate) / this.samplesPerPixel);
+    return Math.ceil((this._duration * this.sampleRate) / this.samplesPerPixel);
   }
 
   get tracks(): TrackDescriptor[] {
@@ -285,12 +285,6 @@ export class DawEditorElement extends LitElement {
         if (!clipDesc.src) continue;
         const audioBuffer = await this._fetchAndDecode(clipDesc.src);
 
-        // Set sampleRate from first decoded buffer.
-        // TODO: mixed sample rates not supported — first track's rate wins.
-        if (this._sampleRate === 48000 && audioBuffer.sampleRate !== 48000) {
-          this._sampleRate = audioBuffer.sampleRate;
-        }
-
         const clip = createClipFromSeconds({
           audioBuffer,
           startTime: clipDesc.start,
@@ -298,7 +292,7 @@ export class DawEditorElement extends LitElement {
           offset: clipDesc.offset,
           gain: clipDesc.gain,
           name: clipDesc.name,
-          sampleRate: audioBuffer.sampleRate,
+          sampleRate: this.sampleRate,
           sourceDuration: audioBuffer.duration,
         });
 
@@ -353,10 +347,10 @@ export class DawEditorElement extends LitElement {
         );
       }
       const arrayBuffer = await response.arrayBuffer();
-      // OfflineAudioContext for decode only — no user gesture required.
-      // Channel count 2 preserves stereo; decodeAudioData returns native channel count.
-      const ctx = new OfflineAudioContext(2, 1, 44100);
-      return ctx.decodeAudioData(arrayBuffer);
+      // Use the global AudioContext shared with Tone.js.
+      // decodeAudioData works even while the context is suspended (pre-gesture).
+      const { getGlobalAudioContext } = await import('@waveform-playlist/playout');
+      return getGlobalAudioContext().decodeAudioData(arrayBuffer);
     })();
 
     this._audioCache.set(src, promise);
@@ -410,7 +404,7 @@ export class DawEditorElement extends LitElement {
         if (endSample > maxSample) maxSample = endSample;
       }
     }
-    this._duration = maxSample / this._sampleRate;
+    this._duration = maxSample / this.sampleRate;
   }
 
   // --- Engine ---
@@ -435,7 +429,7 @@ export class DawEditorElement extends LitElement {
     const adapter = createToneAdapter();
     const engine = new PlaylistEngine({
       adapter,
-      sampleRate: this._sampleRate,
+      sampleRate: this.sampleRate,
       samplesPerPixel: this.samplesPerPixel,
       zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
         .filter((v, i, a) => a.indexOf(v) === i)
@@ -528,10 +522,6 @@ export class DawEditorElement extends LitElement {
       try {
         const audioBuffer = await this._fetchAndDecode(URL.createObjectURL(file));
 
-        if (this._sampleRate === 48000 && audioBuffer.sampleRate !== 48000) {
-          this._sampleRate = audioBuffer.sampleRate;
-        }
-
         const name = file.name.replace(/\.\w+$/, '');
         const clip = createClipFromSeconds({
           audioBuffer,
@@ -540,7 +530,7 @@ export class DawEditorElement extends LitElement {
           offset: 0,
           gain: 1,
           name,
-          sampleRate: audioBuffer.sampleRate,
+          sampleRate: this.sampleRate,
           sourceDuration: audioBuffer.duration,
         });
 
@@ -653,7 +643,7 @@ export class DawEditorElement extends LitElement {
     const engine = this._engine;
     playhead.startAnimation(
       () => (engine ? engine.getCurrentTime() : 0),
-      this._sampleRate,
+      this.sampleRate,
       this.samplesPerPixel
     );
   }
@@ -661,7 +651,7 @@ export class DawEditorElement extends LitElement {
   _stopPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead) return;
-    playhead.stopAnimation(this._currentTime, this._sampleRate, this.samplesPerPixel);
+    playhead.stopAnimation(this._currentTime, this.sampleRate, this.samplesPerPixel);
   }
 
   private _getPlayhead(): DawPlayheadElement | null {
@@ -683,8 +673,8 @@ export class DawEditorElement extends LitElement {
   // --- Render ---
 
   render() {
-    const selStartPx = (this._selectionStartTime * this._sampleRate) / this.samplesPerPixel;
-    const selEndPx = (this._selectionEndTime * this._sampleRate) / this.samplesPerPixel;
+    const selStartPx = (this._selectionStartTime * this.sampleRate) / this.samplesPerPixel;
+    const selEndPx = (this._selectionEndTime * this.sampleRate) / this.samplesPerPixel;
 
     return html`
       <div
@@ -699,7 +689,7 @@ export class DawEditorElement extends LitElement {
         ${this.timescale
           ? html`<daw-ruler
               .samplesPerPixel=${this.samplesPerPixel}
-              .sampleRate=${this._sampleRate}
+              .sampleRate=${this.sampleRate}
               .duration=${this._duration}
             ></daw-ruler>`
           : ''}
