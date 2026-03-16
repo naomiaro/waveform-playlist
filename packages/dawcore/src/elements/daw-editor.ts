@@ -238,15 +238,22 @@ export class DawEditorElement extends LitElement {
 
   private _onTrackRemoved(trackId: string) {
     this._trackElements.delete(trackId);
-
+    // Clean up per-clip data before removing the track (need clip IDs from engine tracks)
+    const removedTrack = this._engineTracks.get(trackId);
+    if (removedTrack) {
+      const nextPeaks = new Map(this._peaksData);
+      for (const clip of removedTrack.clips) {
+        this._clipBuffers.delete(clip.id);
+        nextPeaks.delete(clip.id);
+      }
+      this._peaksData = nextPeaks;
+    }
     const nextTracks = new Map(this._tracks);
     nextTracks.delete(trackId);
     this._tracks = nextTracks;
-
     const nextEngine = new Map(this._engineTracks);
     nextEngine.delete(trackId);
     this._engineTracks = nextEngine;
-
     this._recomputeDuration();
     if (this._engine) {
       this._engine.setTracks([...nextEngine.values()]);
@@ -610,13 +617,15 @@ export class DawEditorElement extends LitElement {
         URL.revokeObjectURL(blobUrl);
         console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
         failed.push({ file, error: err });
-        this.dispatchEvent(
-          new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
-            bubbles: true,
-            composed: true,
-            detail: { file, error: err },
-          })
-        );
+        if (this.isConnected) {
+          this.dispatchEvent(
+            new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
+              bubbles: true,
+              composed: true,
+              detail: { file, error: err },
+            })
+          );
+        }
       }
     }
 

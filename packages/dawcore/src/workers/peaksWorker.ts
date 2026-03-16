@@ -142,6 +142,7 @@ function generateWaveformData(options) {
       else {
         data_view.setInt16(offset, min_value[ch4], true);
         data_view.setInt16(offset + 2, max_value[ch4], true);
+        offset += 4;
       }
     }
   }

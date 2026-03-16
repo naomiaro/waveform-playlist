@@ -2,7 +2,12 @@
  * Peak generation pipeline: AudioBuffer → web worker → WaveformData → PeakData.
  *
  * Manages worker lifecycle, WaveformData caching per AudioBuffer (WeakMap),
- * inflight dedup, and peak extraction at any zoom level via resample().
+ * inflight dedup, and peak extraction via resample() for any zoom level
+ * coarser than the base scale.
+ *
+ * The base scale determines the finest zoom level that can be rendered without
+ * regenerating. Resampling only works to coarser (larger) scales. Set baseScale
+ * to the finest zoom level the user might need.
  */
 
 import type WaveformData from 'waveform-data';
@@ -18,6 +23,7 @@ export class PeakPipeline {
   /**
    * Generate PeakData for a clip from its AudioBuffer.
    * Uses cached WaveformData when available; otherwise generates via worker.
+   * The worker generates at `scale` (= samplesPerPixel) for exact rendering.
    */
   async generatePeaks(
     audioBuffer: AudioBuffer,
@@ -35,7 +41,9 @@ export class PeakPipeline {
 
   /**
    * Re-extract peaks for all clips at a new zoom level using cached WaveformData.
-   * Returns a new Map of clipId → PeakData. Clips without cached WaveformData are skipped.
+   * Only works for zoom levels coarser than (or equal to) the cached base scale.
+   * Returns a new Map of clipId → PeakData. Clips without cached data or where
+   * the target scale is finer than the cached base are skipped.
    */
   reextractPeaks(
     clipBuffers: ReadonlyMap<string, AudioBuffer>,
@@ -46,6 +54,8 @@ export class PeakPipeline {
     for (const [clipId, audioBuffer] of clipBuffers) {
       const cached = this._cache.get(audioBuffer);
       if (cached) {
+        // Skip if target scale is finer than cached — resample can't downsample
+        if (samplesPerPixel < cached.scale) continue;
         try {
           result.set(clipId, extractPeaks(cached, samplesPerPixel, isMono));
         } catch (err) {
@@ -66,7 +76,8 @@ export class PeakPipeline {
     samplesPerPixel: number
   ): Promise<WaveformData> {
     const cached = this._cache.get(audioBuffer);
-    if (cached) return cached;
+    // Use cache if it's at a scale fine enough for the requested zoom
+    if (cached && cached.scale <= samplesPerPixel) return cached;
 
     const inflight = this._inflight.get(audioBuffer);
     if (inflight) return inflight;
@@ -75,7 +86,7 @@ export class PeakPipeline {
       this._worker = createPeaksWorker();
     }
 
-    const baseScale = Math.min(samplesPerPixel, 256);
+    // Generate at the requested scale — this is the finest zoom we can resample from
     // .slice() channel buffers to avoid detaching the original AudioBuffer views
     const channels: ArrayBuffer[] = [];
     for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
@@ -87,7 +98,7 @@ export class PeakPipeline {
         channels,
         length: audioBuffer.length,
         sampleRate: audioBuffer.sampleRate,
-        scale: baseScale,
+        scale: samplesPerPixel,
         bits: 16,
         splitChannels: true,
       })

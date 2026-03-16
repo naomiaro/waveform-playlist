@@ -36,7 +36,7 @@
 - **Derived width, not stored state** — `_totalWidth` is a getter derived from `_duration`, `effectiveSampleRate`, and `samplesPerPixel`. Not a `@state()` property — avoids Lit update loops from setting state in `updated()`.
 - **Error events** — `daw-track-error` dispatched on load failure (with `{ trackId, error }`). `daw-error` dispatched on playback failure (with `{ operation, error }`). Failed fetch promises are removed from cache to allow retry.
 - **Engine promise retry** — `_enginePromise` is cleared on rejection so `_ensureEngine()` can retry instead of caching a permanent failure.
-- **Web worker peak generation** — `PeakPipeline` (in `workers/peakPipeline.ts`) generates `WaveformData` via inline Blob worker at base scale (256), caches per `AudioBuffer` (WeakMap), extracts `PeakData` at current zoom via `resample()`. Near-instant zoom changes. Per-channel peaks when `mono=false`; weighted-average mono merge when `mono=true`.
+- **Web worker peak generation** — `PeakPipeline` (in `workers/peakPipeline.ts`) generates `WaveformData` via inline Blob worker at the current `samplesPerPixel`, caches per `AudioBuffer` (WeakMap), extracts `PeakData` via `resample()`. Resampling only works to coarser (larger) scales — the cached base scale determines the finest renderable zoom. Per-channel peaks when `mono=false`; weighted-average mono merge when `mono=true`.
 
 ## CSS Theming
 
@@ -96,11 +96,11 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Web Worker Peak Generation
 
-- **`peaksWorker.ts`** — Inline Blob worker (portable across bundlers). Generates WaveformData binary format from AudioBuffer channel data at a base scale. Uses `generateWaveformData` algorithm from BBC's waveform-data.js (MIT).
+- **`peaksWorker.ts`** — Inline Blob worker (portable across bundlers). Generates WaveformData binary format from AudioBuffer channel data at a given scale. Uses `generateWaveformData` algorithm from BBC's waveform-data.js (MIT). Includes fix for upstream trailing-bin offset bug in 16-bit multi-channel.
 - **`waveformDataUtils.ts`** — `extractPeaks()` converts WaveformData → PeakData. Handles all channels, mono merging (weighted average), slicing, and aligned resampling.
 - **`peakPipeline.ts`** — Orchestrates worker lifecycle, WaveformData cache (WeakMap per AudioBuffer), inflight dedup, and peak extraction at any zoom level.
 - **Peak resolution order:** (1) WaveformData cache hit → `extractPeaks()` (synchronous resample), (2) worker generation → cache → extract.
-- **Zoom re-extraction:** `willUpdate()` detects `samplesPerPixel` changes and re-extracts peaks from cached WaveformData (near-instant, no worker round-trip).
+- **Zoom re-extraction:** `willUpdate()` detects `samplesPerPixel` changes and re-extracts peaks from cached WaveformData. Only works for scales coarser than the cached base — finer zoom requires regeneration via worker.
 - **Aligned resampling** — When slicing WaveformData before resampling to a different scale, source slice indices must align to the resampling ratio. Uses `floor(targetStart * ratio)` / `ceil(targetEnd * ratio)` to include all contributing source bins. See browser CLAUDE.md "Aligned Peak Resampling" for full explanation.
 - **CSP fallback** — Worker creation can fail in CSP-restricted environments blocking blob: URLs. The fallback rejects with actionable error message suggesting `worker-src blob:` directive.
 - **Disconnect guard** — `_loadTrack` catch checks `this.isConnected` before dispatching error events (detached elements can't bubble, CLAUDE.md pattern #36).
