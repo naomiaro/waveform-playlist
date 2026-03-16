@@ -1,21 +1,25 @@
 import { pixelsToSeconds } from '@waveform-playlist/core';
 
-/**
- * Manages pointer interactions on the timeline: click-to-seek and drag-to-select.
- * Extracted from daw-editor to keep file sizes under 800 lines.
- */
+/** Narrow engine contract for pointer interactions. */
+export interface PointerEngineContract {
+  setSelection(start: number, end: number): void;
+  stop(): void;
+  play(time: number): void;
+  seek(time: number): void;
+  selectTrack(trackId: string | null): void;
+}
+
+/** Manages pointer interactions on the timeline: click-to-seek and drag-to-select. */
 export interface PointerHandlerHost {
   readonly samplesPerPixel: number;
-  readonly scrollLeft: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly _engine: any;
+  readonly _engine: PointerEngineContract | null;
   readonly _isPlaying: boolean;
-  readonly sampleRate: number;
+  readonly effectiveSampleRate: number;
   _currentTime: number;
   _selectionStartTime: number;
   _selectionEndTime: number;
-  _selectedTrackId: string | null;
   _dragOver: boolean;
+  _setSelectedTrackId(trackId: string | null): void;
   _startPlayhead(): void;
   _stopPlayhead(): void;
   dispatchEvent(event: Event): boolean;
@@ -28,21 +32,29 @@ export class PointerHandler {
   private _isDragging = false;
   private _dragStartPx = 0;
   private _timeline: HTMLElement | null = null;
+  // Cached from onPointerDown to avoid forced layout reflows at 60fps during drag
+  private _timelineRect: DOMRect | null = null;
 
   constructor(host: PointerHandlerHost) {
     this._host = host;
   }
 
   private _pxFromPointer(e: PointerEvent): number {
-    if (!this._timeline) return 0;
-    const rect = this._timeline.getBoundingClientRect();
-    return e.clientX - rect.left + this._host.scrollLeft;
+    if (!this._timelineRect) {
+      console.warn('[dawcore] _pxFromPointer called without timeline reference');
+      return 0;
+    }
+    // .timeline is wider than :host (which has overflow-x: auto).
+    // getBoundingClientRect().left already reflects scroll position
+    // (goes negative when scrolled), so no scrollLeft adjustment needed.
+    return e.clientX - this._timelineRect.left;
   }
 
   onPointerDown = (e: PointerEvent) => {
     this._timeline = this._host.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
     if (!this._timeline) return;
 
+    this._timelineRect = this._timeline.getBoundingClientRect();
     this._dragStartPx = this._pxFromPointer(e);
     this._isDragging = false;
 
@@ -56,22 +68,28 @@ export class PointerHandler {
 
     const currentPx = this._pxFromPointer(e);
 
-    // Start drag after 3px threshold
     if (!this._isDragging && Math.abs(currentPx - this._dragStartPx) > 3) {
       this._isDragging = true;
     }
 
     if (this._isDragging) {
       const h = this._host;
-      const startTime = pixelsToSeconds(this._dragStartPx, h.samplesPerPixel, h.sampleRate);
-      const endTime = pixelsToSeconds(currentPx, h.samplesPerPixel, h.sampleRate);
+      const startTime = pixelsToSeconds(
+        this._dragStartPx,
+        h.samplesPerPixel,
+        h.effectiveSampleRate
+      );
+      const endTime = pixelsToSeconds(currentPx, h.samplesPerPixel, h.effectiveSampleRate);
+      // Mutate host fields directly (not @state) and update <daw-selection>
+      // imperatively to avoid triggering Lit re-renders at 60fps during drag
       h._selectionStartTime = Math.min(startTime, endTime);
       h._selectionEndTime = Math.max(startTime, endTime);
-      // Direct update on selection element to avoid @state 60fps re-renders
-      const sel = h.shadowRoot?.querySelector('daw-selection') as any;
+      const sel = h.shadowRoot?.querySelector('daw-selection') as
+        | { startPx: number; endPx: number }
+        | undefined;
       if (sel) {
-        sel.startPx = (h._selectionStartTime * h.sampleRate) / h.samplesPerPixel;
-        sel.endPx = (h._selectionEndTime * h.sampleRate) / h.samplesPerPixel;
+        sel.startPx = (h._selectionStartTime * h.effectiveSampleRate) / h.samplesPerPixel;
+        sel.endPx = (h._selectionEndTime * h.effectiveSampleRate) / h.samplesPerPixel;
       }
     }
   };
@@ -81,8 +99,10 @@ export class PointerHandler {
 
     try {
       this._timeline.releasePointerCapture(e.pointerId);
-    } catch {
-      // Pointer capture may already be released (element removed, system event)
+    } catch (err) {
+      console.warn(
+        '[dawcore] releasePointerCapture failed (may already be released): ' + String(err)
+      );
     }
     this._timeline.removeEventListener('pointermove', this._onPointerMove);
     this._timeline.removeEventListener('pointerup', this._onPointerUp);
@@ -98,6 +118,7 @@ export class PointerHandler {
     } finally {
       this._isDragging = false;
       this._timeline = null;
+      this._timelineRect = null;
     }
   };
 
@@ -119,7 +140,7 @@ export class PointerHandler {
   private _handleSeekClick(e: PointerEvent) {
     const h = this._host;
     const px = this._pxFromPointer(e);
-    const time = pixelsToSeconds(px, h.samplesPerPixel, h.sampleRate);
+    const time = pixelsToSeconds(px, h.samplesPerPixel, h.effectiveSampleRate);
 
     // Clear selection
     h._selectionStartTime = 0;
@@ -140,10 +161,11 @@ export class PointerHandler {
       }
     }
 
+    // Capture playing state before engine calls (stop emits statechange
+    // which synchronously flips _isPlaying — use wasPlaying for all guards)
+    const wasPlaying = h._isPlaying;
+
     if (h._engine) {
-      // Capture playing state before engine calls (stop emits statechange
-      // which synchronously flips _isPlaying)
-      const wasPlaying = h._isPlaying;
       h._engine.setSelection(0, 0);
       if (wasPlaying) {
         // Tone.js needs stop + play to reschedule audio sources
@@ -156,7 +178,7 @@ export class PointerHandler {
     }
 
     h._currentTime = time;
-    if (!h._isPlaying) {
+    if (!wasPlaying) {
       h._stopPlayhead();
     }
 
@@ -176,14 +198,17 @@ export class PointerHandler {
       try {
         h._engine.selectTrack(trackId);
         // Engine sets _selectedTrackId via statechange — don't set locally
-        return;
       } catch (err) {
-        console.warn('[dawcore] selectTrack failed: ' + String(err));
-        return;
+        console.warn(
+          '[dawcore] selectTrack via engine failed, falling back to local: ' + String(err)
+        );
+        // Fall through to local selection below
+        h._setSelectedTrackId(trackId);
       }
+    } else {
+      // No engine — set locally (will be lost when engine builds, acceptable for Phase 2)
+      h._setSelectedTrackId(trackId);
     }
-    // No engine — set locally (will be lost when engine builds, acceptable for Phase 2)
-    h._selectedTrackId = trackId;
     h.dispatchEvent(
       new CustomEvent('daw-track-select', {
         bubbles: true,

@@ -1,12 +1,21 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { ClipTrack, FadeType } from '@waveform-playlist/core';
 import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
+import type { PlaylistEngine } from '@waveform-playlist/engine';
 import { hostStyles } from '../styles/theme';
 import { PointerHandler } from '../interactions/pointer-handler';
+import type {
+  DawSelectionDetail,
+  DawTrackIdDetail,
+  DawTrackErrorDetail,
+  DawFilesLoadErrorDetail,
+  DawErrorDetail,
+  LoadFilesResult,
+} from '../events';
 
 interface TrackDescriptor {
   name: string;
@@ -27,7 +36,7 @@ interface ClipDescriptor {
   name: string;
   fadeIn: number;
   fadeOut: number;
-  fadeType: string;
+  fadeType: FadeType;
 }
 
 @customElement('daw-editor')
@@ -39,7 +48,14 @@ export class DawEditorElement extends LitElement {
   @property({ type: Number, attribute: 'bar-width' }) barWidth = 1;
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
   @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
+  /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
+
+  /**
+   * Resolved sample rate from decoded audio. Falls back to the `sampleRate`
+   * property until the first audio buffer is decoded.
+   */
+  private _resolvedSampleRate: number | null = null;
 
   @state() private _tracks: Map<string, TrackDescriptor> = new Map();
   @state() private _engineTracks: Map<string, ClipTrack> = new Map();
@@ -56,10 +72,8 @@ export class DawEditorElement extends LitElement {
   _selectionEndTime = 0;
   _currentTime = 0;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _engine: any = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _enginePromise: Promise<any> | null = null;
+  _engine: PlaylistEngine | null = null;
+  private _enginePromise: Promise<PlaylistEngine> | null = null;
   private _audioInitialized = false;
   private _audioCache = new Map<string, Promise<AudioBuffer>>();
   private _trackElements = new Map<string, DawTrackElement>();
@@ -88,7 +102,6 @@ export class DawEditorElement extends LitElement {
       }
       .track-row.selected {
         background: rgba(99, 199, 95, 0.08);
-        box-shadow: inset 2px 0 0 var(--daw-progress-color, #63c75f);
       }
       .timeline.drag-over {
         outline: 2px dashed var(--daw-selection-color, rgba(99, 199, 95, 0.3));
@@ -97,9 +110,19 @@ export class DawEditorElement extends LitElement {
     `,
   ];
 
+  /** Effective sample rate: decoded audio rate if available, otherwise the initial hint. */
+  get effectiveSampleRate(): number {
+    return this._resolvedSampleRate ?? this.sampleRate;
+  }
+
   /** Derived pixel width from duration. */
   private get _totalWidth(): number {
-    return Math.ceil((this._duration * this.sampleRate) / this.samplesPerPixel);
+    return Math.ceil((this._duration * this.effectiveSampleRate) / this.samplesPerPixel);
+  }
+
+  /** Setter for external handlers (e.g. PointerHandler) to update @state reactively. */
+  _setSelectedTrackId(trackId: string | null) {
+    this._selectedTrackId = trackId;
   }
 
   get tracks(): TrackDescriptor[] {
@@ -123,7 +146,7 @@ export class DawEditorElement extends LitElement {
     }
     this.requestUpdate();
     this.dispatchEvent(
-      new CustomEvent('daw-selection', {
+      new CustomEvent<DawSelectionDetail>('daw-selection', {
         bubbles: true,
         composed: true,
         detail: { start: this._selectionStartTime, end: this._selectionEndTime },
@@ -171,7 +194,7 @@ export class DawEditorElement extends LitElement {
     try {
       this._disposeEngine();
     } catch (err) {
-      console.warn('[dawcore] Error disposing engine:', err);
+      console.warn('[dawcore] Error disposing engine: ' + String(err));
     }
   }
 
@@ -181,7 +204,7 @@ export class DawEditorElement extends LitElement {
     const trackId = e.detail?.trackId;
     const trackEl = e.detail?.element;
     if (!trackId || !(trackEl instanceof HTMLElement)) {
-      console.warn('[dawcore] Invalid daw-track-connected event detail:', e.detail);
+      console.warn('[dawcore] Invalid daw-track-connected event detail: ' + String(e.detail));
       return;
     }
 
@@ -260,7 +283,7 @@ export class DawEditorElement extends LitElement {
           name: clipEl.name,
           fadeIn: clipEl.fadeIn,
           fadeOut: clipEl.fadeOut,
-          fadeType: clipEl.fadeType,
+          fadeType: clipEl.fadeType as FadeType,
         });
       }
     }
@@ -286,8 +309,8 @@ export class DawEditorElement extends LitElement {
         const audioBuffer = await this._fetchAndDecode(clipDesc.src);
 
         // Use the buffer's actual sample rate — the global AudioContext
-        // decodes at the hardware rate, which may differ from this.sampleRate
-        this.sampleRate = audioBuffer.sampleRate;
+        // decodes at the hardware rate, which may differ from the initial hint
+        this._resolvedSampleRate = audioBuffer.sampleRate;
 
         const clip = createClipFromSeconds({
           audioBuffer,
@@ -320,16 +343,16 @@ export class DawEditorElement extends LitElement {
       engine.setTracks([...this._engineTracks.values()]);
 
       this.dispatchEvent(
-        new CustomEvent('daw-track-ready', {
+        new CustomEvent<DawTrackIdDetail>('daw-track-ready', {
           bubbles: true,
           composed: true,
           detail: { trackId },
         })
       );
     } catch (err) {
-      console.warn('[dawcore] Failed to load track "' + trackId + '":', err);
+      console.warn('[dawcore] Failed to load track "' + trackId + '": ' + String(err));
       this.dispatchEvent(
-        new CustomEvent('daw-track-error', {
+        new CustomEvent<DawTrackErrorDetail>('daw-track-error', {
           bubbles: true,
           composed: true,
           detail: { trackId, error: err },
@@ -408,13 +431,12 @@ export class DawEditorElement extends LitElement {
         if (endSample > maxSample) maxSample = endSample;
       }
     }
-    this._duration = maxSample / this.sampleRate;
+    this._duration = maxSample / this.effectiveSampleRate;
   }
 
   // --- Engine ---
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _ensureEngine(): Promise<any> {
+  private _ensureEngine(): Promise<PlaylistEngine> {
     if (this._engine) return Promise.resolve(this._engine);
     if (this._enginePromise) return this._enginePromise;
     this._enginePromise = this._buildEngine().catch((err) => {
@@ -433,15 +455,14 @@ export class DawEditorElement extends LitElement {
     const adapter = createToneAdapter();
     const engine = new PlaylistEngine({
       adapter,
-      sampleRate: this.sampleRate,
+      sampleRate: this.effectiveSampleRate,
       samplesPerPixel: this.samplesPerPixel,
       zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    engine.on('statechange', (engineState: any) => {
+    engine.on('statechange', (engineState) => {
       this._isPlaying = engineState.isPlaying;
       this._duration = engineState.duration;
       this._selectedTrackId = engineState.selectedTrackId;
@@ -502,9 +523,7 @@ export class DawEditorElement extends LitElement {
     }
   };
 
-  async loadFiles(
-    files: FileList | File[]
-  ): Promise<{ loaded: string[]; failed: Array<{ file: File; error: unknown }> }> {
+  async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
     if (!files) {
       console.warn('[dawcore] loadFiles called with null/undefined');
       return { loaded: [], failed: [] };
@@ -523,10 +542,14 @@ export class DawEditorElement extends LitElement {
         continue;
       }
 
+      const blobUrl = URL.createObjectURL(file);
       try {
-        const audioBuffer = await this._fetchAndDecode(URL.createObjectURL(file));
+        const audioBuffer = await this._fetchAndDecode(blobUrl);
+        URL.revokeObjectURL(blobUrl);
+        // Blob URLs are unique per call — evict from cache since they can't be reused
+        this._audioCache.delete(blobUrl);
 
-        this.sampleRate = audioBuffer.sampleRate;
+        this._resolvedSampleRate = audioBuffer.sampleRate;
 
         const name = file.name.replace(/\.\w+$/, '');
         const clip = createClipFromSeconds({
@@ -575,17 +598,18 @@ export class DawEditorElement extends LitElement {
 
         loaded.push(trackId);
         this.dispatchEvent(
-          new CustomEvent('daw-track-ready', {
+          new CustomEvent<DawTrackIdDetail>('daw-track-ready', {
             bubbles: true,
             composed: true,
             detail: { trackId },
           })
         );
       } catch (err) {
+        URL.revokeObjectURL(blobUrl);
         console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
         failed.push({ file, error: err });
         this.dispatchEvent(
-          new CustomEvent('daw-files-load-error', {
+          new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
             bubbles: true,
             composed: true,
             detail: { file, error: err },
@@ -610,9 +634,9 @@ export class DawEditorElement extends LitElement {
       this._startPlayhead();
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
-      console.warn('[dawcore] Playback failed:', err);
+      console.warn('[dawcore] Playback failed: ' + String(err));
       this.dispatchEvent(
-        new CustomEvent('daw-error', {
+        new CustomEvent<DawErrorDetail>('daw-error', {
           bubbles: true,
           composed: true,
           detail: { operation: 'play', error: err },
@@ -648,8 +672,8 @@ export class DawEditorElement extends LitElement {
     if (!playhead || !this._engine) return;
     const engine = this._engine;
     playhead.startAnimation(
-      () => (engine ? engine.getCurrentTime() : 0),
-      this.sampleRate,
+      () => engine.getCurrentTime(),
+      this.effectiveSampleRate,
       this.samplesPerPixel
     );
   }
@@ -657,7 +681,7 @@ export class DawEditorElement extends LitElement {
   _stopPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead) return;
-    playhead.stopAnimation(this._currentTime, this.sampleRate, this.samplesPerPixel);
+    playhead.stopAnimation(this._currentTime, this.effectiveSampleRate, this.samplesPerPixel);
   }
 
   private _getPlayhead(): DawPlayheadElement | null {
@@ -672,15 +696,21 @@ export class DawEditorElement extends LitElement {
     return [...this._engineTracks.entries()].sort((a, b) => {
       const ai = domOrder.indexOf(a[0]);
       const bi = domOrder.indexOf(b[0]);
-      return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+      // Both not in DOM (e.g. file drops): preserve Map insertion order
+      if (ai === -1 && bi === -1) return 0;
+      // Only one not in DOM: sort it after DOM tracks
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
     });
   }
 
   // --- Render ---
 
   render() {
-    const selStartPx = (this._selectionStartTime * this.sampleRate) / this.samplesPerPixel;
-    const selEndPx = (this._selectionEndTime * this.sampleRate) / this.samplesPerPixel;
+    const sr = this.effectiveSampleRate;
+    const selStartPx = (this._selectionStartTime * sr) / this.samplesPerPixel;
+    const selEndPx = (this._selectionEndTime * sr) / this.samplesPerPixel;
 
     return html`
       <div
@@ -695,7 +725,7 @@ export class DawEditorElement extends LitElement {
         ${this.timescale
           ? html`<daw-ruler
               .samplesPerPixel=${this.samplesPerPixel}
-              .sampleRate=${this.sampleRate}
+              .sampleRate=${this.effectiveSampleRate}
               .duration=${this._duration}
             ></daw-ruler>`
           : ''}

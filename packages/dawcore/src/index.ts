@@ -22,3 +22,19 @@ export { DawStopButtonElement } from './elements/daw-stop-button';
 export { DawEditorElement } from './elements/daw-editor';
 export { DawRulerElement } from './elements/daw-ruler';
 export { DawSelectionElement } from './elements/daw-selection';
+
+export type { PointerEngineContract } from './interactions/pointer-handler';
+
+export type {
+  DawEventMap,
+  DawEvent,
+  DawSelectionDetail,
+  DawSeekDetail,
+  DawTrackSelectDetail,
+  DawTrackConnectedDetail,
+  DawTrackIdDetail,
+  DawTrackErrorDetail,
+  DawFilesLoadErrorDetail,
+  DawErrorDetail,
+  LoadFilesResult,
+} from './events';
