@@ -760,50 +760,49 @@ export class DawEditorElement extends LitElement {
           : ''}
         <daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
         <daw-playhead></daw-playhead>
-        ${this._getOrderedTracks().map(
-          ([trackId, track]) => {
-            // Determine channel count from peak data of first clip with peaks
-            const firstPeaks = track.clips
-              .map((c) => this._peaksData.get(c.id))
-              .find((p) => p && p.data.length > 0);
-            const numChannels = firstPeaks ? firstPeaks.data.length : 1;
-            const channelHeight = this.waveHeight;
-            const trackHeight = channelHeight * numChannels;
+        ${this._getOrderedTracks().map(([trackId, track]) => {
+          // Determine channel count from peak data of first clip with peaks
+          const firstPeaks = track.clips
+            .map((c) => this._peaksData.get(c.id))
+            .find((p) => p && p.data.length > 0);
+          const numChannels = firstPeaks ? firstPeaks.data.length : 1;
+          const channelHeight = this.waveHeight;
+          const trackHeight = channelHeight * numChannels;
 
-            return html`
-              <div
-                class="track-row ${trackId === this._selectedTrackId ? 'selected' : ''}"
-                style="height: ${trackHeight}px;"
-                data-track-id=${trackId}
-              >
-                ${track.clips.map((clip) => {
-                  const peakData = this._peaksData.get(clip.id);
-                  const width = clipPixelWidth(
-                    clip.startSample,
-                    clip.durationSamples,
-                    this.samplesPerPixel
-                  );
-                  const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
-                  const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
+          return html`
+            <div
+              class="track-row ${trackId === this._selectedTrackId ? 'selected' : ''}"
+              style="height: ${trackHeight}px;"
+              data-track-id=${trackId}
+            >
+              ${track.clips.map((clip) => {
+                const peakData = this._peaksData.get(clip.id);
+                const width = clipPixelWidth(
+                  clip.startSample,
+                  clip.durationSamples,
+                  this.samplesPerPixel
+                );
+                const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
+                const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
 
-                  return channels.map(
-                    (channelPeaks, chIdx) => html`
-                      <daw-waveform
-                        style="position: absolute; left: ${clipLeft}px; top: ${chIdx * channelHeight}px;"
-                        .peaks=${channelPeaks}
-                        .bits=${16}
-                        .length=${peakData?.length ?? width}
-                        .waveHeight=${channelHeight}
-                        .barWidth=${this.barWidth}
-                        .barGap=${this.barGap}
-                      ></daw-waveform>
-                    `
-                  );
-                })}
-              </div>
-            `;
-          }
-        )}
+                return channels.map(
+                  (channelPeaks, chIdx) => html`
+                    <daw-waveform
+                      style="position: absolute; left: ${clipLeft}px; top: ${chIdx *
+                      channelHeight}px;"
+                      .peaks=${channelPeaks}
+                      .bits=${16}
+                      .length=${peakData?.length ?? width}
+                      .waveHeight=${channelHeight}
+                      .barWidth=${this.barWidth}
+                      .barGap=${this.barGap}
+                    ></daw-waveform>
+                  `
+                );
+              })}
+            </div>
+          `;
+        })}
       </div>
       <slot></slot>
     `;
