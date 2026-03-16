@@ -841,6 +841,26 @@ export class DawEditorElement extends LitElement {
     playhead.stopAnimation(this._currentTime, this._sampleRate, this.samplesPerPixel);
   }
 
+  /**
+   * Returns engine tracks ordered by the DOM position of their
+   * corresponding <daw-track> elements. Tracks added via loadFiles()
+   * (no DOM element) appear at the end.
+   */
+  private _getOrderedTracks(): Array<[string, ClipTrack]> {
+    const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
+      (el) => (el as DawTrackElement).trackId
+    );
+    const entries = [...this._engineTracks.entries()];
+    return entries.sort((a, b) => {
+      const ai = domOrder.indexOf(a[0]);
+      const bi = domOrder.indexOf(b[0]);
+      // Tracks not in DOM (e.g., from file drop) go to the end
+      const aIndex = ai === -1 ? Infinity : ai;
+      const bIndex = bi === -1 ? Infinity : bi;
+      return aIndex - bIndex;
+    });
+  }
+
   // --- Render ---
 
   render() {
@@ -866,7 +886,7 @@ export class DawEditorElement extends LitElement {
           : ''}
         <daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
         <daw-playhead></daw-playhead>
-        ${[...this._engineTracks.entries()].map(
+        ${this._getOrderedTracks().map(
           ([trackId, track]) => html`
             <div
               class="track-row ${trackId === this._selectedTrackId ? 'selected' : ''}"
