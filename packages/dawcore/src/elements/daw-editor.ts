@@ -1,7 +1,10 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { ClipTrack, FadeType, Peaks, Bits } from '@waveform-playlist/core';
+import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
+import type WaveformData from 'waveform-data';
+import { createPeaksWorker, type PeaksWorkerApi } from '../workers/peaksWorker';
+import { extractPeaks } from '../workers/waveformDataUtils';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
@@ -59,8 +62,7 @@ export class DawEditorElement extends LitElement {
 
   @state() private _tracks: Map<string, TrackDescriptor> = new Map();
   @state() private _engineTracks: Map<string, ClipTrack> = new Map();
-  @state() private _peaksData: Map<string, { data: Peaks[]; bits: Bits; length: number }> =
-    new Map();
+  @state() private _peaksData: Map<string, PeakData> = new Map();
   @state() _isPlaying = false;
   @state() private _duration = 0;
   @state() _selectedTrackId: string | null = null;
@@ -76,6 +78,9 @@ export class DawEditorElement extends LitElement {
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   private _audioInitialized = false;
   private _audioCache = new Map<string, Promise<AudioBuffer>>();
+  private _waveformDataCache = new WeakMap<AudioBuffer, WaveformData>();
+  private _waveformDataInflight = new WeakMap<AudioBuffer, Promise<WaveformData>>();
+  private _peaksWorker: PeaksWorkerApi | null = null;
   private _trackElements = new Map<string, DawTrackElement>();
   private _childObserver: MutationObserver | null = null;
   private _pointer = new PointerHandler(this);
@@ -190,6 +195,8 @@ export class DawEditorElement extends LitElement {
     this._childObserver = null;
     this._trackElements.clear();
     this._audioCache.clear();
+    this._peaksWorker?.terminate();
+    this._peaksWorker = null;
 
     try {
       this._disposeEngine();
@@ -323,7 +330,7 @@ export class DawEditorElement extends LitElement {
           sourceDuration: audioBuffer.duration,
         });
 
-        this._generatePeaks(clip.id, audioBuffer);
+        await this._generatePeaks(clip.id, audioBuffer);
         clips.push(clip);
       }
 
@@ -389,41 +396,60 @@ export class DawEditorElement extends LitElement {
     }
   }
 
-  private _generatePeaks(clipId: string, audioBuffer: AudioBuffer) {
-    const numChannels = this.mono ? 1 : audioBuffer.numberOfChannels;
-    const samplesPerPeak = this.samplesPerPixel;
-    const totalSamples = audioBuffer.getChannelData(0).length;
-    const peakCount = Math.ceil(totalSamples / samplesPerPeak);
+  /**
+   * Generate WaveformData via web worker, then extract PeakData at current zoom.
+   * Caches WaveformData per AudioBuffer for near-instant zoom changes via resample().
+   */
+  private async _generatePeaks(clipId: string, audioBuffer: AudioBuffer) {
+    const waveformData = await this._getWaveformData(audioBuffer);
+    const peakData = extractPeaks(waveformData, this.samplesPerPixel, this.mono);
+    this._peaksData = new Map(this._peaksData).set(clipId, peakData);
+  }
 
-    const data: Int16Array[] = [];
-    for (let ch = 0; ch < numChannels; ch++) {
-      const channelData = audioBuffer.getChannelData(ch);
-      const peaks = new Int16Array(peakCount * 2);
+  private async _getWaveformData(audioBuffer: AudioBuffer): Promise<WaveformData> {
+    // Cache hit
+    const cached = this._waveformDataCache.get(audioBuffer);
+    if (cached) return cached;
 
-      for (let i = 0; i < peakCount; i++) {
-        const start = i * samplesPerPeak;
-        const end = Math.min(start + samplesPerPeak, totalSamples);
-        let min = 0;
-        let max = 0;
+    // Inflight dedup
+    const inflight = this._waveformDataInflight.get(audioBuffer);
+    if (inflight) return inflight;
 
-        for (let j = start; j < end; j++) {
-          const sample = channelData[j];
-          if (sample < min) min = sample;
-          if (sample > max) max = sample;
-        }
-
-        peaks[i * 2] = Math.round(min * 32767);
-        peaks[i * 2 + 1] = Math.round(max * 32767);
-      }
-
-      data.push(peaks);
+    // Generate via worker at base scale (finest zoom level for resample)
+    if (!this._peaksWorker) {
+      this._peaksWorker = createPeaksWorker();
     }
 
-    this._peaksData = new Map(this._peaksData).set(clipId, {
-      data,
-      bits: 16,
-      length: peakCount,
-    });
+    const baseScale = Math.min(this.samplesPerPixel, 256);
+    // .slice() channel buffers to avoid detaching the original AudioBuffer views
+    const channels: ArrayBuffer[] = [];
+    for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+      channels.push(audioBuffer.getChannelData(c).slice().buffer as ArrayBuffer);
+    }
+
+    const id = 'buffer-' + Math.random().toString(36).slice(2, 11);
+    const promise = this._peaksWorker
+      .generate({
+        id,
+        channels,
+        length: audioBuffer.length,
+        sampleRate: audioBuffer.sampleRate,
+        scale: baseScale,
+        bits: 16,
+        splitChannels: true,
+      })
+      .then((waveformData) => {
+        this._waveformDataCache.set(audioBuffer, waveformData);
+        this._waveformDataInflight.delete(audioBuffer);
+        return waveformData;
+      })
+      .catch((err) => {
+        this._waveformDataInflight.delete(audioBuffer);
+        throw err;
+      });
+
+    this._waveformDataInflight.set(audioBuffer, promise);
+    return promise;
   }
 
   private _recomputeDuration() {
@@ -566,7 +592,7 @@ export class DawEditorElement extends LitElement {
           sourceDuration: audioBuffer.duration,
         });
 
-        this._generatePeaks(clip.id, audioBuffer);
+        await this._generatePeaks(clip.id, audioBuffer);
 
         const trackId = crypto.randomUUID();
         const track = createTrack({ name, clips: [clip] });
