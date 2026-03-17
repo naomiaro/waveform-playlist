@@ -7,6 +7,7 @@ import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
+import '../elements/daw-track-controls';
 import { hostStyles } from '../styles/theme';
 import { ViewportController } from '../controllers/viewport-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
@@ -14,10 +15,10 @@ import type {
   DawSelectionDetail,
   DawTrackIdDetail,
   DawTrackErrorDetail,
-  DawFilesLoadErrorDetail,
   DawErrorDetail,
   LoadFilesResult,
 } from '../events';
+import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 
 interface TrackDescriptor {
   name: string;
@@ -57,11 +58,11 @@ export class DawEditorElement extends LitElement {
    * Resolved sample rate from decoded audio. Falls back to the `sampleRate`
    * property until the first audio buffer is decoded.
    */
-  private _resolvedSampleRate: number | null = null;
+  _resolvedSampleRate: number | null = null;
 
-  @state() private _tracks: Map<string, TrackDescriptor> = new Map();
-  @state() private _engineTracks: Map<string, ClipTrack> = new Map();
-  @state() private _peaksData: Map<string, PeakData> = new Map();
+  @state() _tracks: Map<string, TrackDescriptor> = new Map();
+  @state() _engineTracks: Map<string, ClipTrack> = new Map();
+  @state() _peaksData: Map<string, PeakData> = new Map();
   @state() _isPlaying = false;
   @state() private _duration = 0;
   @state() _selectedTrackId: string | null = null;
@@ -76,21 +77,33 @@ export class DawEditorElement extends LitElement {
   _engine: PlaylistEngine | null = null;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   private _audioInitialized = false;
-  private _audioCache = new Map<string, Promise<AudioBuffer>>();
-  private _clipBuffers = new Map<string, AudioBuffer>();
-  private _peakPipeline = new PeakPipeline();
+  _audioCache = new Map<string, Promise<AudioBuffer>>();
+  _clipBuffers = new Map<string, AudioBuffer>();
+  _peakPipeline = new PeakPipeline();
   private _trackElements = new Map<string, DawTrackElement>();
   private _childObserver: MutationObserver | null = null;
   private _pointer = new PointerHandler(this);
-  private _viewport = new ViewportController(this);
+  private _viewport = (() => {
+    const v = new ViewportController(this);
+    v.scrollSelector = '.scroll-area';
+    return v;
+  })();
 
   static styles = [
     hostStyles,
     css`
       :host {
-        display: block;
+        display: flex;
         position: relative;
         background: var(--daw-background, #1a1a2e);
+        overflow: hidden;
+      }
+      .controls-column {
+        flex-shrink: 0;
+        width: var(--daw-controls-width, 180px);
+      }
+      .scroll-area {
+        flex: 1;
         overflow-x: auto;
         overflow-y: hidden;
       }
@@ -163,6 +176,8 @@ export class DawEditorElement extends LitElement {
     super.connectedCallback();
     this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
+    this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
+    this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
 
     // Detect track removal via MutationObserver (detached elements can't bubble events).
     this._childObserver = new MutationObserver((mutations) => {
@@ -189,6 +204,8 @@ export class DawEditorElement extends LitElement {
     super.disconnectedCallback();
     this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
+    this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
+    this.removeEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -285,6 +302,41 @@ export class DawEditorElement extends LitElement {
     }
   };
 
+  private _onTrackControl = (e: CustomEvent) => {
+    const { trackId, prop, value } = e.detail ?? {};
+    if (!trackId || !prop) return;
+
+    // Update descriptor directly (works for both DOM and file-dropped tracks)
+    const oldDescriptor = this._tracks.get(trackId);
+    if (oldDescriptor && prop in oldDescriptor) {
+      const descriptor = { ...oldDescriptor, [prop]: value };
+      this._tracks = new Map(this._tracks).set(trackId, descriptor);
+
+      // Forward to engine
+      if (this._engine) {
+        if (prop === 'volume') this._engine.setTrackVolume(trackId, value as number);
+        if (prop === 'pan') this._engine.setTrackPan(trackId, value as number);
+        if (prop === 'muted') this._engine.setTrackMute(trackId, value as boolean);
+        if (prop === 'soloed') this._engine.setTrackSolo(trackId, value as boolean);
+      }
+    }
+
+    // Also sync the <daw-track> DOM element if it exists
+    const trackEl = this._trackElements.get(trackId);
+    if (trackEl && prop in trackEl) {
+      (trackEl as unknown as Record<string, unknown>)[prop] = value;
+    }
+  };
+
+  private _onTrackRemoveRequest = (e: CustomEvent) => {
+    const { trackId } = e.detail ?? {};
+    if (!trackId) return;
+    const trackEl = this._trackElements.get(trackId);
+    if (trackEl) {
+      trackEl.remove();
+    }
+  };
+
   private _readTrackDescriptor(trackEl: DawTrackElement): TrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
     const clips: ClipDescriptor[] = [];
@@ -369,6 +421,8 @@ export class DawEditorElement extends LitElement {
         muted: descriptor.muted,
         soloed: descriptor.soloed,
       });
+      // Align track.id with the editor's trackId so engine.setTrackSolo/Mute/etc. find it
+      track.id = trackId;
 
       this._engineTracks = new Map(this._engineTracks).set(trackId, track);
       this._recomputeDuration();
@@ -397,7 +451,7 @@ export class DawEditorElement extends LitElement {
     }
   }
 
-  private async _fetchAndDecode(src: string): Promise<AudioBuffer> {
+  async _fetchAndDecode(src: string): Promise<AudioBuffer> {
     if (this._audioCache.has(src)) {
       return this._audioCache.get(src)!;
     }
@@ -425,7 +479,7 @@ export class DawEditorElement extends LitElement {
     }
   }
 
-  private _recomputeDuration() {
+  _recomputeDuration() {
     let maxSample = 0;
     for (const track of this._engineTracks.values()) {
       for (const clip of track.clips) {
@@ -437,7 +491,7 @@ export class DawEditorElement extends LitElement {
   }
 
   // --- Engine ---
-  private _ensureEngine(): Promise<PlaylistEngine> {
+  _ensureEngine(): Promise<PlaylistEngine> {
     if (this._engine) return Promise.resolve(this._engine);
     if (this._enginePromise) return this._enginePromise;
     this._enginePromise = this._buildEngine().catch((err) => {
@@ -524,109 +578,7 @@ export class DawEditorElement extends LitElement {
   };
 
   async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
-    if (!files) {
-      console.warn('[dawcore] loadFiles called with null/undefined');
-      return { loaded: [], failed: [] };
-    }
-
-    const fileArray = Array.from(files);
-    const loaded: string[] = [];
-    const failed: Array<{ file: File; error: unknown }> = [];
-
-    for (const file of fileArray) {
-      // Accept files with empty type (browser may not report MIME for .opus etc.)
-      if (file.type && !file.type.startsWith('audio/')) {
-        const skipped = new Error('Non-audio MIME type: ' + file.type);
-        failed.push({ file, error: skipped });
-        console.warn('[dawcore] Skipping non-audio file: ' + file.name + ' (' + file.type + ')');
-        continue;
-      }
-
-      const blobUrl = URL.createObjectURL(file);
-      try {
-        const audioBuffer = await this._fetchAndDecode(blobUrl);
-        URL.revokeObjectURL(blobUrl);
-        // Blob URLs are unique per call — evict from cache since they can't be reused
-        this._audioCache.delete(blobUrl);
-
-        this._resolvedSampleRate = audioBuffer.sampleRate;
-
-        const name = file.name.replace(/\.\w+$/, '');
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: 0,
-          duration: audioBuffer.duration,
-          offset: 0,
-          gain: 1,
-          name,
-          sampleRate: audioBuffer.sampleRate,
-          sourceDuration: audioBuffer.duration,
-        });
-
-        this._clipBuffers.set(clip.id, audioBuffer);
-        const peakData = await this._peakPipeline.generatePeaks(
-          audioBuffer,
-          this.samplesPerPixel,
-          this.mono
-        );
-        this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
-
-        const trackId = crypto.randomUUID();
-        const track = createTrack({ name, clips: [clip] });
-
-        // Add to both maps so editor.tracks includes dropped files
-        this._tracks = new Map(this._tracks).set(trackId, {
-          name,
-          src: '',
-          volume: 1,
-          pan: 0,
-          muted: false,
-          soloed: false,
-          clips: [
-            {
-              src: '',
-              start: 0,
-              duration: audioBuffer.duration,
-              offset: 0,
-              gain: 1,
-              name,
-              fadeIn: 0,
-              fadeOut: 0,
-              fadeType: 'linear',
-            },
-          ],
-        });
-        this._engineTracks = new Map(this._engineTracks).set(trackId, track);
-        this._recomputeDuration();
-
-        const engine = await this._ensureEngine();
-        engine.setTracks([...this._engineTracks.values()]);
-
-        loaded.push(trackId);
-        this.dispatchEvent(
-          new CustomEvent<DawTrackIdDetail>('daw-track-ready', {
-            bubbles: true,
-            composed: true,
-            detail: { trackId },
-          })
-        );
-      } catch (err) {
-        URL.revokeObjectURL(blobUrl);
-        console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
-        failed.push({ file, error: err });
-        if (this.isConnected) {
-          this.dispatchEvent(
-            new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
-              bubbles: true,
-              composed: true,
-              detail: { file, error: err },
-            })
-          );
-        }
-      }
-    }
-
-    return { loaded, failed };
+    return loadFilesImpl(this, files);
   }
 
   // --- Playback ---
@@ -717,71 +669,97 @@ export class DawEditorElement extends LitElement {
     const selStartPx = (this._selectionStartTime * sr) / this.samplesPerPixel;
     const selEndPx = (this._selectionEndTime * sr) / this.samplesPerPixel;
 
+    // Precompute track info once for both controls column and timeline
+    const orderedTracks = this._getOrderedTracks().map(([trackId, track]) => {
+      const descriptor = this._tracks.get(trackId);
+      const firstPeaks = track.clips
+        .map((c) => this._peaksData.get(c.id))
+        .find((p) => p && p.data.length > 0);
+      const numChannels = firstPeaks ? firstPeaks.data.length : 1;
+      return {
+        trackId,
+        track,
+        descriptor,
+        numChannels,
+        trackHeight: this.waveHeight * numChannels,
+      };
+    });
+
     return html`
-      <div
-        class="timeline ${this._dragOver ? 'drag-over' : ''}"
-        style="width: ${Math.max(this._totalWidth, 100)}px;"
-        data-playing=${this._isPlaying}
-        @pointerdown=${this._pointer.onPointerDown}
-        @dragover=${this._onDragOver}
-        @dragleave=${this._onDragLeave}
-        @drop=${this._onDrop}
-      >
-        ${this.timescale
-          ? html`<daw-ruler
-              .samplesPerPixel=${this.samplesPerPixel}
-              .sampleRate=${this.effectiveSampleRate}
-              .duration=${this._duration}
-            ></daw-ruler>`
-          : ''}
-        <daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
-        <daw-playhead></daw-playhead>
-        ${this._getOrderedTracks().map(([trackId, track]) => {
-          // Determine channel count from peak data of first clip with peaks
-          const firstPeaks = track.clips
-            .map((c) => this._peaksData.get(c.id))
-            .find((p) => p && p.data.length > 0);
-          const numChannels = firstPeaks ? firstPeaks.data.length : 1;
-          const channelHeight = this.waveHeight;
-          const trackHeight = channelHeight * numChannels;
-
-          return html`
-            <div
-              class="track-row ${trackId === this._selectedTrackId ? 'selected' : ''}"
-              style="height: ${trackHeight}px;"
-              data-track-id=${trackId}
-            >
-              ${track.clips.map((clip) => {
-                const peakData = this._peaksData.get(clip.id);
-                const width = clipPixelWidth(
-                  clip.startSample,
-                  clip.durationSamples,
-                  this.samplesPerPixel
-                );
-                const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
-                const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
-
-                return channels.map(
-                  (channelPeaks, chIdx) => html`
-                    <daw-waveform
-                      style="position: absolute; left: ${clipLeft}px; top: ${chIdx *
-                      channelHeight}px;"
-                      .peaks=${channelPeaks}
-                      .bits=${16}
-                      .length=${peakData?.length ?? width}
-                      .waveHeight=${channelHeight}
-                      .barWidth=${this.barWidth}
-                      .barGap=${this.barGap}
-                      .visibleStart=${this._viewport.visibleStart}
-                      .visibleEnd=${this._viewport.visibleEnd}
-                      .originX=${clipLeft}
-                    ></daw-waveform>
-                  `
-                );
-              })}
-            </div>
-          `;
-        })}
+      <div class="controls-column">
+        ${this.timescale ? html`<div style="height: 26px;"></div>` : ''}
+        ${orderedTracks.map(
+          (t) => html`
+            <daw-track-controls
+              style="height: ${t.trackHeight}px;"
+              .trackId=${t.trackId}
+              .trackName=${t.descriptor?.name ?? 'Untitled'}
+              .volume=${t.descriptor?.volume ?? 1}
+              .pan=${t.descriptor?.pan ?? 0}
+              .muted=${t.descriptor?.muted ?? false}
+              .soloed=${t.descriptor?.soloed ?? false}
+            ></daw-track-controls>
+          `
+        )}
+      </div>
+      <div class="scroll-area">
+        <div
+          class="timeline ${this._dragOver ? 'drag-over' : ''}"
+          style="width: ${Math.max(this._totalWidth, 100)}px;"
+          data-playing=${this._isPlaying}
+          @pointerdown=${this._pointer.onPointerDown}
+          @dragover=${this._onDragOver}
+          @dragleave=${this._onDragLeave}
+          @drop=${this._onDrop}
+        >
+          ${this.timescale
+            ? html`<daw-ruler
+                .samplesPerPixel=${this.samplesPerPixel}
+                .sampleRate=${this.effectiveSampleRate}
+                .duration=${this._duration}
+              ></daw-ruler>`
+            : ''}
+          <daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
+          <daw-playhead></daw-playhead>
+          ${orderedTracks.map((t) => {
+            const channelHeight = this.waveHeight;
+            return html`
+              <div
+                class="track-row ${t.trackId === this._selectedTrackId ? 'selected' : ''}"
+                style="height: ${t.trackHeight}px;"
+                data-track-id=${t.trackId}
+              >
+                ${t.track.clips.map((clip) => {
+                  const peakData = this._peaksData.get(clip.id);
+                  const width = clipPixelWidth(
+                    clip.startSample,
+                    clip.durationSamples,
+                    this.samplesPerPixel
+                  );
+                  const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
+                  const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
+                  return channels.map(
+                    (channelPeaks, chIdx) => html`
+                      <daw-waveform
+                        style="position: absolute; left: ${clipLeft}px; top: ${chIdx *
+                        channelHeight}px;"
+                        .peaks=${channelPeaks}
+                        .bits=${16}
+                        .length=${peakData?.length ?? width}
+                        .waveHeight=${channelHeight}
+                        .barWidth=${this.barWidth}
+                        .barGap=${this.barGap}
+                        .visibleStart=${this._viewport.visibleStart}
+                        .visibleEnd=${this._viewport.visibleEnd}
+                        .originX=${clipLeft}
+                      ></daw-waveform>
+                    `
+                  );
+                })}
+              </div>
+            `;
+          })}
+        </div>
       </div>
       <slot></slot>
     `;

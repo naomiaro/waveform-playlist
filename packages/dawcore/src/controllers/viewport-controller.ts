@@ -21,10 +21,18 @@ export class ViewportController implements ReactiveController {
     host.addController(this);
   }
 
+  /** CSS selector for the scroll container inside the host's Shadow DOM. */
+  scrollSelector = '';
+
   hostConnected() {
-    // Re-attach scroll listener on reconnect (e.g. element moved in DOM).
-    // Use the host element itself as the scroll container (:host has overflow-x: auto).
-    this._attachScrollContainer(this._host);
+    // Defer to allow Shadow DOM to render before querying
+    requestAnimationFrame(() => {
+      if (!this._host.isConnected) return;
+      const container = this.scrollSelector
+        ? (this._host.shadowRoot?.querySelector(this.scrollSelector) as HTMLElement)
+        : this._host;
+      if (container) this._attachScrollContainer(container);
+    });
   }
 
   hostDisconnected() {

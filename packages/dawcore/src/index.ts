@@ -9,6 +9,7 @@ import './elements/daw-stop-button';
 import './elements/daw-editor';
 import './elements/daw-ruler';
 import './elements/daw-selection';
+import './elements/daw-track-controls';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
@@ -22,6 +23,7 @@ export { DawStopButtonElement } from './elements/daw-stop-button';
 export { DawEditorElement } from './elements/daw-editor';
 export { DawRulerElement } from './elements/daw-ruler';
 export { DawSelectionElement } from './elements/daw-selection';
+export { DawTrackControlsElement } from './elements/daw-track-controls';
 
 export type { PointerEngineContract } from './interactions/pointer-handler';
 
