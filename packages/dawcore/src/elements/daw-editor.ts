@@ -303,13 +303,14 @@ export class DawEditorElement extends LitElement {
     }
   };
 
+  private static _CONTROL_PROPS = new Set(['volume', 'pan', 'muted', 'soloed']);
+
   private _onTrackControl = (e: CustomEvent) => {
     const { trackId, prop, value } = e.detail ?? {};
-    if (!trackId || !prop) return;
+    if (!trackId || !prop || !DawEditorElement._CONTROL_PROPS.has(prop)) return;
 
-    // Update descriptor directly (works for both DOM and file-dropped tracks)
     const oldDescriptor = this._tracks.get(trackId);
-    if (oldDescriptor && prop in oldDescriptor) {
+    if (oldDescriptor) {
       const descriptor = { ...oldDescriptor, [prop]: value };
       this._tracks = new Map(this._tracks).set(trackId, descriptor);
 
@@ -334,7 +335,9 @@ export class DawEditorElement extends LitElement {
     if (!trackId) return;
     const trackEl = this._trackElements.get(trackId);
     if (trackEl) {
-      trackEl.remove();
+      trackEl.remove(); // MutationObserver will trigger _onTrackRemoved
+    } else {
+      this._onTrackRemoved(trackId); // File-dropped tracks: no DOM element
     }
   };
 
@@ -687,22 +690,24 @@ export class DawEditorElement extends LitElement {
     });
 
     return html`
-      <div class="controls-column">
-        ${this.timescale ? html`<div style="height: 30px;"></div>` : ''}
-        ${orderedTracks.map(
-          (t) => html`
-            <daw-track-controls
-              style="height: ${t.trackHeight}px;"
-              .trackId=${t.trackId}
-              .trackName=${t.descriptor?.name ?? 'Untitled'}
-              .volume=${t.descriptor?.volume ?? 1}
-              .pan=${t.descriptor?.pan ?? 0}
-              .muted=${t.descriptor?.muted ?? false}
-              .soloed=${t.descriptor?.soloed ?? false}
-            ></daw-track-controls>
-          `
-        )}
-      </div>
+      ${orderedTracks.length > 0
+        ? html`<div class="controls-column">
+            ${this.timescale ? html`<div style="height: 30px;"></div>` : ''}
+            ${orderedTracks.map(
+              (t) => html`
+                <daw-track-controls
+                  style="height: ${t.trackHeight}px;"
+                  .trackId=${t.trackId}
+                  .trackName=${t.descriptor?.name ?? 'Untitled'}
+                  .volume=${t.descriptor?.volume ?? 1}
+                  .pan=${t.descriptor?.pan ?? 0}
+                  .muted=${t.descriptor?.muted ?? false}
+                  .soloed=${t.descriptor?.soloed ?? false}
+                ></daw-track-controls>
+              `
+            )}
+          </div>`
+        : ''}
       <div class="scroll-area">
         <div
           class="timeline ${this._dragOver ? 'drag-over' : ''}"
