@@ -106,6 +106,7 @@ export class DawEditorElement extends LitElement {
         flex: 1;
         overflow-x: auto;
         overflow-y: hidden;
+        min-height: var(--daw-min-height, 200px);
       }
       .timeline {
         position: relative;
