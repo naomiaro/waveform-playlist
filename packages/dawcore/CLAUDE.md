@@ -113,6 +113,24 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **`daw-waveform` props** — `visibleStart`, `visibleEnd`, `originX` control which 1000px canvas chunks are rendered. Defaults to all-visible when not set.
 - **File size budget** — `daw-editor.ts` is at 800 lines (the hard max). Extract `loadFiles` (~100 lines) before adding more code.
 
+## Track Controls
+
+- **`<daw-track-controls>`** — Shadow DOM element. Receives track state as props from editor, dispatches `daw-track-control` and `daw-track-remove` events.
+- **Controls outside scroll container** — Flex layout: fixed `.controls-column` (180px, `--daw-controls-width`) + `.scroll-area` (overflow-x: auto). Controls stay fixed while waveforms scroll.
+- **Direct engine forwarding** — `daw-track-control` handler updates `_tracks` descriptor AND forwards to engine directly. Does not go through `<daw-track>` DOM element roundtrip (file-dropped tracks have no DOM element).
+- **Track ID alignment** — `createTrack()` generates its own `id`. Must set `track.id = trackId` after creation so `engine.setTrackSolo/Mute/Volume/Pan(trackId, ...)` can find the track. Applied in both `_loadTrack` and `file-loader.ts`.
+
+## File Loader Extraction
+
+- **`interactions/file-loader.ts`** — `loadFiles()` extracted via `FileLoaderHost` interface to keep editor under 800 lines.
+- **Non-private fields** — Fields accessed by the loader (`_tracks`, `_engineTracks`, `_peaksData`, `_clipBuffers`, `_audioCache`, `_peakPipeline`, `_resolvedSampleRate`, `_fetchAndDecode`, `_recomputeDuration`, `_ensureEngine`) are non-private (no `private` keyword, `_` prefix convention only).
+
+## Empty State
+
+- Hide playhead, selection, and ruler when `orderedTracks.length === 0`
+- Timeline width: `100%` when empty (not hardcoded pixels) for full-width dropzone
+- `.scroll-area` has `min-height: var(--daw-min-height, 200px)` for visible empty dropzone
+
 ## Lit/TypeScript Requirements
 
 - `experimentalDecorators: true` and `useDefineForClassFields: false` in tsconfig — required for Lit's `@property` and `@customElement` decorators

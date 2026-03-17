@@ -359,6 +359,7 @@ const LazyExample = createLazyExample(() =>
 36. **Detached Elements Cannot Dispatch Bubbling Events** — In `disconnectedCallback`, the element is already removed from the DOM. Events dispatched with `bubbles: true` will not reach ancestor elements. Use MutationObserver on the parent to detect child removal instead.
 37. **effectiveSampleRate Pattern in dawcore** — `<daw-editor>` `sampleRate` `@property` is an initial hint. Internal calculations use `effectiveSampleRate` getter which returns `_resolvedSampleRate ?? sampleRate`. The resolved rate is set from decoded audio buffers. `PointerHandlerHost` and all pixel/time conversions use `effectiveSampleRate`.
 38. **WaveformData.resample() Only Upsamples** — `WaveformData.resample({ scale })` can only resample to a coarser (larger) scale than the source. Attempting to resample to a finer scale throws. When caching WaveformData, validate `cached.scale <= requestedScale` before returning cache hits.
+39. **Track ID Alignment in dawcore** — `createTrack()` from core generates its own `id` via `generateId()`. The dawcore editor uses a different ID (`<daw-track>.trackId` or `crypto.randomUUID()` for drops) as its map key. Must set `track.id = trackId` after `createTrack()` so engine methods (`setTrackSolo`, `setTrackMute`, etc.) can find the track by ID.
 
 ---
 
