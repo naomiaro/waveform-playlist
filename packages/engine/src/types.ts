@@ -10,6 +10,8 @@ export interface PlayoutAdapter {
   setTracks(tracks: ClipTrack[]): void;
   /** Incrementally add a single track without rebuilding the entire playout. */
   addTrack?(track: ClipTrack): void;
+  /** Incrementally remove a single track without rebuilding the entire playout. */
+  removeTrack?(trackId: string): void;
   play(startTime: number, endTime?: number): void;
   pause(): void;
   stop(): void;

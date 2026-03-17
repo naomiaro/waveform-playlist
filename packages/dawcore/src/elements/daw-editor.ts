@@ -274,13 +274,8 @@ export class DawEditorElement extends LitElement {
     this._engineTracks = nextEngine;
     this._recomputeDuration();
     if (this._engine) {
-      // setTracks rebuilds the playout (stops Transport). Capture position first.
-      if (this._isPlaying) {
-        this._currentTime = this._engine.getCurrentTime();
-      }
-      this._engine.setTracks([...nextEngine.values()]);
-      // Stop playback — playout was rebuilt (standard DAW behavior)
-      this._stopPlayhead();
+      // Incremental removal preserves playback (no playout rebuild)
+      this._engine.removeTrack(trackId);
     }
     if (nextEngine.size === 0) {
       this._currentTime = 0;

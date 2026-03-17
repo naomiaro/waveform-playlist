@@ -185,6 +185,12 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       playout.applyInitialSoloState();
     },
 
+    removeTrack(trackId: string): void {
+      if (!playout) return;
+      playout.removeTrack(trackId);
+      playout.applyInitialSoloState();
+    },
+
     play(startTime: number, endTime?: number): void {
       if (!playout) {
         console.warn(

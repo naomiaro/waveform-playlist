@@ -125,7 +125,13 @@ export class PlaylistEngine {
     if (this._selectedTrackId === trackId) {
       this._selectedTrackId = null;
     }
-    this._adapter?.setTracks(this._tracks);
+    // Use incremental removeTrack when available (avoids full playout rebuild,
+    // preserves playback). Falls back to setTracks for adapters without it.
+    if (this._adapter?.removeTrack) {
+      this._adapter.removeTrack(trackId);
+    } else {
+      this._adapter?.setTracks(this._tracks);
+    }
     this._emitStateChange();
   }
 
