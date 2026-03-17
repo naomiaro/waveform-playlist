@@ -10,6 +10,11 @@
 
 **Dev page:** `pnpm dev:page` starts Vite at `http://localhost:5173/dev/index.html`. Uses `website/static/` as publicDir for audio files.
 
+## Dev Page Dependencies
+
+- **`pnpm dev:page` resolves peer packages from `dist/`** — No Vite source aliases. After changing `@waveform-playlist/engine` or `@waveform-playlist/playout` source, run `pnpm build` in those packages before testing on the dev page.
+- **Incremental track removal** — `engine.removeTrack(trackId)` uses `adapter.removeTrack()` when available (disposes single track, preserves playback). Falls back to `adapter.setTracks()` (full rebuild, stops Transport).
+
 ## Element Types
 
 **Data elements (light DOM):**
