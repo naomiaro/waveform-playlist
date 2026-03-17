@@ -706,7 +706,7 @@ export class DawEditorElement extends LitElement {
       <div class="scroll-area">
         <div
           class="timeline ${this._dragOver ? 'drag-over' : ''}"
-          style="width: ${Math.max(this._totalWidth, 100)}px;"
+          style="width: ${this._totalWidth > 0 ? this._totalWidth + 'px' : '100%'};"
           data-playing=${this._isPlaying}
           @pointerdown=${this._pointer.onPointerDown}
           @dragover=${this._onDragOver}
