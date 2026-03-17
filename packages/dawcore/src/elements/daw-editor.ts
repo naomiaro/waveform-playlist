@@ -274,16 +274,14 @@ export class DawEditorElement extends LitElement {
     this._engineTracks = nextEngine;
     this._recomputeDuration();
     if (this._engine) {
-      const wasPlaying = this._isPlaying;
-      const currentTime = wasPlaying ? this._engine.getCurrentTime() : this._currentTime;
-      this._engine.setTracks([...nextEngine.values()]);
-      // Resume playback if it was playing and tracks remain
-      if (wasPlaying && nextEngine.size > 0) {
-        this._engine.play(currentTime);
-        this._startPlayhead();
+      // setTracks rebuilds the playout (stops Transport). Capture position first.
+      if (this._isPlaying) {
+        this._currentTime = this._engine.getCurrentTime();
       }
+      this._engine.setTracks([...nextEngine.values()]);
+      // Stop playback — playout was rebuilt (standard DAW behavior)
+      this._stopPlayhead();
     }
-    // Reset playhead when all tracks removed
     if (nextEngine.size === 0) {
       this._currentTime = 0;
       this._stopPlayhead();
