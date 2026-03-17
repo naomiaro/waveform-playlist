@@ -3,38 +3,18 @@
  * Operates on the editor instance via a narrow interface.
  */
 
-import type { ClipTrack, FadeType, PeakData } from '@waveform-playlist/core';
+import type { ClipTrack, PeakData } from '@waveform-playlist/core';
 import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
 import type { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackIdDetail, DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
+import type { TrackDescriptor } from '../elements/daw-editor';
 
 export interface FileLoaderHost {
   readonly samplesPerPixel: number;
   readonly mono: boolean;
   readonly isConnected: boolean;
   _resolvedSampleRate: number | null;
-  _tracks: Map<
-    string,
-    {
-      name: string;
-      src: string;
-      volume: number;
-      pan: number;
-      muted: boolean;
-      soloed: boolean;
-      clips: Array<{
-        src: string;
-        start: number;
-        duration: number;
-        offset: number;
-        gain: number;
-        name: string;
-        fadeIn: number;
-        fadeOut: number;
-        fadeType: FadeType;
-      }>;
-    }
-  >;
+  _tracks: Map<string, TrackDescriptor>;
   _engineTracks: Map<string, ClipTrack>;
   _peaksData: Map<string, PeakData>;
   _clipBuffers: Map<string, AudioBuffer>;

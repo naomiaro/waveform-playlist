@@ -20,7 +20,7 @@ import type {
 } from '../events';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 
-interface TrackDescriptor {
+export interface TrackDescriptor {
   name: string;
   src: string;
   volume: number;
