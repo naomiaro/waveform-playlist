@@ -38,5 +38,7 @@ export type {
   DawTrackErrorDetail,
   DawFilesLoadErrorDetail,
   DawErrorDetail,
+  DawTrackControlDetail,
+  DawTrackRemoveDetail,
   LoadFilesResult,
 } from './events';

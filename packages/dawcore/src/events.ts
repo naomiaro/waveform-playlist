@@ -41,6 +41,16 @@ export interface DawErrorDetail {
   error: unknown;
 }
 
+export interface DawTrackControlDetail {
+  trackId: string;
+  prop: string;
+  value: number | boolean;
+}
+
+export interface DawTrackRemoveDetail {
+  trackId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Event map — augments HTMLElementEventMap for typed addEventListener
 // ---------------------------------------------------------------------------
@@ -58,6 +68,8 @@ export interface DawEventMap {
   'daw-pause': CustomEvent<void>;
   'daw-stop': CustomEvent<void>;
   'daw-error': CustomEvent<DawErrorDetail>;
+  'daw-track-control': CustomEvent<DawTrackControlDetail>;
+  'daw-track-remove': CustomEvent<DawTrackRemoveDetail>;
 }
 
 // Helper type for creating typed custom events

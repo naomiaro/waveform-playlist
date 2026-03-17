@@ -86,7 +86,7 @@ export async function loadFiles(
         sourceDuration: audioBuffer.duration,
       });
 
-      host._clipBuffers.set(clip.id, audioBuffer);
+      host._clipBuffers = new Map(host._clipBuffers).set(clip.id, audioBuffer);
       const peakData = await host._peakPipeline.generatePeaks(
         audioBuffer,
         host.samplesPerPixel,

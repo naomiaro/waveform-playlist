@@ -53,7 +53,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 ## Reactive Controllers
 
 - `AnimationController` — Start/stop RAF loops, auto-cleanup on `hostDisconnected`. Used by `<daw-playhead>`.
-- `ViewportController` — (Scaffolded, not yet wired) Scroll-aware visible range with overscan buffer (1.5x). Will be integrated when `<daw-editor>` supports virtual scrolling.
+- `ViewportController` — Scroll-aware visible range with overscan buffer (1.5x). Attached to `.scroll-area` via `scrollSelector`. See Virtual Scrolling section.
 - `EngineController` — (Scaffolded, not yet wired) DOM traversal to find closest `<daw-editor>`. Will be used by sub-elements that need engine access.
 
 ## Ported Utilities
@@ -107,7 +107,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Virtual Scrolling
 
-- **`ViewportController`** — Lit reactive controller. Attaches to `:host` (scroll container) via `hostConnected` — auto-reattaches on disconnect/reconnect. Tracks scroll position with 1.5x overscan buffer and 100px threshold. Calls `requestUpdate()` on attach and scroll.
+- **`ViewportController`** — Lit reactive controller. Attaches to `.scroll-area` (via `scrollSelector`) in `hostConnected` — auto-reattaches on disconnect/reconnect. Tracks scroll position with 1.5x overscan buffer and 100px threshold. Calls `requestUpdate()` on attach and scroll.
 - **`getVisibleChunkIndices()`** — Shared pure function in `utils/viewport.ts`, re-exported from `viewport-controller.ts`. Used by `daw-waveform._getVisibleChunkIndices()`.
 - **Permissive defaults** — Controller initializes `visibleStart=-Infinity, visibleEnd=Infinity` so all chunks render before scroll container is attached.
 - **`daw-waveform` props** — `visibleStart`, `visibleEnd`, `originX` control which 1000px canvas chunks are rendered. Defaults to all-visible when not set.

@@ -314,12 +314,14 @@ export class DawEditorElement extends LitElement {
       const descriptor = { ...oldDescriptor, [prop]: value };
       this._tracks = new Map(this._tracks).set(trackId, descriptor);
 
-      // Forward to engine
+      // Forward to engine with validated values
       if (this._engine) {
-        if (prop === 'volume') this._engine.setTrackVolume(trackId, value as number);
-        if (prop === 'pan') this._engine.setTrackPan(trackId, value as number);
-        if (prop === 'muted') this._engine.setTrackMute(trackId, value as boolean);
-        if (prop === 'soloed') this._engine.setTrackSolo(trackId, value as boolean);
+        if (prop === 'volume')
+          this._engine.setTrackVolume(trackId, Math.max(0, Math.min(1, Number(value))));
+        if (prop === 'pan')
+          this._engine.setTrackPan(trackId, Math.max(-1, Math.min(1, Number(value))));
+        if (prop === 'muted') this._engine.setTrackMute(trackId, Boolean(value));
+        if (prop === 'soloed') this._engine.setTrackSolo(trackId, Boolean(value));
       }
     }
 
@@ -405,7 +407,7 @@ export class DawEditorElement extends LitElement {
           sourceDuration: audioBuffer.duration,
         });
 
-        this._clipBuffers.set(clip.id, audioBuffer);
+        this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
         const peakData = await this._peakPipeline.generatePeaks(
           audioBuffer,
           this.samplesPerPixel,
