@@ -239,6 +239,49 @@ describe('PlaylistEngine', () => {
       expect(eng.getState().tracks).toHaveLength(1);
       eng.dispose();
     });
+
+    it('removeTrack with non-existent ID does not call adapter', () => {
+      const adapter = createMockAdapter();
+      (adapter as any).removeTrack = vi.fn();
+      const eng = new PlaylistEngine({ adapter });
+      eng.setTracks([makeTrack('t1', [])]);
+      (adapter.setTracks as ReturnType<typeof vi.fn>).mockClear();
+
+      eng.removeTrack('nonexistent');
+
+      expect((adapter as any).removeTrack).not.toHaveBeenCalled();
+      expect(adapter.setTracks).not.toHaveBeenCalled();
+      expect(eng.getState().tracks).toHaveLength(1);
+      eng.dispose();
+    });
+
+    it('removeTrack clears selectedTrackId when selected track is removed', () => {
+      const adapter = createMockAdapter();
+      (adapter as any).removeTrack = vi.fn();
+      const eng = new PlaylistEngine({ adapter });
+      eng.setTracks([makeTrack('t1', []), makeTrack('t2', [])]);
+      eng.selectTrack('t1');
+      expect(eng.getState().selectedTrackId).toBe('t1');
+
+      eng.removeTrack('t1');
+
+      expect(eng.getState().selectedTrackId).toBeNull();
+      eng.dispose();
+    });
+
+    it('removeTrack does not clear selectedTrackId when a different track is removed', () => {
+      const adapter = createMockAdapter();
+      (adapter as any).removeTrack = vi.fn();
+      const eng = new PlaylistEngine({ adapter });
+      eng.setTracks([makeTrack('t1', []), makeTrack('t2', [])]);
+      eng.selectTrack('t1');
+
+      eng.removeTrack('t2');
+
+      expect(eng.getState().selectedTrackId).toBe('t1');
+      expect(eng.getState().tracks).toHaveLength(1);
+      eng.dispose();
+    });
   });
 
   describe('clip editing', () => {

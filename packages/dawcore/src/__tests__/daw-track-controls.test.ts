@@ -151,4 +151,58 @@ describe('DawTrackControlsElement', () => {
 
     document.body.removeChild(el);
   });
+
+  it('dispatches daw-track-control on volume slider input', async () => {
+    const el = document.createElement('daw-track-controls') as any;
+    el.trackId = 'track-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const events: CustomEvent[] = [];
+    el.addEventListener('daw-track-control', (e: CustomEvent) => events.push(e));
+
+    const slider = el.shadowRoot.querySelectorAll('input[type="range"]')[0];
+    slider.value = '0.5';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toEqual({ trackId: 'track-1', prop: 'volume', value: 0.5 });
+    document.body.removeChild(el);
+  });
+
+  it('dispatches daw-track-control on pan slider input', async () => {
+    const el = document.createElement('daw-track-controls') as any;
+    el.trackId = 'track-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const events: CustomEvent[] = [];
+    el.addEventListener('daw-track-control', (e: CustomEvent) => events.push(e));
+
+    const slider = el.shadowRoot.querySelectorAll('input[type="range"]')[1];
+    slider.value = '-0.3';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toEqual({ trackId: 'track-1', prop: 'pan', value: -0.3 });
+    document.body.removeChild(el);
+  });
+
+  it('events have composed: true for Shadow DOM crossing', async () => {
+    const el = document.createElement('daw-track-controls') as any;
+    el.trackId = 'track-1';
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    let composed: boolean | undefined;
+    el.addEventListener('daw-track-control', (e: CustomEvent) => {
+      composed = e.composed;
+    });
+
+    const muteBtn = el.shadowRoot.querySelector('button[title="Mute"]');
+    muteBtn.click();
+
+    expect(composed).toBe(true);
+    document.body.removeChild(el);
+  });
 });
