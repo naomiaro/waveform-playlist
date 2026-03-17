@@ -687,7 +687,7 @@ export class DawEditorElement extends LitElement {
 
     return html`
       <div class="controls-column">
-        ${this.timescale ? html`<div style="height: 26px;"></div>` : ''}
+        ${this.timescale ? html`<div style="height: 30px;"></div>` : ''}
         ${orderedTracks.map(
           (t) => html`
             <daw-track-controls
