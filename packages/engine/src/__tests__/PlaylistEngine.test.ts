@@ -211,6 +211,34 @@ describe('PlaylistEngine', () => {
       expect(listener).not.toHaveBeenCalled();
       engine.dispose();
     });
+
+    it('removeTrack uses adapter.removeTrack when available', () => {
+      const adapter = createMockAdapter();
+      (adapter as any).removeTrack = vi.fn();
+      const eng = new PlaylistEngine({ adapter });
+      eng.setTracks([makeTrack('t1', []), makeTrack('t2', [])]);
+      (adapter.setTracks as ReturnType<typeof vi.fn>).mockClear();
+
+      eng.removeTrack('t1');
+
+      expect((adapter as any).removeTrack).toHaveBeenCalledWith('t1');
+      expect(adapter.setTracks).not.toHaveBeenCalled();
+      expect(eng.getState().tracks).toHaveLength(1);
+      eng.dispose();
+    });
+
+    it('removeTrack falls back to setTracks when adapter lacks removeTrack', () => {
+      const adapter = createMockAdapter();
+      const eng = new PlaylistEngine({ adapter });
+      eng.setTracks([makeTrack('t1', []), makeTrack('t2', [])]);
+      (adapter.setTracks as ReturnType<typeof vi.fn>).mockClear();
+
+      eng.removeTrack('t1');
+
+      expect(adapter.setTracks).toHaveBeenCalledOnce();
+      expect(eng.getState().tracks).toHaveLength(1);
+      eng.dispose();
+    });
   });
 
   describe('clip editing', () => {
