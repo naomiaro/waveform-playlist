@@ -276,6 +276,11 @@ export class DawEditorElement extends LitElement {
     if (this._engine) {
       this._engine.setTracks([...nextEngine.values()]);
     }
+    // Reset playhead when all tracks removed
+    if (nextEngine.size === 0) {
+      this._currentTime = 0;
+      this._stopPlayhead();
+    }
   }
 
   private _onTrackUpdate = (e: CustomEvent) => {
