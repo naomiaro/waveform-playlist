@@ -323,11 +323,9 @@ export class DawEditorElement extends LitElement {
       }
     }
 
-    // Also sync the <daw-track> DOM element if it exists
-    const trackEl = this._trackElements.get(trackId);
-    if (trackEl && prop in trackEl) {
-      (trackEl as unknown as Record<string, unknown>)[prop] = value;
-    }
+    // Note: we don't sync back to the <daw-track> DOM element to avoid
+    // a redundant daw-track-update → _onTrackUpdate loop. The _tracks
+    // descriptor map is the source of truth for control values.
   };
 
   private _onTrackRemoveRequest = (e: CustomEvent) => {
