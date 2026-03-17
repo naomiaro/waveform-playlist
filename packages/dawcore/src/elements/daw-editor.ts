@@ -110,7 +110,7 @@ export class DawEditorElement extends LitElement {
       }
       .timeline {
         position: relative;
-        min-height: 50px;
+        min-height: 100%;
         cursor: text;
       }
       .track-row {
@@ -713,15 +713,17 @@ export class DawEditorElement extends LitElement {
           @dragleave=${this._onDragLeave}
           @drop=${this._onDrop}
         >
-          ${this.timescale
+          ${orderedTracks.length > 0 && this.timescale
             ? html`<daw-ruler
                 .samplesPerPixel=${this.samplesPerPixel}
                 .sampleRate=${this.effectiveSampleRate}
                 .duration=${this._duration}
               ></daw-ruler>`
             : ''}
-          <daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
-          <daw-playhead></daw-playhead>
+          ${orderedTracks.length > 0
+            ? html`<daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
+                <daw-playhead></daw-playhead>`
+            : ''}
           ${orderedTracks.map((t) => {
             const channelHeight = this.waveHeight;
             return html`
