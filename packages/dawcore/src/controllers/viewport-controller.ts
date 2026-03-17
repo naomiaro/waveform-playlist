@@ -31,7 +31,15 @@ export class ViewportController implements ReactiveController {
       const container = this.scrollSelector
         ? (this._host.shadowRoot?.querySelector(this.scrollSelector) as HTMLElement)
         : this._host;
-      if (container) this._attachScrollContainer(container);
+      if (container) {
+        this._attachScrollContainer(container);
+      } else if (this.scrollSelector) {
+        console.warn(
+          '[dawcore] ViewportController: scroll container not found for "' +
+            this.scrollSelector +
+            '"'
+        );
+      }
     });
   }
 

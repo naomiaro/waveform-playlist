@@ -578,6 +578,13 @@ export class DawEditorElement extends LitElement {
       await this.loadFiles(files);
     } catch (err) {
       console.warn('[dawcore] File drop failed: ' + String(err));
+      this.dispatchEvent(
+        new CustomEvent<DawErrorDetail>('daw-error', {
+          bubbles: true,
+          composed: true,
+          detail: { operation: 'file-drop', error: err },
+        })
+      );
     }
   };
 

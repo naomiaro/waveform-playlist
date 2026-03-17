@@ -146,12 +146,12 @@ export class DawTrackControlsElement extends LitElement {
 
   private _onVolumeInput = (e: Event) => {
     const value = Number((e.target as HTMLInputElement).value);
-    this._dispatchControl('volume', value);
+    if (Number.isFinite(value)) this._dispatchControl('volume', value);
   };
 
   private _onPanInput = (e: Event) => {
     const value = Number((e.target as HTMLInputElement).value);
-    this._dispatchControl('pan', value);
+    if (Number.isFinite(value)) this._dispatchControl('pan', value);
   };
 
   private _onMuteClick = () => {
