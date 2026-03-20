@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@waveform-playlist/playout', () => ({
-  resumeGlobalAudioContext: vi.fn(),
+  resumeGlobalAudioContext: vi.fn(() => Promise.resolve()),
 }));
 
 import { AudioResumeController } from '../controllers/audio-resume-controller';
@@ -150,5 +150,57 @@ describe('AudioResumeController', () => {
 
     warnSpy.mockRestore();
     hostSpy.mockRestore();
+  });
+
+  it('skips attachment when host is disconnected before rAF fires', () => {
+    const addSpy = vi.spyOn(host, 'addEventListener');
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+    controller.hostConnected();
+
+    // Disconnect before rAF fires
+    host.remove();
+    flushRaf();
+
+    const captureListeners = addSpy.mock.calls.filter(
+      ([, , opts]) => (opts as any)?.capture === true
+    );
+    expect(captureListeners.length).toBe(0);
+  });
+
+  it('logs warning when resumeGlobalAudioContext rejects', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(resumeGlobalAudioContext).mockRejectedValueOnce(new Error('Context closed'));
+
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+
+    host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    // Allow microtask to settle
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('eager resume failed'));
+    warnSpy.mockRestore();
+  });
+
+  it('warns and becomes inert on invalid CSS selector', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const addSpy = vi.spyOn(host, 'addEventListener');
+
+    const controller = new AudioResumeController(host);
+    controller.target = '[invalid';
+    controller.hostConnected();
+    flushRaf();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('failed to resolve target'));
+    const captureListeners = addSpy.mock.calls.filter(
+      ([, , opts]) => (opts as any)?.capture === true
+    );
+    expect(captureListeners.length).toBe(0);
+
+    warnSpy.mockRestore();
   });
 });

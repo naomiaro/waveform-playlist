@@ -20,7 +20,18 @@ export class AudioResumeController implements ReactiveController {
     requestAnimationFrame(() => {
       if (!this._host.isConnected || this._attached || this.target === undefined) return;
 
-      const resolvedTarget = this._resolveTarget();
+      let resolvedTarget: EventTarget | null;
+      try {
+        resolvedTarget = this._resolveTarget();
+      } catch (err) {
+        console.warn(
+          '[dawcore] AudioResumeController: failed to resolve target "' +
+            this.target +
+            '": ' +
+            String(err)
+        );
+        return;
+      }
       if (!resolvedTarget) return;
 
       this._target = resolvedTarget;
@@ -42,7 +53,11 @@ export class AudioResumeController implements ReactiveController {
   }
 
   private _onGesture = (e: Event) => {
-    resumeGlobalAudioContext();
+    resumeGlobalAudioContext().catch((err) => {
+      console.warn(
+        '[dawcore] AudioResumeController: eager resume failed, will retry on play: ' + String(err)
+      );
+    });
     // Remove the other listener (the fired one was auto-removed by { once: true })
     const otherType = e.type === 'pointerdown' ? 'keydown' : 'pointerdown';
     this._target?.removeEventListener(otherType, this._onGesture, {
@@ -59,7 +74,12 @@ export class AudioResumeController implements ReactiveController {
 
     const el = document.querySelector(t);
     if (!el) {
-      console.warn('[dawcore] AudioResumeController: target not found for "' + t + '", using host');
+      console.warn(
+        '[dawcore] AudioResumeController: target "' +
+          t +
+          '" not found in DOM at attach time, falling back to host element. ' +
+          'Ensure the target exists before <daw-editor> connects.'
+      );
       return this._host;
     }
     return el;
