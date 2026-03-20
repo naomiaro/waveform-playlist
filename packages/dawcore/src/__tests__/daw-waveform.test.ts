@@ -166,6 +166,34 @@ describe('DawWaveformElement', () => {
     document.body.removeChild(el);
   });
 
+  it('marks all dirty when waveHeight changes', async () => {
+    const el = document.createElement('daw-waveform') as any;
+    el.length = 100;
+    el.peaks = new Int16Array([0, 100, -50, 200, 0, 150, -100, 300]);
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 50));
+    flushRaf(); // initial draw
+
+    const canvas = el.shadowRoot?.querySelector('canvas');
+    expect(canvas).toBeTruthy();
+
+    const mockCtx = {
+      clearRect: vi.fn(),
+      resetTransform: vi.fn(),
+      scale: vi.fn(),
+      fillStyle: '',
+      fillRect: vi.fn(),
+    };
+    vi.spyOn(canvas!, 'getContext').mockReturnValue(mockCtx as any);
+
+    el.waveHeight = 256;
+    await new Promise((r) => setTimeout(r, 50));
+    flushRaf();
+
+    expect(mockCtx.clearRect).toHaveBeenCalled();
+    document.body.removeChild(el);
+  });
+
   it('skips draw when dirty set is empty', async () => {
     const el = document.createElement('daw-waveform') as any;
     el.length = 100;
