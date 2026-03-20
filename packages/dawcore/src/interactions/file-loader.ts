@@ -7,7 +7,7 @@ import type { ClipTrack, PeakData } from '@waveform-playlist/core';
 import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
 import type { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackIdDetail, DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
-import type { TrackDescriptor } from '../elements/daw-editor';
+import type { TrackDescriptor } from '../types';
 
 export interface FileLoaderHost {
   readonly samplesPerPixel: number;

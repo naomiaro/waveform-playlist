@@ -5,6 +5,7 @@ export class AudioResumeController implements ReactiveController {
   private _host: ReactiveControllerHost & HTMLElement;
   private _target: EventTarget | null = null;
   private _attached = false;
+  private _generation = 0;
 
   /** CSS selector, or 'document'. When undefined, controller is inert. */
   target?: string;
@@ -17,7 +18,9 @@ export class AudioResumeController implements ReactiveController {
   hostConnected() {
     // Defer to next frame so Lit's willUpdate() can set `target` from
     // the host's attribute before we read it. Same pattern as ViewportController.
+    const gen = ++this._generation;
     requestAnimationFrame(() => {
+      if (gen !== this._generation) return; // stale callback from previous connect
       if (!this._host.isConnected || this._attached || this.target === undefined) return;
 
       let resolvedTarget: EventTarget | null;

@@ -203,4 +203,25 @@ describe('AudioResumeController', () => {
 
     warnSpy.mockRestore();
   });
+
+  it('ignores stale rAF from previous hostConnected after disconnect/reconnect', () => {
+    const addSpy = vi.spyOn(host, 'addEventListener');
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+
+    // First connect schedules rAF-A
+    controller.hostConnected();
+    // Disconnect invalidates rAF-A
+    controller.hostDisconnected();
+    // Reconnect schedules rAF-B
+    controller.hostConnected();
+    // Both rAFs fire — only rAF-B should attach listeners
+    flushRaf();
+
+    const captureListeners = addSpy.mock.calls.filter(
+      ([, , opts]) => (opts as any)?.capture === true
+    );
+    // Exactly 2 listeners (pointerdown + keydown), not 4
+    expect(captureListeners.length).toBe(2);
+  });
 });

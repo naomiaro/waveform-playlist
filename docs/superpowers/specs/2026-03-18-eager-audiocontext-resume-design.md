@@ -78,7 +78,7 @@ When the attribute is absent, `eagerResume` is `undefined`. When present with no
 
 **Behavior:** The controller is self-contained — it only reads from its constructor options, never from host properties. The editor creates it in the constructor and sets the `target` property on it. In `hostConnected()`, the controller reads `this.target` to resolve the listener target. When `target` is `undefined`, the controller skips listener attachment (inert).
 
-The editor sets the controller's `target` from `eagerResume` in `willUpdate()` (runs before `hostConnected()` on first render, and on subsequent attribute changes — though dynamic changes after first connection have no effect since listeners are already attached or skipped).
+The editor sets the controller's `target` from `eagerResume` in `willUpdate()`. Note: `hostConnected()` fires BEFORE `willUpdate()` in Lit's lifecycle, so the controller defers its work via `requestAnimationFrame` — by the time the rAF fires, `willUpdate()` has already set `target`.
 
 This follows `ViewportController.scrollSelector` — a public property set by the host, read by the controller in `hostConnected()`.
 
