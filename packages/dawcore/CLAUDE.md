@@ -60,6 +60,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - `AnimationController` — Start/stop RAF loops, auto-cleanup on `hostDisconnected`. Used by `<daw-playhead>`.
 - `ViewportController` — Scroll-aware visible range with overscan buffer (1.5x). Attached to `.scroll-area` via `scrollSelector`. See Virtual Scrolling section.
 - `EngineController` — (Scaffolded, not yet wired) DOM traversal to find closest `<daw-editor>`. Will be used by sub-elements that need engine access.
+- `AudioResumeController` — One-shot AudioContext resume on first user gesture (`pointerdown`/`keydown`). Configurable target: host element (default), `'document'`, or CSS selector. Used by `<daw-editor eager-resume>`. Exported for standalone use.
 
 ## Ported Utilities
 
