@@ -66,4 +66,91 @@ describe('AudioResumeController', () => {
 
     expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
   });
+
+  it('calls resumeGlobalAudioContext on first keydown', () => {
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+
+    host.dispatchEvent(new Event('keydown', { bubbles: true }));
+
+    expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
+  });
+
+  it('only calls resume once (second event is no-op)', () => {
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+
+    host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    host.dispatchEvent(new Event('keydown', { bubbles: true }));
+
+    expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
+  });
+
+  it('removes listeners on hostDisconnected before any event fires', () => {
+    const removeSpy = vi.spyOn(host, 'removeEventListener');
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+
+    controller.hostDisconnected();
+
+    const captureRemovals = removeSpy.mock.calls.filter(
+      ([, , opts]) => (opts as any)?.capture === true
+    );
+    expect(captureRemovals.length).toBe(2);
+    expect(resumeGlobalAudioContext).not.toHaveBeenCalled();
+  });
+
+  it('attaches to document when target is "document"', () => {
+    const docSpy = vi.spyOn(document, 'addEventListener');
+    const controller = new AudioResumeController(host);
+    controller.target = 'document';
+    controller.hostConnected();
+    flushRaf();
+
+    document.dispatchEvent(new Event('pointerdown'));
+
+    expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
+    docSpy.mockRestore();
+  });
+
+  it('resolves CSS selector target', () => {
+    const target = document.createElement('div');
+    target.id = 'audio-scope';
+    document.body.appendChild(target);
+
+    const targetSpy = vi.spyOn(target, 'addEventListener');
+    const controller = new AudioResumeController(host);
+    controller.target = '#audio-scope';
+    controller.hostConnected();
+    flushRaf();
+
+    expect(targetSpy.mock.calls.some(([type]) => type === 'pointerdown')).toBe(true);
+
+    target.remove();
+    targetSpy.mockRestore();
+  });
+
+  it('falls back to host when selector does not match', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const hostSpy = vi.spyOn(host, 'addEventListener');
+
+    const controller = new AudioResumeController(host);
+    controller.target = '#nonexistent';
+    controller.hostConnected();
+    flushRaf();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('#nonexistent')
+    );
+    expect(hostSpy.mock.calls.some(([type]) => type === 'pointerdown')).toBe(true);
+
+    warnSpy.mockRestore();
+    hostSpy.mockRestore();
+  });
 });
