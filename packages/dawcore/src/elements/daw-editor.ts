@@ -10,6 +10,7 @@ import type { PlaylistEngine } from '@waveform-playlist/engine';
 import '../elements/daw-track-controls';
 import { hostStyles } from '../styles/theme';
 import { ViewportController } from '../controllers/viewport-controller';
+import { AudioResumeController } from '../controllers/audio-resume-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
 import type {
   DawSelectionDetail,
@@ -82,6 +83,8 @@ export class DawEditorElement extends LitElement {
   _peakPipeline = new PeakPipeline();
   private _trackElements = new Map<string, DawTrackElement>();
   private _childObserver: MutationObserver | null = null;
+  private _audioResume = new AudioResumeController(this);
+  @property({ attribute: 'eager-resume' }) eagerResume?: string;
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
     const v = new ViewportController(this);
@@ -222,6 +225,10 @@ export class DawEditorElement extends LitElement {
   }
 
   willUpdate(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has('eagerResume')) {
+      this._audioResume.target = this.eagerResume;
+    }
+
     // Re-extract peaks at new zoom level from cached WaveformData (near-instant)
     if (changedProperties.has('samplesPerPixel') && this._clipBuffers.size > 0) {
       const reextracted = this._peakPipeline.reextractPeaks(

@@ -25,6 +25,8 @@ export { DawRulerElement } from './elements/daw-ruler';
 export { DawSelectionElement } from './elements/daw-selection';
 export { DawTrackControlsElement } from './elements/daw-track-controls';
 
+export { AudioResumeController } from './controllers/audio-resume-controller';
+
 export type { PointerEngineContract } from './interactions/pointer-handler';
 
 export type {
