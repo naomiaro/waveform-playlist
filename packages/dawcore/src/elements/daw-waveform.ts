@@ -12,8 +12,25 @@ const MAX_CANVAS_WIDTH = 1000;
 
 @customElement('daw-waveform')
 export class DawWaveformElement extends LitElement {
-  @property({ type: Object, attribute: false }) peaks: Peaks = new Int16Array(0);
-  @property({ type: Number, attribute: false }) bits: Bits = 16;
+  private _peaks: Peaks = new Int16Array(0);
+  private _dirtyPixels: Set<number> = new Set();
+  private _drawScheduled = false;
+  private _rafId = 0;
+
+  set peaks(value: Peaks) {
+    this._peaks = value;
+    this._markAllDirty();
+    this.requestUpdate();
+  }
+
+  get peaks(): Peaks {
+    return this._peaks;
+  }
+
+  get bits(): Bits {
+    return this._peaks instanceof Int8Array ? 8 : 16;
+  }
+
   @property({ type: Number, attribute: false }) length = 0;
   @property({ type: Number, attribute: false }) waveHeight = 128;
   @property({ type: Number, attribute: false }) barWidth = 1;
@@ -49,6 +66,37 @@ export class DawWaveformElement extends LitElement {
     );
   }
 
+  private _markAllDirty() {
+    const peakCount = Math.floor(this._peaks.length / 2);
+    for (let i = 0; i < peakCount; i++) {
+      this._dirtyPixels.add(i);
+    }
+    this._scheduleDraw();
+  }
+
+  private _scheduleDraw() {
+    if (!this._drawScheduled) {
+      this._drawScheduled = true;
+      this._rafId = requestAnimationFrame(() => {
+        this._drawScheduled = false;
+        this._drawDirty();
+      });
+    }
+  }
+
+  private _drawDirty() {
+    this._dirtyPixels.clear();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._drawScheduled) {
+      cancelAnimationFrame(this._rafId);
+      this._drawScheduled = false;
+    }
+    this._dirtyPixels.clear();
+  }
+
   render() {
     const indices = this._getVisibleChunkIndices();
     const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
@@ -72,11 +120,11 @@ export class DawWaveformElement extends LitElement {
   }
 
   updated() {
-    this._drawVisibleChunks();
+    this._markAllDirty();
   }
 
   private _drawVisibleChunks() {
-    if (this.length === 0 || this.peaks.length === 0) return;
+    if (this.length === 0 || this._peaks.length === 0) return;
 
     const canvases = this.shadowRoot?.querySelectorAll('canvas');
     if (!canvases) return;
@@ -105,7 +153,7 @@ export class DawWaveformElement extends LitElement {
       const firstBar = calculateFirstBarPosition(globalOffset, this.barWidth, step);
 
       for (let bar = Math.max(0, firstBar); bar < canvasEnd; bar += step) {
-        const peak = aggregatePeaks(this.peaks, this.bits, bar, bar + step);
+        const peak = aggregatePeaks(this._peaks, this.bits, bar, bar + step);
         if (!peak) continue;
         const rects = calculateBarRects(
           bar - globalOffset,
