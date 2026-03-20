@@ -145,9 +145,7 @@ describe('AudioResumeController', () => {
     controller.hostConnected();
     flushRaf();
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('#nonexistent')
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('#nonexistent'));
     expect(hostSpy.mock.calls.some(([type]) => type === 'pointerdown')).toBe(true);
 
     warnSpy.mockRestore();

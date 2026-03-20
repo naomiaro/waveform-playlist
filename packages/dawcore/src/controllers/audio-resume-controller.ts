@@ -59,9 +59,7 @@ export class AudioResumeController implements ReactiveController {
 
     const el = document.querySelector(t);
     if (!el) {
-      console.warn(
-        '[dawcore] AudioResumeController: target not found for "' + t + '", using host'
-      );
+      console.warn('[dawcore] AudioResumeController: target not found for "' + t + '", using host');
       return this._host;
     }
     return el;

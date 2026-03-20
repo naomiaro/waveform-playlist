@@ -60,9 +60,7 @@ describe('DawEditorElement', () => {
     // Wait for Lit update cycle + rAF
     await new Promise((r) => setTimeout(r, 50));
 
-    const captureListeners = spy.mock.calls.filter(
-      ([, , opts]) => (opts as any)?.capture === true
-    );
+    const captureListeners = spy.mock.calls.filter(([, , opts]) => (opts as any)?.capture === true);
     expect(captureListeners.length).toBeGreaterThanOrEqual(2);
 
     document.body.removeChild(el);
@@ -76,11 +74,9 @@ describe('DawEditorElement', () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const captureListeners = spy.mock.calls.filter(
-      ([type]) => type === 'pointerdown' || type === 'keydown'
-    ).filter(
-      ([, , opts]) => (opts as any)?.capture === true
-    );
+    const captureListeners = spy.mock.calls
+      .filter(([type]) => type === 'pointerdown' || type === 'keydown')
+      .filter(([, , opts]) => (opts as any)?.capture === true);
     expect(captureListeners.length).toBe(0);
 
     document.body.removeChild(el);
@@ -97,8 +93,7 @@ describe('DawEditorElement', () => {
 
     const docCapture = docSpy.mock.calls.filter(
       ([type, , opts]) =>
-        (type === 'pointerdown' || type === 'keydown') &&
-        (opts as any)?.capture === true
+        (type === 'pointerdown' || type === 'keydown') && (opts as any)?.capture === true
     );
     expect(docCapture.length).toBeGreaterThanOrEqual(2);
 
