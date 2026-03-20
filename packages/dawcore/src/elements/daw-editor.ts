@@ -750,7 +750,6 @@ export class DawEditorElement extends LitElement {
                         style="position: absolute; left: ${clipLeft}px; top: ${chIdx *
                         channelHeight}px;"
                         .peaks=${channelPeaks}
-                        .bits=${16}
                         .length=${peakData?.length ?? width}
                         .waveHeight=${channelHeight}
                         .barWidth=${this.barWidth}

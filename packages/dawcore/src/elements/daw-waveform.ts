@@ -216,7 +216,6 @@ export class DawWaveformElement extends LitElement {
   updated() {
     this._markAllDirty();
   }
-
 }
 
 declare global {
