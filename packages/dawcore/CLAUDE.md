@@ -8,6 +8,10 @@
 
 **Testing:** vitest with happy-dom in `src/__tests__/`. Run with `cd packages/dawcore && npx vitest run`.
 
+**Testing gotchas:**
+- `isConnected` is a readonly getter in happy-dom — cannot be set via `Object.assign` on elements. Append the element to `document.body` instead.
+- Mocks for async functions (e.g., `resumeGlobalAudioContext`) must return `Promise.resolve()`, not `undefined`. Calling `.catch()` on `undefined` crashes.
+
 **Dev page:** `pnpm dev:page` starts Vite at `http://localhost:5173/dev/index.html`. Uses `website/static/` as publicDir for audio files.
 
 ## Dev Page Dependencies
@@ -62,6 +66,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - `EngineController` — (Scaffolded, not yet wired) DOM traversal to find closest `<daw-editor>`. Will be used by sub-elements that need engine access.
 - `AudioResumeController` — One-shot AudioContext resume on first user gesture (`pointerdown`/`keydown`). Configurable target: host element (default), `'document'`, or CSS selector. Used by `<daw-editor eager-resume>`. Exported for standalone use.
 
+**Lit controller lifecycle gotcha:** `hostConnected()` fires during `connectedCallback()`, BEFORE the first `willUpdate()`. Controllers that read properties set from attributes must defer work with `requestAnimationFrame` (as `ViewportController` and `AudioResumeController` do), otherwise the property will still be `undefined`.
+
 ## Ported Utilities
 
 - `peak-rendering.ts` — `aggregatePeaks`, `calculateBarRects`, `calculateFirstBarPosition` (from `ui-components`)
@@ -80,7 +86,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **sampleRate comes from decoded audio** — Always use `audioBuffer.sampleRate` for clip creation. The global AudioContext decodes at the hardware rate (may be 44100 or 48000). Set `this.sampleRate` from the first decoded buffer so the ruler, peaks, and engine all agree.
 - **Use `getGlobalAudioContext()` for decode** — Import from `@waveform-playlist/playout`. Same context Tone.js uses. `decodeAudioData` works while suspended (pre-gesture). Never create a separate AudioContext for decoding.
 - **Pointer interactions extracted** — `interactions/pointer-handler.ts` handles pointerdown/move/up, caches timeline ref and rect, distinguishes click vs drag. The host implements `PointerHandlerHost` interface.
-- **Peak pipeline extracted** — `workers/peakPipeline.ts` manages worker lifecycle, WaveformData cache, inflight dedup. `daw-editor.ts` is ~790 lines (under 800 max); consider extracting `loadFiles` if it grows further.
+- **Peak pipeline extracted** — `workers/peakPipeline.ts` manages worker lifecycle, WaveformData cache, inflight dedup.
 
 ## Typed Events
 
@@ -117,7 +123,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **`getVisibleChunkIndices()`** — Shared pure function in `utils/viewport.ts`, re-exported from `viewport-controller.ts`. Used by `daw-waveform._getVisibleChunkIndices()`.
 - **Permissive defaults** — Controller initializes `visibleStart=-Infinity, visibleEnd=Infinity` so all chunks render before scroll container is attached.
 - **`daw-waveform` props** — `visibleStart`, `visibleEnd`, `originX` control which 1000px canvas chunks are rendered. Defaults to all-visible when not set.
-- **File size budget** — `daw-editor.ts` is at 800 lines (the hard max). Extract `loadFiles` (~100 lines) before adding more code.
+- **File size budget** — `daw-editor.ts` is at exactly 800 lines (the hard max). Any new code in this file requires extracting something else first. `loadFiles` was already extracted to `interactions/file-loader.ts`.
 
 ## Track Controls
 
