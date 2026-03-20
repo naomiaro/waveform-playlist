@@ -85,6 +85,88 @@ export class DawWaveformElement extends LitElement {
   }
 
   private _drawDirty() {
+    if (this._dirtyPixels.size === 0 || this.length === 0 || this._peaks.length === 0) {
+      this._dirtyPixels.clear();
+      return;
+    }
+
+    const canvases = this.shadowRoot?.querySelectorAll('canvas');
+    if (!canvases || canvases.length === 0) {
+      this._dirtyPixels.clear();
+      return;
+    }
+
+    const step = this.barWidth + this.barGap;
+    const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
+    const halfHeight = this.waveHeight / 2;
+    const bits = this.bits;
+    const waveColor =
+      getComputedStyle(this).getPropertyValue('--daw-wave-color').trim() || '#c49a6c';
+
+    // Group dirty peak indices by chunk
+    const dirtyByChunk = new Map<number, { min: number; max: number }>();
+    for (const peakIdx of this._dirtyPixels) {
+      const chunkIdx = Math.floor(peakIdx / MAX_CANVAS_WIDTH);
+      const existing = dirtyByChunk.get(chunkIdx);
+      if (existing) {
+        existing.min = Math.min(existing.min, peakIdx);
+        existing.max = Math.max(existing.max, peakIdx);
+      } else {
+        dirtyByChunk.set(chunkIdx, { min: peakIdx, max: peakIdx });
+      }
+    }
+
+    for (const canvas of canvases) {
+      const chunkIdx = Number(canvas.dataset.index);
+      const range = dirtyByChunk.get(chunkIdx);
+      if (!range) continue;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+
+      const globalOffset = chunkIdx * MAX_CANVAS_WIDTH;
+
+      // Convert dirty peak range to local pixel coordinates
+      const dirtyLocalStart = range.min - globalOffset;
+      const dirtyLocalEnd = range.max - globalOffset;
+
+      // Align to bar boundaries
+      const firstBar = calculateFirstBarPosition(
+        globalOffset + dirtyLocalStart,
+        this.barWidth,
+        step
+      );
+      const clearStart = Math.max(0, firstBar - globalOffset);
+      const clearEnd = dirtyLocalEnd + this.barWidth;
+      const clearWidth = clearEnd - clearStart;
+
+      // Partial clear
+      ctx.resetTransform();
+      ctx.clearRect(clearStart * dpr, 0, clearWidth * dpr, canvas.height);
+      ctx.scale(dpr, dpr);
+      ctx.fillStyle = waveColor;
+
+      // Draw only bars in the dirty region
+      const canvasWidth = Math.min(MAX_CANVAS_WIDTH, this.length - globalOffset);
+      const regionEnd = Math.min(globalOffset + clearEnd, globalOffset + canvasWidth);
+
+      for (let bar = Math.max(0, firstBar); bar < regionEnd; bar += step) {
+        const peak = aggregatePeaks(this._peaks, bits, bar, bar + step);
+        if (!peak) continue;
+        const rects = calculateBarRects(
+          bar - globalOffset,
+          this.barWidth,
+          halfHeight,
+          peak.min,
+          peak.max,
+          'normal'
+        );
+        for (const r of rects) {
+          ctx.fillRect(r.x, r.y, r.width, r.height);
+        }
+      }
+    }
+
     this._dirtyPixels.clear();
   }
 
@@ -123,52 +205,6 @@ export class DawWaveformElement extends LitElement {
     this._markAllDirty();
   }
 
-  private _drawVisibleChunks() {
-    if (this.length === 0 || this._peaks.length === 0) return;
-
-    const canvases = this.shadowRoot?.querySelectorAll('canvas');
-    if (!canvases) return;
-
-    const step = this.barWidth + this.barGap;
-    const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
-    const halfHeight = this.waveHeight / 2;
-
-    const waveColor =
-      getComputedStyle(this).getPropertyValue('--daw-wave-color').trim() || '#c49a6c';
-
-    for (const canvas of canvases) {
-      const idx = Number(canvas.dataset.index);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
-
-      const canvasWidth = Math.min(MAX_CANVAS_WIDTH, this.length - idx * MAX_CANVAS_WIDTH);
-
-      ctx.resetTransform();
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.scale(dpr, dpr);
-      ctx.fillStyle = waveColor;
-
-      const globalOffset = idx * MAX_CANVAS_WIDTH;
-      const canvasEnd = globalOffset + canvasWidth;
-      const firstBar = calculateFirstBarPosition(globalOffset, this.barWidth, step);
-
-      for (let bar = Math.max(0, firstBar); bar < canvasEnd; bar += step) {
-        const peak = aggregatePeaks(this._peaks, this.bits, bar, bar + step);
-        if (!peak) continue;
-        const rects = calculateBarRects(
-          bar - globalOffset,
-          this.barWidth,
-          halfHeight,
-          peak.min,
-          peak.max,
-          'normal'
-        );
-        for (const r of rects) {
-          ctx.fillRect(r.x, r.y, r.width, r.height);
-        }
-      }
-    }
-  }
 }
 
 declare global {

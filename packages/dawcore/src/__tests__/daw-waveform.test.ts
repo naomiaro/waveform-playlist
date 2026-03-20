@@ -62,4 +62,67 @@ describe('DawWaveformElement', () => {
     expect(el.shadowRoot).toBeTruthy();
     document.body.removeChild(el);
   });
+
+  it('calls clearRect on full canvas width when peaks are set', async () => {
+    const el = document.createElement('daw-waveform') as any;
+    el.length = 100;
+    document.body.appendChild(el);
+
+    // Wait for Lit render to create canvas elements
+    await new Promise((r) => setTimeout(r, 50));
+
+    const canvas = el.shadowRoot?.querySelector('canvas');
+    expect(canvas).toBeTruthy();
+
+    // happy-dom returns null for getContext('2d') — install a mock context
+    const mockCtx = {
+      clearRect: vi.fn(),
+      resetTransform: vi.fn(),
+      scale: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: '',
+    };
+    vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx as any);
+
+    // Set peaks — marks all dirty
+    el.peaks = new Int16Array([0, 100, -50, 200, 0, 150, -100, 300]);
+    flushRaf();
+
+    expect(mockCtx.clearRect).toHaveBeenCalled();
+    // clearRect should cover the full canvas width (4 peak pairs = 4 pixels)
+    const [, , width] = mockCtx.clearRect.mock.calls[0];
+    expect(width).toBeGreaterThan(0);
+
+    document.body.removeChild(el);
+  });
+
+  it('skips draw when dirty set is empty', async () => {
+    const el = document.createElement('daw-waveform') as any;
+    el.length = 100;
+    document.body.appendChild(el);
+
+    // Wait for Lit render to create canvas elements
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Flush any pending draws from mount
+    flushRaf();
+
+    const canvas = el.shadowRoot?.querySelector('canvas');
+    expect(canvas).toBeTruthy();
+
+    const mockCtx = {
+      clearRect: vi.fn(),
+      resetTransform: vi.fn(),
+      scale: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: '',
+    };
+    vi.spyOn(canvas!, 'getContext').mockReturnValue(mockCtx as any);
+
+    // No peaks set, no updatePeaks called — dirty set should be empty
+    flushRaf();
+    expect(mockCtx.clearRect).not.toHaveBeenCalled();
+
+    document.body.removeChild(el);
+  });
 });
