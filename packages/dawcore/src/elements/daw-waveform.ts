@@ -66,6 +66,18 @@ export class DawWaveformElement extends LitElement {
     );
   }
 
+  /**
+   * Mark a range of peak indices as dirty for incremental redraw.
+   * The caller must have already updated the underlying peaks array.
+   * Does NOT trigger a Lit re-render — bypasses Lit entirely.
+   */
+  updatePeaks(startIndex: number, endIndex: number) {
+    for (let i = startIndex; i < endIndex; i++) {
+      this._dirtyPixels.add(i);
+    }
+    this._scheduleDraw();
+  }
+
   private _markAllDirty() {
     const peakCount = Math.floor(this._peaks.length / 2);
     for (let i = 0; i < peakCount; i++) {

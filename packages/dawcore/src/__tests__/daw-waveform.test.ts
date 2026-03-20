@@ -96,6 +96,76 @@ describe('DawWaveformElement', () => {
     document.body.removeChild(el);
   });
 
+  it('updatePeaks marks only the specified range dirty', async () => {
+    const el = document.createElement('daw-waveform') as any;
+    el.length = 200;
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Set initial peaks (10 pairs = 10 pixels)
+    el.peaks = new Int16Array(20);
+    flushRaf(); // flush the full draw
+
+    const canvas = el.shadowRoot?.querySelector('canvas');
+    expect(canvas).toBeTruthy();
+
+    const mockCtx = {
+      clearRect: vi.fn(),
+      resetTransform: vi.fn(),
+      scale: vi.fn(),
+      fillStyle: '',
+      fillRect: vi.fn(),
+    };
+    vi.spyOn(canvas!, 'getContext').mockReturnValue(mockCtx as any);
+
+    // Incremental update: only pixels 8-9 changed
+    el.updatePeaks(8, 10);
+    flushRaf();
+
+    expect(mockCtx.clearRect).toHaveBeenCalled();
+    // clearRect x should be near pixel 8, NOT 0 (dpr=1)
+    const [x] = mockCtx.clearRect.mock.calls[0];
+    expect(x).toBeGreaterThanOrEqual(8);
+
+    document.body.removeChild(el);
+  });
+
+  it('batches multiple updatePeaks into single rAF draw', async () => {
+    const el = document.createElement('daw-waveform') as any;
+    el.length = 200;
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 50));
+
+    el.peaks = new Int16Array(20);
+    flushRaf();
+
+    const canvas = el.shadowRoot?.querySelector('canvas');
+    expect(canvas).toBeTruthy();
+
+    const mockCtx = {
+      clearRect: vi.fn(),
+      resetTransform: vi.fn(),
+      scale: vi.fn(),
+      fillStyle: '',
+      fillRect: vi.fn(),
+    };
+    vi.spyOn(canvas!, 'getContext').mockReturnValue(mockCtx as any);
+
+    // Two incremental updates before rAF fires
+    el.updatePeaks(2, 4);
+    el.updatePeaks(7, 9);
+    flushRaf();
+
+    // Should be one clearRect call covering the merged range
+    expect(mockCtx.clearRect).toHaveBeenCalledTimes(1);
+    const [x, , width] = mockCtx.clearRect.mock.calls[0];
+    // Should cover from pixel 2 to at least pixel 9
+    expect(x).toBeLessThanOrEqual(2);
+    expect(x + width).toBeGreaterThanOrEqual(9);
+
+    document.body.removeChild(el);
+  });
+
   it('skips draw when dirty set is empty', async () => {
     const el = document.createElement('daw-waveform') as any;
     el.length = 100;
