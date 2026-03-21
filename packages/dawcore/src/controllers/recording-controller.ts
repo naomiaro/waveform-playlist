@@ -89,23 +89,15 @@ export class RecordingController implements ReactiveController {
       // Detect channel count from stream (not source.channelCount — defaults to 2)
       const channelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
 
+      const startSample =
+        options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
+
       // Use Tone.js Context methods — avoids standardized-audio-context identity issues
       const source = context.createMediaStreamSource(stream);
       const workletNode = context.createAudioWorkletNode('recording-processor', {
         channelCount,
         channelCountMode: 'explicit' as globalThis.ChannelCountMode,
       });
-      source.connect(workletNode);
-
-      // Send start command to worklet (processor won't emit data without it)
-      workletNode.port.postMessage({
-        command: 'start',
-        sampleRate: rawCtx.sampleRate,
-        channelCount,
-      });
-
-      const startSample =
-        options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
 
       const session: RecordingSession = {
         trackId,
@@ -122,11 +114,18 @@ export class RecordingController implements ReactiveController {
         bits,
         isFirstMessage: true,
       };
+      this._sessions.set(trackId, session);
 
-      // Wire worklet messages
+      // Wire handler BEFORE connect and start (recording CLAUDE.md: reset refs before connect)
       workletNode.port.onmessage = (e: MessageEvent) => {
         this._onWorkletMessage(trackId, e.data);
       };
+      source.connect(workletNode);
+      workletNode.port.postMessage({
+        command: 'start',
+        sampleRate: rawCtx.sampleRate,
+        channelCount,
+      });
 
       // Handle stream ending (mic unplug)
       const onStreamEnded = () => {
@@ -136,8 +135,6 @@ export class RecordingController implements ReactiveController {
         }
       };
       stream.addEventListener('ended', onStreamEnded);
-
-      this._sessions.set(trackId, session);
 
       this._host.dispatchEvent(
         new CustomEvent<DawRecordingStartDetail>('daw-recording-start', {
