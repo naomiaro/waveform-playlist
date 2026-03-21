@@ -43,5 +43,8 @@ export type {
   DawErrorDetail,
   DawTrackControlDetail,
   DawTrackRemoveDetail,
+  DawRecordingStartDetail,
+  DawRecordingCompleteDetail,
+  DawRecordingErrorDetail,
   LoadFilesResult,
 } from './events';

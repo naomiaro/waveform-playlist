@@ -51,6 +51,23 @@ export interface DawTrackRemoveDetail {
   trackId: string;
 }
 
+export interface DawRecordingStartDetail {
+  trackId: string;
+  stream: MediaStream;
+}
+
+export interface DawRecordingCompleteDetail {
+  trackId: string;
+  audioBuffer: AudioBuffer;
+  startSample: number;
+  durationSamples: number;
+}
+
+export interface DawRecordingErrorDetail {
+  trackId: string;
+  error: unknown;
+}
+
 // ---------------------------------------------------------------------------
 // Event map — augments HTMLElementEventMap for typed addEventListener
 // ---------------------------------------------------------------------------
@@ -70,6 +87,9 @@ export interface DawEventMap {
   'daw-error': CustomEvent<DawErrorDetail>;
   'daw-track-control': CustomEvent<DawTrackControlDetail>;
   'daw-track-remove': CustomEvent<DawTrackRemoveDetail>;
+  'daw-recording-start': CustomEvent<DawRecordingStartDetail>;
+  'daw-recording-complete': CustomEvent<DawRecordingCompleteDetail>;
+  'daw-recording-error': CustomEvent<DawRecordingErrorDetail>;
 }
 
 // Helper type for creating typed custom events
