@@ -49,11 +49,12 @@ vi.stubGlobal('registerProcessor', (_name: string, ctor: typeof ProcessorClass) 
 await import('../worklet/recording-processor.worklet');
 
 /** Helper: create a processor and start recording */
-function createProcessor(sampleRate = 44100, channelCount = 1) {
+function createProcessor(rate = 44100, channelCount = 1) {
   messages.length = 0;
+  // Worklet uses the global sampleRate, not the message payload
+  vi.stubGlobal('sampleRate', rate);
   const proc = new ProcessorClass();
-  // Simulate 'start' message
-  proc.port.onmessage({ data: { command: 'start', sampleRate, channelCount } });
+  proc.port.onmessage({ data: { command: 'start', channelCount } });
   return proc;
 }
 

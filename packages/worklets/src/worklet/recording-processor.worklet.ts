@@ -43,7 +43,7 @@ class RecordingProcessor extends AudioWorkletProcessor {
 
     // Listen for control messages from main thread
     this.port.onmessage = (event) => {
-      const { command, sampleRate, channelCount } = event.data;
+      const { command, channelCount } = event.data;
 
       if (command === 'start') {
         this.isRecording = true;
@@ -51,7 +51,8 @@ class RecordingProcessor extends AudioWorkletProcessor {
 
         // Calculate buffer size for ~16ms chunks (60 fps)
         // At 48kHz: 48000 * 0.016 = 768 samples
-        this.bufferSize = Math.floor((sampleRate || 48000) * 0.016);
+        // Uses the AudioWorklet global `sampleRate` — always correct for this context
+        this.bufferSize = Math.floor(sampleRate * 0.016);
 
         // Initialize buffers for each channel
         this.buffers = [];

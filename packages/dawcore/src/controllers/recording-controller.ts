@@ -121,11 +121,7 @@ export class RecordingController implements ReactiveController {
         this._onWorkletMessage(trackId, e.data);
       };
       source.connect(workletNode);
-      workletNode.port.postMessage({
-        command: 'start',
-        sampleRate: rawCtx.sampleRate,
-        channelCount,
-      });
+      workletNode.port.postMessage({ command: 'start', channelCount });
 
       // Handle stream ending (mic unplug)
       const onStreamEnded = () => {
