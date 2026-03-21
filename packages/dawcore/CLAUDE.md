@@ -45,6 +45,9 @@
 - **Cancelable clip creation** — `daw-recording-complete` event is cancelable. `preventDefault()` skips automatic clip creation; consumer handles the `AudioBuffer` themselves.
 - **Channel detection** — `stream.getAudioTracks()[0].getSettings().channelCount`, not `source.channelCount` (defaults to 2 per spec).
 - **Worklet loading** — `rawContext.audioWorklet.addModule(recordingProcessorUrl)` (native API, not Tone.js which caches single module).
+- **Use `getGlobalContext()` not `getGlobalAudioContext()`** — Recording audio graph (source, worklet node) must use Tone.js Context methods (`context.createMediaStreamSource()`, `context.createAudioWorkletNode()`). `getGlobalAudioContext()` returns a `standardized-audio-context` wrapper that fails `instanceof BaseAudioContext` in native constructors. Use `rawContext` only for `audioWorklet.addModule()` and `sampleRate`.
+- **Worklet requires `start` command** — `recording-processor` defaults `isRecording=false`. Must `port.postMessage({ command: 'start', sampleRate, channelCount })` after connecting source→worklet. Without it, no data flows.
+- **Use `createClip()` not `createClipFromSeconds()` for recorded clips** — Recording session provides exact integer samples. The seconds round-trip (`samples/rateA → seconds → Math.round(seconds*rateB)`) drifts when `effectiveSampleRate` differs from `audioBuffer.sampleRate`.
 
 ## Key Patterns
 
