@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import type { ClipTrack, AudioClip, FadeType } from '@waveform-playlist/core';
-import { type EffectsFunction, getUnderlyingAudioParam } from '@waveform-playlist/playout';
+import {
+  type EffectsFunction,
+  getUnderlyingAudioParam,
+  getGlobalAudioContext,
+} from '@waveform-playlist/playout';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
 
 /** Function type for per-track effects (same as in @waveform-playlist/core) */
@@ -111,8 +115,8 @@ export function useExportWav(): UseExportWavReturn {
           throw new Error('Invalid track index for individual export');
         }
 
-        // Get sample rate from first clip (use clip.sampleRate which is always defined)
-        const sampleRate = tracks[0].clips[0]?.sampleRate || 44100;
+        // Use AudioContext sample rate — the single source of truth for all audio
+        const sampleRate = getGlobalAudioContext().sampleRate;
 
         // Calculate total duration from all clips (in samples)
         let totalDurationSamples = 0;

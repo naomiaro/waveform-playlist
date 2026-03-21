@@ -368,9 +368,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Provider-level ref for scroll-position math and animation loop pixel
   // calculation. Distinct from useZoomControls's internal ref (statechange guard).
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  // Effective sample rate for scroll/zoom calculations. Updated each render.
-  // Derived from audioBuffers or first clip's sampleRate (supports MIDI-only playlists).
-  const sampleRateRef = useRef<number>(44100);
+  // AudioContext sample rate — the single source of truth. All decoded audio and
+  // recordings run at this rate. Set from getGlobalAudioContext() in loadAudio.
+  // Default 48000 until AudioContext is available.
+  const sampleRateRef = useRef<number>(48000);
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
@@ -707,6 +708,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // Reset init flag — new adapter needs Tone.start() on first play
         audioInitializedRef.current = false;
         const adapter = createToneAdapter({ effects, soundFontCache: soundFontCacheRef.current });
+        // Resolve AudioContext sample rate — the single source of truth for all audio
+        try {
+          const { getGlobalAudioContext } = await import('@waveform-playlist/playout');
+          sampleRateRef.current = getGlobalAudioContext().sampleRate;
+        } catch {
+          /* AudioContext not yet available — keep default */
+        }
         const engine = new PlaylistEngine({
           adapter,
           samplesPerPixel: samplesPerPixelRef.current,
@@ -1320,9 +1328,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     []
   );
 
-  // Derive sampleRate from the first available clip (works for both audio and MIDI clips).
-  // MIDI clips use sampleRate purely for sample-based timeline positioning (default 44100).
-  const sampleRate = audioBuffers[0]?.sampleRate || tracks[0]?.clips[0]?.sampleRate || 44100;
+  const sampleRate = sampleRateRef.current;
   sampleRateRef.current = sampleRate;
   const timeScaleHeight = timescale ? 30 : 0;
   const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
