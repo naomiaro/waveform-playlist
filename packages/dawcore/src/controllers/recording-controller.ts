@@ -290,12 +290,15 @@ export class RecordingController implements ReactiveController {
   }
 
   private _createClipFromRecording(
-    _trackId: string,
-    _audioBuffer: AudioBuffer,
-    _startSample: number,
-    _durationSamples: number
+    trackId: string,
+    audioBuffer: AudioBuffer,
+    startSample: number,
+    durationSamples: number
   ) {
-    // Task 6 will implement clip creation via the editor's existing track/peak pipeline
+    const host = this._host as any;
+    if (typeof host._addRecordedClip === 'function') {
+      host._addRecordedClip(trackId, audioBuffer, startSample, durationSamples);
+    }
   }
 
   private _cleanupSession(trackId: string) {

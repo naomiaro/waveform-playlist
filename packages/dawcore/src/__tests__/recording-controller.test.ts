@@ -199,6 +199,38 @@ describe('RecordingController', () => {
     expect(session!.chunks).toHaveLength(2);
   });
 
+  it('calls host._addRecordedClip when stopRecording is not prevented', async () => {
+    host._addRecordedClip = vi.fn();
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
+
+    controller.stopRecording();
+
+    expect(host._addRecordedClip).toHaveBeenCalledWith(
+      'track-1',
+      expect.anything(), // audioBuffer
+      expect.any(Number), // startSample
+      expect.any(Number)  // durationSamples
+    );
+  });
+
+  it('does not call host._addRecordedClip when preventDefault', async () => {
+    host._addRecordedClip = vi.fn();
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    host.addEventListener('daw-recording-complete', (e: Event) => {
+      e.preventDefault();
+    });
+
+    controller.stopRecording();
+
+    expect(host._addRecordedClip).not.toHaveBeenCalled();
+  });
+
   it('cleans up all sessions on hostDisconnected', async () => {
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });

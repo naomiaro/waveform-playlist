@@ -198,7 +198,6 @@ export class DawEditorElement extends LitElement {
       console.warn('[dawcore] Error disposing engine: ' + String(err));
     }
   }
-
   willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has('eagerResume')) {
       this._audioResume.target = this.eagerResume;
@@ -219,7 +218,6 @@ export class DawEditorElement extends LitElement {
       }
     }
   }
-
   // --- Track Events ---
   private _onTrackConnected = (e: CustomEvent) => {
     const trackId = e.detail?.trackId;
@@ -263,7 +261,6 @@ export class DawEditorElement extends LitElement {
       this._stopPlayhead();
     }
   }
-
   private _onTrackUpdate = (e: CustomEvent) => {
     const trackId = e.detail?.trackId as string;
     if (!trackId) return;
@@ -288,9 +285,7 @@ export class DawEditorElement extends LitElement {
       this._loadTrack(trackId, descriptor);
     }
   };
-
   private static _CONTROL_PROPS = new Set(['volume', 'pan', 'muted', 'soloed']);
-
   private _onTrackControl = (e: CustomEvent) => {
     const { trackId, prop, value } = e.detail ?? {};
     if (!trackId || !prop || !DawEditorElement._CONTROL_PROPS.has(prop)) return;
@@ -315,7 +310,6 @@ export class DawEditorElement extends LitElement {
     // a redundant daw-track-update → _onTrackUpdate loop. The _tracks
     // descriptor map is the source of truth for control values.
   };
-
   private _onTrackRemoveRequest = (e: CustomEvent) => {
     const { trackId } = e.detail ?? {};
     if (!trackId) return;
@@ -326,7 +320,6 @@ export class DawEditorElement extends LitElement {
       this._onTrackRemoved(trackId); // File-dropped tracks: no DOM element
     }
   };
-
   private _readTrackDescriptor(trackEl: DawTrackElement): TrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
     const clips: ClipDescriptor[] = [];
@@ -369,7 +362,6 @@ export class DawEditorElement extends LitElement {
       clips,
     };
   }
-
   // --- Audio Loading ---
   private async _loadTrack(trackId: string, descriptor: TrackDescriptor) {
     try {
@@ -440,7 +432,6 @@ export class DawEditorElement extends LitElement {
       );
     }
   }
-
   async _fetchAndDecode(src: string): Promise<AudioBuffer> {
     if (this._audioCache.has(src)) {
       return this._audioCache.get(src)!;
@@ -468,7 +459,6 @@ export class DawEditorElement extends LitElement {
       throw err;
     }
   }
-
   _recomputeDuration() {
     let maxSample = 0;
     for (const track of this._engineTracks.values()) {
@@ -479,7 +469,6 @@ export class DawEditorElement extends LitElement {
     }
     this._duration = maxSample / this.effectiveSampleRate;
   }
-
   // --- Engine ---
   _ensureEngine(): Promise<PlaylistEngine> {
     if (this._engine) return Promise.resolve(this._engine);
@@ -490,7 +479,6 @@ export class DawEditorElement extends LitElement {
     });
     return this._enginePromise;
   }
-
   private async _buildEngine() {
     const [{ PlaylistEngine }, { createToneAdapter }] = await Promise.all([
       import('@waveform-playlist/engine'),
@@ -525,7 +513,6 @@ export class DawEditorElement extends LitElement {
     this._engine = engine;
     return engine;
   }
-
   private _disposeEngine() {
     if (this._engine) {
       this._engine.dispose();
@@ -533,7 +520,6 @@ export class DawEditorElement extends LitElement {
     }
     this._enginePromise = null;
   }
-
   // --- File Drop ---
   private _onDragOver = (e: DragEvent) => {
     if (!this.fileDrop) return;
@@ -541,7 +527,6 @@ export class DawEditorElement extends LitElement {
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     this._dragOver = true;
   };
-
   private _onDragLeave = (e: DragEvent) => {
     if (!this.fileDrop) return;
     // relatedTarget is null when cursor leaves the browser window — that's fine,
@@ -551,7 +536,6 @@ export class DawEditorElement extends LitElement {
       this._dragOver = false;
     }
   };
-
   private _onDrop = async (e: DragEvent) => {
     if (!this.fileDrop) return;
     e.preventDefault();
@@ -573,7 +557,6 @@ export class DawEditorElement extends LitElement {
       );
     }
   };
-
   async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
     return loadFilesImpl(this, files);
   }
@@ -622,6 +605,23 @@ export class DawEditorElement extends LitElement {
   get isRecording(): boolean { return this._recordingController.isRecording; }
   stopRecording(): void { this._recordingController.stopRecording(); }
 
+  _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number) {
+    const sr = this.effectiveSampleRate;
+    const clip = createClipFromSeconds({ audioBuffer: buf,
+      startTime: startSample / sr, duration: durSamples / sr, offset: 0,
+      gain: 1, name: 'Recording', sampleRate: buf.sampleRate, sourceDuration: buf.duration });
+    this._clipBuffers = new Map(this._clipBuffers).set(clip.id, buf);
+    this._peakPipeline.generatePeaks(buf, this.samplesPerPixel, this.mono).then((pd) => {
+      this._peaksData = new Map(this._peaksData).set(clip.id, pd);
+      const t = this._engineTracks.get(trackId);
+      if (t) {
+        this._engineTracks = new Map(this._engineTracks).set(trackId,
+          { ...t, clips: [...t.clips, clip] });
+        this._recomputeDuration();
+        this._engine?.setTracks([...this._engineTracks.values()]);
+      }
+    });
+  }
   async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
     const s = stream ?? this.recordingStream;
     if (!s) {
