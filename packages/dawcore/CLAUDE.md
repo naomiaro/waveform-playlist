@@ -46,7 +46,8 @@
 - **Channel detection** — `stream.getAudioTracks()[0].getSettings().channelCount`, not `source.channelCount` (defaults to 2 per spec).
 - **Worklet loading** — `rawContext.audioWorklet.addModule(recordingProcessorUrl)` (native API, not Tone.js which caches single module).
 - **Use `getGlobalContext()` not `getGlobalAudioContext()`** — Recording audio graph (source, worklet node) must use Tone.js Context methods (`context.createMediaStreamSource()`, `context.createAudioWorkletNode()`). `getGlobalAudioContext()` returns a `standardized-audio-context` wrapper that fails `instanceof BaseAudioContext` in native constructors. Use `rawContext` only for `audioWorklet.addModule()` and `sampleRate`.
-- **Worklet requires `start` command** — `recording-processor` defaults `isRecording=false`. Must `port.postMessage({ command: 'start', sampleRate, channelCount })` after connecting source→worklet. Without it, no data flows.
+- **Worklet requires `start` command** — `recording-processor` defaults `isRecording=false`. Must `port.postMessage({ command: 'start', channelCount })` after connecting source→worklet. Without it, no data flows. Do NOT send `sampleRate` — the worklet uses its global `sampleRate`.
+- **Handler ordering critical** — Set `workletNode.port.onmessage` BEFORE `source.connect(workletNode)` and `postMessage({ command: 'start' })`. The worklet can flush data immediately; messages before handler is wired are silently dropped.
 - **Use `createClip()` not `createClipFromSeconds()` for recorded clips** — Recording session provides exact integer samples. The seconds round-trip (`samples/rateA → seconds → Math.round(seconds*rateB)`) drifts when `effectiveSampleRate` differs from `audioBuffer.sampleRate`.
 
 ## Key Patterns

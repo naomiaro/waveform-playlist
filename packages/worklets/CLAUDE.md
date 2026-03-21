@@ -15,3 +15,8 @@
 - `recordingProcessorUrl` — inline Blob URL for recording-processor worklet
 - `meterProcessorUrl` — inline Blob URL for meter-processor worklet
 - `MeterMessage` — `{ peak: number[]; rms: number[] }` interface for worklet→main thread messages
+
+## Recording Processor Start Message
+
+- **Do NOT send `sampleRate` in the `start` message** — The processor uses the AudioWorklet global `sampleRate` (always correct for the context). Passing it in the message was a source of bugs when callers passed a different rate than the AudioContext's actual rate.
+- **Required fields:** `{ command: 'start', channelCount }` — channelCount configures per-channel buffers.
