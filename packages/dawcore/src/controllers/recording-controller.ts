@@ -13,6 +13,8 @@ export interface RecordingOptions {
   trackId?: string;
   bits?: 8 | 16;
   startSample?: number;
+  /** Start playback during recording so user hears existing tracks. */
+  overdub?: boolean;
 }
 
 export interface RecordingSession {
@@ -52,8 +54,11 @@ export interface RecordingHost extends ReactiveControllerHost {
     trackId: string,
     buf: AudioBuffer,
     startSample: number,
-    durSamples: number
+    durSamples: number,
+    offsetSamples?: number
   ): void;
+  play?(startTime?: number): Promise<void>;
+  stop?(): void;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -171,6 +176,11 @@ export class RecordingController implements ReactiveController {
       );
 
       this._host.requestUpdate();
+
+      // Overdub: start playback so user hears existing tracks and playhead advances
+      if (options.overdub && typeof this._host.play === 'function') {
+        await this._host.play(this._host._currentTime);
+      }
     } catch (err) {
       // Clean up partially-created session to prevent stuck isRecording state
       this._cleanupSession(trackId);
@@ -192,12 +202,17 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(id);
     if (!session) return;
 
+    // Stop playback if overdubbing
+    if (typeof this._host.stop === 'function') {
+      this._host.stop();
+    }
+
     // Send stop BEFORE disconnect so worklet can flush remaining buffered samples
     session.workletNode.port.postMessage({ command: 'stop' });
     session.source.disconnect();
     session.workletNode.disconnect();
 
-    // Remove mic-unplug listener (fix #4: prevent leak on normal stop path)
+    // Remove mic-unplug listener
     this._removeTrackEndedListener(session);
 
     // Build AudioBuffer from accumulated chunks

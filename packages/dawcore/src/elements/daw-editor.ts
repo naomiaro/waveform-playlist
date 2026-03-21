@@ -527,14 +527,14 @@ export class DawEditorElement extends LitElement {
     return loadFilesImpl(this, files);
   }
   // --- Playback ---
-  async play() {
+  async play(startTime?: number) {
     try {
       const engine = await this._ensureEngine();
       if (!this._audioInitialized) {
         await engine.init();
         this._audioInitialized = true;
       }
-      engine.play();
+      engine.play(startTime);
       this._startPlayhead();
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
