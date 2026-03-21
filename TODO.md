@@ -8,7 +8,7 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ### Testing & CI
 
-- [ ] **CI/CD pipeline** — Automated builds, tests, publishing
+- [ ] **CD pipeline** — Automated npm publishing (currently manual via `pnpm publish`)
 
 ### Playback UX
 
