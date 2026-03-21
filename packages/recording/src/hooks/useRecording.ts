@@ -47,6 +47,7 @@ export function useRecording(
   const isPausedRef = useRef<boolean>(false);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const onTrackEndedRef = useRef<(() => void) | null>(null);
+  const stopRecordingRef = useRef<(() => Promise<AudioBuffer | null>) | null>(null);
 
   // Shared duration update loop — starts a rAF loop that updates duration
   // from performance.now(). Used by both startRecording and resumeRecording.
@@ -86,6 +87,7 @@ export function useRecording(
 
   // Start recording
   const startRecording = useCallback(async () => {
+    if (isRecordingRef.current) return;
     if (!stream) {
       setError(new Error('No microphone stream available'));
       return;
@@ -190,6 +192,8 @@ export function useRecording(
       if (audioTrack) {
         const onEnded = () => {
           console.warn('[waveform-playlist] Audio track ended (mic unplugged or revoked)');
+          // Stop recording to clean up worklet, rAF loop, and UI state
+          stopRecordingRef.current?.();
           setError(new Error('Microphone disconnected during recording'));
         };
         onTrackEndedRef.current = onEnded;
@@ -280,6 +284,7 @@ export function useRecording(
       return null;
     }
   }, [isRecording, channelCount]);
+  stopRecordingRef.current = stopRecording;
 
   // Pause recording
   const pauseRecording = useCallback(() => {

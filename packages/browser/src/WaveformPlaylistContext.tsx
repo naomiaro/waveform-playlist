@@ -11,6 +11,7 @@ import React, {
 import { ThemeProvider } from 'styled-components';
 import {
   createToneAdapter,
+  getGlobalAudioContext,
   type EffectsFunction,
   type TrackEffectsFunction,
   type SoundFontCache,
@@ -368,10 +369,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Provider-level ref for scroll-position math and animation loop pixel
   // calculation. Distinct from useZoomControls's internal ref (statechange guard).
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  // AudioContext sample rate — the single source of truth. All decoded audio and
-  // recordings run at this rate. Set from getGlobalAudioContext() in loadAudio.
-  // Default 48000 until AudioContext is available.
-  const sampleRateRef = useRef<number>(48000);
+  // AudioContext sample rate never changes after creation. getGlobalAudioContext()
+  // lazily creates the context (works while suspended), so this is always correct.
+  const sampleRateRef = useRef<number>(getGlobalAudioContext().sampleRate);
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
@@ -708,13 +708,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // Reset init flag — new adapter needs Tone.start() on first play
         audioInitializedRef.current = false;
         const adapter = createToneAdapter({ effects, soundFontCache: soundFontCacheRef.current });
-        // Resolve AudioContext sample rate — the single source of truth for all audio
-        try {
-          const { getGlobalAudioContext } = await import('@waveform-playlist/playout');
-          sampleRateRef.current = getGlobalAudioContext().sampleRate;
-        } catch {
-          /* AudioContext not yet available — keep default */
-        }
         const engine = new PlaylistEngine({
           adapter,
           samplesPerPixel: samplesPerPixelRef.current,
@@ -1329,7 +1322,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   const sampleRate = sampleRateRef.current;
-  sampleRateRef.current = sampleRate;
   const timeScaleHeight = timescale ? 30 : 0;
   const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 
