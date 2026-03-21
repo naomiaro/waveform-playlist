@@ -29,5 +29,5 @@ export type {
 } from './types';
 
 // Utilities
-export { generatePeaks } from './utils/peaksGenerator';
+export { generatePeaks, appendPeaks } from './utils/peaksGenerator';
 export { createAudioBuffer, concatenateAudioData } from './utils/audioBufferUtils';
