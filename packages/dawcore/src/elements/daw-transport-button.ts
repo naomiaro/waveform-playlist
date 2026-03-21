@@ -11,7 +11,7 @@ export class DawTransportButton extends LitElement {
     return transport?.target ?? null;
   }
 
-  static styles = css`
+  static styles: import('lit').CSSResultGroup = css`
     button {
       cursor: pointer;
       background: var(--daw-controls-background, #1a1a2e);

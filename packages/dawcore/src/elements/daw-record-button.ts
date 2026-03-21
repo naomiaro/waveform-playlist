@@ -6,7 +6,7 @@ import { DawTransportButton } from './daw-transport-button';
 export class DawRecordButtonElement extends DawTransportButton {
   @state() private _isRecording = false;
 
-  static styles = [
+  static override styles = [
     DawTransportButton.styles,
     css`
       button[data-recording] {
@@ -37,11 +37,7 @@ export class DawRecordButtonElement extends DawTransportButton {
 
   render() {
     return html`
-      <button
-        part="button"
-        ?data-recording=${this._isRecording}
-        @click=${this._onClick}
-      >
+      <button part="button" ?data-recording=${this._isRecording} @click=${this._onClick}>
         <slot>${this._isRecording ? 'Stop Rec' : 'Record'}</slot>
       </button>
     `;
