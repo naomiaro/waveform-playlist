@@ -13,10 +13,7 @@ import {
   canSplitAt,
   splitClip as splitClipOp,
 } from './operations/clipOperations';
-import {
-  calculateDuration,
-  findClosestZoomIndex,
-} from './operations/timelineOperations';
+import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
 
 const DEFAULT_SAMPLE_RATE = 44100;

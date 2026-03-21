@@ -369,9 +369,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Provider-level ref for scroll-position math and animation loop pixel
   // calculation. Distinct from useZoomControls's internal ref (statechange guard).
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  // AudioContext sample rate never changes after creation. getGlobalAudioContext()
-  // lazily creates the context (works while suspended), so this is always correct.
-  const sampleRateRef = useRef<number>(getGlobalAudioContext().sampleRate);
+  // AudioContext sample rate — single source of truth. Guarded for SSR where
+  // AudioContext is undefined. Rate never changes after context creation.
+  const sampleRateRef = useRef<number>(
+    typeof AudioContext !== 'undefined' ? getGlobalAudioContext().sampleRate : 48000
+  );
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
@@ -1159,7 +1161,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(true);
       startAnimationLoop();
     },
-    [duration, startAnimationLoop, stopAnimationLoop]
+    [startAnimationLoop, stopAnimationLoop]
   );
 
   const pause = useCallback(() => {

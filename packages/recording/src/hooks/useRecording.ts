@@ -308,14 +308,14 @@ export function useRecording(
     }
   }, [isRecording, isPaused, duration, startDurationLoop]);
 
-  // Cleanup on unmount — copy refs in effect body (CLAUDE.md pattern #16)
+  // Cleanup on unmount — read refs in cleanup, not effect body.
+  // Pattern #16 (copy refs in effect body) doesn't apply to [] deps — refs are
+  // null at mount and only set later during startRecording.
   useEffect(() => {
-    const audioTrack = audioTrackRef.current;
-    const onTrackEnded = onTrackEndedRef.current;
     return () => {
       // Remove mic-unplug listener
-      if (audioTrack && onTrackEnded) {
-        audioTrack.removeEventListener('ended', onTrackEnded);
+      if (audioTrackRef.current && onTrackEndedRef.current) {
+        audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);
       }
       if (workletNodeRef.current) {
         workletNodeRef.current.port.postMessage({ command: 'stop' });
