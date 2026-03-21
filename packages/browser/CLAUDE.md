@@ -187,7 +187,7 @@ const rebuildChain = useCallback(() => {
 
 **Rule:** Never derive `sampleRate` from clips or AudioBuffers — use the AudioContext hardware rate. All decoded audio and recordings run at this rate.
 
-- `WaveformPlaylistContext`: `sampleRateRef` set from `getGlobalAudioContext().sampleRate` in `loadAudio`. Default 48000 until AudioContext is available.
+- `WaveformPlaylistContext`: `sampleRateRef` initialized from `getGlobalAudioContext().sampleRate` — one-time read on mount. `getGlobalAudioContext()` lazily creates the context (works while suspended), and the hardware rate never changes, so no updates needed.
 - `useAudioTracks`: `contextSampleRateRef` set from `audioContext.sampleRate` in `loadTracks`.
 - `useExportWav`: calls `getGlobalAudioContext().sampleRate` directly.
 - **Never** fall back to 44100 or derive from `tracks[0].clips[0]?.sampleRate` — that fails in recording-only workflows.
