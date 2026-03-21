@@ -10,6 +10,7 @@ import './elements/daw-editor';
 import './elements/daw-ruler';
 import './elements/daw-selection';
 import './elements/daw-track-controls';
+import './elements/daw-record-button';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
@@ -24,8 +25,11 @@ export { DawEditorElement } from './elements/daw-editor';
 export { DawRulerElement } from './elements/daw-ruler';
 export { DawSelectionElement } from './elements/daw-selection';
 export { DawTrackControlsElement } from './elements/daw-track-controls';
+export { DawRecordButtonElement } from './elements/daw-record-button';
 
 export { AudioResumeController } from './controllers/audio-resume-controller';
+export { RecordingController } from './controllers/recording-controller';
+export type { RecordingOptions, RecordingSession } from './controllers/recording-controller';
 
 export type { TrackDescriptor, ClipDescriptor } from './types';
 export type { PointerEngineContract } from './interactions/pointer-handler';
