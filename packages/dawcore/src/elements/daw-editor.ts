@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
-import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
+import { createClip, createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
@@ -589,16 +589,13 @@ export class DawEditorElement extends LitElement {
   }
 
   _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number) {
-    const sr = this.effectiveSampleRate;
-    const clip = createClipFromSeconds({
+    const clip = createClip({
       audioBuffer: buf,
-      startTime: startSample / sr,
-      duration: durSamples / sr,
-      offset: 0,
+      startSample,
+      durationSamples: durSamples,
+      offsetSamples: 0,
       gain: 1,
       name: 'Recording',
-      sampleRate: buf.sampleRate,
-      sourceDuration: buf.duration,
     });
     this._clipBuffers = new Map(this._clipBuffers).set(clip.id, buf);
     this._peakPipeline.generatePeaks(buf, this.samplesPerPixel, this.mono).then((pd) => {
