@@ -105,9 +105,12 @@
         editor.recordingStream = stream;
         const track = stream.getAudioTracks()[0];
         const settings = track.getSettings();
-        micStatus.textContent = track.label + ' (' + settings.channelCount + 'ch, ' + settings.sampleRate + 'Hz)';
+        const ctxRate = editor.effectiveSampleRate;
+        const micRate = settings.sampleRate;
+        const rateNote = micRate && micRate !== ctxRate ? ' ⚠ resampling' : '';
+        micStatus.textContent = track.label + ' (' + settings.channelCount + 'ch, mic ' + micRate + 'Hz, ctx ' + ctxRate + 'Hz' + rateNote + ')';
         micBtn.disabled = true;
-        addLog('Mic access granted: ' + track.label);
+        addLog('Mic: ' + track.label + ' ' + micRate + 'Hz, AudioContext: ' + ctxRate + 'Hz' + rateNote);
       } catch (err) {
         micStatus.textContent = 'Denied: ' + err.message;
         addLog('Mic access denied: ' + err.message);
