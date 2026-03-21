@@ -185,6 +185,12 @@ importers:
       '@waveform-playlist/playout':
         specifier: workspace:*
         version: link:../playout
+      '@waveform-playlist/recording':
+        specifier: workspace:*
+        version: link:../recording
+      '@waveform-playlist/worklets':
+        specifier: workspace:*
+        version: link:../worklets
       happy-dom:
         specifier: ^17.0.0
         version: 17.6.3

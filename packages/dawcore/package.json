@@ -31,12 +31,24 @@
   "peerDependencies": {
     "@waveform-playlist/engine": ">=7.0.0",
     "@waveform-playlist/core": ">=7.0.0",
-    "@waveform-playlist/playout": ">=7.0.0"
+    "@waveform-playlist/playout": ">=7.0.0",
+    "@waveform-playlist/worklets": ">=7.0.0",
+    "@waveform-playlist/recording": ">=7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@waveform-playlist/recording": {
+      "optional": true
+    },
+    "@waveform-playlist/worklets": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@waveform-playlist/engine": "workspace:*",
     "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/playout": "workspace:*",
+    "@waveform-playlist/worklets": "workspace:*",
+    "@waveform-playlist/recording": "workspace:*",
     "happy-dom": "^17.0.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
