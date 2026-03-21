@@ -174,6 +174,21 @@ function RecordingControls() {
 }
 ```
 
+### Mic Disconnect Detection
+
+`useRecording` automatically detects when the microphone is unplugged or permission is revoked during recording. When the `MediaStreamTrack` 'ended' event fires, the hook calls `stopRecording()` and sets an `error` state:
+
+```tsx
+const { error } = useRecording(stream);
+
+// error.message === 'Microphone disconnected during recording'
+{error && <p style={{ color: 'red' }}>{error.message}</p>}
+```
+
+:::tip Sample Rate Mismatch
+The mic's native sample rate (from `MediaStreamTrack.getSettings().sampleRate`) may differ from the `AudioContext.sampleRate`. The browser automatically resamples at the `MediaStreamAudioSourceNode` boundary. To avoid resampling, match input and output sample rates in your system audio settings (e.g., macOS Audio MIDI Setup).
+:::
+
 ## Accessing Recorded Audio Data
 
 After recording stops, the `audioBuffer` from `useRecording` contains the full recorded audio as a Web Audio API [AudioBuffer](https://developer.mozilla.org/en-US/docs/Web/API/AudioBuffer). You can also await the return value of `stopRecording()` to get the buffer directly.

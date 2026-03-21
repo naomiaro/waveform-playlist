@@ -27,9 +27,9 @@ The engine's only peer dependency is `@waveform-playlist/core` (data model types
 import { PlaylistEngine } from '@waveform-playlist/engine';
 import { createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 
-// 1. Create an engine
+// 1. Create an engine (use AudioContext.sampleRate for the hardware rate)
 const engine = new PlaylistEngine({
-  sampleRate: 44100,
+  sampleRate: 48000, // Match your AudioContext.sampleRate
   samplesPerPixel: 1000,
 });
 
@@ -78,7 +78,7 @@ const engine = new PlaylistEngine(options?: PlaylistEngineOptions);
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `adapter` | `PlayoutAdapter` | `null` | Audio playback backend |
-| `sampleRate` | `number` | `44100` | Audio sample rate |
+| `sampleRate` | `number` | `44100` | Audio sample rate (use `AudioContext.sampleRate` for hardware rate) |
 | `samplesPerPixel` | `number` | `1000` | Initial zoom level |
 | `zoomLevels` | `number[]` | `[256, 512, 1024, 2048, 4096, 8192]` | Available zoom steps (samples per pixel) |
 
@@ -192,7 +192,7 @@ engine.pause(): void;
 // Stop and reset to beginning
 engine.stop(): void;
 
-// Seek to a time position (clamped to duration)
+// Seek to a time position (any non-negative value — plays silence beyond audio)
 engine.seek(time: number): void;
 ```
 
@@ -386,8 +386,8 @@ const newScrollLeft = calculateZoomScrollPosition(
   oldSpp, newSpp, scrollLeft, containerWidth, sampleRate
 );
 
-// Clamp seek position
-const time = clampSeekPosition(requestedTime, duration);
+// Clamp negative seek position to 0
+const time = Math.max(0, requestedTime);
 ```
 
 ### Viewport Operations
@@ -477,7 +477,7 @@ A plain DOM UI that reacts to engine state — no framework required:
   import { PlaylistEngine } from '@waveform-playlist/engine';
   import { createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 
-  const engine = new PlaylistEngine({ sampleRate: 44100 });
+  const engine = new PlaylistEngine({ sampleRate: 48000 });
 
   // Update DOM on every state change
   engine.on('statechange', (state) => {
@@ -508,7 +508,7 @@ A minimal Svelte store that subscribes to engine state:
   import { writable } from 'svelte/store';
   import { PlaylistEngine } from '@waveform-playlist/engine';
 
-  const engine = new PlaylistEngine({ sampleRate: 44100 });
+  const engine = new PlaylistEngine({ sampleRate: 48000 });
 
   const state = writable(engine.getState());
 

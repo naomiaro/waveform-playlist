@@ -20,11 +20,11 @@ waveform-playlist is a React component library for building browser-based audio 
 
 - `@waveform-playlist/browser` — Main package: React components, hooks, effects
 - `@waveform-playlist/core` — Data model: ClipTrack, AudioClip, sample-based math
-- `@waveform-playlist/engine` — Framework-agnostic timeline engine: PlaylistEngine class, pure clip/timeline operations, event emitter. Owns selection, loop, zoom, volume, selectedTrackId, and clip mutation state.
+- `@waveform-playlist/engine` — Framework-agnostic timeline engine: PlaylistEngine class, pure clip/timeline operations, event emitter. Owns selection, loop, zoom, volume, selectedTrackId, and clip mutation state. Seek/play beyond audio duration is supported (silence where there's no audio).
 - `@waveform-playlist/playout` — Audio playback: Tone.js adapter (implements PlayoutAdapter from engine), global AudioContext
 - `@waveform-playlist/ui-components` — Styled primitives, theming, virtual scrolling contexts, playhead components, PlaylistErrorBoundary, BeatsAndBarsProvider
 - `@waveform-playlist/annotations` — Annotation parsing, rendering, keyboard controls
-- `@waveform-playlist/recording` — Microphone access, AudioWorklet recording, VU meter, integrated recording hook
+- `@waveform-playlist/recording` — Microphone access, AudioWorklet recording, VU meter, integrated recording hook, mic-unplug detection
 - `@waveform-playlist/worklets` — Shared AudioWorklet processors: `meter-processor` (sample-accurate peak/RMS metering) and `recording-processor` (multi-channel audio capture). Auto-installed with recording package.
 - `@waveform-playlist/webaudio-peaks` — Peak extraction from AudioBuffer
 - `@waveform-playlist/media-element-playout` — HTMLAudioElement playback with pitch-preserving speed control, optional Web Audio routing for fades and Tone.js effect bridging

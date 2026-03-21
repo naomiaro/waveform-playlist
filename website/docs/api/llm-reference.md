@@ -551,7 +551,7 @@ interface MidiTrackConfig {
   color?: string;
   startTime?: number;              // Clip position in seconds (default 0)
   duration?: number;               // Override clip duration in seconds
-  sampleRate?: number;             // For sample-based positioning (default 44100)
+  sampleRate?: number;             // For sample-based positioning (defaults to AudioContext.sampleRate)
   flatten?: boolean;               // Merge all MIDI tracks into one (default false)
 }
 
@@ -608,7 +608,7 @@ import type { EngineState, PlayoutAdapter, EngineEvents, PlaylistEngineOptions }
 
 interface PlaylistEngineOptions {
   adapter?: PlayoutAdapter;
-  sampleRate?: number;          // Default: 44100
+  sampleRate?: number;          // Default: 44100 (use AudioContext.sampleRate for hardware rate)
   samplesPerPixel?: number;     // Default: 1000
   zoomLevels?: number[];        // Default: [256, 512, 1024, 2048, 4096, 8192]
 }
