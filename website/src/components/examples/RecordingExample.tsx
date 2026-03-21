@@ -480,7 +480,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               hint={
                 micSampleRate != null ? (
                   <>
-                    {micSampleRate}Hz &rarr; {ctxSampleRate}Hz
+                    <MicrophoneIcon size={10} weight="bold" /> {micSampleRate}Hz &rarr;{' '}
+                    <SpeakerHighIcon size={10} weight="bold" /> {ctxSampleRate}Hz
                     {isResampling && ' (resampling)'}
                   </>
                 ) : undefined
