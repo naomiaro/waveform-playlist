@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — recording dev</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #mic-controls {
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #mic-controls button {
+      cursor: pointer;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid currentColor;
+      padding: 4px 8px;
+      font: inherit;
+    }
+    #mic-controls button:hover { opacity: 0.8; }
+    #mic-status {
+      font-size: 0.85rem;
+      color: #888;
+    }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore — recording dev</h1>
+
+  <script type="module" src="/src/index.ts"></script>
+
+  <div id="mic-controls">
+    <button id="mic-btn">Request Mic</button>
+    <span id="mic-status">No mic access</span>
+  </div>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale>
+    <daw-track name="Recording Track"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-record-button></daw-record-button>
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <div id="log"></div>
+
+  <script type="module">
+    const editor = document.getElementById('editor');
+    const log = document.getElementById('log');
+    const micBtn = document.getElementById('mic-btn');
+    const micStatus = document.getElementById('mic-status');
+
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+      log.prepend(line);
+      while (log.children.length > 30) log.lastChild.remove();
+    }
+
+    // Mic access — consumer responsibility
+    micBtn.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+        editor.recordingStream = stream;
+        const track = stream.getAudioTracks()[0];
+        const settings = track.getSettings();
+        micStatus.textContent = track.label + ' (' + settings.channelCount + 'ch, ' + settings.sampleRate + 'Hz)';
+        micBtn.disabled = true;
+        addLog('Mic access granted: ' + track.label);
+      } catch (err) {
+        micStatus.textContent = 'Denied: ' + err.message;
+        addLog('Mic access denied: ' + err.message);
+      }
+    });
+
+    // Recording events
+    editor.addEventListener('daw-recording-start', (e) => {
+      addLog('recording-start: track=' + e.detail.trackId);
+    });
+    editor.addEventListener('daw-recording-complete', (e) => {
+      const d = e.detail;
+      addLog('recording-complete: track=' + d.trackId +
+        ' duration=' + (d.durationSamples / d.audioBuffer.sampleRate).toFixed(2) + 's' +
+        ' channels=' + d.audioBuffer.numberOfChannels);
+    });
+    editor.addEventListener('daw-recording-error', (e) => {
+      addLog('recording-error: ' + e.detail.error);
+    });
+
+    // Other editor events
+    editor.addEventListener('daw-track-ready', (e) => addLog('track-ready: ' + e.detail.trackId));
+    editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
+    editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
+  </script>
+</body>
+</html>
