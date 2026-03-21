@@ -41,9 +41,13 @@ function createMockHost() {
 
 function createMockStream(channelCount = 1): MediaStream {
   return {
-    getAudioTracks: () => [{ getSettings: () => ({ channelCount }) }],
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
+    getAudioTracks: () => [
+      {
+        getSettings: () => ({ channelCount }),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    ],
   } as any;
 }
 
@@ -154,16 +158,16 @@ describe('RecordingController', () => {
     expect(controller.getSession('track-1')).toBeUndefined();
   });
 
-  it('stopRecording with no data warns and cleans up without event', async () => {
+  it('stopRecording with no data dispatches error event so button resets', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    // No simulateWorkletData — totalSamples is 0
 
     const events: CustomEvent[] = [];
-    host.dispatchEvent = vi.fn((e: CustomEvent) => {
-      events.push(e);
-      return true;
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => {
+      if (e instanceof CustomEvent) events.push(e);
+      return origDispatch(e);
     });
 
     controller.stopRecording();
@@ -171,6 +175,9 @@ describe('RecordingController', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('No audio data'));
     expect(controller.isRecording).toBe(false);
     expect(events.find((e) => e.type === 'daw-recording-complete')).toBeUndefined();
+    const errorEvent = events.find((e) => e.type === 'daw-recording-error');
+    expect(errorEvent).toBeTruthy();
+    expect(errorEvent!.detail.trackId).toBe('track-1');
     warnSpy.mockRestore();
   });
 

@@ -140,7 +140,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **`getVisibleChunkIndices()`** — Shared pure function in `utils/viewport.ts`, re-exported from `viewport-controller.ts`. Used by `daw-waveform._getVisibleChunkIndices()`.
 - **Permissive defaults** — Controller initializes `visibleStart=-Infinity, visibleEnd=Infinity` so all chunks render before scroll container is attached.
 - **`daw-waveform` props** — `visibleStart`, `visibleEnd`, `originX` control which 1000px canvas chunks are rendered. Defaults to all-visible when not set.
-- **File size budget** — `daw-editor.ts` is at 778 lines (hard max: 800). `loadFiles` extracted to `interactions/file-loader.ts`; `TrackDescriptor`/`ClipDescriptor` extracted to `src/types.ts`.
+- **File size budget** — `daw-editor.ts` hard max 800 lines. `loadFiles` extracted to `interactions/file-loader.ts`; `addRecordedClip` extracted to `interactions/recording-clip.ts`; `TrackDescriptor`/`ClipDescriptor` extracted to `src/types.ts`.
 
 ## Track Controls
 

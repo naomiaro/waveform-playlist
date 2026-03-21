@@ -2,12 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
-import {
-  createClip,
-  createClipFromSeconds,
-  createTrack,
-  clipPixelWidth,
-} from '@waveform-playlist/core';
+import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
@@ -28,6 +23,7 @@ import type {
   LoadFilesResult,
 } from '../events';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
+import { addRecordedClip } from '../interactions/recording-clip';
 
 @customElement('daw-editor')
 export class DawEditorElement extends LitElement {
@@ -579,44 +575,7 @@ export class DawEditorElement extends LitElement {
     this._recordingController.stopRecording();
   }
   _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number) {
-    const clip = createClip({
-      audioBuffer: buf,
-      startSample,
-      durationSamples: durSamples,
-      offsetSamples: 0,
-      gain: 1,
-      name: 'Recording',
-    });
-    this._clipBuffers = new Map(this._clipBuffers).set(clip.id, buf);
-    this._peakPipeline
-      .generatePeaks(buf, this.samplesPerPixel, this.mono)
-      .then((pd) => {
-        this._peaksData = new Map(this._peaksData).set(clip.id, pd);
-        const t = this._engineTracks.get(trackId);
-        if (t) {
-          this._engineTracks = new Map(this._engineTracks).set(trackId, {
-            ...t,
-            clips: [...t.clips, clip],
-          });
-          this._recomputeDuration();
-          this._engine?.setTracks([...this._engineTracks.values()]);
-        }
-      })
-      .catch((err) => {
-        console.warn('[dawcore] Failed to generate peaks for recorded clip: ' + String(err));
-        const next = new Map(this._clipBuffers);
-        next.delete(clip.id);
-        this._clipBuffers = next;
-        if (this.isConnected) {
-          this.dispatchEvent(
-            new CustomEvent<DawErrorDetail>('daw-error', {
-              bubbles: true,
-              composed: true,
-              detail: { operation: 'recording-peaks', error: err },
-            })
-          );
-        }
-      });
+    addRecordedClip(this, trackId, buf, startSample, durSamples);
   }
   async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
     const s = stream ?? this.recordingStream;

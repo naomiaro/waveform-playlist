@@ -27,10 +27,15 @@ export interface RecordingSession {
   readonly channelCount: number;
   readonly bits: Bits;
   isFirstMessage: boolean;
+  /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
+  readonly _onTrackEnded: (() => void) | null;
+  readonly _audioTrack: MediaStreamTrack | null;
 }
 
 /** Readonly view of a recording session for external consumers. */
-export type ReadonlyRecordingSession = Readonly<Omit<RecordingSession, 'chunks' | 'peaks'>> & {
+export type ReadonlyRecordingSession = Readonly<
+  Omit<RecordingSession, 'chunks' | 'peaks' | '_onTrackEnded' | '_audioTrack'>
+> & {
   readonly chunks: ReadonlyArray<ReadonlyArray<Float32Array>>;
   readonly peaks: ReadonlyArray<Int8Array | Int16Array>;
 };
@@ -116,6 +121,16 @@ export class RecordingController implements ReactiveController {
         channelCountMode: 'explicit' as globalThis.ChannelCountMode,
       });
 
+      // Listen on MediaStreamTrack (not MediaStream — MediaStream has no 'ended' event)
+      const audioTrack = stream.getAudioTracks()[0] ?? null;
+      const onTrackEnded = audioTrack
+        ? () => {
+            if (this._sessions.has(trackId)) {
+              this.stopRecording(trackId);
+            }
+          }
+        : null;
+
       const session: RecordingSession = {
         trackId,
         stream,
@@ -130,24 +145,22 @@ export class RecordingController implements ReactiveController {
         channelCount,
         bits,
         isFirstMessage: true,
+        _onTrackEnded: onTrackEnded,
+        _audioTrack: audioTrack,
       };
       this._sessions.set(trackId, session);
 
-      // Wire handler BEFORE connect and start (recording CLAUDE.md: reset refs before connect)
+      // dawcore CLAUDE.md: wire onmessage BEFORE source.connect() and postMessage start
       workletNode.port.onmessage = (e: MessageEvent) => {
         this._onWorkletMessage(trackId, e.data);
       };
       source.connect(workletNode);
       workletNode.port.postMessage({ command: 'start', channelCount });
 
-      // Handle stream ending (mic unplug)
-      const onStreamEnded = () => {
-        stream.removeEventListener('ended', onStreamEnded);
-        if (this._sessions.has(trackId)) {
-          this.stopRecording(trackId);
-        }
-      };
-      stream.addEventListener('ended', onStreamEnded);
+      // Attach mic-unplug listener (stored in session for cleanup)
+      if (audioTrack && onTrackEnded) {
+        audioTrack.addEventListener('ended', onTrackEnded);
+      }
 
       this._host.dispatchEvent(
         new CustomEvent<DawRecordingStartDetail>('daw-recording-start', {
@@ -184,11 +197,22 @@ export class RecordingController implements ReactiveController {
     session.source.disconnect();
     session.workletNode.disconnect();
 
+    // Remove mic-unplug listener (fix #4: prevent leak on normal stop path)
+    this._removeTrackEndedListener(session);
+
     // Build AudioBuffer from accumulated chunks
     if (session.totalSamples === 0) {
       console.warn('[dawcore] RecordingController: No audio data captured');
       this._sessions.delete(id);
       this._host.requestUpdate();
+      // Dispatch error so record button can reset its state (fix #3)
+      this._host.dispatchEvent(
+        new CustomEvent<DawRecordingErrorDetail>('daw-recording-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId: id, error: new Error('No audio data captured') },
+        })
+      );
       return;
     }
     const stopCtx = getGlobalContext().rawContext as AudioContext;
@@ -301,10 +325,17 @@ export class RecordingController implements ReactiveController {
     }
   }
 
+  private _removeTrackEndedListener(session: RecordingSession) {
+    if (session._audioTrack && session._onTrackEnded) {
+      session._audioTrack.removeEventListener('ended', session._onTrackEnded);
+    }
+  }
+
   private _cleanupSession(trackId: string) {
     const session = this._sessions.get(trackId);
     if (!session) return;
     try {
+      this._removeTrackEndedListener(session);
       session.workletNode.port.postMessage({ command: 'stop' });
       session.source.disconnect();
       session.workletNode.disconnect();

@@ -9,7 +9,6 @@
  * Message Format (to main thread):
  * {
  *   channels: Float32Array[],  // Per-channel audio samples for this chunk
- *   sampleRate: number,        // Sample rate of the audio
  *   channelCount: number       // Number of channels
  * }
  *
@@ -19,7 +18,6 @@
 
 interface RecordingProcessorMessage {
   channels: Float32Array[];
-  sampleRate: number;
   channelCount: number;
 }
 
@@ -132,7 +130,6 @@ class RecordingProcessor extends AudioWorkletProcessor {
 
     this.port.postMessage({
       channels,
-      sampleRate: sampleRate,
       channelCount: this.channelCount,
     } as RecordingProcessorMessage);
 
