@@ -214,7 +214,7 @@ export function useRecording(
 
   // Stop recording
   const stopRecording = useCallback(async (): Promise<AudioBuffer | null> => {
-    if (!isRecording) {
+    if (!isRecordingRef.current) {
       return null;
     }
 
@@ -283,7 +283,7 @@ export function useRecording(
       setError(err instanceof Error ? err : new Error('Failed to stop recording'));
       return null;
     }
-  }, [isRecording, channelCount]);
+  }, [channelCount]);
   stopRecordingRef.current = stopRecording;
 
   // Pause recording
@@ -308,12 +308,14 @@ export function useRecording(
     }
   }, [isRecording, isPaused, duration, startDurationLoop]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — copy refs in effect body (CLAUDE.md pattern #16)
   useEffect(() => {
+    const audioTrack = audioTrackRef.current;
+    const onTrackEnded = onTrackEndedRef.current;
     return () => {
       // Remove mic-unplug listener
-      if (audioTrackRef.current && onTrackEndedRef.current) {
-        audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);
+      if (audioTrack && onTrackEnded) {
+        audioTrack.removeEventListener('ended', onTrackEnded);
       }
       if (workletNodeRef.current) {
         workletNodeRef.current.port.postMessage({ command: 'stop' });
