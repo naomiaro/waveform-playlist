@@ -238,6 +238,64 @@ describe('createClipFromSeconds', () => {
     expect(clip.name).toBe('My Clip');
     expect(clip.color).toBe('#00ff00');
   });
+
+  it('round-trips integer samples at 44100Hz without drift', () => {
+    // Simulate: 132300 samples at 44100Hz = exactly 3.0 seconds
+    const samples = 132300;
+    const rate = 44100;
+    const clip = createClipFromSeconds({
+      startTime: samples / rate,
+      duration: samples / rate,
+      sampleRate: rate,
+      sourceDuration: samples / rate,
+    });
+    expect(clip.startSample).toBe(samples);
+    expect(clip.durationSamples).toBe(samples);
+  });
+
+  it('round-trips integer samples at 48000Hz without drift', () => {
+    const samples = 144000;
+    const rate = 48000;
+    const clip = createClipFromSeconds({
+      startTime: samples / rate,
+      duration: samples / rate,
+      sampleRate: rate,
+      sourceDuration: samples / rate,
+    });
+    expect(clip.startSample).toBe(samples);
+    expect(clip.durationSamples).toBe(samples);
+  });
+
+  it('round-trips odd sample counts without losing samples', () => {
+    // 99999 / 48000 = 2.0833125 — not exactly representable in float64
+    const samples = 99999;
+    const rate = 48000;
+    const clip = createClipFromSeconds({
+      startTime: samples / rate,
+      duration: samples / rate,
+      sampleRate: rate,
+      sourceDuration: samples / rate,
+    });
+    // Math.round should recover the original integer
+    expect(clip.startSample).toBe(samples);
+    expect(clip.durationSamples).toBe(samples);
+  });
+
+  it('drifts when division and multiplication use different rates', () => {
+    // This documents the footgun: dividing by one rate, multiplying by another
+    const samples = 132300;
+    const editorRate = 44100;
+    const bufferRate = 48000;
+    const clip = createClipFromSeconds({
+      startTime: samples / editorRate, // 3.0 seconds
+      duration: samples / editorRate,  // 3.0 seconds
+      sampleRate: bufferRate,          // but clip uses 48000
+      sourceDuration: samples / editorRate,
+    });
+    // 3.0 * 48000 = 144000, NOT 132300 — a 8.8% error
+    expect(clip.startSample).not.toBe(samples);
+    expect(clip.startSample).toBe(Math.round(3.0 * 48000)); // 144000
+  });
 });
 
 // --- createTrack ---
