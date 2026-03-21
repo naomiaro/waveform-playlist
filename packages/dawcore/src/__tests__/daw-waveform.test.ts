@@ -194,6 +194,42 @@ describe('DawWaveformElement', () => {
     document.body.removeChild(el);
   });
 
+  it('setPeaksQuiet replaces peaks without marking all dirty', async () => {
+    const el = document.createElement('daw-waveform') as any;
+    el.length = 200;
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Set initial peaks (full draw)
+    el.peaks = new Int16Array([0, 100, -50, 200, 0, 150, -100, 300]);
+    flushRaf();
+
+    const canvas = el.shadowRoot?.querySelector('canvas');
+    expect(canvas).toBeTruthy();
+
+    const mockCtx = {
+      clearRect: vi.fn(),
+      resetTransform: vi.fn(),
+      scale: vi.fn(),
+      fillStyle: '',
+      fillRect: vi.fn(),
+    };
+    vi.spyOn(canvas!, 'getContext').mockReturnValue(mockCtx as any);
+
+    // setPeaksQuiet should NOT trigger a draw
+    const longerPeaks = new Int16Array([0, 100, -50, 200, 0, 150, -100, 300, 0, 50, -25, 100]);
+    el.setPeaksQuiet(longerPeaks);
+    flushRaf();
+
+    // No clearRect called — peaks replaced silently
+    expect(mockCtx.clearRect).not.toHaveBeenCalled();
+    // But the peaks reference is updated
+    expect(el.peaks).toBe(longerPeaks);
+    expect(el.bits).toBe(16);
+
+    document.body.removeChild(el);
+  });
+
   it('skips draw when dirty set is empty', async () => {
     const el = document.createElement('daw-waveform') as any;
     el.length = 100;

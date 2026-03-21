@@ -55,6 +55,15 @@ export class DawWaveformElement extends LitElement {
     return this._peaks;
   }
 
+  /**
+   * Replace the internal peaks reference without marking all dirty.
+   * Use with updatePeaks() for incremental recording updates where
+   * appendPeaks() returns a new array but only the tail changed.
+   */
+  setPeaksQuiet(value: Peaks) {
+    this._peaks = value;
+  }
+
   get bits(): Bits {
     return this._peaks instanceof Int8Array ? 8 : 16;
   }
