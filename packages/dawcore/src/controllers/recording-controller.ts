@@ -244,9 +244,10 @@ export class RecordingController implements ReactiveController {
     }
     session.totalSamples += channels[0].length;
 
-    // Generate peaks per channel
+    // Generate peaks per channel and update live preview waveforms
     for (let ch = 0; ch < session.channelCount; ch++) {
       if (!channels[ch]) continue;
+      const oldPeakCount = Math.floor(session.peaks[ch].length / 2);
       session.peaks[ch] = appendPeaks(
         session.peaks[ch],
         channels[ch],
@@ -254,8 +255,24 @@ export class RecordingController implements ReactiveController {
         samplesProcessedBefore,
         session.bits
       );
+      const newPeakCount = Math.floor(session.peaks[ch].length / 2);
 
-      // Live preview update will be wired in Task 5
+      // Update live preview waveform
+      const waveformSelector = `daw-waveform[data-recording-track="${trackId}"][data-recording-channel="${ch}"]`;
+      const waveformEl = (this._host as any).shadowRoot?.querySelector(
+        waveformSelector
+      );
+      if (waveformEl) {
+        if (session.isFirstMessage) {
+          waveformEl.peaks = session.peaks[ch];
+        } else {
+          waveformEl.setPeaksQuiet(session.peaks[ch]);
+          waveformEl.updatePeaks(
+            Math.max(0, oldPeakCount - 1),
+            newPeakCount
+          );
+        }
+      }
     }
 
     session.isFirstMessage = false;

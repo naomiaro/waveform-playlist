@@ -12,6 +12,8 @@ import '../elements/daw-track-controls';
 import { hostStyles } from '../styles/theme';
 import { ViewportController } from '../controllers/viewport-controller';
 import { AudioResumeController } from '../controllers/audio-resume-controller';
+import { RecordingController } from '../controllers/recording-controller';
+import type { RecordingOptions } from '../controllers/recording-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
 import type {
   DawSelectionDetail,
@@ -65,6 +67,7 @@ export class DawEditorElement extends LitElement {
   private _audioResume = new AudioResumeController(this);
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
+  private _recordingController = new RecordingController(this as any);
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
     const v = new ViewportController(this);
@@ -111,29 +114,21 @@ export class DawEditorElement extends LitElement {
     `,
   ];
 
-  /** Effective sample rate: decoded audio rate if available, otherwise the initial hint. */
   get effectiveSampleRate(): number {
     return this._resolvedSampleRate ?? this.sampleRate;
   }
-
-  /** Derived pixel width from duration. */
   private get _totalWidth(): number {
     return Math.ceil((this._duration * this.effectiveSampleRate) / this.samplesPerPixel);
   }
-
-  /** Setter for external handlers (e.g. PointerHandler) to update @state reactively. */
   _setSelectedTrackId(trackId: string | null) {
     this._selectedTrackId = trackId;
   }
-
   get tracks(): TrackDescriptor[] {
     return [...this._tracks.values()];
   }
-
   get selectedTrackId(): string | null {
     return this._selectedTrackId;
   }
-
   get selection(): { start: number; end: number } | null {
     if (this._selectionStartTime === 0 && this._selectionEndTime === 0) return null;
     return { start: this._selectionStartTime, end: this._selectionEndTime };
@@ -582,7 +577,6 @@ export class DawEditorElement extends LitElement {
   async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
     return loadFilesImpl(this, files);
   }
-
   // --- Playback ---
   async play() {
     try {
@@ -605,25 +599,52 @@ export class DawEditorElement extends LitElement {
       );
     }
   }
-
   pause() {
     if (!this._engine) return;
     this._engine.pause();
     this._stopPlayhead();
     this.dispatchEvent(new CustomEvent('daw-pause', { bubbles: true, composed: true }));
   }
-
   stop() {
     if (!this._engine) return;
     this._engine.stop();
     this._stopPlayhead();
     this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
   }
-
   seekTo(time: number) {
     if (!this._engine) return;
     this._engine.seek(time);
     this._currentTime = time;
+  }
+
+  // --- Recording ---
+  recordingStream: MediaStream | null = null;
+  get isRecording(): boolean { return this._recordingController.isRecording; }
+  stopRecording(): void { this._recordingController.stopRecording(); }
+
+  async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
+    const s = stream ?? this.recordingStream;
+    if (!s) {
+      console.warn('[dawcore] startRecording: no stream provided and recordingStream is null');
+      return;
+    }
+    await this._recordingController.startRecording(s, options);
+  }
+
+  private _renderRecordingPreview(trackId: string, chH: number) {
+    const rs = this._recordingController.getSession(trackId);
+    if (!rs) return '';
+    const left = Math.floor(rs.startSample / this.samplesPerPixel);
+    const w = Math.floor(rs.totalSamples / this.samplesPerPixel);
+    return rs.peaks.map((chPeaks, ch) => html`
+      <daw-waveform data-recording-track=${trackId} data-recording-channel=${ch}
+        style="position:absolute;left:${left}px;top:${ch * chH}px;"
+        .peaks=${chPeaks} .length=${w} .waveHeight=${chH}
+        .barWidth=${this.barWidth} .barGap=${this.barGap}
+        .visibleStart=${this._viewport.visibleStart}
+        .visibleEnd=${this._viewport.visibleEnd} .originX=${left}
+      ></daw-waveform>
+    `);
   }
 
   // --- Playhead ---
@@ -761,6 +782,7 @@ export class DawEditorElement extends LitElement {
                     `
                   );
                 })}
+                ${this._renderRecordingPreview(t.trackId, channelHeight)}
               </div>
             `;
           })}
