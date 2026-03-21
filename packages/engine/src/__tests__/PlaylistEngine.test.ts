@@ -714,23 +714,30 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('clamps seek to duration', () => {
+    it('seek beyond duration is allowed (recording/empty timeline)', () => {
       const engine = new PlaylistEngine();
       engine.setTracks([
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
       ]);
       engine.seek(100);
-      expect(engine.getState().currentTime).toBe(1); // 44100 samples = 1 second
+      expect(engine.getState().currentTime).toBe(100);
       engine.dispose();
     });
 
-    it('clamps startTime in play()', () => {
+    it('seek clamps negative to 0', () => {
+      const engine = new PlaylistEngine();
+      engine.seek(-5);
+      expect(engine.getState().currentTime).toBe(0);
+      engine.dispose();
+    });
+
+    it('play beyond duration is allowed (recording/empty timeline)', () => {
       const engine = new PlaylistEngine();
       engine.setTracks([
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
       ]);
-      engine.play(100); // Beyond duration of 1 second
-      expect(engine.getState().currentTime).toBe(1);
+      engine.play(100); // Beyond duration — Transport plays silence
+      expect(engine.getState().currentTime).toBe(100);
       engine.dispose();
     });
 
