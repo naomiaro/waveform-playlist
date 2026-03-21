@@ -264,6 +264,10 @@ describe('useMidiTracks', () => {
   });
 
   describe('error handling', () => {
+    beforeEach(() => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
     it('sets error on fetch failure', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
