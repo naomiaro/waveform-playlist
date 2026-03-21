@@ -1,12 +1,8 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import type { Bits } from '@waveform-playlist/core';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
+import { getGlobalContext } from '@waveform-playlist/playout';
 import { recordingProcessorUrl } from '@waveform-playlist/worklets';
-import {
-  appendPeaks,
-  concatenateAudioData,
-  createAudioBuffer,
-} from '@waveform-playlist/recording';
+import { appendPeaks, concatenateAudioData, createAudioBuffer } from '@waveform-playlist/recording';
 import type {
   DawRecordingStartDetail,
   DawRecordingCompleteDetail,
@@ -22,8 +18,8 @@ export interface RecordingOptions {
 export interface RecordingSession {
   trackId: string;
   stream: MediaStream;
-  source: MediaStreamAudioSourceNode;
-  workletNode: AudioWorkletNode;
+  source: { disconnect(): void; connect(dest: any): void };
+  workletNode: { port: MessagePort; disconnect(): void };
   chunks: Float32Array[][];
   totalSamples: number;
   peaks: (Int8Array | Int16Array)[];
@@ -68,49 +64,38 @@ export class RecordingController implements ReactiveController {
     return this._sessions.get(trackId);
   }
 
-  async startRecording(
-    stream: MediaStream,
-    options: RecordingOptions = {}
-  ): Promise<void> {
+  async startRecording(stream: MediaStream, options: RecordingOptions = {}): Promise<void> {
     const trackId = options.trackId ?? this._host._selectedTrackId;
     if (!trackId) {
-      console.warn(
-        '[dawcore] RecordingController: No track selected for recording'
-      );
+      console.warn('[dawcore] RecordingController: No track selected for recording');
       return;
     }
     if (this._sessions.has(trackId)) {
-      console.warn(
-        '[dawcore] RecordingController: Already recording on track "' +
-          trackId +
-          '"'
-      );
+      console.warn('[dawcore] RecordingController: Already recording on track "' + trackId + '"');
       return;
     }
 
     const bits: Bits = options.bits ?? 16;
-    const audioContext = getGlobalAudioContext();
+    const context = getGlobalContext();
+    const rawCtx = context.rawContext as AudioContext;
 
     try {
+      // Load worklet via native API (not Tone.js addAudioWorkletModule — caches single URL)
       if (!this._workletLoaded) {
-        await audioContext.audioWorklet.addModule(recordingProcessorUrl);
+        await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
         this._workletLoaded = true;
       }
 
-      const source = audioContext.createMediaStreamSource(stream);
-      const workletNode = new AudioWorkletNode(
-        audioContext,
-        'recording-processor'
-      );
+      // Use Tone.js Context methods — avoids standardized-audio-context identity issues
+      const source = context.createMediaStreamSource(stream);
+      const workletNode = context.createAudioWorkletNode('recording-processor');
       source.connect(workletNode);
 
       // Detect channel count from stream (not source.channelCount — defaults to 2)
-      const channelCount =
-        stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
+      const channelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
 
       const startSample =
-        options.startSample ??
-        Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
+        options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
 
       const session: RecordingSession = {
         trackId,
@@ -154,10 +139,7 @@ export class RecordingController implements ReactiveController {
 
       this._host.requestUpdate();
     } catch (err) {
-      console.warn(
-        '[dawcore] RecordingController: Failed to start recording: ' +
-          String(err)
-      );
+      console.warn('[dawcore] RecordingController: Failed to start recording: ' + String(err));
       this._host.dispatchEvent(
         new CustomEvent<DawRecordingErrorDetail>('daw-recording-error', {
           bubbles: true,
@@ -181,34 +163,24 @@ export class RecordingController implements ReactiveController {
     session.workletNode.port.postMessage({ command: 'stop' });
 
     // Build AudioBuffer from accumulated chunks
-    const audioContext = getGlobalAudioContext();
-    const channelData = session.chunks.map((chunkArr) =>
-      concatenateAudioData(chunkArr)
-    );
-    const audioBuffer = createAudioBuffer(
-      audioContext,
-      channelData,
-      audioContext.sampleRate,
-      session.channelCount
-    );
+    const rawCtx = getGlobalContext().rawContext as AudioContext;
+    const channelData = session.chunks.map((chunkArr) => concatenateAudioData(chunkArr));
+    const audioBuffer = createAudioBuffer(rawCtx, channelData, rawCtx.sampleRate, session.channelCount);
 
     const durationSamples = audioBuffer.length;
 
     // Dispatch cancelable event
-    const event = new CustomEvent<DawRecordingCompleteDetail>(
-      'daw-recording-complete',
-      {
-        bubbles: true,
-        composed: true,
-        cancelable: true,
-        detail: {
-          trackId: id,
-          audioBuffer,
-          startSample: session.startSample,
-          durationSamples,
-        },
-      }
-    );
+    const event = new CustomEvent<DawRecordingCompleteDetail>('daw-recording-complete', {
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+      detail: {
+        trackId: id,
+        audioBuffer,
+        startSample: session.startSample,
+        durationSamples,
+      },
+    });
     const notPrevented = this._host.dispatchEvent(event);
 
     // Clean up session
@@ -217,12 +189,7 @@ export class RecordingController implements ReactiveController {
 
     // If not prevented, create clip (Task 6 will implement this)
     if (notPrevented) {
-      this._createClipFromRecording(
-        id,
-        audioBuffer,
-        session.startSample,
-        durationSamples
-      );
+      this._createClipFromRecording(id, audioBuffer, session.startSample, durationSamples);
     }
   }
 
@@ -259,18 +226,13 @@ export class RecordingController implements ReactiveController {
 
       // Update live preview waveform
       const waveformSelector = `daw-waveform[data-recording-track="${trackId}"][data-recording-channel="${ch}"]`;
-      const waveformEl = (this._host as any).shadowRoot?.querySelector(
-        waveformSelector
-      );
+      const waveformEl = (this._host as any).shadowRoot?.querySelector(waveformSelector);
       if (waveformEl) {
         if (session.isFirstMessage) {
           waveformEl.peaks = session.peaks[ch];
         } else {
           waveformEl.setPeaksQuiet(session.peaks[ch]);
-          waveformEl.updatePeaks(
-            Math.max(0, oldPeakCount - 1),
-            newPeakCount
-          );
+          waveformEl.updatePeaks(Math.max(0, oldPeakCount - 1), newPeakCount);
         }
       }
     }
@@ -278,9 +240,7 @@ export class RecordingController implements ReactiveController {
     session.isFirstMessage = false;
 
     // Throttle requestUpdate — only when container width needs to grow
-    const newPixelWidth = Math.floor(
-      session.totalSamples / this._host.samplesPerPixel
-    );
+    const newPixelWidth = Math.floor(session.totalSamples / this._host.samplesPerPixel);
     const oldPixelWidth = Math.floor(
       (session.totalSamples - channels[0].length) / this._host.samplesPerPixel
     );

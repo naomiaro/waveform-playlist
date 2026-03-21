@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('@waveform-playlist/playout', () => ({
-  getGlobalAudioContext: vi.fn(() => mockAudioContext),
+  getGlobalContext: vi.fn(() => mockToneContext),
 }));
 
 vi.mock('@waveform-playlist/worklets', () => ({
@@ -15,7 +15,8 @@ vi.mock('@waveform-playlist/recording', () => ({
   createAudioBuffer: vi.fn(() => mockAudioBuffer),
 }));
 
-let mockAudioContext: any;
+let mockToneContext: any;
+let mockRawContext: any;
 let mockAudioBuffer: any;
 let mockWorkletNode: any;
 let mockSource: any;
@@ -38,9 +39,7 @@ function createMockHost() {
 
 function createMockStream(channelCount = 1): MediaStream {
   return {
-    getAudioTracks: () => [
-      { getSettings: () => ({ channelCount }) },
-    ],
+    getAudioTracks: () => [{ getSettings: () => ({ channelCount }) }],
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   } as any;
@@ -60,17 +59,20 @@ describe('RecordingController', () => {
       connect: vi.fn(),
       disconnect: vi.fn(),
     };
-    mockAudioContext = {
-      createMediaStreamSource: vi.fn(() => mockSource),
+    mockRawContext = {
       audioWorklet: { addModule: vi.fn(() => Promise.resolve()) },
       sampleRate: 48000,
+    };
+    mockToneContext = {
+      rawContext: mockRawContext,
+      createMediaStreamSource: vi.fn(() => mockSource),
+      createAudioWorkletNode: vi.fn(() => mockWorkletNode),
     };
     mockAudioBuffer = {
       length: 48000,
       sampleRate: 48000,
       numberOfChannels: 1,
     };
-    vi.stubGlobal('AudioWorkletNode', vi.fn(() => mockWorkletNode));
     host = createMockHost();
   });
 
@@ -213,7 +215,7 @@ describe('RecordingController', () => {
       'track-1',
       expect.anything(), // audioBuffer
       expect.any(Number), // startSample
-      expect.any(Number)  // durationSamples
+      expect.any(Number) // durationSamples
     );
   });
 
