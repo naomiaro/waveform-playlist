@@ -1,11 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { Peaks, Bits } from '@waveform-playlist/core';
-import {
-  aggregatePeaks,
-  calculateBarRects,
-  calculateFirstBarPosition,
-} from '../utils/peak-rendering';
+import { aggregatePeaks, calculateBarRects } from '../utils/peak-rendering';
 import { getVisibleChunkIndices } from '../utils/viewport';
 
 const MAX_CANVAS_WIDTH = 1000;
@@ -14,8 +10,9 @@ const MAX_CANVAS_WIDTH = 1000;
 const LAYOUT_PROPS = new Set(['length', 'waveHeight', 'barWidth', 'barGap']);
 
 /**
- * Group dirty peak indices by canvas chunk, mapping peak indices to bar pixel
- * positions for correct chunk assignment when barWidth > 1 or barGap > 0.
+ * Group dirty peak indices by canvas chunk. Returns bar-pixel-aligned
+ * min/max positions per chunk for correct clearRect coordinates,
+ * including when barWidth > 1 or barGap > 0.
  */
 function groupDirtyByChunk(
   dirtyPixels: Set<number>,
@@ -29,11 +26,11 @@ function groupDirtyByChunk(
     const existing = dirtyByChunk.get(chunkIdx);
     if (existing) {
       dirtyByChunk.set(chunkIdx, {
-        min: Math.min(existing.min, peakIdx),
-        max: Math.max(existing.max, peakIdx),
+        min: Math.min(existing.min, barPixel),
+        max: Math.max(existing.max, barPixel),
       });
     } else {
-      dirtyByChunk.set(chunkIdx, { min: peakIdx, max: peakIdx });
+      dirtyByChunk.set(chunkIdx, { min: barPixel, max: barPixel });
     }
   }
   return dirtyByChunk;
@@ -45,7 +42,7 @@ export class DawWaveformElement extends LitElement {
   private _dirtyPixels: Set<number> = new Set();
   private _drawScheduled = false;
   private _rafId = 0;
-  /** Chunk indices that were drawn in the last frame — used to detect new chunks on scroll. */
+  /** Chunk indices visible in the last draw pass — used to detect new chunks on scroll. */
   private _drawnChunks: Set<number> = new Set();
 
   set peaks(value: Peaks) {
@@ -138,7 +135,8 @@ export class DawWaveformElement extends LitElement {
 
     const canvases = this.shadowRoot?.querySelectorAll('canvas');
     if (!canvases || canvases.length === 0) {
-      this._dirtyPixels.clear();
+      // Don't clear _dirtyPixels — canvases may appear after Lit renders.
+      // connectedCallback or updated() will reschedule the draw.
       return;
     }
 
@@ -177,13 +175,11 @@ export class DawWaveformElement extends LitElement {
     if (!ctx) return;
 
     const globalOffset = chunkIdx * MAX_CANVAS_WIDTH;
-    const dirtyLocalStart = range.min - globalOffset;
-    const dirtyLocalEnd = range.max - globalOffset;
-
-    const firstBar = calculateFirstBarPosition(globalOffset + dirtyLocalStart, this.barWidth, step);
-    const clearStart = Math.max(0, firstBar - globalOffset);
-    const clearEnd = dirtyLocalEnd + this.barWidth;
+    // range.min/max are bar-pixel-aligned global positions from groupDirtyByChunk
+    const clearStart = Math.max(0, range.min - globalOffset);
+    const clearEnd = range.max - globalOffset + this.barWidth;
     const clearWidth = clearEnd - clearStart;
+    const firstBar = range.min;
 
     ctx.resetTransform();
     ctx.clearRect(clearStart * dpr, 0, clearWidth * dpr, canvas.height);

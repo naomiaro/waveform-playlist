@@ -116,6 +116,7 @@ Canvas chunks may be created or destroyed during Lit's render. The rAF callback 
 |---------|-------------------|
 | `.peaks` setter | All (`0..peakCount-1`) |
 | `updatePeaks(start, end)` | Range `start..end-1` |
+| `length` change | All |
 | `waveHeight` change | All |
 | `barWidth` / `barGap` change | All |
 | `updated()` (after Lit re-render) | All visible (ensures new canvas chunks get drawn) |
