@@ -79,6 +79,9 @@ export class RecordingController implements ReactiveController {
     const context = getGlobalContext();
     const rawCtx = context.rawContext as AudioContext;
 
+    // Resolve editor sample rate from AudioContext (same as _loadTrack does from decoded audio)
+    (this._host as any)._resolvedSampleRate = rawCtx.sampleRate;
+
     try {
       // Load worklet via native API (not Tone.js addAudioWorkletModule — caches single URL)
       if (!this._workletLoaded) {
@@ -89,8 +92,6 @@ export class RecordingController implements ReactiveController {
       // Detect channel count from stream (not source.channelCount — defaults to 2)
       const channelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
 
-      // Use the AudioContext's actual sample rate — recorded audio will be at this rate,
-      // not the editor's effectiveSampleRate (which may differ before first audio decode)
       const startSample =
         options.startSample ?? Math.floor(this._host._currentTime * rawCtx.sampleRate);
 
