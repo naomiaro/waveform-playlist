@@ -288,8 +288,8 @@ describe('createClipFromSeconds', () => {
     const bufferRate = 48000;
     const clip = createClipFromSeconds({
       startTime: samples / editorRate, // 3.0 seconds
-      duration: samples / editorRate,  // 3.0 seconds
-      sampleRate: bufferRate,          // but clip uses 48000
+      duration: samples / editorRate, // 3.0 seconds
+      sampleRate: bufferRate, // but clip uses 48000
       sourceDuration: samples / editorRate,
     });
     // 3.0 * 48000 = 144000, NOT 132300 — a 8.8% error

@@ -49,6 +49,8 @@
 - **Worklet requires `start` command** — `recording-processor` defaults `isRecording=false`. Must `port.postMessage({ command: 'start', channelCount })` after connecting source→worklet. Without it, no data flows. Do NOT send `sampleRate` — the worklet uses its global `sampleRate`.
 - **Handler ordering critical** — Set `workletNode.port.onmessage` BEFORE `source.connect(workletNode)` and `postMessage({ command: 'start' })`. The worklet can flush data immediately; messages before handler is wired are silently dropped.
 - **Use `createClip()` not `createClipFromSeconds()` for recorded clips** — Recording session provides exact integer samples. The seconds round-trip (`samples/rateA → seconds → Math.round(seconds*rateB)`) drifts when `effectiveSampleRate` differs from `audioBuffer.sampleRate`.
+- **`RecordingHost` must declare all host dependencies** — Any property or method the controller accesses on the host must be on the `RecordingHost` interface. No `as any` casts — the editor satisfies the interface directly. `_addRecordedClip?` is optional (runtime check), `shadowRoot` comes from `HTMLElement` intersection.
+- **Always clean up partial sessions on error** — `startRecording` adds the session to `_sessions` before connect/start. The catch block must call `_cleanupSession(trackId)` to prevent stuck `isRecording` state and mic leak.
 
 ## Key Patterns
 
