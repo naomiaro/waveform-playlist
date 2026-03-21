@@ -45,6 +45,8 @@ export function useRecording(
   const startTimeRef = useRef<number>(0);
   const isRecordingRef = useRef<boolean>(false);
   const isPausedRef = useRef<boolean>(false);
+  const audioTrackRef = useRef<MediaStreamTrack | null>(null);
+  const onTrackEndedRef = useRef<(() => void) | null>(null);
 
   // Shared duration update loop — starts a rAF loop that updates duration
   // from performance.now(). Used by both startRecording and resumeRecording.
@@ -179,11 +181,21 @@ export function useRecording(
 
       // Connect and start — after state reset and handler setup
       source.connect(workletNode);
-      workletNode.port.postMessage({
-        command: 'start',
-        sampleRate: context.sampleRate,
-        channelCount: streamChannelCount,
-      });
+      // Do NOT send sampleRate — worklet uses its global sampleRate (always correct)
+      workletNode.port.postMessage({ command: 'start', channelCount: streamChannelCount });
+
+      // Listen on MediaStreamTrack for mic unplug (MediaStream has no 'ended' event)
+      const audioTrack = stream.getAudioTracks()[0] ?? null;
+      audioTrackRef.current = audioTrack;
+      if (audioTrack) {
+        const onEnded = () => {
+          console.warn('[waveform-playlist] Audio track ended (mic unplugged or revoked)');
+          setError(new Error('Microphone disconnected during recording'));
+        };
+        onTrackEndedRef.current = onEnded;
+        audioTrack.addEventListener('ended', onEnded);
+      }
+
       isRecordingRef.current = true;
       isPausedRef.current = false;
       setIsRecording(true);
@@ -203,6 +215,13 @@ export function useRecording(
     }
 
     try {
+      // Remove mic-unplug listener
+      if (audioTrackRef.current && onTrackEndedRef.current) {
+        audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);
+        audioTrackRef.current = null;
+        onTrackEndedRef.current = null;
+      }
+
       // Stop the worklet
       if (workletNodeRef.current) {
         workletNodeRef.current.port.postMessage({ command: 'stop' });
@@ -287,6 +306,10 @@ export function useRecording(
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Remove mic-unplug listener
+      if (audioTrackRef.current && onTrackEndedRef.current) {
+        audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);
+      }
       if (workletNodeRef.current) {
         workletNodeRef.current.port.postMessage({ command: 'stop' });
 
