@@ -83,6 +83,33 @@ describe('DawEditorElement', () => {
     spy.mockRestore();
   });
 
+  it('effectiveSampleRate defaults to sampleRate property', () => {
+    const el = document.createElement('daw-editor') as any;
+    expect(el.effectiveSampleRate).toBe(48000);
+  });
+
+  it('resolveAudioContextSampleRate sets effective rate', () => {
+    const el = document.createElement('daw-editor') as any;
+    el.resolveAudioContextSampleRate(44100);
+    expect(el.effectiveSampleRate).toBe(44100);
+  });
+
+  it('resolveAudioContextSampleRate only sets once (first wins)', () => {
+    const el = document.createElement('daw-editor') as any;
+    el.resolveAudioContextSampleRate(44100);
+    el.resolveAudioContextSampleRate(96000);
+    expect(el.effectiveSampleRate).toBe(44100);
+  });
+
+  it('decoded audio _resolvedSampleRate takes precedence over resolveAudioContextSampleRate', () => {
+    const el = document.createElement('daw-editor') as any;
+    // Simulate what _loadTrack does
+    el._resolvedSampleRate = 44100;
+    // This should be a no-op since _resolvedSampleRate is already set
+    el.resolveAudioContextSampleRate(48000);
+    expect(el.effectiveSampleRate).toBe(44100);
+  });
+
   it('passes eager-resume="document" to controller target', async () => {
     const docSpy = vi.spyOn(document, 'addEventListener');
     const el = document.createElement('daw-editor') as any;

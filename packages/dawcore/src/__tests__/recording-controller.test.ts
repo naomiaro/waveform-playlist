@@ -173,6 +173,31 @@ describe('RecordingController', () => {
     warnSpy.mockRestore();
   });
 
+  it('resolves editor sampleRate from AudioContext on start', async () => {
+    mockRawContext.sampleRate = 44100;
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    expect(host.resolveAudioContextSampleRate).toHaveBeenCalledWith(44100);
+  });
+
+  it('computes startSample using resolved effectiveSampleRate', async () => {
+    // Simulate: host effectiveSampleRate updated by resolveAudioContextSampleRate
+    mockRawContext.sampleRate = 44100;
+    host._currentTime = 2.0;
+    host.effectiveSampleRate = 44100;
+    host.resolveAudioContextSampleRate = vi.fn(() => {
+      host.effectiveSampleRate = 44100;
+    });
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    const session = controller.getSession('track-1');
+    // Should use 44100, not the original default 48000
+    expect(session!.startSample).toBe(Math.floor(2.0 * 44100));
+  });
+
   it('rejects recording on a track that already has a session', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const controller = new RecordingController(host);
