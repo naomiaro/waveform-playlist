@@ -589,6 +589,8 @@ export class DawEditorElement extends LitElement {
   }
 
   _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number) {
+    // Align editor sample rate with the recorded audio (same as _loadTrack)
+    this._resolvedSampleRate = buf.sampleRate;
     const clip = createClip({
       audioBuffer: buf,
       startSample,

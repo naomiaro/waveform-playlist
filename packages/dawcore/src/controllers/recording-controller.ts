@@ -89,8 +89,10 @@ export class RecordingController implements ReactiveController {
       // Detect channel count from stream (not source.channelCount — defaults to 2)
       const channelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
 
+      // Use the AudioContext's actual sample rate — recorded audio will be at this rate,
+      // not the editor's effectiveSampleRate (which may differ before first audio decode)
       const startSample =
-        options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
+        options.startSample ?? Math.floor(this._host._currentTime * rawCtx.sampleRate);
 
       // Use Tone.js Context methods — avoids standardized-audio-context identity issues
       const source = context.createMediaStreamSource(stream);
