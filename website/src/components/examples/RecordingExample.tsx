@@ -213,11 +213,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // Start recording and playback together (overdub)
   const startRecordingWithPlayback = useCallback(async () => {
     // Read from ref to avoid stale closure (currentTime updates at 60fps)
-    const startTime = currentTimeRef.current;
-    recordStartTimeRef.current = startTime;
+    recordStartTimeRef.current = currentTimeRef.current;
     await startRecording();
-    // Always start playback so the playhead advances during recording
-    await play(startTime);
+    // Start Transport so playhead advances and user hears existing tracks (overdub)
+    await play(currentTimeRef.current);
   }, [startRecording, play, currentTimeRef]);
 
   // Auto-start recording when a new track is created and selected

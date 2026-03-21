@@ -1107,7 +1107,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Playback controls
   const play = useCallback(
     async (startTime?: number, playDuration?: number) => {
-      if (!engineRef.current || duration === 0) return;
+      if (!engineRef.current) return;
 
       const actualStartTime = startTime ?? currentTimeRef.current;
       playStartPositionRef.current = actualStartTime;
