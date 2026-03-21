@@ -33,6 +33,7 @@ function createMockHost() {
     samplesPerPixel: 1024,
     effectiveSampleRate: 48000,
     resolveAudioContextSampleRate: vi.fn(),
+    _addRecordedClip: vi.fn(),
     _selectedTrackId: 'track-1',
     _currentTime: 0,
   }) as any;
@@ -46,12 +47,12 @@ function createMockStream(channelCount = 1): MediaStream {
   } as any;
 }
 
-/** Simulate a worklet message so session.totalSamples > 0 */
-function simulateWorkletData(controller: RecordingController, trackId: string) {
-  const session = controller.getSession(trackId);
-  if (!session) return;
-  session.chunks[0].push(new Float32Array(1024));
-  session.totalSamples = 1024;
+/** Simulate a worklet message by triggering the onmessage handler */
+function simulateWorkletData(_trackId = 'track-1', samples = 1024) {
+  const handler = mockWorkletNode.port.onmessage;
+  if (handler) {
+    handler({ data: { channels: [new Float32Array(samples)] } } as MessageEvent);
+  }
 }
 
 describe('RecordingController', () => {
@@ -116,7 +117,7 @@ describe('RecordingController', () => {
   it('stopRecording dispatches cancelable event and cleans up', async () => {
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    simulateWorkletData(controller, 'track-1');
+    simulateWorkletData('track-1');
 
     const events: CustomEvent[] = [];
     host.dispatchEvent = vi.fn((e: CustomEvent) => {
@@ -140,7 +141,7 @@ describe('RecordingController', () => {
   it('stopRecording with preventDefault skips clip creation', async () => {
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    simulateWorkletData(controller, 'track-1');
+    simulateWorkletData('track-1');
 
     host.dispatchEvent = vi.fn((e: CustomEvent) => {
       e.preventDefault();
@@ -261,7 +262,7 @@ describe('RecordingController', () => {
     host._addRecordedClip = vi.fn();
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    simulateWorkletData(controller, 'track-1');
+    simulateWorkletData('track-1');
 
     const origDispatch = host.dispatchEvent.bind(host);
     host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
@@ -280,7 +281,7 @@ describe('RecordingController', () => {
     host._addRecordedClip = vi.fn();
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    simulateWorkletData(controller, 'track-1');
+    simulateWorkletData('track-1');
 
     host.addEventListener('daw-recording-complete', (e: Event) => {
       e.preventDefault();
@@ -299,5 +300,84 @@ describe('RecordingController', () => {
 
     expect(controller.isRecording).toBe(false);
     expect(mockSource.disconnect).toHaveBeenCalled();
+    // Should send stop command to worklet on cleanup
+    expect(mockWorkletNode.port.postMessage).toHaveBeenCalledWith({ command: 'stop' });
+  });
+
+  it('cleans up session on startRecording failure', async () => {
+    mockRawContext.audioWorklet.addModule = vi.fn(() => Promise.reject(new Error('CSP blocked')));
+    const controller = new RecordingController(host);
+    const events: CustomEvent[] = [];
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => {
+      if (e instanceof CustomEvent) events.push(e);
+      return origDispatch(e);
+    });
+
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    expect(controller.isRecording).toBe(false);
+    expect(controller.getSession('track-1')).toBeUndefined();
+    const errorEvent = events.find((e) => e.type === 'daw-recording-error');
+    expect(errorEvent).toBeTruthy();
+    expect(errorEvent!.detail.trackId).toBe('track-1');
+  });
+
+  // --- _onWorkletMessage tests ---
+
+  it('worklet message accumulates chunks and totalSamples', async () => {
+    const { appendPeaks: mockAppendPeaks } = await import('@waveform-playlist/recording');
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    simulateWorkletData('track-1', 512);
+
+    const session = controller.getSession('track-1');
+    expect(session!.totalSamples).toBe(512);
+    expect(session!.chunks[0]).toHaveLength(1);
+    expect(mockAppendPeaks).toHaveBeenCalledWith(
+      expect.any(Int16Array), // existing peaks
+      expect.any(Float32Array), // new samples
+      host.samplesPerPixel,
+      0, // samplesProcessedBefore
+      16 // bits
+    );
+  });
+
+  it('worklet message calls requestUpdate when pixel width grows', async () => {
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    host.requestUpdate.mockClear();
+
+    // Send enough samples to cross a pixel boundary (samplesPerPixel = 1024)
+    simulateWorkletData('track-1', 2048);
+
+    expect(host.requestUpdate).toHaveBeenCalled();
+  });
+
+  it('worklet message after session deleted is ignored', async () => {
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    const handler = mockWorkletNode.port.onmessage;
+
+    // Stop recording (deletes session), then trigger the handler — should not throw
+    simulateWorkletData('track-1', 512);
+    controller.stopRecording();
+
+    // Late message arrives after session is gone
+    expect(() => {
+      handler({ data: { channels: [new Float32Array(128)] } } as MessageEvent);
+    }).not.toThrow();
+  });
+
+  it('worklet message with empty channels is ignored', async () => {
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    mockWorkletNode.port.onmessage({
+      data: { channels: [] },
+    } as MessageEvent);
+
+    expect(controller.getSession('track-1')!.totalSamples).toBe(0);
   });
 });

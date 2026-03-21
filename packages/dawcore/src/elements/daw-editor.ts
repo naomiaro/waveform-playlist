@@ -2,7 +2,12 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
-import { createClip, createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
+import {
+  createClip,
+  createClipFromSeconds,
+  createTrack,
+  clipPixelWidth,
+} from '@waveform-playlist/core';
 import { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
@@ -35,13 +40,8 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
   /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
-
-  /**
-   * Resolved sample rate from decoded audio. Falls back to the `sampleRate`
-   * property until the first audio buffer is decoded.
-   */
+  /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
   _resolvedSampleRate: number | null = null;
-
   @state() _tracks: Map<string, TrackDescriptor> = new Map();
   @state() _engineTracks: Map<string, ClipTrack> = new Map();
   @state() _peaksData: Map<string, PeakData> = new Map();
@@ -49,13 +49,10 @@ export class DawEditorElement extends LitElement {
   @state() private _duration = 0;
   @state() _selectedTrackId: string | null = null;
   @state() _dragOver = false;
-
-  // Not @state — selection updated directly on <daw-selection> element
-  // during drag to avoid 60fps Lit re-renders (same pattern as _currentTime)
+  // Not @state — updated directly to avoid 60fps Lit re-renders
   _selectionStartTime = 0;
   _selectionEndTime = 0;
   _currentTime = 0;
-
   _engine: PlaylistEngine | null = null;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   private _audioInitialized = false;
@@ -67,7 +64,7 @@ export class DawEditorElement extends LitElement {
   private _audioResume = new AudioResumeController(this);
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
-  private _recordingController = new RecordingController(this as any);
+  private _recordingController = new RecordingController(this);
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
     const v = new ViewportController(this);
@@ -114,7 +111,9 @@ export class DawEditorElement extends LitElement {
     `,
   ];
 
-  get effectiveSampleRate(): number { return this._resolvedSampleRate ?? this.sampleRate; }
+  get effectiveSampleRate(): number {
+    return this._resolvedSampleRate ?? this.sampleRate;
+  }
   resolveAudioContextSampleRate(rate: number) {
     if (!this._resolvedSampleRate) this._resolvedSampleRate = rate;
   }
@@ -294,10 +293,8 @@ export class DawEditorElement extends LitElement {
         if (prop === 'soloed') this._engine.setTrackSolo(trackId, Boolean(value));
       }
     }
-
-    // Note: we don't sync back to the <daw-track> DOM element to avoid
-    // a redundant daw-track-update → _onTrackUpdate loop. The _tracks
-    // descriptor map is the source of truth for control values.
+    // Don't sync back to <daw-track> DOM element — avoids daw-track-update loop.
+    // _tracks descriptor map is the source of truth for control values.
   };
   private _onTrackRemoveRequest = (e: CustomEvent) => {
     const { trackId } = e.detail ?? {};
@@ -425,12 +422,10 @@ export class DawEditorElement extends LitElement {
         );
       }
       const arrayBuffer = await response.arrayBuffer();
-      // Use the global AudioContext shared with Tone.js.
-      // decodeAudioData works even while the context is suspended (pre-gesture).
+      // decodeAudioData works while context is suspended (pre-gesture)
       const { getGlobalAudioContext } = await import('@waveform-playlist/playout');
       return getGlobalAudioContext().decodeAudioData(arrayBuffer);
     })();
-
     this._audioCache.set(src, promise);
     try {
       return await promise;
@@ -474,17 +469,14 @@ export class DawEditorElement extends LitElement {
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b),
     });
-
     engine.on('statechange', (engineState) => {
       this._isPlaying = engineState.isPlaying;
       this._duration = engineState.duration;
       this._selectedTrackId = engineState.selectedTrackId;
     });
-
     engine.on('timeupdate', (time: number) => {
       this._currentTime = time;
     });
-
     engine.on('stop', () => {
       this._currentTime = engine.getCurrentTime();
       this._stopPlayhead();
@@ -520,10 +512,8 @@ export class DawEditorElement extends LitElement {
     if (!this.fileDrop) return;
     e.preventDefault();
     this._dragOver = false;
-
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
-
     try {
       await this.loadFiles(files);
     } catch (err) {
@@ -588,7 +578,6 @@ export class DawEditorElement extends LitElement {
   stopRecording(): void {
     this._recordingController.stopRecording();
   }
-
   _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number) {
     const clip = createClip({
       audioBuffer: buf,
@@ -599,18 +588,35 @@ export class DawEditorElement extends LitElement {
       name: 'Recording',
     });
     this._clipBuffers = new Map(this._clipBuffers).set(clip.id, buf);
-    this._peakPipeline.generatePeaks(buf, this.samplesPerPixel, this.mono).then((pd) => {
-      this._peaksData = new Map(this._peaksData).set(clip.id, pd);
-      const t = this._engineTracks.get(trackId);
-      if (t) {
-        this._engineTracks = new Map(this._engineTracks).set(trackId, {
-          ...t,
-          clips: [...t.clips, clip],
-        });
-        this._recomputeDuration();
-        this._engine?.setTracks([...this._engineTracks.values()]);
-      }
-    });
+    this._peakPipeline
+      .generatePeaks(buf, this.samplesPerPixel, this.mono)
+      .then((pd) => {
+        this._peaksData = new Map(this._peaksData).set(clip.id, pd);
+        const t = this._engineTracks.get(trackId);
+        if (t) {
+          this._engineTracks = new Map(this._engineTracks).set(trackId, {
+            ...t,
+            clips: [...t.clips, clip],
+          });
+          this._recomputeDuration();
+          this._engine?.setTracks([...this._engineTracks.values()]);
+        }
+      })
+      .catch((err) => {
+        console.warn('[dawcore] Failed to generate peaks for recorded clip: ' + String(err));
+        const next = new Map(this._clipBuffers);
+        next.delete(clip.id);
+        this._clipBuffers = next;
+        if (this.isConnected) {
+          this.dispatchEvent(
+            new CustomEvent<DawErrorDetail>('daw-error', {
+              bubbles: true,
+              composed: true,
+              detail: { operation: 'recording-peaks', error: err },
+            })
+          );
+        }
+      });
   }
   async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
     const s = stream ?? this.recordingStream;
@@ -656,18 +662,14 @@ export class DawEditorElement extends LitElement {
       this.samplesPerPixel
     );
   }
-
   _stopPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead) return;
     playhead.stopAnimation(this._currentTime, this.effectiveSampleRate, this.samplesPerPixel);
   }
-
   private _getPlayhead(): DawPlayheadElement | null {
     return this.shadowRoot?.querySelector('daw-playhead') as DawPlayheadElement | null;
   }
-
-  /** Returns engine tracks sorted by DOM order of <daw-track> children. */
   private _getOrderedTracks(): Array<[string, ClipTrack]> {
     const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
       (el) => (el as DawTrackElement).trackId

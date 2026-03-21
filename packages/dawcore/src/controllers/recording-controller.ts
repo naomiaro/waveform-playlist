@@ -16,18 +16,24 @@ export interface RecordingOptions {
 }
 
 export interface RecordingSession {
-  trackId: string;
-  stream: MediaStream;
-  source: { disconnect(): void; connect(dest: any): void };
-  workletNode: { port: MessagePort; disconnect(): void };
-  chunks: Float32Array[][];
+  readonly trackId: string;
+  readonly stream: MediaStream;
+  readonly source: { disconnect(): void; connect(dest: unknown): void };
+  readonly workletNode: { port: MessagePort; disconnect(): void };
+  readonly chunks: Float32Array[][];
   totalSamples: number;
-  peaks: (Int8Array | Int16Array)[];
-  startSample: number;
-  channelCount: number;
-  bits: Bits;
+  readonly peaks: (Int8Array | Int16Array)[];
+  readonly startSample: number;
+  readonly channelCount: number;
+  readonly bits: Bits;
   isFirstMessage: boolean;
 }
+
+/** Readonly view of a recording session for external consumers. */
+export type ReadonlyRecordingSession = Readonly<Omit<RecordingSession, 'chunks' | 'peaks'>> & {
+  readonly chunks: ReadonlyArray<ReadonlyArray<Float32Array>>;
+  readonly peaks: ReadonlyArray<Int8Array | Int16Array>;
+};
 
 /** Narrow interface for the host editor. */
 export interface RecordingHost extends ReactiveControllerHost {
@@ -35,7 +41,14 @@ export interface RecordingHost extends ReactiveControllerHost {
   readonly effectiveSampleRate: number;
   readonly _selectedTrackId: string | null;
   readonly _currentTime: number;
+  readonly shadowRoot: ShadowRoot | null;
   resolveAudioContextSampleRate(rate: number): void;
+  _addRecordedClip?(
+    trackId: string,
+    buf: AudioBuffer,
+    startSample: number,
+    durSamples: number
+  ): void;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -61,7 +74,7 @@ export class RecordingController implements ReactiveController {
     return this._sessions.size > 0;
   }
 
-  getSession(trackId: string): RecordingSession | undefined {
+  getSession(trackId: string): ReadonlyRecordingSession | undefined {
     return this._sessions.get(trackId);
   }
 
@@ -146,6 +159,8 @@ export class RecordingController implements ReactiveController {
 
       this._host.requestUpdate();
     } catch (err) {
+      // Clean up partially-created session to prevent stuck isRecording state
+      this._cleanupSession(trackId);
       console.warn('[dawcore] RecordingController: Failed to start recording: ' + String(err));
       this._host.dispatchEvent(
         new CustomEvent<DawRecordingErrorDetail>('daw-recording-error', {
@@ -164,10 +179,10 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(id);
     if (!session) return;
 
-    // Disconnect audio graph
+    // Send stop BEFORE disconnect so worklet can flush remaining buffered samples
+    session.workletNode.port.postMessage({ command: 'stop' });
     session.source.disconnect();
     session.workletNode.disconnect();
-    session.workletNode.port.postMessage({ command: 'stop' });
 
     // Build AudioBuffer from accumulated chunks
     if (session.totalSamples === 0) {
@@ -179,7 +194,10 @@ export class RecordingController implements ReactiveController {
     const stopCtx = getGlobalContext().rawContext as AudioContext;
     const channelData = session.chunks.map((chunkArr) => concatenateAudioData(chunkArr));
     const audioBuffer = createAudioBuffer(
-      stopCtx, channelData, this._host.effectiveSampleRate, session.channelCount
+      stopCtx,
+      channelData,
+      this._host.effectiveSampleRate,
+      session.channelCount
     );
     const durationSamples = audioBuffer.length;
 
@@ -201,18 +219,21 @@ export class RecordingController implements ReactiveController {
     this._sessions.delete(id);
     this._host.requestUpdate();
 
-    // If not prevented, create clip (Task 6 will implement this)
     if (notPrevented) {
       this._createClipFromRecording(id, audioBuffer, session.startSample, durationSamples);
     }
   }
 
-  private _onWorkletMessage(trackId: string, data: any) {
+  // Session fields are mutated in place on the hot path (~60fps worklet messages).
+  // This is intentional — creating new session objects + Map entries per message
+  // would cause significant GC pressure. Mutations are confined to the controller's
+  // private map and do not affect Lit's reactive rendering.
+  private _onWorkletMessage(trackId: string, data: unknown) {
     const session = this._sessions.get(trackId);
     if (!session) return;
 
     const { channels } = data as { channels: Float32Array[] };
-    if (!channels || channels.length === 0) return;
+    if (!channels || channels.length === 0 || !channels[0]) return;
 
     // Capture pre-increment value for appendPeaks
     const samplesProcessedBefore = session.totalSamples;
@@ -229,7 +250,7 @@ export class RecordingController implements ReactiveController {
     for (let ch = 0; ch < session.channelCount; ch++) {
       if (!channels[ch]) continue;
       const oldPeakCount = Math.floor(session.peaks[ch].length / 2);
-      session.peaks[ch] = appendPeaks(
+      (session.peaks as (Int8Array | Int16Array)[])[ch] = appendPeaks(
         session.peaks[ch],
         channels[ch],
         this._host.samplesPerPixel,
@@ -238,9 +259,9 @@ export class RecordingController implements ReactiveController {
       );
       const newPeakCount = Math.floor(session.peaks[ch].length / 2);
 
-      // Update live preview waveform
+      // Update live preview waveform — host is already & HTMLElement so shadowRoot is typed
       const waveformSelector = `daw-waveform[data-recording-track="${trackId}"][data-recording-channel="${ch}"]`;
-      const waveformEl = (this._host as any).shadowRoot?.querySelector(waveformSelector);
+      const waveformEl = this._host.shadowRoot?.querySelector(waveformSelector) as any;
       if (waveformEl) {
         if (session.isFirstMessage) {
           waveformEl.peaks = session.peaks[ch];
@@ -269,9 +290,14 @@ export class RecordingController implements ReactiveController {
     startSample: number,
     durationSamples: number
   ) {
-    const host = this._host as any;
-    if (typeof host._addRecordedClip === 'function') {
-      host._addRecordedClip(trackId, audioBuffer, startSample, durationSamples);
+    if (typeof this._host._addRecordedClip === 'function') {
+      this._host._addRecordedClip(trackId, audioBuffer, startSample, durationSamples);
+    } else {
+      console.warn(
+        '[dawcore] RecordingController: host does not implement _addRecordedClip — clip not created for track "' +
+          trackId +
+          '"'
+      );
     }
   }
 
@@ -279,10 +305,16 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(trackId);
     if (!session) return;
     try {
+      session.workletNode.port.postMessage({ command: 'stop' });
       session.source.disconnect();
       session.workletNode.disconnect();
-    } catch {
-      // Ignore disconnect errors on cleanup
+    } catch (err) {
+      console.warn(
+        '[dawcore] RecordingController: disconnect error during cleanup for track "' +
+          trackId +
+          '": ' +
+          String(err)
+      );
     }
     this._sessions.delete(trackId);
   }

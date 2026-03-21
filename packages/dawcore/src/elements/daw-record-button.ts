@@ -5,6 +5,16 @@ import { DawTransportButton } from './daw-transport-button';
 @customElement('daw-record-button')
 export class DawRecordButtonElement extends DawTransportButton {
   @state() private _isRecording = false;
+  private _targetRef: HTMLElement | null = null;
+  private _onStart = () => {
+    this._isRecording = true;
+  };
+  private _onComplete = () => {
+    this._isRecording = false;
+  };
+  private _onError = () => {
+    this._isRecording = false;
+  };
 
   static override styles = [
     DawTransportButton.styles,
@@ -21,18 +31,27 @@ export class DawRecordButtonElement extends DawTransportButton {
     this._listenToTarget();
   }
 
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._cleanupListeners();
+  }
+
   private _listenToTarget() {
     const target = this.target;
     if (!target) return;
-    target.addEventListener('daw-recording-start', () => {
-      this._isRecording = true;
-    });
-    target.addEventListener('daw-recording-complete', () => {
-      this._isRecording = false;
-    });
-    target.addEventListener('daw-recording-error', () => {
-      this._isRecording = false;
-    });
+    this._targetRef = target;
+    target.addEventListener('daw-recording-start', this._onStart);
+    target.addEventListener('daw-recording-complete', this._onComplete);
+    target.addEventListener('daw-recording-error', this._onError);
+  }
+
+  private _cleanupListeners() {
+    if (this._targetRef) {
+      this._targetRef.removeEventListener('daw-recording-start', this._onStart);
+      this._targetRef.removeEventListener('daw-recording-complete', this._onComplete);
+      this._targetRef.removeEventListener('daw-recording-error', this._onError);
+      this._targetRef = null;
+    }
   }
 
   render() {
