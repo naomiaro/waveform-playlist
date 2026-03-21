@@ -96,6 +96,13 @@ const MeterChannel = styled.div`
   gap: 6px;
 `;
 
+const SampleRateInfo = styled.div`
+  font-size: 0.7rem;
+  font-family: 'Courier New', Monaco, monospace;
+  color: var(--gray-8);
+  margin-top: 2px;
+`;
+
 const MeterGroup = styled.div`
   display: flex;
   flex-direction: column;
@@ -184,6 +191,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     devices,
     hasPermission,
     selectedDevice,
+    stream,
     startRecording,
     stopRecording,
     requestMicAccess,
@@ -191,6 +199,11 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     error,
     recordingPeaks,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime, channelCount: 2 });
+
+  // Sample rate info — flag potential resampling between mic and AudioContext
+  const micSampleRate = stream?.getAudioTracks()[0]?.getSettings()?.sampleRate ?? null;
+  const ctxSampleRate = sampleRate;
+  const isResampling = micSampleRate != null && ctxSampleRate > 0 && micSampleRate !== ctxSampleRate;
 
   // Output meter for master bus
   const { levels: outputLevels, peakLevels: outputPeaks } = useOutputMeter({ channelCount: 2, isPlaying });
@@ -472,6 +485,12 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               onDeviceChange={changeDevice}
               disabled={isRecording}
             />
+          )}
+          {hasPermission && micSampleRate != null && (
+            <SampleRateInfo>
+              mic {micSampleRate}Hz / ctx {ctxSampleRate}Hz
+              {isResampling && ' ⚠ resampling'}
+            </SampleRateInfo>
           )}
         </ToolbarSection>
 
