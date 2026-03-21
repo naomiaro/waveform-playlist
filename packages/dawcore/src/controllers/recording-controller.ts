@@ -35,6 +35,7 @@ export interface RecordingHost extends ReactiveControllerHost {
   readonly effectiveSampleRate: number;
   readonly _selectedTrackId: string | null;
   readonly _currentTime: number;
+  resolveAudioContextSampleRate(rate: number): void;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -79,8 +80,8 @@ export class RecordingController implements ReactiveController {
     const context = getGlobalContext();
     const rawCtx = context.rawContext as AudioContext;
 
-    // Resolve editor sample rate from AudioContext (same as _loadTrack does from decoded audio)
-    (this._host as any)._resolvedSampleRate = rawCtx.sampleRate;
+    // Resolve editor sample rate from AudioContext before computing startSample
+    this._host.resolveAudioContextSampleRate(rawCtx.sampleRate);
 
     try {
       // Load worklet via native API (not Tone.js addAudioWorkletModule — caches single URL)
@@ -93,7 +94,7 @@ export class RecordingController implements ReactiveController {
       const channelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
 
       const startSample =
-        options.startSample ?? Math.floor(this._host._currentTime * rawCtx.sampleRate);
+        options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
 
       // Use Tone.js Context methods — avoids standardized-audio-context identity issues
       const source = context.createMediaStreamSource(stream);
@@ -175,9 +176,11 @@ export class RecordingController implements ReactiveController {
       this._host.requestUpdate();
       return;
     }
-    const rawCtx = getGlobalContext().rawContext as AudioContext;
+    const stopCtx = getGlobalContext().rawContext as AudioContext;
     const channelData = session.chunks.map((chunkArr) => concatenateAudioData(chunkArr));
-    const audioBuffer = createAudioBuffer(rawCtx, channelData, rawCtx.sampleRate, session.channelCount);
+    const audioBuffer = createAudioBuffer(
+      stopCtx, channelData, this._host.effectiveSampleRate, session.channelCount
+    );
     const durationSamples = audioBuffer.length;
 
     // Dispatch cancelable event

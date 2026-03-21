@@ -32,6 +32,7 @@ function createMockHost() {
     updateComplete: Promise.resolve(true),
     samplesPerPixel: 1024,
     effectiveSampleRate: 48000,
+    resolveAudioContextSampleRate: vi.fn(),
     _selectedTrackId: 'track-1',
     _currentTime: 0,
   }) as any;

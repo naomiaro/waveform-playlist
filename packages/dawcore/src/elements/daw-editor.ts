@@ -114,8 +114,9 @@ export class DawEditorElement extends LitElement {
     `,
   ];
 
-  get effectiveSampleRate(): number {
-    return this._resolvedSampleRate ?? this.sampleRate;
+  get effectiveSampleRate(): number { return this._resolvedSampleRate ?? this.sampleRate; }
+  resolveAudioContextSampleRate(rate: number) {
+    if (!this._resolvedSampleRate) this._resolvedSampleRate = rate;
   }
   private get _totalWidth(): number {
     return Math.ceil((this._duration * this.effectiveSampleRate) / this.samplesPerPixel);
@@ -589,8 +590,6 @@ export class DawEditorElement extends LitElement {
   }
 
   _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number) {
-    // Align editor sample rate with the recorded audio (same as _loadTrack)
-    this._resolvedSampleRate = buf.sampleRate;
     const clip = createClip({
       audioBuffer: buf,
       startSample,
