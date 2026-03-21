@@ -45,6 +45,14 @@ function createMockStream(channelCount = 1): MediaStream {
   } as any;
 }
 
+/** Simulate a worklet message so session.totalSamples > 0 */
+function simulateWorkletData(controller: RecordingController, trackId: string) {
+  const session = controller.getSession(trackId);
+  if (!session) return;
+  session.chunks[0].push(new Float32Array(1024));
+  session.totalSamples = 1024;
+}
+
 describe('RecordingController', () => {
   let host: any;
 
@@ -107,6 +115,7 @@ describe('RecordingController', () => {
   it('stopRecording dispatches cancelable event and cleans up', async () => {
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData(controller, 'track-1');
 
     const events: CustomEvent[] = [];
     host.dispatchEvent = vi.fn((e: CustomEvent) => {
@@ -130,6 +139,7 @@ describe('RecordingController', () => {
   it('stopRecording with preventDefault skips clip creation', async () => {
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData(controller, 'track-1');
 
     host.dispatchEvent = vi.fn((e: CustomEvent) => {
       e.preventDefault();
@@ -140,6 +150,26 @@ describe('RecordingController', () => {
 
     // Clip creation would involve calling host methods — verify they weren't called
     expect(controller.getSession('track-1')).toBeUndefined();
+  });
+
+  it('stopRecording with no data warns and cleans up without event', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    // No simulateWorkletData — totalSamples is 0
+
+    const events: CustomEvent[] = [];
+    host.dispatchEvent = vi.fn((e: CustomEvent) => {
+      events.push(e);
+      return true;
+    });
+
+    controller.stopRecording();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('No audio data'));
+    expect(controller.isRecording).toBe(false);
+    expect(events.find((e) => e.type === 'daw-recording-complete')).toBeUndefined();
+    warnSpy.mockRestore();
   });
 
   it('rejects recording on a track that already has a session', async () => {
@@ -205,6 +235,7 @@ describe('RecordingController', () => {
     host._addRecordedClip = vi.fn();
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData(controller, 'track-1');
 
     const origDispatch = host.dispatchEvent.bind(host);
     host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
@@ -223,6 +254,7 @@ describe('RecordingController', () => {
     host._addRecordedClip = vi.fn();
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData(controller, 'track-1');
 
     host.addEventListener('daw-recording-complete', (e: Event) => {
       e.preventDefault();

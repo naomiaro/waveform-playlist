@@ -86,13 +86,23 @@ export class RecordingController implements ReactiveController {
         this._workletLoaded = true;
       }
 
-      // Use Tone.js Context methods — avoids standardized-audio-context identity issues
-      const source = context.createMediaStreamSource(stream);
-      const workletNode = context.createAudioWorkletNode('recording-processor');
-      source.connect(workletNode);
-
       // Detect channel count from stream (not source.channelCount — defaults to 2)
       const channelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
+
+      // Use Tone.js Context methods — avoids standardized-audio-context identity issues
+      const source = context.createMediaStreamSource(stream);
+      const workletNode = context.createAudioWorkletNode('recording-processor', {
+        channelCount,
+        channelCountMode: 'explicit' as globalThis.ChannelCountMode,
+      });
+      source.connect(workletNode);
+
+      // Send start command to worklet (processor won't emit data without it)
+      workletNode.port.postMessage({
+        command: 'start',
+        sampleRate: rawCtx.sampleRate,
+        channelCount,
+      });
 
       const startSample =
         options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
@@ -163,10 +173,15 @@ export class RecordingController implements ReactiveController {
     session.workletNode.port.postMessage({ command: 'stop' });
 
     // Build AudioBuffer from accumulated chunks
+    if (session.totalSamples === 0) {
+      console.warn('[dawcore] RecordingController: No audio data captured');
+      this._sessions.delete(id);
+      this._host.requestUpdate();
+      return;
+    }
     const rawCtx = getGlobalContext().rawContext as AudioContext;
     const channelData = session.chunks.map((chunkArr) => concatenateAudioData(chunkArr));
     const audioBuffer = createAudioBuffer(rawCtx, channelData, rawCtx.sampleRate, session.channelCount);
-
     const durationSamples = audioBuffer.length;
 
     // Dispatch cancelable event
