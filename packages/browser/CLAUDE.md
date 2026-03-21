@@ -183,11 +183,14 @@ const rebuildChain = useCallback(() => {
 - **`engine.play()` try-catch in play callback** — `engine.play()` is synchronous but can throw (adapter failures). Wrap in try-catch; on error, `stopAnimationLoop()` and return early to avoid `setIsPlaying(true)` with no audio.
 - **Fire-and-forget async `.catch()` handlers** — `reschedulePlayback()` and `resumePlayback()` are async functions called without `await` in useEffect callbacks. Without `.catch()`, throws become unhandled promise rejections. Each `.catch()` resets UI state (`setIsPlaying(false)`, `stopAnimationLoop()`).
 
-## useAudioTracks Real Sample Rate
+## AudioContext Is the Single Source of Truth for Sample Rate
 
-**Decision:** `buildTrackFromConfig` receives the actual `audioContext.sampleRate` from `loadTracks`, cached in `contextSampleRateRef` for immediate-mode `useMemo`. Static fallback is 48000 (worst case before AudioContext exists).
+**Rule:** Never derive `sampleRate` from clips or AudioBuffers — use the AudioContext hardware rate. All decoded audio and recordings run at this rate.
 
-**Why:** Hardcoded 48000 caused sample-to-second conversion errors on systems with 44100Hz AudioContext.
+- `WaveformPlaylistContext`: `sampleRateRef` set from `getGlobalAudioContext().sampleRate` in `loadAudio`. Default 48000 until AudioContext is available.
+- `useAudioTracks`: `contextSampleRateRef` set from `audioContext.sampleRate` in `loadTracks`.
+- `useExportWav`: calls `getGlobalAudioContext().sampleRate` directly.
+- **Never** fall back to 44100 or derive from `tracks[0].clips[0]?.sampleRate` — that fails in recording-only workflows.
 
 ## Aligned Peak Resampling (waveformDataLoader.ts)
 
