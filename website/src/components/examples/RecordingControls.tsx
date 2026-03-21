@@ -213,6 +213,8 @@ export interface MicrophoneSelectorProps {
   selectedDeviceId?: string;
   onDeviceChange: (deviceId: string) => void;
   disabled?: boolean;
+  /** Optional hint text rendered below the dropdown (e.g., sample rate info) */
+  hint?: React.ReactNode;
 }
 
 const SelectorLabel = styled.label`
@@ -227,11 +229,18 @@ const MicSelect = styled(BaseSelectSmall)`
   min-width: 200px;
 `;
 
+const SelectorHint = styled.span`
+  font-size: 0.7rem;
+  font-family: 'Courier New', Monaco, monospace;
+  color: var(--gray-10);
+`;
+
 export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
   devices,
   selectedDeviceId,
   onDeviceChange,
   disabled = false,
+  hint,
 }) => {
   const currentValue = selectedDeviceId || (devices.length > 0 ? devices[0].deviceId : '');
 
@@ -253,6 +262,7 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
           ))
         )}
       </MicSelect>
+      {hint && <SelectorHint>{hint}</SelectorHint>}
     </SelectorLabel>
   );
 };

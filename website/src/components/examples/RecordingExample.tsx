@@ -96,13 +96,6 @@ const MeterChannel = styled.div`
   gap: 6px;
 `;
 
-const SampleRateInfo = styled.div`
-  font-size: 0.7rem;
-  font-family: 'Courier New', Monaco, monospace;
-  color: var(--gray-8);
-  margin-top: 2px;
-`;
-
 const MeterGroup = styled.div`
   display: flex;
   flex-direction: column;
@@ -484,13 +477,15 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               selectedDeviceId={selectedDevice || undefined}
               onDeviceChange={changeDevice}
               disabled={isRecording}
+              hint={
+                micSampleRate != null ? (
+                  <>
+                    {micSampleRate}Hz &rarr; {ctxSampleRate}Hz
+                    {isResampling && ' (resampling)'}
+                  </>
+                ) : undefined
+              }
             />
-          )}
-          {hasPermission && micSampleRate != null && (
-            <SampleRateInfo>
-              mic {micSampleRate}Hz / ctx {ctxSampleRate}Hz
-              {isResampling && ' ⚠ resampling'}
-            </SampleRateInfo>
           )}
         </ToolbarSection>
 
