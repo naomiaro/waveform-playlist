@@ -11,6 +11,7 @@ function createMockEngine(): ClipEngineContract {
     moveClip: vi.fn(),
     trimClip: vi.fn(),
     updateTrack: vi.fn(),
+    getClipState: vi.fn().mockReturnValue({ offsetSamples: 0, durationSamples: 48000 }),
   };
 }
 
@@ -33,6 +34,7 @@ function createMockHost(
       events.push(event);
       return true;
     }),
+    reextractClipPeaks: vi.fn().mockReturnValue(null),
     events,
     ...overrides,
   };

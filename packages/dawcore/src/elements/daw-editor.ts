@@ -74,6 +74,22 @@ export class DawEditorElement extends LitElement {
   get engine() {
     return this._engine;
   }
+  /** Re-extract peaks for a clip at new offset/duration from cached WaveformData. */
+  reextractClipPeaks(clipId: string, offsetSamples: number, durationSamples: number) {
+    const buf = this._clipBuffers.get(clipId);
+    if (!buf) return null;
+    const singleClipBuffers = new Map([[clipId, buf]]);
+    const singleClipOffsets = new Map([[clipId, { offsetSamples, durationSamples }]]);
+    const result = this._peakPipeline.reextractPeaks(
+      singleClipBuffers,
+      this.samplesPerPixel,
+      this.mono,
+      singleClipOffsets
+    );
+    const peakData = result.get(clipId);
+    if (!peakData) return null;
+    return { data: peakData.data, length: peakData.length };
+  }
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
     const v = new ViewportController(this);

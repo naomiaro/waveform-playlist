@@ -163,6 +163,22 @@ export class PlaylistEngine {
   }
 
   // ---------------------------------------------------------------------------
+  // Clip Queries
+  // ---------------------------------------------------------------------------
+
+  /** Get a clip's current offset and duration. Returns null if not found. */
+  getClipState(
+    trackId: string,
+    clipId: string
+  ): { offsetSamples: number; durationSamples: number } | null {
+    const track = this._tracks.find((t) => t.id === trackId);
+    if (!track) return null;
+    const clip = track.clips.find((c: AudioClip) => c.id === clipId);
+    if (!clip) return null;
+    return { offsetSamples: clip.offsetSamples, durationSamples: clip.durationSamples };
+  }
+
+  // ---------------------------------------------------------------------------
   // Clip Editing (delegates to operations/)
   // ---------------------------------------------------------------------------
 

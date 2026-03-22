@@ -11,6 +11,16 @@ export interface ClipEngineContract {
     skipAdapter?: boolean
   ): void;
   updateTrack(trackId: string): void;
+  getClipState(
+    trackId: string,
+    clipId: string
+  ): { offsetSamples: number; durationSamples: number } | null;
+}
+
+/** Peak data returned by reextractClipPeaks for imperative waveform updates. */
+export interface ClipPeakSlice {
+  data: ArrayLike<number>[];
+  length: number;
 }
 
 /** Host interface required by ClipPointerHandler. */
@@ -21,6 +31,12 @@ export interface ClipPointerHost {
   readonly engine: ClipEngineContract | null;
   readonly shadowRoot: ShadowRoot | null;
   dispatchEvent(event: Event): boolean;
+  /** Re-extract peaks for a clip at new offset/duration from cached WaveformData. */
+  reextractClipPeaks(
+    clipId: string,
+    offsetSamples: number,
+    durationSamples: number
+  ): ClipPeakSlice | null;
 }
 
 type DragMode = 'move' | 'trim-left' | 'trim-right';
@@ -44,11 +60,13 @@ export class ClipPointerHandler {
   private _isDragging = false;
   private _lastDeltaPx = 0;
   private _cumulativeDeltaSamples = 0;
-  // Trim visual feedback: snapshot of original clip container CSS
+  // Trim visual feedback: snapshot of original clip state
   private _clipContainer: HTMLElement | null = null;
   private _boundaryEl: HTMLElement | null = null;
   private _originalLeft = 0;
   private _originalWidth = 0;
+  private _originalOffsetSamples = 0;
+  private _originalDurationSamples = 0;
 
   constructor(host: ClipPointerHost) {
     this._host = host;
@@ -117,6 +135,15 @@ export class ClipPointerHandler {
       } else {
         console.warn('[dawcore] clip container not found for trim visual feedback: ' + clipId);
       }
+      // Snapshot clip audio bounds for peak re-extraction during drag
+      const engine = this._host.engine;
+      if (engine) {
+        const clipState = engine.getClipState(trackId, clipId);
+        if (clipState) {
+          this._originalOffsetSamples = clipState.offsetSamples;
+          this._originalDurationSamples = clipState.durationSamples;
+        }
+      }
     }
   }
 
@@ -152,9 +179,11 @@ export class ClipPointerHandler {
       // Trim: track cumulative delta — engine called once at pointerup.
       this._cumulativeDeltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
 
-      // Visual feedback: update clip container CSS imperatively
+      // Visual feedback: update clip container CSS and re-extract peaks
       if (this._clipContainer) {
         const deltaPx = Math.round(totalDeltaPx);
+        const deltaSamples = this._cumulativeDeltaSamples;
+
         if (this._mode === 'trim-left') {
           // Left trim: container shifts right and shrinks.
           // Waveforms shift left by the same amount so they stay at their
@@ -168,12 +197,19 @@ export class ClipPointerHandler {
             for (const wf of waveforms) {
               (wf as HTMLElement).style.left = -deltaPx + 'px';
             }
+            // Re-extract peaks at new offset/duration from cached WaveformData
+            const newOffset = this._originalOffsetSamples + deltaSamples;
+            const newDuration = this._originalDurationSamples - deltaSamples;
+            this._updateWaveformPeaks(newOffset, newDuration);
           }
         } else {
           // Right trim: extend/shrink right edge — left stays fixed
           const newWidth = this._originalWidth + deltaPx;
           if (newWidth > 0) {
             this._clipContainer.style.width = newWidth + 'px';
+            // Re-extract peaks at new duration from cached WaveformData
+            const newDuration = this._originalDurationSamples + deltaSamples;
+            this._updateWaveformPeaks(this._originalOffsetSamples, newDuration);
           }
         }
       }
@@ -236,6 +272,23 @@ export class ClipPointerHandler {
     }
   }
 
+  /** Re-extract peaks from cache and set on waveform elements during trim drag. */
+  private _updateWaveformPeaks(offsetSamples: number, durationSamples: number): void {
+    if (!this._clipContainer || durationSamples <= 0) return;
+    const peakSlice = this._host.reextractClipPeaks(this._clipId, offsetSamples, durationSamples);
+    if (!peakSlice) return;
+
+    const waveforms = this._clipContainer.querySelectorAll('daw-waveform');
+    for (let i = 0; i < waveforms.length; i++) {
+      const wf = waveforms[i] as HTMLElement & { peaks: unknown; length: number };
+      const channelPeaks = peakSlice.data[i];
+      if (channelPeaks) {
+        wf.peaks = channelPeaks;
+        wf.length = peakSlice.length;
+      }
+    }
+  }
+
   /** Restore clip container CSS to original values after trim visual preview. */
   private _restoreTrimVisual(): void {
     if (this._clipContainer) {
@@ -265,5 +318,7 @@ export class ClipPointerHandler {
     this._clipContainer = null;
     this._originalLeft = 0;
     this._originalWidth = 0;
+    this._originalOffsetSamples = 0;
+    this._originalDurationSamples = 0;
   }
 }
