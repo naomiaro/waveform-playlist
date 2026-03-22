@@ -471,19 +471,29 @@ export class DawEditorElement extends LitElement {
     this._duration = maxSample / this.effectiveSampleRate;
   }
   /**
-   * Generate peaks for clips that exist in engine state but not in _peaksData.
-   * This handles split operations where new clips share the original AudioBuffer.
+   * Regenerate peaks for clips that are new or whose offset/duration changed.
+   * Handles split (new clip IDs) and trim (same ID, changed bounds).
    */
-  private _syncPeaksForNewClips(tracks: ClipTrack[]) {
+  private _syncPeaksForChangedClips(tracks: ClipTrack[]) {
     for (const track of tracks) {
       for (const clip of track.clips) {
-        if (this._peaksData.has(clip.id)) continue;
+        // Check if peaks need regeneration: new clip or changed offset/duration
+        const cached = this._clipOffsets.get(clip.id);
+        const needsPeaks =
+          !this._peaksData.has(clip.id) ||
+          !cached ||
+          cached.offsetSamples !== clip.offsetSamples ||
+          cached.durationSamples !== clip.durationSamples;
 
-        // Find the AudioBuffer from a sibling clip that shares the same source
-        const audioBuffer = clip.audioBuffer ?? this._findAudioBufferForClip(clip, track);
+        if (!needsPeaks) continue;
+
+        const audioBuffer =
+          clip.audioBuffer ??
+          this._clipBuffers.get(clip.id) ??
+          this._findAudioBufferForClip(clip, track);
         if (!audioBuffer) continue;
 
-        // Store buffer reference for the new clip ID
+        // Update cached state
         this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
         this._clipOffsets.set(clip.id, {
           offsetSamples: clip.offsetSamples,
@@ -560,8 +570,8 @@ export class DawEditorElement extends LitElement {
           nextTracks.set(track.id, track);
         }
         this._engineTracks = nextTracks;
-        // Generate peaks for any new clip IDs (e.g. after split)
-        this._syncPeaksForNewClips(engineState.tracks);
+        // Regenerate peaks for new or trimmed clips
+        this._syncPeaksForChangedClips(engineState.tracks);
       }
     });
     engine.on('timeupdate', (time: number) => {
