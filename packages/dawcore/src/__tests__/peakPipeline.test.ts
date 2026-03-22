@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock the worker
 vi.mock('../workers/peaksWorker', () => ({
@@ -11,7 +11,7 @@ vi.mock('../workers/peaksWorker', () => ({
         length: 100,
         duration: 1.0,
         sample_rate: 48000,
-        channel: (ch: number) => ({
+        channel: (_ch: number) => ({
           min_array: () => new Int16Array(100).fill(-100),
           max_array: () => new Int16Array(100).fill(100),
         }),
@@ -26,7 +26,7 @@ vi.mock('../workers/peaksWorker', () => ({
             length: newLength,
             duration: this.duration,
             sample_rate: this.sample_rate,
-            channel: (ch: number) => ({
+            channel: (_ch: number) => ({
               min_array: () => new Int16Array(newLength).fill(-100),
               max_array: () => new Int16Array(newLength).fill(100),
             }),
@@ -39,7 +39,7 @@ vi.mock('../workers/peaksWorker', () => ({
           return {
             ...this,
             length: sliceLen,
-            channel: (ch: number) => ({
+            channel: (_ch: number) => ({
               min_array: () => new Int16Array(sliceLen).fill(-100),
               max_array: () => new Int16Array(sliceLen).fill(100),
             }),
@@ -95,13 +95,8 @@ describe('PeakPipeline', () => {
     const buf = makeBuffer();
 
     await pipeline.generatePeaks(buf, 1024, false);
-    // Second call at different zoom should use cache
+    // Second call at different zoom should use cache (no new worker call)
     await pipeline.generatePeaks(buf, 2048, false);
-
-    // Worker generate should only be called once (cached on second call)
-    const { createPeaksWorker } = await import('../workers/peaksWorker');
-    const worker = (createPeaksWorker as any)();
-    // The mock was called once for the first generatePeaks
   });
 
   it('reextractPeaks returns peaks for cached buffers', async () => {
