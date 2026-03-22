@@ -1,12 +1,38 @@
 import { html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import { DawTransportButton } from './daw-transport-button';
 
 @customElement('daw-play-button')
 export class DawPlayButtonElement extends DawTransportButton {
+  @state() private _isRecording = false;
+  private _targetRef: HTMLElement | null = null;
+  private _onRecStart = () => { this._isRecording = true; };
+  private _onRecEnd = () => { this._isRecording = false; };
+
+  connectedCallback() {
+    super.connectedCallback();
+    const target = this.target;
+    if (target) {
+      this._targetRef = target;
+      target.addEventListener('daw-recording-start', this._onRecStart);
+      target.addEventListener('daw-recording-complete', this._onRecEnd);
+      target.addEventListener('daw-recording-error', this._onRecEnd);
+    }
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._targetRef) {
+      this._targetRef.removeEventListener('daw-recording-start', this._onRecStart);
+      this._targetRef.removeEventListener('daw-recording-complete', this._onRecEnd);
+      this._targetRef.removeEventListener('daw-recording-error', this._onRecEnd);
+      this._targetRef = null;
+    }
+  }
+
   render() {
     return html`
-      <button part="button" @click=${this._onClick}>
+      <button part="button" ?disabled=${this._isRecording} @click=${this._onClick}>
         <slot>Play</slot>
       </button>
     `;

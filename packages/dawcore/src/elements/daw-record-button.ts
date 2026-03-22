@@ -22,6 +22,7 @@ export class DawRecordButtonElement extends DawTransportButton {
       button[data-recording] {
         color: #d08070;
         border-color: #d08070;
+        background: rgba(208, 128, 112, 0.15);
       }
     `,
   ];
@@ -56,18 +57,14 @@ export class DawRecordButtonElement extends DawTransportButton {
 
   render() {
     return html`
-      <button
-        part="button"
-        ?data-recording=${this._isRecording}
-        ?disabled=${this._isRecording}
-        @click=${this._onClick}
-      >
+      <button part="button" ?data-recording=${this._isRecording} @click=${this._onClick}>
         <slot>Record</slot>
       </button>
     `;
   }
 
   private _onClick() {
+    // Start-only — stop is handled by the stop button
     if (this._isRecording) return;
     const target = this.target;
     if (!target) {
