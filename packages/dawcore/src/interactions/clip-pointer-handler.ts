@@ -177,17 +177,28 @@ export class ClipPointerHandler {
       engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples, true);
     } else {
       // Trim: track cumulative delta — engine called once at pointerup.
-      this._cumulativeDeltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
+      let deltaPx = Math.round(totalDeltaPx);
+      let deltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
+
+      // Clamp left trim: can't go past timeline start or audio start
+      if (this._mode === 'trim-left') {
+        const minDeltaPx = -this._originalLeft;
+        if (deltaPx < minDeltaPx) {
+          deltaPx = minDeltaPx;
+          deltaSamples = Math.round(minDeltaPx * this._host.samplesPerPixel);
+        }
+        if (this._originalOffsetSamples + deltaSamples < 0) {
+          deltaSamples = -this._originalOffsetSamples;
+          deltaPx = Math.round(deltaSamples / this._host.samplesPerPixel);
+        }
+      }
+
+      this._cumulativeDeltaSamples = deltaSamples;
 
       // Visual feedback: update clip container CSS and re-extract peaks
       if (this._clipContainer) {
-        const deltaPx = Math.round(totalDeltaPx);
-        const deltaSamples = this._cumulativeDeltaSamples;
-
         if (this._mode === 'trim-left') {
-          // Left trim: container shifts right and shrinks.
-          // Waveforms shift left by the same amount so they stay at their
-          // global timeline position (container.left + waveform.left = constant).
+          // Left trim: container shifts and resizes
           const newLeft = this._originalLeft + deltaPx;
           const newWidth = this._originalWidth - deltaPx;
           if (newWidth > 0) {
