@@ -32,17 +32,32 @@ export function addRecordedClip(
   durSamples: number,
   offsetSamples = 0
 ) {
+  // Slice off latency samples so peaks and playback only cover the audible portion
+  let trimmedBuf = buf;
+  if (offsetSamples > 0 && offsetSamples < buf.length) {
+    const trimmed = new AudioBuffer({
+      numberOfChannels: buf.numberOfChannels,
+      length: durSamples,
+      sampleRate: buf.sampleRate,
+    });
+    for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+      const source = buf.getChannelData(ch);
+      trimmed.copyToChannel(source.subarray(offsetSamples, offsetSamples + durSamples), ch);
+    }
+    trimmedBuf = trimmed;
+  }
+
   const clip = createClip({
-    audioBuffer: buf,
+    audioBuffer: trimmedBuf,
     startSample,
     durationSamples: durSamples,
-    offsetSamples,
+    offsetSamples: 0, // offset already applied by slicing
     gain: 1,
     name: 'Recording',
   });
-  host._clipBuffers = new Map(host._clipBuffers).set(clip.id, buf);
+  host._clipBuffers = new Map(host._clipBuffers).set(clip.id, trimmedBuf);
   host._peakPipeline
-    .generatePeaks(buf, host.samplesPerPixel, host.mono)
+    .generatePeaks(trimmedBuf, host.samplesPerPixel, host.mono)
     .then((pd) => {
       host._peaksData = new Map(host._peaksData).set(clip.id, pd);
       const t = host._engineTracks.get(trackId);
