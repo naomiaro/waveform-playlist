@@ -390,4 +390,105 @@ describe('RecordingController', () => {
 
     expect(controller.getSession('track-1')!.totalSamples).toBe(0);
   });
+
+  // --- Latency compensation tests ---
+
+  it('passes latency offsetSamples to _addRecordedClip', async () => {
+    // Set up latency: outputLatency=0.01s + lookAhead=0.1s = 0.11s
+    mockRawContext.outputLatency = 0.01;
+    mockToneContext.lookAhead = 0.1;
+    host._addRecordedClip = vi.fn();
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 48000); // 1 second of audio
+
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
+
+    controller.stopRecording();
+
+    // offsetSamples = floor(0.11 * 48000) = 5280
+    // durationSamples = 48000 - 5280 = 42720
+    expect(host._addRecordedClip).toHaveBeenCalledWith(
+      'track-1',
+      expect.anything(),
+      expect.any(Number),
+      42720, // effectiveDuration
+      5280   // latencyOffsetSamples
+    );
+  });
+
+  it('dispatches error when recording too short for latency compensation', async () => {
+    // Latency of 1 second on a 0.5s recording
+    mockRawContext.outputLatency = 0.5;
+    mockToneContext.lookAhead = 0.5;
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 24000); // 0.5 seconds at 48kHz
+
+    const events: CustomEvent[] = [];
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => {
+      if (e instanceof CustomEvent) events.push(e);
+      return origDispatch(e);
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    controller.stopRecording();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('too short'));
+    expect(controller.isRecording).toBe(false);
+    const errorEvent = events.find((e) => e.type === 'daw-recording-error');
+    expect(errorEvent).toBeTruthy();
+    warnSpy.mockRestore();
+  });
+
+  it('includes offsetSamples in daw-recording-complete event detail', async () => {
+    mockRawContext.outputLatency = 0.02;
+    mockToneContext.lookAhead = 0.1;
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 48000);
+
+    const events: CustomEvent[] = [];
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => {
+      if (e instanceof CustomEvent) events.push(e);
+      return origDispatch(e);
+    });
+
+    controller.stopRecording();
+
+    const completeEvent = events.find((e) => e.type === 'daw-recording-complete');
+    expect(completeEvent).toBeTruthy();
+    // offsetSamples = floor(0.12 * 48000) = 5760
+    expect(completeEvent!.detail.offsetSamples).toBe(5760);
+    expect(completeEvent!.detail.durationSamples).toBe(48000 - 5760);
+  });
+
+  it('zero latency passes offsetSamples=0', async () => {
+    mockRawContext.outputLatency = 0;
+    mockToneContext.lookAhead = 0;
+    host._addRecordedClip = vi.fn();
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 48000);
+
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
+
+    controller.stopRecording();
+
+    expect(host._addRecordedClip).toHaveBeenCalledWith(
+      'track-1',
+      expect.anything(),
+      expect.any(Number),
+      48000, // full duration — no offset
+      0      // zero latency
+    );
+  });
 });

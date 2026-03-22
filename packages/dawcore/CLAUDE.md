@@ -51,6 +51,8 @@
 - **Use `createClip()` not `createClipFromSeconds()` for recorded clips** — Recording session provides exact integer samples. The seconds round-trip (`samples/rateA → seconds → Math.round(seconds*rateB)`) drifts when `effectiveSampleRate` differs from `audioBuffer.sampleRate`.
 - **`RecordingHost` must declare all host dependencies** — Any property or method the controller accesses on the host must be on the `RecordingHost` interface. No `as any` casts — the editor satisfies the interface directly. `_addRecordedClip?` is optional (runtime check), `shadowRoot` comes from `HTMLElement` intersection.
 - **Always clean up partial sessions on error** — `startRecording` adds the session to `_sessions` before connect/start. The catch block must call `_cleanupSession(trackId)` to prevent stuck `isRecording` state and mic leak.
+- **Slice latency from AudioBuffer, don't use offsetSamples** — `addRecordedClip` slices the buffer at `offsetSamples` before storing and generating peaks. The clip gets `offsetSamples: 0` since the offset is already applied. This ensures peaks match `durationSamples` exactly — using `offsetSamples` on the clip causes the peak pipeline to generate peaks for the full buffer, making the waveform wider than the clip container.
+- **Track height must include recording session channels** — `numChannels` for track height is derived from finalized clip peaks. During live recording with no clips yet, it falls back to 1. Check `_recordingController.getSession(trackId)?.channelCount` for the correct channel count during recording.
 
 ## Key Patterns
 

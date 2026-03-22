@@ -595,15 +595,25 @@ export class DawEditorElement extends LitElement {
   private _renderRecordingPreview(trackId: string, chH: number) {
     const rs = this._recordingController.getSession(trackId);
     if (!rs) return '';
+    // Skip latency samples in the preview — they'll be sliced on finalization.
+    // Position stays at startSample (same as finalized clip).
+    const audibleSamples = Math.max(0, rs.totalSamples - rs.latencySamples);
+    if (audibleSamples === 0) return '';
+    const latencyPixels = Math.floor(rs.latencySamples / this.samplesPerPixel);
     const left = Math.floor(rs.startSample / this.samplesPerPixel);
-    const w = Math.floor(rs.totalSamples / this.samplesPerPixel);
+    const w = Math.floor(audibleSamples / this.samplesPerPixel);
     return rs.peaks.map(
-      (chPeaks, ch) => html`
+      (chPeaks, ch) => {
+        // Slice peaks to skip latency prefix (2 entries per pixel: min/max)
+        const slicedPeaks = latencyPixels > 0
+          ? chPeaks.slice(latencyPixels * 2)
+          : chPeaks;
+        return html`
         <daw-waveform
           data-recording-track=${trackId}
           data-recording-channel=${ch}
           style="position:absolute;left:${left}px;top:${ch * chH}px;"
-          .peaks=${chPeaks}
+          .peaks=${slicedPeaks}
           .length=${w}
           .waveHeight=${chH}
           .barWidth=${this.barWidth}
@@ -612,7 +622,8 @@ export class DawEditorElement extends LitElement {
           .visibleEnd=${this._viewport.visibleEnd}
           .originX=${left}
         ></daw-waveform>
-      `
+      `;
+      }
     );
   }
 

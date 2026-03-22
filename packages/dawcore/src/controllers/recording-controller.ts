@@ -1,6 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import type { Bits } from '@waveform-playlist/core';
 import { getGlobalContext } from '@waveform-playlist/playout';
+import type { DawWaveformElement } from '../elements/daw-waveform';
 import { recordingProcessorUrl } from '@waveform-playlist/worklets';
 import { appendPeaks, concatenateAudioData, createAudioBuffer } from '@waveform-playlist/recording';
 import type {
@@ -29,6 +30,8 @@ export interface RecordingSession {
   readonly channelCount: number;
   readonly bits: Bits;
   isFirstMessage: boolean;
+  /** Latency samples to skip in live preview (outputLatency + lookAhead). */
+  readonly latencySamples: number;
   /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
   readonly _onTrackEnded: (() => void) | null;
   readonly _audioTrack: MediaStreamTrack | null;
@@ -36,8 +39,9 @@ export interface RecordingSession {
 
 /** Readonly view of a recording session for external consumers. */
 export type ReadonlyRecordingSession = Readonly<
-  Omit<RecordingSession, 'chunks' | 'peaks' | '_onTrackEnded' | '_audioTrack'>
+  Omit<RecordingSession, 'chunks' | 'peaks' | '_onTrackEnded' | '_audioTrack' | 'latencySamples'>
 > & {
+  readonly latencySamples: number;
   readonly chunks: ReadonlyArray<ReadonlyArray<Float32Array>>;
   readonly peaks: ReadonlyArray<Int8Array | Int16Array>;
 };
@@ -119,6 +123,11 @@ export class RecordingController implements ReactiveController {
       const startSample =
         options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
 
+      // Compute latency offset once at start (doesn't change during session)
+      const outputLatency = rawCtx.outputLatency ?? 0;
+      const lookAhead = context.lookAhead ?? 0;
+      const latencySamples = Math.floor((outputLatency + lookAhead) * rawCtx.sampleRate);
+
       // Use Tone.js Context methods — avoids standardized-audio-context identity issues
       const source = context.createMediaStreamSource(stream);
       const workletNode = context.createAudioWorkletNode('recording-processor', {
@@ -150,6 +159,7 @@ export class RecordingController implements ReactiveController {
         channelCount,
         bits,
         isFirstMessage: true,
+        latencySamples,
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
       };
@@ -256,13 +266,8 @@ export class RecordingController implements ReactiveController {
       session.channelCount
     );
 
-    // Latency compensation: user hears playback delayed by lookAhead + outputLatency,
-    // so they perform late relative to the timeline. Skip that duration at the start
-    // of the recorded audio to align the performance with the timeline.
-    const outputLatency = (stopCtx as any).outputLatency ?? 0;
-    const lookAhead = context.lookAhead ?? 0;
-    const totalLatency = outputLatency + lookAhead;
-    const latencyOffsetSamples = Math.floor(totalLatency * audioBuffer.sampleRate);
+    // Latency compensation: use the offset computed at start time
+    const latencyOffsetSamples = session.latencySamples;
     const effectiveDuration = Math.max(0, audioBuffer.length - latencyOffsetSamples);
 
     if (effectiveDuration === 0) {
@@ -342,7 +347,7 @@ export class RecordingController implements ReactiveController {
 
       // Update live preview waveform — host is already & HTMLElement so shadowRoot is typed
       const waveformSelector = `daw-waveform[data-recording-track="${trackId}"][data-recording-channel="${ch}"]`;
-      const waveformEl = this._host.shadowRoot?.querySelector(waveformSelector) as any;
+      const waveformEl = this._host.shadowRoot?.querySelector(waveformSelector) as DawWaveformElement | null;
       if (waveformEl) {
         if (session.isFirstMessage) {
           waveformEl.peaks = session.peaks[ch];
