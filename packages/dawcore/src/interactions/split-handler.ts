@@ -2,16 +2,20 @@ import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 import type { DawClipSplitDetail } from '../events';
 
 // ---------------------------------------------------------------------------
-// Host interface
+// Contracts
 // ---------------------------------------------------------------------------
 
+/** Narrow engine contract for split operations. */
+export interface SplitEngineContract {
+  getState(): { selectedTrackId: string | null; tracks: ClipTrack[] };
+  splitClip(trackId: string, clipId: string, atSample: number): void;
+}
+
+/** Host interface for splitAtPlayhead. */
 export interface SplitHost {
   readonly effectiveSampleRate: number;
   readonly currentTime: number;
-  readonly engine: {
-    getState(): { selectedTrackId: string | null; tracks: ClipTrack[] };
-    splitClip(trackId: string, clipId: string, atSample: number): void;
-  } | null;
+  readonly engine: SplitEngineContract | null;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -49,15 +53,28 @@ export function splitAtPlayhead(host: SplitHost): boolean {
 
   const stateAfter = engine.getState();
   const trackAfter = stateAfter.tracks.find((t) => t.id === selectedTrackId);
-  if (!trackAfter) return false;
+  if (!trackAfter) {
+    console.warn(
+      '[dawcore] splitAtPlayhead: track "' + selectedTrackId + '" disappeared after split'
+    );
+    return false;
+  }
 
+  // Engine replaces the original clip with two halves; both get new IDs
   const newClips = trackAfter.clips.filter((c) => !clipIdsBefore.has(c.id));
-  if (newClips.length !== 2) return false;
+  if (newClips.length !== 2) {
+    if (newClips.length > 0) {
+      console.warn(
+        '[dawcore] splitAtPlayhead: expected 2 new clips after split but got ' + newClips.length
+      );
+    }
+    return false;
+  }
 
   // Sort by startSample: lower = left, higher = right
   const sorted = [...newClips].sort((a, b) => a.startSample - b.startSample);
   const leftClipId = sorted[0].id;
-  const rightClipId = sorted[sorted.length - 1].id;
+  const rightClipId = sorted[1].id;
 
   host.dispatchEvent(
     new CustomEvent<DawClipSplitDetail>('daw-clip-split', {

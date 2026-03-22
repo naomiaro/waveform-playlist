@@ -243,13 +243,23 @@ export class ToneTrack {
 
     try {
       transport.clear(scheduled.scheduleId);
-    } catch {
-      /* already cleared */
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] removeScheduledClip: clear failed on track "' +
+          this.id +
+          '": ' +
+          String(err)
+      );
     }
     try {
       scheduled.fadeGainNode.disconnect();
-    } catch {
-      /* already disconnected */
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] removeScheduledClip: disconnect failed on track "' +
+          this.id +
+          '": ' +
+          String(err)
+      );
     }
 
     this.scheduledClips.splice(index, 1);
@@ -305,13 +315,23 @@ export class ToneTrack {
         const scheduled = this.scheduledClips[i];
         try {
           tp.clear(scheduled.scheduleId);
-        } catch {
-          /* */
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] replaceClips: clear failed on track "' +
+              this.id +
+              '": ' +
+              String(err)
+          );
         }
         try {
           scheduled.fadeGainNode.disconnect();
-        } catch {
-          /* */
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] replaceClips: disconnect failed on track "' +
+              this.id +
+              '": ' +
+              String(err)
+          );
         }
       }
     }

@@ -332,7 +332,7 @@ describe('PointerHandler', () => {
       timeline.appendChild(clipHeader);
 
       // Dispatch through the DOM so composedPath()[0] = clipHeader
-      timeline.addEventListener('pointerdown', handler.onPointerDown);
+      timeline.addEventListener('pointerdown', handler.onPointerDown as EventListener);
       clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
 
       expect(mockClipHandler.tryHandle).toHaveBeenCalled();
@@ -352,7 +352,7 @@ describe('PointerHandler', () => {
       handler = new PointerHandler(host);
 
       const timeline = host.shadowRoot!.querySelector('.timeline')!;
-      timeline.addEventListener('pointerdown', handler.onPointerDown);
+      timeline.addEventListener('pointerdown', handler.onPointerDown as EventListener);
       timeline.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
       timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 150 }));
 
@@ -377,7 +377,7 @@ describe('PointerHandler', () => {
       clipHeader.classList.add('clip-header');
       timeline.appendChild(clipHeader);
 
-      timeline.addEventListener('pointerdown', handler.onPointerDown);
+      timeline.addEventListener('pointerdown', handler.onPointerDown as EventListener);
       clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
 
       // Simulate pointermove and pointerup on the timeline

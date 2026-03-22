@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { AudioClip, ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
+import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
 import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import { PeakPipeline } from '../workers/peakPipeline';
@@ -26,6 +26,7 @@ import type {
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
+import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
 
 @customElement('daw-editor')
 export class DawEditorElement extends LitElement {
@@ -470,68 +471,6 @@ export class DawEditorElement extends LitElement {
     }
     this._duration = maxSample / this.effectiveSampleRate;
   }
-  /**
-   * Regenerate peaks for clips that are new or whose offset/duration changed.
-   * Handles split (new clip IDs) and trim (same ID, changed bounds).
-   */
-  private _syncPeaksForChangedClips(tracks: ClipTrack[]) {
-    for (const track of tracks) {
-      for (const clip of track.clips) {
-        // Check if peaks need regeneration: new clip or changed offset/duration
-        const cached = this._clipOffsets.get(clip.id);
-        const needsPeaks =
-          !this._peaksData.has(clip.id) ||
-          !cached ||
-          cached.offsetSamples !== clip.offsetSamples ||
-          cached.durationSamples !== clip.durationSamples;
-
-        if (!needsPeaks) continue;
-
-        const audioBuffer =
-          clip.audioBuffer ??
-          this._clipBuffers.get(clip.id) ??
-          this._findAudioBufferForClip(clip, track);
-        if (!audioBuffer) continue;
-
-        // Update cached state
-        this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
-        this._clipOffsets.set(clip.id, {
-          offsetSamples: clip.offsetSamples,
-          durationSamples: clip.durationSamples,
-        });
-
-        // Generate peaks asynchronously
-        this._peakPipeline
-          .generatePeaks(
-            audioBuffer,
-            this.samplesPerPixel,
-            this.mono,
-            clip.offsetSamples,
-            clip.durationSamples
-          )
-          .then((peakData) => {
-            this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
-          })
-          .catch((err) => {
-            console.warn(
-              '[dawcore] Failed to generate peaks for clip ' + clip.id + ': ' + String(err)
-            );
-          });
-      }
-    }
-  }
-
-  /** Find an AudioBuffer for a clip by checking siblings on the same track. */
-  private _findAudioBufferForClip(clip: AudioClip, track: ClipTrack): AudioBuffer | null {
-    // Check if any sibling clip on the same track has a buffer we can use
-    for (const sibling of track.clips) {
-      if (sibling.id === clip.id) continue;
-      const buf = this._clipBuffers.get(sibling.id);
-      if (buf) return buf;
-    }
-    return null;
-  }
-
   // --- Engine ---
   _ensureEngine(): Promise<PlaylistEngine> {
     if (this._engine) return Promise.resolve(this._engine);
@@ -571,7 +510,7 @@ export class DawEditorElement extends LitElement {
         }
         this._engineTracks = nextTracks;
         // Regenerate peaks for new or trimmed clips
-        this._syncPeaksForChangedClips(engineState.tracks);
+        syncPeaksForChangedClips(this, engineState.tracks);
       }
     });
     engine.on('timeupdate', (time: number) => {
@@ -682,6 +621,8 @@ export class DawEditorElement extends LitElement {
   private _onKeyDown = (e: KeyboardEvent) => {
     if (!this.interactiveClips) return;
     if (e.key === 's' || e.key === 'S') {
+      // Don't intercept Ctrl+S/Cmd+S (save) or other modifier combos
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Don't split when user is typing in a form element
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;

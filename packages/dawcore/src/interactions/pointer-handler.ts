@@ -74,8 +74,10 @@ export class PointerHandler {
             this._timeline?.removeEventListener('pointerup', onUp);
             try {
               this._timeline?.releasePointerCapture((ue as PointerEvent).pointerId);
-            } catch {
-              /* may already be released */
+            } catch (err) {
+              console.warn(
+                '[dawcore] releasePointerCapture failed (may already be released): ' + String(err)
+              );
             }
             this._timeline = null;
           };

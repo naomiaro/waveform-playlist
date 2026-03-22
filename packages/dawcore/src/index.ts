@@ -36,7 +36,7 @@ export type { PointerEngineContract } from './interactions/pointer-handler';
 export { ClipPointerHandler } from './interactions/clip-pointer-handler';
 export type { ClipPointerHost, ClipEngineContract } from './interactions/clip-pointer-handler';
 export { splitAtPlayhead } from './interactions/split-handler';
-export type { SplitHost } from './interactions/split-handler';
+export type { SplitHost, SplitEngineContract } from './interactions/split-handler';
 
 export type {
   DawEventMap,

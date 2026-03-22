@@ -21,7 +21,6 @@ export interface ClipPointerHost {
   readonly engine: ClipEngineContract | null;
   readonly shadowRoot: ShadowRoot | null;
   dispatchEvent(event: Event): boolean;
-  requestUpdate(): void;
 }
 
 type DragMode = 'move' | 'trim-left' | 'trim-right';
@@ -30,7 +29,9 @@ type DragMode = 'move' | 'trim-left' | 'trim-right';
  * Handles pointer interactions for clip move and trim drag operations.
  * Converts pixel deltas to sample deltas and delegates to the engine.
  *
- * Move: sends incremental deltas per-frame (engine shifts startSample additively).
+ * Move: sends incremental deltas per-frame with skipAdapter=true (engine shifts
+ *   startSample additively without touching audio adapter). Adapter synced once
+ *   via updateTrack() at drag end.
  * Trim: updates clip container CSS imperatively during drag for visual feedback,
  *   then applies cumulative delta to engine once at drag end.
  */
@@ -45,6 +46,7 @@ export class ClipPointerHandler {
   private _cumulativeDeltaSamples = 0;
   // Trim visual feedback: snapshot of original clip container CSS
   private _clipContainer: HTMLElement | null = null;
+  private _boundaryEl: HTMLElement | null = null;
   private _originalLeft = 0;
   private _originalWidth = 0;
 
@@ -77,6 +79,7 @@ export class ClipPointerHandler {
       if (!clipId || !trackId || (edge !== 'left' && edge !== 'right')) return false;
 
       this._beginDrag(edge === 'left' ? 'trim-left' : 'trim-right', clipId, trackId, e);
+      this._boundaryEl = boundary;
       return true;
     }
 
@@ -111,6 +114,8 @@ export class ClipPointerHandler {
         this._clipContainer = container;
         this._originalLeft = parseFloat(container.style.left) || 0;
         this._originalWidth = parseFloat(container.style.width) || 0;
+      } else {
+        console.warn('[dawcore] clip container not found for trim visual feedback: ' + clipId);
       }
     }
   }
@@ -124,6 +129,10 @@ export class ClipPointerHandler {
     // Activate drag after threshold is exceeded
     if (!this._isDragging && Math.abs(totalDeltaPx) > DRAG_THRESHOLD) {
       this._isDragging = true;
+      // Apply .dragging class to boundary element for active drag styling
+      if (this._boundaryEl) {
+        this._boundaryEl.classList.add('dragging');
+      }
     }
 
     if (!this._isDragging) return;
@@ -132,7 +141,8 @@ export class ClipPointerHandler {
     if (!engine) return;
 
     if (this._mode === 'move') {
-      // Move: send incremental deltas per-frame (additive on startSample)
+      // Move: send incremental deltas per-frame with skipAdapter=true.
+      // Adapter synced once via updateTrack() at drag end.
       const incrementalDeltaPx = totalDeltaPx - this._lastDeltaPx;
       this._lastDeltaPx = totalDeltaPx;
       const incrementalDeltaSamples = Math.round(incrementalDeltaPx * this._host.samplesPerPixel);
@@ -187,18 +197,18 @@ export class ClipPointerHandler {
         // Sync adapter once on drop (skipped during drag for performance)
         if (engine) {
           engine.updateTrack(this._trackId);
+          this._host.dispatchEvent(
+            new CustomEvent('daw-clip-move', {
+              bubbles: true,
+              composed: true,
+              detail: {
+                trackId: this._trackId,
+                clipId: this._clipId,
+                deltaSamples: this._cumulativeDeltaSamples,
+              },
+            })
+          );
         }
-        this._host.dispatchEvent(
-          new CustomEvent('daw-clip-move', {
-            bubbles: true,
-            composed: true,
-            detail: {
-              trackId: this._trackId,
-              clipId: this._clipId,
-              deltaSamples: this._cumulativeDeltaSamples,
-            },
-          })
-        );
       } else {
         // Restore visual before engine applies — Lit will re-render with correct values
         this._restoreTrimVisual();
@@ -207,19 +217,19 @@ export class ClipPointerHandler {
         const boundary = this._mode === 'trim-left' ? 'left' : 'right';
         if (engine) {
           engine.trimClip(this._trackId, this._clipId, boundary, this._cumulativeDeltaSamples);
+          this._host.dispatchEvent(
+            new CustomEvent('daw-clip-trim', {
+              bubbles: true,
+              composed: true,
+              detail: {
+                trackId: this._trackId,
+                clipId: this._clipId,
+                boundary,
+                deltaSamples: this._cumulativeDeltaSamples,
+              },
+            })
+          );
         }
-        this._host.dispatchEvent(
-          new CustomEvent('daw-clip-trim', {
-            bubbles: true,
-            composed: true,
-            detail: {
-              trackId: this._trackId,
-              clipId: this._clipId,
-              boundary,
-              deltaSamples: this._cumulativeDeltaSamples,
-            },
-          })
-        );
       }
     } finally {
       this._reset();
@@ -240,6 +250,11 @@ export class ClipPointerHandler {
   }
 
   private _reset(): void {
+    // Remove .dragging class from boundary element
+    if (this._boundaryEl) {
+      this._boundaryEl.classList.remove('dragging');
+      this._boundaryEl = null;
+    }
     this._mode = null;
     this._clipId = '';
     this._trackId = '';

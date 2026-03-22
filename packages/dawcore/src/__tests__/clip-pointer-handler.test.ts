@@ -33,7 +33,6 @@ function createMockHost(
       events.push(event);
       return true;
     }),
-    requestUpdate: vi.fn(),
     events,
     ...overrides,
   };
