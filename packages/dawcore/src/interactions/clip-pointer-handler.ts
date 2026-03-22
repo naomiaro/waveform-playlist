@@ -193,14 +193,24 @@ export class ClipPointerHandler {
           if (newWidth > 0) {
             this._clipContainer.style.left = newLeft + 'px';
             this._clipContainer.style.width = newWidth + 'px';
-            const waveforms = this._clipContainer.querySelectorAll('daw-waveform');
-            for (const wf of waveforms) {
-              (wf as HTMLElement).style.left = -deltaPx + 'px';
-            }
-            // Re-extract peaks at new offset/duration from cached WaveformData
+            // Re-extract peaks at new offset/duration from cached WaveformData.
+            // New peaks cover the full new bounds, so waveforms stay at left:0
+            // (no shift needed — the container position handles global alignment).
             const newOffset = this._originalOffsetSamples + deltaSamples;
             const newDuration = this._originalDurationSamples - deltaSamples;
-            this._updateWaveformPeaks(newOffset, newDuration);
+            if (this._updateWaveformPeaks(newOffset, newDuration)) {
+              // Peaks updated — reset waveform positions to fill container
+              const waveforms = this._clipContainer.querySelectorAll('daw-waveform');
+              for (const wf of waveforms) {
+                (wf as HTMLElement).style.left = '0px';
+              }
+            } else {
+              // No cached peaks — fall back to shifting waveforms for visual stability
+              const waveforms = this._clipContainer.querySelectorAll('daw-waveform');
+              for (const wf of waveforms) {
+                (wf as HTMLElement).style.left = -deltaPx + 'px';
+              }
+            }
           }
         } else {
           // Right trim: extend/shrink right edge — left stays fixed
@@ -272,11 +282,12 @@ export class ClipPointerHandler {
     }
   }
 
-  /** Re-extract peaks from cache and set on waveform elements during trim drag. */
-  private _updateWaveformPeaks(offsetSamples: number, durationSamples: number): void {
-    if (!this._clipContainer || durationSamples <= 0) return;
+  /** Re-extract peaks from cache and set on waveform elements during trim drag.
+   *  Returns true if peaks were successfully updated. */
+  private _updateWaveformPeaks(offsetSamples: number, durationSamples: number): boolean {
+    if (!this._clipContainer || durationSamples <= 0) return false;
     const peakSlice = this._host.reextractClipPeaks(this._clipId, offsetSamples, durationSamples);
-    if (!peakSlice) return;
+    if (!peakSlice) return false;
 
     const waveforms = this._clipContainer.querySelectorAll('daw-waveform');
     for (let i = 0; i < waveforms.length; i++) {
@@ -287,6 +298,7 @@ export class ClipPointerHandler {
         wf.length = peakSlice.length;
       }
     }
+    return true;
   }
 
   /** Restore clip container CSS to original values after trim visual preview. */
