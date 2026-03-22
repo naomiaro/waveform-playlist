@@ -52,7 +52,7 @@ export function splitAtPlayhead(host: SplitHost): boolean {
   if (!trackAfter) return false;
 
   const newClips = trackAfter.clips.filter((c) => !clipIdsBefore.has(c.id));
-  if (newClips.length === 0) return false;
+  if (newClips.length !== 2) return false;
 
   // Sort by startSample: lower = left, higher = right
   const sorted = [...newClips].sort((a, b) => a.startSample - b.startSample);

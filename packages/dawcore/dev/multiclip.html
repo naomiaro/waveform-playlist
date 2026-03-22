@@ -45,7 +45,7 @@
 
   <script type="module" src="/src/index.ts"></script>
 
-  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers>
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers interactive-clips>
     <!-- Kick: two clips with a gap -->
     <daw-track name="Kick">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/01_Kick.opus"
@@ -155,6 +155,9 @@
     editor.addEventListener('daw-play', () => addLog('play'));
     editor.addEventListener('daw-pause', () => addLog('pause'));
     editor.addEventListener('daw-stop', () => addLog('stop'));
+    editor.addEventListener('daw-clip-move', (e) => addLog('clip-move: ' + e.detail.clipId + ' delta=' + e.detail.deltaSamples));
+    editor.addEventListener('daw-clip-trim', (e) => addLog('clip-trim: ' + e.detail.clipId + ' ' + e.detail.boundary + ' delta=' + e.detail.deltaSamples));
+    editor.addEventListener('daw-clip-split', (e) => addLog('clip-split: ' + e.detail.originalClipId + ' → ' + e.detail.leftClipId + ' + ' + e.detail.rightClipId));
   </script>
 </body>
 </html>

@@ -608,8 +608,10 @@ export class DawEditorElement extends LitElement {
   private _onKeyDown = (e: KeyboardEvent) => {
     if (!this.interactiveClips) return;
     if (e.key === 's' || e.key === 'S') {
-      // Don't split when user is typing in an input
-      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+      // Don't split when user is typing in a form element
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
       e.preventDefault();
       this.splitAtPlayhead();
     }

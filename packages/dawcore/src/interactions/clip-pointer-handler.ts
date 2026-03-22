@@ -50,40 +50,38 @@ export class ClipPointerHandler {
 
     const el = target as HTMLElement;
 
-    // Check for clip header (move target)
-    if (el.classList.contains('clip-header') && el.dataset.interactive !== undefined) {
-      const clipId = el.dataset.clipId;
-      const trackId = el.dataset.trackId;
-      if (!clipId || !trackId) return false;
-
-      this._mode = 'move';
-      this._clipId = clipId;
-      this._trackId = trackId;
-      this._startPx = e.clientX;
-      this._isDragging = false;
-      this._lastDeltaPx = 0;
-      this._cumulativeDeltaSamples = 0;
-      return true;
-    }
-
-    // Check for clip boundary (trim target)
+    // Check boundary first (higher z-index, overlaps header at corners)
     if (el.classList.contains('clip-boundary') && el.dataset.boundaryEdge !== undefined) {
       const clipId = el.dataset.clipId;
       const trackId = el.dataset.trackId;
       const edge = el.dataset.boundaryEdge as 'left' | 'right';
       if (!clipId || !trackId || (edge !== 'left' && edge !== 'right')) return false;
 
-      this._mode = edge === 'left' ? 'trim-left' : 'trim-right';
-      this._clipId = clipId;
-      this._trackId = trackId;
-      this._startPx = e.clientX;
-      this._isDragging = false;
-      this._lastDeltaPx = 0;
-      this._cumulativeDeltaSamples = 0;
+      this._beginDrag(edge === 'left' ? 'trim-left' : 'trim-right', clipId, trackId, e);
+      return true;
+    }
+
+    // Check for clip header (move target)
+    if (el.classList.contains('clip-header') && el.dataset.interactive !== undefined) {
+      const clipId = el.dataset.clipId;
+      const trackId = el.dataset.trackId;
+      if (!clipId || !trackId) return false;
+
+      this._beginDrag('move', clipId, trackId, e);
       return true;
     }
 
     return false;
+  }
+
+  private _beginDrag(mode: DragMode, clipId: string, trackId: string, e: PointerEvent): void {
+    this._mode = mode;
+    this._clipId = clipId;
+    this._trackId = trackId;
+    this._startPx = e.clientX;
+    this._isDragging = false;
+    this._lastDeltaPx = 0;
+    this._cumulativeDeltaSamples = 0;
   }
 
   /** Processes pointermove events during an active drag. */
@@ -122,7 +120,7 @@ export class ClipPointerHandler {
     if (this._mode === null) return;
 
     try {
-      if (!this._isDragging) return;
+      if (!this._isDragging || this._cumulativeDeltaSamples === 0) return;
 
       if (this._mode === 'move') {
         this._host.dispatchEvent(
