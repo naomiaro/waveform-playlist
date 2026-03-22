@@ -414,21 +414,113 @@ describe('ClipPointerHandler', () => {
       expect(container.style.width).toBe('380px');
     });
 
-    it('shifts waveform elements left during left trim drag', () => {
+    it('keeps waveform at left:0 when peaks are re-extracted during left trim', () => {
       const shadowHost = document.createElement('div');
       const shadow = shadowHost.attachShadow({ mode: 'open' });
       const container = makeClipContainer('clip-1');
       shadow.appendChild(container);
 
-      const localHost = createMockHost(engine, { shadowRoot: shadow });
+      const mockPeaks = { data: [new Int16Array(10)], length: 10 };
+      const localHost = createMockHost(engine, {
+        shadowRoot: shadow,
+        reextractClipPeaks: vi.fn().mockReturnValue(mockPeaks),
+      });
       const localHandler = new ClipPointerHandler(localHost);
 
       const el = makeBoundaryEl('clip-1', 'track-1', 'left');
       localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
       localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 220 }));
 
+      // With re-extracted peaks, waveform stays at left:0 (peaks cover full bounds)
+      const waveform = container.querySelector('daw-waveform') as HTMLElement;
+      expect(waveform.style.left).toBe('0px');
+    });
+
+    it('falls back to shifting waveform when peaks not available during left trim', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const localHost = createMockHost(engine, {
+        shadowRoot: shadow,
+        reextractClipPeaks: vi.fn().mockReturnValue(null),
+      });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'left');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 220 }));
+
+      // Without peaks, waveform shifts left for visual stability
       const waveform = container.querySelector('daw-waveform') as HTMLElement;
       expect(waveform.style.left).toBe('-20px');
+    });
+
+    it('calls reextractClipPeaks with correct offset/duration during right trim', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const reextractClipPeaks = vi.fn().mockReturnValue(null);
+      const localHost = createMockHost(engine, { shadowRoot: shadow, reextractClipPeaks });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'right');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 600 }));
+      // Drag 30px right (extend) — 30 * 1024 spp = 30720 samples
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 630 }));
+
+      // Original offset=0, duration=48000 (from mock engine), delta=+30720
+      // Right trim: offset unchanged, duration = 48000 + 30720 = 78720
+      expect(reextractClipPeaks).toHaveBeenCalledWith('clip-1', 0, 78720);
+    });
+
+    it('calls reextractClipPeaks with correct offset/duration during left trim', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const reextractClipPeaks = vi.fn().mockReturnValue(null);
+      const localHost = createMockHost(engine, { shadowRoot: shadow, reextractClipPeaks });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'left');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
+      // Drag 20px right (shrink from left) — 20 * 1024 spp = 20480 samples
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 220 }));
+
+      // Original offset=0, duration=48000, delta=+20480
+      // Left trim: offset = 0 + 20480 = 20480, duration = 48000 - 20480 = 27520
+      expect(reextractClipPeaks).toHaveBeenCalledWith('clip-1', 20480, 27520);
+    });
+
+    it('sets peaks and length on waveform elements during trim', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const mockPeaksData = new Int16Array([1, 2, 3, 4, 5]);
+      const mockPeaks = { data: [mockPeaksData], length: 42 };
+      const localHost = createMockHost(engine, {
+        shadowRoot: shadow,
+        reextractClipPeaks: vi.fn().mockReturnValue(mockPeaks),
+      });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'right');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 600 }));
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 630 }));
+
+      const waveform = container.querySelector('daw-waveform') as HTMLElement & {
+        peaks: unknown;
+        length: number;
+      };
+      expect(waveform.peaks).toBe(mockPeaksData);
+      expect(waveform.length).toBe(42);
     });
 
     it('updates container width during right trim drag', () => {
