@@ -193,10 +193,36 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
     updateTrack(trackId: string, track: ClipTrack): void {
       if (!playout) return;
+
+      // Try clip-level update first — preserves track audio graph (no glitch)
+      const audioClips = track.clips.filter((c) => c.audioBuffer && !c.midiNotes);
+      if (audioClips.length > 0) {
+        const startTime = Math.min(...audioClips.map(clipStartTime));
+        const clipInfos: ClipInfo[] = audioClips.map((clip) => ({
+          buffer: clip.audioBuffer!,
+          startTime: clipStartTime(clip) - startTime,
+          duration: clipDurationTime(clip),
+          offset: clipOffsetTime(clip),
+          fadeIn: clip.fadeIn,
+          fadeOut: clip.fadeOut,
+          gain: clip.gain,
+        }));
+
+        if (playout.replaceTrackClips(trackId, clipInfos)) {
+          playout.applyInitialSoloState();
+          return;
+        }
+      }
+
+      // Fallback: full track remove+re-add (for MIDI tracks or tracks without audio)
       playout.removeTrack(trackId);
       playout.removeTrack(trackId + ':midi');
       addTrackToPlayout(playout, track);
       playout.applyInitialSoloState();
+      if (_isPlaying) {
+        playout.resumeTrackMidPlayback(trackId);
+        playout.resumeTrackMidPlayback(trackId + ':midi');
+      }
     },
 
     addTrack(track: ClipTrack): void {

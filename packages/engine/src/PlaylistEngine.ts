@@ -142,7 +142,7 @@ export class PlaylistEngine {
     } else {
       this._adapter?.setTracks(this._tracks);
     }
-    if (track) this._emitStateChange();
+    this._emitStateChange();
   }
 
   /** Internal: update adapter after modifying this._tracks in place. */

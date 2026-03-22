@@ -209,6 +209,142 @@ export class ToneTrack {
   }
 
   /**
+   * Add a clip to this track at runtime. Creates a Transport.schedule event
+   * and fadeGainNode. If playing, starts the source mid-clip if needed.
+   */
+  addClip(clipInfo: ClipInfo): ScheduledClip {
+    const transport = getTransport();
+    const rawContext = getContext().rawContext as AudioContext;
+    const volumeNativeInput = (this.volumeNode.input as unknown as Gain).input;
+
+    const fadeGainNode = rawContext.createGain();
+    fadeGainNode.gain.value = clipInfo.gain;
+    fadeGainNode.connect(volumeNativeInput);
+
+    const absTransportTime = this.track.startTime + clipInfo.startTime;
+    const scheduleId = transport.schedule((audioContextTime: number) => {
+      if (absTransportTime < this._scheduleGuardOffset) return;
+      this.startClipSource(clipInfo, fadeGainNode, audioContextTime);
+    }, absTransportTime);
+
+    const scheduled: ScheduledClip = { clipInfo, fadeGainNode, scheduleId };
+    this.scheduledClips.push(scheduled);
+    return scheduled;
+  }
+
+  /**
+   * Remove a scheduled clip by index. Clears the Transport event and
+   * disconnects the fadeGainNode.
+   */
+  removeScheduledClip(index: number): void {
+    const scheduled = this.scheduledClips[index];
+    if (!scheduled) return;
+    const transport = getTransport();
+
+    try {
+      transport.clear(scheduled.scheduleId);
+    } catch {
+      /* already cleared */
+    }
+    try {
+      scheduled.fadeGainNode.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+
+    this.scheduledClips.splice(index, 1);
+  }
+
+  /**
+   * Replace clips on this track. Diffs old vs new by buffer + timing —
+   * unchanged clips keep their active sources playing (no audible interruption).
+   * Changed/added/removed clips are rescheduled. Disconnecting a removed clip's
+   * fadeGainNode silences its source immediately (audio path broken) without
+   * needing to explicitly stop it.
+   */
+  replaceClips(newClips: ClipInfo[]): void {
+    const tp = getTransport();
+
+    // Diff old vs new clips — a clip is "unchanged" if buffer reference and
+    // all timing properties match exactly
+    const kept: ScheduledClip[] = [];
+    const toAdd: ClipInfo[] = [];
+    const matched = new Set<number>(); // indices into this.scheduledClips
+
+    for (const clipInfo of newClips) {
+      const idx = this.scheduledClips.findIndex(
+        (s, i) => !matched.has(i) && this._clipsEqual(s.clipInfo, clipInfo)
+      );
+      if (idx !== -1) {
+        kept.push(this.scheduledClips[idx]);
+        matched.add(idx);
+      } else {
+        toAdd.push(clipInfo);
+      }
+    }
+
+    // Remove old clips that weren't matched — disconnect fadeGainNode to
+    // silence any active source (audio path broken, no audible pop)
+    for (let i = 0; i < this.scheduledClips.length; i++) {
+      if (!matched.has(i)) {
+        const scheduled = this.scheduledClips[i];
+        try {
+          tp.clear(scheduled.scheduleId);
+        } catch {
+          /* */
+        }
+        try {
+          scheduled.fadeGainNode.disconnect();
+        } catch {
+          /* */
+        }
+      }
+    }
+
+    this.scheduledClips = kept;
+
+    // Add new/changed clips — start mid-clip source if Transport is running
+    const isPlaying = tp.state === 'started';
+    for (const clipInfo of toAdd) {
+      const scheduled = this.addClip(clipInfo);
+      if (isPlaying) {
+        const context = getContext();
+        const transportOffset = tp.seconds;
+        const audioContextTime = context.currentTime;
+        // Transport runs lookAhead ahead of what's audible. The old source was
+        // disconnected but had ~lookAhead of buffered audio still playing.
+        // Start the new source lookAhead earlier so it overlaps with the
+        // remaining buffered audio, producing a seamless transition.
+        const lookAhead = context.lookAhead ?? 0;
+        const audibleOffset = Math.max(0, transportOffset - lookAhead);
+        const absClipStart = this.track.startTime + clipInfo.startTime;
+        const absClipEnd = absClipStart + clipInfo.duration;
+        if (absClipStart < transportOffset && absClipEnd > audibleOffset) {
+          const elapsed = audibleOffset - absClipStart;
+          this.startClipSource(
+            clipInfo,
+            scheduled.fadeGainNode,
+            audioContextTime,
+            clipInfo.offset + Math.max(0, elapsed),
+            clipInfo.duration - Math.max(0, elapsed)
+          );
+        }
+      }
+    }
+  }
+
+  /** Compare two clips by reference (buffer) and timing properties */
+  private _clipsEqual(a: ClipInfo, b: ClipInfo): boolean {
+    return (
+      a.buffer === b.buffer &&
+      a.startTime === b.startTime &&
+      a.duration === b.duration &&
+      a.offset === b.offset &&
+      a.gain === b.gain
+    );
+  }
+
+  /**
    * Stop all active AudioBufferSourceNodes and clear the set.
    * Native AudioBufferSourceNodes ignore Transport state changes —
    * they must be explicitly stopped.
