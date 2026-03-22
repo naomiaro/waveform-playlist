@@ -59,7 +59,7 @@ describe('useMidiTracks', () => {
       ];
 
       // Stable config reference to avoid useEffect infinite loop
-      const configs: MidiTrackConfig[] = [{ midiNotes: notes, name: 'Test' }];
+      const configs: MidiTrackConfig[] = [{ midiNotes: notes, name: 'Test', sampleRate: 48000 }];
 
       const { result } = renderHook(() => useMidiTracks(configs));
 
@@ -89,6 +89,7 @@ describe('useMidiTracks', () => {
           muted: true,
           soloed: true,
           color: '#ff0000',
+          sampleRate: 48000,
         },
       ];
 
@@ -154,7 +155,7 @@ describe('useMidiTracks', () => {
         arrayBuffer: () => Promise.resolve(midiBuffer),
       });
 
-      const configs: MidiTrackConfig[] = [{ src: '/test.mid', name: 'Song' }];
+      const configs: MidiTrackConfig[] = [{ src: '/test.mid', name: 'Song', sampleRate: 48000 }];
 
       const { result } = renderHook(() => useMidiTracks(configs));
 
@@ -190,7 +191,7 @@ describe('useMidiTracks', () => {
         arrayBuffer: () => Promise.resolve(midiBuffer),
       });
 
-      const configs: MidiTrackConfig[] = [{ src: '/multi.mid' }];
+      const configs: MidiTrackConfig[] = [{ src: '/multi.mid', sampleRate: 48000 }];
 
       const { result } = renderHook(() => useMidiTracks(configs));
 
@@ -222,7 +223,7 @@ describe('useMidiTracks', () => {
         arrayBuffer: () => Promise.resolve(midiBuffer),
       });
 
-      const configs: MidiTrackConfig[] = [{ src: '/multi.mid', flatten: true }];
+      const configs: MidiTrackConfig[] = [{ src: '/multi.mid', flatten: true, sampleRate: 48000 }];
 
       const { result } = renderHook(() => useMidiTracks(configs));
 
@@ -239,7 +240,7 @@ describe('useMidiTracks', () => {
     it('starts in loading state', () => {
       mockFetch.mockReturnValue(new Promise(() => {})); // never resolves
 
-      const configs: MidiTrackConfig[] = [{ src: '/test.mid' }];
+      const configs: MidiTrackConfig[] = [{ src: '/test.mid', sampleRate: 48000 }];
 
       const { result } = renderHook(() => useMidiTracks(configs));
 
@@ -274,7 +275,7 @@ describe('useMidiTracks', () => {
         statusText: 'Not Found',
       });
 
-      const configs: MidiTrackConfig[] = [{ src: '/missing.mid' }];
+      const configs: MidiTrackConfig[] = [{ src: '/missing.mid', sampleRate: 48000 }];
 
       const { result } = renderHook(() => useMidiTracks(configs));
 
@@ -287,7 +288,7 @@ describe('useMidiTracks', () => {
     });
 
     it('sets error when neither src nor midiNotes provided', async () => {
-      const configs: MidiTrackConfig[] = [{ name: 'Invalid' }];
+      const configs: MidiTrackConfig[] = [{ name: 'Invalid', sampleRate: 48000 }];
 
       const { result } = renderHook(() => useMidiTracks(configs));
 
@@ -307,7 +308,7 @@ describe('useMidiTracks', () => {
         return new Promise(() => {}); // never resolves
       });
 
-      const configs: MidiTrackConfig[] = [{ src: '/test.mid' }];
+      const configs: MidiTrackConfig[] = [{ src: '/test.mid', sampleRate: 48000 }];
 
       const { unmount } = renderHook(() => useMidiTracks(configs));
 
@@ -332,8 +333,8 @@ describe('useMidiTracks', () => {
       ];
 
       const configs: MidiTrackConfig[] = [
-        { midiNotes: notes1, name: 'Track 1' },
-        { midiNotes: notes2, name: 'Track 2' },
+        { midiNotes: notes1, name: 'Track 1', sampleRate: 48000 },
+        { midiNotes: notes2, name: 'Track 2', sampleRate: 48000 },
       ];
 
       const { result } = renderHook(() => useMidiTracks(configs));

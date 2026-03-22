@@ -21,6 +21,8 @@ vi.mock('../TonePlayout', () => {
       }),
       getTrackIds: vi.fn().mockReturnValue([]),
       removeTrack: vi.fn(),
+      replaceTrackClips: vi.fn().mockReturnValue(false),
+      resumeTrackMidPlayback: vi.fn(),
       dispose: vi.fn(),
       setOnPlaybackComplete: vi.fn(),
       setLoop: vi.fn(),

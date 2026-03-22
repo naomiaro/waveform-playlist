@@ -172,9 +172,12 @@ export class TonePlayout {
     if (!track) return;
     const transport = getTransport();
     if (transport.state !== 'started') return;
-    const transportOffset = transport.seconds;
-    const audioContextTime = getContext().currentTime;
-    track.startMidClipSources(transportOffset, audioContextTime);
+    const context = getContext();
+    // Use audible position (transportOffset - lookAhead) so new sources
+    // overlap with remaining buffered audio for a seamless transition
+    const lookAhead = context.lookAhead ?? 0;
+    const audibleOffset = Math.max(0, transport.seconds - lookAhead);
+    track.startMidClipSources(audibleOffset, context.currentTime);
   }
 
   play(when?: number, offset?: number, duration?: number): void {

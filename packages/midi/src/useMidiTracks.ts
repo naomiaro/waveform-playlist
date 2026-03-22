@@ -35,8 +35,8 @@ export interface MidiTrackConfig {
   startTime?: number;
   /** Override clip duration in seconds (default: derived from last note) */
   duration?: number;
-  /** Sample rate for sample-based positioning (default 44100) */
-  sampleRate?: number;
+  /** Sample rate for sample-based positioning — pass AudioContext.sampleRate */
+  sampleRate: number;
   /** Merge all MIDI tracks from the file into one ClipTrack (default false) */
   flatten?: boolean;
 }
@@ -103,7 +103,7 @@ export function useMidiTracks(configs: MidiTrackConfig[]): UseMidiTracksReturn {
       midiChannel?: number,
       midiProgram?: number
     ): ClipTrack => {
-      const sampleRate = config.sampleRate ?? 44100;
+      const sampleRate = config.sampleRate;
       const clipDuration = config.duration ?? noteDuration;
 
       const clip = createClipFromSeconds({

@@ -16,7 +16,7 @@ import {
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
 
-const DEFAULT_SAMPLE_RATE = 44100;
+const DEFAULT_SAMPLE_RATE = 48000;
 const DEFAULT_SAMPLES_PER_PIXEL = 1024;
 const DEFAULT_ZOOM_LEVELS = [256, 512, 1024, 2048, 4096, 8192];
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
@@ -132,7 +132,6 @@ export class PlaylistEngine {
   updateTrack(trackId: string, track?: ClipTrack): void {
     const resolved = track ?? this._tracks.find((t) => t.id === trackId);
     if (!resolved) return;
-    // Update internal tracks array if a new track object was provided
     if (track) {
       this._tracks = this._tracks.map((t) => (t.id === trackId ? track : t));
       this._tracksVersion++;
@@ -142,7 +141,8 @@ export class PlaylistEngine {
     } else {
       this._adapter?.setTracks(this._tracks);
     }
-    this._emitStateChange();
+    // Only emit statechange when internal state actually changed
+    if (track) this._emitStateChange();
   }
 
   /** Internal: update adapter after modifying this._tracks in place. */

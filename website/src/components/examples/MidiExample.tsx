@@ -25,7 +25,7 @@ import { createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 import type { ClipTrack } from '@waveform-playlist/core';
 import { useMidiTracks } from '@waveform-playlist/midi';
 import type { MidiTrackConfig } from '@waveform-playlist/midi';
-import { SoundFontCache } from '@waveform-playlist/playout';
+import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 
@@ -276,14 +276,17 @@ export function MidiExample() {
   } = useSoundFontCache(soundFontUrl);
 
   // Build configs: base (unless hidden) + user-added
+  const ctxSampleRate = typeof AudioContext !== 'undefined'
+    ? getGlobalAudioContext().sampleRate : 48000;
+
   const midiConfigs = React.useMemo(() => {
     const configs: MidiTrackConfig[] = [];
     if (!baseHidden) {
-      configs.push({ src: BASE_MIDI_SRC });
+      configs.push({ src: BASE_MIDI_SRC, sampleRate: ctxSampleRate });
     }
-    configs.push(...userMidiConfigs);
+    configs.push(...userMidiConfigs.map((c) => ({ ...c, sampleRate: c.sampleRate ?? ctxSampleRate })));
     return configs;
-  }, [baseHidden, userMidiConfigs]);
+  }, [baseHidden, userMidiConfigs, ctxSampleRate]);
 
   const { tracks: allTracks, loading, error, loadedCount, totalCount } = useMidiTracks(midiConfigs);
 

@@ -57,7 +57,7 @@ describe('PlaylistEngine', () => {
       const engine = new PlaylistEngine();
       const state = engine.getState();
       expect(state.tracks).toEqual([]);
-      expect(state.sampleRate).toBe(44100);
+      expect(state.sampleRate).toBe(48000);
       expect(state.samplesPerPixel).toBe(1024);
       expect(state.isPlaying).toBe(false);
       expect(state.currentTime).toBe(0);

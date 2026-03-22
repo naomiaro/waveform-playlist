@@ -119,12 +119,14 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     }
   }
 
+  // Creates the initial TonePlayout. Called only on the first setTracks().
+  // Subsequent setTracks calls use the incremental path (no dispose/rebuild).
   function buildPlayout(tracks: ClipTrack[]): void {
     if (playout) {
       try {
         playout.dispose();
       } catch (err) {
-        console.warn('[waveform-playlist] Error disposing previous playout during rebuild:', err);
+        console.warn('[waveform-playlist] Error disposing previous playout:', err);
       }
       playout = null;
     }
@@ -141,7 +143,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     if (_audioInitialized) {
       _pendingInit = playout.init().catch((err) => {
         console.warn(
-          '[waveform-playlist] Failed to re-initialize playout after rebuild. ' +
+          '[waveform-playlist] Failed to initialize playout. ' +
             'Audio playback will require another user gesture.',
           err
         );
@@ -181,20 +183,38 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
         buildPlayout(tracks);
         return;
       }
-      // Playout exists — replace all tracks incrementally
-      for (const id of playout.getTrackIds()) {
-        playout.removeTrack(id);
+      // Incremental: diff by track ID — only remove/add what changed
+      const newTrackIds = new Set(tracks.map((t) => t.id));
+      const oldTrackIds = new Set(playout.getTrackIds());
+
+      // Remove tracks no longer present
+      for (const id of oldTrackIds) {
+        if (!newTrackIds.has(id)) {
+          playout.removeTrack(id);
+        }
       }
+      // Add or replace tracks
       for (const track of tracks) {
+        if (oldTrackIds.has(track.id)) {
+          playout.removeTrack(track.id);
+          playout.removeTrack(track.id + ':midi');
+        }
         addTrackToPlayout(playout, track);
       }
       playout.applyInitialSoloState();
+      // Resume mid-clip sources if playing
+      if (_isPlaying) {
+        for (const track of tracks) {
+          playout.resumeTrackMidPlayback(track.id);
+          playout.resumeTrackMidPlayback(track.id + ':midi');
+        }
+      }
     },
 
     updateTrack(trackId: string, track: ClipTrack): void {
       if (!playout) return;
 
-      // Try clip-level update first — preserves track audio graph (no glitch)
+      // Try clip-level update — preserves track audio graph (no glitch)
       const audioClips = track.clips.filter((c) => c.audioBuffer && !c.midiNotes);
       if (audioClips.length > 0) {
         const startTime = Math.min(...audioClips.map(clipStartTime));
@@ -208,13 +228,26 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
           gain: clip.gain,
         }));
 
-        if (playout.replaceTrackClips(trackId, clipInfos, startTime)) {
+        const audioUpdated = playout.replaceTrackClips(trackId, clipInfos, startTime);
+
+        // Also update companion MIDI track if present
+        const midiClips = track.clips.filter((c) => c.midiNotes && c.midiNotes.length > 0);
+        if (midiClips.length > 0) {
+          const midiTrackId = trackId + ':midi';
+          playout.removeTrack(midiTrackId);
+          addTrackToPlayout(playout, track);
+          if (_isPlaying) {
+            playout.resumeTrackMidPlayback(midiTrackId);
+          }
+        }
+
+        if (audioUpdated) {
           playout.applyInitialSoloState();
           return;
         }
       }
 
-      // Fallback: full track remove+re-add (for MIDI tracks or tracks without audio)
+      // Fallback: full track remove+re-add (MIDI-only or no audio clips)
       playout.removeTrack(trackId);
       playout.removeTrack(trackId + ':midi');
       addTrackToPlayout(playout, track);

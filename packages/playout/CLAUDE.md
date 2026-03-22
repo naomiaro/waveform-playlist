@@ -6,7 +6,7 @@
 
 **Location:** `src/TonePlayoutAdapter.ts`
 
-**Pattern:** Factory/closure (not class). `setTracks()` does incremental track updates (no full rebuild after initial creation). `updateTrack()` replaces a single track's clips via `ToneTrack.replaceClips()`. Generation counter prevents stale completion callbacks. Loop state (`_loopEnabled`, `_loopStart`, `_loopEnd`) and `_audioInitialized` persist.
+**Pattern:** Factory/closure (not class). `setTracks()` does incremental track updates (no full rebuild after initial creation). `updateTrack()` replaces a single track's clips via `ToneTrack.replaceClips()`. `buildPlayout()` only runs on the first `setTracks()` call — the playout persists for the adapter's lifetime. Loop state (`_loopEnabled`, `_loopStart`, `_loopEnd`) and `_audioInitialized` persist.
 
 **Key mappings:** `ClipTrack.volume` → `Track.gain`, `ClipTrack.pan` → `Track.stereoPan`, sample-based clips → seconds via core helpers.
 
