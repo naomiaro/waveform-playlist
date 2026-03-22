@@ -45,7 +45,7 @@ The `loadedTracksMap` stores `ClipTrack[]` per config index (not single `ClipTra
 
 ### MIDI Has No Native Sample Rate
 
-MIDI is event-based, not sample-based. The `sampleRate` config option is **required** on `MidiTrackConfig` — pass `AudioContext.sampleRate` (or `getGlobalAudioContext().sampleRate` from playout). Used for sample-based timeline positioning in `createClipFromSeconds()`. The actual audio synthesis sample rate is determined by the `AudioContext` in the playout layer.
+MIDI is event-based, not sample-based. `sampleRate` is **required** on `UseMidiTracksOptions` (second arg to `useMidiTracks()`) — pass `getGlobalAudioContext().sampleRate` from playout. Used for sample-based timeline positioning in `createClipFromSeconds()`. The actual audio synthesis sample rate is determined by the `AudioContext` in the playout layer. Never hardcode a default (e.g., 48000) — the real AudioContext rate varies by hardware.
 
 ## @tonejs/midi Gotchas
 

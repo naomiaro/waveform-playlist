@@ -192,6 +192,10 @@ const rebuildChain = useCallback(() => {
 - `useExportWav`: calls `getGlobalAudioContext().sampleRate` directly.
 - **Never** fall back to 44100 or derive from `tracks[0].clips[0]?.sampleRate` — that fails in recording-only workflows.
 
+## sampleRate From Context (Not Props)
+
+Internal hooks (`useClipDragHandlers`, `useClipSplitting`, `useAnnotationKeyboardControls`) read `sampleRate` from `usePlaylistData()` — do NOT add it as a parameter. `useAnnotationDragHandlers` accepts optional `sampleRate` (defaults to `getGlobalAudioContext().sampleRate`) because it's used in both WaveformPlaylist and MediaElement contexts. `SnapToGridModifier` and `calculateBoundaryTrim` are not hooks — they still receive `sampleRate` as a parameter from callers that have context access.
+
 ## Aligned Peak Resampling (waveformDataLoader.ts)
 
 **Decision:** When slicing WaveformData before resampling to a different scale, source slice indices must align to the resampling ratio.
