@@ -15,7 +15,7 @@ export class DawTrackControlsElement extends LitElement {
     :host {
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       box-sizing: border-box;
       padding: 6px 8px;
       background: var(--daw-controls-background, #0f0f1a);
@@ -23,13 +23,14 @@ export class DawTrackControlsElement extends LitElement {
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       font-family: system-ui, sans-serif;
       font-size: 11px;
+      overflow: hidden;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 4px;
-      margin-bottom: 6px;
+      margin-bottom: 3px;
     }
     .name {
       flex: 1;
@@ -56,7 +57,7 @@ export class DawTrackControlsElement extends LitElement {
     .buttons {
       display: flex;
       gap: 3px;
-      margin-bottom: 6px;
+      margin-bottom: 3px;
     }
     .btn {
       background: rgba(255, 255, 255, 0.06);
@@ -86,7 +87,7 @@ export class DawTrackControlsElement extends LitElement {
       display: flex;
       align-items: center;
       gap: 4px;
-      height: 20px;
+      height: 16px;
     }
     .slider-label {
       width: 50px;

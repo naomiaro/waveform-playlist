@@ -9,7 +9,7 @@ import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import '../elements/daw-track-controls';
-import { hostStyles } from '../styles/theme';
+import { hostStyles, clipStyles } from '../styles/theme';
 import { ViewportController } from '../controllers/viewport-controller';
 import { AudioResumeController } from '../controllers/audio-resume-controller';
 import { RecordingController } from '../controllers/recording-controller';
@@ -34,6 +34,7 @@ export class DawEditorElement extends LitElement {
   @property({ type: Number, attribute: 'bar-width' }) barWidth = 1;
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
   @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
+  @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
   /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
   /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
@@ -104,6 +105,7 @@ export class DawEditorElement extends LitElement {
         outline-offset: -2px;
       }
     `,
+    clipStyles,
   ];
 
   get effectiveSampleRate(): number {
@@ -366,7 +368,9 @@ export class DawEditorElement extends LitElement {
         const peakData = await this._peakPipeline.generatePeaks(
           audioBuffer,
           this.samplesPerPixel,
-          this.mono
+          this.mono,
+          clip.offsetSamples,
+          clip.durationSamples
         );
         this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
         clips.push(clip);
@@ -629,7 +633,6 @@ export class DawEditorElement extends LitElement {
       `;
     });
   }
-
   // --- Playhead ---
   _startPlayhead() {
     const playhead = this._getPlayhead();
@@ -750,22 +753,33 @@ export class DawEditorElement extends LitElement {
                   );
                   const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
                   const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
-                  return channels.map(
-                    (channelPeaks, chIdx) => html`
-                      <daw-waveform
-                        style="position: absolute; left: ${clipLeft}px; top: ${chIdx *
-                        channelHeight}px;"
-                        .peaks=${channelPeaks}
-                        .length=${peakData?.length ?? width}
-                        .waveHeight=${channelHeight}
-                        .barWidth=${this.barWidth}
-                        .barGap=${this.barGap}
-                        .visibleStart=${this._viewport.visibleStart}
-                        .visibleEnd=${this._viewport.visibleEnd}
-                        .originX=${clipLeft}
-                      ></daw-waveform>
-                    `
-                  );
+                  const hdrH = this.clipHeaders ? 20 : 0;
+                  const chH = Math.floor((t.trackHeight - hdrH) / t.numChannels);
+                  return html` <div
+                    class="clip-container"
+                    style="left:${clipLeft}px;top:0;width:${width}px;height:${t.trackHeight}px;"
+                    data-clip-id=${clip.id}
+                  >
+                    ${hdrH > 0
+                      ? html`<div class="clip-header">
+                          <span>${clip.name || t.descriptor?.name || ''}</span>
+                        </div>`
+                      : ''}
+                    ${channels.map(
+                      (chPeaks, chIdx) =>
+                        html` <daw-waveform
+                          style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
+                          .peaks=${chPeaks}
+                          .length=${peakData?.length ?? width}
+                          .waveHeight=${chH}
+                          .barWidth=${this.barWidth}
+                          .barGap=${this.barGap}
+                          .visibleStart=${this._viewport.visibleStart}
+                          .visibleEnd=${this._viewport.visibleEnd}
+                          .originX=${clipLeft}
+                        ></daw-waveform>`
+                    )}
+                  </div>`;
                 })}
                 ${this._renderRecordingPreview(t.trackId, channelHeight)}
               </div>

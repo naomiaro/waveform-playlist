@@ -28,11 +28,13 @@ export class PeakPipeline {
   async generatePeaks(
     audioBuffer: AudioBuffer,
     samplesPerPixel: number,
-    isMono: boolean
+    isMono: boolean,
+    offsetSamples?: number,
+    durationSamples?: number
   ): Promise<PeakData> {
     const waveformData = await this._getWaveformData(audioBuffer, samplesPerPixel);
     try {
-      return extractPeaks(waveformData, samplesPerPixel, isMono);
+      return extractPeaks(waveformData, samplesPerPixel, isMono, offsetSamples, durationSamples);
     } catch (err) {
       console.warn('[dawcore] extractPeaks failed: ' + String(err));
       throw err;

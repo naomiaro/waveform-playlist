@@ -21,3 +21,33 @@ export const hostStyles = css`
     --daw-clip-header-text: #e0d4c8;
   }
 `;
+
+/** Clip container and header styles for the editor timeline. */
+export const clipStyles = css`
+  .clip-container {
+    position: absolute;
+    overflow: hidden;
+  }
+  .clip-header {
+    position: relative;
+    z-index: 1;
+    height: 20px;
+    background: var(--daw-clip-header-background, rgba(0, 0, 0, 0.4));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    user-select: none;
+  }
+  .clip-header span {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    font-family: system-ui, sans-serif;
+    color: var(--daw-clip-header-text, #e0d4c8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.8;
+  }
+`;
