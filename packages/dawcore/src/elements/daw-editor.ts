@@ -663,7 +663,13 @@ export class DawEditorElement extends LitElement {
       const firstPeaks = track.clips
         .map((c) => this._peaksData.get(c.id))
         .find((p) => p && p.data.length > 0);
-      const numChannels = firstPeaks ? firstPeaks.data.length : 1;
+      // Use recording session channel count if no finalized clips yet
+      const recSession = this._recordingController.getSession(trackId);
+      const numChannels = firstPeaks
+        ? firstPeaks.data.length
+        : recSession
+          ? recSession.channelCount
+          : 1;
       return {
         trackId,
         track,
