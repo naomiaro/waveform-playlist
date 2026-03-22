@@ -742,7 +742,6 @@ interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
-  sampleRate: number;
   engineRef: RefObject<PlaylistEngine | null>;
   /** Ref toggled during boundary trim drags. Obtain from usePlaylistData(). */
   isDraggingRef: MutableRefObject<boolean>;
@@ -758,14 +757,13 @@ import { ClipCollisionModifier, noDropAnimationPlugins, useDragSensors } from '@
 
 function EditablePlaylist() {
   const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
-  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
+  const { samplesPerPixel, playoutRef, isDraggingRef } = usePlaylistData();
   const sensors = useDragSensors();
 
   const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
     tracks,
     onTracksChange: setTracks,
     samplesPerPixel,
-    sampleRate,
     engineRef: playoutRef,
     isDraggingRef,
   });
@@ -814,7 +812,6 @@ function useClipSplitting(options: UseClipSplittingOptions): UseClipSplittingRes
 ```typescript
 interface UseClipSplittingOptions {
   tracks: ClipTrack[];
-  sampleRate: number;
   samplesPerPixel: number;
   engineRef: RefObject<PlaylistEngine | null>;
 }
@@ -833,11 +830,10 @@ interface UseClipSplittingResult {
 
 ```tsx
 function SplitButton() {
-  const { tracks, sampleRate, samplesPerPixel, playoutRef } = usePlaylistData();
+  const { tracks, samplesPerPixel, playoutRef } = usePlaylistData();
 
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
-    sampleRate,
     samplesPerPixel,
     engineRef: playoutRef,
   });

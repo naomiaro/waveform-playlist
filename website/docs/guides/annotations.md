@@ -151,9 +151,9 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
   annotations,           // AnnotationData[]
   onAnnotationsChange,   // (annotations) => void
   samplesPerPixel,       // number
-  sampleRate,            // number
   duration,              // number (total duration in seconds)
   linkEndpoints,         // boolean
+  sampleRate,            // number (optional — defaults to getGlobalAudioContext().sampleRate)
 });
 ```
 

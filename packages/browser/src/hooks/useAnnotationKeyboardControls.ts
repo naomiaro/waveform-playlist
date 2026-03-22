@@ -19,10 +19,6 @@ interface UseAnnotationKeyboardControlsOptions {
   enabled?: boolean;
   /** Optional: scroll container ref for auto-scrolling to annotation */
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
-  /** Optional: samples per pixel for scroll position calculation */
-  samplesPerPixel?: number;
-  /** Optional: sample rate for scroll position calculation */
-  sampleRate?: number;
   /** Optional: callback to start playback at a time with optional duration */
   onPlay?: (startTime: number, duration?: number) => void;
 }
@@ -68,13 +64,9 @@ export function useAnnotationKeyboardControls({
   continuousPlay = false,
   enabled = true,
   scrollContainerRef,
-  samplesPerPixel: samplesPerPixelProp,
-  sampleRate: sampleRateProp,
   onPlay,
 }: UseAnnotationKeyboardControlsOptions) {
-  const contextData = usePlaylistData();
-  const samplesPerPixel = samplesPerPixelProp ?? contextData.samplesPerPixel;
-  const sampleRate = sampleRateProp ?? contextData.sampleRate;
+  const { samplesPerPixel, sampleRate } = usePlaylistData();
 
   const activeIndex = useMemo(() => {
     if (!activeAnnotationId) return -1;

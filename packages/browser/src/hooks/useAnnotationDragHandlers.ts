@@ -31,7 +31,6 @@ interface UseAnnotationDragHandlersOptions {
  *   annotations,
  *   onAnnotationsChange: setAnnotations,
  *   samplesPerPixel,
- *   sampleRate,
  *   duration,
  *   linkEndpoints,
  * });

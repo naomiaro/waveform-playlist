@@ -449,7 +449,6 @@ interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
-  sampleRate: number;
   engineRef: RefObject<PlaylistEngine | null>;
   /** Ref toggled during boundary trim drags. Obtain from usePlaylistData(). */
   isDraggingRef: MutableRefObject<boolean>;
@@ -516,7 +515,6 @@ function useClipSplitting(options: UseClipSplittingOptions): UseClipSplittingRes
 
 interface UseClipSplittingOptions {
   tracks: ClipTrack[];
-  sampleRate: number;
   samplesPerPixel: number;
   engineRef: RefObject<PlaylistEngine | null>;
 }
@@ -538,7 +536,7 @@ Load and parse MIDI files into `ClipTrack[]` with `midiNotes` for piano roll vis
 ### useMidiTracks
 
 ```typescript
-function useMidiTracks(configs: MidiTrackConfig[]): UseMidiTracksReturn;
+function useMidiTracks(configs: MidiTrackConfig[], options: UseMidiTracksOptions): UseMidiTracksReturn;
 
 interface MidiTrackConfig {
   src?: string;                    // URL to .mid file
@@ -551,8 +549,11 @@ interface MidiTrackConfig {
   color?: string;
   startTime?: number;              // Clip position in seconds (default 0)
   duration?: number;               // Override clip duration in seconds
-  sampleRate: number;              // Required — pass AudioContext.sampleRate
   flatten?: boolean;               // Merge all MIDI tracks into one (default false)
+}
+
+interface UseMidiTracksOptions {
+  sampleRate: number;              // Required — pass AudioContext.sampleRate
 }
 
 interface UseMidiTracksReturn {

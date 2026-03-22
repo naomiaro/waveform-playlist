@@ -53,8 +53,7 @@ export interface UseMidiTracksReturn {
 }
 
 export interface UseMidiTracksOptions {
-  /** Default sample rate for all configs. Pass AudioContext.sampleRate.
-   *  Per-config sampleRate overrides this value. */
+  /** Sample rate for sample-based timeline positioning. Pass AudioContext.sampleRate. */
   sampleRate: number;
 }
 

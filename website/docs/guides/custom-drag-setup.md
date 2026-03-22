@@ -42,7 +42,7 @@ The minimal setup for interactive clips with collision detection:
 
 ```tsx
 function PlaylistWithDrag({ tracks, onTracksChange }) {
-  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
+  const { samplesPerPixel, playoutRef, isDraggingRef } = usePlaylistData();
   const { setSelectedTrackId } = usePlaylistControls();
 
   // Configure drag sensors (pointer activation with 1px distance threshold)
@@ -57,7 +57,6 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
     tracks,
     onTracksChange,
     samplesPerPixel,
-    sampleRate,
     engineRef: playoutRef,
     isDraggingRef,
   });
@@ -118,6 +117,7 @@ import { useBeatsAndBars } from '@waveform-playlist/ui-components';
 function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
   const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
   const beatsAndBars = useBeatsAndBars();
+
   const { bpm, timeSignature, snapTo } = beatsAndBars;
 
   // Snap function for boundary trims (snaps absolute sample position to grid)
@@ -137,7 +137,6 @@ function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
     tracks,
     onTracksChange,
     samplesPerPixel,
-    sampleRate,
     engineRef: playoutRef,
     isDraggingRef,
     snapSamplePosition, // Snaps boundary trims to grid
@@ -317,7 +316,6 @@ This uses delay-based activation for touch events (distinguishes drag from scrol
 | `tracks` | `ClipTrack[]` | Yes | Current tracks state |
 | `onTracksChange` | `(tracks: ClipTrack[]) => void` | Yes | Callback when tracks change |
 | `samplesPerPixel` | `number` | Yes | Current zoom level |
-| `sampleRate` | `number` | Yes | Audio sample rate |
 | `engineRef` | `RefObject<PlaylistEngine>` | Yes | Engine ref from `usePlaylistData().playoutRef` |
 | `isDraggingRef` | `MutableRefObject<boolean>` | Yes | Drag state ref from `usePlaylistData().isDraggingRef` |
 | `snapSamplePosition` | `(sample: number) => number` | No | Snap function for boundary trims |

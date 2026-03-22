@@ -89,7 +89,6 @@ describe('useMidiTracks', () => {
           muted: true,
           soloed: true,
           color: '#ff0000',
-          sampleRate: 48000,
         },
       ];
 
@@ -118,7 +117,6 @@ describe('useMidiTracks', () => {
           name: 'Positioned',
           startTime: 5.0,
           duration: 10.0,
-          sampleRate: 48000,
         },
       ];
 

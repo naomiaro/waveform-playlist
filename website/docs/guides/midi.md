@@ -24,9 +24,10 @@ import { useMidiTracks } from '@waveform-playlist/midi';
 import { WaveformPlaylistProvider, Waveform, PlayButton, StopButton } from '@waveform-playlist/browser';
 
 function MidiPlayer() {
-  const { tracks, loading, error } = useMidiTracks([
-    { src: '/music/song.mid' },
-  ]);
+  const { tracks, loading, error } = useMidiTracks(
+    [{ src: '/music/song.mid' }],
+    { sampleRate: 48000 },
+  );
 
   if (loading) return <div>Loading MIDI...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -56,8 +57,11 @@ interface MidiTrackConfig {
   color?: string;
   startTime?: number;         // Clip position in seconds (default: 0)
   duration?: number;          // Override clip duration in seconds
-  sampleRate: number;          // Required — pass AudioContext.sampleRate
   flatten?: boolean;          // Merge all MIDI tracks into one (default: false)
+}
+
+interface UseMidiTracksOptions {
+  sampleRate: number;         // Required — pass AudioContext.sampleRate
 }
 ```
 
@@ -66,16 +70,19 @@ interface MidiTrackConfig {
 If you already have note data (e.g., from a custom parser or algorithm), skip the fetch step:
 
 ```tsx
-const { tracks } = useMidiTracks([
-  {
-    midiNotes: [
-      { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
-      { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
-    ],
-    name: 'Melody',
-    duration: 4,
-  },
-]);
+const { tracks } = useMidiTracks(
+  [
+    {
+      midiNotes: [
+        { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
+        { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
+      ],
+      name: 'Melody',
+      duration: 4,
+    },
+  ],
+  { sampleRate: 48000 },
+);
 ```
 
 ### Flatten Mode
@@ -83,9 +90,10 @@ const { tracks } = useMidiTracks([
 By default, each MIDI channel becomes a separate track. Use `flatten: true` to merge all channels into one visual track:
 
 ```tsx
-const { tracks } = useMidiTracks([
-  { src: '/music/song.mid', flatten: true },
-]);
+const { tracks } = useMidiTracks(
+  [{ src: '/music/song.mid', flatten: true }],
+  { sampleRate: 48000 },
+);
 ```
 
 ## SoundFont Playback
@@ -119,9 +127,10 @@ import { useMidiTracks } from '@waveform-playlist/midi';
 import { useAudioTracks, WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 
 function MixedPlayer() {
-  const { tracks: midiTracks, loading: midiLoading } = useMidiTracks([
-    { src: '/music/song.mid' },
-  ]);
+  const { tracks: midiTracks, loading: midiLoading } = useMidiTracks(
+    [{ src: '/music/song.mid' }],
+    { sampleRate: 48000 },
+  );
 
   const { tracks: audioTracks, loading: audioLoading } = useAudioTracks([
     { src: '/audio/vocals.mp3', name: 'Vocals' },

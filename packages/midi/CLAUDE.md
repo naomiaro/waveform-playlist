@@ -93,10 +93,10 @@ MIDI velocity is a 0-127 integer. `@tonejs/midi` normalizes to 0-1 float, but ro
 ```typescript
 // ✅ Stable reference
 const configs: MidiTrackConfig[] = [{ midiNotes: notes, name: 'Test' }];
-const { result } = renderHook(() => useMidiTracks(configs));
+const { result } = renderHook(() => useMidiTracks(configs, { sampleRate: 48000 }));
 
 // ❌ New reference each render — infinite effect loop
-const { result } = renderHook(() => useMidiTracks([{ midiNotes: notes }]));
+const { result } = renderHook(() => useMidiTracks([{ midiNotes: notes }], { sampleRate: 48000 }));
 ```
 
 ### Flatten Is Visual-Only (Planned)
