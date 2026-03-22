@@ -101,11 +101,17 @@
     </daw-track>
   </daw-editor>
 
-  <daw-transport for="editor">
-    <daw-play-button></daw-play-button>
-    <daw-pause-button></daw-pause-button>
-    <daw-stop-button></daw-stop-button>
-  </daw-transport>
+  <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:12px;height:28px;">
+    <daw-transport for="editor" style="display:contents;">
+      <daw-play-button></daw-play-button>
+      <daw-pause-button></daw-pause-button>
+      <daw-stop-button></daw-stop-button>
+    </daw-transport>
+    <span style="width:1px;background:rgba(255,255,255,0.15);"></span>
+    <button id="zoom-in" style="cursor:pointer;background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:0 10px;font:inherit;line-height:1;">+</button>
+    <button id="zoom-out" style="cursor:pointer;background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:0 10px;font:inherit;line-height:1;">&minus;</button>
+    <span id="zoom-level" style="font-family:'Courier New',monospace;font-size:0.75rem;color:#888;display:flex;align-items:center;">1024 spp</span>
+  </div>
 
   <div id="log"></div>
 
@@ -119,6 +125,27 @@
       log.prepend(line);
       while (log.children.length > 30) log.lastChild.remove();
     }
+
+    // Zoom controls
+    const zoomLevels = [128, 256, 512, 1024, 2048, 4096, 8192];
+    const zoomLabel = document.getElementById('zoom-level');
+    function updateZoomLabel() {
+      zoomLabel.textContent = editor.samplesPerPixel + ' spp';
+    }
+    document.getElementById('zoom-in').addEventListener('click', () => {
+      const idx = zoomLevels.indexOf(editor.samplesPerPixel);
+      if (idx > 0) {
+        editor.samplesPerPixel = zoomLevels[idx - 1];
+        updateZoomLabel();
+      }
+    });
+    document.getElementById('zoom-out').addEventListener('click', () => {
+      const idx = zoomLevels.indexOf(editor.samplesPerPixel);
+      if (idx < zoomLevels.length - 1) {
+        editor.samplesPerPixel = zoomLevels[idx + 1];
+        updateZoomLabel();
+      }
+    });
 
     // Editor events
     editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));

@@ -54,6 +54,7 @@ export class DawEditorElement extends LitElement {
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
   _clipBuffers = new Map<string, AudioBuffer>();
+  private _clipOffsets = new Map<string, { offsetSamples: number; durationSamples: number }>();
   _peakPipeline = new PeakPipeline();
   private _trackElements = new Map<string, DawTrackElement>();
   private _childObserver: MutationObserver | null = null;
@@ -194,18 +195,14 @@ export class DawEditorElement extends LitElement {
     if (changedProperties.has('eagerResume')) {
       this._audioResume.target = this.eagerResume;
     }
-    // Re-extract peaks at new zoom level from cached WaveformData (near-instant)
+    // Re-extract peaks at new zoom level from cached WaveformData (near-instant).
+    // Always works because the worker generates at baseScale (128), the finest level.
     if (changedProperties.has('samplesPerPixel') && this._clipBuffers.size > 0) {
-      const reextracted = this._peakPipeline.reextractPeaks(
-        this._clipBuffers,
-        this.samplesPerPixel,
-        this.mono
-      );
-      if (reextracted.size > 0) {
+      const re = this._peakPipeline.reextractPeaks(
+        this._clipBuffers, this.samplesPerPixel, this.mono, this._clipOffsets);
+      if (re.size > 0) {
         const next = new Map(this._peaksData);
-        for (const [clipId, peakData] of reextracted) {
-          next.set(clipId, peakData);
-        }
+        for (const [id, pd] of re) next.set(id, pd);
         this._peaksData = next;
       }
     }
@@ -365,6 +362,10 @@ export class DawEditorElement extends LitElement {
         });
 
         this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
+        this._clipOffsets.set(clip.id, {
+          offsetSamples: clip.offsetSamples,
+          durationSamples: clip.durationSamples,
+        });
         const peakData = await this._peakPipeline.generatePeaks(
           audioBuffer,
           this.samplesPerPixel,
@@ -692,7 +693,7 @@ export class DawEditorElement extends LitElement {
         track,
         descriptor,
         numChannels,
-        trackHeight: this.waveHeight * numChannels,
+        trackHeight: this.waveHeight * numChannels + (this.clipHeaders ? 20 : 0),
       };
     });
 
@@ -754,7 +755,7 @@ export class DawEditorElement extends LitElement {
                   const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
                   const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
                   const hdrH = this.clipHeaders ? 20 : 0;
-                  const chH = Math.floor((t.trackHeight - hdrH) / t.numChannels);
+                  const chH = this.waveHeight;
                   return html` <div
                     class="clip-container"
                     style="left:${clipLeft}px;top:0;width:${width}px;height:${t.trackHeight}px;"

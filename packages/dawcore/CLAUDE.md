@@ -57,6 +57,7 @@
 - **Worklet pause/resume** — `recording-processor` accepts `pause` (flushes partial buffer, stops accumulating) and `resume` (restarts). Controller exposes `pauseRecording()`/`resumeRecording()`, editor delegates. Pause button sends both worklet pause and Transport pause.
 - **Peak generation must pass clip offset/duration** — `generatePeaks(buf, spp, mono, offsetSamples, durationSamples)` extracts peaks for only the clip's visible portion. Without offset/duration, clips sharing an AudioBuffer get full-buffer peaks and overlap visually.
 - **`clip-headers` boolean attribute** — Defaults to false (no headers). Enable with `<daw-editor clip-headers>`. CSS in `clipStyles` from `theme.ts`. Header height (20px) subtracted from waveform area, divided equally among channels.
+- **PeakPipeline baseScale** — Worker generates WaveformData at `baseScale` (default 128, matching AudioWorklet quantum). `extractPeaks` resamples to any coarser zoom level from cache. All zoom levels >= baseScale work without regeneration. Configurable: `new PeakPipeline(baseScale, bits)`.
 
 ## Key Patterns
 
