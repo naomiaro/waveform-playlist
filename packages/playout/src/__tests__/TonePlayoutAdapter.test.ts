@@ -19,6 +19,8 @@ vi.mock('../TonePlayout', () => {
         setVolume: vi.fn(),
         setPan: vi.fn(),
       }),
+      getTrackIds: vi.fn().mockReturnValue([]),
+      removeTrack: vi.fn(),
       dispose: vi.fn(),
       setOnPlaybackComplete: vi.fn(),
       setLoop: vi.fn(),
@@ -147,7 +149,7 @@ describe('createToneAdapter', () => {
       expect(mockInstance.applyInitialSoloState).toHaveBeenCalled();
     });
 
-    it('disposes old playout on subsequent setTracks calls', () => {
+    it('reuses playout on subsequent setTracks calls (incremental update)', () => {
       const adapter = createToneAdapter();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
       adapter.setTracks([makeTrack('t1', [clip])]);
@@ -155,8 +157,12 @@ describe('createToneAdapter', () => {
       const firstInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
         .value;
 
+      // Second setTracks should NOT dispose — incremental update
+      firstInstance.getTrackIds.mockReturnValue(['t1']);
       adapter.setTracks([makeTrack('t2', [clip])]);
-      expect(firstInstance.dispose).toHaveBeenCalled();
+      expect(firstInstance.dispose).not.toHaveBeenCalled();
+      // Old track removed, new track added
+      expect(firstInstance.removeTrack).toHaveBeenCalledWith('t1');
     });
 
     it('passes track effects to playout.addTrack', () => {
@@ -226,26 +232,23 @@ describe('createToneAdapter', () => {
       expect(adapter.isPlaying()).toBe(false);
     });
 
-    it('ignores stale completion callback after setTracks rebuild', () => {
+    it('completion callback still works after incremental setTracks', () => {
       const adapter = createToneAdapter();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
       adapter.setTracks([makeTrack('t1', [clip])]);
       adapter.play(0);
       expect(adapter.isPlaying()).toBe(true);
 
-      // Capture the old playout's completion callback
-      const oldInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
-        .value;
-      const oldCallback = oldInstance.setOnPlaybackComplete.mock.calls[0][0];
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const callback = instance.setOnPlaybackComplete.mock.calls[0][0];
 
-      // Rebuild with new tracks (simulates setTracks during playback)
-      adapter.setTracks([makeTrack('t2', [clip])]);
-      adapter.play(0);
-      expect(adapter.isPlaying()).toBe(true);
+      // Incremental update — same playout, callback still valid
+      instance.getTrackIds.mockReturnValue(['t1']);
+      adapter.setTracks([makeTrack('t1', [clip])]);
 
-      // Old callback fires (stale) — should NOT reset isPlaying
-      oldCallback();
-      expect(adapter.isPlaying()).toBe(true);
+      // Callback fires — resets isPlaying (not stale, same playout)
+      callback();
+      expect(adapter.isPlaying()).toBe(false);
     });
 
     it('delegates init to playout.init', async () => {
@@ -406,55 +409,57 @@ describe('createToneAdapter', () => {
       expect(() => adapter.setLoop(true, 0, 5)).not.toThrow();
     });
 
-    it('persists loop state across setTracks rebuilds', () => {
+    it('preserves loop state across incremental setTracks', () => {
       const adapter = createToneAdapter();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
 
       adapter.setTracks([makeTrack('t1', [clip])]);
       adapter.setLoop(true, 2.0, 6.0);
 
-      // Rebuild with new tracks — loop state should be re-applied
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.getTrackIds.mockReturnValue(['t1']);
+
+      // Incremental update — same playout, loop state persists
       adapter.setTracks([makeTrack('t2', [clip])]);
 
-      // The second TonePlayout instance should have setLoop called during buildPlayout
-      const secondInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[1]
-        .value;
-      expect(secondInstance.setLoop).toHaveBeenCalledWith(true, 2.0, 6.0);
+      // Same instance — setLoop was called originally, no re-apply needed
+      // (playout persists, Transport keeps its loop config)
+      expect(instance.dispose).not.toHaveBeenCalled();
     });
   });
 
   describe('audioInitialized persistence', () => {
-    it('calls init on new playout after setTracks rebuild when previously initialized', async () => {
+    it('playout stays initialized across incremental setTracks', async () => {
       const adapter = createToneAdapter();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
 
       adapter.setTracks([makeTrack('t1', [clip])]);
       await adapter.init();
 
-      const firstInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
-        .value;
-      expect(firstInstance.init).toHaveBeenCalled();
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.init).toHaveBeenCalled();
 
-      // Rebuild with new tracks — init should be called on the new instance
+      // Incremental update — no new playout, no re-init needed
+      instance.getTrackIds.mockReturnValue(['t1']);
       adapter.setTracks([makeTrack('t2', [clip])]);
 
-      const secondInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[1]
-        .value;
-      expect(secondInstance.init).toHaveBeenCalled();
+      // Only one TonePlayout instance was ever created
+      expect((TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results).toHaveLength(1);
     });
 
-    it('does not call init on new playout if never initialized', () => {
+    it('incremental setTracks does not require init', () => {
       const adapter = createToneAdapter();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
 
       adapter.setTracks([makeTrack('t1', [clip])]);
       // No init() call
 
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.getTrackIds.mockReturnValue(['t1']);
       adapter.setTracks([makeTrack('t2', [clip])]);
 
-      const secondInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[1]
-        .value;
-      expect(secondInstance.init).not.toHaveBeenCalled();
+      // Same playout, no re-init
+      expect((TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results).toHaveLength(1);
     });
   });
 

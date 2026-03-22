@@ -147,6 +147,10 @@ export class TonePlayout {
     return this.tracks.get(trackId);
   }
 
+  getTrackIds(): string[] {
+    return [...this.tracks.keys()];
+  }
+
   play(when?: number, offset?: number, duration?: number): void {
     if (!this.isInitialized) {
       throw new Error('[waveform-playlist] TonePlayout not initialized. Call init() first.');
