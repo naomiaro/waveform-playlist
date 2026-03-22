@@ -62,8 +62,11 @@
   <script type="module" src="/src/index.ts"></script>
 
   <div id="mic-controls">
-    <button id="mic-btn">Request Mic</button>
-    <span id="mic-status">No mic access</span>
+    <button id="mic-btn">Enable Mic</button>
+    <select id="mic-select" disabled style="background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:4px;font:inherit;min-width:200px;">
+      <option value="">No mic access</option>
+    </select>
+    <span id="mic-status" style="font-size:0.7rem;font-family:'Courier New',monospace;color:#888;"></span>
   </div>
 
   <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale file-drop>
@@ -94,28 +97,79 @@
       while (log.children.length > 30) log.lastChild.remove();
     }
 
-    // Mic access — consumer responsibility
+    const micSelect = document.getElementById('mic-select');
+    const audioConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+
+    function updateMicStatus(stream) {
+      const track = stream.getAudioTracks()[0];
+      const settings = track.getSettings();
+      const ctxRate = editor.effectiveSampleRate;
+      const micRate = settings.sampleRate;
+      const ch = settings.channelCount ?? 1;
+      const rateNote = micRate && micRate !== ctxRate ? ' (resampling)' : '';
+      micStatus.textContent = ch + 'ch ' + micRate + 'Hz \u2192 ' + ctxRate + 'Hz' + rateNote;
+      addLog('Mic: ' + track.label + ' ' + ch + 'ch ' + micRate + 'Hz, ctx ' + ctxRate + 'Hz' + rateNote);
+    }
+
+    async function enumerateDevices() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter(d => d.kind === 'audioinput');
+      while (micSelect.firstChild) micSelect.removeChild(micSelect.firstChild);
+      for (const mic of mics) {
+        const opt = document.createElement('option');
+        opt.value = mic.deviceId;
+        opt.textContent = mic.label || 'Microphone ' + (micSelect.options.length + 1);
+        micSelect.appendChild(opt);
+      }
+      micSelect.disabled = mics.length === 0;
+    }
+
+    async function selectDevice(deviceId) {
+      if (editor.recordingStream) {
+        editor.recordingStream.getTracks().forEach(t => t.stop());
+      }
+      const constraints = deviceId
+        ? { audio: { ...audioConstraints, deviceId: { exact: deviceId } } }
+        : { audio: audioConstraints };
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        editor.recordingStream = stream;
+        updateMicStatus(stream);
+      } catch (err) {
+        micStatus.textContent = 'Error: ' + err.message;
+        addLog('Mic error: ' + err.message);
+      }
+    }
+
+    // Initial mic access
     micBtn.addEventListener('click', async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          },
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
         editor.recordingStream = stream;
-        const track = stream.getAudioTracks()[0];
-        const settings = track.getSettings();
-        const ctxRate = editor.effectiveSampleRate;
-        const micRate = settings.sampleRate;
-        const rateNote = micRate && micRate !== ctxRate ? ' ⚠ resampling' : '';
-        micStatus.textContent = track.label + ' (' + settings.channelCount + 'ch, mic ' + micRate + 'Hz, ctx ' + ctxRate + 'Hz' + rateNote + ')';
         micBtn.disabled = true;
-        addLog('Mic: ' + track.label + ' ' + micRate + 'Hz, AudioContext: ' + ctxRate + 'Hz' + rateNote);
+        await enumerateDevices();
+        const currentId = stream.getAudioTracks()[0]?.getSettings()?.deviceId;
+        if (currentId) micSelect.value = currentId;
+        updateMicStatus(stream);
       } catch (err) {
         micStatus.textContent = 'Denied: ' + err.message;
         addLog('Mic access denied: ' + err.message);
+      }
+    });
+
+    // Device switch
+    micSelect.addEventListener('change', () => {
+      if (micSelect.value) selectDevice(micSelect.value);
+    });
+
+    // Hot-plug detection
+    navigator.mediaDevices.addEventListener('devicechange', async () => {
+      if (!micBtn.disabled) return;
+      const prevValue = micSelect.value;
+      await enumerateDevices();
+      if (micSelect.value !== prevValue && micSelect.options.length > 0) {
+        addLog('Device changed \u2014 switching to ' + micSelect.options[0].textContent);
+        selectDevice(micSelect.options[0].value);
       }
     });
 
