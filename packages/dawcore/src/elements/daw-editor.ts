@@ -195,6 +195,10 @@ export class DawEditorElement extends LitElement {
     if (changedProperties.has('eagerResume')) {
       this._audioResume.target = this.eagerResume;
     }
+    // Restart playhead animation with new samplesPerPixel if playing
+    if (changedProperties.has('samplesPerPixel') && this._isPlaying) {
+      this._startPlayhead();
+    }
     // Re-extract peaks at new zoom level from cached WaveformData (near-instant).
     // Always works because the worker generates at baseScale (128), the finest level.
     if (changedProperties.has('samplesPerPixel') && this._clipBuffers.size > 0) {
