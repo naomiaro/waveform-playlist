@@ -2,11 +2,14 @@ import React, { useCallback } from 'react';
 import type { ClipTrack } from '@waveform-playlist/core';
 import { calculateSplitPoint, canSplitAt } from '@waveform-playlist/engine';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
-import { usePlaybackAnimation, usePlaylistState } from '../WaveformPlaylistContext';
+import {
+  usePlaybackAnimation,
+  usePlaylistData,
+  usePlaylistState,
+} from '../WaveformPlaylistContext';
 
 export interface UseClipSplittingOptions {
   tracks: ClipTrack[];
-  sampleRate: number;
   samplesPerPixel: number;
   engineRef: React.RefObject<PlaylistEngine | null>;
 }
@@ -30,7 +33,6 @@ export interface UseClipSplittingResult {
  * ```tsx
  * const { splitClipAtPlayhead } = useClipSplitting({
  *   tracks,
- *   sampleRate,
  *   samplesPerPixel,
  *   engineRef: playoutRef,
  * });
@@ -44,7 +46,8 @@ export interface UseClipSplittingResult {
  * ```
  */
 export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
-  const { tracks, sampleRate, engineRef } = options;
+  const { tracks, engineRef } = options;
+  const { sampleRate } = usePlaylistData();
   const { currentTimeRef } = usePlaybackAnimation();
   const { selectedTrackId } = usePlaylistState();
 
@@ -90,7 +93,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       engine.splitClip(track.id, clip.id, snappedSplitSample);
       return true;
     },
-    [tracks, options, sampleRate, engineRef]
+    [tracks, options, engineRef, sampleRate]
   );
 
   /**

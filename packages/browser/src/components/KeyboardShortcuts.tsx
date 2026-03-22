@@ -35,7 +35,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   additionalShortcuts = [],
 }) => {
   // Clip splitting setup
-  const { tracks, samplesPerPixel, sampleRate, playoutRef, duration } = usePlaylistData();
+  const { tracks, samplesPerPixel, playoutRef, duration } = usePlaylistData();
   const {
     annotations: annotationList,
     linkEndpoints,
@@ -46,7 +46,6 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
 
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
-    sampleRate,
     samplesPerPixel,
     engineRef: playoutRef,
   });
@@ -83,8 +82,6 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
     linkEndpoints,
     continuousPlay,
     scrollContainerRef,
-    samplesPerPixel,
-    sampleRate,
     onPlay: play,
     enabled: annotations && annotationList.length > 0,
   });

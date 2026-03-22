@@ -175,7 +175,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     annotations,
     onAnnotationsChange: handleAnnotationUpdate,
     samplesPerPixel,
-    sampleRate,
     duration,
     linkEndpoints: linkEndpointsProp,
   });

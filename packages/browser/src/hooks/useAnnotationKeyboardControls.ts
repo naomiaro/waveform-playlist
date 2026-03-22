@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import type { AnnotationData } from '@waveform-playlist/core';
+import { usePlaylistData } from '../WaveformPlaylistContext';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
@@ -67,10 +68,14 @@ export function useAnnotationKeyboardControls({
   continuousPlay = false,
   enabled = true,
   scrollContainerRef,
-  samplesPerPixel,
-  sampleRate,
+  samplesPerPixel: samplesPerPixelProp,
+  sampleRate: sampleRateProp,
   onPlay,
 }: UseAnnotationKeyboardControlsOptions) {
+  const contextData = usePlaylistData();
+  const samplesPerPixel = samplesPerPixelProp ?? contextData.samplesPerPixel;
+  const sampleRate = sampleRateProp ?? contextData.sampleRate;
+
   const activeIndex = useMemo(() => {
     if (!activeAnnotationId) return -1;
     return annotations.findIndex((a) => a.id === activeAnnotationId);

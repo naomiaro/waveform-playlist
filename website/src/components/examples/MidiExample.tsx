@@ -276,19 +276,18 @@ export function MidiExample() {
   } = useSoundFontCache(soundFontUrl);
 
   // Build configs: base (unless hidden) + user-added
-  const ctxSampleRate = typeof AudioContext !== 'undefined'
-    ? getGlobalAudioContext().sampleRate : 48000;
-
   const midiConfigs = React.useMemo(() => {
     const configs: MidiTrackConfig[] = [];
     if (!baseHidden) {
-      configs.push({ src: BASE_MIDI_SRC, sampleRate: ctxSampleRate });
+      configs.push({ src: BASE_MIDI_SRC });
     }
-    configs.push(...userMidiConfigs.map((c) => ({ ...c, sampleRate: c.sampleRate ?? ctxSampleRate })));
+    configs.push(...userMidiConfigs);
     return configs;
-  }, [baseHidden, userMidiConfigs, ctxSampleRate]);
+  }, [baseHidden, userMidiConfigs]);
 
-  const { tracks: allTracks, loading, error, loadedCount, totalCount } = useMidiTracks(midiConfigs);
+  const { tracks: allTracks, loading, error, loadedCount, totalCount } = useMidiTracks(midiConfigs, {
+    sampleRate: getGlobalAudioContext().sampleRate,
+  });
 
   // Merge MIDI + audio tracks and filter out removed ones
   const filteredTracks = React.useMemo(

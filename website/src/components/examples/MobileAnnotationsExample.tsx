@@ -259,7 +259,7 @@ interface MobileAnnotationsContentProps {
 }
 
 const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tracks }) => {
-  const { samplesPerPixel, sampleRate, duration, controls } = usePlaylistData();
+  const { samplesPerPixel, duration, controls } = usePlaylistData();
   const { annotations, linkEndpoints, activeAnnotationId, continuousPlay } = usePlaylistState();
   const { setAnnotations, setActiveAnnotationId, play } = usePlaylistControls();
   const { currentTime } = usePlaybackAnimation();
@@ -271,7 +271,6 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
     annotations,
     onAnnotationsChange: setAnnotations,
     samplesPerPixel,
-    sampleRate,
     duration,
     linkEndpoints,
   });

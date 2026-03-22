@@ -91,7 +91,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     tracks,
     onTracksChange: onTracksChange ?? NOOP_TRACKS_CHANGE,
     samplesPerPixel,
-    sampleRate,
     engineRef: playoutRef,
     isDraggingRef,
     snapSamplePosition,

@@ -5,6 +5,7 @@ import type {
   DragEndEvent as DragEndCallback,
 } from '@dnd-kit/abstract';
 import type { AnnotationData } from '@waveform-playlist/core';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
 
@@ -12,7 +13,8 @@ interface UseAnnotationDragHandlersOptions {
   annotations: AnnotationData[];
   onAnnotationsChange: (annotations: AnnotationData[]) => void;
   samplesPerPixel: number;
-  sampleRate: number;
+  /** Sample rate for pixel-to-time conversion. Defaults to AudioContext.sampleRate. */
+  sampleRate?: number;
   duration: number;
   linkEndpoints: boolean;
 }
@@ -50,7 +52,7 @@ export function useAnnotationDragHandlers({
   annotations,
   onAnnotationsChange,
   samplesPerPixel,
-  sampleRate,
+  sampleRate = getGlobalAudioContext().sampleRate,
   duration,
   linkEndpoints,
 }: UseAnnotationDragHandlersOptions) {

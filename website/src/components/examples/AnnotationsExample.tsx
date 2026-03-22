@@ -332,7 +332,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   defaultAnnotationDuration = 3.0,
   minAnnotationDuration = 0.5,
 }) => {
-  const { samplesPerPixel, sampleRate, duration, controls } = usePlaylistData();
+  const { samplesPerPixel, duration, controls } = usePlaylistData();
   const { annotations, linkEndpoints, activeAnnotationId } = usePlaylistState();
   const { setAnnotations, play } = usePlaylistControls();
   const { currentTime } = usePlaybackAnimation();
@@ -345,7 +345,6 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     annotations,
     onAnnotationsChange: setAnnotations,
     samplesPerPixel,
-    sampleRate,
     duration,
     linkEndpoints,
   });

@@ -35,8 +35,6 @@ export interface MidiTrackConfig {
   startTime?: number;
   /** Override clip duration in seconds (default: derived from last note) */
   duration?: number;
-  /** Sample rate for sample-based positioning — pass AudioContext.sampleRate */
-  sampleRate: number;
   /** Merge all MIDI tracks from the file into one ClipTrack (default false) */
   flatten?: boolean;
 }
@@ -54,6 +52,12 @@ export interface UseMidiTracksReturn {
   totalCount: number;
 }
 
+export interface UseMidiTracksOptions {
+  /** Default sample rate for all configs. Pass AudioContext.sampleRate.
+   *  Per-config sampleRate overrides this value. */
+  sampleRate: number;
+}
+
 /**
  * Hook to load MIDI files and convert to ClipTrack format with midiNotes.
  *
@@ -63,17 +67,22 @@ export interface UseMidiTracksReturn {
  *
  * @example
  * ```typescript
- * const { tracks, loading, error } = useMidiTracks([
- *   { src: '/music/song.mid', name: 'Piano' },
- * ]);
+ * const { tracks, loading, error } = useMidiTracks(
+ *   [{ src: '/music/song.mid', name: 'Piano' }],
+ *   { sampleRate: audioContext.sampleRate }
+ * );
  *
  * // Pre-parsed notes (no fetch)
- * const { tracks } = useMidiTracks([
- *   { midiNotes: myNotes, name: 'Synth Lead', duration: 30 },
- * ]);
+ * const { tracks } = useMidiTracks(
+ *   [{ midiNotes: myNotes, name: 'Synth Lead', duration: 30 }],
+ *   { sampleRate: 48000 }
+ * );
  * ```
  */
-export function useMidiTracks(configs: MidiTrackConfig[]): UseMidiTracksReturn {
+export function useMidiTracks(
+  configs: MidiTrackConfig[],
+  options: UseMidiTracksOptions
+): UseMidiTracksReturn {
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +112,7 @@ export function useMidiTracks(configs: MidiTrackConfig[]): UseMidiTracksReturn {
       midiChannel?: number,
       midiProgram?: number
     ): ClipTrack => {
-      const sampleRate = config.sampleRate;
+      const sampleRate = options.sampleRate;
       const clipDuration = config.duration ?? noteDuration;
 
       const clip = createClipFromSeconds({
@@ -210,7 +219,7 @@ export function useMidiTracks(configs: MidiTrackConfig[]): UseMidiTracksReturn {
       cancelled = true;
       abortController.abort();
     };
-  }, [configs]);
+  }, [configs, options.sampleRate]);
 
   return { tracks, loading, error, loadedCount, totalCount };
 }

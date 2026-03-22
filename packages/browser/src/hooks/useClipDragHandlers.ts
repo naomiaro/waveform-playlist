@@ -7,12 +7,12 @@ import type {
 import type { ClipTrack } from '@waveform-playlist/core';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import { calculateBoundaryTrim } from '../utils/boundaryTrim';
+import { usePlaylistData } from '../WaveformPlaylistContext';
 
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
   onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
-  sampleRate: number;
   engineRef: React.RefObject<PlaylistEngine | null>;
   /** Ref toggled during boundary trim drags. When true, the provider's loadAudio
    *  skips engine rebuilds so engine keeps original clip positions. On drag end,
@@ -44,7 +44,6 @@ interface UseClipDragHandlersOptions {
  *   tracks,
  *   onTracksChange: setTracks,
  *   samplesPerPixel,
- *   sampleRate,
  *   engineRef: playoutRef,
  *   isDraggingRef,
  * });
@@ -65,11 +64,11 @@ export function useClipDragHandlers({
   tracks,
   onTracksChange,
   samplesPerPixel,
-  sampleRate,
   engineRef,
   isDraggingRef,
   snapSamplePosition,
 }: UseClipDragHandlersOptions) {
+  const { sampleRate } = usePlaylistData();
   // Store snap function in ref so onDragMove doesn't need it as a dependency
   const snapSamplePositionRef = React.useRef(snapSamplePosition);
   snapSamplePositionRef.current = snapSamplePosition;
