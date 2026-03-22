@@ -29,13 +29,14 @@ export function addRecordedClip(
   trackId: string,
   buf: AudioBuffer,
   startSample: number,
-  durSamples: number
+  durSamples: number,
+  offsetSamples = 0
 ) {
   const clip = createClip({
     audioBuffer: buf,
     startSample,
     durationSamples: durSamples,
-    offsetSamples: 0,
+    offsetSamples,
     gain: 1,
     name: 'Recording',
   });

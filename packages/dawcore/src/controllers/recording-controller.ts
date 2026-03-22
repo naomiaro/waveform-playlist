@@ -230,7 +230,8 @@ export class RecordingController implements ReactiveController {
       );
       return;
     }
-    const stopCtx = getGlobalContext().rawContext as AudioContext;
+    const context = getGlobalContext();
+    const stopCtx = context.rawContext as AudioContext;
     const channelData = session.chunks.map((chunkArr) => concatenateAudioData(chunkArr));
     const audioBuffer = createAudioBuffer(
       stopCtx,
@@ -238,7 +239,29 @@ export class RecordingController implements ReactiveController {
       this._host.effectiveSampleRate,
       session.channelCount
     );
-    const durationSamples = audioBuffer.length;
+
+    // Latency compensation: user hears playback delayed by lookAhead + outputLatency,
+    // so they perform late relative to the timeline. Skip that duration at the start
+    // of the recorded audio to align the performance with the timeline.
+    const outputLatency = (stopCtx as any).outputLatency ?? 0;
+    const lookAhead = context.lookAhead ?? 0;
+    const totalLatency = outputLatency + lookAhead;
+    const latencyOffsetSamples = Math.floor(totalLatency * audioBuffer.sampleRate);
+    const effectiveDuration = Math.max(0, audioBuffer.length - latencyOffsetSamples);
+
+    if (effectiveDuration === 0) {
+      console.warn('[dawcore] RecordingController: Recording too short for latency compensation');
+      this._sessions.delete(id);
+      this._host.requestUpdate();
+      this._host.dispatchEvent(
+        new CustomEvent<DawRecordingErrorDetail>('daw-recording-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId: id, error: new Error('Recording too short to save') },
+        })
+      );
+      return;
+    }
 
     // Dispatch cancelable event
     const event = new CustomEvent<DawRecordingCompleteDetail>('daw-recording-complete', {
@@ -249,7 +272,8 @@ export class RecordingController implements ReactiveController {
         trackId: id,
         audioBuffer,
         startSample: session.startSample,
-        durationSamples,
+        durationSamples: effectiveDuration,
+        offsetSamples: latencyOffsetSamples,
       },
     });
     const notPrevented = this._host.dispatchEvent(event);
@@ -259,7 +283,9 @@ export class RecordingController implements ReactiveController {
     this._host.requestUpdate();
 
     if (notPrevented) {
-      this._createClipFromRecording(id, audioBuffer, session.startSample, durationSamples);
+      this._createClipFromRecording(
+        id, audioBuffer, session.startSample, effectiveDuration, latencyOffsetSamples
+      );
     }
   }
 
@@ -327,10 +353,11 @@ export class RecordingController implements ReactiveController {
     trackId: string,
     audioBuffer: AudioBuffer,
     startSample: number,
-    durationSamples: number
+    durationSamples: number,
+    offsetSamples = 0
   ) {
     if (typeof this._host._addRecordedClip === 'function') {
-      this._host._addRecordedClip(trackId, audioBuffer, startSample, durationSamples);
+      this._host._addRecordedClip(trackId, audioBuffer, startSample, durationSamples, offsetSamples);
     } else {
       console.warn(
         '[dawcore] RecordingController: host does not implement _addRecordedClip — clip not created for track "' +

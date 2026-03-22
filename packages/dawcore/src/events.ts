@@ -61,6 +61,7 @@ export interface DawRecordingCompleteDetail {
   audioBuffer: AudioBuffer;
   startSample: number;
   durationSamples: number;
+  offsetSamples: number;
 }
 
 export interface DawRecordingErrorDetail {

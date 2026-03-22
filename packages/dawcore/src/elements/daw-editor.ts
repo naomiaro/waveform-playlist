@@ -574,8 +574,8 @@ export class DawEditorElement extends LitElement {
   stopRecording(): void {
     this._recordingController.stopRecording();
   }
-  _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number) {
-    addRecordedClip(this, trackId, buf, startSample, durSamples);
+  _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number, offsetSamples = 0) {
+    addRecordedClip(this, trackId, buf, startSample, durSamples, offsetSamples);
   }
   async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
     const s = stream ?? this.recordingStream;

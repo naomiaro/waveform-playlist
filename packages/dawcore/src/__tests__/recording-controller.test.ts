@@ -34,6 +34,8 @@ function createMockHost() {
     effectiveSampleRate: 48000,
     resolveAudioContextSampleRate: vi.fn(),
     _addRecordedClip: vi.fn(),
+    play: vi.fn(() => Promise.resolve()),
+    stop: vi.fn(),
     _selectedTrackId: 'track-1',
     _currentTime: 0,
   }) as any;
@@ -280,7 +282,8 @@ describe('RecordingController', () => {
       'track-1',
       expect.anything(), // audioBuffer
       expect.any(Number), // startSample
-      expect.any(Number) // durationSamples
+      expect.any(Number), // durationSamples
+      expect.any(Number) // offsetSamples (latency compensation)
     );
   });
 
