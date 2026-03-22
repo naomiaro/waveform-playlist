@@ -18,8 +18,13 @@ export interface ClipPeakSyncHost {
  * Called from the statechange handler when tracksVersion changes.
  */
 export function syncPeaksForChangedClips(host: ClipPeakSyncHost, tracks: ClipTrack[]): void {
+  // Collect all current clip IDs for orphan detection
+  const currentClipIds = new Set<string>();
+
   for (const track of tracks) {
     for (const clip of track.clips) {
+      currentClipIds.add(clip.id);
+
       // Check if peaks need regeneration: new clip or changed offset/duration
       const cached = host._clipOffsets.get(clip.id);
       const needsPeaks =
@@ -61,6 +66,45 @@ export function syncPeaksForChangedClips(host: ClipPeakSyncHost, tracks: ClipTra
           );
         });
     }
+  }
+
+  // Clean up orphaned entries for clip IDs no longer in any track
+  // (e.g., the original clip after a split is replaced by two new clips)
+  cleanupOrphanedClipData(host, currentClipIds);
+}
+
+/**
+ * Remove entries from per-clip Maps for clip IDs that no longer exist in any track.
+ * Prevents memory leaks from orphaned AudioBuffer references after split operations.
+ */
+function cleanupOrphanedClipData(host: ClipPeakSyncHost, currentClipIds: Set<string>): void {
+  let buffersChanged = false;
+  let peaksChanged = false;
+
+  for (const id of host._clipBuffers.keys()) {
+    if (!currentClipIds.has(id)) {
+      host._clipBuffers.delete(id);
+      buffersChanged = true;
+    }
+  }
+  for (const id of host._clipOffsets.keys()) {
+    if (!currentClipIds.has(id)) {
+      host._clipOffsets.delete(id);
+    }
+  }
+  for (const id of host._peaksData.keys()) {
+    if (!currentClipIds.has(id)) {
+      host._peaksData.delete(id);
+      peaksChanged = true;
+    }
+  }
+
+  // Trigger Lit reactivity for @state() Maps that changed
+  if (buffersChanged) {
+    host._clipBuffers = new Map(host._clipBuffers);
+  }
+  if (peaksChanged) {
+    host._peaksData = new Map(host._peaksData);
   }
 }
 

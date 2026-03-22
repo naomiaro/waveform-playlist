@@ -122,7 +122,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **`splitAtPlayhead()`** in `interactions/split-handler.ts` — discovers new clip IDs by diffing `engine.getState().tracks` before/after `engine.splitClip()` (returns void). Requires exactly 2 new IDs.
 - **`_syncPeaksForChangedClips`** — Called in statechange handler when `tracksVersion` changes. Regenerates peaks for clips with new IDs (split) or changed `offsetSamples`/`durationSamples` (trim). Without this, split clips have no waveform and trimmed clips show wrong audio portion.
 - **Statechange syncs `_engineTracks`** — When `tracksVersion` changes, rebuild `_engineTracks` Map from engine state. This is how `moveClip`/`trimClip`/`splitClip` trigger Lit re-renders.
-- **`DRAG_THRESHOLD` and `BOUNDARY_WIDTH`** — Shared constants in `interactions/constants.ts`. Threshold is 3px (click vs drag), boundary hit zone is 8px.
+- **`DRAG_THRESHOLD`** — Shared constant in `interactions/constants.ts` (3px, click vs drag). Boundary width (8px) is CSS-only in `styles/theme.ts` (CSS can't import JS constants).
 
 ## Typed Events
 

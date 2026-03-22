@@ -456,12 +456,13 @@ import { DRAG_THRESHOLD, BOUNDARY_WIDTH } from './constants';
 
 /** Narrow engine contract for clip interactions. */
 export interface ClipEngineContract {
-  moveClip(trackId: string, clipId: string, deltaSamples: number): void;
+  moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter?: boolean): void;
   trimClip(
     trackId: string,
     clipId: string,
     boundary: 'left' | 'right',
-    deltaSamples: number
+    deltaSamples: number,
+    skipAdapter?: boolean
   ): void;
 }
 
@@ -555,7 +556,7 @@ export class ClipPointerHandler {
     if (!engine) return;
 
     if (this._mode === 'move') {
-      engine.moveClip(this._trackId, this._clipId, incrementalSamples);
+      engine.moveClip(this._trackId, this._clipId, incrementalSamples, true);
     } else {
       const boundary = this._mode === 'trim-left' ? 'left' : 'right';
       engine.trimClip(this._trackId, this._clipId, boundary, incrementalSamples);
