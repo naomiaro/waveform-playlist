@@ -7,11 +7,7 @@ import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeClip(
-  id: string,
-  startSample: number,
-  durationSamples: number
-): AudioClip {
+function makeClip(id: string, startSample: number, durationSamples: number): AudioClip {
   return {
     id,
     startSample,
@@ -273,10 +269,7 @@ describe('splitAtPlayhead', () => {
       const stateSnapshot = { selectedTrackId: 'track-1', tracks: [track] };
 
       const engine = {
-        getState: vi
-          .fn()
-          .mockReturnValueOnce(stateSnapshot)
-          .mockReturnValueOnce(stateSnapshot),
+        getState: vi.fn().mockReturnValueOnce(stateSnapshot).mockReturnValueOnce(stateSnapshot),
         splitClip: vi.fn(),
       };
       const host = createMockHost({

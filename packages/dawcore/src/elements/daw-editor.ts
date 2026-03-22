@@ -808,10 +808,12 @@ export class DawEditorElement extends LitElement {
                     data-clip-id=${clip.id}
                   >
                     ${hdrH > 0
-                      ? html`<div class="clip-header"
+                      ? html`<div
+                          class="clip-header"
                           data-clip-id=${clip.id}
                           data-track-id=${t.trackId}
-                          ?data-interactive=${this.interactiveClips}>
+                          ?data-interactive=${this.interactiveClips}
+                        >
                           <span>${clip.name || t.descriptor?.name || ''}</span>
                         </div>`
                       : ''}
@@ -830,15 +832,18 @@ export class DawEditorElement extends LitElement {
                         ></daw-waveform>`
                     )}
                     ${this.interactiveClips
-                      ? html`
-                        <div class="clip-boundary"
-                          data-boundary-edge="left"
-                          data-clip-id=${clip.id}
-                          data-track-id=${t.trackId}></div>
-                        <div class="clip-boundary"
-                          data-boundary-edge="right"
-                          data-clip-id=${clip.id}
-                          data-track-id=${t.trackId}></div>`
+                      ? html` <div
+                            class="clip-boundary"
+                            data-boundary-edge="left"
+                            data-clip-id=${clip.id}
+                            data-track-id=${t.trackId}
+                          ></div>
+                          <div
+                            class="clip-boundary"
+                            data-boundary-edge="right"
+                            data-clip-id=${clip.id}
+                            data-track-id=${t.trackId}
+                          ></div>`
                       : ''}
                   </div>`;
                 })}

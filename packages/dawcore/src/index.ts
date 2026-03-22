@@ -33,6 +33,10 @@ export type { RecordingOptions, RecordingSession } from './controllers/recording
 
 export type { TrackDescriptor, ClipDescriptor } from './types';
 export type { PointerEngineContract } from './interactions/pointer-handler';
+export { ClipPointerHandler } from './interactions/clip-pointer-handler';
+export type { ClipPointerHost, ClipEngineContract } from './interactions/clip-pointer-handler';
+export { splitAtPlayhead } from './interactions/split-handler';
+export type { SplitHost } from './interactions/split-handler';
 
 export type {
   DawEventMap,
@@ -50,5 +54,8 @@ export type {
   DawRecordingStartDetail,
   DawRecordingCompleteDetail,
   DawRecordingErrorDetail,
+  DawClipMoveDetail,
+  DawClipTrimDetail,
+  DawClipSplitDetail,
   LoadFilesResult,
 } from './events';

@@ -74,7 +74,9 @@ export class PointerHandler {
             this._timeline?.removeEventListener('pointerup', onUp);
             try {
               this._timeline?.releasePointerCapture((ue as PointerEvent).pointerId);
-            } catch { /* may already be released */ }
+            } catch {
+              /* may already be released */
+            }
             this._timeline = null;
           };
           this._timeline.addEventListener('pointermove', onMove);
