@@ -118,11 +118,14 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Hit detection uses `closest()`** — `composedPath()[0]` returns the deepest element (e.g., `<span>` inside `.clip-header`). Always use `target.closest('.clip-header')` / `target.closest('.clip-boundary')` to walk up.
 - **Move: incremental deltas with `skipAdapter`** — `engine.moveClip(id, clipId, delta, true)` skips adapter during drag (60fps). Call `engine.updateTrack(trackId)` once on `pointerup` to sync Tone.js.
 - **Trim: cumulative delta on drop only** — Engine's `constrainBoundaryTrim` checks constraints against current clip state, so incremental deltas compound incorrectly. Accumulate total delta during drag, call `engine.trimClip()` once on `pointerup`.
-- **Trim visual feedback** — Imperatively update `.clip-container` CSS (`left`/`width`) during drag. For left trim, also shift `<daw-waveform>` children by `-deltaPx` so waveform stays at its global timeline position. Restore original CSS before engine applies.
+- **Trim visual feedback** — Imperatively update `.clip-container` CSS (`left`/`width`) during drag. Restore original CSS before engine applies.
 - **`splitAtPlayhead()`** in `interactions/split-handler.ts` — discovers new clip IDs by diffing `engine.getState().tracks` before/after `engine.splitClip()` (returns void). Requires exactly 2 new IDs.
 - **`_syncPeaksForChangedClips`** — Called in statechange handler when `tracksVersion` changes. Regenerates peaks for clips with new IDs (split) or changed `offsetSamples`/`durationSamples` (trim). Without this, split clips have no waveform and trimmed clips show wrong audio portion.
+- **`cleanupOrphanedClipData`** — Called by `syncPeaksForChangedClips` to remove entries from `_clipBuffers`, `_clipOffsets`, `_peaksData` for clip IDs no longer in any track. Prevents memory leaks after split (original clip ID becomes orphaned).
+- **Trim peak re-extraction** — During trim drag, call `host.reextractClipPeaks()` to synchronously re-slice peaks from cached WaveformData at the new offset/duration. When peaks are available, set waveforms to `left:0` (peaks cover full new bounds). Fall back to `-deltaPx` shift only when cache unavailable.
 - **Statechange syncs `_engineTracks`** — When `tracksVersion` changes, rebuild `_engineTracks` Map from engine state. This is how `moveClip`/`trimClip`/`splitClip` trigger Lit re-renders.
 - **`DRAG_THRESHOLD`** — Shared constant in `interactions/constants.ts` (3px, click vs drag). Boundary width (8px) is CSS-only in `styles/theme.ts` (CSS can't import JS constants).
+- **Keyboard shortcut modifier guard** — `_onKeyDown` must check `e.ctrlKey || e.metaKey || e.altKey` before handling `S` key. Without this, Ctrl+S (save) triggers split.
 
 ## Typed Events
 

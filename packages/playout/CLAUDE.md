@@ -161,6 +161,7 @@ AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
 
 - **`replaceClips` force-reschedules on startTime change** — The diff uses relative `ClipInfo.startTime` values. When `track.startTime` shifts (e.g., moving the first clip), clips with unchanged relative positions kept stale Transport events at old absolute times. Fix: detect `newStartTime !== old startTime` and skip the diff, rescheduling all clips.
 - **`skipAdapter` on `moveClip`/`trimClip`** — Engine's `moveClip(id, clipId, delta, skipAdapter=true)` updates internal state + emits statechange without touching the adapter. Dawcore uses this during drag (60fps) and calls `engine.updateTrack(trackId)` once on `pointerup`. Without this, `replaceClips` runs every frame, creating ghost audio from stale Transport events.
+- **`engine.getClipState(trackId, clipId)`** — Returns `{ offsetSamples, durationSamples }` or null. Used by dawcore's trim handler to snapshot clip bounds at drag start for peak re-extraction.
 
 **`ToneTrack.addClip(clipInfo)` / `removeScheduledClip(index)`:** Granular clip-level methods. `addClip` creates fadeGainNode + Transport.schedule. During playback, new clips that span the current Transport position get a mid-clip source started immediately with lookAhead compensation.
 
