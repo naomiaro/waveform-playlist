@@ -56,13 +56,19 @@ export class DawRecordButtonElement extends DawTransportButton {
 
   render() {
     return html`
-      <button part="button" ?data-recording=${this._isRecording} @click=${this._onClick}>
-        <slot>${this._isRecording ? 'Stop Rec' : 'Record'}</slot>
+      <button
+        part="button"
+        ?data-recording=${this._isRecording}
+        ?disabled=${this._isRecording}
+        @click=${this._onClick}
+      >
+        <slot>Record</slot>
       </button>
     `;
   }
 
   private _onClick() {
+    if (this._isRecording) return;
     const target = this.target;
     if (!target) {
       console.warn(
@@ -70,11 +76,7 @@ export class DawRecordButtonElement extends DawTransportButton {
       );
       return;
     }
-    if (this._isRecording) {
-      target.stopRecording();
-    } else {
-      target.startRecording(target.recordingStream);
-    }
+    target.startRecording(target.recordingStream);
   }
 }
 

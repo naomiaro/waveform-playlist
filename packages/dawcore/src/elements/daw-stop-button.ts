@@ -20,6 +20,11 @@ export class DawStopButtonElement extends DawTransportButton {
       );
       return;
     }
+    // Stop recording first (also stops playback via the controller),
+    // then stop playback if it was running independently
+    if (target.isRecording) {
+      target.stopRecording();
+    }
     target.stop();
   }
 }
