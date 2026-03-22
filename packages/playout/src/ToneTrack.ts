@@ -263,6 +263,12 @@ export class ToneTrack {
    * needing to explicitly stop it.
    */
   replaceClips(newClips: ClipInfo[], newStartTime?: number): void {
+    // When track.startTime changes, all Transport events must be rescheduled
+    // because absolute times (track.startTime + clip.startTime) shift even if
+    // relative clip.startTime values stay the same.
+    const startTimeChanged =
+      newStartTime !== undefined && newStartTime !== this.track.startTime;
+
     // Update track startTime if the minimum clip position changed (e.g., moveClip)
     if (newStartTime !== undefined) {
       this.track.startTime = newStartTime;
@@ -270,20 +276,26 @@ export class ToneTrack {
     const tp = getTransport();
 
     // Diff old vs new clips — a clip is "unchanged" if buffer reference and
-    // all timing properties match exactly
+    // all timing properties match exactly. Skip diff if startTime changed
+    // (all clips need rescheduling for new absolute positions).
     const kept: ScheduledClip[] = [];
     const toAdd: ClipInfo[] = [];
     const matched = new Set<number>(); // indices into this.scheduledClips
 
-    for (const clipInfo of newClips) {
-      const idx = this.scheduledClips.findIndex(
-        (s, i) => !matched.has(i) && this._clipsEqual(s.clipInfo, clipInfo)
-      );
-      if (idx !== -1) {
-        kept.push(this.scheduledClips[idx]);
-        matched.add(idx);
-      } else {
-        toAdd.push(clipInfo);
+    if (startTimeChanged) {
+      // Force full reschedule — all new clips are "toAdd", none kept
+      toAdd.push(...newClips);
+    } else {
+      for (const clipInfo of newClips) {
+        const idx = this.scheduledClips.findIndex(
+          (s, i) => !matched.has(i) && this._clipsEqual(s.clipInfo, clipInfo)
+        );
+        if (idx !== -1) {
+          kept.push(this.scheduledClips[idx]);
+          matched.add(idx);
+        } else {
+          toAdd.push(clipInfo);
+        }
       }
     }
 

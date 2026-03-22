@@ -265,6 +265,107 @@ describe('ToneTrack', () => {
       expect(mockTransport.clear).toHaveBeenCalledTimes(1);
       expect(mockTransport.schedule).toHaveBeenCalledTimes(1);
     });
+
+    it('reschedules all clips when newStartTime changes', () => {
+      const buf = makeBuffer();
+      const clip1 = makeClipInfo({ buffer: buf, startTime: 0, duration: 1 });
+      const clip2 = makeClipInfo({ buffer: buf, startTime: 2, duration: 1 });
+      const track = new ToneTrack({
+        clips: [clip1, clip2],
+        track: makeTrack(),
+      });
+
+      // 2 clips scheduled initially
+      expect(mockTransport.schedule).toHaveBeenCalledTimes(2);
+      mockTransport.schedule.mockClear();
+      mockTransport.clear.mockClear();
+
+      // Move clip1 left: track.startTime shifts from 0 to -1
+      // clip1 relative startTime stays 0, clip2 becomes 3
+      // Without the fix, clip1 would be "kept" (same relStart=0) with stale Transport event
+      track.replaceClips(
+        [
+          makeClipInfo({ buffer: buf, startTime: 0, duration: 1 }),
+          makeClipInfo({ buffer: buf, startTime: 3, duration: 1 }),
+        ],
+        -1
+      );
+
+      // Both old clips cleared, both new clips scheduled
+      expect(mockTransport.clear).toHaveBeenCalledTimes(2);
+      expect(mockTransport.schedule).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not force reschedule when newStartTime is the same', () => {
+      const buf = makeBuffer();
+      const clip1 = makeClipInfo({ buffer: buf, startTime: 0, duration: 1 });
+      const clip2 = makeClipInfo({ buffer: buf, startTime: 2, duration: 1 });
+      const track = new ToneTrack({
+        clips: [clip1, clip2],
+        track: makeTrack(),
+      });
+
+      mockTransport.schedule.mockClear();
+      mockTransport.clear.mockClear();
+
+      // Same startTime, same clips — nothing should change
+      track.replaceClips(
+        [
+          makeClipInfo({ buffer: buf, startTime: 0, duration: 1 }),
+          makeClipInfo({ buffer: buf, startTime: 2, duration: 1 }),
+        ],
+        0 // same as initial track.startTime
+      );
+
+      expect(mockTransport.clear).not.toHaveBeenCalled();
+      expect(mockTransport.schedule).not.toHaveBeenCalled();
+    });
+
+    it('reschedules only changed clips when newStartTime is undefined', () => {
+      const buf = makeBuffer();
+      const clip1 = makeClipInfo({ buffer: buf, startTime: 0, duration: 1 });
+      const clip2 = makeClipInfo({ buffer: buf, startTime: 2, duration: 1 });
+      const track = new ToneTrack({
+        clips: [clip1, clip2],
+        track: makeTrack(),
+      });
+
+      mockTransport.schedule.mockClear();
+      mockTransport.clear.mockClear();
+
+      // No newStartTime, clip2 changed duration — only clip2 rescheduled
+      track.replaceClips([
+        makeClipInfo({ buffer: buf, startTime: 0, duration: 1 }),
+        makeClipInfo({ buffer: buf, startTime: 2, duration: 0.5 }),
+      ]);
+
+      expect(mockTransport.clear).toHaveBeenCalledTimes(1);
+      expect(mockTransport.schedule).toHaveBeenCalledTimes(1);
+    });
+
+    it('schedules clips at correct absolute time after startTime change', () => {
+      const buf = makeBuffer();
+      const clip = makeClipInfo({ buffer: buf, startTime: 0, duration: 1 });
+      const t = makeTrack();
+      t.startTime = 5;
+      const track = new ToneTrack({
+        clips: [clip],
+        track: t,
+      });
+
+      // Initial schedule at absolute time 5 + 0 = 5
+      expect(mockTransport.schedule).toHaveBeenLastCalledWith(expect.any(Function), 5);
+      mockTransport.schedule.mockClear();
+
+      // Move: startTime changes from 5 to 3, clip relStart stays 0
+      track.replaceClips(
+        [makeClipInfo({ buffer: buf, startTime: 0, duration: 1 })],
+        3
+      );
+
+      // New schedule at absolute time 3 + 0 = 3
+      expect(mockTransport.schedule).toHaveBeenCalledWith(expect.any(Function), 3);
+    });
   });
 
   describe('addClip', () => {
