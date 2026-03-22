@@ -67,7 +67,6 @@
   </div>
 
   <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale>
-    <daw-track name="Recording Track"></daw-track>
   </daw-editor>
 
   <daw-transport for="editor">
@@ -84,6 +83,9 @@
     const log = document.getElementById('log');
     const micBtn = document.getElementById('mic-btn');
     const micStatus = document.getElementById('mic-status');
+    const recordBtn = document.querySelector('daw-record-button');
+
+    let trackCounter = 0;
 
     function addLog(msg) {
       const line = document.createElement('div');
@@ -117,6 +119,41 @@
       }
     });
 
+    // Auto-create track + overdub recording
+    // Override record button click to handle auto-track creation
+    recordBtn.addEventListener('click', async (e) => {
+      // Let the button handle stop if already recording
+      if (editor.isRecording) return;
+
+      e.stopImmediatePropagation(); // prevent default button handler
+
+      if (!editor.recordingStream) {
+        addLog('No mic access — click "Request Mic" first');
+        return;
+      }
+
+      // Auto-create track if none selected
+      if (!editor.selectedTrackId) {
+        trackCounter++;
+        const name = 'Take ' + trackCounter;
+        const track = document.createElement('daw-track');
+        track.setAttribute('name', name);
+        editor.appendChild(track);
+        addLog('Auto-created track: ' + name);
+
+        // Wait for track to connect, then select it
+        const trackId = await new Promise((resolve) => {
+          editor.addEventListener('daw-track-connected', (ev) => {
+            resolve(ev.detail.trackId);
+          }, { once: true });
+        });
+        editor._setSelectedTrackId(trackId);
+      }
+
+      // Start recording with overdub
+      await editor.startRecording(editor.recordingStream, { overdub: true });
+    }, { capture: true }); // capture phase to run before the button's own handler
+
     // Recording events
     editor.addEventListener('daw-recording-start', (e) => {
       addLog('recording-start: track=' + e.detail.trackId);
@@ -125,6 +162,7 @@
       const d = e.detail;
       addLog('recording-complete: track=' + d.trackId +
         ' duration=' + (d.durationSamples / d.audioBuffer.sampleRate).toFixed(2) + 's' +
+        ' offset=' + d.offsetSamples + ' samples' +
         ' channels=' + d.audioBuffer.numberOfChannels);
     });
     editor.addEventListener('daw-recording-error', (e) => {
