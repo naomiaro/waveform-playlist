@@ -155,10 +155,10 @@ export class TonePlayout {
    * Replace clips on a track, preserving the track's audio graph.
    * Only works for ToneTrack (audio clips), not MidiToneTrack.
    */
-  replaceTrackClips(trackId: string, newClips: ClipInfo[]): boolean {
+  replaceTrackClips(trackId: string, newClips: ClipInfo[], newStartTime?: number): boolean {
     const track = this.tracks.get(trackId);
     if (!track || !('replaceClips' in track)) return false;
-    (track as ToneTrack).replaceClips(newClips);
+    (track as ToneTrack).replaceClips(newClips, newStartTime);
     return true;
   }
 

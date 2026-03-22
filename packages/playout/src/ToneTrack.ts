@@ -262,7 +262,11 @@ export class ToneTrack {
    * fadeGainNode silences its source immediately (audio path broken) without
    * needing to explicitly stop it.
    */
-  replaceClips(newClips: ClipInfo[]): void {
+  replaceClips(newClips: ClipInfo[], newStartTime?: number): void {
+    // Update track startTime if the minimum clip position changed (e.g., moveClip)
+    if (newStartTime !== undefined) {
+      this.track.startTime = newStartTime;
+    }
     const tp = getTransport();
 
     // Diff old vs new clips — a clip is "unchanged" if buffer reference and
@@ -333,14 +337,18 @@ export class ToneTrack {
     }
   }
 
-  /** Compare two clips by reference (buffer) and timing properties */
+  /** Compare two clips by reference (buffer), timing, and fade properties */
   private _clipsEqual(a: ClipInfo, b: ClipInfo): boolean {
     return (
       a.buffer === b.buffer &&
       a.startTime === b.startTime &&
       a.duration === b.duration &&
       a.offset === b.offset &&
-      a.gain === b.gain
+      a.gain === b.gain &&
+      a.fadeIn?.duration === b.fadeIn?.duration &&
+      a.fadeIn?.type === b.fadeIn?.type &&
+      a.fadeOut?.duration === b.fadeOut?.duration &&
+      a.fadeOut?.type === b.fadeOut?.type
     );
   }
 

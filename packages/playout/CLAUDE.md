@@ -6,7 +6,7 @@
 
 **Location:** `src/TonePlayoutAdapter.ts`
 
-**Pattern:** Factory/closure (not class). Rebuild-on-`setTracks()` — disposes old `TonePlayout`, creates fresh one. Generation counter prevents stale completion callbacks. Loop state (`_loopEnabled`, `_loopStart`, `_loopEnd`) and `_audioInitialized` persist across rebuilds.
+**Pattern:** Factory/closure (not class). `setTracks()` does incremental track updates (no full rebuild after initial creation). `updateTrack()` replaces a single track's clips via `ToneTrack.replaceClips()`. Generation counter prevents stale completion callbacks. Loop state (`_loopEnabled`, `_loopStart`, `_loopEnd`) and `_audioInitialized` persist.
 
 **Key mappings:** `ClipTrack.volume` → `Track.gain`, `ClipTrack.pan` → `Track.stereoPan`, sample-based clips → seconds via core helpers.
 
@@ -147,11 +147,23 @@ AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
 
 **Dependency:** `soundfont2` (MIT) in `package.json`. SF2 files have separate licenses — not bundled in npm package, users provide via URL.
 
-## Incremental Track Addition
+## Incremental Track Updates
 
-**`addTrackToPlayout()` helper:** Extracted from `buildPlayout`'s per-track loop. Shared by both `buildPlayout` (full rebuild) and `adapter.addTrack()` (incremental). Handles audio clips, MIDI clips, and SoundFont routing.
+**`addTrackToPlayout()` helper:** Extracted from `buildPlayout`'s per-track loop. Shared by `buildPlayout`, `adapter.addTrack()`, and `adapter.updateTrack()`. Handles audio clips, MIDI clips, and SoundFont routing.
 
-**`adapter.addTrack(track)`:** Adds a single track to the existing playout without disposing/recreating. Calls `addTrackToPlayout()` then `playout.applyInitialSoloState()`. Throws if called before `setTracks()` (no playout exists yet) — this is a programming error, not a recoverable condition.
+**`adapter.addTrack(track)`:** Adds a single track to the existing playout. Throws if called before `setTracks()` (no playout exists yet).
+
+**`adapter.updateTrack(trackId, track)`:** For audio tracks, uses `ToneTrack.replaceClips()` which diffs clips and only reschedules changed ones. Falls back to remove+re-add for MIDI tracks.
+
+**`adapter.setTracks(tracks)`:** First call creates the playout via `buildPlayout`. Subsequent calls do incremental removal+re-add (no full dispose).
+
+**`ToneTrack.replaceClips(newClips, newStartTime?)`:** Diffs old vs new clips by buffer reference + timing + fades (`_clipsEqual`). Unchanged clips keep their active sources and Transport events — no audible interruption. Changed clips: fadeGainNode disconnected (silences source via broken audio path), new clip added. Updates `track.startTime` if the minimum clip position changed.
+
+**`ToneTrack.addClip(clipInfo)` / `removeScheduledClip(index)`:** Granular clip-level methods. `addClip` creates fadeGainNode + Transport.schedule. During playback, new clips that span the current Transport position get a mid-clip source started immediately with lookAhead compensation.
+
+**lookAhead compensation:** New sources in `replaceClips` start at `transportOffset - lookAhead` (the audible position), not `transportOffset` (which is lookAhead ahead of what the listener hears). This overlaps with the old source's remaining buffered audio for a seamless transition.
+
+**Testing:** `src/__tests__/ToneTrack.test.ts` — tests replaceClips diff, mid-clip restart, lookAhead compensation, buffer reference equality.
 
 ## Firefox Compatibility (standardized-audio-context)
 

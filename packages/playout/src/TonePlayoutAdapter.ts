@@ -208,7 +208,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
           gain: clip.gain,
         }));
 
-        if (playout.replaceTrackClips(trackId, clipInfos)) {
+        if (playout.replaceTrackClips(trackId, clipInfos, startTime)) {
           playout.applyInitialSoloState();
           return;
         }
