@@ -1,4 +1,5 @@
 import { pixelsToSeconds } from '@waveform-playlist/core';
+import { DRAG_THRESHOLD } from './constants';
 
 /** Narrow engine contract for pointer interactions. */
 export interface PointerEngineContract {
@@ -68,7 +69,7 @@ export class PointerHandler {
 
     const currentPx = this._pxFromPointer(e);
 
-    if (!this._isDragging && Math.abs(currentPx - this._dragStartPx) > 3) {
+    if (!this._isDragging && Math.abs(currentPx - this._dragStartPx) > DRAG_THRESHOLD) {
       this._isDragging = true;
     }
 
