@@ -53,6 +53,8 @@
 - **Always clean up partial sessions on error** — `startRecording` adds the session to `_sessions` before connect/start. The catch block must call `_cleanupSession(trackId)` to prevent stuck `isRecording` state and mic leak.
 - **Slice latency from AudioBuffer, don't use offsetSamples** — `addRecordedClip` slices the buffer at `offsetSamples` before storing and generating peaks. The clip gets `offsetSamples: 0` since the offset is already applied. This ensures peaks match `durationSamples` exactly — using `offsetSamples` on the clip causes the peak pipeline to generate peaks for the full buffer, making the waveform wider than the clip container.
 - **Track height must include recording session channels** — `numChannels` for track height is derived from finalized clip peaks. During live recording with no clips yet, it falls back to 1. Check `_recordingController.getSession(trackId)?.channelCount` for the correct channel count during recording.
+- **Live preview position must match finalized clip** — Preview skips latency peaks (slice `latencyPixels * 2` from front) but keeps `left = startSample / spp` (no latency pixel offset on position). Both preview and finalized clip sit at `startSample` — the audio data is what shifts, not the container position.
+- **Worklet pause/resume** — `recording-processor` accepts `pause` (flushes partial buffer, stops accumulating) and `resume` (restarts). Controller exposes `pauseRecording()`/`resumeRecording()`, editor delegates. Pause button sends both worklet pause and Transport pause.
 
 ## Key Patterns
 
