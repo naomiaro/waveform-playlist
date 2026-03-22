@@ -26,6 +26,12 @@ export interface PointerHandlerHost {
   dispatchEvent(event: Event): boolean;
   shadowRoot: ShadowRoot | null;
   requestUpdate(): void;
+  readonly _clipHandler: {
+    tryHandle(target: Element, e: PointerEvent): boolean;
+    onPointerMove(e: PointerEvent): void;
+    onPointerUp(e: PointerEvent): void;
+    isActive: boolean;
+  } | null;
 }
 
 export class PointerHandler {
@@ -52,6 +58,32 @@ export class PointerHandler {
   }
 
   onPointerDown = (e: PointerEvent) => {
+    // Check if click landed on an interactive clip element
+    const clipHandler = this._host._clipHandler;
+    if (clipHandler) {
+      const target = e.composedPath()[0] as Element;
+      if (target && clipHandler.tryHandle(target, e)) {
+        // Clip handler took over — wire move/up to it
+        this._timeline = this._host.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
+        if (this._timeline) {
+          this._timeline.setPointerCapture(e.pointerId);
+          const onMove = (me: Event) => clipHandler.onPointerMove(me as PointerEvent);
+          const onUp = (ue: Event) => {
+            clipHandler.onPointerUp(ue as PointerEvent);
+            this._timeline?.removeEventListener('pointermove', onMove);
+            this._timeline?.removeEventListener('pointerup', onUp);
+            try {
+              this._timeline?.releasePointerCapture((ue as PointerEvent).pointerId);
+            } catch { /* may already be released */ }
+            this._timeline = null;
+          };
+          this._timeline.addEventListener('pointermove', onMove);
+          this._timeline.addEventListener('pointerup', onUp);
+        }
+        return;
+      }
+    }
+
     this._timeline = this._host.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
     if (!this._timeline) return;
 

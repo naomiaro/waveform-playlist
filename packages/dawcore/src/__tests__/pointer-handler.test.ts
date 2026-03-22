@@ -83,6 +83,7 @@ function createMockHost(
     }),
     shadowRoot: shadow,
     requestUpdate: vi.fn(),
+    _clipHandler: null,
     events,
     ...overrides,
   };

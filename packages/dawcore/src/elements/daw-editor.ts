@@ -15,6 +15,7 @@ import { AudioResumeController } from '../controllers/audio-resume-controller';
 import { RecordingController } from '../controllers/recording-controller';
 import type { RecordingOptions } from '../controllers/recording-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
+import type { PointerHandlerHost } from '../interactions/pointer-handler';
 import type {
   DawSelectionDetail,
   DawTrackIdDetail,
@@ -62,6 +63,7 @@ export class DawEditorElement extends LitElement {
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
+  readonly _clipHandler: PointerHandlerHost['_clipHandler'] = null;
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
     const v = new ViewportController(this);
