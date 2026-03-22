@@ -120,6 +120,32 @@ describe('ClipPointerHandler', () => {
 
       expect(handler.tryHandle(el, e)).toBe(false);
     });
+
+    it('returns true when target is a child of clip-header (e.g. span)', () => {
+      const header = makeClipEl('clip-1', 'track-1');
+      const span = document.createElement('span');
+      span.textContent = 'vocals.wav';
+      header.appendChild(span);
+      // Append to DOM so closest() can walk the tree
+      document.body.appendChild(header);
+
+      const e = pointerEvent('pointerdown', { clientX: 100 });
+      expect(handler.tryHandle(span, e)).toBe(true);
+
+      document.body.removeChild(header);
+    });
+
+    it('returns true when target is a child of clip-boundary', () => {
+      const boundary = makeBoundaryEl('clip-1', 'track-1', 'right');
+      const inner = document.createElement('div');
+      boundary.appendChild(inner);
+      document.body.appendChild(boundary);
+
+      const e = pointerEvent('pointerdown', { clientX: 100 });
+      expect(handler.tryHandle(inner, e)).toBe(true);
+
+      document.body.removeChild(boundary);
+    });
   });
 
   describe('isActive', () => {

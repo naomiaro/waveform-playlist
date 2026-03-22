@@ -48,13 +48,16 @@ export class ClipPointerHandler {
   tryHandle(target: Element, e: PointerEvent): boolean {
     if (!this._host.interactiveClips) return false;
 
-    const el = target as HTMLElement;
+    // Walk up from click target to find clip interaction elements.
+    // composedPath()[0] may be a child (e.g. <span> inside .clip-header).
+    const boundary = (target as HTMLElement).closest?.('.clip-boundary') as HTMLElement | null;
+    const header = (target as HTMLElement).closest?.('.clip-header') as HTMLElement | null;
 
     // Check boundary first (higher z-index, overlaps header at corners)
-    if (el.classList.contains('clip-boundary') && el.dataset.boundaryEdge !== undefined) {
-      const clipId = el.dataset.clipId;
-      const trackId = el.dataset.trackId;
-      const edge = el.dataset.boundaryEdge as 'left' | 'right';
+    if (boundary && boundary.dataset.boundaryEdge !== undefined) {
+      const clipId = boundary.dataset.clipId;
+      const trackId = boundary.dataset.trackId;
+      const edge = boundary.dataset.boundaryEdge as 'left' | 'right';
       if (!clipId || !trackId || (edge !== 'left' && edge !== 'right')) return false;
 
       this._beginDrag(edge === 'left' ? 'trim-left' : 'trim-right', clipId, trackId, e);
@@ -62,9 +65,9 @@ export class ClipPointerHandler {
     }
 
     // Check for clip header (move target)
-    if (el.classList.contains('clip-header') && el.dataset.interactive !== undefined) {
-      const clipId = el.dataset.clipId;
-      const trackId = el.dataset.trackId;
+    if (header && header.dataset.interactive !== undefined) {
+      const clipId = header.dataset.clipId;
+      const trackId = header.dataset.trackId;
       if (!clipId || !trackId) return false;
 
       this._beginDrag('move', clipId, trackId, e);
