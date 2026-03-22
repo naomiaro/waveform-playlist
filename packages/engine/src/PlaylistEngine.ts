@@ -166,7 +166,7 @@ export class PlaylistEngine {
   // Clip Editing (delegates to operations/)
   // ---------------------------------------------------------------------------
 
-  moveClip(trackId: string, clipId: string, deltaSamples: number): void {
+  moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter = false): void {
     const track = this._tracks.find((t) => t.id === trackId);
     if (!track) {
       console.warn(`[waveform-playlist/engine] moveClip: track "${trackId}" not found`);
@@ -203,7 +203,9 @@ export class PlaylistEngine {
     });
 
     this._tracksVersion++;
-    this._updateTrackOnAdapter(trackId);
+    if (!skipAdapter) {
+      this._updateTrackOnAdapter(trackId);
+    }
     this._emitStateChange();
   }
 
@@ -251,7 +253,8 @@ export class PlaylistEngine {
     trackId: string,
     clipId: string,
     boundary: 'left' | 'right',
-    deltaSamples: number
+    deltaSamples: number,
+    skipAdapter = false
   ): void {
     const track = this._tracks.find((t) => t.id === trackId);
     if (!track) {
@@ -302,7 +305,9 @@ export class PlaylistEngine {
     });
 
     this._tracksVersion++;
-    this._updateTrackOnAdapter(trackId);
+    if (!skipAdapter) {
+      this._updateTrackOnAdapter(trackId);
+    }
     this._emitStateChange();
   }
 

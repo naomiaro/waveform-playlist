@@ -10,6 +10,7 @@ function createMockEngine(): ClipEngineContract {
   return {
     moveClip: vi.fn(),
     trimClip: vi.fn(),
+    updateTrack: vi.fn(),
   };
 }
 
