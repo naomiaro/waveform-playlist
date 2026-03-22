@@ -58,6 +58,14 @@ class RecordingProcessor extends AudioWorkletProcessor {
           this.buffers[i] = new Float32Array(this.bufferSize);
         }
         this.samplesCollected = 0;
+      } else if (command === 'pause') {
+        this.isRecording = false;
+        // Flush partial buffer so peaks are up to date at pause point
+        if (this.samplesCollected > 0) {
+          this.flushBuffers();
+        }
+      } else if (command === 'resume') {
+        this.isRecording = true;
       } else if (command === 'stop') {
         this.isRecording = false;
 

@@ -571,6 +571,12 @@ export class DawEditorElement extends LitElement {
   get isRecording(): boolean {
     return this._recordingController.isRecording;
   }
+  pauseRecording(): void {
+    this._recordingController.pauseRecording();
+  }
+  resumeRecording(): void {
+    this._recordingController.resumeRecording();
+  }
   stopRecording(): void {
     this._recordingController.stopRecording();
   }

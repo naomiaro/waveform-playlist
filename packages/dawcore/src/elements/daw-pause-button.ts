@@ -62,11 +62,13 @@ export class DawPauseButtonElement extends DawTransportButton {
     }
 
     if (this._isRecording) {
-      // During recording: toggle pause/resume of playback (Audacity-style)
+      // During recording: toggle pause/resume of both worklet and playback (Audacity-style)
       if (this._isPaused) {
+        target.resumeRecording();
         target.play();
         this._isPaused = false;
       } else {
+        target.pauseRecording();
         target.pause();
         this._isPaused = true;
       }

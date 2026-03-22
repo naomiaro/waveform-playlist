@@ -195,6 +195,22 @@ export class RecordingController implements ReactiveController {
     }
   }
 
+  pauseRecording(trackId?: string): void {
+    const id = trackId ?? [...this._sessions.keys()][0];
+    if (!id) return;
+    const session = this._sessions.get(id);
+    if (!session) return;
+    session.workletNode.port.postMessage({ command: 'pause' });
+  }
+
+  resumeRecording(trackId?: string): void {
+    const id = trackId ?? [...this._sessions.keys()][0];
+    if (!id) return;
+    const session = this._sessions.get(id);
+    if (!session) return;
+    session.workletNode.port.postMessage({ command: 'resume' });
+  }
+
   stopRecording(trackId?: string): void {
     const id = trackId ?? [...this._sessions.keys()][0];
     if (!id) return;
