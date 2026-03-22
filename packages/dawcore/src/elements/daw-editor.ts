@@ -25,6 +25,7 @@ import type {
 } from '../events';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
+import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 
 @customElement('daw-editor')
 export class DawEditorElement extends LitElement {
@@ -159,6 +160,10 @@ export class DawEditorElement extends LitElement {
   // --- Lifecycle ---
   connectedCallback() {
     super.connectedCallback();
+    if (!this.hasAttribute('tabindex')) {
+      this.setAttribute('tabindex', '0');
+    }
+    this.addEventListener('keydown', this._onKeyDown);
     this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
@@ -185,6 +190,7 @@ export class DawEditorElement extends LitElement {
   }
   disconnectedCallback() {
     super.disconnectedCallback();
+    this.removeEventListener('keydown', this._onKeyDown);
     this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
@@ -588,6 +594,26 @@ export class DawEditorElement extends LitElement {
     this._engine.seek(time);
     this._currentTime = time;
   }
+
+  /** Split the clip under the playhead on the selected track. */
+  splitAtPlayhead(): boolean {
+    return performSplitAtPlayhead({
+      effectiveSampleRate: this.effectiveSampleRate,
+      currentTime: this._currentTime,
+      engine: this._engine,
+      dispatchEvent: (e: Event) => this.dispatchEvent(e),
+    });
+  }
+
+  private _onKeyDown = (e: KeyboardEvent) => {
+    if (!this.interactiveClips) return;
+    if (e.key === 's' || e.key === 'S') {
+      // Don't split when user is typing in an input
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+      e.preventDefault();
+      this.splitAtPlayhead();
+    }
+  };
 
   // --- Recording ---
   recordingStream: MediaStream | null = null;
