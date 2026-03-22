@@ -21,6 +21,9 @@ type DragMode = 'move' | 'trim-left' | 'trim-right';
 /**
  * Handles pointer interactions for clip move and trim drag operations.
  * Converts pixel deltas to sample deltas and delegates to the engine.
+ *
+ * Move: sends incremental deltas per-frame (engine shifts startSample additively).
+ * Trim: sends cumulative delta once at drag end (engine applies to original clip state).
  */
 export class ClipPointerHandler {
   private _host: ClipPointerHost;
@@ -100,21 +103,21 @@ export class ClipPointerHandler {
 
     if (!this._isDragging) return;
 
-    // Incremental delta since last move event
-    const incrementalDeltaPx = totalDeltaPx - this._lastDeltaPx;
-    this._lastDeltaPx = totalDeltaPx;
-
-    const incrementalDeltaSamples = Math.round(incrementalDeltaPx * this._host.samplesPerPixel);
-    this._cumulativeDeltaSamples += incrementalDeltaSamples;
-
     const engine = this._host.engine;
     if (!engine) return;
 
     if (this._mode === 'move') {
+      // Move: send incremental deltas per-frame (additive on startSample)
+      const incrementalDeltaPx = totalDeltaPx - this._lastDeltaPx;
+      this._lastDeltaPx = totalDeltaPx;
+      const incrementalDeltaSamples = Math.round(incrementalDeltaPx * this._host.samplesPerPixel);
+      this._cumulativeDeltaSamples += incrementalDeltaSamples;
       engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples);
     } else {
-      const boundary = this._mode === 'trim-left' ? 'left' : 'right';
-      engine.trimClip(this._trackId, this._clipId, boundary, incrementalDeltaSamples);
+      // Trim: track cumulative delta only — engine called once at pointerup.
+      // The engine's constrainBoundaryTrim checks constraints against current
+      // clip state, so sending incremental deltas compounds incorrectly.
+      this._cumulativeDeltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
     }
   }
 
@@ -124,6 +127,8 @@ export class ClipPointerHandler {
 
     try {
       if (!this._isDragging || this._cumulativeDeltaSamples === 0) return;
+
+      const engine = this._host.engine;
 
       if (this._mode === 'move') {
         this._host.dispatchEvent(
@@ -138,7 +143,11 @@ export class ClipPointerHandler {
           })
         );
       } else {
+        // Trim: apply cumulative delta to engine in one shot
         const boundary = this._mode === 'trim-left' ? 'left' : 'right';
+        if (engine) {
+          engine.trimClip(this._trackId, this._clipId, boundary, this._cumulativeDeltaSamples);
+        }
         this._host.dispatchEvent(
           new CustomEvent('daw-clip-trim', {
             bubbles: true,

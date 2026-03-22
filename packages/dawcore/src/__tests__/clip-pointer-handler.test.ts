@@ -259,12 +259,22 @@ describe('ClipPointerHandler', () => {
   });
 
   describe('trim left', () => {
-    it('calls engine.trimClip with "left" boundary', () => {
+    it('does not call engine.trimClip during drag (only on pointerup)', () => {
       const el = makeBoundaryEl('clip-1', 'track-1', 'left');
       handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
 
       // Move 20px right — over threshold
       handler.onPointerMove(pointerEvent('pointermove', { clientX: 120 }));
+
+      // Engine should NOT be called during drag — trim uses cumulative delta at end
+      expect(engine.trimClip).not.toHaveBeenCalled();
+    });
+
+    it('calls engine.trimClip with cumulative delta on pointerup', () => {
+      const el = makeBoundaryEl('clip-1', 'track-1', 'left');
+      handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 120 }));
+      handler.onPointerUp(pointerEvent('pointerup', { clientX: 120 }));
 
       expect(engine.trimClip).toHaveBeenCalledWith('track-1', 'clip-1', 'left', 20 * 1024);
     });
@@ -287,12 +297,21 @@ describe('ClipPointerHandler', () => {
   });
 
   describe('trim right', () => {
-    it('calls engine.trimClip with "right" boundary', () => {
+    it('does not call engine.trimClip during drag', () => {
       const el = makeBoundaryEl('clip-1', 'track-1', 'right');
       handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
 
       // Move 30px left — over threshold
       handler.onPointerMove(pointerEvent('pointermove', { clientX: 170 }));
+
+      expect(engine.trimClip).not.toHaveBeenCalled();
+    });
+
+    it('calls engine.trimClip with cumulative delta on pointerup', () => {
+      const el = makeBoundaryEl('clip-1', 'track-1', 'right');
+      handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 170 }));
+      handler.onPointerUp(pointerEvent('pointerup', { clientX: 170 }));
 
       expect(engine.trimClip).toHaveBeenCalledWith('track-1', 'clip-1', 'right', -30 * 1024);
     });

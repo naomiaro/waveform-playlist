@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
+import type { AudioClip, ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
 import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
 import { PeakPipeline } from '../workers/peakPipeline';
@@ -470,6 +470,58 @@ export class DawEditorElement extends LitElement {
     }
     this._duration = maxSample / this.effectiveSampleRate;
   }
+  /**
+   * Generate peaks for clips that exist in engine state but not in _peaksData.
+   * This handles split operations where new clips share the original AudioBuffer.
+   */
+  private _syncPeaksForNewClips(tracks: ClipTrack[]) {
+    for (const track of tracks) {
+      for (const clip of track.clips) {
+        if (this._peaksData.has(clip.id)) continue;
+
+        // Find the AudioBuffer from a sibling clip that shares the same source
+        const audioBuffer = clip.audioBuffer ?? this._findAudioBufferForClip(clip, track);
+        if (!audioBuffer) continue;
+
+        // Store buffer reference for the new clip ID
+        this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
+        this._clipOffsets.set(clip.id, {
+          offsetSamples: clip.offsetSamples,
+          durationSamples: clip.durationSamples,
+        });
+
+        // Generate peaks asynchronously
+        this._peakPipeline
+          .generatePeaks(
+            audioBuffer,
+            this.samplesPerPixel,
+            this.mono,
+            clip.offsetSamples,
+            clip.durationSamples
+          )
+          .then((peakData) => {
+            this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
+          })
+          .catch((err) => {
+            console.warn(
+              '[dawcore] Failed to generate peaks for clip ' + clip.id + ': ' + String(err)
+            );
+          });
+      }
+    }
+  }
+
+  /** Find an AudioBuffer for a clip by checking siblings on the same track. */
+  private _findAudioBufferForClip(clip: AudioClip, track: ClipTrack): AudioBuffer | null {
+    // Check if any sibling clip on the same track has a buffer we can use
+    for (const sibling of track.clips) {
+      if (sibling.id === clip.id) continue;
+      const buf = this._clipBuffers.get(sibling.id);
+      if (buf) return buf;
+    }
+    return null;
+  }
+
   // --- Engine ---
   _ensureEngine(): Promise<PlaylistEngine> {
     if (this._engine) return Promise.resolve(this._engine);
@@ -495,10 +547,22 @@ export class DawEditorElement extends LitElement {
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b),
     });
+    let lastTracksVersion = -1;
     engine.on('statechange', (engineState) => {
       this._isPlaying = engineState.isPlaying;
       this._duration = engineState.duration;
       this._selectedTrackId = engineState.selectedTrackId;
+      // Sync clip positions when tracks change (moveClip, trimClip, splitClip)
+      if (engineState.tracksVersion !== lastTracksVersion) {
+        lastTracksVersion = engineState.tracksVersion;
+        const nextTracks = new Map<string, ClipTrack>();
+        for (const track of engineState.tracks) {
+          nextTracks.set(track.id, track);
+        }
+        this._engineTracks = nextTracks;
+        // Generate peaks for any new clip IDs (e.g. after split)
+        this._syncPeaksForNewClips(engineState.tracks);
+      }
     });
     engine.on('timeupdate', (time: number) => {
       this._currentTime = time;

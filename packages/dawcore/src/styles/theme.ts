@@ -68,20 +68,20 @@ export const clipStyles = css`
   .clip-boundary[data-boundary-edge='right'] {
     right: 0;
   }
-  .clip-boundary:hover {
+  .clip-boundary[data-boundary-edge='left']:hover {
     background: rgba(255, 255, 255, 0.2);
     border-left: 2px solid rgba(255, 255, 255, 0.5);
   }
-  .clip-boundary[data-boundary-edge='left']:hover {
-    border-left: none;
+  .clip-boundary[data-boundary-edge='right']:hover {
+    background: rgba(255, 255, 255, 0.2);
     border-right: 2px solid rgba(255, 255, 255, 0.5);
   }
-  .clip-boundary.dragging {
+  .clip-boundary[data-boundary-edge='left'].dragging {
     background: rgba(255, 255, 255, 0.4);
     border-left: 2px solid rgba(255, 255, 255, 0.8);
   }
-  .clip-boundary[data-boundary-edge='left'].dragging {
-    border-left: none;
+  .clip-boundary[data-boundary-edge='right'].dragging {
+    background: rgba(255, 255, 255, 0.4);
     border-right: 2px solid rgba(255, 255, 255, 0.8);
   }
   .clip-header[data-interactive] {
