@@ -122,17 +122,13 @@ describe('PeakPipeline', () => {
     await pipeline.generatePeaks(buf, 1024, false);
 
     const clipBuffers = new Map([['clip-1', buf]]);
-    const clipOffsets = new Map([
-      ['clip-1', { offsetSamples: 4800, durationSamples: 24000 }],
-    ]);
+    const clipOffsets = new Map([['clip-1', { offsetSamples: 4800, durationSamples: 24000 }]]);
 
     const result = pipeline.reextractPeaks(clipBuffers, 1024, false, clipOffsets);
     expect(result.size).toBe(1);
     // Peaks should be shorter than full buffer (offset + duration subset)
     const fullResult = pipeline.reextractPeaks(clipBuffers, 1024, false);
-    expect(result.get('clip-1')!.length).toBeLessThanOrEqual(
-      fullResult.get('clip-1')!.length
-    );
+    expect(result.get('clip-1')!.length).toBeLessThanOrEqual(fullResult.get('clip-1')!.length);
   });
 
   it('reextractPeaks returns empty map for uncached buffers', () => {

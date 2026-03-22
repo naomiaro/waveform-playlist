@@ -203,7 +203,11 @@ export class DawEditorElement extends LitElement {
     // Always works because the worker generates at baseScale (128), the finest level.
     if (changedProperties.has('samplesPerPixel') && this._clipBuffers.size > 0) {
       const re = this._peakPipeline.reextractPeaks(
-        this._clipBuffers, this.samplesPerPixel, this.mono, this._clipOffsets);
+        this._clipBuffers,
+        this.samplesPerPixel,
+        this.mono,
+        this._clipOffsets
+      );
       if (re.size > 0) {
         const next = new Map(this._peaksData);
         for (const [id, pd] of re) next.set(id, pd);

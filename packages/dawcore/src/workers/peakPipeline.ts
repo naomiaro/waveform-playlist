@@ -91,9 +91,7 @@ export class PeakPipeline {
     this._worker = null;
   }
 
-  private async _getWaveformData(
-    audioBuffer: AudioBuffer
-  ): Promise<WaveformData> {
+  private async _getWaveformData(audioBuffer: AudioBuffer): Promise<WaveformData> {
     const cached = this._cache.get(audioBuffer);
     if (cached) return cached;
 
