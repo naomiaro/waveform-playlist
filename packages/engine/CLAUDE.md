@@ -21,6 +21,7 @@
 ## Patterns
 
 - **`play()` and `seek()` do not clamp to duration** — The Transport runs at any non-negative position, playing silence where there's no audio. This enables recording from cursor positions beyond existing clips. Only negative values are clamped to 0.
+- **Default sampleRate is 48000** — Changed from 44100 to match modern hardware. Consumers should still pass `AudioContext.sampleRate` explicitly when creating the engine.
 - All mutating methods (moveClip, trimClip, removeTrack, setZoomLevel) guard against no-op statechange emissions — bail early when constrained delta is 0, track not found, or zoom unchanged
 - `setTracks()` copies input array; `getState()` copies output tracks — defensive at both boundaries
 - `PlayoutAdapter.isPlaying()` is defined but not called by engine (engine tracks own `_isPlaying`). Known design gap.
