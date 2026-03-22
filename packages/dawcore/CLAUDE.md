@@ -55,6 +55,8 @@
 - **Track height must include recording session channels** — `numChannels` for track height is derived from finalized clip peaks. During live recording with no clips yet, it falls back to 1. Check `_recordingController.getSession(trackId)?.channelCount` for the correct channel count during recording.
 - **Live preview position must match finalized clip** — Preview skips latency peaks (slice `latencyPixels * 2` from front) but keeps `left = startSample / spp` (no latency pixel offset on position). Both preview and finalized clip sit at `startSample` — the audio data is what shifts, not the container position.
 - **Worklet pause/resume** — `recording-processor` accepts `pause` (flushes partial buffer, stops accumulating) and `resume` (restarts). Controller exposes `pauseRecording()`/`resumeRecording()`, editor delegates. Pause button sends both worklet pause and Transport pause.
+- **Peak generation must pass clip offset/duration** — `generatePeaks(buf, spp, mono, offsetSamples, durationSamples)` extracts peaks for only the clip's visible portion. Without offset/duration, clips sharing an AudioBuffer get full-buffer peaks and overlap visually.
+- **`clip-headers` boolean attribute** — Defaults to false (no headers). Enable with `<daw-editor clip-headers>`. CSS in `clipStyles` from `theme.ts`. Header height (20px) subtracted from waveform area, divided equally among channels.
 
 ## Key Patterns
 
