@@ -15,7 +15,7 @@ import { AudioResumeController } from '../controllers/audio-resume-controller';
 import { RecordingController } from '../controllers/recording-controller';
 import type { RecordingOptions } from '../controllers/recording-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
-import type { PointerHandlerHost } from '../interactions/pointer-handler';
+import { ClipPointerHandler } from '../interactions/clip-pointer-handler';
 import type {
   DawSelectionDetail,
   DawTrackIdDetail,
@@ -36,6 +36,8 @@ export class DawEditorElement extends LitElement {
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
   @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
+  @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
+  @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
   /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
   /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
@@ -63,7 +65,13 @@ export class DawEditorElement extends LitElement {
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
-  readonly _clipHandler: PointerHandlerHost['_clipHandler'] = null;
+  private _clipPointer = new ClipPointerHandler(this);
+  get _clipHandler() {
+    return this.interactiveClips ? this._clipPointer : null;
+  }
+  get engine() {
+    return this._engine;
+  }
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
     const v = new ViewportController(this);
@@ -705,7 +713,7 @@ export class DawEditorElement extends LitElement {
         track,
         descriptor,
         numChannels,
-        trackHeight: this.waveHeight * numChannels + (this.clipHeaders ? 20 : 0),
+        trackHeight: this.waveHeight * numChannels + (this.clipHeaders ? this.clipHeaderHeight : 0),
       };
     });
 
@@ -766,7 +774,7 @@ export class DawEditorElement extends LitElement {
                   );
                   const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
                   const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
-                  const hdrH = this.clipHeaders ? 20 : 0;
+                  const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
                   const chH = this.waveHeight;
                   return html` <div
                     class="clip-container"
@@ -774,7 +782,10 @@ export class DawEditorElement extends LitElement {
                     data-clip-id=${clip.id}
                   >
                     ${hdrH > 0
-                      ? html`<div class="clip-header">
+                      ? html`<div class="clip-header"
+                          data-clip-id=${clip.id}
+                          data-track-id=${t.trackId}
+                          ?data-interactive=${this.interactiveClips}>
                           <span>${clip.name || t.descriptor?.name || ''}</span>
                         </div>`
                       : ''}
@@ -792,6 +803,17 @@ export class DawEditorElement extends LitElement {
                           .originX=${clipLeft}
                         ></daw-waveform>`
                     )}
+                    ${this.interactiveClips
+                      ? html`
+                        <div class="clip-boundary"
+                          data-boundary-edge="left"
+                          data-clip-id=${clip.id}
+                          data-track-id=${t.trackId}></div>
+                        <div class="clip-boundary"
+                          data-boundary-edge="right"
+                          data-clip-id=${clip.id}
+                          data-track-id=${t.trackId}></div>`
+                      : ''}
                   </div>`;
                 })}
                 ${this._renderRecordingPreview(t.trackId, channelHeight)}
