@@ -50,4 +50,44 @@ export const clipStyles = css`
     text-overflow: ellipsis;
     opacity: 0.8;
   }
+  .clip-boundary {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    z-index: 2;
+    cursor: col-resize;
+    background: transparent;
+    border: none;
+    touch-action: none;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .clip-boundary[data-boundary-edge='left'] {
+    left: 0;
+  }
+  .clip-boundary[data-boundary-edge='right'] {
+    right: 0;
+  }
+  .clip-boundary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-left: 2px solid rgba(255, 255, 255, 0.5);
+  }
+  .clip-boundary[data-boundary-edge='left']:hover {
+    border-left: none;
+    border-right: 2px solid rgba(255, 255, 255, 0.5);
+  }
+  .clip-boundary.dragging {
+    background: rgba(255, 255, 255, 0.4);
+    border-left: 2px solid rgba(255, 255, 255, 0.8);
+  }
+  .clip-boundary[data-boundary-edge='left'].dragging {
+    border-left: none;
+    border-right: 2px solid rgba(255, 255, 255, 0.8);
+  }
+  .clip-header[data-interactive] {
+    cursor: grab;
+  }
+  .clip-header[data-interactive]:active {
+    cursor: grabbing;
+  }
 `;
