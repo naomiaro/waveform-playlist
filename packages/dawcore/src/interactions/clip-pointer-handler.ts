@@ -146,15 +146,21 @@ export class ClipPointerHandler {
       if (this._clipContainer) {
         const deltaPx = Math.round(totalDeltaPx);
         if (this._mode === 'trim-left') {
-          // Left trim: move left edge right → container shifts right and shrinks
+          // Left trim: container shifts right and shrinks.
+          // Waveforms shift left by the same amount so they stay at their
+          // global timeline position (container.left + waveform.left = constant).
           const newLeft = this._originalLeft + deltaPx;
           const newWidth = this._originalWidth - deltaPx;
           if (newWidth > 0) {
             this._clipContainer.style.left = newLeft + 'px';
             this._clipContainer.style.width = newWidth + 'px';
+            const waveforms = this._clipContainer.querySelectorAll('daw-waveform');
+            for (const wf of waveforms) {
+              (wf as HTMLElement).style.left = -deltaPx + 'px';
+            }
           }
         } else {
-          // Right trim: extend/shrink right edge
+          // Right trim: extend/shrink right edge — left stays fixed
           const newWidth = this._originalWidth + deltaPx;
           if (newWidth > 0) {
             this._clipContainer.style.width = newWidth + 'px';
@@ -221,6 +227,11 @@ export class ClipPointerHandler {
     if (this._clipContainer) {
       this._clipContainer.style.left = this._originalLeft + 'px';
       this._clipContainer.style.width = this._originalWidth + 'px';
+      // Restore waveform positions (shifted during left trim preview)
+      const waveforms = this._clipContainer.querySelectorAll('daw-waveform');
+      for (const wf of waveforms) {
+        (wf as HTMLElement).style.left = '0px';
+      }
     }
   }
 
