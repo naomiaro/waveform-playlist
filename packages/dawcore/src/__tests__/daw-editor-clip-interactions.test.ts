@@ -258,6 +258,34 @@ describe('splitAtPlayhead', () => {
 
       expect(engine.splitClip).toHaveBeenCalledWith('track-1', 'clip-1', 88200);
     });
+
+    it('daw-clip-split event has bubbles=true and composed=true', () => {
+      const clip = makeClip('clip-1', 0, 96000);
+      const track = makeTrack('track-1', [clip]);
+
+      const leftClip = makeClip('clip-left', 0, 24000);
+      const rightClip = makeClip('clip-right', 24000, 72000);
+      const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
+
+      const engine = {
+        getState: vi
+          .fn()
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] })
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
+        splitClip: vi.fn(),
+      };
+      const host = createMockHost({
+        engine,
+        currentTime: 0.5,
+        effectiveSampleRate: 48000,
+      });
+
+      splitAtPlayhead(host);
+
+      const splitEvent = host.events[0] as CustomEvent;
+      expect(splitEvent.bubbles).toBe(true);
+      expect(splitEvent.composed).toBe(true);
+    });
   });
 
   describe('engine no-op (state unchanged)', () => {

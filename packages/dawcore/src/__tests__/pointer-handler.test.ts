@@ -309,4 +309,96 @@ describe('PointerHandler', () => {
       expect(trackEvent).toBeDefined();
     });
   });
+
+  describe('clip handler delegation', () => {
+    // onPointerDown uses e.composedPath()[0] to get the click target.
+    // We must dispatch the event through the DOM so composedPath works,
+    // using @pointerdown on the timeline (matching daw-editor's template).
+
+    it('delegates to clipHandler when tryHandle returns true', () => {
+      const mockClipHandler = {
+        tryHandle: vi.fn().mockReturnValue(true),
+        onPointerMove: vi.fn(),
+        onPointerUp: vi.fn(),
+        isActive: true,
+      };
+      host = createMockHost({ _clipHandler: mockClipHandler });
+      handler = new PointerHandler(host);
+
+      // Add a clip header inside the timeline for composedPath
+      const timeline = host.shadowRoot!.querySelector('.timeline')!;
+      const clipHeader = document.createElement('div');
+      clipHeader.classList.add('clip-header');
+      timeline.appendChild(clipHeader);
+
+      // Dispatch through the DOM so composedPath()[0] = clipHeader
+      timeline.addEventListener('pointerdown', handler.onPointerDown);
+      clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
+
+      expect(mockClipHandler.tryHandle).toHaveBeenCalled();
+      // Seek should NOT have been triggered (no daw-seek event)
+      const seekEvent = host.events.find((e) => (e as CustomEvent).type === 'daw-seek');
+      expect(seekEvent).toBeUndefined();
+    });
+
+    it('falls through to seek when clipHandler.tryHandle returns false', () => {
+      const mockClipHandler = {
+        tryHandle: vi.fn().mockReturnValue(false),
+        onPointerMove: vi.fn(),
+        onPointerUp: vi.fn(),
+        isActive: false,
+      };
+      host = createMockHost({ _clipHandler: mockClipHandler });
+      handler = new PointerHandler(host);
+
+      const timeline = host.shadowRoot!.querySelector('.timeline')!;
+      timeline.addEventListener('pointerdown', handler.onPointerDown);
+      timeline.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
+      timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 150 }));
+
+      expect(mockClipHandler.tryHandle).toHaveBeenCalled();
+      // Should fall through to seek
+      const seekEvent = host.events.find((e) => (e as CustomEvent).type === 'daw-seek');
+      expect(seekEvent).toBeDefined();
+    });
+
+    it('wires pointermove and pointerup to clipHandler after delegation', () => {
+      const mockClipHandler = {
+        tryHandle: vi.fn().mockReturnValue(true),
+        onPointerMove: vi.fn(),
+        onPointerUp: vi.fn(),
+        isActive: true,
+      };
+      host = createMockHost({ _clipHandler: mockClipHandler });
+      handler = new PointerHandler(host);
+
+      const timeline = host.shadowRoot!.querySelector('.timeline')!;
+      const clipHeader = document.createElement('div');
+      clipHeader.classList.add('clip-header');
+      timeline.appendChild(clipHeader);
+
+      timeline.addEventListener('pointerdown', handler.onPointerDown);
+      clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
+
+      // Simulate pointermove and pointerup on the timeline
+      timeline.dispatchEvent(pointerEvent('pointermove', { clientX: 170 }));
+      timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 170 }));
+
+      expect(mockClipHandler.onPointerMove).toHaveBeenCalled();
+      expect(mockClipHandler.onPointerUp).toHaveBeenCalled();
+    });
+
+    it('skips delegation when _clipHandler is null', () => {
+      host = createMockHost({ _clipHandler: null });
+      handler = new PointerHandler(host);
+
+      handler.onPointerDown(pointerEvent('pointerdown', { clientX: 150 }));
+      const timeline = host.shadowRoot!.querySelector('.timeline')!;
+      timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 150 }));
+
+      // Normal seek should work
+      const seekEvent = host.events.find((e) => (e as CustomEvent).type === 'daw-seek');
+      expect(seekEvent).toBeDefined();
+    });
+  });
 });

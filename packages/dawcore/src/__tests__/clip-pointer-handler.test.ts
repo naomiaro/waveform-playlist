@@ -336,6 +336,144 @@ describe('ClipPointerHandler', () => {
     });
   });
 
+  describe('move calls updateTrack on pointerup', () => {
+    it('calls engine.updateTrack on pointerup after move drag', () => {
+      const el = makeClipEl('clip-1', 'track-1');
+      handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 150 }));
+      handler.onPointerUp(pointerEvent('pointerup', { clientX: 150 }));
+
+      expect(engine.updateTrack).toHaveBeenCalledWith('track-1');
+    });
+
+    it('does not call engine.updateTrack when no drag occurred', () => {
+      const el = makeClipEl('clip-1', 'track-1');
+      handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
+      handler.onPointerUp(pointerEvent('pointerup', { clientX: 100 }));
+
+      expect(engine.updateTrack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('zero-delta guard', () => {
+    it('does not dispatch daw-clip-move when cumulative delta is zero', () => {
+      const el = makeClipEl('clip-1', 'track-1');
+      handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
+      // Move 4px right then 4px back — over threshold but net zero
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 104 }));
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 100 }));
+      handler.onPointerUp(pointerEvent('pointerup', { clientX: 100 }));
+
+      const moveEvent = host.events.find((e) => (e as CustomEvent).type === 'daw-clip-move');
+      expect(moveEvent).toBeUndefined();
+    });
+
+    it('does not dispatch daw-clip-trim when cumulative delta is zero', () => {
+      const el = makeBoundaryEl('clip-1', 'track-1', 'right');
+      handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
+      // Move 4px right then 4px back — over threshold but net zero
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 204 }));
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 200 }));
+      handler.onPointerUp(pointerEvent('pointerup', { clientX: 200 }));
+
+      const trimEvent = host.events.find((e) => (e as CustomEvent).type === 'daw-clip-trim');
+      expect(trimEvent).toBeUndefined();
+    });
+  });
+
+  describe('trim visual feedback', () => {
+    function makeClipContainer(clipId: string): HTMLElement {
+      const container = document.createElement('div');
+      container.classList.add('clip-container');
+      container.dataset.clipId = clipId;
+      container.style.left = '200px';
+      container.style.width = '400px';
+      // Add a waveform child
+      const waveform = document.createElement('daw-waveform');
+      waveform.style.left = '0px';
+      container.appendChild(waveform);
+      return container;
+    }
+
+    it('updates container left and width during left trim drag', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const localHost = createMockHost(engine, { shadowRoot: shadow });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'left');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
+      // Drag 20px right
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 220 }));
+
+      expect(container.style.left).toBe('220px');
+      expect(container.style.width).toBe('380px');
+    });
+
+    it('shifts waveform elements left during left trim drag', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const localHost = createMockHost(engine, { shadowRoot: shadow });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'left');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 220 }));
+
+      const waveform = container.querySelector('daw-waveform') as HTMLElement;
+      expect(waveform.style.left).toBe('-20px');
+    });
+
+    it('updates container width during right trim drag', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const localHost = createMockHost(engine, { shadowRoot: shadow });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'right');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 600 }));
+      // Drag 30px right (extend)
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 630 }));
+
+      expect(container.style.left).toBe('200px'); // unchanged
+      expect(container.style.width).toBe('430px');
+    });
+
+    it('restores original CSS on pointerup', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const localHost = createMockHost(engine, { shadowRoot: shadow });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'left');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 220 }));
+
+      // During drag: modified
+      expect(container.style.left).toBe('220px');
+
+      localHandler.onPointerUp(pointerEvent('pointerup', { clientX: 220 }));
+
+      // After drop: restored (engine will re-render with correct values)
+      expect(container.style.left).toBe('200px');
+      expect(container.style.width).toBe('400px');
+      const waveform = container.querySelector('daw-waveform') as HTMLElement;
+      expect(waveform.style.left).toBe('0px');
+    });
+  });
+
   describe('event properties', () => {
     it('daw-clip-move event has bubbles=true and composed=true', () => {
       const el = makeClipEl('clip-1', 'track-1');
