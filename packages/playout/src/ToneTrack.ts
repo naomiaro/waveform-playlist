@@ -266,8 +266,7 @@ export class ToneTrack {
     // When track.startTime changes, all Transport events must be rescheduled
     // because absolute times (track.startTime + clip.startTime) shift even if
     // relative clip.startTime values stay the same.
-    const startTimeChanged =
-      newStartTime !== undefined && newStartTime !== this.track.startTime;
+    const startTimeChanged = newStartTime !== undefined && newStartTime !== this.track.startTime;
 
     // Update track startTime if the minimum clip position changed (e.g., moveClip)
     if (newStartTime !== undefined) {

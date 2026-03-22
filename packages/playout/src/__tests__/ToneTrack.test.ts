@@ -358,10 +358,7 @@ describe('ToneTrack', () => {
       mockTransport.schedule.mockClear();
 
       // Move: startTime changes from 5 to 3, clip relStart stays 0
-      track.replaceClips(
-        [makeClipInfo({ buffer: buf, startTime: 0, duration: 1 })],
-        3
-      );
+      track.replaceClips([makeClipInfo({ buffer: buf, startTime: 0, duration: 1 })], 3);
 
       // New schedule at absolute time 3 + 0 = 3
       expect(mockTransport.schedule).toHaveBeenCalledWith(expect.any(Function), 3);
