@@ -12,6 +12,8 @@ export interface PlayoutAdapter {
   addTrack?(track: ClipTrack): void;
   /** Incrementally remove a single track without rebuilding the entire playout. */
   removeTrack?(trackId: string): void;
+  /** Update a single track's clips (removes old, adds new). */
+  updateTrack?(trackId: string, track: ClipTrack): void;
   play(startTime: number, endTime?: number): void;
   pause(): void;
   stop(): void;

@@ -19,7 +19,10 @@ export interface RecordingClipHost {
   _peaksData: Map<string, PeakData>;
   _clipBuffers: Map<string, AudioBuffer>;
   _peakPipeline: PeakPipeline;
-  _engine: { setTracks(tracks: ClipTrack[]): void } | null;
+  _engine: {
+    setTracks(tracks: ClipTrack[]): void;
+    updateTrack?(trackId: string, track: ClipTrack): void;
+  } | null;
   _recomputeDuration(): void;
   dispatchEvent(event: Event): boolean;
 }
@@ -93,7 +96,12 @@ export function addRecordedClip(
         });
       }
       host._recomputeDuration();
-      host._engine?.setTracks([...host._engineTracks.values()]);
+      const updatedTrack = host._engineTracks.get(trackId);
+      if (host._engine?.updateTrack && updatedTrack) {
+        host._engine.updateTrack(trackId, updatedTrack);
+      } else {
+        host._engine?.setTracks([...host._engineTracks.values()]);
+      }
     })
     .catch((err) => {
       console.warn('[dawcore] Failed to generate peaks for recorded clip: ' + String(err));

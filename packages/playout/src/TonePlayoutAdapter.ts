@@ -178,33 +178,24 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
     setTracks(tracks: ClipTrack[]): void {
       if (!playout) {
-        // First call — full build
         buildPlayout(tracks);
         return;
       }
-
-      // Incremental update: diff old vs new tracks by ID
-      const newTrackIds = new Set(tracks.map((t) => t.id));
-      const oldTrackIds = new Set(playout.getTrackIds());
-
-      // Remove tracks that no longer exist
-      for (const id of oldTrackIds) {
-        if (!newTrackIds.has(id)) {
-          playout.removeTrack(id);
-        }
+      // Playout exists — replace all tracks incrementally
+      for (const id of playout.getTrackIds()) {
+        playout.removeTrack(id);
       }
-
-      // Add or replace tracks
       for (const track of tracks) {
-        if (oldTrackIds.has(track.id)) {
-          // Track exists — remove and re-add with updated clips
-          playout.removeTrack(track.id);
-          // Also remove companion MIDI track if present
-          playout.removeTrack(track.id + ':midi');
-        }
         addTrackToPlayout(playout, track);
       }
+      playout.applyInitialSoloState();
+    },
 
+    updateTrack(trackId: string, track: ClipTrack): void {
+      if (!playout) return;
+      playout.removeTrack(trackId);
+      playout.removeTrack(trackId + ':midi');
+      addTrackToPlayout(playout, track);
       playout.applyInitialSoloState();
     },
 

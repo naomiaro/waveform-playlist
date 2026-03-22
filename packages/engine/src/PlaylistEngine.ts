@@ -105,7 +105,6 @@ export class PlaylistEngine {
   addTrack(track: ClipTrack): void {
     this._tracks = [...this._tracks, track];
     this._tracksVersion++;
-    // Use incremental addTrack when the adapter supports it (avoids full rebuild)
     if (this._adapter?.addTrack) {
       this._adapter.addTrack(track);
     } else {
@@ -121,14 +120,40 @@ export class PlaylistEngine {
     if (this._selectedTrackId === trackId) {
       this._selectedTrackId = null;
     }
-    // Use incremental removeTrack when available (avoids full playout rebuild,
-    // preserves playback). Falls back to setTracks for adapters without it.
     if (this._adapter?.removeTrack) {
       this._adapter.removeTrack(trackId);
     } else {
       this._adapter?.setTracks(this._tracks);
     }
     this._emitStateChange();
+  }
+
+  /** Update a single track's clips on the adapter (no full rebuild). */
+  updateTrack(trackId: string, track?: ClipTrack): void {
+    const resolved = track ?? this._tracks.find((t) => t.id === trackId);
+    if (!resolved) return;
+    // Update internal tracks array if a new track object was provided
+    if (track) {
+      this._tracks = this._tracks.map((t) => (t.id === trackId ? track : t));
+      this._tracksVersion++;
+    }
+    if (this._adapter?.updateTrack) {
+      this._adapter.updateTrack(trackId, resolved);
+    } else {
+      this._adapter?.setTracks(this._tracks);
+    }
+    if (track) this._emitStateChange();
+  }
+
+  /** Internal: update adapter after modifying this._tracks in place. */
+  private _updateTrackOnAdapter(trackId: string): void {
+    const t = this._tracks.find((tr) => tr.id === trackId);
+    if (!t) return;
+    if (this._adapter?.updateTrack) {
+      this._adapter.updateTrack(trackId, t);
+    } else {
+      this._adapter?.setTracks(this._tracks);
+    }
   }
 
   selectTrack(trackId: string | null): void {
@@ -178,7 +203,7 @@ export class PlaylistEngine {
     });
 
     this._tracksVersion++;
-    this._adapter?.setTracks(this._tracks);
+    this._updateTrackOnAdapter(trackId);
     this._emitStateChange();
   }
 
@@ -218,7 +243,7 @@ export class PlaylistEngine {
     });
 
     this._tracksVersion++;
-    this._adapter?.setTracks(this._tracks);
+    this._updateTrackOnAdapter(trackId);
     this._emitStateChange();
   }
 
@@ -277,7 +302,7 @@ export class PlaylistEngine {
     });
 
     this._tracksVersion++;
-    this._adapter?.setTracks(this._tracks);
+    this._updateTrackOnAdapter(trackId);
     this._emitStateChange();
   }
 
