@@ -102,7 +102,7 @@ export class PeakPipeline {
       this._worker = createPeaksWorker();
     }
 
-    // Generate at the requested scale — this is the finest zoom we can resample from
+    // Generate at baseScale — the finest zoom we can resample from
     // .slice() channel buffers to avoid detaching the original AudioBuffer views
     const channels: ArrayBuffer[] = [];
     for (let c = 0; c < audioBuffer.numberOfChannels; c++) {

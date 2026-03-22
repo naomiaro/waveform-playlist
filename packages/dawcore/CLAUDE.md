@@ -160,7 +160,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 - **`interactions/file-loader.ts`** — `loadFiles()` extracted via `FileLoaderHost` interface to keep editor under 800 lines.
 - **`src/types.ts`** — `TrackDescriptor` and `ClipDescriptor` interfaces, shared by `daw-editor.ts` and `file-loader.ts`. Re-exported from `index.ts`.
-- **Non-private fields** — Fields accessed by the loader (`_tracks`, `_engineTracks`, `_peaksData`, `_clipBuffers`, `_audioCache`, `_peakPipeline`, `_resolvedSampleRate`, `_fetchAndDecode`, `_recomputeDuration`, `_ensureEngine`) are non-private (no `private` keyword, `_` prefix convention only).
+- **Non-private fields** — Fields accessed by the loader (`_tracks`, `_engineTracks`, `_peaksData`, `_clipBuffers`, `_clipOffsets`, `_audioCache`, `_peakPipeline`, `_resolvedSampleRate`, `_fetchAndDecode`, `_recomputeDuration`, `_ensureEngine`) are non-private (no `private` keyword, `_` prefix convention only).
+- **Per-clip Map cleanup** — Any `Map` keyed by clip ID (`_clipBuffers`, `_clipOffsets`, `_peaksData`) must be cleaned in `_onTrackRemoved`. When adding a new per-clip Map, add the corresponding `.delete(clip.id)` in the removal loop.
 
 ## Empty State
 

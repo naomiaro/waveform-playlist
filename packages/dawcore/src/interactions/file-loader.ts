@@ -18,6 +18,7 @@ export interface FileLoaderHost {
   _engineTracks: Map<string, ClipTrack>;
   _peaksData: Map<string, PeakData>;
   _clipBuffers: Map<string, AudioBuffer>;
+  _clipOffsets: Map<string, { offsetSamples: number; durationSamples: number }>;
   _audioCache: Map<string, Promise<AudioBuffer>>;
   _peakPipeline: PeakPipeline;
   _fetchAndDecode(src: string): Promise<AudioBuffer>;
@@ -67,10 +68,16 @@ export async function loadFiles(
       });
 
       host._clipBuffers = new Map(host._clipBuffers).set(clip.id, audioBuffer);
+      host._clipOffsets.set(clip.id, {
+        offsetSamples: clip.offsetSamples,
+        durationSamples: clip.durationSamples,
+      });
       const peakData = await host._peakPipeline.generatePeaks(
         audioBuffer,
         host.samplesPerPixel,
-        host.mono
+        host.mono,
+        clip.offsetSamples,
+        clip.durationSamples
       );
       host._peaksData = new Map(host._peaksData).set(clip.id, peakData);
 

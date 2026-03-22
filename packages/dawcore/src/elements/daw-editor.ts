@@ -54,7 +54,7 @@ export class DawEditorElement extends LitElement {
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
   _clipBuffers = new Map<string, AudioBuffer>();
-  private _clipOffsets = new Map<string, { offsetSamples: number; durationSamples: number }>();
+  _clipOffsets = new Map<string, { offsetSamples: number; durationSamples: number }>();
   _peakPipeline = new PeakPipeline();
   private _trackElements = new Map<string, DawTrackElement>();
   private _childObserver: MutationObserver | null = null;
@@ -184,6 +184,7 @@ export class DawEditorElement extends LitElement {
     this._trackElements.clear();
     this._audioCache.clear();
     this._clipBuffers.clear();
+    this._clipOffsets.clear();
     this._peakPipeline.terminate();
     try {
       this._disposeEngine();
@@ -236,6 +237,7 @@ export class DawEditorElement extends LitElement {
       const nextPeaks = new Map(this._peaksData);
       for (const clip of removedTrack.clips) {
         this._clipBuffers.delete(clip.id);
+        this._clipOffsets.delete(clip.id);
         nextPeaks.delete(clip.id);
       }
       this._peaksData = nextPeaks;
