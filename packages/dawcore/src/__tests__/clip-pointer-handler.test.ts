@@ -19,11 +19,15 @@ function createMockHost(
 ): ClipPointerHost & { events: Event[] } {
   const events: Event[] = [];
 
+  const shadowHost = document.createElement('div');
+  const shadow = shadowHost.attachShadow({ mode: 'open' });
+
   return {
     samplesPerPixel: 1024,
     effectiveSampleRate: 48000,
     interactiveClips: true,
     engine,
+    shadowRoot: shadow,
     dispatchEvent: vi.fn((event: Event) => {
       events.push(event);
       return true;

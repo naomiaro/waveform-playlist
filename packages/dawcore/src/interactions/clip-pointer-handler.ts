@@ -3,7 +3,12 @@ import { DRAG_THRESHOLD } from './constants';
 /** Narrow engine contract for clip move/trim interactions. */
 export interface ClipEngineContract {
   moveClip(trackId: string, clipId: string, deltaSamples: number): void;
-  trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
+  trimClip(
+    trackId: string,
+    clipId: string,
+    boundary: 'left' | 'right',
+    deltaSamples: number
+  ): void;
 }
 
 /** Host interface required by ClipPointerHandler. */
@@ -12,6 +17,7 @@ export interface ClipPointerHost {
   readonly effectiveSampleRate: number;
   readonly interactiveClips: boolean;
   readonly engine: ClipEngineContract | null;
+  readonly shadowRoot: ShadowRoot | null;
   dispatchEvent(event: Event): boolean;
   requestUpdate(): void;
 }
@@ -23,7 +29,8 @@ type DragMode = 'move' | 'trim-left' | 'trim-right';
  * Converts pixel deltas to sample deltas and delegates to the engine.
  *
  * Move: sends incremental deltas per-frame (engine shifts startSample additively).
- * Trim: sends cumulative delta once at drag end (engine applies to original clip state).
+ * Trim: updates clip container CSS imperatively during drag for visual feedback,
+ *   then applies cumulative delta to engine once at drag end.
  */
 export class ClipPointerHandler {
   private _host: ClipPointerHost;
@@ -34,6 +41,10 @@ export class ClipPointerHandler {
   private _isDragging = false;
   private _lastDeltaPx = 0;
   private _cumulativeDeltaSamples = 0;
+  // Trim visual feedback: snapshot of original clip container CSS
+  private _clipContainer: HTMLElement | null = null;
+  private _originalLeft = 0;
+  private _originalWidth = 0;
 
   constructor(host: ClipPointerHost) {
     this._host = host;
@@ -88,6 +99,18 @@ export class ClipPointerHandler {
     this._isDragging = false;
     this._lastDeltaPx = 0;
     this._cumulativeDeltaSamples = 0;
+
+    // For trim: snapshot the clip container's current position/width
+    if (mode === 'trim-left' || mode === 'trim-right') {
+      const container = this._host.shadowRoot?.querySelector(
+        `.clip-container[data-clip-id="${clipId}"]`
+      ) as HTMLElement | null;
+      if (container) {
+        this._clipContainer = container;
+        this._originalLeft = parseFloat(container.style.left) || 0;
+        this._originalWidth = parseFloat(container.style.width) || 0;
+      }
+    }
   }
 
   /** Processes pointermove events during an active drag. */
@@ -110,14 +133,34 @@ export class ClipPointerHandler {
       // Move: send incremental deltas per-frame (additive on startSample)
       const incrementalDeltaPx = totalDeltaPx - this._lastDeltaPx;
       this._lastDeltaPx = totalDeltaPx;
-      const incrementalDeltaSamples = Math.round(incrementalDeltaPx * this._host.samplesPerPixel);
+      const incrementalDeltaSamples = Math.round(
+        incrementalDeltaPx * this._host.samplesPerPixel
+      );
       this._cumulativeDeltaSamples += incrementalDeltaSamples;
       engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples);
     } else {
-      // Trim: track cumulative delta only — engine called once at pointerup.
-      // The engine's constrainBoundaryTrim checks constraints against current
-      // clip state, so sending incremental deltas compounds incorrectly.
+      // Trim: track cumulative delta — engine called once at pointerup.
       this._cumulativeDeltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
+
+      // Visual feedback: update clip container CSS imperatively
+      if (this._clipContainer) {
+        const deltaPx = Math.round(totalDeltaPx);
+        if (this._mode === 'trim-left') {
+          // Left trim: move left edge right → container shifts right and shrinks
+          const newLeft = this._originalLeft + deltaPx;
+          const newWidth = this._originalWidth - deltaPx;
+          if (newWidth > 0) {
+            this._clipContainer.style.left = newLeft + 'px';
+            this._clipContainer.style.width = newWidth + 'px';
+          }
+        } else {
+          // Right trim: extend/shrink right edge
+          const newWidth = this._originalWidth + deltaPx;
+          if (newWidth > 0) {
+            this._clipContainer.style.width = newWidth + 'px';
+          }
+        }
+      }
     }
   }
 
@@ -126,7 +169,11 @@ export class ClipPointerHandler {
     if (this._mode === null) return;
 
     try {
-      if (!this._isDragging || this._cumulativeDeltaSamples === 0) return;
+      if (!this._isDragging || this._cumulativeDeltaSamples === 0) {
+        // Restore original CSS if trim drag didn't produce a delta
+        this._restoreTrimVisual();
+        return;
+      }
 
       const engine = this._host.engine;
 
@@ -143,6 +190,9 @@ export class ClipPointerHandler {
           })
         );
       } else {
+        // Restore visual before engine applies — Lit will re-render with correct values
+        this._restoreTrimVisual();
+
         // Trim: apply cumulative delta to engine in one shot
         const boundary = this._mode === 'trim-left' ? 'left' : 'right';
         if (engine) {
@@ -166,6 +216,14 @@ export class ClipPointerHandler {
     }
   }
 
+  /** Restore clip container CSS to original values after trim visual preview. */
+  private _restoreTrimVisual(): void {
+    if (this._clipContainer) {
+      this._clipContainer.style.left = this._originalLeft + 'px';
+      this._clipContainer.style.width = this._originalWidth + 'px';
+    }
+  }
+
   private _reset(): void {
     this._mode = null;
     this._clipId = '';
@@ -174,5 +232,8 @@ export class ClipPointerHandler {
     this._isDragging = false;
     this._lastDeltaPx = 0;
     this._cumulativeDeltaSamples = 0;
+    this._clipContainer = null;
+    this._originalLeft = 0;
+    this._originalWidth = 0;
   }
 }
