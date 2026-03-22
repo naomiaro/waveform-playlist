@@ -159,6 +159,9 @@ AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
 
 **`ToneTrack.replaceClips(newClips, newStartTime?)`:** Diffs old vs new clips by buffer reference + timing + fades (`_clipsEqual`). Unchanged clips keep their active sources and Transport events — no audible interruption. Changed clips: fadeGainNode disconnected (silences source via broken audio path), new clip added. Updates `track.startTime` if the minimum clip position changed.
 
+- **`replaceClips` force-reschedules on startTime change** — The diff uses relative `ClipInfo.startTime` values. When `track.startTime` shifts (e.g., moving the first clip), clips with unchanged relative positions kept stale Transport events at old absolute times. Fix: detect `newStartTime !== old startTime` and skip the diff, rescheduling all clips.
+- **`skipAdapter` on `moveClip`/`trimClip`** — Engine's `moveClip(id, clipId, delta, skipAdapter=true)` updates internal state + emits statechange without touching the adapter. Dawcore uses this during drag (60fps) and calls `engine.updateTrack(trackId)` once on `pointerup`. Without this, `replaceClips` runs every frame, creating ghost audio from stale Transport events.
+
 **`ToneTrack.addClip(clipInfo)` / `removeScheduledClip(index)`:** Granular clip-level methods. `addClip` creates fadeGainNode + Transport.schedule. During playback, new clips that span the current Transport position get a mid-clip source started immediately with lookAhead compensation.
 
 **lookAhead compensation:** New sources in `replaceClips` start at `transportOffset - lookAhead` (the audible position), not `transportOffset` (which is lookAhead ahead of what the listener hears). This overlaps with the old source's remaining buffered audio for a seamless transition.

@@ -112,6 +112,18 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Pointer interactions extracted** — `interactions/pointer-handler.ts` handles pointerdown/move/up, caches timeline ref and rect, distinguishes click vs drag. The host implements `PointerHandlerHost` interface.
 - **Peak pipeline extracted** — `workers/peakPipeline.ts` manages worker lifecycle, WaveformData cache, inflight dedup.
 
+## Clip Interactions
+
+- **`ClipPointerHandler`** in `interactions/clip-pointer-handler.ts` — handles move/trim drag. `ClipEngineContract` is a narrow interface (`moveClip`, `trimClip`, `updateTrack`). `ClipPointerHost` interface satisfied by `<daw-editor>` via getters.
+- **Hit detection uses `closest()`** — `composedPath()[0]` returns the deepest element (e.g., `<span>` inside `.clip-header`). Always use `target.closest('.clip-header')` / `target.closest('.clip-boundary')` to walk up.
+- **Move: incremental deltas with `skipAdapter`** — `engine.moveClip(id, clipId, delta, true)` skips adapter during drag (60fps). Call `engine.updateTrack(trackId)` once on `pointerup` to sync Tone.js.
+- **Trim: cumulative delta on drop only** — Engine's `constrainBoundaryTrim` checks constraints against current clip state, so incremental deltas compound incorrectly. Accumulate total delta during drag, call `engine.trimClip()` once on `pointerup`.
+- **Trim visual feedback** — Imperatively update `.clip-container` CSS (`left`/`width`) during drag. For left trim, also shift `<daw-waveform>` children by `-deltaPx` so waveform stays at its global timeline position. Restore original CSS before engine applies.
+- **`splitAtPlayhead()`** in `interactions/split-handler.ts` — discovers new clip IDs by diffing `engine.getState().tracks` before/after `engine.splitClip()` (returns void). Requires exactly 2 new IDs.
+- **`_syncPeaksForChangedClips`** — Called in statechange handler when `tracksVersion` changes. Regenerates peaks for clips with new IDs (split) or changed `offsetSamples`/`durationSamples` (trim). Without this, split clips have no waveform and trimmed clips show wrong audio portion.
+- **Statechange syncs `_engineTracks`** — When `tracksVersion` changes, rebuild `_engineTracks` Map from engine state. This is how `moveClip`/`trimClip`/`splitClip` trigger Lit re-renders.
+- **`DRAG_THRESHOLD` and `BOUNDARY_WIDTH`** — Shared constants in `interactions/constants.ts`. Threshold is 3px (click vs drag), boundary hit zone is 8px.
+
 ## Typed Events
 
 - **`DawEventMap`** in `src/events.ts` — all 12 custom events with typed details. Use `new CustomEvent<DetailType>(...)` at dispatch sites.
