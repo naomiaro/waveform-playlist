@@ -27,6 +27,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
   let _loopStart = 0;
   let _loopEnd = 0;
   let _audioInitialized = false;
+  let _pendingInit: Promise<void> | null = null;
 
   // Add a single ClipTrack to the playout (shared by buildPlayout and addTrack)
   function addTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
@@ -136,10 +137,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     });
 
     // If Tone.start() was already called (AudioContext resumed), carry
-    // initialization forward. Tone.start() is safe to call multiple times —
-    // it resolves immediately if the AudioContext is already running.
+    // initialization forward. Store the promise so adapter.init() can await it.
     if (_audioInitialized) {
-      playout.init().catch((err) => {
+      _pendingInit = playout.init().catch((err) => {
         console.warn(
           '[waveform-playlist] Failed to re-initialize playout after rebuild. ' +
             'Audio playback will require another user gesture.',
@@ -164,6 +164,12 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
   return {
     async init(): Promise<void> {
+      // If buildPlayout already started init (rebuild after setTracks), await it
+      if (_pendingInit) {
+        await _pendingInit;
+        _pendingInit = null;
+        return;
+      }
       if (playout) {
         await playout.init();
         _audioInitialized = true;

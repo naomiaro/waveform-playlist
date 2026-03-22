@@ -29,7 +29,8 @@ export class DawRecordButtonElement extends DawTransportButton {
 
   connectedCallback() {
     super.connectedCallback();
-    this._listenToTarget();
+    // Defer so <daw-transport for="..."> and the target editor are resolved
+    requestAnimationFrame(() => this._listenToTarget());
   }
 
   disconnectedCallback() {

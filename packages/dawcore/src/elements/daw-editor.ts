@@ -51,7 +51,6 @@ export class DawEditorElement extends LitElement {
   _currentTime = 0;
   _engine: PlaylistEngine | null = null;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
-  private _audioInitialized = false;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
   _clipBuffers = new Map<string, AudioBuffer>();
   _peakPipeline = new PeakPipeline();
@@ -530,10 +529,9 @@ export class DawEditorElement extends LitElement {
   async play(startTime?: number) {
     try {
       const engine = await this._ensureEngine();
-      if (!this._audioInitialized) {
-        await engine.init();
-        this._audioInitialized = true;
-      }
+      // Always init — adapter awaits pending rebuild init if needed,
+      // and Tone.start() is a no-op if already running.
+      await engine.init();
       engine.play(startTime);
       this._startPlayhead();
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
@@ -568,6 +566,9 @@ export class DawEditorElement extends LitElement {
 
   // --- Recording ---
   recordingStream: MediaStream | null = null;
+  get currentTime(): number {
+    return this._currentTime;
+  }
   get isRecording(): boolean {
     return this._recordingController.isRecording;
   }

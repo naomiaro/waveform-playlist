@@ -32,6 +32,7 @@ export interface RecordingSession {
   isFirstMessage: boolean;
   /** Latency samples to skip in live preview (outputLatency + lookAhead). */
   readonly latencySamples: number;
+  readonly wasOverdub: boolean;
   /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
   readonly _onTrackEnded: (() => void) | null;
   readonly _audioTrack: MediaStreamTrack | null;
@@ -160,6 +161,7 @@ export class RecordingController implements ReactiveController {
         bits,
         isFirstMessage: true,
         latencySamples,
+        wasOverdub: options.overdub ?? false,
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
       };
@@ -228,8 +230,8 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(id);
     if (!session) return;
 
-    // Stop playback if overdubbing
-    if (typeof this._host.stop === 'function') {
+    // Stop playback only if this was an overdub session
+    if (session.wasOverdub && typeof this._host.stop === 'function') {
       this._host.stop();
     }
 

@@ -25,13 +25,15 @@ export class DawPauseButtonElement extends DawTransportButton {
 
   connectedCallback() {
     super.connectedCallback();
-    const target = this.target;
-    if (target) {
+    // Defer so <daw-transport for="..."> and the target editor are resolved
+    requestAnimationFrame(() => {
+      const target = this.target;
+      if (!target) return;
       this._targetRef = target;
       target.addEventListener('daw-recording-start', this._onRecStart);
       target.addEventListener('daw-recording-complete', this._onRecEnd);
       target.addEventListener('daw-recording-error', this._onRecEnd);
-    }
+    });
   }
 
   disconnectedCallback() {
@@ -65,7 +67,7 @@ export class DawPauseButtonElement extends DawTransportButton {
       // During recording: toggle pause/resume of both worklet and playback (Audacity-style)
       if (this._isPaused) {
         target.resumeRecording();
-        target.play();
+        target.play(target.currentTime);
         this._isPaused = false;
       } else {
         target.pauseRecording();
