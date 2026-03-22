@@ -69,6 +69,26 @@ export interface DawRecordingErrorDetail {
   error: unknown;
 }
 
+export interface DawClipMoveDetail {
+  trackId: string;
+  clipId: string;
+  deltaSamples: number;
+}
+
+export interface DawClipTrimDetail {
+  trackId: string;
+  clipId: string;
+  boundary: 'left' | 'right';
+  deltaSamples: number;
+}
+
+export interface DawClipSplitDetail {
+  trackId: string;
+  originalClipId: string;
+  leftClipId: string;
+  rightClipId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Event map — augments HTMLElementEventMap for typed addEventListener
 // ---------------------------------------------------------------------------
@@ -91,6 +111,9 @@ export interface DawEventMap {
   'daw-recording-start': CustomEvent<DawRecordingStartDetail>;
   'daw-recording-complete': CustomEvent<DawRecordingCompleteDetail>;
   'daw-recording-error': CustomEvent<DawRecordingErrorDetail>;
+  'daw-clip-move': CustomEvent<DawClipMoveDetail>;
+  'daw-clip-trim': CustomEvent<DawClipTrimDetail>;
+  'daw-clip-split': CustomEvent<DawClipSplitDetail>;
 }
 
 // Helper type for creating typed custom events
