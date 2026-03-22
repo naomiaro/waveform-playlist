@@ -176,7 +176,7 @@ describe('ClipPointerHandler', () => {
       // samplesPerPixel=1024, so deltaSamples = 50 * 1024 = 51200
       handler.onPointerMove(pointerEvent('pointermove', { clientX: 150 }));
 
-      expect(engine.moveClip).toHaveBeenCalledWith('track-1', 'clip-1', 50 * 1024);
+      expect(engine.moveClip).toHaveBeenCalledWith('track-1', 'clip-1', 50 * 1024, true);
     });
 
     it('does not call engine when movement is within threshold (<=3px)', () => {
@@ -220,11 +220,11 @@ describe('ClipPointerHandler', () => {
 
       // First move: 50px total → incremental 50px
       handler.onPointerMove(pointerEvent('pointermove', { clientX: 150 }));
-      expect(engine.moveClip).toHaveBeenLastCalledWith('track-1', 'clip-1', 50 * 1024);
+      expect(engine.moveClip).toHaveBeenLastCalledWith('track-1', 'clip-1', 50 * 1024, true);
 
       // Second move: 80px total → incremental 30px from last position
       handler.onPointerMove(pointerEvent('pointermove', { clientX: 180 }));
-      expect(engine.moveClip).toHaveBeenLastCalledWith('track-1', 'clip-1', 30 * 1024);
+      expect(engine.moveClip).toHaveBeenLastCalledWith('track-1', 'clip-1', 30 * 1024, true);
     });
 
     it('dispatches daw-clip-move with cumulative deltaSamples', () => {
