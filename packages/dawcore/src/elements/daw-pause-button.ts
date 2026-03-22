@@ -7,7 +7,9 @@ export class DawPauseButtonElement extends DawTransportButton {
   @state() private _isPaused = false;
   @state() private _isRecording = false;
   private _targetRef: HTMLElement | null = null;
-  private _onRecStart = () => { this._isRecording = true; };
+  private _onRecStart = () => {
+    this._isRecording = true;
+  };
   private _onRecEnd = () => {
     this._isRecording = false;
     this._isPaused = false;

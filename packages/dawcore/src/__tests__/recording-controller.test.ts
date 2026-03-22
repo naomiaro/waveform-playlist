@@ -415,7 +415,7 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       42720, // effectiveDuration
-      5280   // latencyOffsetSamples
+      5280 // latencyOffsetSamples
     );
   });
 
@@ -488,7 +488,7 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       48000, // full duration — no offset
-      0      // zero latency
+      0 // zero latency
     );
   });
 });

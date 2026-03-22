@@ -581,7 +581,13 @@ export class DawEditorElement extends LitElement {
   stopRecording(): void {
     this._recordingController.stopRecording();
   }
-  _addRecordedClip(trackId: string, buf: AudioBuffer, startSample: number, durSamples: number, offsetSamples = 0) {
+  _addRecordedClip(
+    trackId: string,
+    buf: AudioBuffer,
+    startSample: number,
+    durSamples: number,
+    offsetSamples = 0
+  ) {
     addRecordedClip(this, trackId, buf, startSample, durSamples, offsetSamples);
   }
   async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
@@ -603,13 +609,10 @@ export class DawEditorElement extends LitElement {
     const latencyPixels = Math.floor(rs.latencySamples / this.samplesPerPixel);
     const left = Math.floor(rs.startSample / this.samplesPerPixel);
     const w = Math.floor(audibleSamples / this.samplesPerPixel);
-    return rs.peaks.map(
-      (chPeaks, ch) => {
-        // Slice peaks to skip latency prefix (2 entries per pixel: min/max)
-        const slicedPeaks = latencyPixels > 0
-          ? chPeaks.slice(latencyPixels * 2)
-          : chPeaks;
-        return html`
+    return rs.peaks.map((chPeaks, ch) => {
+      // Slice peaks to skip latency prefix (2 entries per pixel: min/max)
+      const slicedPeaks = latencyPixels > 0 ? chPeaks.slice(latencyPixels * 2) : chPeaks;
+      return html`
         <daw-waveform
           data-recording-track=${trackId}
           data-recording-channel=${ch}
@@ -624,8 +627,7 @@ export class DawEditorElement extends LitElement {
           .originX=${left}
         ></daw-waveform>
       `;
-      }
-    );
+    });
   }
 
   // --- Playhead ---

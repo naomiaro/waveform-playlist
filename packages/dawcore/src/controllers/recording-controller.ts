@@ -307,7 +307,11 @@ export class RecordingController implements ReactiveController {
 
     if (notPrevented) {
       this._createClipFromRecording(
-        id, audioBuffer, session.startSample, effectiveDuration, latencyOffsetSamples
+        id,
+        audioBuffer,
+        session.startSample,
+        effectiveDuration,
+        latencyOffsetSamples
       );
     }
   }
@@ -349,7 +353,9 @@ export class RecordingController implements ReactiveController {
 
       // Update live preview waveform — host is already & HTMLElement so shadowRoot is typed
       const waveformSelector = `daw-waveform[data-recording-track="${trackId}"][data-recording-channel="${ch}"]`;
-      const waveformEl = this._host.shadowRoot?.querySelector(waveformSelector) as DawWaveformElement | null;
+      const waveformEl = this._host.shadowRoot?.querySelector(
+        waveformSelector
+      ) as DawWaveformElement | null;
       if (waveformEl) {
         if (session.isFirstMessage) {
           waveformEl.peaks = session.peaks[ch];
@@ -380,7 +386,13 @@ export class RecordingController implements ReactiveController {
     offsetSamples = 0
   ) {
     if (typeof this._host._addRecordedClip === 'function') {
-      this._host._addRecordedClip(trackId, audioBuffer, startSample, durationSamples, offsetSamples);
+      this._host._addRecordedClip(
+        trackId,
+        audioBuffer,
+        startSample,
+        durationSamples,
+        offsetSamples
+      );
     } else {
       console.warn(
         '[dawcore] RecordingController: host does not implement _addRecordedClip — clip not created for track "' +

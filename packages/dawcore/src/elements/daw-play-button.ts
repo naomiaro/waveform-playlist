@@ -6,8 +6,12 @@ import { DawTransportButton } from './daw-transport-button';
 export class DawPlayButtonElement extends DawTransportButton {
   @state() private _isRecording = false;
   private _targetRef: HTMLElement | null = null;
-  private _onRecStart = () => { this._isRecording = true; };
-  private _onRecEnd = () => { this._isRecording = false; };
+  private _onRecStart = () => {
+    this._isRecording = true;
+  };
+  private _onRecEnd = () => {
+    this._isRecording = false;
+  };
 
   connectedCallback() {
     super.connectedCallback();
