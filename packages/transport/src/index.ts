@@ -6,3 +6,5 @@ export type {
   TempoEntry,
   TransportPosition,
 } from './types';
+
+export { Clock } from './core/clock';
