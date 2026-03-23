@@ -77,10 +77,10 @@ describe('Selection', () => {
 });
 
 describe('seekTo', () => {
-  it('updates currentTime', () => {
+  it('updates currentTime when not playing', () => {
     const el = document.createElement('daw-editor') as any;
-    // Provide a mock engine so seekTo doesn't bail
     el._engine = { seek: vi.fn() };
+    el._isPlaying = false;
     el.seekTo(5.0);
     expect(el._currentTime).toBe(5.0);
   });
@@ -95,14 +95,17 @@ describe('seekTo', () => {
     spy.mockRestore();
   });
 
-  it('does not call _stopPlayhead when playing', () => {
+  it('stops and restarts playback when playing (Tone.js reschedule)', () => {
     const el = document.createElement('daw-editor') as any;
-    el._engine = { seek: vi.fn() };
+    el._engine = { seek: vi.fn(), stop: vi.fn(), play: vi.fn(), init: vi.fn().mockResolvedValue(undefined) };
     el._isPlaying = true;
-    const spy = vi.spyOn(el, '_stopPlayhead').mockImplementation(() => {});
+    const stopSpy = vi.spyOn(el, 'stop');
+    const playSpy = vi.spyOn(el, 'play');
     el.seekTo(3.0);
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
+    expect(stopSpy).toHaveBeenCalled();
+    expect(playSpy).toHaveBeenCalledWith(3.0);
+    stopSpy.mockRestore();
+    playSpy.mockRestore();
   });
 });
 

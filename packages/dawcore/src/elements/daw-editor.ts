@@ -648,9 +648,13 @@ export class DawEditorElement extends LitElement {
       console.warn('[dawcore] seekTo: engine not ready, call ignored');
       return;
     }
-    this._engine.seek(time);
-    this._currentTime = time;
-    if (!this._isPlaying) {
+    if (this._isPlaying) {
+      // Tone.js needs stop+play to reschedule audio sources at new position
+      this.stop();
+      this.play(time);
+    } else {
+      this._engine.seek(time);
+      this._currentTime = time;
       this._stopPlayhead();
     }
   }
