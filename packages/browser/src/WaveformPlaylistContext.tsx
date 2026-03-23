@@ -868,31 +868,30 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         let peaks: PeakData | undefined;
 
         // Path A: External pre-computed waveform data (e.g. from audiowaveform .dat file)
-        // Only use when sample rates match — mismatched rates cause wrong peak widths
-        // in trim/split/zoom. Falls through to Path B (worker) on mismatch.
-        if (
-          clip.waveformData &&
-          clip.waveformData.sample_rate === sampleRateRef.current
-        ) {
-          try {
-            peaks = extractPeaksFromWaveformDataFull(
-              clip.waveformData as WaveformData,
-              samplesPerPixel,
-              mono,
-              clip.offsetSamples,
-              clip.durationSamples
-            );
-          } catch (err) {
-            console.warn('[waveform-playlist] Failed to extract peaks from waveformData:', err);
+        // When sample rates match, always use pre-computed peaks (fast, accurate).
+        // When rates mismatch AND audioBuffer is available, skip to Path B (worker)
+        // for correct trim/split/zoom. When rates mismatch but no audioBuffer yet
+        // (immediate/progressive loading), use pre-computed peaks as a preview —
+        // slightly off but better than blank. Worker replaces them once audio decodes.
+        if (clip.waveformData) {
+          const ratesMatch = clip.waveformData.sample_rate === sampleRateRef.current;
+          const hasWorkerFallback = !!clip.audioBuffer;
+          if (ratesMatch || !hasWorkerFallback) {
+            try {
+              peaks = extractPeaksFromWaveformDataFull(
+                clip.waveformData as WaveformData,
+                samplesPerPixel,
+                mono,
+                clip.offsetSamples,
+                clip.durationSamples
+              );
+            } catch (err) {
+              console.warn('[waveform-playlist] Failed to extract peaks from waveformData:', err);
+            }
           }
-        } else if (clip.waveformData) {
-          console.warn(
-            '[waveform-playlist] Pre-computed peaks at ' +
-              clip.waveformData.sample_rate +
-              ' Hz do not match AudioContext at ' +
-              sampleRateRef.current +
-              ' Hz — generating from audio'
-          );
+          if (!ratesMatch && hasWorkerFallback) {
+            // Worker will generate correct peaks from decoded audio
+          }
         }
 
         // Path B: Worker-generated WaveformData cache (fast resample on zoom)
