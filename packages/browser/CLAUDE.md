@@ -255,7 +255,7 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 - `new KeyboardEvent()` has `target: null` in jsdom — use `Object.defineProperty(event, 'target', { value: document.body })` when calling handlers directly (not via `dispatchEvent`)
 - jsdom doesn't implement `isContentEditable` (returns `undefined` as of jsdom 28). Polyfill with `Object.defineProperty(el, 'isContentEditable', { value: true })` in tests
-- `handleKeyboardEvent` is exported as a pure function from `useKeyboardShortcuts.ts` for direct unit testing without React rendering infrastructure
+- `handleKeyboardEvent` is a pure function in `@waveform-playlist/core` (re-exported from `useKeyboardShortcuts.ts` for backwards compatibility). Unit tests import from core directly.
 
 ## Click-to-Seek During Auto-Scroll
 
