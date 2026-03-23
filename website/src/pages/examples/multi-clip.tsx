@@ -52,6 +52,8 @@ export default function MultiClipExamplePage(): React.ReactElement {
             <li><code>Escape</code> - Stop</li>
             <li><code>0</code> - Rewind to start</li>
             <li><code>S</code> - Split clip at playhead (select a track first)</li>
+            <li><code>Cmd/Ctrl+Z</code> - Undo</li>
+            <li><code>Cmd/Ctrl+Shift+Z</code> - Redo</li>
           </ul>
         </div>
 
