@@ -18,6 +18,7 @@ export type { ToneTrackOptions, TrackEffectsFunction } from './ToneTrack';
 
 // Export global AudioContext manager
 export {
+  configureGlobalContext,
   getGlobalContext,
   getGlobalAudioContext,
   getGlobalToneContext,
@@ -25,6 +26,7 @@ export {
   getGlobalAudioContextState,
   closeGlobalAudioContext,
 } from './audioContext';
+export type { AudioContextOptions } from './audioContext';
 
 // Export MediaStreamSource manager
 export {

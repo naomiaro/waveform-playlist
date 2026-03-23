@@ -12,6 +12,48 @@ import { Context, setContext } from 'tone';
 
 let globalToneContext: Context | null = null;
 
+export interface AudioContextOptions {
+  /** Desired sample rate. If hardware can't match, falls back to default. */
+  sampleRate?: number;
+  /** Latency hint: 'interactive' (default), 'balanced', or 'playback'. */
+  latencyHint?: AudioContextLatencyCategory;
+}
+
+/**
+ * Configure the global AudioContext with sample rate and latency hints.
+ * Must be called BEFORE getGlobalContext() — throws if context already exists.
+ * Returns the actual sample rate (may differ from requested if hardware can't match).
+ */
+export function configureGlobalContext(options: AudioContextOptions): number {
+  if (globalToneContext) {
+    throw new Error(
+      '[playout] configureGlobalContext: context already created. Call before any audio operations.'
+    );
+  }
+  const contextOptions: Record<string, unknown> = {};
+  if (options.latencyHint !== undefined) {
+    contextOptions.latencyHint = options.latencyHint;
+  }
+  if (options.sampleRate !== undefined) {
+    contextOptions.sampleRate = options.sampleRate;
+  }
+  try {
+    globalToneContext = new Context(contextOptions);
+  } catch {
+    // Hardware doesn't support requested sampleRate — fall back to default
+    console.warn(
+      '[playout] Requested sampleRate ' +
+        options.sampleRate +
+        ' not supported — using hardware default'
+    );
+    globalToneContext = new Context(
+      options.latencyHint !== undefined ? { latencyHint: options.latencyHint } : undefined
+    );
+  }
+  setContext(globalToneContext);
+  return (globalToneContext.rawContext as AudioContext).sampleRate;
+}
+
 /**
  * Get the global Tone.js Context
  * This is the main context for cross-browser audio operations.
