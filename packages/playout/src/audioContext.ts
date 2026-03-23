@@ -40,35 +40,25 @@ export function configureGlobalContext(options: AudioContextOptions): number {
     }
     return existingRate;
   }
-  // Create a native AudioContext with the requested options — Tone.js's Context
-  // constructor doesn't pass sampleRate through to standardized-audio-context.
-  const nativeOptions: Record<string, unknown> = {};
-  if (options.latencyHint !== undefined) {
-    nativeOptions.latencyHint = options.latencyHint;
-  }
-  if (options.sampleRate !== undefined) {
-    nativeOptions.sampleRate = options.sampleRate;
-  }
-  let rawContext: AudioContext;
-  try {
-    rawContext = new AudioContext(nativeOptions as any);
-  } catch {
-    // Hardware doesn't support requested sampleRate — fall back to default
+  // TODO: Tone.js Context doesn't pass sampleRate to standardized-audio-context.
+  // Native AudioContext({ sampleRate }) works but causes issues with Tone.js internals.
+  // For now, create a standard Context and let the rate comparison + worker fallback
+  // handle mismatches. Revisit when Tone.js supports sampleRate passthrough.
+  globalToneContext = new Context();
+  setContext(globalToneContext);
+  const actualRate = (globalToneContext.rawContext as AudioContext).sampleRate;
+  if (options.sampleRate !== undefined && options.sampleRate !== actualRate) {
     console.warn(
       '[playout] Requested sampleRate ' +
         options.sampleRate +
-        ' not supported — using hardware default'
+        ' but AudioContext is running at ' +
+        actualRate +
+        ' — pre-computed peaks at ' +
+        options.sampleRate +
+        ' Hz will fall back to worker'
     );
-    const fallbackOptions: Record<string, unknown> = {};
-    if (options.latencyHint !== undefined) {
-      fallbackOptions.latencyHint = options.latencyHint;
-    }
-    rawContext = new AudioContext(fallbackOptions as any);
   }
-  // Wrap in Tone.js Context for cross-browser compat (standardized-audio-context)
-  globalToneContext = new Context(rawContext);
-  setContext(globalToneContext);
-  return rawContext.sampleRate;
+  return actualRate;
 }
 
 /**
