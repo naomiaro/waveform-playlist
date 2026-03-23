@@ -32,6 +32,8 @@ export interface ClipEngineContract {
   beginTransaction(): void;
   /** Commit the transaction — pushes one undo step for all grouped mutations. */
   commitTransaction(): void;
+  /** Abort the transaction — restores pre-transaction state without pushing to undo. */
+  abortTransaction(): void;
 }
 
 /** Peak data returned by reextractClipPeaks for imperative waveform updates. */
