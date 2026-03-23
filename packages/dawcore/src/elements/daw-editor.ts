@@ -25,7 +25,7 @@ import type {
 } from '../events';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
-import { splitAtPlayheadSafe } from '../interactions/split-handler';
+import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 import { handleKeyboardEvent } from '@waveform-playlist/core';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
@@ -637,7 +637,7 @@ export class DawEditorElement extends LitElement {
 
   /** Split the clip under the playhead on the selected track. */
   splitAtPlayhead(): boolean {
-    return splitAtPlayheadSafe({
+    return performSplitAtPlayhead({
       effectiveSampleRate: this.effectiveSampleRate,
       currentTime: this._currentTime,
       isPlaying: this._isPlaying,

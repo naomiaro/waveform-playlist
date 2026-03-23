@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { splitAtPlayhead, splitAtPlayheadSafe } from '../interactions/split-handler';
-import type { SplitHost, SplitDuringPlaybackHost } from '../interactions/split-handler';
+import { splitAtPlayhead } from '../interactions/split-handler';
+import type { SplitHost } from '../interactions/split-handler';
 import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 
 // ---------------------------------------------------------------------------
@@ -43,7 +43,10 @@ function createMockHost(overrides: Partial<SplitHost> = {}): SplitHost & { event
   const host: SplitHost & { events: CustomEvent[] } = {
     effectiveSampleRate: 48000,
     currentTime: 0,
+    isPlaying: false,
     engine: null,
+    stop: vi.fn(),
+    play: vi.fn(),
     dispatchEvent: vi.fn((event: Event) => {
       events.push(event as CustomEvent);
       return true;
@@ -315,13 +318,11 @@ describe('splitAtPlayhead', () => {
 });
 
 // ---------------------------------------------------------------------------
-// splitAtPlayheadSafe — stop/resume during playback
+// splitAtPlayhead — stop/resume during playback
 // ---------------------------------------------------------------------------
 
-describe('splitAtPlayheadSafe', () => {
-  function createPlaybackHost(
-    overrides: Partial<SplitDuringPlaybackHost> = {}
-  ): SplitDuringPlaybackHost & { events: Event[] } {
+describe('splitAtPlayhead', () => {
+  function createPlaybackHost(overrides: Partial<SplitHost> = {}): SplitHost & { events: Event[] } {
     const events: Event[] = [];
     return {
       effectiveSampleRate: 48000,
@@ -361,7 +362,7 @@ describe('splitAtPlayheadSafe', () => {
       isPlaying: true,
     });
 
-    const result = splitAtPlayheadSafe(host);
+    const result = splitAtPlayhead(host);
 
     expect(result).toBe(true);
     expect(host.stop).toHaveBeenCalledTimes(1);
@@ -390,7 +391,7 @@ describe('splitAtPlayheadSafe', () => {
       isPlaying: false,
     });
 
-    splitAtPlayheadSafe(host);
+    splitAtPlayhead(host);
 
     expect(host.stop).not.toHaveBeenCalled();
     expect(host.play).not.toHaveBeenCalled();
@@ -402,7 +403,7 @@ describe('splitAtPlayheadSafe', () => {
       isPlaying: true,
     });
 
-    const result = splitAtPlayheadSafe(host);
+    const result = splitAtPlayhead(host);
 
     expect(result).toBe(false);
     expect(host.stop).toHaveBeenCalledTimes(1);

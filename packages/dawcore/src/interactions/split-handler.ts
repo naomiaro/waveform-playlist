@@ -15,8 +15,11 @@ export interface SplitEngineContract {
 export interface SplitHost {
   readonly effectiveSampleRate: number;
   readonly currentTime: number;
+  readonly isPlaying: boolean;
   readonly engine: SplitEngineContract | null;
   dispatchEvent(event: Event): boolean;
+  stop(): void;
+  play(time: number): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -24,12 +27,36 @@ export interface SplitHost {
 // ---------------------------------------------------------------------------
 
 /**
- * Splits the clip under the playhead on the selected track.
+ * Split the clip under the playhead on the selected track.
+ * Stops playback before split and resumes after to avoid duplicate audio
+ * from Transport rescheduling during playback.
  *
  * Returns true if the split occurred and dispatched a daw-clip-split event.
  * Returns false for any guard failure or engine no-op.
  */
 export function splitAtPlayhead(host: SplitHost): boolean {
+  const wasPlaying = host.isPlaying;
+  const time = host.currentTime;
+
+  if (wasPlaying) {
+    host.stop();
+  }
+
+  const result = performSplit(host, time);
+
+  if (wasPlaying && result) {
+    host.play(time);
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Internal
+// ---------------------------------------------------------------------------
+
+/** Core split logic — finds clip at position, calls engine, diffs state for new IDs. */
+function performSplit(host: SplitHost, time: number): boolean {
   const { engine } = host;
   if (!engine) return false;
 
@@ -41,7 +68,7 @@ export function splitAtPlayhead(host: SplitHost): boolean {
   const track = tracks.find((t) => t.id === selectedTrackId);
   if (!track) return false;
 
-  const atSample = Math.round(host.currentTime * host.effectiveSampleRate);
+  const atSample = Math.round(time * host.effectiveSampleRate);
 
   const clip = findClipAtSample(track.clips, atSample);
   if (!clip) return false;
@@ -91,42 +118,6 @@ export function splitAtPlayhead(host: SplitHost): boolean {
 
   return true;
 }
-
-// ---------------------------------------------------------------------------
-// Split with playback management
-// ---------------------------------------------------------------------------
-
-export interface SplitDuringPlaybackHost extends SplitHost {
-  readonly isPlaying: boolean;
-  stop(): void;
-  play(time: number): void;
-}
-
-/**
- * Split at playhead with stop→split→resume to avoid duplicate audio.
- * During playback, replaceTrackClips creates new sources alongside old ones.
- * Stopping first ensures clean Transport state.
- */
-export function splitAtPlayheadSafe(host: SplitDuringPlaybackHost): boolean {
-  const wasPlaying = host.isPlaying;
-  const time = host.currentTime;
-
-  if (wasPlaying) {
-    host.stop();
-  }
-
-  const result = splitAtPlayhead(host);
-
-  if (wasPlaying && result) {
-    host.play(time);
-  }
-
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Finds a clip that strictly contains the given sample position.
