@@ -83,6 +83,7 @@ export class DawEditorElement extends LitElement {
   _engine: PlaylistEngine | null = null;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
+  private _peaksCache = new Map<string, Promise<import('waveform-data').default>>();
   _clipBuffers = new Map<string, AudioBuffer>();
   _clipOffsets = new Map<string, { offsetSamples: number; durationSamples: number }>();
   _peakPipeline = new PeakPipeline();
@@ -238,6 +239,7 @@ export class DawEditorElement extends LitElement {
     this._childObserver = null;
     this._trackElements.clear();
     this._audioCache.clear();
+    this._peaksCache.clear();
     this._clipBuffers.clear();
     this._clipOffsets.clear();
     this._peakPipeline.terminate();
@@ -435,7 +437,7 @@ export class DawEditorElement extends LitElement {
 
         // Start both fetches concurrently — await peaks first to render preview before audio decode
         const waveformDataPromise = clipDesc.peaksSrc
-          ? loadWaveformDataFromUrl(clipDesc.peaksSrc)
+          ? this._fetchPeaks(clipDesc.peaksSrc)
           : null;
         const audioPromise = this._fetchAndDecode(clipDesc.src);
 
@@ -607,6 +609,16 @@ export class DawEditorElement extends LitElement {
       this._audioCache.delete(src);
       throw err;
     }
+  }
+  private _fetchPeaks(src: string): Promise<import('waveform-data').default> {
+    const cached = this._peaksCache.get(src);
+    if (cached) return cached;
+    const promise = loadWaveformDataFromUrl(src).catch((err) => {
+      this._peaksCache.delete(src);
+      throw err;
+    });
+    this._peaksCache.set(src, promise);
+    return promise;
   }
   _recomputeDuration() {
     let maxSample = 0;
