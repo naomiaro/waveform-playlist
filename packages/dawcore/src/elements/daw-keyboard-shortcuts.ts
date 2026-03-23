@@ -132,7 +132,9 @@ export class DawKeyboardShortcutsElement extends LitElement {
       const redoBinding = map?.redo ?? { key: 'z', shiftKey: true };
 
       // Undo: Ctrl+Z (Win/Linux) and Cmd+Z (Mac)
-      if (!undoBinding.ctrlKey && !undoBinding.metaKey) {
+      // Use === undefined to distinguish "not specified" (auto-expand) from
+      // "explicitly false" (user wants no modifier — respect their intent).
+      if (undoBinding.ctrlKey === undefined && undoBinding.metaKey === undefined) {
         result.push(
           this._makeShortcut(
             { ...undoBinding, ctrlKey: true, shiftKey: false },
@@ -150,7 +152,7 @@ export class DawKeyboardShortcutsElement extends LitElement {
       }
 
       // Redo: Ctrl+Shift+Z (Win/Linux) and Cmd+Shift+Z (Mac)
-      if (!redoBinding.ctrlKey && !redoBinding.metaKey) {
+      if (redoBinding.ctrlKey === undefined && redoBinding.metaKey === undefined) {
         result.push(
           this._makeShortcut(
             { ...redoBinding, ctrlKey: true, shiftKey: true },
