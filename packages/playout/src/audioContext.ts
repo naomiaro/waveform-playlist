@@ -13,27 +13,30 @@ import { Context, setContext } from 'tone';
 let globalToneContext: Context | null = null;
 
 export interface AudioContextOptions {
-  /** Desired sample rate for comparison. Context uses hardware default; a warning
-   *  is logged if rates differ. Not yet wired through (see playout CLAUDE.md). */
+  /** Desired sample rate. When audioContext is provided, this is for comparison only.
+   *  When audioContext is not provided, Tone.js 15.1.22 ignores this (unreleased fix
+   *  in upstream). Pass your own AudioContext({ sampleRate }) for reliable control. */
   sampleRate?: number;
-  /** Latency hint. Not yet wired through (see playout CLAUDE.md). */
+  /** Latency hint. Same caveat as sampleRate — pass your own AudioContext for control. */
   latencyHint?: AudioContextLatencyCategory | number;
+  /** Pre-configured AudioContext. Use this for reliable sampleRate/latencyHint control:
+   *  `new AudioContext({ sampleRate: 48000, latencyHint: 0 })` */
+  audioContext?: AudioContext;
 }
 
 /**
- * Configure the global AudioContext with sample rate hint.
+ * Configure the global AudioContext.
  * Should be called BEFORE getGlobalContext(). If the context already exists
  * (e.g., from resumeGlobalAudioContext), warns and returns the existing rate.
- * Returns the actual sample rate (may differ from requested).
+ * Returns the actual sample rate.
  *
- * Note: sampleRate and latencyHint are currently not wired through — Tone.js
- * Context ignores them and native AudioContext wrapping causes Tone.js issues.
- * The hint is used only for rate comparison + warning. See playout CLAUDE.md.
+ * For reliable sample rate control, pass your own AudioContext:
+ * ```ts
+ * configureGlobalContext({ audioContext: new AudioContext({ sampleRate: 48000 }) })
+ * ```
  */
 export function configureGlobalContext(options: AudioContextOptions): number {
   if (globalToneContext) {
-    // Context already created (e.g., by resumeGlobalAudioContext before first track load).
-    // Return the existing rate — the hint was too late but the context is usable.
     const existingRate = (globalToneContext.rawContext as AudioContext).sampleRate;
     if (options.sampleRate !== undefined && options.sampleRate !== existingRate) {
       console.warn(
@@ -46,10 +49,14 @@ export function configureGlobalContext(options: AudioContextOptions): number {
     }
     return existingRate;
   }
-  // TODO: Tone.js Context doesn't pass sampleRate to standardized-audio-context.
-  // Native AudioContext({ sampleRate }) works but causes issues with Tone.js internals.
-  // For now, create a standard Context and let the rate comparison + worker fallback
-  // handle mismatches. Revisit when Tone.js supports sampleRate passthrough.
+  if (options.audioContext) {
+    // User-provided AudioContext — wrap in Tone.js Context
+    globalToneContext = new Context(options.audioContext);
+    setContext(globalToneContext);
+    return options.audioContext.sampleRate;
+  }
+  // Fallback: create standard Tone.js Context (sampleRate/latencyHint not wired
+  // through in Tone.js 15.1.22 — see playout CLAUDE.md)
   globalToneContext = new Context();
   setContext(globalToneContext);
   const actualRate = (globalToneContext.rawContext as AudioContext).sampleRate;

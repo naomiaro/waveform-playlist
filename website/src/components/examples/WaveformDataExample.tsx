@@ -144,6 +144,12 @@ interface BBCPeaksData {
 export function WaveformDataExample() {
   const { theme } = useDocusaurusTheme();
   const [bbcPeaks, setBbcPeaks] = useState<Map<string, BBCPeaksData>>(new Map());
+  // Create AudioContext at 48000 Hz to match .dat peaks — lazy, created once
+  const [audioCtx] = useState(() =>
+    typeof AudioContext !== 'undefined'
+      ? new AudioContext({ sampleRate: 48000 })
+      : undefined
+  );
 
   // Load BBC peaks independently - each track appears as its peaks load
   useEffect(() => {
@@ -231,7 +237,7 @@ export function WaveformDataExample() {
 
       <WaveformPlaylistProvider
         tracks={tracks}
-        sampleRate={48000}
+        audioContext={audioCtx}
         samplesPerPixel={1024}
         mono
         waveHeight={100}

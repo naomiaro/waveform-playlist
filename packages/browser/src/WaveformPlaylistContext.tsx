@@ -254,10 +254,11 @@ export interface WaveformPlaylistProviderProps {
   /** Disable automatic stop when the cursor reaches the end of the longest
    *  track. Useful for DAW-style recording beyond existing audio. */
   indefinitePlayback?: boolean;
-  /** Desired AudioContext sample rate. Pre-computed peaks (.dat files) must match
-   *  this rate for instant rendering. If hardware can't match, falls back gracefully
-   *  and worker recomputes peaks from decoded audio. Default: hardware rate. */
-  sampleRate?: number;
+  /** Pre-configured AudioContext for sampleRate/latencyHint control.
+   *  Example: `new AudioContext({ sampleRate: 48000, latencyHint: 0 })`.
+   *  Pre-computed peaks (.dat files) render instantly when their sample rate
+   *  matches the AudioContext rate. On mismatch, falls back to worker. */
+  audioContext?: AudioContext;
   children: ReactNode;
 }
 
@@ -283,7 +284,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   soundFontCache,
   deferEngineRebuild = false,
   indefinitePlayback = false,
-  sampleRate: sampleRateHint,
+  audioContext: audioContextProp,
   children,
 }) => {
   // Default progressBarWidth to barWidth + barGap (fills gaps)
@@ -388,21 +389,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // AudioContext is undefined. Rate never changes after context creation.
   // If sampleRateHint is provided, configure the context before reading the rate.
   const [initialSampleRate] = useState<number>(() => {
-    if (typeof AudioContext === 'undefined') return sampleRateHint ?? 48000;
-    if (sampleRateHint !== undefined) {
-      const actualRate = configureGlobalContext({
-        sampleRate: sampleRateHint,
-        latencyHint: 0,
-      });
-      if (actualRate !== sampleRateHint) {
-        console.warn(
-          '[waveform-playlist] Requested sampleRate ' +
-            sampleRateHint +
-            ' but AudioContext is running at ' +
-            actualRate
-        );
-      }
-      return actualRate;
+    if (typeof AudioContext === 'undefined') return 48000;
+    if (audioContextProp) {
+      return configureGlobalContext({ audioContext: audioContextProp });
     }
     return getGlobalAudioContext().sampleRate;
   });
