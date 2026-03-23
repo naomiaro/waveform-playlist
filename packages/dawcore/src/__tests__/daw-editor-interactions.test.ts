@@ -97,7 +97,12 @@ describe('seekTo', () => {
 
   it('stops and restarts playback when playing (Tone.js reschedule)', () => {
     const el = document.createElement('daw-editor') as any;
-    el._engine = { seek: vi.fn(), stop: vi.fn(), play: vi.fn(), init: vi.fn().mockResolvedValue(undefined) };
+    el._engine = {
+      seek: vi.fn(),
+      stop: vi.fn(),
+      play: vi.fn(),
+      init: vi.fn().mockResolvedValue(undefined),
+    };
     el._isPlaying = true;
     const stopSpy = vi.spyOn(el, 'stop');
     const playSpy = vi.spyOn(el, 'play');
