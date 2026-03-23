@@ -129,6 +129,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Keyboard shortcuts via core** — `<daw-editor>` uses `handleKeyboardEvent` from `@waveform-playlist/core`. Listener on `document` (not the element — users won't know to focus it). Configurable via `editor.shortcuts` JS property; defaults: Space (play/pause), Escape (stop), 0 (rewind), S (split, when `interactive-clips`).
 - **Split pre-flight check** — `splitAtPlayhead` calls `canSplitAtTime` before stopping playback. Without this, pressing S with no track selected interrupts audio for a no-op.
 - **`engine.constrainTrimDelta()`** — Wraps the engine's `constrainBoundaryTrim` pure function. Call during trim drag for per-frame collision detection (timeline bounds, audio bounds, neighbor overlap, min duration). Don't manually clamp — use the engine's constraints so visual preview matches what's applied on drop.
+- **Drag transactions for undo** — `beginTransaction()` at drag start (`_beginDrag`), `commitTransaction()` in `finally` of `onPointerUp`. Groups all per-frame `moveClip`/`trimClip` calls into one undo step. Without this, a 1-second drag creates 60 individual undo steps.
+- **Undo/redo keyboard shortcuts** — Cmd/Ctrl+Z (undo), Cmd/Ctrl+Shift+Z (redo) in default shortcuts when `keyboard-shortcuts` attribute is set. Both Ctrl and Meta variants registered as separate entries since `handleKeyboardEvent` treats undefined modifiers as "match any".
 
 ## Typed Events
 

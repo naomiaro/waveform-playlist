@@ -32,6 +32,14 @@
 - **Loop activation uses `< loopEnd` check** — `play()` activates Transport loop when starting before `loopEnd` (not `>= loopStart && < loopEnd` like before). Starting before the loop region still activates looping — Transport plays through to `loopEnd`, then wraps to `loopStart`. Starting at or past `loopEnd` plays to the end without looping (click-past-loop behavior). `setLoopEnabled()`/`setLoopRegion()` during playback use `_isBeforeLoopEnd()` — same `< loopEnd` check against live adapter position. Selection/annotation playback (with `endTime`) always disables loop.
 - **`play()` state rollback on adapter throw** — `play()` saves `prevCurrentTime` and `prevPlayStartPosition` before mutations. If `adapter.play()` throws, state is restored so the engine isn't left with a moved playhead but no audio.
 - `engine.dispose()` wraps `adapter.dispose()` in try-catch to guarantee `_listeners.clear()` always runs. Explicit `engine.off()` is unnecessary when the engine itself is being disposed.
+
+## Undo/Redo
+
+- **Snapshot-based stack** — `_undoStack` stores frozen `ClipTrack[]` copies before each undoable mutation. No per-operation inverse logic. `undoLimit` defaults to 100.
+- **Undoable operations:** `moveClip`, `trimClip`, `splitClip`, `addTrack`, `removeTrack`, `updateTrack` (when track arg provided). **Not undoable:** `setSelection`, `setZoomLevel`, `setMasterVolume`, `setLoopEnabled`, `setLoopRegion`, `selectTrack`.
+- **`setTracks()` clears history** — old snapshots reference a different track set.
+- **Transactions** — `beginTransaction()` captures one snapshot; mutations during the transaction don't push individual undo steps. `commitTransaction()` pushes the pre-transaction snapshot. `abortTransaction()` restores it without pushing.
+- **`canUndo`/`canRedo`** — exposed as getters and in `EngineState` for UI binding.
 - **Console warn diagnostics** — `moveClip`, `trimClip`, `splitClip` log `console.warn('[waveform-playlist/engine] methodName: ...')` on invalid track/clip IDs. Tests exercising these paths must mock `console.warn`.
 - **`tracksVersion` counter** — Monotonic counter in `EngineState` that increments only on track mutations (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). Does NOT increment on selection/zoom/volume/loop changes. Used by the provider to detect track-specific statechange events and skip `loadAudio` rebuilds.
 - **Testing animation-frame code** — `_startTimeUpdateLoop` uses `requestAnimationFrame`, unavailable in Node.js. Use `vi.stubGlobal('requestAnimationFrame', vi.fn((cb) => { rafCallbacks.push(cb); return rafCallbacks.length; }))` and `vi.unstubAllGlobals()` in cleanup. Fire ticks manually via `rafCallbacks[rafCallbacks.length - 1](performance.now())`.
