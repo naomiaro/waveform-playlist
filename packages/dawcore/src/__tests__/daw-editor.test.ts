@@ -19,6 +19,46 @@ describe('DawEditorElement', () => {
     expect(el.mono).toBe(false);
   });
 
+  it('samplesPerPixel setter ignores NaN', () => {
+    const el = document.createElement('daw-editor') as any;
+    el.samplesPerPixel = 512;
+    el.samplesPerPixel = NaN;
+    expect(el.samplesPerPixel).toBe(512);
+  });
+
+  it('samplesPerPixel setter ignores zero and negative values', () => {
+    const el = document.createElement('daw-editor') as any;
+    el.samplesPerPixel = 512;
+    el.samplesPerPixel = 0;
+    expect(el.samplesPerPixel).toBe(512);
+    el.samplesPerPixel = -1;
+    expect(el.samplesPerPixel).toBe(512);
+  });
+
+  it('samplesPerPixel setter clamps to _minSamplesPerPixel synchronously', () => {
+    const el = document.createElement('daw-editor') as any;
+    el._minSamplesPerPixel = 256;
+    el.samplesPerPixel = 128;
+    // Should read back as clamped value immediately (no async)
+    expect(el.samplesPerPixel).toBe(256);
+  });
+
+  it('samplesPerPixel setter allows values at or above _minSamplesPerPixel', () => {
+    const el = document.createElement('daw-editor') as any;
+    el._minSamplesPerPixel = 256;
+    el.samplesPerPixel = 256;
+    expect(el.samplesPerPixel).toBe(256);
+    el.samplesPerPixel = 1024;
+    expect(el.samplesPerPixel).toBe(1024);
+  });
+
+  it('samplesPerPixel setter has no limit when _minSamplesPerPixel is 0', () => {
+    const el = document.createElement('daw-editor') as any;
+    expect(el._minSamplesPerPixel).toBe(0);
+    el.samplesPerPixel = 64;
+    expect(el.samplesPerPixel).toBe(64);
+  });
+
   it('exposes playback methods', () => {
     const el = document.createElement('daw-editor') as any;
     expect(typeof el.play).toBe('function');

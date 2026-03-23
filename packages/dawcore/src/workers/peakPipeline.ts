@@ -28,6 +28,14 @@ export class PeakPipeline {
   }
 
   /**
+   * Inject externally-loaded WaveformData (e.g., from a .dat file) into the cache.
+   * Prevents worker generation for this AudioBuffer on all subsequent calls.
+   */
+  cacheWaveformData(audioBuffer: AudioBuffer, waveformData: WaveformData): void {
+    this._cache.set(audioBuffer, waveformData);
+  }
+
+  /**
    * Generate PeakData for a clip from its AudioBuffer.
    * Uses cached WaveformData when available; otherwise generates via worker.
    * Worker generates at baseScale (default 128); extractPeaks resamples to the requested zoom.
@@ -40,8 +48,9 @@ export class PeakPipeline {
     durationSamples?: number
   ): Promise<PeakData> {
     const waveformData = await this._getWaveformData(audioBuffer);
+    const effectiveScale = this._clampScale(waveformData, samplesPerPixel);
     try {
-      return extractPeaks(waveformData, samplesPerPixel, isMono, offsetSamples, durationSamples);
+      return extractPeaks(waveformData, effectiveScale, isMono, offsetSamples, durationSamples);
     } catch (err) {
       console.warn('[dawcore] extractPeaks failed: ' + String(err));
       throw err;
@@ -61,18 +70,23 @@ export class PeakPipeline {
     clipOffsets?: ReadonlyMap<string, { offsetSamples: number; durationSamples: number }>
   ): Map<string, PeakData> {
     const result = new Map<string, PeakData>();
+    let clampedCount = 0;
+    let clampedScale = 0;
     for (const [clipId, audioBuffer] of clipBuffers) {
       const cached = this._cache.get(audioBuffer);
       if (cached) {
-        // Skip if target scale is finer than cached — resample can't downsample
-        if (samplesPerPixel < cached.scale) continue;
+        const effectiveScale = this._clampScale(cached, samplesPerPixel, false);
+        if (effectiveScale !== samplesPerPixel) {
+          clampedCount++;
+          clampedScale = effectiveScale;
+        }
         try {
           const offsets = clipOffsets?.get(clipId);
           result.set(
             clipId,
             extractPeaks(
               cached,
-              samplesPerPixel,
+              effectiveScale,
               isMono,
               offsets?.offsetSamples,
               offsets?.durationSamples
@@ -83,7 +97,57 @@ export class PeakPipeline {
         }
       }
     }
+    if (clampedCount > 0) {
+      console.warn(
+        '[dawcore] Requested zoom ' +
+          samplesPerPixel +
+          ' spp is finer than pre-computed peaks (' +
+          clampedScale +
+          ' spp) — ' +
+          clampedCount +
+          ' clip(s) using available resolution'
+      );
+    }
     return result;
+  }
+
+  /**
+   * Clamp requested scale to cached WaveformData scale.
+   * WaveformData.resample() can only go coarser — if the requested zoom is
+   * finer than the cached data, use the cached scale. Set warn=true to log
+   * (default); reextractPeaks passes false and logs a single summary instead.
+   */
+  private _clampScale(
+    waveformData: WaveformData,
+    requestedScale: number,
+    warn = true
+  ): number {
+    if (requestedScale < waveformData.scale) {
+      if (warn) {
+        console.warn(
+          '[dawcore] Requested zoom ' +
+            requestedScale +
+            ' spp is finer than pre-computed peaks (' +
+            waveformData.scale +
+            ' spp) — using available resolution'
+        );
+      }
+      return waveformData.scale;
+    }
+    return requestedScale;
+  }
+
+  /**
+   * Return the coarsest (largest) scale among cached WaveformData entries
+   * that correspond to the given clip buffers. Returns 0 if none are cached.
+   */
+  getMaxCachedScale(clipBuffers: ReadonlyMap<string, AudioBuffer>): number {
+    let max = 0;
+    for (const audioBuffer of clipBuffers.values()) {
+      const cached = this._cache.get(audioBuffer);
+      if (cached && cached.scale > max) max = cached.scale;
+    }
+    return max;
   }
 
   terminate() {

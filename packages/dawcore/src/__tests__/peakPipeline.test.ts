@@ -64,6 +64,40 @@ function makeBuffer(length = 48000): AudioBuffer {
   } as any;
 }
 
+function makeWaveformData(scale: number, length = 50): any {
+  return {
+    scale,
+    bits: 16,
+    channels: 1,
+    length,
+    duration: 1.0,
+    sample_rate: 48000,
+    channel: (_ch: number) => ({
+      min_array: () => new Int16Array(length).fill(-80),
+      max_array: () => new Int16Array(length).fill(80),
+    }),
+    resample: vi.fn(function (this: any, opts: any) {
+      const ratio = opts.scale / this.scale;
+      const newLength = Math.ceil(this.length / ratio);
+      return {
+        scale: opts.scale,
+        bits: this.bits,
+        channels: this.channels,
+        length: newLength,
+        duration: this.duration,
+        sample_rate: this.sample_rate,
+        channel: (_ch: number) => ({
+          min_array: () => new Int16Array(newLength).fill(-80),
+          max_array: () => new Int16Array(newLength).fill(80),
+        }),
+        resample: vi.fn(),
+        slice: vi.fn(),
+      };
+    }),
+    slice: vi.fn(),
+  };
+}
+
 describe('PeakPipeline', () => {
   it('defaults baseScale to 128 and bits to 16', () => {
     const pipeline = new PeakPipeline();
@@ -140,15 +174,107 @@ describe('PeakPipeline', () => {
     expect(result.size).toBe(0);
   });
 
-  it('reextractPeaks skips buffers when requested scale is finer than cached', async () => {
+  it('reextractPeaks clamps to cached scale when requested scale is finer', async () => {
     const pipeline = new PeakPipeline();
     const buf = makeBuffer();
 
     await pipeline.generatePeaks(buf, 1024, false);
-    // Mock returns scale: 128. Requesting 64 (finer) should skip.
+    // Mock returns scale: 128. Requesting 64 (finer) should clamp to 128 and warn.
     const clipBuffers = new Map([['clip-1', buf]]);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = pipeline.reextractPeaks(clipBuffers, 64, false);
-    expect(result.size).toBe(0);
+    expect(result.size).toBe(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('finer than pre-computed peaks')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('reextractPeaks logs single summary warning for multiple clamped clips', async () => {
+    const pipeline = new PeakPipeline();
+    const buf1 = makeBuffer();
+    const buf2 = makeBuffer(24000);
+
+    await pipeline.generatePeaks(buf1, 1024, false);
+    await pipeline.generatePeaks(buf2, 1024, false);
+
+    const clipBuffers = new Map([
+      ['clip-1', buf1],
+      ['clip-2', buf2],
+    ]);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    pipeline.reextractPeaks(clipBuffers, 64, false);
+    // Should log exactly once with count, not once per clip
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('2 clip(s)'));
+    warnSpy.mockRestore();
+  });
+
+  it('generatePeaks clamps when cached WaveformData scale is coarser than requested', async () => {
+    const pipeline = new PeakPipeline();
+    const buf = makeBuffer();
+
+    // Inject .dat-style cache at scale 256
+    pipeline.cacheWaveformData(buf, makeWaveformData(256));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Request finer zoom (128) — should clamp to 256 and warn
+    const result = await pipeline.generatePeaks(buf, 128, false);
+    expect(result.data.length).toBeGreaterThan(0);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('finer than pre-computed peaks')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('getMaxCachedScale returns coarsest scale from cached entries', () => {
+    const pipeline = new PeakPipeline();
+    const buf1 = makeBuffer();
+    const buf2 = makeBuffer(24000);
+
+    pipeline.cacheWaveformData(buf1, makeWaveformData(256));
+    pipeline.cacheWaveformData(buf2, makeWaveformData(512));
+
+    const clipBuffers = new Map([
+      ['clip-1', buf1],
+      ['clip-2', buf2],
+    ]);
+    expect(pipeline.getMaxCachedScale(clipBuffers)).toBe(512);
+  });
+
+  it('getMaxCachedScale returns 0 when nothing is cached', () => {
+    const pipeline = new PeakPipeline();
+    const buf = makeBuffer();
+    const clipBuffers = new Map([['clip-1', buf]]);
+    expect(pipeline.getMaxCachedScale(clipBuffers)).toBe(0);
+  });
+
+  it('cacheWaveformData injects external WaveformData and skips worker', async () => {
+    const pipeline = new PeakPipeline();
+    const buf = makeBuffer();
+
+    pipeline.cacheWaveformData(buf, makeWaveformData(256));
+
+    // generatePeaks should use cached data without creating a worker
+    const result = await pipeline.generatePeaks(buf, 1024, false);
+    expect(result.data.length).toBeGreaterThan(0);
+    // Worker should NOT have been created
+    expect((pipeline as any)._worker).toBeNull();
+  });
+
+  it('cacheWaveformData allows reextractPeaks at coarser zoom', () => {
+    const pipeline = new PeakPipeline();
+    const buf = makeBuffer();
+
+    pipeline.cacheWaveformData(buf, makeWaveformData(256));
+
+    const clipBuffers = new Map([['clip-1', buf]]);
+    // Coarser than 256 — should work without warning
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = pipeline.reextractPeaks(clipBuffers, 1024, false);
+    expect(result.size).toBe(1);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('terminate cleans up worker', async () => {
