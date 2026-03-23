@@ -42,10 +42,10 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
   @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
   @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
-  /** Configurable keyboard shortcuts. Set via JS property (not HTML attribute).
-   *  When `interactive-clips` is set, a default split shortcut (S key) is included
-   *  unless overridden. */
-  shortcuts: KeyboardShortcut[] = [];
+  /** Enable default keyboard shortcuts (Space, Escape, 0, and S when interactive-clips). */
+  @property({ type: Boolean, attribute: 'keyboard-shortcuts' }) keyboardShortcuts = false;
+  /** Custom keyboard shortcuts. Set via JS property. Overrides defaults when non-null. */
+  shortcuts: KeyboardShortcut[] | null = null;
   /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
   /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
@@ -644,7 +644,10 @@ export class DawEditorElement extends LitElement {
     }
   }
   seekTo(time: number) {
-    if (!this._engine) return;
+    if (!this._engine) {
+      console.warn('[dawcore] seekTo: engine not ready, call ignored');
+      return;
+    }
     this._engine.seek(time);
     this._currentTime = time;
     if (!this._isPlaying) {
@@ -665,9 +668,12 @@ export class DawEditorElement extends LitElement {
     });
   }
 
-  /** Get the active shortcuts — user-provided or defaults. */
+  /** Get the active shortcuts — custom overrides defaults when non-null. */
   private _getActiveShortcuts(): KeyboardShortcut[] {
-    if (this.shortcuts.length > 0) return this.shortcuts;
+    // Custom shortcuts override everything (including empty array = no shortcuts)
+    if (this.shortcuts !== null) return this.shortcuts;
+    // Defaults only when keyboard-shortcuts attribute is set
+    if (!this.keyboardShortcuts) return [];
     const defaults: KeyboardShortcut[] = [
       { key: ' ', action: () => this.togglePlayPause(), description: 'Play/Pause' },
       { key: 'Escape', action: () => this.stop(), description: 'Stop' },
@@ -686,7 +692,18 @@ export class DawEditorElement extends LitElement {
   private _onKeyDown = (e: KeyboardEvent) => {
     const shortcuts = this._getActiveShortcuts();
     if (shortcuts.length === 0) return;
-    handleKeyboardEvent(e, shortcuts, true);
+    try {
+      handleKeyboardEvent(e, shortcuts, true);
+    } catch (err) {
+      console.warn('[dawcore] Keyboard shortcut failed: ' + String(err));
+      this.dispatchEvent(
+        new CustomEvent('daw-error', {
+          bubbles: true,
+          composed: true,
+          detail: { operation: 'keyboard-shortcut', error: err },
+        })
+      );
+    }
   };
 
   // --- Recording ---

@@ -45,9 +45,16 @@ export function splitAtPlayhead(host: SplitHost): boolean {
     host.stop();
   }
 
-  const result = performSplit(host, time);
+  let result: boolean;
+  try {
+    result = performSplit(host, time);
+  } catch (err) {
+    console.warn('[dawcore] splitAtPlayhead failed: ' + String(err));
+    result = false;
+  }
 
-  if (wasPlaying && result) {
+  // Always resume if was playing — even on failed split, don't leave audio stopped
+  if (wasPlaying) {
     host.play(time);
   }
 

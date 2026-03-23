@@ -387,11 +387,13 @@ describe('splitAtPlayhead', () => {
     const rightClip = makeClip('clip-right', 24000, 72000);
     const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
 
+    const stateBefore = { selectedTrackId: 'track-1', tracks: [track] };
     const engine = {
       getState: vi
         .fn()
-        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] })
-        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
+        .mockReturnValueOnce(stateBefore) // canSplitAtTime
+        .mockReturnValueOnce(stateBefore) // performSplit before
+        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }), // after
       splitClip: vi.fn(),
     };
 
@@ -401,8 +403,9 @@ describe('splitAtPlayhead', () => {
       isPlaying: false,
     });
 
-    splitAtPlayhead(host);
+    const result = splitAtPlayhead(host);
 
+    expect(result).toBe(true);
     expect(host.stop).not.toHaveBeenCalled();
     expect(host.play).not.toHaveBeenCalled();
   });
@@ -456,5 +459,34 @@ describe('splitAtPlayhead', () => {
     expect(result).toBe(false);
     expect(host.stop).not.toHaveBeenCalled();
     expect(host.play).not.toHaveBeenCalled();
+  });
+
+  it('resumes playback even when split fails (engine no-op)', () => {
+    const clip = makeClip('clip-1', 0, 96000);
+    const track = makeTrack('track-1', [clip]);
+
+    // canSplitAtTime passes, but engine no-ops (state unchanged after splitClip)
+    const state = { selectedTrackId: 'track-1', tracks: [track] };
+    const engine = {
+      getState: vi
+        .fn()
+        .mockReturnValueOnce(state) // canSplitAtTime
+        .mockReturnValueOnce(state) // performSplit before
+        .mockReturnValueOnce(state), // after — unchanged, no-op
+      splitClip: vi.fn(),
+    };
+
+    const host = createPlaybackHost({
+      engine,
+      currentTime: 0.5,
+      isPlaying: true,
+    });
+
+    const result = splitAtPlayhead(host);
+
+    expect(result).toBe(false);
+    expect(host.stop).toHaveBeenCalledTimes(1);
+    // Must resume even though split was a no-op
+    expect(host.play).toHaveBeenCalledWith(0.5);
   });
 });
