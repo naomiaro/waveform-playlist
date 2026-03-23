@@ -49,6 +49,7 @@ export class PlaylistEngine {
   private _redoStack: ClipTrack[][] = [];
   private _inTransaction = false;
   private _transactionSnapshot: ClipTrack[] | null = null;
+  private _transactionMutated = false;
   undoLimit = 100;
 
   constructor(options: PlaylistEngineOptions = {}) {
@@ -111,6 +112,7 @@ export class PlaylistEngine {
     }
     this._transactionSnapshot = this._snapshotTracks();
     this._inTransaction = true;
+    this._transactionMutated = false;
   }
 
   commitTransaction(): void {
@@ -133,16 +135,21 @@ export class PlaylistEngine {
       return;
     }
     const snapshot = this._transactionSnapshot;
+    const mutated = this._transactionMutated;
     this._transactionSnapshot = null;
     this._inTransaction = false;
-    this._restoreTracks(snapshot);
+    this._transactionMutated = false;
+    // Only restore if mutations occurred — avoids full adapter rebuild on click
+    if (mutated) {
+      this._restoreTracks(snapshot);
+    }
   }
 
   // ---------------------------------------------------------------------------
   // State snapshot
   // ---------------------------------------------------------------------------
 
-  getState(): EngineState & { canUndo: boolean; canRedo: boolean } {
+  getState(): EngineState {
     return {
       tracks: this._tracks.map((t) => ({ ...t, clips: [...t.clips] })),
       tracksVersion: this._tracksVersion,
@@ -666,11 +673,14 @@ export class PlaylistEngine {
   // ---------------------------------------------------------------------------
 
   private _snapshotTracks(): ClipTrack[] {
-    return this._tracks.map((t) => ({ ...t, clips: [...t.clips] }));
+    return this._tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c })) }));
   }
 
   private _pushUndoSnapshot(): void {
-    if (this._inTransaction) return;
+    if (this._inTransaction) {
+      this._transactionMutated = true;
+      return;
+    }
     this._undoStack.push(this._snapshotTracks());
     if (this._undoStack.length > this.undoLimit) {
       this._undoStack.shift();

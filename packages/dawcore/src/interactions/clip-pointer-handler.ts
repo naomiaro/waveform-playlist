@@ -143,7 +143,13 @@ export class ClipPointerHandler {
     this._cumulativeDeltaSamples = 0;
 
     // Group all drag mutations into one undo step
-    this._host.engine?.beginTransaction();
+    if (this._host.engine) {
+      this._host.engine.beginTransaction();
+    } else {
+      console.warn(
+        '[dawcore] beginDrag: engine unavailable, drag mutations will not be grouped for undo'
+      );
+    }
 
     // For trim: snapshot the clip container's current position/width
     if (mode === 'trim-left' || mode === 'trim-right') {
