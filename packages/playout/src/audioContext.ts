@@ -20,9 +20,14 @@ export interface AudioContextOptions {
 }
 
 /**
- * Configure the global AudioContext with sample rate and latency hints.
- * Must be called BEFORE getGlobalContext() — throws if context already exists.
- * Returns the actual sample rate (may differ from requested if hardware can't match).
+ * Configure the global AudioContext with sample rate hint.
+ * Should be called BEFORE getGlobalContext(). If the context already exists
+ * (e.g., from resumeGlobalAudioContext), warns and returns the existing rate.
+ * Returns the actual sample rate (may differ from requested).
+ *
+ * Note: sampleRate and latencyHint are currently not wired through — Tone.js
+ * Context ignores them and native AudioContext wrapping causes Tone.js issues.
+ * The hint is used only for rate comparison + warning. See playout CLAUDE.md.
  */
 export function configureGlobalContext(options: AudioContextOptions): number {
   if (globalToneContext) {
