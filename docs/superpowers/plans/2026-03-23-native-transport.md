@@ -65,7 +65,7 @@
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
-    "@waveform-playlist/core": ">=7.0.0",
+    "@waveform-playlist/core": ">=11.0.0",
     "@waveform-playlist/engine": ">=11.0.0"
   },
   "dependencies": {}
@@ -1120,7 +1120,16 @@ This is the largest and most critical component. Implements `SchedulerListener<C
 
 - [ ] **Step 1: Write failing tests**
 
-Test `generate()` returns correct events for clips overlapping a time window. Test `consume()` calls `source.start()` with correct timing. Test `onPositionJump()` stops sources and re-schedules mid-clip. Test `silence()` stops all sources. Test loop boundary clamping. Test empty tracks and missing audioBuffers.
+Required test cases (derive from spec edge cases):
+1. `generate()` returns events for clips overlapping `[fromTime, toTime)` — verify `audioTime`, `offset`, `duration`
+2. `generate()` skips clips with `durationSamples === 0`
+3. `generate()` skips clips with `audioBuffer === undefined` (peaks-first)
+4. `generate()` returns `[]` for empty tracks
+5. `generate()` clamps duration at `loopEnd` when clip spans boundary: `duration = loopEnd - clipStartTime`
+6. `consume()` calls `source.start(when, offset, duration)` with correct values
+7. `onPositionJump()` calls `.stop()` on all active sources, creates mid-clip sources for clips spanning new position with `offset = newTime - clipStartTime`
+8. `silence()` calls `.stop()` on all active sources, clears set
+9. `updateTrack()` silences only that track's sources, not others
 
 - [ ] **Step 2: Implement ClipPlayer**
 
@@ -1199,11 +1208,11 @@ git commit -m "feat(transport): add Transport — top-level orchestrator"
 
 - [ ] **Step 1: Write failing tests**
 
-Test all `PlayoutAdapter` methods delegate correctly. Test `init()` resumes AudioContext. Test `transport` getter.
+Test all `PlayoutAdapter` methods delegate correctly, including optional methods `addTrack?`, `removeTrack?`, and `updateTrack?`. Test `init()` resumes AudioContext. Test `transport` getter exposes the Transport instance.
 
 - [ ] **Step 2: Implement NativePlayoutAdapter**
 
-Thin delegation to Transport. Import `PlayoutAdapter` type from engine.
+Thin delegation to Transport. Import `PlayoutAdapter` type from `@waveform-playlist/engine`. Must implement all required methods (`init`, `setTracks`, `play`, `pause`, `stop`, `seek`, `getCurrentTime`, `isPlaying`, `setMasterVolume`, `setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`, `setLoop`, `dispose`) plus optional methods (`addTrack`, `removeTrack`, `updateTrack`).
 
 - [ ] **Step 3: Run tests, verify full build, commit**
 
@@ -1224,7 +1233,9 @@ git commit -m "feat(transport): add NativePlayoutAdapter — PlayoutAdapter brid
 
 - [ ] **Step 1: Add transport alias to dev vite config**
 - [ ] **Step 2: Update multiclip.html to use NativePlayoutAdapter**
-- [ ] **Step 3: Manual test — play, pause, stop, seek, zoom, loop**
+- [ ] **Step 3: Human verification checkpoint**
+
+Stop and ask user to test manually in browser. Verify: play, pause, stop, seek, zoom, loop, solo/mute, split clip during playback. Report any audio glitches or visual mismatches.
 - [ ] **Step 4: Commit**
 
 ```bash
