@@ -42,12 +42,22 @@ export function configureGlobalContext(options: AudioContextOptions): number {
   }
   // Create a native AudioContext with the requested options — Tone.js's Context
   // constructor doesn't pass sampleRate through to standardized-audio-context.
-  const nativeOptions: AudioContextOptions = {};
+  // Firefox has issues with the sampleRate option (despite MDN support docs),
+  // so skip it on Firefox — same approach as openDAW.
+  const isFirefox =
+    typeof navigator !== 'undefined' &&
+    navigator.userAgent.toLowerCase().includes('firefox');
+  const nativeOptions: Record<string, unknown> = {};
   if (options.latencyHint !== undefined) {
-    nativeOptions.latencyHint = options.latencyHint as any;
+    nativeOptions.latencyHint = options.latencyHint;
   }
-  if (options.sampleRate !== undefined) {
+  if (options.sampleRate !== undefined && !isFirefox) {
     nativeOptions.sampleRate = options.sampleRate;
+  }
+  if (isFirefox && options.sampleRate !== undefined) {
+    console.warn(
+      '[playout] Firefox does not reliably support AudioContext sampleRate option — using hardware default'
+    );
   }
   let rawContext: AudioContext;
   try {
@@ -59,9 +69,9 @@ export function configureGlobalContext(options: AudioContextOptions): number {
         options.sampleRate +
         ' not supported — using hardware default'
     );
-    const fallbackOptions: AudioContextOptions = {};
+    const fallbackOptions: Record<string, unknown> = {};
     if (options.latencyHint !== undefined) {
-      fallbackOptions.latencyHint = options.latencyHint as any;
+      fallbackOptions.latencyHint = options.latencyHint;
     }
     rawContext = new AudioContext(fallbackOptions as any);
   }
