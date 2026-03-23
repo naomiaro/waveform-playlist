@@ -401,6 +401,9 @@ interface WaveformPlaylistProviderProps {
   deferEngineRebuild?: boolean;
   /** Disable automatic stop when cursor reaches end of longest track */
   indefinitePlayback?: boolean;
+  /** Pre-configured AudioContext for sampleRate/latencyHint control.
+   *  Pre-computed peaks (.dat) render instantly when rates match. */
+  audioContext?: AudioContext;
 }
 ```
 
