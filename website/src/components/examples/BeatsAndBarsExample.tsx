@@ -234,7 +234,7 @@ export function BeatsAndBarsExample() {
     >
       <BeatsAndBarsProvider bpm={bpm} timeSignature={timeSignature} snapTo={snapTo} scaleMode={scaleMode}>
         <ClipInteractionProvider snap={snap}>
-          <KeyboardShortcuts playback clipSplitting />
+          <KeyboardShortcuts playback clipSplitting undo />
           <Controls>
             <ControlGroup>
               <PlayButton />

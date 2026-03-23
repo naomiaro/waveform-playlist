@@ -415,7 +415,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
       </Card>
 
       <ClipInteractionProvider>
-        <KeyboardShortcuts playback clipSplitting />
+        <KeyboardShortcuts playback clipSplitting undo />
         <Waveform
           renderTrackControls={(trackIndex) => (
             <CustomTrackControls trackIndex={trackIndex} />

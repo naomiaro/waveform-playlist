@@ -225,7 +225,7 @@ export function MultiClipExample() {
       barGap={0}
     >
       <ClipInteractionProvider>
-        <KeyboardShortcuts playback clipSplitting />
+        <KeyboardShortcuts playback clipSplitting undo />
         <Controls>
           <ControlGroup>
             <PlayButton />
