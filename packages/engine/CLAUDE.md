@@ -40,6 +40,10 @@
 - **`setTracks()` clears history** — old snapshots reference a different track set.
 - **Transactions** — `beginTransaction()` captures one snapshot; mutations during the transaction don't push individual undo steps. `commitTransaction()` pushes the pre-transaction snapshot. `abortTransaction()` restores it without pushing.
 - **`canUndo`/`canRedo`** — exposed as getters and in `EngineState` for UI binding.
+- **`moveClip` returns constrained delta** — Returns the actually-applied delta (number), not void. Callers (e.g., dawcore clip handler) track this instead of raw pixel delta to avoid no-op undo entries when dragging against boundaries.
+- **`_restoreTracks` uses incremental adapter updates** — Diffs old vs new tracks by reference. When track count is unchanged, calls `_updateTrackOnAdapter` per changed track (avoids full playout rebuild that interrupts playback). Falls back to `adapter.setTracks()` when tracks were added/removed.
+- **`_transactionMutated` flag** — Set in `_pushUndoSnapshot` when inside a transaction. `abortTransaction` skips `_restoreTracks` when no mutations occurred, preventing a full adapter rebuild on click (no-op abort).
+- **`undoLimit`** — Constructor option via `PlaylistEngineOptions`, `readonly` field. Default 100.
 - **Console warn diagnostics** — `moveClip`, `trimClip`, `splitClip` log `console.warn('[waveform-playlist/engine] methodName: ...')` on invalid track/clip IDs. Tests exercising these paths must mock `console.warn`.
 - **`tracksVersion` counter** — Monotonic counter in `EngineState` that increments only on track mutations (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). Does NOT increment on selection/zoom/volume/loop changes. Used by the provider to detect track-specific statechange events and skip `loadAudio` rebuilds.
 - **Testing animation-frame code** — `_startTimeUpdateLoop` uses `requestAnimationFrame`, unavailable in Node.js. Use `vi.stubGlobal('requestAnimationFrame', vi.fn((cb) => { rafCallbacks.push(cb); return rafCallbacks.length; }))` and `vi.unstubAllGlobals()` in cleanup. Fire ticks manually via `rafCallbacks[rafCallbacks.length - 1](performance.now())`.
