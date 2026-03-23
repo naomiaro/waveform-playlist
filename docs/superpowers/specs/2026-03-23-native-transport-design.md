@@ -349,6 +349,87 @@ The `transport` getter exposes features beyond `PlayoutAdapter` (tempo, metronom
 - **webaudio-transport** (`/Users/naomiaro/Code/webaudio-transport`) — sliding window scheduler, generator/consumer pattern, metronome as player, tempo map
 - **openDAW** (`/Users/naomiaro/Code/openDAWOriginal`) — block-based processing, global loop + per-clip loop, PPQN timeline, discontinuous position jumps
 
+## Edge Cases & Implementation Details
+
+### Seek During Playback (Scheduler Flush)
+
+`Transport.seek(time)` during playback must kill pre-scheduled audio from the lookahead window:
+
+1. `timer.stop()` — pause the scheduler tick loop
+2. Call `silence()` on all listeners — stops all active `AudioBufferSourceNode`s (`.stop()` on each, clear `activeSources` set)
+3. `clock.seekTo(time)` — jump clock to new position
+4. Reset scheduler edges: `leftEdge = time`, `rightEdge = time`
+5. `timer.start()` — resume ticking from new position
+6. Next tick generates fresh events from the new position
+
+`AudioBufferSourceNode.stop()` is instantaneous — it silences sources that were pre-scheduled with a future `when`. Sources that have already finished playing are already garbage collected. The 200ms lookahead window means at most 200ms of pre-scheduled audio is killed.
+
+### Clips Spanning Loop Boundary
+
+When a clip starts before `loopEnd` and extends past it:
+
+1. During `generate(leftEdge, loopEnd)`: clip generates an event with duration **clamped to `loopEnd`** — `duration = loopEnd - clipStart` instead of the full clip duration. The `AudioBufferSourceNode` stops exactly at `loopEnd`.
+2. After `onPositionJump(loopStart)`: if `loopStart` is mid-clip (clip starts before `loopStart`), `onPositionJump` creates a new source with `offset = loopStart - clipStart` (same as `startMidClipSources` pattern). No duplicate sources — the first source was clamped to `loopEnd`.
+
+For clips that are entirely within the loop region, no clamping needed — they play normally and are re-scheduled on each loop iteration.
+
+### Pause vs Stop
+
+- **`pause()`**: `clock.stop()` (accumulates elapsed time), `timer.stop()`, call `silence()` on all listeners. Position preserved — next `play()` resumes from paused position.
+- **`stop()`**: `clock.reset()`, `timer.stop()`, call `silence()` on all listeners. Position returns to 0 (or play-start position per engine convention).
+
+### Empty Tracks and Missing AudioBuffers
+
+- **Empty tracks** (`clips: []`): `ClipPlayer.generate()` returns `[]`. TrackNode still exists for volume/pan/solo state.
+- **Zero-length clips** (`durationSamples: 0`): skipped in `generate()` — no event produced.
+- **Missing `audioBuffer`** (peaks-first rendering): skipped in `generate()` — no source to schedule. Once `audioBuffer` is backfilled via `updateTrack()`, subsequent scheduler windows include it.
+
+### Solo Logic
+
+- `Transport.setTracks()`: reads `ClipTrack.soloed` and `ClipTrack.muted` from initial data. Builds `_soloedTrackIds` set. Applies mute graph immediately.
+- `Transport.setTrackSolo()` during playback: updates `_soloedTrackIds`, re-evaluates all tracks' effective mute state, applies immediately via `TrackNode.setMute()`. A track that is both explicitly muted AND soloed stays muted (explicit mute takes precedence — matches current behavior).
+
+### ClipPlayer Per-Track Updates
+
+- `Transport.updateTrack(trackId, track)`: calls `ClipPlayer.updateTrack(trackId, track)` which replaces that track's clip list. During playback, calls `silence()` only for that track's active sources, then lets the next scheduler tick re-generate events for the updated clips. Other tracks are unaffected.
+
+### Effects Compatibility
+
+`ClipTrack.effects` (`TrackEffectsFunction`) is a Tone.js-oriented API and is **not supported** by `NativePlayoutAdapter`. Instead:
+
+- Use `transport.connectTrackOutput(trackId, effectsInputNode)` to insert any `AudioNode` chain.
+- For WAV export (offline rendering), consumers create an `OfflineAudioContext`, a separate `Transport` instance, and connect tracks to the offline destination. No Tone.js `isOffline` parameter needed.
+- Migration: consumers using `ClipTrack.effects` must switch to the `connectTrackOutput` API or continue using `TonePlayoutAdapter`.
+
+### TempoMap Cache Invalidation
+
+When `setTempo(bpm, atTick)` inserts a mid-sequence entry, all entries after `atTick` must have their `secondsAtTick` recomputed. Implementation: binary search for insertion point, recompute from that entry forward. For single-tempo use (v1 typical), this is a no-op — one entry at tick 0.
+
+### TransportOptions.sampleRate
+
+Always defaults to `audioContext.sampleRate`. The option exists for the rare case where `SampleTimeline` needs a different rate than the context (e.g., clip data was authored at 48000 but context runs at 44100). In practice, consumers should not set this — it's a safety valve, not a configuration knob.
+
+### NativePlayoutAdapter.init()
+
+```typescript
+async init(): Promise<void> {
+  if (this._transport.audioContext.state === 'suspended') {
+    await this._transport.audioContext.resume();
+  }
+}
+```
+
+Resumes the AudioContext on first play (user gesture required). Same contract as the existing `TonePlayoutAdapter.init()`.
+
+### MetronomePlayer silence() and onPositionJump()
+
+- `silence()`: stops any active click sources (short one-shots, typically already finished). Clears `activeSources` set.
+- `onPositionJump(newTime)`: converts `newTime` to ticks, updates internal beat counter so next `generate()` produces beats from the correct position. No sources to stop (clicks are ~50ms one-shots).
+
+### Animation Loop / timeupdate
+
+Unchanged from current architecture. `PlaylistEngine._startTimeUpdateLoop` uses `requestAnimationFrame` and polls `adapter.getCurrentTime()`. `NativePlayoutAdapter.getCurrentTime()` delegates to `Transport.getCurrentTime()` which reads `Clock.getTime()`. `Clock.getTime()` is a pure calculation (`clockTimeAtStart + (audioContext.currentTime - audioTimeAtStart)`) — safe to call from any frame at any frequency.
+
 ## Testing Strategy
 
 - **Core (clock, scheduler, timer)** — unit tests with mocked `AudioContext.currentTime`, no real audio
