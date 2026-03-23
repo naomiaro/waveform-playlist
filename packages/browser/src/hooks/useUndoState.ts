@@ -26,11 +26,19 @@ export function useUndoState({ engineRef }: UseUndoStateProps): UndoControls & {
   const [canRedo, setCanRedo] = useState(false);
 
   const undo = useCallback(() => {
-    engineRef.current?.undo();
+    if (!engineRef.current) {
+      console.warn('[waveform-playlist] undo: engine not ready, call ignored');
+      return;
+    }
+    engineRef.current.undo();
   }, [engineRef]);
 
   const redo = useCallback(() => {
-    engineRef.current?.redo();
+    if (!engineRef.current) {
+      console.warn('[waveform-playlist] redo: engine not ready, call ignored');
+      return;
+    }
+    engineRef.current.redo();
   }, [engineRef]);
 
   // Called by the provider's statechange handler to mirror engine state.

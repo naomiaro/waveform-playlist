@@ -315,6 +315,10 @@ export class ClipPointerHandler {
               },
             })
           );
+        } else {
+          console.warn(
+            '[dawcore] engine unavailable at trim drop — trim not applied for clip ' + this._clipId
+          );
         }
       }
     } finally {

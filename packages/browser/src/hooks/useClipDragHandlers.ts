@@ -99,7 +99,13 @@ export function useClipDragHandlers({
       if (!data.boundary) {
         originalClipStateRef.current = null;
         // Group move into one undo step
-        engineRef.current?.beginTransaction();
+        if (engineRef.current) {
+          engineRef.current.beginTransaction();
+        } else {
+          console.warn(
+            '[waveform-playlist] onDragStart: engine not ready, move will not be grouped for undo'
+          );
+        }
         return;
       }
 
@@ -116,7 +122,13 @@ export function useClipDragHandlers({
         // Signal provider to skip loadAudio rebuilds during the drag
         isDraggingRef.current = true;
         // Group the drag into one undo step
-        engineRef.current?.beginTransaction();
+        if (engineRef.current) {
+          engineRef.current.beginTransaction();
+        } else {
+          console.warn(
+            '[waveform-playlist] onDragStart: engine not ready, trim will not be grouped for undo'
+          );
+        }
       }
     },
     [tracks, isDraggingRef, engineRef]
@@ -267,7 +279,11 @@ export function useClipDragHandlers({
           }
         | undefined;
 
-      if (!data) return;
+      if (!data) {
+        // Transaction was opened in onDragStart — abort to prevent leak
+        engineRef.current?.abortTransaction();
+        return;
+      }
 
       const { trackIndex, clipId, boundary } = data;
 
