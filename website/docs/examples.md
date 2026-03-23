@@ -217,7 +217,7 @@ import { KeyboardShortcuts } from '@waveform-playlist/browser';
 
 // Declarative — just enable the features you want
 <WaveformPlaylistProvider tracks={tracks} {...}>
-  <KeyboardShortcuts playback clipSplitting />
+  <KeyboardShortcuts playback clipSplitting undo />
   <Waveform />
 </WaveformPlaylistProvider>
 

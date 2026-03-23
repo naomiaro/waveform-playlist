@@ -325,6 +325,10 @@ interface PlaylistStateContextValue {
   loopEnd: number;
   /** Whether playback continues past the end of loaded audio */
   indefinitePlayback: boolean;
+  /** Whether undo is available */
+  canUndo: boolean;
+  /** Whether redo is available */
+  canRedo: boolean;
 }
 ```
 
@@ -407,6 +411,10 @@ interface PlaylistControlsContextValue {
   setLoopRegion: (start: number, end: number) => void;
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
+
+  // Undo/redo
+  undo: () => void;
+  redo: () => void;
 }
 ```
 
