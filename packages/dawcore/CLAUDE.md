@@ -111,6 +111,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Use `getGlobalAudioContext()` for decode** — Import from `@waveform-playlist/playout`. Same context Tone.js uses. `decodeAudioData` works while suspended (pre-gesture). Never create a separate AudioContext for decoding.
 - **Pointer interactions extracted** — `interactions/pointer-handler.ts` handles pointerdown/move/up, caches timeline ref and rect, distinguishes click vs drag. The host implements `PointerHandlerHost` interface.
 - **Peak pipeline extracted** — `workers/peakPipeline.ts` manages worker lifecycle, WaveformData cache, inflight dedup.
+- **Prevent native drag on interactive elements** — `<daw-editor>` has `@dragover`/`@drop` for file drops, which activates the browser's drag-and-drop system. Clip headers and boundaries need `e.preventDefault()` on `pointerdown` (in pointer-handler delegation), `-webkit-user-drag: none` and `user-select: none` in CSS to prevent the browser from stealing pointer events during custom drag operations.
 
 ## Clip Interactions
 
@@ -126,6 +127,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Statechange syncs `_engineTracks`** — When `tracksVersion` changes, rebuild `_engineTracks` Map from engine state. This is how `moveClip`/`trimClip`/`splitClip` trigger Lit re-renders.
 - **`DRAG_THRESHOLD`** — Shared constant in `interactions/constants.ts` (3px, click vs drag). Boundary width (8px) is CSS-only in `styles/theme.ts` (CSS can't import JS constants).
 - **Keyboard shortcut modifier guard** — `_onKeyDown` must check `e.ctrlKey || e.metaKey || e.altKey` before handling `S` key. Without this, Ctrl+S (save) triggers split.
+- **`engine.constrainTrimDelta()`** — Wraps the engine's `constrainBoundaryTrim` pure function. Call during trim drag for per-frame collision detection (timeline bounds, audio bounds, neighbor overlap, min duration). Don't manually clamp — use the engine's constraints so visual preview matches what's applied on drop.
 
 ## Typed Events
 
