@@ -25,7 +25,7 @@ import type {
 } from '../events';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
-import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
+import { splitAtPlayheadSafe } from '../interactions/split-handler';
 import { handleKeyboardEvent } from '@waveform-playlist/core';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
@@ -637,23 +637,15 @@ export class DawEditorElement extends LitElement {
 
   /** Split the clip under the playhead on the selected track. */
   splitAtPlayhead(): boolean {
-    const wasPlaying = this._isPlaying;
-    const time = this._currentTime;
-    // Stop before split to avoid duplicate audio from Transport rescheduling
-    if (wasPlaying) {
-      this.stop();
-    }
-    const result = performSplitAtPlayhead({
+    return splitAtPlayheadSafe({
       effectiveSampleRate: this.effectiveSampleRate,
-      currentTime: time,
+      currentTime: this._currentTime,
+      isPlaying: this._isPlaying,
       engine: this._engine,
       dispatchEvent: (e: Event) => this.dispatchEvent(e),
+      stop: () => this.stop(),
+      play: (time: number) => this.play(time),
     });
-    // Resume playback from the same position
-    if (wasPlaying && result) {
-      this.play(time);
-    }
-    return result;
   }
 
   /** Get the active shortcuts — user-provided or defaults. */

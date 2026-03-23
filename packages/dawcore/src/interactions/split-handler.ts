@@ -93,6 +93,38 @@ export function splitAtPlayhead(host: SplitHost): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Split with playback management
+// ---------------------------------------------------------------------------
+
+export interface SplitDuringPlaybackHost extends SplitHost {
+  readonly isPlaying: boolean;
+  stop(): void;
+  play(time: number): void;
+}
+
+/**
+ * Split at playhead with stop→split→resume to avoid duplicate audio.
+ * During playback, replaceTrackClips creates new sources alongside old ones.
+ * Stopping first ensures clean Transport state.
+ */
+export function splitAtPlayheadSafe(host: SplitDuringPlaybackHost): boolean {
+  const wasPlaying = host.isPlaying;
+  const time = host.currentTime;
+
+  if (wasPlaying) {
+    host.stop();
+  }
+
+  const result = splitAtPlayhead(host);
+
+  if (wasPlaying && result) {
+    host.play(time);
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 

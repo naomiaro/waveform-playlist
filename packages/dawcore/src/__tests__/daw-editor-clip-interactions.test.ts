@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { splitAtPlayhead } from '../interactions/split-handler';
-import type { SplitHost } from '../interactions/split-handler';
+import { splitAtPlayhead, splitAtPlayheadSafe } from '../interactions/split-handler';
+import type { SplitHost, SplitDuringPlaybackHost } from '../interactions/split-handler';
 import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 
 // ---------------------------------------------------------------------------
@@ -311,5 +311,101 @@ describe('splitAtPlayhead', () => {
       expect(result).toBe(false);
       expect(host.events).toHaveLength(0);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// splitAtPlayheadSafe — stop/resume during playback
+// ---------------------------------------------------------------------------
+
+describe('splitAtPlayheadSafe', () => {
+  function createPlaybackHost(
+    overrides: Partial<SplitDuringPlaybackHost> = {}
+  ): SplitDuringPlaybackHost & { events: Event[] } {
+    const events: Event[] = [];
+    return {
+      effectiveSampleRate: 48000,
+      currentTime: 0.5,
+      isPlaying: false,
+      engine: null,
+      stop: vi.fn(),
+      play: vi.fn(),
+      dispatchEvent: vi.fn((event: Event) => {
+        events.push(event);
+        return true;
+      }),
+      events,
+      ...overrides,
+    };
+  }
+
+  it('stops playback before split and resumes after success', () => {
+    const clip = makeClip('clip-1', 0, 96000);
+    const track = makeTrack('track-1', [clip]);
+
+    const leftClip = makeClip('clip-left', 0, 24000);
+    const rightClip = makeClip('clip-right', 24000, 72000);
+    const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
+
+    const engine = {
+      getState: vi
+        .fn()
+        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] })
+        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
+      splitClip: vi.fn(),
+    };
+
+    const host = createPlaybackHost({
+      engine,
+      currentTime: 0.5,
+      isPlaying: true,
+    });
+
+    const result = splitAtPlayheadSafe(host);
+
+    expect(result).toBe(true);
+    expect(host.stop).toHaveBeenCalledTimes(1);
+    expect(host.play).toHaveBeenCalledWith(0.5);
+  });
+
+  it('does not stop or resume when not playing', () => {
+    const clip = makeClip('clip-1', 0, 96000);
+    const track = makeTrack('track-1', [clip]);
+
+    const leftClip = makeClip('clip-left', 0, 24000);
+    const rightClip = makeClip('clip-right', 24000, 72000);
+    const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
+
+    const engine = {
+      getState: vi
+        .fn()
+        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] })
+        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
+      splitClip: vi.fn(),
+    };
+
+    const host = createPlaybackHost({
+      engine,
+      currentTime: 0.5,
+      isPlaying: false,
+    });
+
+    splitAtPlayheadSafe(host);
+
+    expect(host.stop).not.toHaveBeenCalled();
+    expect(host.play).not.toHaveBeenCalled();
+  });
+
+  it('does not resume when split fails', () => {
+    const host = createPlaybackHost({
+      engine: null,
+      isPlaying: true,
+    });
+
+    const result = splitAtPlayheadSafe(host);
+
+    expect(result).toBe(false);
+    expect(host.stop).toHaveBeenCalledTimes(1);
+    expect(host.play).not.toHaveBeenCalled();
   });
 });
