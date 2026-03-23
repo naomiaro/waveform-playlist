@@ -345,13 +345,8 @@ export function createClip(options: CreateClipOptions): AudioClip {
     );
   }
 
-  // Warn if sample rates don't match
-  if (audioBuffer && waveformData && audioBuffer.sampleRate !== waveformData.sample_rate) {
-    console.warn(
-      `Sample rate mismatch: audioBuffer (${audioBuffer.sampleRate}) vs waveformData (${waveformData.sample_rate}). ` +
-        `Using audioBuffer sample rate. Waveform visualization may be slightly off.`
-    );
-  }
+  // Note: audioBuffer and waveformData may have different sample rates (e.g., Opus at 48000
+  // decoded on 44100 hardware). This is expected — callers handle rate conversion for peaks.
 
   // Default duration to full source duration
   const durationSamples = options.durationSamples ?? sourceDurationSamples;

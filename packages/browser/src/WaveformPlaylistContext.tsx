@@ -868,29 +868,33 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         let peaks: PeakData | undefined;
 
         // Path A: External pre-computed waveform data (e.g. from audiowaveform .dat file)
-        // When sample rates match, always use pre-computed peaks (fast, accurate).
-        // When rates mismatch AND audioBuffer is available, skip to Path B (worker)
-        // for correct trim/split/zoom. When rates mismatch but no audioBuffer yet
-        // (immediate/progressive loading), use pre-computed peaks as a preview —
-        // slightly off but better than blank. Worker replaces them once audio decodes.
+        // When sample rates match, use clip offsets directly.
+        // When rates mismatch (e.g., waveformData at 48000 Hz, clip rebuilt at 44100 Hz
+        // after audio decode), convert offsets to the waveformData's sample space and
+        // adjust samplesPerPixel so peaks fill the correct container width.
+        // Path B (worker) replaces these on next render once cache is populated.
         if (clip.waveformData) {
-          const ratesMatch = clip.waveformData.sample_rate === sampleRateRef.current;
-          const hasWorkerFallback = !!clip.audioBuffer;
-          if (ratesMatch || !hasWorkerFallback) {
-            try {
-              peaks = extractPeaksFromWaveformDataFull(
-                clip.waveformData as WaveformData,
-                samplesPerPixel,
-                mono,
-                clip.offsetSamples,
-                clip.durationSamples
-              );
-            } catch (err) {
-              console.warn('[waveform-playlist] Failed to extract peaks from waveformData:', err);
+          try {
+            const wdRate = clip.waveformData.sample_rate;
+            const clipRate = clip.sampleRate;
+            let peakOffset = clip.offsetSamples;
+            let peakDuration = clip.durationSamples;
+            let peakSpp = samplesPerPixel;
+            if (wdRate !== clipRate) {
+              const ratio = wdRate / clipRate;
+              peakOffset = Math.round(clip.offsetSamples * ratio);
+              peakDuration = Math.round(clip.durationSamples * ratio);
+              peakSpp = Math.round(samplesPerPixel * ratio);
             }
-          }
-          if (!ratesMatch && hasWorkerFallback) {
-            // Worker will generate correct peaks from decoded audio
+            peaks = extractPeaksFromWaveformDataFull(
+              clip.waveformData as WaveformData,
+              peakSpp,
+              mono,
+              peakOffset,
+              peakDuration
+            );
+          } catch (err) {
+            console.warn('[waveform-playlist] Failed to extract peaks from waveformData:', err);
           }
         }
 
