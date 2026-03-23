@@ -35,7 +35,7 @@ function makeTrack(id: string, clips: ReturnType<typeof makeClip>[]): ClipTrack 
 }
 
 function makePeakData(): PeakData {
-  return { data: [new Int16Array(10)], length: 10 };
+  return { data: [new Int16Array(10)], length: 10, bits: 16 };
 }
 
 function makeAudioBuffer(): AudioBuffer {
