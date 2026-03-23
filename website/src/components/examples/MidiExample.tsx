@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import * as Tone from 'tone';
 import {
@@ -408,6 +409,7 @@ export function MidiExample() {
       {filteredTracks.length > 0 ? (
         <WaveformPlaylistProvider
           tracks={filteredTracks}
+          audioContext={getExampleAudioContext()}
           samplesPerPixel={2048}
           mono
           theme={{ ...theme, ...gradientTheme }}

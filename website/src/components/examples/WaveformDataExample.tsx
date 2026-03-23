@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
 import {
@@ -144,12 +145,7 @@ interface BBCPeaksData {
 export function WaveformDataExample() {
   const { theme } = useDocusaurusTheme();
   const [bbcPeaks, setBbcPeaks] = useState<Map<string, BBCPeaksData>>(new Map());
-  // Create AudioContext at 48000 Hz to match .dat peaks — lazy, created once
-  const [audioCtx] = useState(() =>
-    typeof AudioContext !== 'undefined'
-      ? new AudioContext({ sampleRate: 48000 })
-      : undefined
-  );
+  const audioCtx = getExampleAudioContext();
 
   // Load BBC peaks independently - each track appears as its peaks load
   useEffect(() => {

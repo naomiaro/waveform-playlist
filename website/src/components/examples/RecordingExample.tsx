@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
@@ -604,6 +605,7 @@ export function RecordingExample() {
       <Container>
         <WaveformPlaylistProvider
           tracks={tracks}
+          audioContext={getExampleAudioContext()}
           onTracksChange={setTracks}
           samplesPerPixel={1024}
           zoomLevels={[256, 512, 1024, 2048, 4096]}

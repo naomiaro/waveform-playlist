@@ -1,4 +1,5 @@
 import React from 'react';
+import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -118,6 +119,7 @@ export function StemTracksExample() {
     <Container>
       <WaveformPlaylistProvider
         tracks={tracks}
+        audioContext={getExampleAudioContext()}
         samplesPerPixel={512}
         mono
         waveHeight={100}

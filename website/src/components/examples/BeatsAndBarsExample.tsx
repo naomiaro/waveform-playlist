@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
@@ -219,6 +220,7 @@ export function BeatsAndBarsExample() {
   return (
     <WaveformPlaylistProvider
       tracks={tracksState}
+      audioContext={getExampleAudioContext()}
       onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono

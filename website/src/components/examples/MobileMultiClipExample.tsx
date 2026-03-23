@@ -11,6 +11,7 @@
  * Touch and hold a clip edge to trim it.
  */
 import React, { useState, useEffect } from 'react';
+import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
@@ -265,6 +266,7 @@ export function MobileMultiClipExample() {
 
       <WaveformPlaylistProvider
         tracks={tracks}
+        audioContext={getExampleAudioContext()}
         onTracksChange={setTracks}
         samplesPerPixel={1024}
         mono

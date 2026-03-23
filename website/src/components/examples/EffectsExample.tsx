@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
 
@@ -765,6 +766,7 @@ export function EffectsExample() {
 
       <WaveformPlaylistProvider
         tracks={tracksWithEffects}
+        audioContext={getExampleAudioContext()}
         samplesPerPixel={512}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         waveHeight={100}
