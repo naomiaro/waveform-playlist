@@ -14,8 +14,8 @@ export async function loadWaveformDataFromUrl(src: string): Promise<WaveformData
     throw new Error('[dawcore] Failed to fetch peaks data: ' + response.statusText);
   }
 
-  // Detect binary format: strip query string and fragment before checking extension
-  const pathname = src.split('?')[0].split('#')[0];
+  // Detect binary format from pathname (ignores query string and fragment)
+  const { pathname } = new URL(src, globalThis.location?.href ?? 'http://localhost');
   const isBinary = pathname.toLowerCase().endsWith('.dat');
 
   if (isBinary) {
