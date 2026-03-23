@@ -14,7 +14,7 @@ waveform-playlist is a React component library for building browser-based audio 
 - Recording with live waveform preview and VU level metering (input and output)
 - WAV export with offline rendering
 - BBC audiowaveform support for instant rendering of large files
-- AudioContext passthrough for sample rate control (`audioContext` prop on provider)
+- Sample rate hint for pre-computed peaks matching (`sampleRate` prop on provider)
 - Theming via styled-components
 
 ## Packages

@@ -254,11 +254,10 @@ export interface WaveformPlaylistProviderProps {
   /** Disable automatic stop when the cursor reaches the end of the longest
    *  track. Useful for DAW-style recording beyond existing audio. */
   indefinitePlayback?: boolean;
-  /** Pre-configured AudioContext for sampleRate/latencyHint control.
-   *  Example: `new AudioContext({ sampleRate: 48000, latencyHint: 0 })`.
-   *  Pre-computed peaks (.dat files) render instantly when their sample rate
-   *  matches the AudioContext rate. On mismatch, falls back to worker. */
-  audioContext?: AudioContext;
+  /** Desired AudioContext sample rate. Creates a cross-browser AudioContext at
+   *  this rate via standardized-audio-context. Pre-computed peaks (.dat files)
+   *  render instantly when they match. On mismatch, falls back to worker. */
+  sampleRate?: number;
   children: ReactNode;
 }
 
@@ -284,7 +283,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   soundFontCache,
   deferEngineRebuild = false,
   indefinitePlayback = false,
-  audioContext: audioContextProp,
+  sampleRate: sampleRateProp,
   children,
 }) => {
   // Default progressBarWidth to barWidth + barGap (fills gaps)
@@ -389,19 +388,21 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // AudioContext is undefined. Rate never changes after context creation.
   // If sampleRateHint is provided, configure the context before reading the rate.
   const [initialSampleRate] = useState<number>(() => {
-    if (typeof AudioContext === 'undefined') return 48000;
+    if (typeof AudioContext === 'undefined') return sampleRateProp ?? 48000;
     try {
-      if (audioContextProp) {
-        return configureGlobalContext({ audioContext: audioContextProp });
+      if (sampleRateProp !== undefined) {
+        return configureGlobalContext({ sampleRate: sampleRateProp });
       }
       return getGlobalAudioContext().sampleRate;
     } catch (err) {
       console.warn(
         '[waveform-playlist] Failed to configure AudioContext: ' +
           String(err) +
-          ' — falling back to 48000 Hz'
+          ' — falling back to ' +
+          (sampleRateProp ?? 48000) +
+          ' Hz'
       );
-      return 48000;
+      return sampleRateProp ?? 48000;
     }
   });
   const sampleRateRef = useRef<number>(initialSampleRate);

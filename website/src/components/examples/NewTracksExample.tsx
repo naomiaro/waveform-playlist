@@ -8,7 +8,6 @@
  */
 
 import React, { useCallback } from 'react';
-import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -126,7 +125,7 @@ export function NewTracksExample() {
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
           tracks={tracks}
-          audioContext={getExampleAudioContext()}
+          sampleRate={48000}
           samplesPerPixel={8192}
           zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
           mono

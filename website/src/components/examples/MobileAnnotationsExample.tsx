@@ -11,7 +11,6 @@
  * Tap an annotation to select it and play from that point.
  */
 import React, { useState, useCallback, useEffect } from 'react';
-import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
@@ -411,7 +410,7 @@ export function MobileAnnotationsExample() {
   return (
     <WaveformPlaylistProvider
       tracks={tracks}
-      audioContext={getExampleAudioContext()}
+      sampleRate={48000}
       samplesPerPixel={1024}
       mono
       waveHeight={100}

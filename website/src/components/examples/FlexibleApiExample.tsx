@@ -10,7 +10,6 @@
  */
 
 import React, { useRef, useEffect, useState } from 'react';
-import { getExampleAudioContext } from '../audioContext';
 import { getContext } from 'tone';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
@@ -557,7 +556,7 @@ export function FlexibleApiExample() {
       <Container>
         <WaveformPlaylistProvider
           tracks={tracks}
-          audioContext={getExampleAudioContext()}
+          sampleRate={48000}
           onTracksChange={setTracks}
           deferEngineRebuild={loading}
           samplesPerPixel={512}

@@ -8,7 +8,6 @@
  */
 
 import React from 'react';
-import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -68,7 +67,7 @@ export function StereoExample() {
   return (
     <WaveformPlaylistProvider
       tracks={tracks}
-      audioContext={getExampleAudioContext()}
+      sampleRate={48000}
       samplesPerPixel={1024}
       theme={theme}
       barWidth={2}

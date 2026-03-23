@@ -114,19 +114,17 @@ Pre-computed peaks embed the source audio's sample rate (e.g., 48000 Hz). The br
   - **WAV at 48000 Hz** — uncompressed, lossless. `ffmpeg -i audio.wav -ar 48000 audio-48k.wav`
   - **FLAC at 48000 Hz** — lossless compression (~50-60% of WAV). `ffmpeg -i audio.wav -ar 48000 audio-48k.flac`
 - Generate `.dat` files from your 48000 Hz audio so peaks match the hardware rate
-- **Pass your own AudioContext** to guarantee the sample rate matches your peaks:
+- **Set the `sampleRate` prop** to get an early warning when the hardware rate doesn't match:
 
 ```tsx
 // React
-const [ctx] = useState(() => new AudioContext({ sampleRate: 48000 }));
-<WaveformPlaylistProvider audioContext={ctx} tracks={tracks} />
+<WaveformPlaylistProvider sampleRate={48000} tracks={tracks} />
 
 // Web Components
-const editor = document.querySelector('daw-editor');
-editor.audioContext = new AudioContext({ sampleRate: 48000 });
+<daw-editor sample-rate="48000">
 ```
 
-This bypasses the browser's hardware default and ensures pre-computed peaks render instantly.
+When the hardware rate matches, pre-computed peaks render instantly. On mismatch, peaks fall back to worker generation from decoded audio (slower but correct).
 :::
 
 ### Using Pre-computed Waveforms

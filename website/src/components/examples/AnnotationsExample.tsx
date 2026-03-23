@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
 import { DragDropProvider } from '@dnd-kit/react';
@@ -726,7 +725,7 @@ export function AnnotationsExample() {
   return (
     <WaveformPlaylistProvider
       tracks={tracks}
-      audioContext={getExampleAudioContext()}
+      sampleRate={48000}
       samplesPerPixel={1024}
       mono
       waveHeight={128}

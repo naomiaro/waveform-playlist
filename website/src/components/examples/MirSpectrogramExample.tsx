@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import { getExampleAudioContext } from '../audioContext';
 import styled from 'styled-components';
 import * as Tone from 'tone';
 import {
@@ -157,7 +156,7 @@ export function MirSpectrogramExample() {
       {allTracks.length > 0 && (
         <WaveformPlaylistProvider
           tracks={allTracks}
-          audioContext={getExampleAudioContext()}
+          sampleRate={48000}
           theme={theme}
           timescale
           automaticScroll

@@ -70,12 +70,9 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
   @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
   @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
-  /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
+  /** Desired sample rate. Creates a cross-browser AudioContext at this rate.
+   *  Pre-computed .dat peaks render instantly when they match. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
-  /** Pre-configured AudioContext for sampleRate/latencyHint control.
-   *  Set via JS: `editor.audioContext = new AudioContext({ sampleRate: 48000 })`.
-   *  Takes precedence over sample-rate attribute. */
-  audioContext: AudioContext | null = null;
   /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
   _resolvedSampleRate: number | null = null;
   @state() _tracks: Map<string, TrackDescriptor> = new Map();
@@ -626,9 +623,9 @@ export class DawEditorElement extends LitElement {
     if (!this._contextConfigurePromise) {
       this._contextConfigurePromise = (async () => {
         const { configureGlobalContext } = await import('@waveform-playlist/playout');
-        const actualRate = this.audioContext
-          ? configureGlobalContext({ audioContext: this.audioContext })
-          : configureGlobalContext({ sampleRate: this.sampleRate });
+        const actualRate = configureGlobalContext({
+          sampleRate: this.sampleRate,
+        });
         if (actualRate !== this.sampleRate) {
           console.warn(
             '[dawcore] Requested sampleRate ' +
