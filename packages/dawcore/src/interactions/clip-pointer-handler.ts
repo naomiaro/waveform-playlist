@@ -28,6 +28,10 @@ export interface ClipEngineContract {
     boundary: 'left' | 'right',
     deltaSamples: number
   ): number;
+  /** Begin a transaction — groups mutations into one undo step. */
+  beginTransaction(): void;
+  /** Commit the transaction — pushes one undo step for all grouped mutations. */
+  commitTransaction(): void;
 }
 
 /** Peak data returned by reextractClipPeaks for imperative waveform updates. */
@@ -135,6 +139,9 @@ export class ClipPointerHandler {
     this._isDragging = false;
     this._lastDeltaPx = 0;
     this._cumulativeDeltaSamples = 0;
+
+    // Group all drag mutations into one undo step
+    this._host.engine?.beginTransaction();
 
     // For trim: snapshot the clip container's current position/width
     if (mode === 'trim-left' || mode === 'trim-right') {
@@ -302,6 +309,8 @@ export class ClipPointerHandler {
         }
       }
     } finally {
+      // Commit transaction — one undo step for the entire drag gesture
+      this._host.engine?.commitTransaction();
       this._reset();
     }
   }
