@@ -83,6 +83,7 @@
 
   <script type="module">
     const editor = document.getElementById('editor');
+    editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
     const log = document.getElementById('log');
     const micBtn = document.getElementById('mic-btn');
     const micStatus = document.getElementById('mic-status');
