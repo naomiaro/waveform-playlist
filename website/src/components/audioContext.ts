@@ -7,7 +7,7 @@ let sharedContext: AudioContext | undefined;
 
 export function getExampleAudioContext(): AudioContext | undefined {
   if (typeof AudioContext === 'undefined') return undefined;
-  if (!sharedContext) {
+  if (!sharedContext || sharedContext.state === 'closed') {
     sharedContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
   }
   return sharedContext;

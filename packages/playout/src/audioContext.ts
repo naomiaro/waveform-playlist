@@ -59,6 +59,22 @@ export function configureGlobalContext(options: AudioContextOptions): number {
     return existingRate;
   }
   if (options.audioContext) {
+    // Validate before wrapping — catch common mistakes early
+    if (options.audioContext.state === 'closed') {
+      throw new Error(
+        '[playout] configureGlobalContext: the provided AudioContext is closed. ' +
+          'Create a new AudioContext or ensure the existing one has not been closed.'
+      );
+    }
+    if (
+      typeof OfflineAudioContext !== 'undefined' &&
+      options.audioContext instanceof OfflineAudioContext
+    ) {
+      throw new Error(
+        '[playout] configureGlobalContext: received an OfflineAudioContext. ' +
+          'Pass a standard AudioContext for real-time playback.'
+      );
+    }
     // User-provided AudioContext — wrap in Tone.js Context
     globalToneContext = new Context(options.audioContext);
     setContext(globalToneContext);
@@ -75,9 +91,11 @@ export function configureGlobalContext(options: AudioContextOptions): number {
         options.sampleRate +
         ' but AudioContext is running at ' +
         actualRate +
-        ' — pre-computed peaks at ' +
+        ' — pre-computed peaks will fall back to worker. ' +
+        'For reliable rate control, pass your own AudioContext: ' +
+        'configureGlobalContext({ audioContext: new AudioContext({ sampleRate: ' +
         options.sampleRate +
-        ' Hz will fall back to worker'
+        ' }) })'
     );
   }
   return actualRate;

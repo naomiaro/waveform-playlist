@@ -390,10 +390,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // If sampleRateHint is provided, configure the context before reading the rate.
   const [initialSampleRate] = useState<number>(() => {
     if (typeof AudioContext === 'undefined') return 48000;
-    if (audioContextProp) {
-      return configureGlobalContext({ audioContext: audioContextProp });
+    try {
+      if (audioContextProp) {
+        return configureGlobalContext({ audioContext: audioContextProp });
+      }
+      return getGlobalAudioContext().sampleRate;
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] Failed to configure AudioContext: ' +
+          String(err) +
+          ' — falling back to 48000 Hz'
+      );
+      return 48000;
     }
-    return getGlobalAudioContext().sampleRate;
   });
   const sampleRateRef = useRef<number>(initialSampleRate);
 
