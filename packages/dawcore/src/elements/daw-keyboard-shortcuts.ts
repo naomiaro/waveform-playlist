@@ -60,10 +60,19 @@ export class DawKeyboardShortcutsElement extends LitElement {
   customShortcuts: KeyboardShortcut[] = [];
 
   private _editor: DawEditorElement | null = null;
+  private _cachedShortcuts: KeyboardShortcut[] | null = null;
 
-  /** All active shortcuts (read-only). */
+  /** All active shortcuts (read-only, cached). */
   get shortcuts(): KeyboardShortcut[] {
-    return this._buildShortcuts();
+    if (!this._cachedShortcuts) {
+      this._cachedShortcuts = this._buildShortcuts();
+    }
+    return this._cachedShortcuts;
+  }
+
+  /** Invalidate cached shortcuts when Lit properties change. */
+  override updated(): void {
+    this._cachedShortcuts = null;
   }
 
   // --- Lifecycle ---
@@ -142,14 +151,16 @@ export class DawKeyboardShortcutsElement extends LitElement {
       // Use === undefined to distinguish "not specified" (auto-expand) from
       // "explicitly false" (user wants no modifier — respect their intent).
       if (undoBinding.ctrlKey === undefined && undoBinding.metaKey === undefined) {
+        // Only set shiftKey: false when user didn't provide a value
+        const undoShift = undoBinding.shiftKey === undefined ? { shiftKey: false } : {};
         result.push(
           this._makeShortcut(
-            { ...undoBinding, ctrlKey: true, shiftKey: false },
+            { ...undoBinding, ctrlKey: true, ...undoShift },
             () => editor.undo(),
             'Undo'
           ),
           this._makeShortcut(
-            { ...undoBinding, metaKey: true, shiftKey: false },
+            { ...undoBinding, metaKey: true, ...undoShift },
             () => editor.undo(),
             'Undo'
           )
@@ -160,14 +171,15 @@ export class DawKeyboardShortcutsElement extends LitElement {
 
       // Redo: Ctrl+Shift+Z (Win/Linux) and Cmd+Shift+Z (Mac)
       if (redoBinding.ctrlKey === undefined && redoBinding.metaKey === undefined) {
+        const redoShift = redoBinding.shiftKey === undefined ? { shiftKey: true } : {};
         result.push(
           this._makeShortcut(
-            { ...redoBinding, ctrlKey: true, shiftKey: true },
+            { ...redoBinding, ctrlKey: true, ...redoShift },
             () => editor.redo(),
             'Redo'
           ),
           this._makeShortcut(
-            { ...redoBinding, metaKey: true, shiftKey: true },
+            { ...redoBinding, metaKey: true, ...redoShift },
             () => editor.redo(),
             'Redo'
           )
@@ -200,13 +212,14 @@ export class DawKeyboardShortcutsElement extends LitElement {
   // --- Event handler ---
 
   private _onKeyDown = (e: KeyboardEvent) => {
-    const shortcuts = this._buildShortcuts();
+    const shortcuts = this.shortcuts;
     if (shortcuts.length === 0) return;
     try {
       handleKeyboardEvent(e, shortcuts, true);
     } catch (err) {
       console.warn('[dawcore] Keyboard shortcut failed (key=' + e.key + '): ' + String(err));
-      this._editor?.dispatchEvent(
+      const target = this._editor ?? this;
+      target.dispatchEvent(
         new CustomEvent('daw-error', {
           bubbles: true,
           composed: true,
