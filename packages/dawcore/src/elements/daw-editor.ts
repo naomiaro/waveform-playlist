@@ -686,6 +686,9 @@ export class DawEditorElement extends LitElement {
     if (this.interactiveClips) {
       defaults.push({
         key: 's',
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
         action: () => this.splitAtPlayhead(),
         description: 'Split at playhead',
       });
