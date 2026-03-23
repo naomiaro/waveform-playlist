@@ -11,6 +11,7 @@ import './elements/daw-ruler';
 import './elements/daw-selection';
 import './elements/daw-track-controls';
 import './elements/daw-record-button';
+import './elements/daw-keyboard-shortcuts';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
@@ -26,6 +27,13 @@ export { DawRulerElement } from './elements/daw-ruler';
 export { DawSelectionElement } from './elements/daw-selection';
 export { DawTrackControlsElement } from './elements/daw-track-controls';
 export { DawRecordButtonElement } from './elements/daw-record-button';
+export { DawKeyboardShortcutsElement } from './elements/daw-keyboard-shortcuts';
+export type {
+  KeyBinding,
+  PlaybackShortcutMap,
+  SplittingShortcutMap,
+  UndoShortcutMap,
+} from './elements/daw-keyboard-shortcuts';
 
 export { AudioResumeController } from './controllers/audio-resume-controller';
 export { RecordingController } from './controllers/recording-controller';

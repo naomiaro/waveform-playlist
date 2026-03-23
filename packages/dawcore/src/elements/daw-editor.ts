@@ -26,8 +26,6 @@ import type {
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
-import { handleKeyboardEvent } from '@waveform-playlist/core';
-import type { KeyboardShortcut } from '@waveform-playlist/core';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
 
 @customElement('daw-editor')
@@ -42,10 +40,6 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
   @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
   @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
-  /** Enable default keyboard shortcuts (Space, Escape, 0, and S when interactive-clips). */
-  @property({ type: Boolean, attribute: 'keyboard-shortcuts' }) keyboardShortcuts = false;
-  /** Custom keyboard shortcuts. Set via JS property. Overrides defaults when non-null. */
-  shortcuts: KeyboardShortcut[] | null = null;
   /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
   /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
@@ -183,7 +177,6 @@ export class DawEditorElement extends LitElement {
   // --- Lifecycle ---
   connectedCallback() {
     super.connectedCallback();
-    document.addEventListener('keydown', this._onKeyDown);
     this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
@@ -210,7 +203,6 @@ export class DawEditorElement extends LitElement {
   }
   disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener('keydown', this._onKeyDown);
     this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
@@ -708,63 +700,6 @@ export class DawEditorElement extends LitElement {
       },
     });
   }
-
-  /** Get the active shortcuts — custom overrides defaults when non-null. */
-  private _getActiveShortcuts(): KeyboardShortcut[] {
-    // Custom shortcuts override everything (including empty array = no shortcuts)
-    if (this.shortcuts !== null) return this.shortcuts;
-    // Defaults only when keyboard-shortcuts attribute is set
-    if (!this.keyboardShortcuts) return [];
-    const defaults: KeyboardShortcut[] = [
-      { key: ' ', action: () => this.togglePlayPause(), description: 'Play/Pause' },
-      { key: 'Escape', action: () => this.stop(), description: 'Stop' },
-      { key: '0', action: () => this.seekTo(0), description: 'Rewind to start' },
-      { key: 'z', ctrlKey: true, shiftKey: false, action: () => this.undo(), description: 'Undo' },
-      {
-        key: 'z',
-        ctrlKey: true,
-        shiftKey: true,
-        action: () => this.redo(),
-        description: 'Redo',
-      },
-      { key: 'z', metaKey: true, shiftKey: false, action: () => this.undo(), description: 'Undo' },
-      {
-        key: 'z',
-        metaKey: true,
-        shiftKey: true,
-        action: () => this.redo(),
-        description: 'Redo',
-      },
-    ];
-    if (this.interactiveClips) {
-      defaults.push({
-        key: 's',
-        ctrlKey: false,
-        metaKey: false,
-        altKey: false,
-        action: () => this.splitAtPlayhead(),
-        description: 'Split at playhead',
-      });
-    }
-    return defaults;
-  }
-
-  private _onKeyDown = (e: KeyboardEvent) => {
-    const shortcuts = this._getActiveShortcuts();
-    if (shortcuts.length === 0) return;
-    try {
-      handleKeyboardEvent(e, shortcuts, true);
-    } catch (err) {
-      console.warn('[dawcore] Keyboard shortcut failed: ' + String(err));
-      this.dispatchEvent(
-        new CustomEvent('daw-error', {
-          bubbles: true,
-          composed: true,
-          detail: { operation: 'keyboard-shortcut', error: err },
-        })
-      );
-    }
-  };
 
   // --- Recording ---
   recordingStream: MediaStream | null = null;

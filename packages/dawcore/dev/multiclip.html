@@ -45,7 +45,9 @@
 
   <script type="module" src="/src/index.ts"></script>
 
-  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers interactive-clips keyboard-shortcuts>
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers interactive-clips>
+    <daw-keyboard-shortcuts playback splitting undo></daw-keyboard-shortcuts>
+
     <!-- Kick: two clips with a gap -->
     <daw-track name="Kick">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/01_Kick.opus"
