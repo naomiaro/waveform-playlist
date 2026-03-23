@@ -59,9 +59,9 @@ export class PeakPipeline {
 
   /**
    * Re-extract peaks for all clips at a new zoom level using cached WaveformData.
-   * Only works for zoom levels coarser than (or equal to) the cached base scale.
-   * Returns a new Map of clipId → PeakData. Clips without cached data or where
-   * the target scale is finer than the cached base are skipped.
+   * Returns a new Map of clipId → PeakData. Clips without cached data are skipped.
+   * When the requested scale is finer than cached data, peaks are clamped to the
+   * cached scale and a single summary warning is logged.
    */
   reextractPeaks(
     clipBuffers: ReadonlyMap<string, AudioBuffer>,

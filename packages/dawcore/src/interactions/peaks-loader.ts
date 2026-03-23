@@ -1,11 +1,8 @@
 /**
  * Load pre-computed waveform data from a .dat or .json file (BBC audiowaveform format).
- * Returns PeakData ready for rendering.
  */
 
 import WaveformData from 'waveform-data';
-import type { PeakData } from '@waveform-playlist/core';
-import { extractPeaks } from '../workers/waveformDataUtils';
 
 /**
  * Fetch and parse a waveform data file (.dat binary or .json).
@@ -17,7 +14,9 @@ export async function loadWaveformDataFromUrl(src: string): Promise<WaveformData
     throw new Error('[dawcore] Failed to fetch peaks data: ' + response.statusText);
   }
 
-  const isBinary = src.endsWith('.dat');
+  // Detect binary format: strip query string and fragment before checking extension
+  const pathname = src.split('?')[0].split('#')[0];
+  const isBinary = pathname.toLowerCase().endsWith('.dat');
 
   if (isBinary) {
     const arrayBuffer = await response.arrayBuffer();
@@ -26,18 +25,4 @@ export async function loadWaveformDataFromUrl(src: string): Promise<WaveformData
     const json = await response.json();
     return WaveformData.create(json);
   }
-}
-
-/**
- * Load a .dat/.json peaks file and extract PeakData at the given zoom level.
- */
-export async function loadPeaksFromUrl(
-  src: string,
-  samplesPerPixel: number,
-  isMono: boolean,
-  offsetSamples?: number,
-  durationSamples?: number
-): Promise<PeakData> {
-  const waveformData = await loadWaveformDataFromUrl(src);
-  return extractPeaks(waveformData, samplesPerPixel, isMono, offsetSamples, durationSamples);
 }

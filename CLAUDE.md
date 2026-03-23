@@ -366,6 +366,7 @@ const LazyExample = createLazyExample(() =>
 43. **Peak Regeneration After Clip Mutations** — After `splitClip` (new clip IDs) or `trimClip` (changed offset/duration), peaks must be regenerated via `_syncPeaksForChangedClips`. The statechange handler detects changes by comparing `_clipOffsets` cache with current clip state.
 44. **`undefined` vs `false` in Optional Boolean Modifiers** — In `KeyboardShortcut` and `KeyBinding`, `undefined` means "match any state" while `false` means "must NOT be pressed." Never use falsy checks (`!value`) to test these — use `=== undefined`. The distinction matters for auto-expansion logic (e.g., undo shortcuts generating both Ctrl and Meta variants).
 45. **Lit `noAccessor` for Synchronous Property Validation** — Lit's `@property` setter stores values immediately; `willUpdate` runs asynchronously. If external code reads the property right after setting it, it sees the unvalidated value. Use `@property({ noAccessor: true })` with a custom getter/setter that validates synchronously and calls `this.requestUpdate(name, oldValue)`.
+46. **`createClipFromSeconds` Supports Peaks-First Rendering** — `audioBuffer` is optional. Provide `waveformData` (from `waveform-data.js`) + `sampleRate` + `sourceDuration` instead. This enables rendering waveforms before audio decode completes. The `WaveformDataObject` interface in `@waveform-playlist/core` defines the required shape.
 
 ---
 
