@@ -183,10 +183,7 @@ export class DawEditorElement extends LitElement {
   // --- Lifecycle ---
   connectedCallback() {
     super.connectedCallback();
-    if (!this.hasAttribute('tabindex')) {
-      this.setAttribute('tabindex', '0');
-    }
-    this.addEventListener('keydown', this._onKeyDown);
+    document.addEventListener('keydown', this._onKeyDown);
     this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
@@ -213,7 +210,7 @@ export class DawEditorElement extends LitElement {
   }
   disconnectedCallback() {
     super.disconnectedCallback();
-    this.removeEventListener('keydown', this._onKeyDown);
+    document.removeEventListener('keydown', this._onKeyDown);
     this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
