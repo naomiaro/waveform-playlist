@@ -95,6 +95,7 @@ export async function loadFiles(
         clips: [
           {
             src: '',
+            peaksSrc: '',
             start: 0,
             duration: audioBuffer.duration,
             offset: 0,

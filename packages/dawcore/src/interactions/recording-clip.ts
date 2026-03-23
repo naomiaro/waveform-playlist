@@ -81,6 +81,7 @@ export function addRecordedClip(
         const sr = host.effectiveSampleRate;
         const clipDesc: ClipDescriptor = {
           src: '',
+          peaksSrc: '',
           start: startSample / sr,
           duration: durSamples / sr,
           offset: 0,

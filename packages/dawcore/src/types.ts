@@ -12,6 +12,7 @@ export interface TrackDescriptor {
 
 export interface ClipDescriptor {
   src: string;
+  peaksSrc: string;
   start: number;
   duration: number;
   offset: number;

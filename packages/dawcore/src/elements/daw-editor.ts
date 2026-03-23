@@ -27,6 +27,7 @@ import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
+import { loadPeaksFromUrl } from '../interactions/peaks-loader';
 
 @customElement('daw-editor')
 export class DawEditorElement extends LitElement {
@@ -359,6 +360,7 @@ export class DawEditorElement extends LitElement {
     if (clipEls.length === 0 && trackEl.src) {
       clips.push({
         src: trackEl.src,
+        peaksSrc: '',
         start: 0,
         duration: 0,
         offset: 0,
@@ -372,6 +374,7 @@ export class DawEditorElement extends LitElement {
       for (const clipEl of clipEls) {
         clips.push({
           src: clipEl.src,
+          peaksSrc: clipEl.peaksSrc,
           start: clipEl.start,
           duration: clipEl.duration,
           offset: clipEl.offset,
@@ -399,6 +402,13 @@ export class DawEditorElement extends LitElement {
       const clips = [];
       for (const clipDesc of descriptor.clips) {
         if (!clipDesc.src) continue;
+
+        // If peaks-src is set, load pre-computed peaks in parallel with audio decode.
+        // Peaks render immediately; audio decode completes in the background.
+        const peaksSrcPromise = clipDesc.peaksSrc
+          ? loadPeaksFromUrl(clipDesc.peaksSrc, this.samplesPerPixel, this.mono)
+          : null;
+
         const audioBuffer = await this._fetchAndDecode(clipDesc.src);
         // Use the buffer's actual sample rate (hardware rate may differ from initial hint)
         this._resolvedSampleRate = audioBuffer.sampleRate;
@@ -418,13 +428,31 @@ export class DawEditorElement extends LitElement {
           offsetSamples: clip.offsetSamples,
           durationSamples: clip.durationSamples,
         });
-        const peakData = await this._peakPipeline.generatePeaks(
-          audioBuffer,
-          this.samplesPerPixel,
-          this.mono,
-          clip.offsetSamples,
-          clip.durationSamples
-        );
+
+        // Use pre-computed peaks if available, otherwise generate from AudioBuffer
+        let peakData;
+        if (peaksSrcPromise) {
+          try {
+            peakData = await peaksSrcPromise;
+          } catch (err) {
+            console.warn(
+              '[dawcore] Failed to load peaks from ' +
+                clipDesc.peaksSrc +
+                ': ' +
+                String(err) +
+                ' — falling back to AudioBuffer generation'
+            );
+          }
+        }
+        if (!peakData) {
+          peakData = await this._peakPipeline.generatePeaks(
+            audioBuffer,
+            this.samplesPerPixel,
+            this.mono,
+            clip.offsetSamples,
+            clip.durationSamples
+          );
+        }
         this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
         clips.push(clip);
       }
