@@ -192,6 +192,10 @@ interface PlaylistStateContextValue {
   loopEnd: number;
   /** Whether playback continues past the end of loaded audio */
   indefinitePlayback: boolean;
+  /** Whether undo is available */
+  canUndo: boolean;
+  /** Whether redo is available */
+  canRedo: boolean;
 }
 ```
 
@@ -244,6 +248,10 @@ interface PlaylistControlsContextValue {
   setLoopRegion: (start: number, end: number) => void;
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
+
+  // Undo/redo
+  undo: () => void;
+  redo: () => void;
 }
 ```
 
@@ -900,6 +908,7 @@ interface KeyboardShortcutsProps {
   playback?: boolean;                  // Default: false — Space (play/pause), Escape (stop), 0 (rewind)
   clipSplitting?: boolean;             // Default: false — 's' key splits clip at playhead
   annotations?: boolean;               // Default: false — arrow nav, boundary editing, Enter to play
+  undo?: boolean;                      // Default: false — Cmd/Ctrl+Z (undo), Cmd/Ctrl+Shift+Z (redo)
   additionalShortcuts?: KeyboardShortcut[];  // Appended to enabled defaults
 }
 ```

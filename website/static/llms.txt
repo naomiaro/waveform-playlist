@@ -84,7 +84,8 @@ Both providers use React Context with 4 split contexts for performance.
 - `useExportWav()` — Offline WAV export with effects support
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
 - `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0)
-- `KeyboardShortcuts` — Self-closing component for declarative keyboard shortcut setup. Props: `playback` (Space/Escape/0), `clipSplitting` ('s' key), `annotations` (arrow nav, boundary editing), `additionalShortcuts`. All booleans default to false. Reads all required data from context. Replaces manual `usePlaybackShortcuts` + `useClipSplitting` + `useAnnotationKeyboardControls` wiring.
+- `useUndoState(opts)` — Undo/redo state (canUndo, canRedo, undo, redo) with engine delegation
+- `KeyboardShortcuts` — Self-closing component for declarative keyboard shortcut setup. Props: `playback` (Space/Escape/0), `clipSplitting` ('s' key), `annotations` (arrow nav, boundary editing), `undo` (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z), `additionalShortcuts`. All booleans default to false. Reads all required data from context.
 
 ### MIDI Hooks (from `@waveform-playlist/midi`)
 
@@ -117,7 +118,7 @@ Both providers use React Context with 4 split contexts for performance.
 - `MediaElementPlaylistProvider` — Single-track provider (HTMLAudioElement). Multiple instances per page OK (independent audio elements). Props: track, audioContext, playbackRate, timescale, controls, theme, annotationList, onAnnotationsChange, onReady, barWidth, barGap, waveHeight, samplesPerPixel. Track config supports fadeIn/fadeOut (requires audioContext). Use for language learning, podcasts, single-track viewers, and Tone.js effect bridging.
 - `Waveform` — Main visualization. Props: showClipHeaders, interactiveClips, renderPlayhead, renderTrackControls, showFades, touchOptimized
 - `ClipInteractionProvider` — Declarative wrapper for clip drag/move/trim/snap/collision. Props: snap (boolean, auto-detects beats vs timescale from BeatsAndBarsProvider context), touchOptimized. Auto-enables interactiveClips on descendant Waveform. Replaces manual DragDropProvider + useClipDragHandlers + modifier setup. `useClipInteractionEnabled()` hook returns true when inside this provider.
-- `KeyboardShortcuts` — Self-closing component for declarative keyboard shortcut setup. Props: `playback`, `clipSplitting`, `annotations`, `additionalShortcuts`. All booleans default to false. Must be inside WaveformPlaylistProvider.
+- `KeyboardShortcuts` — Self-closing component for declarative keyboard shortcut setup. Props: `playback`, `clipSplitting`, `annotations`, `undo`, `additionalShortcuts`. All booleans default to false. Must be inside WaveformPlaylistProvider.
 - Buttons: PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton, LoopButton, SetLoopRegionButton, ClearAllButton, ZoomInButton, ZoomOutButton, ExportWavButton
 - Controls: MasterVolumeControl, TimeFormatSelect, AudioPosition, SelectionTimeInputs, AutomaticScrollCheckbox, ContinuousPlayCheckbox
 
