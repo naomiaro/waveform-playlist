@@ -109,10 +109,12 @@ Pre-computed peaks embed the source audio's sample rate (e.g., 48000 Hz). The br
 **If the rates don't match**, the peaks will be slightly wider or narrower than the decoded audio, causing misaligned waveforms during trim, split, and zoom. When a mismatch is detected, waveform-playlist logs a warning and falls back to generating peaks from the decoded audio (slower initial load, but correct).
 
 **Recommendations:**
-- **Use Opus format** for audio — Opus always encodes at 48000 Hz (per spec), so `.dat` files generated from Opus sources automatically match most hardware. Opus also has excellent compression (~1/10 of WAV) and broad browser support.
-- Generate `.dat` files at **48000 Hz** (the most common hardware rate)
-- If your source audio is 44100 Hz, either encode to Opus first (`ffmpeg -i audio.wav -c:a libopus audio.opus`) or resample before generating peaks (`ffmpeg -i audio.wav -ar 48000 audio-48k.wav`)
-- Or use `configureGlobalContext({ sampleRate: 44100 })` from `@waveform-playlist/playout` before any audio operations to request a matching AudioContext rate (hardware permitting)
+- **Serve audio at 48000 Hz** to match most browser AudioContext hardware rates:
+  - **Opus** — best compressed option. Always encodes at 48000 Hz (per spec), excellent quality at low bitrates, broad browser support. `ffmpeg -i audio.wav -c:a libopus audio.opus`
+  - **WAV at 48000 Hz** — uncompressed, lossless. `ffmpeg -i audio.wav -ar 48000 audio-48k.wav`
+  - **FLAC at 48000 Hz** — lossless compression (~50-60% of WAV). `ffmpeg -i audio.wav -ar 48000 audio-48k.flac`
+- Generate `.dat` files from your 48000 Hz audio so peaks match the hardware rate
+- If your source is 44100 Hz and you can't re-encode, use `configureGlobalContext({ sampleRate: 44100 })` from `@waveform-playlist/playout` before any audio operations to request a matching AudioContext rate (hardware permitting)
 :::
 
 ### Using Pre-computed Waveforms
