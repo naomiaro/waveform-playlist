@@ -71,6 +71,8 @@ export interface PlaylistEngineOptions {
   sampleRate?: number;
   samplesPerPixel?: number;
   zoomLevels?: number[];
+  /** Maximum number of undo steps (default 100). */
+  undoLimit?: number;
 }
 
 /**

@@ -139,7 +139,7 @@ describe('PlaylistEngine — Undo/Redo', () => {
 
   describe('stack limit', () => {
     it('respects undoLimit', () => {
-      engine.undoLimit = 3;
+      engine = new PlaylistEngine({ sampleRate: 48000, undoLimit: 3 });
       const clip = makeClip(0, 48000);
       const track = makeTrack([clip]);
       engine.setTracks([track]);

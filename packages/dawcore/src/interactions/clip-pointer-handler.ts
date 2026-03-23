@@ -10,7 +10,7 @@ export interface ClipBounds {
 
 /** Narrow engine contract for clip move/trim interactions. */
 export interface ClipEngineContract {
-  moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter?: boolean): void;
+  moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter?: boolean): number;
   trimClip(
     trackId: string,
     clipId: string,
@@ -201,8 +201,9 @@ export class ClipPointerHandler {
       const incrementalDeltaPx = totalDeltaPx - this._lastDeltaPx;
       this._lastDeltaPx = totalDeltaPx;
       const incrementalDeltaSamples = Math.round(incrementalDeltaPx * this._host.samplesPerPixel);
-      this._cumulativeDeltaSamples += incrementalDeltaSamples;
-      engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples, true);
+      // Track constrained delta (not raw) so undo transactions are accurate
+      const applied = engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples, true);
+      this._cumulativeDeltaSamples += applied;
     } else {
       // Trim: constrain delta using engine's full collision/bounds logic,
       // then track for visual feedback. Engine called once at pointerup.

@@ -8,7 +8,7 @@ import type { ClipEngineContract, ClipPointerHost } from '../interactions/clip-p
 
 function createMockEngine(): ClipEngineContract {
   return {
-    moveClip: vi.fn(),
+    moveClip: vi.fn().mockImplementation((_t: string, _c: string, d: number) => d),
     trimClip: vi.fn(),
     updateTrack: vi.fn(),
     getClipBounds: vi.fn().mockReturnValue({

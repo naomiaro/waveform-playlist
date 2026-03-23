@@ -50,12 +50,13 @@ export class PlaylistEngine {
   private _inTransaction = false;
   private _transactionSnapshot: ClipTrack[] | null = null;
   private _transactionMutated = false;
-  undoLimit = 100;
+  readonly undoLimit: number;
 
   constructor(options: PlaylistEngineOptions = {}) {
     this._sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE;
     this._zoomLevels = [...(options.zoomLevels ?? DEFAULT_ZOOM_LEVELS)];
     this._adapter = options.adapter ?? null;
+    this.undoLimit = options.undoLimit ?? 100;
 
     if (this._zoomLevels.length === 0) {
       throw new Error('PlaylistEngine: zoomLevels must not be empty');
@@ -306,11 +307,12 @@ export class PlaylistEngine {
   // Clip Editing (delegates to operations/)
   // ---------------------------------------------------------------------------
 
-  moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter = false): void {
+  /** Move a clip by deltaSamples. Returns the constrained delta actually applied (0 if no-op). */
+  moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter = false): number {
     const track = this._tracks.find((t) => t.id === trackId);
     if (!track) {
       console.warn(`[waveform-playlist/engine] moveClip: track "${trackId}" not found`);
-      return;
+      return 0;
     }
 
     const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
@@ -318,7 +320,7 @@ export class PlaylistEngine {
       console.warn(
         `[waveform-playlist/engine] moveClip: clip "${clipId}" not found in track "${trackId}"`
       );
-      return;
+      return 0;
     }
 
     const clip = track.clips[clipIndex];
@@ -327,7 +329,7 @@ export class PlaylistEngine {
 
     const constrainedDelta = constrainClipDrag(clip, deltaSamples, sortedClips, sortedIndex);
 
-    if (constrainedDelta === 0) return;
+    if (constrainedDelta === 0) return 0;
 
     this._pushUndoSnapshot();
 
@@ -349,6 +351,7 @@ export class PlaylistEngine {
       this._updateTrackOnAdapter(trackId);
     }
     this._emitStateChange();
+    return constrainedDelta;
   }
 
   splitClip(trackId: string, clipId: string, atSample: number): void {
@@ -689,9 +692,20 @@ export class PlaylistEngine {
   }
 
   private _restoreTracks(snapshot: ClipTrack[]): void {
+    const oldTracks = this._tracks;
     this._tracks = snapshot;
     this._tracksVersion++;
-    this._adapter?.setTracks(this._tracks);
+    // Use incremental adapter updates when track count is unchanged —
+    // avoids full playout rebuild that interrupts playback during undo/redo.
+    if (this._adapter && oldTracks.length === snapshot.length) {
+      for (let i = 0; i < snapshot.length; i++) {
+        if (oldTracks[i] !== snapshot[i]) {
+          this._updateTrackOnAdapter(snapshot[i].id);
+        }
+      }
+    } else {
+      this._adapter?.setTracks(this._tracks);
+    }
     this._emitStateChange();
   }
 
