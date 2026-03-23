@@ -176,7 +176,8 @@ describe('splitAtPlayhead', () => {
       const engine = {
         getState: vi
           .fn()
-          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackBefore] })
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackBefore] }) // canSplitAtTime
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackBefore] }) // performSplit before
           .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
         splitClip: vi.fn(),
       };
@@ -218,7 +219,8 @@ describe('splitAtPlayhead', () => {
       const engine = {
         getState: vi
           .fn()
-          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackBefore] })
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackBefore] }) // canSplitAtTime
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackBefore] }) // performSplit before
           .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
         splitClip: vi.fn(),
       };
@@ -247,7 +249,8 @@ describe('splitAtPlayhead', () => {
       const engine = {
         getState: vi
           .fn()
-          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] })
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] }) // canSplitAtTime
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] }) // performSplit before
           .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
         splitClip: vi.fn(),
       };
@@ -273,7 +276,8 @@ describe('splitAtPlayhead', () => {
       const engine = {
         getState: vi
           .fn()
-          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] })
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] }) // canSplitAtTime
+          .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] }) // performSplit before
           .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
         splitClip: vi.fn(),
       };
@@ -300,7 +304,11 @@ describe('splitAtPlayhead', () => {
       const stateSnapshot = { selectedTrackId: 'track-1', tracks: [track] };
 
       const engine = {
-        getState: vi.fn().mockReturnValueOnce(stateSnapshot).mockReturnValueOnce(stateSnapshot),
+        getState: vi
+          .fn()
+          .mockReturnValueOnce(stateSnapshot) // canSplitAtTime
+          .mockReturnValueOnce(stateSnapshot) // performSplit before
+          .mockReturnValueOnce(stateSnapshot), // after (unchanged = no-op)
         splitClip: vi.fn(),
       };
       const host = createMockHost({
@@ -348,11 +356,13 @@ describe('splitAtPlayhead', () => {
     const rightClip = makeClip('clip-right', 24000, 72000);
     const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
 
+    const stateBefore = { selectedTrackId: 'track-1', tracks: [track] };
     const engine = {
       getState: vi
         .fn()
-        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [track] })
-        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }),
+        .mockReturnValueOnce(stateBefore) // canSplitAtTime check
+        .mockReturnValueOnce(stateBefore) // performSplit before
+        .mockReturnValueOnce({ selectedTrackId: 'track-1', tracks: [trackAfter] }), // after
       splitClip: vi.fn(),
     };
 
@@ -397,7 +407,7 @@ describe('splitAtPlayhead', () => {
     expect(host.play).not.toHaveBeenCalled();
   });
 
-  it('does not resume when split fails', () => {
+  it('does not stop or resume when split would be a no-op (no engine)', () => {
     const host = createPlaybackHost({
       engine: null,
       isPlaying: true,
@@ -406,7 +416,45 @@ describe('splitAtPlayhead', () => {
     const result = splitAtPlayhead(host);
 
     expect(result).toBe(false);
-    expect(host.stop).toHaveBeenCalledTimes(1);
+    expect(host.stop).not.toHaveBeenCalled();
+    expect(host.play).not.toHaveBeenCalled();
+  });
+
+  it('does not stop or resume when no track is selected', () => {
+    const engine = {
+      getState: vi.fn().mockReturnValue({ selectedTrackId: null, tracks: [] }),
+      splitClip: vi.fn(),
+    };
+    const host = createPlaybackHost({
+      engine,
+      isPlaying: true,
+      currentTime: 1.0,
+    });
+
+    const result = splitAtPlayhead(host);
+
+    expect(result).toBe(false);
+    expect(host.stop).not.toHaveBeenCalled();
+    expect(host.play).not.toHaveBeenCalled();
+  });
+
+  it('does not stop or resume when playhead is not over a clip', () => {
+    const clip = makeClip('clip-1', 0, 48000);
+    const track = makeTrack('track-1', [clip]);
+    const engine = {
+      getState: vi.fn().mockReturnValue({ selectedTrackId: 'track-1', tracks: [track] }),
+      splitClip: vi.fn(),
+    };
+    const host = createPlaybackHost({
+      engine,
+      isPlaying: true,
+      currentTime: 100.0, // way past the clip
+    });
+
+    const result = splitAtPlayhead(host);
+
+    expect(result).toBe(false);
+    expect(host.stop).not.toHaveBeenCalled();
     expect(host.play).not.toHaveBeenCalled();
   });
 });
