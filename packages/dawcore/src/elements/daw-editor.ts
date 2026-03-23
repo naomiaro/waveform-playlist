@@ -319,6 +319,20 @@ export class DawEditorElement extends LitElement {
   private _onTrackControl = (e: CustomEvent) => {
     const { trackId, prop, value } = e.detail ?? {};
     if (!trackId || !prop || !DawEditorElement._CONTROL_PROPS.has(prop)) return;
+    // Select the track when interacting with its controls
+    if (this._selectedTrackId !== trackId) {
+      this._setSelectedTrackId(trackId);
+      if (this._engine) {
+        this._engine.selectTrack(trackId);
+      }
+      this.dispatchEvent(
+        new CustomEvent('daw-track-select', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId },
+        })
+      );
+    }
     const oldDescriptor = this._tracks.get(trackId);
     if (oldDescriptor) {
       const descriptor = { ...oldDescriptor, [prop]: value };
