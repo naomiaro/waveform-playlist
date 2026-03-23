@@ -225,7 +225,7 @@ const analyser = context.createAnalyser();
 
 ## Native AudioContext for sampleRate Control
 
-**Critical:** `new Context({ sampleRate })` does NOT pass `sampleRate` through to `standardized-audio-context`. The option is silently ignored. To control sample rate, create a native `AudioContext({ sampleRate, latencyHint: 0 })` first, then wrap with `new Context(rawContext)`. This is implemented in `configureGlobalContext()`.
+**Critical:** `new Context({ sampleRate })` does NOT pass `sampleRate` through to `standardized-audio-context`. The option is silently ignored. Native `AudioContext({ sampleRate, latencyHint: 0 })` wrapped with `new Context(rawContext)` also causes Tone.js internal issues (reverted). `configureGlobalContext()` currently creates a standard `new Context()` and only compares the requested rate against the actual rate — it warns but cannot force the rate. The rate comparison + worker fallback handles mismatches. Revisit when Tone.js or standardized-audio-context supports sampleRate passthrough.
 
 ## Context Singleton Warning
 
