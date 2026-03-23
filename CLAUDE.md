@@ -364,6 +364,7 @@ const LazyExample = createLazyExample(() =>
 41. **Clip Interaction Adapter Sync** — During clip move drag, pass `skipAdapter=true` to `engine.moveClip()` to avoid 60fps adapter rebuilds. Call `engine.updateTrack(trackId)` once on `pointerup`. Trim uses cumulative delta (engine called once on drop). Split calls engine normally (single operation).
 42. **`composedPath()[0]` vs `closest()` in Shadow DOM** — `composedPath()[0]` returns the deepest clicked element (may be a child like `<span>`). For hit detection on interaction zones (`.clip-header`, `.clip-boundary`), always use `target.closest('.class-name')` to walk up the DOM tree.
 43. **Peak Regeneration After Clip Mutations** — After `splitClip` (new clip IDs) or `trimClip` (changed offset/duration), peaks must be regenerated via `_syncPeaksForChangedClips`. The statechange handler detects changes by comparing `_clipOffsets` cache with current clip state.
+44. **`undefined` vs `false` in Optional Boolean Modifiers** — In `KeyboardShortcut` and `KeyBinding`, `undefined` means "match any state" while `false` means "must NOT be pressed." Never use falsy checks (`!value`) to test these — use `=== undefined`. The distinction matters for auto-expansion logic (e.g., undo shortcuts generating both Ctrl and Meta variants).
 
 ---
 
