@@ -17,7 +17,7 @@
 
 ## Dev Page Dependencies
 
-- **`pnpm dev:page` resolves peer packages from `dist/`** — No Vite source aliases. After changing `@waveform-playlist/engine` or `@waveform-playlist/playout` source, run `pnpm build` in those packages before testing on the dev page.
+- **`pnpm dev:page` resolves peer packages from source** — `dev/vite.config.ts` has `resolve.alias` for core, engine, and playout pointing to `src/index.ts`. Changes are picked up immediately without rebuilding.
 - **Incremental track removal** — `engine.removeTrack(trackId)` uses `adapter.removeTrack()` when available (disposes single track, preserves playback). Falls back to `adapter.setTracks()` (full rebuild, stops Transport).
 
 ## Element Types
@@ -126,7 +126,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Trim peak re-extraction** — During trim drag, call `host.reextractClipPeaks()` to synchronously re-slice peaks from cached WaveformData at the new offset/duration. When peaks are available, set waveforms to `left:0` (peaks cover full new bounds). Fall back to `-deltaPx` shift only when cache unavailable.
 - **Statechange syncs `_engineTracks`** — When `tracksVersion` changes, rebuild `_engineTracks` Map from engine state. This is how `moveClip`/`trimClip`/`splitClip` trigger Lit re-renders.
 - **`DRAG_THRESHOLD`** — Shared constant in `interactions/constants.ts` (3px, click vs drag). Boundary width (8px) is CSS-only in `styles/theme.ts` (CSS can't import JS constants).
-- **Keyboard shortcut modifier guard** — `_onKeyDown` must check `e.ctrlKey || e.metaKey || e.altKey` before handling `S` key. Without this, Ctrl+S (save) triggers split.
+- **Keyboard shortcuts via core** — `<daw-editor>` uses `handleKeyboardEvent` from `@waveform-playlist/core`. Listener on `document` (not the element — users won't know to focus it). Configurable via `editor.shortcuts` JS property; defaults: Space (play/pause), Escape (stop), 0 (rewind), S (split, when `interactive-clips`).
+- **Split pre-flight check** — `splitAtPlayhead` calls `canSplitAtTime` before stopping playback. Without this, pressing S with no track selected interrupts audio for a no-op.
 - **`engine.constrainTrimDelta()`** — Wraps the engine's `constrainBoundaryTrim` pure function. Call during trim drag for per-frame collision detection (timeline bounds, audio bounds, neighbor overlap, min duration). Don't manually clamp — use the engine's constraints so visual preview matches what's applied on drop.
 
 ## Typed Events
