@@ -624,6 +624,14 @@ export class DawEditorElement extends LitElement {
     this._stopPlayhead();
     this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
   }
+  /** Toggle between play and pause. */
+  togglePlayPause() {
+    if (this._isPlaying) {
+      this.pause();
+    } else {
+      this.play();
+    }
+  }
   seekTo(time: number) {
     if (!this._engine) return;
     this._engine.seek(time);
@@ -640,12 +648,21 @@ export class DawEditorElement extends LitElement {
     });
   }
 
-  /** Get the active shortcuts — user-provided or defaults when interactive-clips is set. */
+  /** Get the active shortcuts — user-provided or defaults. */
   private _getActiveShortcuts(): KeyboardShortcut[] {
     if (this.shortcuts.length > 0) return this.shortcuts;
-    if (!this.interactiveClips) return [];
-    // Default: split at playhead on S key
-    return [{ key: 's', action: () => this.splitAtPlayhead(), description: 'Split at playhead' }];
+    const defaults: KeyboardShortcut[] = [
+      { key: ' ', action: () => this.togglePlayPause(), description: 'Play/Pause' },
+      { key: 'Escape', action: () => this.stop(), description: 'Stop' },
+    ];
+    if (this.interactiveClips) {
+      defaults.push({
+        key: 's',
+        action: () => this.splitAtPlayhead(),
+        description: 'Split at playhead',
+      });
+    }
+    return defaults;
   }
 
   private _onKeyDown = (e: KeyboardEvent) => {
