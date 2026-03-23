@@ -122,17 +122,18 @@ interface SchedulerListener<T> {
 
 ### Timer
 
-Drives the scheduler at a fixed interval.
+Drives the scheduler via `requestAnimationFrame` — never `setTimeout` or `setInterval`. rAF is synced to display refresh (~16ms at 60Hz), gives the most accurate timing, and avoids drift/throttling issues.
 
 ```typescript
 class Timer {
-  private _interval: number;  // default 20ms
-  start(): void   // begin ticking
-  stop(): void    // stop ticking
+  private _rafId: number | null;
+
+  start(): void   // begin rAF loop
+  stop(): void    // cancel rAF
 }
 ```
 
-Each tick: `scheduler.advance(clock.getTime())`.
+Each frame: `scheduler.advance(clock.getTime())`. The scheduler's lookahead (200ms) absorbs any frame timing jitter.
 
 ## Timeline Layer
 
@@ -305,7 +306,7 @@ interface TransportOptions {
   tempo?: number;              // default: 120 BPM
   beatsPerBar?: number;        // default: 4
   schedulerLookahead?: number; // seconds, default: 0.2
-  schedulerInterval?: number;  // ms, default: 20
+  // Timer uses requestAnimationFrame exclusively — no interval config needed
 }
 ```
 
