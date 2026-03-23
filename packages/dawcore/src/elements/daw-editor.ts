@@ -654,6 +654,7 @@ export class DawEditorElement extends LitElement {
     const defaults: KeyboardShortcut[] = [
       { key: ' ', action: () => this.togglePlayPause(), description: 'Play/Pause' },
       { key: 'Escape', action: () => this.stop(), description: 'Stop' },
+      { key: '0', action: () => this.seekTo(0), description: 'Rewind to start' },
     ];
     if (this.interactiveClips) {
       defaults.push({
