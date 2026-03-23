@@ -38,7 +38,16 @@ export interface AudioContextOptions {
 export function configureGlobalContext(options: AudioContextOptions): number {
   if (globalToneContext) {
     const existingRate = (globalToneContext.rawContext as AudioContext).sampleRate;
-    if (options.sampleRate !== undefined && options.sampleRate !== existingRate) {
+    const existingRaw = globalToneContext.rawContext as AudioContext;
+    if (options.audioContext && existingRaw !== options.audioContext) {
+      console.warn(
+        '[playout] configureGlobalContext: context already created at ' +
+          existingRate +
+          ' Hz. Provided AudioContext at ' +
+          options.audioContext.sampleRate +
+          ' Hz was ignored. Call configureGlobalContext before any audio operations.'
+      );
+    } else if (options.sampleRate !== undefined && options.sampleRate !== existingRate) {
       console.warn(
         '[playout] configureGlobalContext: context already created at ' +
           existingRate +
