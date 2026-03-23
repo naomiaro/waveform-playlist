@@ -121,13 +121,18 @@ export class PlaylistEngine {
       console.warn('[waveform-playlist/engine] commitTransaction: no active transaction to commit');
       return;
     }
-    this._undoStack.push(this._transactionSnapshot);
-    if (this._undoStack.length > this.undoLimit) {
-      this._undoStack.shift();
+    // Only push undo entry if mutations actually occurred during the transaction.
+    // Without this, no-op drags (e.g., against a boundary) create phantom undo entries.
+    if (this._transactionMutated) {
+      this._undoStack.push(this._transactionSnapshot);
+      if (this._undoStack.length > this.undoLimit) {
+        this._undoStack.shift();
+      }
+      this._redoStack = [];
     }
-    this._redoStack = [];
     this._transactionSnapshot = null;
     this._inTransaction = false;
+    this._transactionMutated = false;
   }
 
   abortTransaction(): void {

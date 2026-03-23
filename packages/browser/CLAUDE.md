@@ -142,6 +142,7 @@ const rebuildChain = useCallback(() => {
 - `useSelectedTrack` — selectedTrackId
 - `useZoomControls` — samplesPerPixel, canZoomIn, canZoomOut
 - `useMasterVolume` — masterVolume
+- `useUndoState` — canUndo, canRedo
 
 **Still React-only:** isPlaying (animation loop timing), tracks (loaded via useAudioTracks). `currentTime` is read from engine during playback via `getPlaybackTime()` (→ `engine.getCurrentTime()` → `Transport.seconds`).
 
@@ -154,6 +155,7 @@ const rebuildChain = useCallback(() => {
 - `if (isLoopEnabledRef.current) engine.setLoopEnabled(true)`
 - `engine.setMasterVolume(masterVolumeRef.current ?? 1.0)`
 - `if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current)`
+- `canUndo`/`canRedo` — no seed needed. `setTracks()` calls `clearHistory()`, so undo state always resets on rebuild.
 
 **Guard handler with ref comparisons:** Each hook's `onEngineState()` compares `state.field !== ref.current` before calling `setState` to skip unnecessary React updates. Ref assignments are synchronous; `setState` calls are batched by React.
 

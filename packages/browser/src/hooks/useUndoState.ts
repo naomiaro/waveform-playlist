@@ -1,4 +1,4 @@
-import { useState, useCallback, type RefObject } from 'react';
+import { useState, useCallback, useRef, type RefObject } from 'react';
 import type { PlaylistEngine, EngineState } from '@waveform-playlist/engine';
 
 export interface UseUndoStateProps {
@@ -18,12 +18,19 @@ export interface UndoControls {
  * undo/redo delegate to the engine. canUndo/canRedo are mirrored back
  * from the engine via onEngineState(), which the provider's statechange
  * handler calls on every engine event.
+ *
+ * No refs are exposed for engine seeding — undo history intentionally
+ * resets on engine rebuild (setTracks calls clearHistory).
  */
 export function useUndoState({ engineRef }: UseUndoStateProps): UndoControls & {
   onEngineState: (state: EngineState) => void;
 } {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+
+  // Internal refs for statechange guard (same pattern as useSelectionState etc.)
+  const canUndoRef = useRef(false);
+  const canRedoRef = useRef(false);
 
   const undo = useCallback(() => {
     if (!engineRef.current) {
@@ -43,8 +50,14 @@ export function useUndoState({ engineRef }: UseUndoStateProps): UndoControls & {
 
   // Called by the provider's statechange handler to mirror engine state.
   const onEngineState = useCallback((state: EngineState) => {
-    setCanUndo((prev) => (prev !== state.canUndo ? state.canUndo : prev));
-    setCanRedo((prev) => (prev !== state.canRedo ? state.canRedo : prev));
+    if (state.canUndo !== canUndoRef.current) {
+      canUndoRef.current = state.canUndo;
+      setCanUndo(state.canUndo);
+    }
+    if (state.canRedo !== canRedoRef.current) {
+      canRedoRef.current = state.canRedo;
+      setCanRedo(state.canRedo);
+    }
   }, []);
 
   return {

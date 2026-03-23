@@ -281,6 +281,7 @@ export function useClipDragHandlers({
 
       if (!data) {
         // Transaction was opened in onDragStart — abort to prevent leak
+        isDraggingRef.current = false;
         engineRef.current?.abortTransaction();
         return;
       }
@@ -305,14 +306,15 @@ export function useClipDragHandlers({
           console.warn(
             `[waveform-playlist] onDragEnd: track at index ${trackIndex} not found — trim not synced to adapter`
           );
+          engineRef.current?.abortTransaction();
         } else if (!engineRef.current) {
           console.warn('[waveform-playlist] engineRef is null — trim not synced to adapter');
         } else {
           engineRef.current.trimClip(trackId, clipId, boundary, Math.floor(sampleDelta));
+          engineRef.current.commitTransaction();
         }
         originalClipStateRef.current = null;
         lastBoundaryDeltaRef.current = 0;
-        engineRef.current?.commitTransaction();
         return;
       }
 
@@ -321,12 +323,13 @@ export function useClipDragHandlers({
         console.warn(
           `[waveform-playlist] onDragEnd: track at index ${trackIndex} not found — move not synced to adapter`
         );
+        engineRef.current?.abortTransaction();
       } else if (!engineRef.current) {
         console.warn('[waveform-playlist] engineRef is null — move not synced to adapter');
       } else {
         engineRef.current.moveClip(trackId, clipId, Math.floor(sampleDelta));
+        engineRef.current.commitTransaction();
       }
-      engineRef.current?.commitTransaction();
     },
     [tracks, onTracksChange, samplesPerPixel, engineRef, isDraggingRef]
   );
