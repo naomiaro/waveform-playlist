@@ -868,7 +868,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         let peaks: PeakData | undefined;
 
         // Path A: External pre-computed waveform data (e.g. from audiowaveform .dat file)
-        if (clip.waveformData) {
+        // Only use when sample rates match — mismatched rates cause wrong peak widths
+        // in trim/split/zoom. Falls through to Path B (worker) on mismatch.
+        if (
+          clip.waveformData &&
+          clip.waveformData.sample_rate === sampleRateRef.current
+        ) {
           try {
             peaks = extractPeaksFromWaveformDataFull(
               clip.waveformData as WaveformData,
@@ -880,6 +885,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           } catch (err) {
             console.warn('[waveform-playlist] Failed to extract peaks from waveformData:', err);
           }
+        } else if (clip.waveformData) {
+          console.warn(
+            '[waveform-playlist] Pre-computed peaks at ' +
+              clip.waveformData.sample_rate +
+              ' Hz do not match AudioContext at ' +
+              sampleRateRef.current +
+              ' Hz — generating from audio'
+          );
         }
 
         // Path B: Worker-generated WaveformData cache (fast resample on zoom)

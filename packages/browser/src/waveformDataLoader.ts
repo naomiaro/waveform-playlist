@@ -21,8 +21,9 @@ export async function loadWaveformData(src: string): Promise<WaveformData> {
     throw new Error(`Failed to fetch waveform data: ${response.statusText}`);
   }
 
-  // Check file extension to determine format
-  const isBinary = src.endsWith('.dat');
+  // Detect binary format from pathname (ignores query string and fragment)
+  const { pathname } = new URL(src, globalThis.location?.href ?? 'http://localhost');
+  const isBinary = pathname.toLowerCase().endsWith('.dat');
 
   if (isBinary) {
     const arrayBuffer = await response.arrayBuffer();
