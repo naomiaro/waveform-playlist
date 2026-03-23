@@ -1,0 +1,44 @@
+{
+  "name": "@waveform-playlist/transport",
+  "version": "0.0.1",
+  "description": "Native Web Audio transport for waveform-playlist — scheduling, looping, tempo, metronome",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "pnpm typecheck && tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["waveform", "audio", "webaudio", "transport", "scheduler"],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/transport"
+  },
+  "files": ["dist", "README.md"],
+  "devDependencies": {
+    "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/engine": "workspace:*",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@waveform-playlist/core": ">=11.0.0",
+    "@waveform-playlist/engine": ">=11.0.0"
+  },
+  "dependencies": {}
+}
