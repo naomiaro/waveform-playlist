@@ -392,7 +392,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     if (sampleRateHint !== undefined) {
       const actualRate = configureGlobalContext({
         sampleRate: sampleRateHint,
-        latencyHint: 'interactive',
+        latencyHint: 0,
       });
       if (actualRate !== sampleRateHint) {
         console.warn(

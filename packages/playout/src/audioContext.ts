@@ -15,8 +15,8 @@ let globalToneContext: Context | null = null;
 export interface AudioContextOptions {
   /** Desired sample rate. If hardware can't match, falls back to default. */
   sampleRate?: number;
-  /** Latency hint: 'interactive' (default), 'balanced', or 'playback'. */
-  latencyHint?: AudioContextLatencyCategory;
+  /** Latency hint: 'interactive', 'balanced', 'playback', or seconds (e.g., 0). */
+  latencyHint?: AudioContextLatencyCategory | number;
 }
 
 /**
@@ -40,15 +40,18 @@ export function configureGlobalContext(options: AudioContextOptions): number {
     }
     return existingRate;
   }
-  const contextOptions: Record<string, unknown> = {};
+  // Create a native AudioContext with the requested options — Tone.js's Context
+  // constructor doesn't pass sampleRate through to standardized-audio-context.
+  const nativeOptions: AudioContextOptions = {};
   if (options.latencyHint !== undefined) {
-    contextOptions.latencyHint = options.latencyHint;
+    nativeOptions.latencyHint = options.latencyHint as any;
   }
   if (options.sampleRate !== undefined) {
-    contextOptions.sampleRate = options.sampleRate;
+    nativeOptions.sampleRate = options.sampleRate;
   }
+  let rawContext: AudioContext;
   try {
-    globalToneContext = new Context(contextOptions);
+    rawContext = new AudioContext(nativeOptions as any);
   } catch {
     // Hardware doesn't support requested sampleRate — fall back to default
     console.warn(
@@ -56,12 +59,16 @@ export function configureGlobalContext(options: AudioContextOptions): number {
         options.sampleRate +
         ' not supported — using hardware default'
     );
-    globalToneContext = new Context(
-      options.latencyHint !== undefined ? { latencyHint: options.latencyHint } : undefined
-    );
+    const fallbackOptions: AudioContextOptions = {};
+    if (options.latencyHint !== undefined) {
+      fallbackOptions.latencyHint = options.latencyHint as any;
+    }
+    rawContext = new AudioContext(fallbackOptions as any);
   }
+  // Wrap in Tone.js Context for cross-browser compat (standardized-audio-context)
+  globalToneContext = new Context(rawContext);
   setContext(globalToneContext);
-  return (globalToneContext.rawContext as AudioContext).sampleRate;
+  return rawContext.sampleRate;
 }
 
 /**

@@ -615,7 +615,7 @@ export class DawEditorElement extends LitElement {
     const { configureGlobalContext } = await import('@waveform-playlist/playout');
     const actualRate = configureGlobalContext({
       sampleRate: this.sampleRate,
-      latencyHint: 'interactive',
+      latencyHint: 0,
     });
     if (actualRate !== this.sampleRate) {
       console.warn(
