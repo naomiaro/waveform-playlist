@@ -98,6 +98,8 @@ export function useClipDragHandlers({
       // Only store state for boundary trimming operations
       if (!data.boundary) {
         originalClipStateRef.current = null;
+        // Group move into one undo step
+        engineRef.current?.beginTransaction();
         return;
       }
 
@@ -113,9 +115,11 @@ export function useClipDragHandlers({
         };
         // Signal provider to skip loadAudio rebuilds during the drag
         isDraggingRef.current = true;
+        // Group the drag into one undo step
+        engineRef.current?.beginTransaction();
       }
     },
-    [tracks, isDraggingRef]
+    [tracks, isDraggingRef, engineRef]
   );
 
   const onDragMove = React.useCallback(
@@ -250,6 +254,8 @@ export function useClipDragHandlers({
         isDraggingRef.current = false;
         originalClipStateRef.current = null;
         lastBoundaryDeltaRef.current = 0;
+        // Cancel aborts the transaction — no undo step pushed
+        engineRef.current?.abortTransaction();
         return;
       }
 
@@ -290,6 +296,7 @@ export function useClipDragHandlers({
         }
         originalClipStateRef.current = null;
         lastBoundaryDeltaRef.current = 0;
+        engineRef.current?.commitTransaction();
         return;
       }
 
@@ -303,6 +310,7 @@ export function useClipDragHandlers({
       } else {
         engineRef.current.moveClip(trackId, clipId, Math.floor(sampleDelta));
       }
+      engineRef.current?.commitTransaction();
     },
     [tracks, onTracksChange, samplesPerPixel, engineRef, isDraggingRef]
   );

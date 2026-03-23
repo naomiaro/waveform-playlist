@@ -12,6 +12,8 @@ export interface KeyboardShortcutsProps {
   clipSplitting?: boolean;
   /** Enable annotation keyboard controls (arrow nav, boundary editing). Defaults to false. */
   annotations?: boolean;
+  /** Enable undo/redo shortcuts (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z). Defaults to false. */
+  undo?: boolean;
   /** Additional shortcuts appended to the defaults. */
   additionalShortcuts?: KeyboardShortcut[];
 }
@@ -32,6 +34,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   playback = false,
   clipSplitting = false,
   annotations = false,
+  undo: undoEnabled = false,
   additionalShortcuts = [],
 }) => {
   // Clip splitting setup
@@ -42,7 +45,8 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
     activeAnnotationId,
     continuousPlay,
   } = usePlaylistState();
-  const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play } = usePlaylistControls();
+  const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play, undo, redo } =
+    usePlaylistControls();
 
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,
@@ -60,6 +64,15 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
       description: 'Split clip at playhead',
       preventDefault: true,
     });
+  }
+
+  if (undoEnabled) {
+    allAdditional.push(
+      { key: 'z', ctrlKey: true, shiftKey: false, action: undo, description: 'Undo' },
+      { key: 'z', metaKey: true, shiftKey: false, action: undo, description: 'Undo' },
+      { key: 'z', ctrlKey: true, shiftKey: true, action: redo, description: 'Redo' },
+      { key: 'z', metaKey: true, shiftKey: true, action: redo, description: 'Redo' }
+    );
   }
 
   if (additionalShortcuts.length > 0) {

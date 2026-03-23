@@ -16,6 +16,9 @@ export type { LoopControls, UseLoopStateProps } from './useLoopState';
 export { useSelectedTrack } from './useSelectedTrack';
 export type { SelectedTrackControls, UseSelectedTrackProps } from './useSelectedTrack';
 
+export { useUndoState } from './useUndoState';
+export type { UndoControls, UseUndoStateProps } from './useUndoState';
+
 export { useMasterAnalyser } from './useAudioEffects';
 
 export { useAudioTracks } from './useAudioTracks';

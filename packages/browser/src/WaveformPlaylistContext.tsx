@@ -40,6 +40,7 @@ import {
   useSelectionState,
   useLoopState,
   useSelectedTrack,
+  useUndoState,
   useAnimationFrameLoop,
   useWaveformDataCache,
 } from './hooks';
@@ -106,6 +107,10 @@ export interface PlaylistStateContextValue {
   loopEnd: number;
   /** Whether playback continues past the end of loaded audio */
   indefinitePlayback: boolean;
+  /** Whether undo is available */
+  canUndo: boolean;
+  /** Whether redo is available */
+  canRedo: boolean;
 }
 
 export interface PlaylistControlsContextValue {
@@ -154,6 +159,10 @@ export interface PlaylistControlsContextValue {
   setLoopRegion: (start: number, end: number) => void;
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
+
+  // Undo/redo
+  undo: () => void;
+  redo: () => void;
 }
 
 export interface PlaylistDataContextValue {
@@ -412,6 +421,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     onEngineState: onSelectedTrackEngineState,
     selectedTrackIdRef,
   } = useSelectedTrack({ engineRef });
+  const {
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    onEngineState: onUndoEngineState,
+  } = useUndoState({ engineRef });
   const { animationFrameRef, startAnimationFrameLoop, stopAnimationFrameLoop } =
     useAnimationFrameLoop();
 
@@ -752,6 +768,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           onSelectedTrackEngineState(state);
           onZoomEngineState(state);
           onVolumeEngineState(state);
+          onUndoEngineState(state);
 
           // Mirror engine tracks changes to parent via onTracksChange.
           // tracksVersion only increments on track mutations (move, trim, split,
@@ -825,6 +842,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     onSelectedTrackEngineState,
     onZoomEngineState,
     onVolumeEngineState,
+    onUndoEngineState,
     onTracksChange,
     masterVolumeRef,
     selectionStartRef,
@@ -1365,6 +1383,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       loopStart,
       loopEnd,
       indefinitePlayback,
+      canUndo,
+      canRedo,
     }),
     [
       continuousPlay,
@@ -1380,6 +1400,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       loopStart,
       loopEnd,
       indefinitePlayback,
+      canUndo,
+      canRedo,
     ]
   );
 
@@ -1442,6 +1464,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setLoopRegion,
       setLoopRegionFromSelection,
       clearLoopRegion,
+
+      // Undo/redo
+      undo,
+      redo,
     }),
     [
       play,
@@ -1472,6 +1498,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setLoopRegion,
       setLoopRegionFromSelection,
       clearLoopRegion,
+      undo,
+      redo,
     ]
   );
 
