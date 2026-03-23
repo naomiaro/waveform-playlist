@@ -633,6 +633,9 @@ export class DawEditorElement extends LitElement {
     if (!this._engine) return;
     this._engine.seek(time);
     this._currentTime = time;
+    if (!this._isPlaying) {
+      this._stopPlayhead();
+    }
   }
 
   /** Split the clip under the playhead on the selected track. */
