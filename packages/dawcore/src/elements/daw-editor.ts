@@ -496,8 +496,23 @@ export class DawEditorElement extends LitElement {
           this._engineTracks = new Map(this._engineTracks).set(trackId, previewTrack);
           this._recomputeDuration();
 
-          // Wait for audio decode — errors propagate to outer catch (not blamed on peaks)
-          const audioBuffer = await audioPromise;
+          // Wait for audio decode — clean up preview state if it fails
+          let audioBuffer: AudioBuffer;
+          try {
+            audioBuffer = await audioPromise;
+          } catch (audioErr) {
+            // Remove ghost preview so the user doesn't see a waveform with no audio
+            const nextPeaks = new Map(this._peaksData);
+            nextPeaks.delete(clip.id);
+            this._peaksData = nextPeaks;
+            this._clipOffsets.delete(clip.id);
+            const nextEngine = new Map(this._engineTracks);
+            nextEngine.delete(trackId);
+            this._engineTracks = nextEngine;
+            this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
+            this._recomputeDuration();
+            throw audioErr; // Propagate to outer catch for daw-track-error event
+          }
           this._resolvedSampleRate = audioBuffer.sampleRate;
           // Backfill audioBuffer immutably: new clip replaces the preview clip
           const updatedClip = { ...clip, audioBuffer };
