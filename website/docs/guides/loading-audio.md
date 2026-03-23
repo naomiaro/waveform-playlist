@@ -91,14 +91,28 @@ cmake .. && make && sudo make install
 Generate waveform data:
 
 ```bash
-# Generate JSON format (recommended)
-audiowaveform -i audio.mp3 -o audio.json --pixels-per-second 20
+# Generate binary format (recommended — smaller files)
+audiowaveform -i audio.mp3 -o audio.dat -z 256 -b 8
 
-# Generate binary format (smaller file size)
-audiowaveform -i audio.mp3 -o audio.dat --pixels-per-second 20
+# Generate JSON format
+audiowaveform -i audio.mp3 -o audio.json -z 256 -b 8
+
+# Generate 16-bit for higher precision
+audiowaveform -i audio.mp3 -o audio.dat -z 256 -b 16
 ```
 
-The `--pixels-per-second` option controls resolution. Higher values = more detail but larger files.
+The `-z` option sets samples per pixel (zoom level). Lower values = more detail but larger files.
+
+:::caution Sample Rate Matching
+Pre-computed peaks embed the source audio's sample rate (e.g., 48000 Hz). The browser's `AudioContext` decodes audio at its **hardware** sample rate — typically 48000 Hz on most systems, but 44100 Hz on some devices.
+
+**If the rates don't match**, the peaks will be slightly wider or narrower than the decoded audio, causing misaligned waveforms during trim, split, and zoom. When a mismatch is detected, waveform-playlist logs a warning and falls back to generating peaks from the decoded audio (slower initial load, but correct).
+
+**Recommendations:**
+- Generate `.dat` files at **48000 Hz** (the most common hardware rate)
+- If your audio is 44100 Hz, resample before generating peaks: `ffmpeg -i audio.mp3 -ar 48000 audio-48k.wav && audiowaveform -i audio-48k.wav -o peaks.dat -z 256 -b 8`
+- Or use `configureGlobalContext({ sampleRate: 44100 })` from `@waveform-playlist/playout` before any audio operations to request a matching AudioContext rate (hardware permitting)
+:::
 
 ### Using Pre-computed Waveforms
 
@@ -148,13 +162,15 @@ BBC audiowaveform outputs JSON in this format:
 {
   "version": 2,
   "channels": 2,
-  "sample_rate": 44100,
+  "sample_rate": 48000,
   "samples_per_pixel": 256,
   "bits": 8,
   "length": 1000,
   "data": [0, 10, -5, 15, ...]
 }
 ```
+
+The `sample_rate` field must match the browser's `AudioContext.sampleRate` for pre-computed peaks to be used. See the [sample rate matching](#generating-waveform-data) note above.
 
 ## Loading from Different Sources
 
@@ -369,8 +385,8 @@ const { tracks, loading, loadedCount, totalCount } = useAudioTracks(configs, { i
 ## Performance Tips
 
 1. **Use pre-computed waveforms** for files over 5 minutes
-2. **Load tracks lazily** - Only load what's visible
-3. **Use appropriate sample rates** - 44.1kHz is usually sufficient
+2. **Generate peaks at 48000 Hz** to match most hardware — mismatched rates fall back to browser decoding
+3. **Load tracks lazily** - Only load what's visible
 4. **Compress audio** - MP3 loads faster than WAV
 5. **Consider streaming** for very long files
 
