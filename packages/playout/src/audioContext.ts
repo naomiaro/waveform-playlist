@@ -13,9 +13,10 @@ import { Context, setContext } from 'tone';
 let globalToneContext: Context | null = null;
 
 export interface AudioContextOptions {
-  /** Desired sample rate. If hardware can't match, falls back to default. */
+  /** Desired sample rate for comparison. Context uses hardware default; a warning
+   *  is logged if rates differ. Not yet wired through (see playout CLAUDE.md). */
   sampleRate?: number;
-  /** Latency hint: 'interactive', 'balanced', 'playback', or seconds (e.g., 0). */
+  /** Latency hint. Not yet wired through (see playout CLAUDE.md). */
   latencyHint?: AudioContextLatencyCategory | number;
 }
 

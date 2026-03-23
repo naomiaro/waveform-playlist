@@ -604,27 +604,31 @@ export class DawEditorElement extends LitElement {
       );
     }
   }
-  private _contextConfigured = false;
+  private _contextConfigurePromise: Promise<void> | null = null;
   /**
    * Ensure the global AudioContext is configured with the editor's sample-rate hint
-   * before the first audio operation. Must be called before getGlobalAudioContext().
+   * before the first audio operation. Idempotent — concurrent callers await the
+   * same promise so no one proceeds to getGlobalAudioContext() before configuration.
    */
-  private async _ensureContextConfigured(): Promise<void> {
-    if (this._contextConfigured) return;
-    this._contextConfigured = true;
-    const { configureGlobalContext } = await import('@waveform-playlist/playout');
-    const actualRate = configureGlobalContext({
-      sampleRate: this.sampleRate,
-      latencyHint: 0,
-    });
-    if (actualRate !== this.sampleRate) {
-      console.warn(
-        '[dawcore] Requested sampleRate ' +
-          this.sampleRate +
-          ' but AudioContext is running at ' +
-          actualRate
-      );
+  private _ensureContextConfigured(): Promise<void> {
+    if (!this._contextConfigurePromise) {
+      this._contextConfigurePromise = (async () => {
+        const { configureGlobalContext } = await import('@waveform-playlist/playout');
+        const actualRate = configureGlobalContext({
+          sampleRate: this.sampleRate,
+          latencyHint: 0,
+        });
+        if (actualRate !== this.sampleRate) {
+          console.warn(
+            '[dawcore] Requested sampleRate ' +
+              this.sampleRate +
+              ' but AudioContext is running at ' +
+              actualRate
+          );
+        }
+      })();
     }
+    return this._contextConfigurePromise;
   }
   async _fetchAndDecode(src: string): Promise<AudioBuffer> {
     if (this._audioCache.has(src)) {

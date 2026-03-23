@@ -904,11 +904,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             let peakOffset = clip.offsetSamples;
             let peakDuration = clip.durationSamples;
             let peakSpp = samplesPerPixel;
-            if (wdRate !== clipRate) {
+            if (wdRate !== clipRate && clipRate > 0 && wdRate > 0) {
               const ratio = wdRate / clipRate;
               peakOffset = Math.round(clip.offsetSamples * ratio);
               peakDuration = Math.round(clip.durationSamples * ratio);
-              peakSpp = Math.round(samplesPerPixel * ratio);
+              peakSpp = Math.max(1, Math.round(samplesPerPixel * ratio));
             }
             peaks = extractPeaksFromWaveformDataFull(
               clip.waveformData as WaveformData,
@@ -918,7 +918,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
               peakDuration
             );
           } catch (err) {
-            console.warn('[waveform-playlist] Failed to extract peaks from waveformData:', err);
+            console.warn(
+              '[waveform-playlist] Failed to extract peaks from waveformData: ' + String(err)
+            );
           }
         }
 
@@ -935,7 +937,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
                 clip.durationSamples
               );
             } catch (err) {
-              console.warn('[waveform-playlist] Failed to extract peaks from cache:', err);
+              console.warn(
+                '[waveform-playlist] Failed to extract peaks from cache: ' + String(err)
+              );
             }
           }
         }
