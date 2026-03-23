@@ -32,6 +32,16 @@ export default function FlexibleApiExamplePage(): React.ReactElement {
           custom UI with any component library while the library handles the audio engine.
         </p>
 
+        <h3>Keyboard Shortcuts</h3>
+        <ul>
+          <li><code>Space</code> - Play/Pause</li>
+          <li><code>Escape</code> - Stop</li>
+          <li><code>0</code> - Rewind to start</li>
+          <li><code>S</code> - Split clip at playhead (select a track first)</li>
+          <li><code>Cmd/Ctrl+Z</code> - Undo</li>
+          <li><code>Cmd/Ctrl+Shift+Z</code> - Redo</li>
+        </ul>
+
         <div style={{ marginTop: '2rem' }}>
           <LazyFlexibleApiExample />
         </div>
