@@ -8,13 +8,11 @@ import type { DawEditorElement } from './daw-editor';
 // Types
 // ---------------------------------------------------------------------------
 
-export interface KeyBinding {
-  key: string;
-  ctrlKey?: boolean;
-  shiftKey?: boolean;
-  metaKey?: boolean;
-  altKey?: boolean;
-}
+/** Key binding for remapping — derived from KeyboardShortcut to stay in sync. */
+export type KeyBinding = Pick<
+  KeyboardShortcut,
+  'key' | 'ctrlKey' | 'shiftKey' | 'metaKey' | 'altKey'
+>;
 
 export interface PlaybackShortcutMap {
   playPause?: KeyBinding;
@@ -74,7 +72,10 @@ export class DawKeyboardShortcutsElement extends LitElement {
     super.connectedCallback();
     this._editor = this.closest('daw-editor') as DawEditorElement | null;
     if (!this._editor) {
-      console.warn('[dawcore] <daw-keyboard-shortcuts> must be placed inside a <daw-editor>');
+      console.warn(
+        '[dawcore] <daw-keyboard-shortcuts> must be placed inside a <daw-editor>. ' +
+          'Preset shortcuts (playback, splitting, undo) will be inactive; only customShortcuts will fire.'
+      );
     }
     document.addEventListener('keydown', this._onKeyDown);
   }
@@ -100,15 +101,21 @@ export class DawKeyboardShortcutsElement extends LitElement {
 
     if (this.playback) {
       const map = this.playbackShortcuts;
+      // Explicit ctrlKey/metaKey: false prevents Cmd+Space (Spotlight on Mac)
+      // and Ctrl+0 etc. from triggering playback shortcuts.
       result.push(
         this._makeShortcut(
-          map?.playPause ?? { key: ' ' },
+          map?.playPause ?? { key: ' ', ctrlKey: false, metaKey: false },
           () => editor.togglePlayPause(),
           'Play/Pause'
         ),
-        this._makeShortcut(map?.stop ?? { key: 'Escape' }, () => editor.stop(), 'Stop'),
         this._makeShortcut(
-          map?.rewindToStart ?? { key: '0' },
+          map?.stop ?? { key: 'Escape', ctrlKey: false, metaKey: false },
+          () => editor.stop(),
+          'Stop'
+        ),
+        this._makeShortcut(
+          map?.rewindToStart ?? { key: '0', ctrlKey: false, metaKey: false },
           () => editor.seekTo(0),
           'Rewind to start'
         )
@@ -198,12 +205,12 @@ export class DawKeyboardShortcutsElement extends LitElement {
     try {
       handleKeyboardEvent(e, shortcuts, true);
     } catch (err) {
-      console.warn('[dawcore] Keyboard shortcut failed: ' + String(err));
+      console.warn('[dawcore] Keyboard shortcut failed (key=' + e.key + '): ' + String(err));
       this._editor?.dispatchEvent(
         new CustomEvent('daw-error', {
           bubbles: true,
           composed: true,
-          detail: { operation: 'keyboard-shortcut', error: err },
+          detail: { operation: 'keyboard-shortcut', key: e.key, error: err },
         })
       );
     }
