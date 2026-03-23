@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { ThemeProvider } from 'styled-components';
 import {
+  configureGlobalContext,
   createToneAdapter,
   getGlobalAudioContext,
   type EffectsFunction,
@@ -253,6 +254,10 @@ export interface WaveformPlaylistProviderProps {
   /** Disable automatic stop when the cursor reaches the end of the longest
    *  track. Useful for DAW-style recording beyond existing audio. */
   indefinitePlayback?: boolean;
+  /** Desired AudioContext sample rate. Pre-computed peaks (.dat files) must match
+   *  this rate for instant rendering. If hardware can't match, falls back gracefully
+   *  and worker recomputes peaks from decoded audio. Default: hardware rate. */
+  sampleRate?: number;
   children: ReactNode;
 }
 
@@ -278,6 +283,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   soundFontCache,
   deferEngineRebuild = false,
   indefinitePlayback = false,
+  sampleRate: sampleRateHint,
   children,
 }) => {
   // Default progressBarWidth to barWidth + barGap (fills gaps)
@@ -380,9 +386,27 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
   // AudioContext sample rate — single source of truth. Guarded for SSR where
   // AudioContext is undefined. Rate never changes after context creation.
-  const sampleRateRef = useRef<number>(
-    typeof AudioContext !== 'undefined' ? getGlobalAudioContext().sampleRate : 48000
-  );
+  // If sampleRateHint is provided, configure the context before reading the rate.
+  const [initialSampleRate] = useState<number>(() => {
+    if (typeof AudioContext === 'undefined') return sampleRateHint ?? 48000;
+    if (sampleRateHint !== undefined) {
+      const actualRate = configureGlobalContext({
+        sampleRate: sampleRateHint,
+        latencyHint: 'interactive',
+      });
+      if (actualRate !== sampleRateHint) {
+        console.warn(
+          '[waveform-playlist] Requested sampleRate ' +
+            sampleRateHint +
+            ' but AudioContext is running at ' +
+            actualRate
+        );
+      }
+      return actualRate;
+    }
+    return getGlobalAudioContext().sampleRate;
+  });
+  const sampleRateRef = useRef<number>(initialSampleRate);
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
