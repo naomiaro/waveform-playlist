@@ -26,9 +26,19 @@ export interface AudioContextOptions {
  */
 export function configureGlobalContext(options: AudioContextOptions): number {
   if (globalToneContext) {
-    throw new Error(
-      '[playout] configureGlobalContext: context already created. Call before any audio operations.'
-    );
+    // Context already created (e.g., by resumeGlobalAudioContext before first track load).
+    // Return the existing rate — the hint was too late but the context is usable.
+    const existingRate = (globalToneContext.rawContext as AudioContext).sampleRate;
+    if (options.sampleRate !== undefined && options.sampleRate !== existingRate) {
+      console.warn(
+        '[playout] configureGlobalContext: context already created at ' +
+          existingRate +
+          ' Hz (requested ' +
+          options.sampleRate +
+          ' Hz). Call configureGlobalContext before any audio operations for sample rate control.'
+      );
+    }
+    return existingRate;
   }
   const contextOptions: Record<string, unknown> = {};
   if (options.latencyHint !== undefined) {
