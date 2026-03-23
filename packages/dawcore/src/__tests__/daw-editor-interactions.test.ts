@@ -76,6 +76,92 @@ describe('Selection', () => {
   });
 });
 
+describe('seekTo', () => {
+  it('updates currentTime', () => {
+    const el = document.createElement('daw-editor') as any;
+    // Provide a mock engine so seekTo doesn't bail
+    el._engine = { seek: vi.fn() };
+    el.seekTo(5.0);
+    expect(el._currentTime).toBe(5.0);
+  });
+
+  it('calls _stopPlayhead when not playing', () => {
+    const el = document.createElement('daw-editor') as any;
+    el._engine = { seek: vi.fn() };
+    el._isPlaying = false;
+    const spy = vi.spyOn(el, '_stopPlayhead').mockImplementation(() => {});
+    el.seekTo(0);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('does not call _stopPlayhead when playing', () => {
+    const el = document.createElement('daw-editor') as any;
+    el._engine = { seek: vi.fn() };
+    el._isPlaying = true;
+    const spy = vi.spyOn(el, '_stopPlayhead').mockImplementation(() => {});
+    el.seekTo(3.0);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+describe('Track control selects track', () => {
+  it('selects track when daw-track-control event is dispatched', () => {
+    const el = document.createElement('daw-editor') as any;
+    document.body.appendChild(el);
+    // Set up minimal state for the handler
+    el._tracks = new Map([['track-1', { volume: 1, pan: 0, muted: false, soloed: false }]]);
+    el._engine = {
+      selectTrack: vi.fn(),
+      setTrackVolume: vi.fn(),
+    };
+
+    const events: CustomEvent[] = [];
+    el.addEventListener('daw-track-select', (e: CustomEvent) => events.push(e));
+
+    el.dispatchEvent(
+      new CustomEvent('daw-track-control', {
+        bubbles: true,
+        detail: { trackId: 'track-1', prop: 'volume', value: 0.5 },
+      })
+    );
+
+    expect(el._selectedTrackId).toBe('track-1');
+    expect(el._engine.selectTrack).toHaveBeenCalledWith('track-1');
+    expect(events).toHaveLength(1);
+    expect(events[0].detail.trackId).toBe('track-1');
+
+    document.body.removeChild(el);
+  });
+
+  it('does not re-select already selected track', () => {
+    const el = document.createElement('daw-editor') as any;
+    document.body.appendChild(el);
+    el._tracks = new Map([['track-1', { volume: 1, pan: 0, muted: false, soloed: false }]]);
+    el._engine = {
+      selectTrack: vi.fn(),
+      setTrackVolume: vi.fn(),
+    };
+    el._selectedTrackId = 'track-1';
+
+    const events: CustomEvent[] = [];
+    el.addEventListener('daw-track-select', (e: CustomEvent) => events.push(e));
+
+    el.dispatchEvent(
+      new CustomEvent('daw-track-control', {
+        bubbles: true,
+        detail: { trackId: 'track-1', prop: 'volume', value: 0.5 },
+      })
+    );
+
+    expect(el._engine.selectTrack).not.toHaveBeenCalled();
+    expect(events).toHaveLength(0);
+
+    document.body.removeChild(el);
+  });
+});
+
 describe('effectiveSampleRate', () => {
   it('returns initial sampleRate hint when no audio decoded', () => {
     const el = document.createElement('daw-editor') as any;
