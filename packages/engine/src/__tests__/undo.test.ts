@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PlaylistEngine } from '../PlaylistEngine';
 import { createClip, createTrack } from '@waveform-playlist/core';
 
@@ -252,6 +252,98 @@ describe('PlaylistEngine — Undo/Redo', () => {
       // Only one undo step, not two
       engine.undo();
       expect(engine.canUndo).toBe(false);
+    });
+  });
+
+  describe('addTrack/removeTrack undo', () => {
+    it('undo after addTrack removes the track', () => {
+      const clip = makeClip(0, 48000);
+      const track = makeTrack([clip]);
+      engine.setTracks([track]);
+      expect(engine.getState().tracks).toHaveLength(1);
+
+      const newTrack = makeTrack([makeClip(0, 24000)]);
+      engine.addTrack(newTrack);
+      expect(engine.getState().tracks).toHaveLength(2);
+
+      engine.undo();
+      expect(engine.getState().tracks).toHaveLength(1);
+    });
+
+    it('undo after removeTrack restores the track', () => {
+      const clip1 = makeClip(0, 48000);
+      const clip2 = makeClip(0, 24000);
+      const track1 = makeTrack([clip1]);
+      const track2 = makeTrack([clip2]);
+      engine.setTracks([track1, track2]);
+      expect(engine.getState().tracks).toHaveLength(2);
+
+      const trackId = engine.getState().tracks[1].id;
+      engine.removeTrack(trackId);
+      expect(engine.getState().tracks).toHaveLength(1);
+
+      engine.undo();
+      expect(engine.getState().tracks).toHaveLength(2);
+    });
+  });
+
+  describe('empty stack safety', () => {
+    it('undo on empty stack is a no-op (no throw, no state change)', () => {
+      expect(engine.canUndo).toBe(false);
+      expect(() => engine.undo()).not.toThrow();
+      expect(engine.canUndo).toBe(false);
+      expect(engine.canRedo).toBe(false);
+    });
+
+    it('redo on empty stack is a no-op (no throw, no state change)', () => {
+      expect(engine.canRedo).toBe(false);
+      expect(() => engine.redo()).not.toThrow();
+      expect(engine.canUndo).toBe(false);
+      expect(engine.canRedo).toBe(false);
+    });
+  });
+
+  describe('transaction edge cases', () => {
+    it('commitTransaction without beginTransaction is a no-op', () => {
+      expect(() => engine.commitTransaction()).not.toThrow();
+      expect(engine.canUndo).toBe(false);
+    });
+
+    it('abortTransaction without beginTransaction is a no-op', () => {
+      expect(() => engine.abortTransaction()).not.toThrow();
+      expect(engine.canUndo).toBe(false);
+    });
+
+    it('double beginTransaction warns but does not throw', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      engine.beginTransaction();
+      engine.beginTransaction();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already in a transaction'));
+      // Clean up — commit the second transaction
+      engine.commitTransaction();
+      warnSpy.mockRestore();
+    });
+
+    it('double commitTransaction warns on second call', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const clip = makeClip(0, 48000);
+      const track = makeTrack([clip]);
+      engine.setTracks([track]);
+
+      engine.beginTransaction();
+      engine.moveClip(
+        engine.getState().tracks[0].id,
+        engine.getState().tracks[0].clips[0].id,
+        1000
+      );
+      engine.commitTransaction();
+      expect(engine.canUndo).toBe(true);
+
+      engine.commitTransaction(); // second commit — no active transaction
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('no active transaction to commit')
+      );
+      warnSpy.mockRestore();
     });
   });
 

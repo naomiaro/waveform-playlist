@@ -103,12 +103,21 @@ export class PlaylistEngine {
   }
 
   beginTransaction(): void {
+    if (this._inTransaction) {
+      console.warn(
+        '[waveform-playlist/engine] beginTransaction: already in a transaction, ' +
+          'previous snapshot will be overwritten'
+      );
+    }
     this._transactionSnapshot = this._snapshotTracks();
     this._inTransaction = true;
   }
 
   commitTransaction(): void {
-    if (!this._inTransaction || this._transactionSnapshot === null) return;
+    if (!this._inTransaction || this._transactionSnapshot === null) {
+      console.warn('[waveform-playlist/engine] commitTransaction: no active transaction to commit');
+      return;
+    }
     this._undoStack.push(this._transactionSnapshot);
     if (this._undoStack.length > this.undoLimit) {
       this._undoStack.shift();
@@ -119,7 +128,10 @@ export class PlaylistEngine {
   }
 
   abortTransaction(): void {
-    if (!this._inTransaction || this._transactionSnapshot === null) return;
+    if (!this._inTransaction || this._transactionSnapshot === null) {
+      console.warn('[waveform-playlist/engine] abortTransaction: no active transaction to abort');
+      return;
+    }
     const snapshot = this._transactionSnapshot;
     this._transactionSnapshot = null;
     this._inTransaction = false;

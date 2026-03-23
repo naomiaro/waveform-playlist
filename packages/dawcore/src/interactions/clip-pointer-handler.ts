@@ -309,8 +309,13 @@ export class ClipPointerHandler {
         }
       }
     } finally {
-      // Commit transaction — one undo step for the entire drag gesture
-      this._host.engine?.commitTransaction();
+      // Commit transaction if mutations occurred, abort if click/no-op.
+      // Abort does NOT push to undo stack or clear redo stack.
+      if (this._isDragging && this._cumulativeDeltaSamples !== 0) {
+        this._host.engine?.commitTransaction();
+      } else {
+        this._host.engine?.abortTransaction();
+      }
       this._reset();
     }
   }

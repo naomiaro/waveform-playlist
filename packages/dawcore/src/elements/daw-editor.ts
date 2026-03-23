@@ -661,13 +661,19 @@ export class DawEditorElement extends LitElement {
 
   /** Undo the last structural edit. */
   undo(): void {
-    if (!this._engine) return;
+    if (!this._engine) {
+      console.warn('[dawcore] undo: engine not ready, call ignored');
+      return;
+    }
     this._engine.undo();
   }
 
   /** Redo the last undone edit. */
   redo(): void {
-    if (!this._engine) return;
+    if (!this._engine) {
+      console.warn('[dawcore] redo: engine not ready, call ignored');
+      return;
+    }
     this._engine.redo();
   }
 

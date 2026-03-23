@@ -21,6 +21,7 @@ function createMockEngine(): ClipEngineContract {
     constrainTrimDelta: vi.fn().mockImplementation((_t, _c, _b, d) => d),
     beginTransaction: vi.fn(),
     commitTransaction: vi.fn(),
+    abortTransaction: vi.fn(),
   };
 }
 
