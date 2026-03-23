@@ -39,7 +39,14 @@ export function syncPeaksForChangedClips(host: ClipPeakSyncHost, tracks: ClipTra
         clip.audioBuffer ??
         host._clipBuffers.get(clip.id) ??
         findAudioBufferForClip(host, clip, track);
-      if (!audioBuffer) continue;
+      if (!audioBuffer) {
+        console.warn(
+          '[dawcore] syncPeaksForChangedClips: no AudioBuffer for clip ' +
+            clip.id +
+            ' — waveform will be blank'
+        );
+        continue;
+      }
 
       // Update cached state
       host._clipBuffers = new Map(host._clipBuffers).set(clip.id, audioBuffer);
@@ -87,9 +94,11 @@ function cleanupOrphanedClipData(host: ClipPeakSyncHost, currentClipIds: Set<str
       buffersChanged = true;
     }
   }
+  let offsetsChanged = false;
   for (const id of host._clipOffsets.keys()) {
     if (!currentClipIds.has(id)) {
       host._clipOffsets.delete(id);
+      offsetsChanged = true;
     }
   }
   for (const id of host._peaksData.keys()) {
@@ -103,6 +112,9 @@ function cleanupOrphanedClipData(host: ClipPeakSyncHost, currentClipIds: Set<str
   // _clipBuffers uses reference identity for change detection in syncPeaksForChangedClips
   if (buffersChanged) {
     host._clipBuffers = new Map(host._clipBuffers);
+  }
+  if (offsetsChanged) {
+    host._clipOffsets = new Map(host._clipOffsets);
   }
   if (peaksChanged) {
     host._peaksData = new Map(host._peaksData);

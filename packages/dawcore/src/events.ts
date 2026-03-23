@@ -70,27 +70,27 @@ export interface DawRecordingErrorDetail {
 }
 
 export interface DawClipMoveDetail {
-  trackId: string;
-  clipId: string;
+  readonly trackId: string;
+  readonly clipId: string;
   /** Requested cumulative delta. May exceed actual applied movement due to
    *  collision constraints. Query engine state for actual clip positions. */
-  deltaSamples: number;
+  readonly deltaSamples: number;
 }
 
 export interface DawClipTrimDetail {
-  trackId: string;
-  clipId: string;
-  boundary: 'left' | 'right';
+  readonly trackId: string;
+  readonly clipId: string;
+  readonly boundary: 'left' | 'right';
   /** Constrained cumulative delta applied by the engine. Already clamped
    *  by collision and boundary constraints during drag. */
-  deltaSamples: number;
+  readonly deltaSamples: number;
 }
 
 export interface DawClipSplitDetail {
-  trackId: string;
-  originalClipId: string;
-  leftClipId: string;
-  rightClipId: string;
+  readonly trackId: string;
+  readonly originalClipId: string;
+  readonly leftClipId: string;
+  readonly rightClipId: string;
 }
 
 // ---------------------------------------------------------------------------

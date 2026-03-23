@@ -2,10 +2,10 @@ import { DRAG_THRESHOLD } from './constants';
 
 /** Snapshot of a clip's bounds for trim constraint computation. */
 export interface ClipBounds {
-  offsetSamples: number;
-  durationSamples: number;
-  startSample: number;
-  sourceDurationSamples: number;
+  readonly offsetSamples: number;
+  readonly durationSamples: number;
+  readonly startSample: number;
+  readonly sourceDurationSamples: number;
 }
 
 /** Narrow engine contract for clip move/trim interactions. */
@@ -272,6 +272,11 @@ export class ClipPointerHandler {
                 deltaSamples: this._cumulativeDeltaSamples,
               },
             })
+          );
+        } else {
+          console.warn(
+            '[dawcore] engine unavailable at move drop — audio may be out of sync for track ' +
+              this._trackId
           );
         }
       } else {
