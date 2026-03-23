@@ -353,7 +353,7 @@ export function createClip(options: CreateClipOptions): AudioClip {
         waveformData.sample_rate +
         ' Hz do not match decoded audio at ' +
         audioBuffer.sampleRate +
-        ' Hz — falling back to worker to recompute peaks'
+        ' Hz — peaks may be recomputed from decoded audio'
     );
   }
 

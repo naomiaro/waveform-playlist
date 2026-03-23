@@ -2,7 +2,12 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ClipTrack, FadeType, Peaks, PeakData } from '@waveform-playlist/core';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
-import { createClipFromSeconds, createTrack, clipPixelWidth } from '@waveform-playlist/core';
+import {
+  createClip,
+  createClipFromSeconds,
+  createTrack,
+  clipPixelWidth,
+} from '@waveform-playlist/core';
 import { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
@@ -244,6 +249,7 @@ export class DawEditorElement extends LitElement {
     this._clipOffsets.clear();
     this._peakPipeline.terminate();
     this._minSamplesPerPixel = 0;
+    this._contextConfigurePromise = null;
     try {
       this._disposeEngine();
     } catch (err) {
@@ -476,16 +482,18 @@ export class DawEditorElement extends LitElement {
           }
         }
         if (waveformData) {
-          // Create clip from WaveformData metadata (no audioBuffer yet)
-          const clip = createClipFromSeconds({
+          // Create clip with integer samples to avoid float round-trip drift
+          // (CLAUDE.md pattern #40: prefer createClip when samples known)
+          const wdRate = waveformData.sample_rate;
+          const clip = createClip({
             waveformData,
-            startTime: clipDesc.start,
-            duration: clipDesc.duration || waveformData.duration,
-            offset: clipDesc.offset,
+            startSample: Math.round(clipDesc.start * wdRate),
+            durationSamples: Math.round((clipDesc.duration || waveformData.duration) * wdRate),
+            offsetSamples: Math.round(clipDesc.offset * wdRate),
             gain: clipDesc.gain,
             name: clipDesc.name,
-            sampleRate: waveformData.sample_rate,
-            sourceDuration: waveformData.duration,
+            sampleRate: wdRate,
+            sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
           });
           const effectiveScale = Math.max(this.samplesPerPixel, waveformData.scale);
           const peakData = extractPeaks(
@@ -626,7 +634,11 @@ export class DawEditorElement extends LitElement {
               actualRate
           );
         }
-      })();
+      })().catch((err) => {
+        // Clear on rejection so next call can retry (same pattern as _enginePromise)
+        this._contextConfigurePromise = null;
+        throw err;
+      });
     }
     return this._contextConfigurePromise;
   }
