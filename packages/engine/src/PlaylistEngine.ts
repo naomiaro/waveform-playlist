@@ -45,6 +45,12 @@ export class PlaylistEngine {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private _listeners: Map<string, Set<Function>> = new Map();
 
+  private _undoStack: ClipTrack[][] = [];
+  private _redoStack: ClipTrack[][] = [];
+  private _inTransaction = false;
+  private _transactionSnapshot: ClipTrack[] | null = null;
+  undoLimit = 100;
+
   constructor(options: PlaylistEngineOptions = {}) {
     this._sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE;
     this._zoomLevels = [...(options.zoomLevels ?? DEFAULT_ZOOM_LEVELS)];
@@ -66,10 +72,65 @@ export class PlaylistEngine {
   }
 
   // ---------------------------------------------------------------------------
+  // Undo/Redo
+  // ---------------------------------------------------------------------------
+
+  get canUndo(): boolean {
+    return this._undoStack.length > 0;
+  }
+
+  get canRedo(): boolean {
+    return this._redoStack.length > 0;
+  }
+
+  undo(): void {
+    if (this._undoStack.length === 0) return;
+    const snapshot = this._undoStack.pop()!;
+    this._redoStack.push(this._snapshotTracks());
+    this._restoreTracks(snapshot);
+  }
+
+  redo(): void {
+    if (this._redoStack.length === 0) return;
+    const snapshot = this._redoStack.pop()!;
+    this._undoStack.push(this._snapshotTracks());
+    this._restoreTracks(snapshot);
+  }
+
+  clearHistory(): void {
+    this._undoStack = [];
+    this._redoStack = [];
+  }
+
+  beginTransaction(): void {
+    this._transactionSnapshot = this._snapshotTracks();
+    this._inTransaction = true;
+  }
+
+  commitTransaction(): void {
+    if (!this._inTransaction || this._transactionSnapshot === null) return;
+    this._undoStack.push(this._transactionSnapshot);
+    if (this._undoStack.length > this.undoLimit) {
+      this._undoStack.shift();
+    }
+    this._redoStack = [];
+    this._transactionSnapshot = null;
+    this._inTransaction = false;
+  }
+
+  abortTransaction(): void {
+    if (!this._inTransaction || this._transactionSnapshot === null) return;
+    const snapshot = this._transactionSnapshot;
+    this._transactionSnapshot = null;
+    this._inTransaction = false;
+    this._restoreTracks(snapshot);
+  }
+
+  // ---------------------------------------------------------------------------
   // State snapshot
   // ---------------------------------------------------------------------------
 
-  getState(): EngineState {
+  getState(): EngineState & { canUndo: boolean; canRedo: boolean } {
     return {
       tracks: this._tracks.map((t) => ({ ...t, clips: [...t.clips] })),
       tracksVersion: this._tracksVersion,
@@ -88,6 +149,8 @@ export class PlaylistEngine {
       loopStart: this._loopStart,
       loopEnd: this._loopEnd,
       isLoopEnabled: this._isLoopEnabled,
+      canUndo: this.canUndo,
+      canRedo: this.canRedo,
     };
   }
 
@@ -96,6 +159,7 @@ export class PlaylistEngine {
   // ---------------------------------------------------------------------------
 
   setTracks(tracks: ClipTrack[]): void {
+    this.clearHistory();
     this._tracks = [...tracks];
     this._tracksVersion++;
     this._adapter?.setTracks(this._tracks);
@@ -103,6 +167,7 @@ export class PlaylistEngine {
   }
 
   addTrack(track: ClipTrack): void {
+    this._pushUndoSnapshot();
     this._tracks = [...this._tracks, track];
     this._tracksVersion++;
     if (this._adapter?.addTrack) {
@@ -115,6 +180,7 @@ export class PlaylistEngine {
 
   removeTrack(trackId: string): void {
     if (!this._tracks.some((t) => t.id === trackId)) return;
+    this._pushUndoSnapshot();
     this._tracks = this._tracks.filter((t) => t.id !== trackId);
     this._tracksVersion++;
     if (this._selectedTrackId === trackId) {
@@ -133,6 +199,7 @@ export class PlaylistEngine {
     const resolved = track ?? this._tracks.find((t) => t.id === trackId);
     if (!resolved) return;
     if (track) {
+      this._pushUndoSnapshot();
       this._tracks = this._tracks.map((t) => (t.id === trackId ? track : t));
       this._tracksVersion++;
     }
@@ -243,6 +310,8 @@ export class PlaylistEngine {
 
     if (constrainedDelta === 0) return;
 
+    this._pushUndoSnapshot();
+
     this._tracks = this._tracks.map((t) => {
       if (t.id !== trackId) return t;
       const newClips = t.clips.map((c: AudioClip, i: number) =>
@@ -288,6 +357,8 @@ export class PlaylistEngine {
       );
       return;
     }
+
+    this._pushUndoSnapshot();
 
     const { left, right } = splitClipOp(clip, atSample);
 
@@ -339,6 +410,8 @@ export class PlaylistEngine {
     );
 
     if (constrained === 0) return;
+
+    this._pushUndoSnapshot();
 
     this._tracks = this._tracks.map((t) => {
       if (t.id !== trackId) return t;
@@ -579,6 +652,26 @@ export class PlaylistEngine {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  private _snapshotTracks(): ClipTrack[] {
+    return this._tracks.map((t) => ({ ...t, clips: [...t.clips] }));
+  }
+
+  private _pushUndoSnapshot(): void {
+    if (this._inTransaction) return;
+    this._undoStack.push(this._snapshotTracks());
+    if (this._undoStack.length > this.undoLimit) {
+      this._undoStack.shift();
+    }
+    this._redoStack = [];
+  }
+
+  private _restoreTracks(snapshot: ClipTrack[]): void {
+    this._tracks = snapshot;
+    this._tracksVersion++;
+    this._adapter?.setTracks(this._tracks);
+    this._emitStateChange();
+  }
 
   private _emit(event: string, ...args: unknown[]): void {
     const listeners = this._listeners.get(event);

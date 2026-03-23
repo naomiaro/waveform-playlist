@@ -57,6 +57,10 @@ export interface EngineState {
   loopEnd: number;
   /** Whether loop playback is active. */
   isLoopEnabled: boolean;
+  /** Whether undo is available. */
+  canUndo: boolean;
+  /** Whether redo is available. */
+  canRedo: boolean;
 }
 
 /**
