@@ -11,7 +11,14 @@ function createMockEngine(): ClipEngineContract {
     moveClip: vi.fn(),
     trimClip: vi.fn(),
     updateTrack: vi.fn(),
-    getClipState: vi.fn().mockReturnValue({ offsetSamples: 0, durationSamples: 48000 }),
+    getClipBounds: vi.fn().mockReturnValue({
+      offsetSamples: 0,
+      durationSamples: 48000,
+      startSample: 0,
+      sourceDurationSamples: 96000,
+    }),
+    // Default: pass through unconstrained (tests can override)
+    constrainTrimDelta: vi.fn().mockImplementation((_t, _c, _b, d) => d),
   };
 }
 
@@ -523,11 +530,11 @@ describe('ClipPointerHandler', () => {
       expect(waveform.length).toBe(42);
     });
 
-    it('clamps left trim so container cannot go past timeline start (left >= 0)', () => {
-      // Clip with large offset (plenty of audio room to expand left)
-      const largeOffsetEngine = {
+    it('uses constrainTrimDelta to clamp visual feedback during left trim', () => {
+      // Engine constrains delta to -200*1024 (timeline boundary)
+      const constrainedEngine = {
         ...createMockEngine(),
-        getClipState: vi.fn().mockReturnValue({ offsetSamples: 500000, durationSamples: 48000 }),
+        constrainTrimDelta: vi.fn().mockReturnValue(-200 * 1024),
       };
       const shadowHost = document.createElement('div');
       const shadow = shadowHost.attachShadow({ mode: 'open' });
@@ -535,47 +542,64 @@ describe('ClipPointerHandler', () => {
       // Container starts at left:200px
       shadow.appendChild(container);
 
-      const localHost = createMockHost(largeOffsetEngine, { shadowRoot: shadow });
+      const localHost = createMockHost(constrainedEngine, { shadowRoot: shadow });
       const localHandler = new ClipPointerHandler(localHost);
 
       const el = makeBoundaryEl('clip-1', 'track-1', 'left');
       localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
-      // Drag 300px LEFT — would put container at -100px without clamping
+      // Drag 300px LEFT — raw delta = -300*1024, but engine constrains to -200*1024
       localHandler.onPointerMove(pointerEvent('pointermove', { clientX: -100 }));
 
-      // Should clamp to left:0, not go negative
+      // Container should use constrained delta: left:0, width:600
       expect(container.style.left).toBe('0px');
-      // Width should expand by 200px (original position), not 300px
       expect(container.style.width).toBe('600px');
     });
 
-    it('clamps left trim so offset cannot go below 0', () => {
-      // Engine returns clip with offsetSamples=10000 — can only expand left by 10000 samples
-      const clampEngine = {
+    it('uses constrainTrimDelta to prevent overlap with neighbor clips', () => {
+      // Engine constrains right trim delta to 5000 samples (neighbor collision)
+      const constrainedEngine = {
         ...createMockEngine(),
-        getClipState: vi.fn().mockReturnValue({ offsetSamples: 10000, durationSamples: 48000 }),
+        constrainTrimDelta: vi.fn().mockReturnValue(5000),
       };
       const shadowHost = document.createElement('div');
       const shadow = shadowHost.attachShadow({ mode: 'open' });
       const container = makeClipContainer('clip-1');
       shadow.appendChild(container);
 
-      const reextractClipPeaks = vi.fn().mockReturnValue(null);
-      const localHost = createMockHost(clampEngine, { shadowRoot: shadow, reextractClipPeaks });
+      const localHost = createMockHost(constrainedEngine, { shadowRoot: shadow });
+      const localHandler = new ClipPointerHandler(localHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'right');
+      localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 600 }));
+      // Drag 50px RIGHT — raw delta = 50*1024 = 51200, but engine constrains to 5000
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 650 }));
+
+      // Width should use constrained delta: 400 + round(5000/1024) = 400 + 5 = 405px
+      const constrainedPx = Math.round(5000 / 1024);
+      expect(container.style.width).toBe(400 + constrainedPx + 'px');
+    });
+
+    it('passes constrained delta to engine on pointerup', () => {
+      // Engine constrains to -10000
+      const constrainedEngine = {
+        ...createMockEngine(),
+        constrainTrimDelta: vi.fn().mockReturnValue(-10000),
+      };
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = makeClipContainer('clip-1');
+      shadow.appendChild(container);
+
+      const localHost = createMockHost(constrainedEngine, { shadowRoot: shadow });
       const localHandler = new ClipPointerHandler(localHost);
 
       const el = makeBoundaryEl('clip-1', 'track-1', 'left');
       localHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 200 }));
-      // Drag 100px LEFT — 100 * 1024 = 102400 samples, but offset is only 10000
       localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 100 }));
       localHandler.onPointerUp(pointerEvent('pointerup', { clientX: 100 }));
 
-      // Cumulative delta should be clamped to -10000 (not -102400)
-      const trimEvent = localHost.events.find(
-        (e) => (e as CustomEvent).type === 'daw-clip-trim'
-      ) as CustomEvent;
-      expect(trimEvent).toBeDefined();
-      expect(trimEvent.detail.deltaSamples).toBe(-10000);
+      // Engine.trimClip should receive the constrained delta
+      expect(constrainedEngine.trimClip).toHaveBeenCalledWith('track-1', 'clip-1', 'left', -10000);
     });
 
     it('updates container width during right trim drag', () => {

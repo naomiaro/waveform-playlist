@@ -1,5 +1,13 @@
 import { DRAG_THRESHOLD } from './constants';
 
+/** Snapshot of a clip's bounds for trim constraint computation. */
+export interface ClipBounds {
+  offsetSamples: number;
+  durationSamples: number;
+  startSample: number;
+  sourceDurationSamples: number;
+}
+
 /** Narrow engine contract for clip move/trim interactions. */
 export interface ClipEngineContract {
   moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter?: boolean): void;
@@ -11,10 +19,15 @@ export interface ClipEngineContract {
     skipAdapter?: boolean
   ): void;
   updateTrack(trackId: string): void;
-  getClipState(
+  /** Get a clip's full bounds for trim constraint computation. */
+  getClipBounds(trackId: string, clipId: string): ClipBounds | null;
+  /** Constrain a trim delta using the engine's collision/bounds logic. */
+  constrainTrimDelta(
     trackId: string,
-    clipId: string
-  ): { offsetSamples: number; durationSamples: number } | null;
+    clipId: string,
+    boundary: 'left' | 'right',
+    deltaSamples: number
+  ): number;
 }
 
 /** Peak data returned by reextractClipPeaks for imperative waveform updates. */
@@ -138,10 +151,10 @@ export class ClipPointerHandler {
       // Snapshot clip audio bounds for peak re-extraction during drag
       const engine = this._host.engine;
       if (engine) {
-        const clipState = engine.getClipState(trackId, clipId);
-        if (clipState) {
-          this._originalOffsetSamples = clipState.offsetSamples;
-          this._originalDurationSamples = clipState.durationSamples;
+        const bounds = engine.getClipBounds(trackId, clipId);
+        if (bounds) {
+          this._originalOffsetSamples = bounds.offsetSamples;
+          this._originalDurationSamples = bounds.durationSamples;
         }
       }
     }
@@ -176,22 +189,17 @@ export class ClipPointerHandler {
       this._cumulativeDeltaSamples += incrementalDeltaSamples;
       engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples, true);
     } else {
-      // Trim: track cumulative delta — engine called once at pointerup.
-      let deltaPx = Math.round(totalDeltaPx);
-      let deltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
-
-      // Clamp left trim: can't go past timeline start or audio start
-      if (this._mode === 'trim-left') {
-        const minDeltaPx = -this._originalLeft;
-        if (deltaPx < minDeltaPx) {
-          deltaPx = minDeltaPx;
-          deltaSamples = Math.round(minDeltaPx * this._host.samplesPerPixel);
-        }
-        if (this._originalOffsetSamples + deltaSamples < 0) {
-          deltaSamples = -this._originalOffsetSamples;
-          deltaPx = Math.round(deltaSamples / this._host.samplesPerPixel);
-        }
-      }
+      // Trim: constrain delta using engine's full collision/bounds logic,
+      // then track for visual feedback. Engine called once at pointerup.
+      const boundary = this._mode === 'trim-left' ? 'left' : 'right';
+      const rawDeltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
+      const deltaSamples = engine.constrainTrimDelta(
+        this._trackId,
+        this._clipId,
+        boundary,
+        rawDeltaSamples
+      );
+      const deltaPx = Math.round(deltaSamples / this._host.samplesPerPixel);
 
       this._cumulativeDeltaSamples = deltaSamples;
 
