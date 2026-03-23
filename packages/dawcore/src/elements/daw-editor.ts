@@ -667,8 +667,17 @@ export class DawEditorElement extends LitElement {
       isPlaying: this._isPlaying,
       engine: this._engine,
       dispatchEvent: (e: Event) => this.dispatchEvent(e),
-      stop: () => this.stop(),
-      play: (time: number) => this.play(time),
+      stop: () => {
+        this._engine?.stop();
+        this._stopPlayhead();
+      },
+      // Call engine.play directly (synchronous) — not the async editor play()
+      // which yields to microtask queue via await engine.init(). Engine is
+      // already initialized at split time; the async gap causes audio desync.
+      play: (time: number) => {
+        this._engine?.play(time);
+        this._startPlayhead();
+      },
     });
   }
 
