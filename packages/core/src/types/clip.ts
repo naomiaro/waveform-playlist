@@ -345,8 +345,15 @@ export function createClip(options: CreateClipOptions): AudioClip {
     );
   }
 
-  // Note: audioBuffer and waveformData may have different sample rates (e.g., Opus at 48000
-  // decoded on 44100 hardware). This is expected — callers handle rate conversion for peaks.
+  if (audioBuffer && waveformData && audioBuffer.sampleRate !== waveformData.sample_rate) {
+    console.warn(
+      '[waveform-playlist] Pre-computed peaks at ' +
+        waveformData.sample_rate +
+        ' Hz do not match decoded audio at ' +
+        audioBuffer.sampleRate +
+        ' Hz — falling back to worker to recompute peaks'
+    );
+  }
 
   // Default duration to full source duration
   const durationSamples = options.durationSamples ?? sourceDurationSamples;
