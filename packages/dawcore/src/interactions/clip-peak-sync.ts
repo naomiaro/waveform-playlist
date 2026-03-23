@@ -99,7 +99,8 @@ function cleanupOrphanedClipData(host: ClipPeakSyncHost, currentClipIds: Set<str
     }
   }
 
-  // Trigger Lit reactivity for @state() Maps that changed
+  // Reassign Maps that changed — _peaksData is @state() (triggers Lit re-render),
+  // _clipBuffers uses reference identity for change detection in syncPeaksForChangedClips
   if (buffersChanged) {
     host._clipBuffers = new Map(host._clipBuffers);
   }

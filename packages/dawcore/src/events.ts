@@ -81,8 +81,8 @@ export interface DawClipTrimDetail {
   trackId: string;
   clipId: string;
   boundary: 'left' | 'right';
-  /** Requested cumulative delta. May exceed actual applied trim due to
-   *  boundary constraints. Query engine state for actual clip bounds. */
+  /** Constrained cumulative delta applied by the engine. Already clamped
+   *  by collision and boundary constraints during drag. */
   deltaSamples: number;
 }
 
