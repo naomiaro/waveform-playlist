@@ -26,6 +26,8 @@ import type {
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
+import { handleKeyboardEvent } from '@waveform-playlist/core';
+import type { KeyboardShortcut } from '@waveform-playlist/core';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
 
 @customElement('daw-editor')
@@ -40,6 +42,10 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
   @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
   @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
+  /** Configurable keyboard shortcuts. Set via JS property (not HTML attribute).
+   *  When `interactive-clips` is set, a default split shortcut (S key) is included
+   *  unless overridden. */
+  shortcuts: KeyboardShortcut[] = [];
   /** Initial sample rate hint. Overridden by decoded audio buffer's actual rate. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
   /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
@@ -634,18 +640,18 @@ export class DawEditorElement extends LitElement {
     });
   }
 
+  /** Get the active shortcuts — user-provided or defaults when interactive-clips is set. */
+  private _getActiveShortcuts(): KeyboardShortcut[] {
+    if (this.shortcuts.length > 0) return this.shortcuts;
+    if (!this.interactiveClips) return [];
+    // Default: split at playhead on S key
+    return [{ key: 's', action: () => this.splitAtPlayhead(), description: 'Split at playhead' }];
+  }
+
   private _onKeyDown = (e: KeyboardEvent) => {
-    if (!this.interactiveClips) return;
-    if (e.key === 's' || e.key === 'S') {
-      // Don't intercept Ctrl+S/Cmd+S (save) or other modifier combos
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      // Don't split when user is typing in a form element
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if ((e.target as HTMLElement)?.isContentEditable) return;
-      e.preventDefault();
-      this.splitAtPlayhead();
-    }
+    const shortcuts = this._getActiveShortcuts();
+    if (shortcuts.length === 0) return;
+    handleKeyboardEvent(e, shortcuts, true);
   };
 
   // --- Recording ---

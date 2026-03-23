@@ -3,3 +3,4 @@ export * from './types';
 export * from './utils';
 export * from './clipTimeHelpers';
 export * from './fades';
+export * from './keyboard';
