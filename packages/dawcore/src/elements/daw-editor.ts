@@ -637,12 +637,23 @@ export class DawEditorElement extends LitElement {
 
   /** Split the clip under the playhead on the selected track. */
   splitAtPlayhead(): boolean {
-    return performSplitAtPlayhead({
+    const wasPlaying = this._isPlaying;
+    const time = this._currentTime;
+    // Stop before split to avoid duplicate audio from Transport rescheduling
+    if (wasPlaying) {
+      this.stop();
+    }
+    const result = performSplitAtPlayhead({
       effectiveSampleRate: this.effectiveSampleRate,
-      currentTime: this._currentTime,
+      currentTime: time,
       engine: this._engine,
       dispatchEvent: (e: Event) => this.dispatchEvent(e),
     });
+    // Resume playback from the same position
+    if (wasPlaying && result) {
+      this.play(time);
+    }
+    return result;
   }
 
   /** Get the active shortcuts — user-provided or defaults. */
