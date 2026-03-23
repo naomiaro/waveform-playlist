@@ -80,6 +80,10 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Automatic:** Any clip with `audioBuffer` (loaded or recorded) gets worker treatment — no opt-in needed.
 
+## Pre-Computed Peaks Rate Mismatch
+
+When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after `audioBuffer` decodes at hardware rate), Path A in the peak effect converts `offsetSamples`, `durationSamples`, and `samplesPerPixel` to the waveformData's sample space using `ratio = wdRate / clipRate`. This prevents blank peaks when the clip is rebuilt at the decoded audio rate. Worker cache (Path B) replaces these on the next render cycle. Both `createClip` and `createClipFromSeconds` log a per-clip warning with the clip name.
+
 ## Playlist Loading Detection
 
 Three approaches for detecting when tracks finish loading:
