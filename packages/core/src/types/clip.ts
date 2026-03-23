@@ -347,7 +347,9 @@ export function createClip(options: CreateClipOptions): AudioClip {
 
   if (audioBuffer && waveformData && audioBuffer.sampleRate !== waveformData.sample_rate) {
     console.warn(
-      '[waveform-playlist] Pre-computed peaks at ' +
+      '[waveform-playlist] "' +
+        (name ?? 'unnamed') +
+        '": pre-computed peaks at ' +
         waveformData.sample_rate +
         ' Hz do not match decoded audio at ' +
         audioBuffer.sampleRate +
