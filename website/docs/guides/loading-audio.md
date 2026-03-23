@@ -91,14 +91,14 @@ cmake .. && make && sudo make install
 Generate waveform data:
 
 ```bash
-# Generate binary format (recommended — smaller files)
+# Generate from Opus (recommended — always 48000 Hz)
+audiowaveform -i audio.opus -o audio.dat -z 256 -b 8
+
+# Generate from MP3 or WAV
 audiowaveform -i audio.mp3 -o audio.dat -z 256 -b 8
 
-# Generate JSON format
-audiowaveform -i audio.mp3 -o audio.json -z 256 -b 8
-
 # Generate 16-bit for higher precision
-audiowaveform -i audio.mp3 -o audio.dat -z 256 -b 16
+audiowaveform -i audio.opus -o audio.dat -z 256 -b 16
 ```
 
 The `-z` option sets samples per pixel (zoom level). Lower values = more detail but larger files.
@@ -109,8 +109,9 @@ Pre-computed peaks embed the source audio's sample rate (e.g., 48000 Hz). The br
 **If the rates don't match**, the peaks will be slightly wider or narrower than the decoded audio, causing misaligned waveforms during trim, split, and zoom. When a mismatch is detected, waveform-playlist logs a warning and falls back to generating peaks from the decoded audio (slower initial load, but correct).
 
 **Recommendations:**
+- **Use Opus format** for audio — Opus always encodes at 48000 Hz (per spec), so `.dat` files generated from Opus sources automatically match most hardware. Opus also has excellent compression (~1/10 of WAV) and broad browser support.
 - Generate `.dat` files at **48000 Hz** (the most common hardware rate)
-- If your audio is 44100 Hz, resample before generating peaks: `ffmpeg -i audio.mp3 -ar 48000 audio-48k.wav && audiowaveform -i audio-48k.wav -o peaks.dat -z 256 -b 8`
+- If your source audio is 44100 Hz, either encode to Opus first (`ffmpeg -i audio.wav -c:a libopus audio.opus`) or resample before generating peaks (`ffmpeg -i audio.wav -ar 48000 audio-48k.wav`)
 - Or use `configureGlobalContext({ sampleRate: 44100 })` from `@waveform-playlist/playout` before any audio operations to request a matching AudioContext rate (hardware permitting)
 :::
 

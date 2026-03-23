@@ -73,16 +73,15 @@ export default function WaveformDataExamplePage(): React.ReactElement {
 {`# Install audiowaveform (macOS)
 brew install audiowaveform
 
-# Generate binary .dat file at 256 samples per pixel
+# Generate from Opus (recommended — always 48000 Hz, matching most hardware)
+audiowaveform -i audio.opus -o peaks.dat -z 256 -b 8
+
+# Generate from MP3 or WAV
 audiowaveform -i audio.mp3 -o peaks.dat -z 256 -b 8
 
-# Generate 16-bit for higher precision
-audiowaveform -i audio.mp3 -o peaks-16bit.dat -z 256 -b 16
-
-# If your audio is 44100 Hz, resample to 48000 Hz first
-# (peaks must match the browser's AudioContext sample rate)
-ffmpeg -i audio.mp3 -ar 48000 audio-48k.wav
-audiowaveform -i audio-48k.wav -o peaks.dat -z 256 -b 8`}
+# If source is 44100 Hz, encode to Opus first (resamples to 48000 Hz)
+ffmpeg -i audio.wav -c:a libopus audio.opus
+audiowaveform -i audio.opus -o peaks.dat -z 256 -b 8`}
           </pre>
 
           <p>
