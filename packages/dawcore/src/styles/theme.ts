@@ -38,6 +38,7 @@ export const clipStyles = css`
     align-items: center;
     padding: 0 6px;
     user-select: none;
+    -webkit-user-drag: none;
   }
   .clip-header span {
     font-size: 10px;
@@ -60,6 +61,8 @@ export const clipStyles = css`
     background: transparent;
     border: none;
     touch-action: none;
+    user-select: none;
+    -webkit-user-drag: none;
     transition: background 0.1s, border-color 0.1s;
   }
   .clip-boundary[data-boundary-edge='left'] {

@@ -63,6 +63,8 @@ export class PointerHandler {
     if (clipHandler) {
       const target = e.composedPath()[0] as Element;
       if (target && clipHandler.tryHandle(target, e)) {
+        // Prevent browser native drag (globe icon) and text selection
+        e.preventDefault();
         // Clip handler took over — wire move/up to it
         this._timeline = this._host.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
         if (this._timeline) {
