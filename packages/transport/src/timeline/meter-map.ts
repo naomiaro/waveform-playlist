@@ -110,10 +110,7 @@ export class MeterMap {
         return this._entries[i].tick + barsInto * tpb;
       }
     }
-    // Unreachable — last iteration always matches (nextBar = Infinity)
-    const last = this._entries[this._entries.length - 1];
-    const barsInto = targetBar - last.barAtTick;
-    return last.tick + barsInto * this._ticksPerBarForEntry(last);
+    return 0; // unreachable — last iteration always matches (nextBar = Infinity)
   }
 
   tickToBar(tick: number): number {
