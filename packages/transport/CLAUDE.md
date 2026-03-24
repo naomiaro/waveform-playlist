@@ -1,4 +1,4 @@
-# Transport Package (`@waveform-playlist/transport`)
+# Transport Package (`@dawcore/transport`)
 
 **Purpose:** Native Web Audio transport — replaces Tone.js Transport/scheduling with zero dependencies. Tone.js remains available only for effects (optional, consumer-side).
 
