@@ -12,14 +12,14 @@ describe('TempoMap', () => {
 
   it('single tempo: secondsToTicks', () => {
     const tm = new TempoMap(960, 120);
-    expect(tm.secondsToTicks(0.5)).toBeCloseTo(960);
-    expect(tm.secondsToTicks(1.0)).toBeCloseTo(1920);
+    expect(tm.secondsToTicks(0.5)).toBe(960);
+    expect(tm.secondsToTicks(1.0)).toBe(1920);
   });
 
   it('round-trips ticks through seconds', () => {
     const tm = new TempoMap(960, 140);
     const ticks = 4800;
-    expect(tm.secondsToTicks(tm.ticksToSeconds(ticks))).toBeCloseTo(ticks);
+    expect(tm.secondsToTicks(tm.ticksToSeconds(ticks))).toBe(ticks);
   });
 
   it('getTempo returns BPM', () => {
@@ -47,8 +47,8 @@ describe('TempoMap', () => {
   it('secondsToTicks with multiple tempos', () => {
     const tm = new TempoMap(960, 120);
     tm.setTempo(60, 1920);
-    expect(tm.secondsToTicks(1.0)).toBeCloseTo(1920);
-    expect(tm.secondsToTicks(2.0)).toBeCloseTo(2880);
+    expect(tm.secondsToTicks(1.0)).toBe(1920);
+    expect(tm.secondsToTicks(2.0)).toBe(2880);
   });
 
   it('beatsToSeconds convenience', () => {

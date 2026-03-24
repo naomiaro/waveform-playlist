@@ -59,7 +59,7 @@ export class TempoMap {
     const entry = this._entries[lo];
     const secondsIntoSegment = seconds - entry.secondsAtTick;
     const ticksPerSecond = (entry.bpm / 60) * this._ppqn;
-    return entry.tick + secondsIntoSegment * ticksPerSecond;
+    return Math.round(entry.tick + secondsIntoSegment * ticksPerSecond);
   }
 
   beatsToSeconds(beats: number): number {
