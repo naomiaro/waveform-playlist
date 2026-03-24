@@ -21,3 +21,4 @@ export {
   type MetronomeEvent,
 } from './audio/metronome-player';
 export { Transport } from './transport';
+export { NativePlayoutAdapter } from './adapter';

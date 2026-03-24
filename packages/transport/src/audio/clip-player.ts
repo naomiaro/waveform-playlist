@@ -81,9 +81,8 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         if (clipEndTime <= fromTime) continue;
         if (clipStartTime >= toTime) continue;
 
-        // Compute effective start and duration
+        // Compute effective start
         const effectiveStart = Math.max(clipStartTime, fromTime);
-        const effectiveEnd = Math.min(clipEndTime, toTime);
 
         // Offset into the audio buffer
         const offsetIntoClip = effectiveStart - clipStartTime;

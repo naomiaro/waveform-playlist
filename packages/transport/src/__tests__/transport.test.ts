@@ -9,9 +9,7 @@ function createMockSource() {
     disconnect: vi.fn(),
     start: vi.fn(),
     stop: vi.fn(),
-    addEventListener: vi.fn((event: string, cb: () => void) => {
-      // Auto-fire 'ended' after a tick for cleanup
-    }),
+    addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   };
 }
