@@ -13,7 +13,7 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **Recording** — Live mic recording with waveform preview (optional)
 - **Pre-computed peaks** — Instant waveform rendering from `.dat` files before audio decodes
 - **CSS theming** — Dark mode by default, fully customizable via CSS custom properties
-- **Pluggable audio backend** — Tone.js (default) or native Web Audio via `@dawcore/transport`
+- **Native Web Audio** — Uses `@dawcore/transport` for playback scheduling. No Tone.js dependency.
 
 ## Installation
 
@@ -23,7 +23,7 @@ npm install @dawcore/components
 
 Peer dependencies:
 ```bash
-npm install @waveform-playlist/core @waveform-playlist/engine @waveform-playlist/playout
+npm install @waveform-playlist/core @waveform-playlist/engine @dawcore/transport
 ```
 
 Optional (for recording):
@@ -150,17 +150,16 @@ editor.addEventListener('daw-clip-split', (e) => console.log('split:', e.detail)
 editor.addEventListener('daw-track-error', (e) => console.error('error:', e.detail));
 ```
 
-## Pluggable Audio Backend
+## Custom AudioContext
 
-By default, `<daw-editor>` uses Tone.js for audio playback. To use the native Web Audio transport instead:
+By default, `<daw-editor>` creates its own `AudioContext` using the `sample-rate` attribute. To provide your own:
 
 ```javascript
-import { NativePlayoutAdapter } from '@dawcore/transport';
-
 const editor = document.getElementById('editor');
-const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
-editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);
+editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
 ```
+
+Set this before tracks load. The provided context is used for decoding, playback, and recording.
 
 ## API
 

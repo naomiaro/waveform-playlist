@@ -1,6 +1,6 @@
 # dawcore Package (`@dawcore/components`)
 
-**Purpose:** Framework-agnostic Web Components for multi-track audio editing. Wraps `PlaylistEngine` + `createToneAdapter()` in Lit elements so any framework (or vanilla HTML) can render waveforms and control playback.
+**Purpose:** Framework-agnostic Web Components for multi-track audio editing. Wraps `PlaylistEngine` + `NativePlayoutAdapter` in Lit elements so any framework (or vanilla HTML) can render waveforms and control playback. No Tone.js dependency — uses native Web Audio exclusively.
 
 **Architecture:** Data elements (`<daw-track>`, `<daw-clip>`) use light DOM; visual elements (`<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>`) use Shadow DOM with chunked canvas rendering. `<daw-editor>` orchestrates everything. Transport elements find their target via `for` attribute.
 
@@ -17,7 +17,7 @@
 
 ## Dev Page Dependencies
 
-- **`pnpm dev:page` resolves peer packages from source** — `dev/vite.config.ts` has `resolve.alias` for core, engine, and playout pointing to `src/index.ts`. Changes are picked up immediately without rebuilding.
+- **`pnpm dev:page` resolves peer packages from source** — `dev/vite.config.ts` has `resolve.alias` for core, engine, and transport pointing to `src/index.ts`. Changes are picked up immediately without rebuilding.
 - **Incremental track removal** — `engine.removeTrack(trackId)` uses `adapter.removeTrack()` when available (disposes single track, preserves playback). Falls back to `adapter.setTracks()` (full rebuild, stops Transport).
 
 ## Element Types
@@ -45,7 +45,7 @@
 - **Cancelable clip creation** — `daw-recording-complete` event is cancelable. `preventDefault()` skips automatic clip creation; consumer handles the `AudioBuffer` themselves.
 - **Channel detection** — `stream.getAudioTracks()[0].getSettings().channelCount`, not `source.channelCount` (defaults to 2 per spec).
 - **Worklet loading** — `rawContext.audioWorklet.addModule(recordingProcessorUrl)` (native API, not Tone.js which caches single module).
-- **Use `getGlobalContext()` not `getGlobalAudioContext()`** — Recording audio graph (source, worklet node) must use Tone.js Context methods (`context.createMediaStreamSource()`, `context.createAudioWorkletNode()`). `getGlobalAudioContext()` returns a `standardized-audio-context` wrapper that fails `instanceof BaseAudioContext` in native constructors. Use `rawContext` only for `audioWorklet.addModule()` and `sampleRate`.
+- **Recording uses native AudioContext** — `RecordingController` accesses `host.audioContext` directly for `createMediaStreamSource()` and `new AudioWorkletNode()`. No Tone.js wrapper needed.
 - **Worklet requires `start` command** — `recording-processor` defaults `isRecording=false`. Must `port.postMessage({ command: 'start', channelCount })` after connecting source→worklet. Without it, no data flows. Do NOT send `sampleRate` — the worklet uses its global `sampleRate`.
 - **Handler ordering critical** — Set `workletNode.port.onmessage` BEFORE `source.connect(workletNode)` and `postMessage({ command: 'start' })`. The worklet can flush data immediately; messages before handler is wired are silently dropped.
 - **Use `createClip()` not `createClipFromSeconds()` for recorded clips** — Recording session provides exact integer samples. The seconds round-trip (`samples/rateA → seconds → Math.round(seconds*rateB)`) drifts when `effectiveSampleRate` differs from `audioBuffer.sampleRate`.
@@ -62,9 +62,9 @@
 ## Key Patterns
 
 - **Event-driven track loading** — `<daw-track>` dispatches `daw-track-connected` (bubbling, composed); `<daw-editor>` listens and loads audio for that track individually. Track removal uses MutationObserver (events from `disconnectedCallback` can't bubble since element is already detached).
-- **Eager audio decode** — Audio fetches and decodes on track connect using `getGlobalAudioContext()` from playout (works while suspended, pre-gesture). Waveforms render immediately without waiting for play.
-- **Engine built lazily on first track load** — `PlaylistEngine` + adapter created when the first `_loadTrack` resolves (uses correct `sampleRate` from decoded audio). `engine.setTracks()` called as tracks load (builds playout structure). `engine.init()` deferred to first `play()` (resumes AudioContext, requires user gesture).
-- **Engine API note** — Initial track loading uses `engine.setTracks()`. Recording clip finalization uses `engine.updateTrack()` for incremental updates. `adapter.addTrack()` throws if no playout exists.
+- **Eager audio decode** — Audio fetches and decodes on track connect using `this.audioContext.decodeAudioData()` (works while suspended, pre-gesture). Waveforms render immediately without waiting for play.
+- **Engine built lazily on first track load** — `PlaylistEngine` + `NativePlayoutAdapter` created when the first `_loadTrack` resolves (uses correct `sampleRate` from decoded audio). `engine.setTracks()` called as tracks load. `engine.init()` deferred to first `play()` (resumes AudioContext, requires user gesture).
+- **Engine API note** — Initial track loading uses `engine.setTracks()`. Recording clip finalization uses `engine.updateTrack()` for incremental updates.
 - **Immutable state updates** — All `@state()` Maps are replaced with `new Map(old).set(...)`, never mutated in place.
 - **Derived width, not stored state** — `_totalWidth` is a getter derived from `_duration`, `effectiveSampleRate`, and `samplesPerPixel`. Not a `@state()` property — avoids Lit update loops from setting state in `updated()`.
 - **Error events** — `daw-track-error` dispatched on load failure (with `{ trackId, error }`). `daw-error` dispatched on playback failure (with `{ operation, error }`). Failed fetch promises are removed from cache to allow retry.
@@ -92,11 +92,11 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 **Lit controller lifecycle gotcha:** `hostConnected()` fires during `connectedCallback()`, BEFORE the first `willUpdate()`. Controllers that read properties set from attributes must defer work with `requestAnimationFrame` (as `ViewportController` and `AudioResumeController` do), otherwise the property will still be `undefined`.
 
-## Pluggable Audio Backend
+## AudioContext Ownership
 
-**`adapterFactory` JS property** — Optional function `() => PlayoutAdapter` on `<daw-editor>`. When set before tracks load, `_buildEngine` uses it instead of `createToneAdapter()`. Enables swapping Tone.js for `NativePlayoutAdapter` or custom backends without modifying dawcore source.
+**`audioContext` JS property** — Optional `AudioContext` on `<daw-editor>`. When set before tracks load, the editor uses it for decode, playback (via `NativePlayoutAdapter`), and recording. When not set, the editor creates its own `AudioContext({ sampleRate })` lazily on first audio operation.
 
-Example: `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);`
+Example: `editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });`
 
 ## Ported Utilities
 
@@ -106,7 +106,7 @@ Example: `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);`
 
 ## Interaction Patterns
 
-- **Seek during playback requires stop+play** — Tone.js `transport.seconds = time` doesn't reschedule audio sources. Must call `engine.stop()` then `engine.play(newTime)` and restart playhead animation.
+- **Seek during playback requires stop+play** — Must call `engine.stop()` then `engine.play(newTime)` and restart playhead animation.
 - **Stop returns to play start position** — Standard DAW behavior. Engine tracks `_playStartPosition`; read `engine.getCurrentTime()` in the `stop` event handler, not `_currentTime`.
 - **Pointer events, not click** — Use `pointerdown`/`pointermove`/`pointerup` with 3px activation threshold to distinguish click (seek) from drag (selection). Wrap `releasePointerCapture` in try-catch; use `finally` to reset `_isDragging`.
 - **No scrollLeft in pointer math** — `:host` has `overflow-x: auto`; `.timeline` is wider. `getBoundingClientRect().left` on `.timeline` already reflects scroll (goes negative when scrolled right), so `clientX - rect.left` gives the correct pixel. Do NOT add `scrollLeft`.
@@ -114,7 +114,7 @@ Example: `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);`
 - **File type detection** — `file.type` can be empty string for valid audio (`.opus` on some browsers). Only reject files with explicitly non-audio MIME types: `if (file.type && !file.type.startsWith('audio/'))`.
 - **`loadFiles()` returns result** — Returns `{ loaded: string[], failed: Array<{ file, error }> }` so callers can detect partial failures. Individual file errors are caught and reported via `daw-files-load-error` events.
 - **sampleRate comes from decoded audio** — Always use `audioBuffer.sampleRate` for clip creation. The global AudioContext decodes at the hardware rate (may be 44100 or 48000). Set `this.sampleRate` from the first decoded buffer so the ruler, peaks, and engine all agree.
-- **Use `getGlobalAudioContext()` for decode** — Import from `@waveform-playlist/playout`. Same context Tone.js uses. `decodeAudioData` works while suspended (pre-gesture). Never create a separate AudioContext for decoding.
+- **Use `this.audioContext` for decode** — The editor's native AudioContext. `decodeAudioData` works while suspended (pre-gesture).
 - **Pointer interactions extracted** — `interactions/pointer-handler.ts` handles pointerdown/move/up, caches timeline ref and rect, distinguishes click vs drag. The host implements `PointerHandlerHost` interface.
 - **Peak pipeline extracted** — `workers/peakPipeline.ts` manages worker lifecycle, WaveformData cache, inflight dedup.
 - **Prevent native drag on interactive elements** — `<daw-editor>` has `@dragover`/`@drop` for file drops, which activates the browser's drag-and-drop system. Clip headers and boundaries need `e.preventDefault()` on `pointerdown` (in pointer-handler delegation), `-webkit-user-drag: none` and `user-select: none` in CSS to prevent the browser from stealing pointer events during custom drag operations.
@@ -123,7 +123,7 @@ Example: `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);`
 
 - **`ClipPointerHandler`** in `interactions/clip-pointer-handler.ts` — handles move/trim drag. `ClipEngineContract` is a narrow interface (`moveClip`, `trimClip`, `updateTrack`). `ClipPointerHost` interface satisfied by `<daw-editor>` via getters.
 - **Hit detection uses `closest()`** — `composedPath()[0]` returns the deepest element (e.g., `<span>` inside `.clip-header`). Always use `target.closest('.clip-header')` / `target.closest('.clip-boundary')` to walk up.
-- **Move: incremental deltas with `skipAdapter`** — `engine.moveClip(id, clipId, delta, true)` skips adapter during drag (60fps). Call `engine.updateTrack(trackId)` once on `pointerup` to sync Tone.js.
+- **Move: incremental deltas with `skipAdapter`** — `engine.moveClip(id, clipId, delta, true)` skips adapter during drag (60fps). Call `engine.updateTrack(trackId)` once on `pointerup` to sync the transport.
 - **Trim: cumulative delta on drop only** — Engine's `constrainBoundaryTrim` checks constraints against current clip state, so incremental deltas compound incorrectly. Accumulate total delta during drag, call `engine.trimClip()` once on `pointerup`.
 - **Trim visual feedback** — Imperatively update `.clip-container` CSS (`left`/`width`) during drag. Restore original CSS before engine applies.
 - **`splitAtPlayhead()`** in `interactions/split-handler.ts` — discovers new clip IDs by diffing `engine.getState().tracks` before/after `engine.splitClip()` (returns void). Requires exactly 2 new IDs.
@@ -139,8 +139,7 @@ Example: `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);`
 - **Undo/redo keyboard shortcuts** — Cmd/Ctrl+Z (undo), Cmd/Ctrl+Shift+Z (redo) when `<daw-keyboard-shortcuts undo>` is present. Auto-expands to both Ctrl and Meta variants when no specific modifier is provided. Uses `=== undefined` checks (not falsy) to distinguish "not specified" from "explicitly false".
 - **Peaks-First Rendering** — When `peaks-src` is set, `_loadTrack` awaits the `.dat` file first (small, fast), creates a clip via `createClipFromSeconds({ waveformData, ... })` (no `audioBuffer`), extracts peaks, and renders a preview track immediately. Audio decode runs in the background; on completion, `clip.audioBuffer` is backfilled and the clip is added to `_clipBuffers`. WaveformData is cached in `PeakPipeline` via `cacheWaveformData(audioBuffer, waveformData)` so all downstream paths (zoom, split/trim) skip the worker. If `.dat` loading fails, falls through to the standard audio-first path. If audio decode fails after peaks render, preview state is cleaned up (peaks, engineTracks, clipOffsets, zoom floor) before dispatching `daw-track-error`. `_peaksCache` (`Map<string, Promise<WaveformData>>`) deduplicates in-flight and repeated fetches for the same `.dat`/`.json` URL, mirroring `_audioCache`. Cleared in `disconnectedCallback`; deleted on rejection to allow retry.
 - **`samplesPerPixel` Zoom Floor via `noAccessor`** — `samplesPerPixel` uses `@property({ noAccessor: true })` with a custom getter/setter that clamps to `_minSamplesPerPixel` synchronously and rejects NaN/Infinity/zero/negative. `_minSamplesPerPixel` lifecycle: set only after successful `extractPeaks` in `_loadTrack` (not before — avoids restricting zoom on failure), recomputed via `_peakPipeline.getMaxCachedScale()` on track removal, reset to 0 on `disconnectedCallback`.
-- **`configureGlobalContext` Race with Eager Resume** — `AudioResumeController` (or any gesture handler) can call `getGlobalContext()` before `_ensureContextConfigured` runs, creating the context without the sample rate hint. `configureGlobalContext` handles this gracefully: warns and returns the existing rate instead of throwing. For reliable sample rate control, avoid `eager-resume` or ensure `configureGlobalContext` runs before any user gesture.
-- **`sample-rate` Attribute for Peaks Matching** — `<daw-editor sample-rate="48000">` passes the rate to `configureGlobalContext({ sampleRate })` in `_ensureContextConfigured`. Cannot force the rate (Tone.js limitation) but warns on mismatch and triggers worker fallback for pre-computed peaks.
+- **`sample-rate` Attribute** — `<daw-editor sample-rate="48000">` creates the native AudioContext at that rate. Warns if the browser doesn't honor the requested rate. Pre-computed `.dat` peaks must match the AudioContext's actual rate.
 
 ## Typed Events
 

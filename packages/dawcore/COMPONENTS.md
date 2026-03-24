@@ -28,7 +28,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `adapterFactory` | `() => PlayoutAdapter \| null` | Custom audio backend factory. Set before tracks load. |
+| `audioContext` | `AudioContext \| null` | Custom AudioContext for decode, playback, and recording. Set before tracks load. |
 | `recordingStream` | `MediaStream \| null` | Mic stream for recording. Consumer provides via `getUserMedia`. |
 | `samplesPerPixel` | number | Zoom level (same as attribute, but with validation and clamping) |
 
