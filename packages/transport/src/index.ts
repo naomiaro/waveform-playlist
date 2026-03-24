@@ -11,3 +11,4 @@ export { Clock } from './core/clock';
 export { Scheduler, type SchedulerOptions } from './core/scheduler';
 export { Timer } from './core/timer';
 export { SampleTimeline } from './timeline/sample-timeline';
+export { TickTimeline } from './timeline/tick-timeline';
