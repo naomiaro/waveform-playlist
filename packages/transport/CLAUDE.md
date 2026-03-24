@@ -6,7 +6,7 @@
 
 **Build:** Uses tsup — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 
-**Testing:** vitest unit tests in `src/__tests__/`. Run with `cd packages/transport && npx vitest run`. 85 tests across 11 files.
+**Testing:** vitest unit tests in `src/__tests__/`. Run with `cd packages/transport && npx vitest run`.
 
 **Zero dependencies.** `@waveform-playlist/core` and `@waveform-playlist/engine` are peer deps (types only at runtime).
 
@@ -139,6 +139,40 @@ Only `multiclip.html` uses the native transport. `record.html` and `index.html` 
 
 Not yet integrated. Future work: pass `NativePlayoutAdapter` via the engine's `adapter` option.
 
+## Edge Cases
+
+### Clips Spanning Loop Boundary
+
+When a clip starts before `loopEnd` and extends past it, `generate()` clamps `duration` to `loopEnd - clipStartTime`. The `AudioBufferSourceNode` stops exactly at `loopEnd`. After `onPositionJump(loopStart)`, if the clip also spans `loopStart`, a new mid-clip source is created. No duplicate sources — the first was clamped.
+
+### Empty Tracks and Missing AudioBuffers
+
+- **Empty tracks** (`clips: []`): `generate()` returns `[]`. TrackNode still exists for volume/pan/solo state.
+- **Zero-length clips** (`durationSamples: 0`): skipped in `generate()`.
+- **Missing `audioBuffer`** (peaks-first): skipped in `generate()`. Once backfilled via `updateTrack()`, subsequent windows include it.
+
+### Effects Compatibility
+
+`ClipTrack.effects` (`TrackEffectsFunction`) is a Tone.js-oriented API and is **not supported** by `NativePlayoutAdapter`. Use `transport.connectTrackOutput(trackId, effectsInputNode)` instead. Consumers using `ClipTrack.effects` must switch to the `connectTrackOutput` API or continue using `TonePlayoutAdapter`.
+
+### Offline Rendering (WAV Export)
+
+Consumers create an `OfflineAudioContext`, a separate `Transport` instance, and connect tracks to the offline destination. No Tone.js `isOffline` parameter needed.
+
 ## Not Yet Supported
 
 - **Recording** — The transport handles playback only. Recording (mic capture, AudioWorklet, clip creation) is handled by `@waveform-playlist/recording` and dawcore's `RecordingController`, which use the AudioContext directly and don't depend on Tone.js Transport. Recording should work alongside the native transport if the AudioContext is shared, but this path is untested. `record.html` stays on the Tone adapter for now.
+
+## Migration Path
+
+1. ~~Build transport package on experimental branch~~ ✓
+2. ~~Wire into one example (multiclip) for testing~~ ✓
+3. Compare audio output with `TonePlayoutAdapter` side-by-side
+4. Gradually migrate other dawcore dev pages and website examples
+5. Wire into React (`WaveformPlaylistContext`)
+6. Make Tone.js adapter the legacy path, native the default
+
+## Reference Projects
+
+- **webaudio-transport** (`/Users/naomiaro/Code/webaudio-transport`) — sliding window scheduler, generator/consumer pattern, metronome as player, tempo map. No pause — only stop + start.
+- **openDAW** (`/Users/naomiaro/Code/openDAWOriginal`) — block-based processing, global loop + per-clip loop, PPQN timeline, discontinuous position jumps
