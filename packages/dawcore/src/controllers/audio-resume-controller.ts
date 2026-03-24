@@ -61,7 +61,9 @@ export class AudioResumeController implements ReactiveController {
 
   private _onGesture = (e: Event) => {
     const ctx = this._host.audioContext;
-    if (ctx.state === 'suspended') {
+    if (ctx.state === 'closed') {
+      console.warn('[dawcore] AudioResumeController: AudioContext is closed, cannot resume.');
+    } else if (ctx.state === 'suspended') {
       ctx.resume().catch((err) => {
         console.warn(
           '[dawcore] AudioResumeController: eager resume failed, will retry on play: ' + String(err)

@@ -92,6 +92,16 @@ export class DawEditorElement extends LitElement {
 
   /** Set an AudioContext to use for all audio operations. Must be set before tracks load. */
   set audioContext(ctx: AudioContext | null) {
+    if (ctx && ctx.state === 'closed') {
+      console.warn('[dawcore] Provided AudioContext is already closed. Ignoring.');
+      return;
+    }
+    if (this._engine) {
+      console.warn(
+        '[dawcore] audioContext set after engine is built. ' +
+          'The engine will continue using the previous context.'
+      );
+    }
     this._externalAudioContext = ctx;
   }
 

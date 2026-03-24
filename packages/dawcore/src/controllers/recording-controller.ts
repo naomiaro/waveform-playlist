@@ -83,6 +83,7 @@ export class RecordingController implements ReactiveController {
     for (const trackId of [...this._sessions.keys()]) {
       this._cleanupSession(trackId);
     }
+    this._workletLoadedCtx = null;
   }
 
   get isRecording(): boolean {
