@@ -312,8 +312,6 @@ describe('Transport', () => {
     expect(transport.barToTick(2)).toBe(3840); // 4/4 default
   });
 
-
-
   it('removeMeter fires meterchange event', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

@@ -81,7 +81,6 @@ describe('MetronomePlayer', () => {
     player.setEnabled(false);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-
     const events = player.generate(0, 2);
     expect(events.length).toBe(0);
   });
