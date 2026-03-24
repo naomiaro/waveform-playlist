@@ -16,6 +16,14 @@
       font-size: 1.2rem;
       margin-bottom: 16px;
     }
+    h2 {
+      font-size: 0.95rem;
+      color: #888;
+      margin: 0 0 10px 0;
+      font-weight: normal;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
     .controls {
       display: flex;
       gap: 8px;
@@ -106,6 +114,33 @@
       color: #888;
       margin-top: 8px;
     }
+    .divider {
+      border: none;
+      border-top: 1px solid #2a2a3e;
+      margin: 24px 0;
+    }
+    .sequence-grid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .sequence-grid button {
+      font-size: 0.85rem;
+      padding: 6px 14px;
+    }
+    .sequence-grid button.active {
+      background: #63C75F;
+      color: #0f0f1a;
+      border-color: #63C75F;
+    }
+    .sequence-desc {
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      color: #666;
+      min-height: 1.4em;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
@@ -151,6 +186,14 @@
     <button id="stop-btn" disabled>Stop</button>
   </div>
 
+  <hr class="divider" />
+
+  <div class="section">
+    <h2>Sequences</h2>
+    <div class="sequence-grid" id="sequence-grid"></div>
+    <div class="sequence-desc" id="sequence-desc"></div>
+  </div>
+
   <script type="module">
     import { Transport } from '@dawcore/transport';
 
@@ -158,7 +201,9 @@
     const transport = new Transport(audioCtx, { tempo: 120, beatsPerBar: 4 });
 
     let beatsPerBar = 4;
+    let denominator = 4;
     let isPlaying = false;
+    let activeSequence = null;
 
     // --- Generate click sounds ---
     function createClickBuffer(frequency, duration, gain) {
@@ -188,27 +233,34 @@
     const positionEl = document.getElementById('position');
     const playBtn = document.getElementById('play-btn');
     const stopBtn = document.getElementById('stop-btn');
+    const sequenceGrid = document.getElementById('sequence-grid');
+    const sequenceDesc = document.getElementById('sequence-desc');
 
     // --- Beat dots ---
-    function buildBeatDots() {
+    function buildBeatDots(n) {
       while (beatIndicator.firstChild) beatIndicator.removeChild(beatIndicator.firstChild);
-      for (let i = 0; i < beatsPerBar; i++) {
+      for (let i = 0; i < n; i++) {
         const dot = document.createElement('div');
         dot.className = 'beat-dot' + (i === 0 ? ' accent' : '');
         beatIndicator.appendChild(dot);
       }
     }
-    buildBeatDots();
+    buildBeatDots(beatsPerBar);
 
-    // --- Tempo ---
-    function setTempo(bpm) {
-      transport.setTempo(bpm);
-      tempoSlider.value = bpm;
+    // --- Tempo display helper ---
+    function updateTempoDisplay(bpm) {
       tempoDisplay.textContent = '';
       tempoDisplay.appendChild(document.createTextNode(bpm + ' '));
       const span = document.createElement('span');
       span.textContent = 'BPM';
       tempoDisplay.appendChild(span);
+    }
+
+    // --- Tempo ---
+    function setTempo(bpm) {
+      transport.setTempo(bpm);
+      tempoSlider.value = bpm;
+      updateTempoDisplay(bpm);
       presetsEl.querySelectorAll('button').forEach(btn => {
         btn.classList.toggle('selected', Number(btn.dataset.bpm) === bpm);
       });
@@ -224,54 +276,198 @@
     timeSigsEl.addEventListener('click', (e) => {
       if (!e.target.dataset.beats) return;
       beatsPerBar = Number(e.target.dataset.beats);
+      denominator = beatsPerBar >= 6 ? 8 : 4;
       transport.setBeatsPerBar(beatsPerBar);
-      buildBeatDots();
+      buildBeatDots(beatsPerBar);
       timeSigsEl.querySelectorAll('button').forEach(btn => {
         btn.classList.toggle('selected', Number(btn.dataset.beats) === beatsPerBar);
       });
     });
 
+    // --- Play/Stop helpers ---
+    function uiSetPlaying(playing) {
+      isPlaying = playing;
+      playBtn.disabled = playing;
+      stopBtn.disabled = !playing;
+      playBtn.classList.toggle('active', playing);
+      if (!playing) {
+        beatIndicator.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
+        positionEl.textContent = '';
+      }
+    }
+
     // --- Play / Stop ---
     playBtn.addEventListener('click', async () => {
       if (audioCtx.state === 'suspended') await audioCtx.resume();
       transport.play();
-      isPlaying = true;
-      playBtn.disabled = true;
-      stopBtn.disabled = false;
-      playBtn.classList.add('active');
+      uiSetPlaying(true);
     });
 
     stopBtn.addEventListener('click', () => {
       transport.stop();
-      isPlaying = false;
-      playBtn.disabled = false;
-      stopBtn.disabled = true;
-      playBtn.classList.remove('active');
-      beatIndicator.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
-      positionEl.textContent = '';
+      activeSequence = null;
+      sequenceGrid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      sequenceDesc.textContent = '';
+      uiSetPlaying(false);
     });
 
     // --- Animation loop: update beat indicator ---
     function tick() {
       if (isPlaying) {
         const time = transport.getCurrentTime();
-        const tempo = transport.getTempo();
-        const beatDuration = 60 / tempo;
+        const currentTick = transport.timeToTick(time);
+        const meter = transport.getMeter(currentTick);
+        const currentNumerator = meter.numerator;
+        const currentDenominator = meter.denominator;
+
+        // Rebuild dots if numerator changed
+        const dotCount = beatIndicator.childElementCount;
+        if (dotCount !== currentNumerator) {
+          buildBeatDots(currentNumerator);
+        }
+
+        // Beat duration depends on the denominator (e.g., 7/8 beats are eighth-notes)
+        const beatDuration = 60 / transport.getTempo(currentTick) * (4 / currentDenominator);
         const totalBeats = time / beatDuration;
-        const currentBeat = Math.floor(totalBeats % beatsPerBar);
+        const currentBeat = Math.floor(totalBeats % currentNumerator);
 
         const dots = beatIndicator.querySelectorAll('.beat-dot');
         dots.forEach((dot, i) => {
           dot.classList.toggle('active', i === currentBeat);
         });
 
-        const bar = Math.floor(totalBeats / beatsPerBar) + 1;
+        const bar = Math.floor(totalBeats / currentNumerator) + 1;
         const beat = currentBeat + 1;
         positionEl.textContent = 'Bar ' + bar + ' \u00B7 Beat ' + beat;
       }
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
+
+    // --- Sequence definitions ---
+    const SEQUENCES = [
+      {
+        id: 'rock',
+        label: 'Rock 4/4',
+        description: '4/4 at 120 BPM, 8 bars',
+        setup(t) {
+          t.clearMeters();
+          t.clearTempos();
+          t.setTempo(120);
+          t.setMeter(4, 4);
+          t.setLoop(true, 0, t.tickToTime(t.barToTick(9)));
+        },
+        displayNumerator: 4,
+        displayDenominator: 4,
+        displayTempo: 120,
+      },
+      {
+        id: 'waltz',
+        label: 'Jazz Waltz',
+        description: '3/4 at 140 BPM, 8 bars',
+        setup(t) {
+          t.clearMeters();
+          t.clearTempos();
+          t.setTempo(140);
+          t.setMeter(3, 4);
+          t.setLoop(true, 0, t.tickToTime(t.barToTick(9)));
+        },
+        displayNumerator: 3,
+        displayDenominator: 4,
+        displayTempo: 140,
+      },
+      {
+        id: 'progressive',
+        label: 'Progressive',
+        description: 'bars 1-2: 4/4 · bars 3-4: 7/8 · bars 5-6: 4/4 · bars 7-8: 3/4 @ 100 BPM',
+        setup(t) {
+          t.clearMeters();
+          t.clearTempos();
+          t.setTempo(100);
+          t.setMeter(4, 4);
+          t.setMeter(7, 8, t.barToTick(3));
+          t.setMeter(4, 4, t.barToTick(5));
+          t.setMeter(3, 4, t.barToTick(7));
+          t.setLoop(true, 0, t.tickToTime(t.barToTick(9)));
+        },
+        displayNumerator: 4,
+        displayDenominator: 4,
+        displayTempo: 100,
+      },
+      {
+        id: 'balkan',
+        label: 'Balkan',
+        description: 'bars 1-2: 7/8 · bars 3-4: 11/8 · bars 5-6: 7/8 · bars 7-8: 9/8 @ 160 BPM',
+        setup(t) {
+          t.clearMeters();
+          t.clearTempos();
+          t.setTempo(160);
+          t.setMeter(7, 8);
+          t.setMeter(11, 8, t.barToTick(3));
+          t.setMeter(7, 8, t.barToTick(5));
+          t.setMeter(9, 8, t.barToTick(7));
+          t.setLoop(true, 0, t.tickToTime(t.barToTick(9)));
+        },
+        displayNumerator: 7,
+        displayDenominator: 8,
+        displayTempo: 160,
+      },
+      {
+        id: 'accelerando',
+        label: 'Accelerando',
+        description: '4/4 at 80 BPM · tempo jump to 120 at bar 5',
+        setup(t) {
+          t.clearMeters();
+          t.clearTempos();
+          t.setMeter(4, 4);
+          t.setTempo(80);
+          t.setTempo(120, t.barToTick(5));
+          t.setLoop(true, 0, t.tickToTime(t.barToTick(9)));
+        },
+        displayNumerator: 4,
+        displayDenominator: 4,
+        displayTempo: 80,
+      },
+    ];
+
+    // --- Build sequence buttons ---
+    SEQUENCES.forEach((seq) => {
+      const btn = document.createElement('button');
+      btn.textContent = seq.label;
+      btn.dataset.seqId = seq.id;
+      btn.addEventListener('click', async () => {
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+        // Stop and reset
+        transport.stop();
+
+        // Apply the sequence
+        seq.setup(transport);
+
+        // Update free-play UI to reflect bar 1 meter/tempo
+        beatsPerBar = seq.displayNumerator;
+        denominator = seq.displayDenominator;
+        buildBeatDots(beatsPerBar);
+        tempoSlider.value = seq.displayTempo;
+        updateTempoDisplay(seq.displayTempo);
+        presetsEl.querySelectorAll('button').forEach(b => {
+          b.classList.toggle('selected', Number(b.dataset.bpm) === seq.displayTempo);
+        });
+        timeSigsEl.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+
+        // Mark active sequence button
+        activeSequence = seq.id;
+        sequenceGrid.querySelectorAll('button').forEach(b => {
+          b.classList.toggle('active', b.dataset.seqId === seq.id);
+        });
+        sequenceDesc.textContent = seq.description;
+
+        // Start playing
+        transport.play();
+        uiSetPlaying(true);
+      });
+      sequenceGrid.appendChild(btn);
+    });
   </script>
 </body>
 </html>

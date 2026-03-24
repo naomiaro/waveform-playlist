@@ -342,8 +342,28 @@ export class Transport {
     this._emit('meterchange');
   }
 
+  clearMeters(): void {
+    this._meterMap.clearMeters();
+    this._emit('meterchange');
+  }
+
+  clearTempos(): void {
+    this._tempoMap.clearTempos();
+    this._emit('tempochange');
+  }
+
   barToTick(bar: number): number {
     return this._meterMap.barToTick(bar);
+  }
+
+  /** Convert transport time (seconds) to tick position, using the tempo map. */
+  timeToTick(seconds: number): number {
+    return this._tempoMap.secondsToTicks(seconds);
+  }
+
+  /** Convert tick position to transport time (seconds), using the tempo map. */
+  tickToTime(tick: number): number {
+    return this._tempoMap.ticksToSeconds(tick);
   }
 
   /** @deprecated Use setMeter(beats, 4) instead */

@@ -70,6 +70,11 @@ export class TempoMap {
     return this.secondsToTicks(seconds) / this._ppqn;
   }
 
+  clearTempos(): void {
+    const first = this._entries[0];
+    this._entries = [{ tick: 0, bpm: first.bpm, secondsAtTick: 0 }];
+  }
+
   private _ticksToSecondsInternal(ticks: number): number {
     const entry = this._entryAt(ticks);
     const ticksIntoSegment = ticks - entry.tick;
