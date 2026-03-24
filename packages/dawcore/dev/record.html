@@ -99,12 +99,11 @@
     }
 
     const micSelect = document.getElementById('mic-select');
-    const FALLBACK_CHANNELS = 2;
     const audioConstraints = {
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
-      channelCount: { ideal: FALLBACK_CHANNELS },
+      channelCount: { ideal: 2 },
     };
 
     function updateMicStatus(stream) {
@@ -212,8 +211,12 @@
         editor._setSelectedTrackId(trackId);
       }
 
-      // Start recording with overdub — use same channel fallback as status display
-      await editor.startRecording(editor.recordingStream, { overdub: true, channelCount: FALLBACK_CHANNELS });
+      // Read actual channel count from stream, matching openDAW's approach
+      const streamChannels = editor.recordingStream.getAudioTracks()[0]?.getSettings()?.channelCount;
+      await editor.startRecording(editor.recordingStream, {
+        overdub: true,
+        ...(streamChannels && { channelCount: streamChannels }),
+      });
     }, { capture: true }); // capture phase to run before the button's own handler
 
     // Recording events
