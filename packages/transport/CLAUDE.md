@@ -50,6 +50,7 @@ Parallel to TempoMap, stores time signature entries at tick positions. Each entr
 - **Bar boundary constraint:** `setMeter(numerator, denominator, atTick?)` snaps `atTick` forward to the next bar boundary if not already on one. This keeps bar numbers consistent for all subsequent entries.
 - **Conversions:** `barToTick(bar)` walks the entry list accumulating bar counts; `tickToBar(tick)` is the inverse. Both return 1-indexed bar numbers.
 - **`clearMeters()`** removes all entries and resets to the initial meter.
+- **Tick-0 meter change re-snaps downstream entries** — `setMeter(n, d)` at tick 0 calls `_resnapDownstreamEntries` to move all subsequent entries to bar boundaries of the new meter. Without this, `barAtTick` becomes fractional, breaking `barToTick`/`tickToBar` round-trips.
 
 `MetronomePlayer.generate()` queries the MeterMap per beat to determine accent placement (beat 1 of each bar) and beat unit duration.
 
