@@ -1,8 +1,12 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
-import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
+
+export interface AudioResumeHost extends ReactiveControllerHost, HTMLElement {
+  /** Returns the AudioContext to resume on user gesture */
+  readonly audioContext: AudioContext;
+}
 
 export class AudioResumeController implements ReactiveController {
-  private _host: ReactiveControllerHost & HTMLElement;
+  private _host: AudioResumeHost;
   private _target: EventTarget | null = null;
   private _attached = false;
   private _generation = 0;
@@ -10,7 +14,7 @@ export class AudioResumeController implements ReactiveController {
   /** CSS selector, or 'document'. When undefined, controller is inert. */
   target?: string;
 
-  constructor(host: ReactiveControllerHost & HTMLElement) {
+  constructor(host: AudioResumeHost) {
     this._host = host;
     host.addController(this);
   }
@@ -56,11 +60,14 @@ export class AudioResumeController implements ReactiveController {
   }
 
   private _onGesture = (e: Event) => {
-    resumeGlobalAudioContext().catch((err) => {
-      console.warn(
-        '[dawcore] AudioResumeController: eager resume failed, will retry on play: ' + String(err)
-      );
-    });
+    const ctx = this._host.audioContext;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch((err) => {
+        console.warn(
+          '[dawcore] AudioResumeController: eager resume failed, will retry on play: ' + String(err)
+        );
+      });
+    }
     // Remove the other listener (the fired one was auto-removed by { once: true })
     const otherType = e.type === 'pointerdown' ? 'keydown' : 'pointerdown';
     this._target?.removeEventListener(otherType, this._onGesture, {

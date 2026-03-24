@@ -131,13 +131,9 @@
   <div id="log"></div>
 
   <script type="module">
-    import { NativePlayoutAdapter } from '@dawcore/transport';
-
     const editor = document.getElementById('editor');
-    // Create AudioContext at 48000 Hz to match .dat peaks, with low latency
-    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
-    // Use NativePlayoutAdapter instead of TonePlayoutAdapter
-    editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);
+    // Pass AudioContext at 48000 Hz to match .dat peaks
+    editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
     const log = document.getElementById('log');
 
     function addLog(msg) {

@@ -176,15 +176,15 @@ importers:
         specifier: ^4.5.2
         version: 4.5.2
     devDependencies:
+      '@dawcore/transport':
+        specifier: workspace:*
+        version: link:../transport
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
       '@waveform-playlist/engine':
         specifier: workspace:*
         version: link:../engine
-      '@waveform-playlist/playout':
-        specifier: workspace:*
-        version: link:../playout
       '@waveform-playlist/recording':
         specifier: workspace:*
         version: link:../recording

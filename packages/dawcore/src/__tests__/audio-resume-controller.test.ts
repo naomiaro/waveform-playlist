@@ -1,22 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('@waveform-playlist/playout', () => ({
-  resumeGlobalAudioContext: vi.fn(() => Promise.resolve()),
-}));
-
 import { AudioResumeController } from '../controllers/audio-resume-controller';
-import { resumeGlobalAudioContext } from '@waveform-playlist/playout';
 
 let rafCallbacks: Array<(time: number) => void>;
 
-function createMockHost() {
+function createMockAudioContext(state: AudioContextState = 'suspended') {
+  return {
+    state,
+    sampleRate: 48000,
+    resume: vi.fn(() => Promise.resolve()),
+  } as unknown as AudioContext;
+}
+
+function createMockHost(audioContext?: AudioContext) {
+  const ctx = audioContext ?? createMockAudioContext();
   const el = document.createElement('div');
   document.body.appendChild(el);
-  // isConnected is a read-only getter on HTMLElement; add the controller methods directly
   Object.assign(el, {
     addController: vi.fn(),
     requestUpdate: vi.fn(),
     updateComplete: Promise.resolve(true),
+    audioContext: ctx,
   });
   return el as any;
 }
@@ -56,7 +60,7 @@ describe('AudioResumeController', () => {
     expect(addSpy).not.toHaveBeenCalled();
   });
 
-  it('calls resumeGlobalAudioContext on first pointerdown', () => {
+  it('resumes suspended AudioContext on first pointerdown', () => {
     const controller = new AudioResumeController(host);
     controller.target = '';
     controller.hostConnected();
@@ -64,10 +68,10 @@ describe('AudioResumeController', () => {
 
     host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
 
-    expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
+    expect(host.audioContext.resume).toHaveBeenCalledOnce();
   });
 
-  it('calls resumeGlobalAudioContext on first keydown', () => {
+  it('resumes suspended AudioContext on first keydown', () => {
     const controller = new AudioResumeController(host);
     controller.target = '';
     controller.hostConnected();
@@ -75,10 +79,10 @@ describe('AudioResumeController', () => {
 
     host.dispatchEvent(new Event('keydown', { bubbles: true }));
 
-    expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
+    expect(host.audioContext.resume).toHaveBeenCalledOnce();
   });
 
-  it('only calls resume once (second event is no-op)', () => {
+  it('only resumes once (second event is no-op)', () => {
     const controller = new AudioResumeController(host);
     controller.target = '';
     controller.hostConnected();
@@ -87,7 +91,20 @@ describe('AudioResumeController', () => {
     host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     host.dispatchEvent(new Event('keydown', { bubbles: true }));
 
-    expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
+    expect(host.audioContext.resume).toHaveBeenCalledOnce();
+  });
+
+  it('skips resume when AudioContext is already running', () => {
+    const ctx = createMockAudioContext('running');
+    host = createMockHost(ctx);
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+
+    host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    expect(ctx.resume).not.toHaveBeenCalled();
   });
 
   it('removes listeners on hostDisconnected before any event fires', () => {
@@ -103,7 +120,7 @@ describe('AudioResumeController', () => {
       ([, , opts]) => (opts as any)?.capture === true
     );
     expect(captureRemovals.length).toBe(2);
-    expect(resumeGlobalAudioContext).not.toHaveBeenCalled();
+    expect(host.audioContext.resume).not.toHaveBeenCalled();
   });
 
   it('attaches to document when target is "document"', () => {
@@ -115,7 +132,7 @@ describe('AudioResumeController', () => {
 
     document.dispatchEvent(new Event('pointerdown'));
 
-    expect(resumeGlobalAudioContext).toHaveBeenCalledOnce();
+    expect(host.audioContext.resume).toHaveBeenCalledOnce();
     docSpy.mockRestore();
   });
 
@@ -158,7 +175,6 @@ describe('AudioResumeController', () => {
     controller.target = '';
     controller.hostConnected();
 
-    // Disconnect before rAF fires
     host.remove();
     flushRaf();
 
@@ -168,9 +184,9 @@ describe('AudioResumeController', () => {
     expect(captureListeners.length).toBe(0);
   });
 
-  it('logs warning when resumeGlobalAudioContext rejects', async () => {
+  it('logs warning when context.resume() rejects', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.mocked(resumeGlobalAudioContext).mockRejectedValueOnce(new Error('Context closed'));
+    host.audioContext.resume.mockRejectedValueOnce(new Error('Context closed'));
 
     const controller = new AudioResumeController(host);
     controller.target = '';
@@ -179,7 +195,6 @@ describe('AudioResumeController', () => {
 
     host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
 
-    // Allow microtask to settle
     await new Promise((r) => setTimeout(r, 0));
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('eager resume failed'));
@@ -209,19 +224,14 @@ describe('AudioResumeController', () => {
     const controller = new AudioResumeController(host);
     controller.target = '';
 
-    // First connect schedules rAF-A
     controller.hostConnected();
-    // Disconnect invalidates rAF-A
     controller.hostDisconnected();
-    // Reconnect schedules rAF-B
     controller.hostConnected();
-    // Both rAFs fire — only rAF-B should attach listeners
     flushRaf();
 
     const captureListeners = addSpy.mock.calls.filter(
       ([, , opts]) => (opts as any)?.capture === true
     );
-    // Exactly 2 listeners (pointerdown + keydown), not 4
     expect(captureListeners.length).toBe(2);
   });
 });

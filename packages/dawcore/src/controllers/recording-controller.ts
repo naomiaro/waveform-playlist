@@ -1,6 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import type { Bits } from '@waveform-playlist/core';
-import { getGlobalContext } from '@waveform-playlist/playout';
 import type { DawWaveformElement } from '../elements/daw-waveform';
 import { recordingProcessorUrl } from '@waveform-playlist/worklets';
 import { appendPeaks, concatenateAudioData, createAudioBuffer } from '@waveform-playlist/recording';
@@ -49,6 +48,7 @@ export type ReadonlyRecordingSession = Readonly<
 
 /** Narrow interface for the host editor. */
 export interface RecordingHost extends ReactiveControllerHost {
+  readonly audioContext: AudioContext;
   readonly samplesPerPixel: number;
   readonly effectiveSampleRate: number;
   readonly _selectedTrackId: string | null;
@@ -105,8 +105,7 @@ export class RecordingController implements ReactiveController {
     }
 
     const bits: Bits = options.bits ?? 16;
-    const context = getGlobalContext();
-    const rawCtx = context.rawContext as AudioContext;
+    const rawCtx = this._host.audioContext;
 
     // Resolve editor sample rate from AudioContext before computing startSample
     this._host.resolveAudioContextSampleRate(rawCtx.sampleRate);
@@ -126,12 +125,11 @@ export class RecordingController implements ReactiveController {
 
       // Compute latency offset once at start (doesn't change during session)
       const outputLatency = rawCtx.outputLatency ?? 0;
-      const lookAhead = context.lookAhead ?? 0;
-      const latencySamples = Math.floor((outputLatency + lookAhead) * rawCtx.sampleRate);
+      const latencySamples = Math.floor(outputLatency * rawCtx.sampleRate);
 
-      // Use Tone.js Context methods — avoids standardized-audio-context identity issues
-      const source = context.createMediaStreamSource(stream);
-      const workletNode = context.createAudioWorkletNode('recording-processor', {
+      // Use native AudioContext methods directly (no Tone.js wrapper)
+      const source = rawCtx.createMediaStreamSource(stream);
+      const workletNode = new AudioWorkletNode(rawCtx, 'recording-processor', {
         channelCount,
         channelCountMode: 'explicit' as globalThis.ChannelCountMode,
       });
@@ -258,8 +256,7 @@ export class RecordingController implements ReactiveController {
       );
       return;
     }
-    const context = getGlobalContext();
-    const stopCtx = context.rawContext as AudioContext;
+    const stopCtx = this._host.audioContext;
     const channelData = session.chunks.map((chunkArr) => concatenateAudioData(chunkArr));
     const audioBuffer = createAudioBuffer(
       stopCtx,

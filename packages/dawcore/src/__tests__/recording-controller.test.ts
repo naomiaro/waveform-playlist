@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies
-vi.mock('@waveform-playlist/playout', () => ({
-  getGlobalContext: vi.fn(() => mockToneContext),
-}));
-
 vi.mock('@waveform-playlist/worklets', () => ({
   recordingProcessorUrl: 'blob:mock-recording-processor',
 }));
@@ -15,8 +11,6 @@ vi.mock('@waveform-playlist/recording', () => ({
   createAudioBuffer: vi.fn(() => mockAudioBuffer),
 }));
 
-let mockToneContext: any;
-let mockRawContext: any;
 let mockAudioBuffer: any;
 let mockWorkletNode: any;
 let mockSource: any;
@@ -30,6 +24,17 @@ function createMockHost() {
     addController: vi.fn(),
     requestUpdate: vi.fn(),
     updateComplete: Promise.resolve(true),
+    audioContext: {
+      sampleRate: 48000,
+      outputLatency: 0,
+      state: 'running',
+      resume: vi.fn(() => Promise.resolve()),
+      createMediaStreamSource: vi.fn(() => ({
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      })),
+      audioWorklet: { addModule: vi.fn(() => Promise.resolve()) },
+    },
     samplesPerPixel: 1024,
     effectiveSampleRate: 48000,
     resolveAudioContextSampleRate: vi.fn(),
@@ -75,21 +80,26 @@ describe('RecordingController', () => {
       connect: vi.fn(),
       disconnect: vi.fn(),
     };
-    mockRawContext = {
-      audioWorklet: { addModule: vi.fn(() => Promise.resolve()) },
-      sampleRate: 48000,
-    };
-    mockToneContext = {
-      rawContext: mockRawContext,
-      createMediaStreamSource: vi.fn(() => mockSource),
-      createAudioWorkletNode: vi.fn(() => mockWorkletNode),
-    };
     mockAudioBuffer = {
       length: 48000,
       sampleRate: 48000,
       numberOfChannels: 1,
     };
+    // Stub AudioWorkletNode constructor (recording-controller uses `new AudioWorkletNode()`)
+    vi.stubGlobal(
+      'AudioWorkletNode',
+      vi.fn(() => mockWorkletNode)
+    );
     host = createMockHost();
+    // Override audioContext with mocks that tests can mutate
+    host.audioContext = {
+      sampleRate: 48000,
+      outputLatency: 0,
+      state: 'running',
+      resume: vi.fn(() => Promise.resolve()),
+      createMediaStreamSource: vi.fn(() => mockSource),
+      audioWorklet: { addModule: vi.fn(() => Promise.resolve()) },
+    };
   });
 
   afterEach(() => {
@@ -184,7 +194,7 @@ describe('RecordingController', () => {
   });
 
   it('resolves editor sampleRate from AudioContext on start', async () => {
-    mockRawContext.sampleRate = 44100;
+    host.audioContext.sampleRate = 44100;
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
 
@@ -193,7 +203,7 @@ describe('RecordingController', () => {
 
   it('computes startSample using resolved effectiveSampleRate', async () => {
     // Simulate: host effectiveSampleRate updated by resolveAudioContextSampleRate
-    mockRawContext.sampleRate = 44100;
+    host.audioContext.sampleRate = 44100;
     host._currentTime = 2.0;
     host.effectiveSampleRate = 44100;
     host.resolveAudioContextSampleRate = vi.fn(() => {
@@ -315,7 +325,9 @@ describe('RecordingController', () => {
   });
 
   it('cleans up session on startRecording failure', async () => {
-    mockRawContext.audioWorklet.addModule = vi.fn(() => Promise.reject(new Error('CSP blocked')));
+    host.audioContext.audioWorklet.addModule = vi.fn(() =>
+      Promise.reject(new Error('CSP blocked'))
+    );
     const controller = new RecordingController(host);
     const events: CustomEvent[] = [];
     const origDispatch = host.dispatchEvent.bind(host);
@@ -394,9 +406,8 @@ describe('RecordingController', () => {
   // --- Latency compensation tests ---
 
   it('passes latency offsetSamples to _addRecordedClip', async () => {
-    // Set up latency: outputLatency=0.01s + lookAhead=0.1s = 0.11s
-    mockRawContext.outputLatency = 0.01;
-    mockToneContext.lookAhead = 0.1;
+    // Set up latency: outputLatency=0.01s (no Tone.js lookAhead)
+    host.audioContext.outputLatency = 0.01;
     host._addRecordedClip = vi.fn();
 
     const controller = new RecordingController(host);
@@ -408,21 +419,27 @@ describe('RecordingController', () => {
 
     controller.stopRecording();
 
-    // offsetSamples = floor(0.11 * 48000) = 5280
-    // durationSamples = 48000 - 5280 = 42720
+    // offsetSamples = floor(0.01 * 48000) = 480
+    // durationSamples = 48000 - 480 = 47520
     expect(host._addRecordedClip).toHaveBeenCalledWith(
       'track-1',
       expect.anything(),
       expect.any(Number),
-      42720, // effectiveDuration
-      5280 // latencyOffsetSamples
+      47520, // effectiveDuration
+      480 // latencyOffsetSamples
     );
   });
 
   it('dispatches error when recording too short for latency compensation', async () => {
-    // Latency of 1 second on a 0.5s recording
-    mockRawContext.outputLatency = 0.5;
-    mockToneContext.lookAhead = 0.5;
+    // Latency of 0.5s matches 0.5s recording — no usable samples
+    host.audioContext.outputLatency = 0.5;
+    // Mock createAudioBuffer to return a buffer matching the short recording
+    const { createAudioBuffer } = await import('@waveform-playlist/recording');
+    vi.mocked(createAudioBuffer).mockReturnValueOnce({
+      length: 24000,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+    } as any);
 
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
@@ -446,8 +463,7 @@ describe('RecordingController', () => {
   });
 
   it('includes offsetSamples in daw-recording-complete event detail', async () => {
-    mockRawContext.outputLatency = 0.02;
-    mockToneContext.lookAhead = 0.1;
+    host.audioContext.outputLatency = 0.02;
 
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
@@ -464,14 +480,13 @@ describe('RecordingController', () => {
 
     const completeEvent = events.find((e) => e.type === 'daw-recording-complete');
     expect(completeEvent).toBeTruthy();
-    // offsetSamples = floor(0.12 * 48000) = 5760
-    expect(completeEvent!.detail.offsetSamples).toBe(5760);
-    expect(completeEvent!.detail.durationSamples).toBe(48000 - 5760);
+    // offsetSamples = floor(0.02 * 48000) = 960
+    expect(completeEvent!.detail.offsetSamples).toBe(960);
+    expect(completeEvent!.detail.durationSamples).toBe(48000 - 960);
   });
 
   it('zero latency passes offsetSamples=0', async () => {
-    mockRawContext.outputLatency = 0;
-    mockToneContext.lookAhead = 0;
+    host.audioContext.outputLatency = 0;
     host._addRecordedClip = vi.fn();
 
     const controller = new RecordingController(host);
