@@ -32,6 +32,8 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   private _trackNodes: Map<string, TrackNode> = new Map();
   private _activeSources: Map<AudioBufferSourceNode, { trackId: string; gainNode: GainNode }> =
     new Map();
+  private _loopEnabled = false;
+  private _loopEnd = 0;
 
   constructor(
     audioContext: AudioContext,
@@ -49,6 +51,11 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     for (const track of tracks) {
       this._tracks.set(track.id, { track, clips: track.clips });
     }
+  }
+
+  setLoop(enabled: boolean, _start: number, end: number): void {
+    this._loopEnabled = enabled;
+    this._loopEnd = end;
   }
 
   updateTrack(trackId: string, track: ClipTrack): void {
@@ -82,13 +89,20 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
           ? this._sampleTimeline.samplesToSeconds(clip.fadeOut.duration ?? 0)
           : 0;
 
+        // Clamp duration at loopEnd so the source stops exactly at the
+        // loop boundary. onPositionJump handles the mid-clip restart.
+        let duration = clipDuration;
+        if (this._loopEnabled && clipStartTime + duration > this._loopEnd) {
+          duration = this._loopEnd - clipStartTime;
+        }
+
         events.push({
           trackId,
           clipId: clip.id,
           audioBuffer: clip.audioBuffer,
           transportTime: clipStartTime,
           offset: clipOffsetTime,
-          duration: clipDuration,
+          duration,
           gain: clip.gain,
           fadeInDuration,
           fadeOutDuration,

@@ -12,6 +12,7 @@ function createMockGainNode() {
 function createMockPannerNode() {
   return {
     pan: { value: 0 },
+    channelCount: 1,
     connect: vi.fn(),
     disconnect: vi.fn(),
   };

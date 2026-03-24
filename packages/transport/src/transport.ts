@@ -339,6 +339,7 @@ export class Transport {
 
   setLoop(enabled: boolean, start: number, end: number): void {
     this._scheduler.setLoop(enabled, start, end);
+    this._clipPlayer.setLoop(enabled, start, end);
     this._emit('loop');
   }
 

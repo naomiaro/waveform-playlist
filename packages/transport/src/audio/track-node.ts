@@ -10,6 +10,7 @@ export class TrackNode {
     this.id = id;
     this._volumeNode = audioContext.createGain();
     this._panNode = audioContext.createStereoPanner();
+    this._panNode.channelCount = 2;
     this._muteNode = audioContext.createGain();
 
     // Wire: volume → pan → mute (caller connects output via connectOutput)

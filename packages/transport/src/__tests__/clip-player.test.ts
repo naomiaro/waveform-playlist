@@ -221,6 +221,25 @@ describe('ClipPlayer', () => {
     expect(events.length).toBe(0);
   });
 
+  it('generate clamps clip duration at loopEnd', () => {
+    // 2s clip starting at 0, loop region [0, 1)
+    const clip = makeClip({
+      startSample: 0,
+      durationSamples: 96000, // 2s
+      offsetSamples: 0,
+    });
+    const track = makeTrack([clip]);
+    const trackNode = createMockTrackNode('track-1');
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
+    player.setTracks([track], new Map([['track-1', trackNode]]));
+    player.setLoop(true, 0, 1);
+
+    const events = player.generate(0, 0.2);
+    expect(events.length).toBe(1);
+    // Duration should be clamped to 1s (loopEnd - clipStart), not full 2s
+    expect(events[0].duration).toBeCloseTo(1);
+  });
+
   it('mid-clip playback is handled by onPositionJump, not generate', () => {
     const clip = makeClip({
       startSample: 0,
