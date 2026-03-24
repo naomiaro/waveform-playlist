@@ -1,8 +1,15 @@
 import type { TempoEntry } from '../types';
 
+/** Mutable internal version of TempoEntry (exported interface has readonly secondsAtTick) */
+interface MutableTempoEntry {
+  tick: number;
+  bpm: number;
+  secondsAtTick: number;
+}
+
 export class TempoMap {
   private _ppqn: number;
-  private _entries: TempoEntry[];
+  private _entries: MutableTempoEntry[];
 
   constructor(ppqn: number = 960, initialBpm: number = 120) {
     this._ppqn = ppqn;
@@ -16,7 +23,7 @@ export class TempoMap {
 
   setTempo(bpm: number, atTick: number = 0): void {
     if (atTick === 0) {
-      this._entries[0].bpm = bpm;
+      this._entries[0] = { ...this._entries[0], bpm };
       this._recomputeCache(0);
       return;
     }
@@ -25,7 +32,7 @@ export class TempoMap {
     while (i > 0 && this._entries[i].tick > atTick) i--;
 
     if (this._entries[i].tick === atTick) {
-      this._entries[i].bpm = bpm;
+      this._entries[i] = { ...this._entries[i], bpm };
     } else {
       const secondsAtTick = this._ticksToSecondsInternal(atTick);
       this._entries.splice(i + 1, 0, { tick: atTick, bpm, secondsAtTick });
@@ -39,7 +46,6 @@ export class TempoMap {
   }
 
   secondsToTicks(seconds: number): number {
-    // Binary search for the entry whose secondsAtTick is <= seconds
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {
@@ -88,10 +94,12 @@ export class TempoMap {
   private _recomputeCache(fromIndex: number): void {
     for (let i = Math.max(1, fromIndex); i < this._entries.length; i++) {
       const prev = this._entries[i - 1];
-      const curr = this._entries[i];
-      const tickDelta = curr.tick - prev.tick;
+      const tickDelta = this._entries[i].tick - prev.tick;
       const secondsPerTick = 60 / (prev.bpm * this._ppqn);
-      curr.secondsAtTick = prev.secondsAtTick + tickDelta * secondsPerTick;
+      this._entries[i] = {
+        ...this._entries[i],
+        secondsAtTick: prev.secondsAtTick + tickDelta * secondsPerTick,
+      };
     }
   }
 }

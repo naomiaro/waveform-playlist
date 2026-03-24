@@ -2,6 +2,8 @@ import type { SchedulerEvent, SchedulerListener } from '../types';
 
 export interface SchedulerOptions {
   lookahead?: number;
+  /** Called when the scheduler wraps at loopEnd — Transport uses this to seek the clock */
+  onLoop?: (loopStartTime: number) => void;
 }
 
 export class Scheduler<T extends SchedulerEvent> {
@@ -11,9 +13,11 @@ export class Scheduler<T extends SchedulerEvent> {
   private _loopEnabled = false;
   private _loopStart = 0;
   private _loopEnd = 0;
+  private _onLoop: ((loopStartTime: number) => void) | undefined;
 
   constructor(options: SchedulerOptions = {}) {
     this._lookahead = options.lookahead ?? 0.2;
+    this._onLoop = options.onLoop;
   }
 
   addListener(listener: SchedulerListener<T>): void {
@@ -25,6 +29,16 @@ export class Scheduler<T extends SchedulerEvent> {
   }
 
   setLoop(enabled: boolean, start: number, end: number): void {
+    if (enabled && start >= end) {
+      console.warn(
+        '[waveform-playlist] Scheduler.setLoop: start (' +
+          start +
+          ') must be less than end (' +
+          end +
+          ')'
+      );
+      return;
+    }
     this._loopEnabled = enabled;
     this._loopStart = start;
     this._loopEnd = end;
@@ -46,6 +60,9 @@ export class Scheduler<T extends SchedulerEvent> {
         for (const listener of this._listeners) {
           listener.onPositionJump(this._loopStart);
         }
+        // Seek clock back to loopStart so subsequent advance() calls
+        // receive currentTime values within the loop region
+        this._onLoop?.(this._loopStart);
         // Continue from loopStart
         const remaining = targetEdge - this._loopEnd;
         this._generateAndConsume(this._loopStart, this._loopStart + remaining);
@@ -62,9 +79,23 @@ export class Scheduler<T extends SchedulerEvent> {
 
   private _generateAndConsume(from: number, to: number): void {
     for (const listener of this._listeners) {
-      const events = listener.generate(from, to);
-      for (const event of events) {
-        listener.consume(event);
+      try {
+        const events = listener.generate(from, to);
+        for (const event of events) {
+          try {
+            listener.consume(event);
+          } catch (err) {
+            console.warn(
+              '[waveform-playlist] Scheduler: error consuming event:',
+              String(err)
+            );
+          }
+        }
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] Scheduler: error generating events:',
+          String(err)
+        );
       }
     }
   }

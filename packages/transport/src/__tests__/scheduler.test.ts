@@ -24,7 +24,7 @@ function createMockListener(): SchedulerListener<TestEvent> & {
       const events: TestEvent[] = [];
       // Generate an event every 0.1s in the window
       for (let t = Math.ceil(from * 10) / 10; t < to; t += 0.1) {
-        const event = { audioTime: t, id: 'e-' + t.toFixed(1) };
+        const event = { transportTime: t, id: 'e-' + t.toFixed(1) };
         events.push(event);
         state.generated.push(event);
       }
@@ -51,8 +51,8 @@ describe('Scheduler', () => {
     scheduler.advance(0);
     // Should generate events in [0, 0.2): 0.0, 0.1
     expect(listener.consumed.length).toBe(2);
-    expect(listener.consumed[0].audioTime).toBeCloseTo(0.0);
-    expect(listener.consumed[1].audioTime).toBeCloseTo(0.1);
+    expect(listener.consumed[0].transportTime).toBeCloseTo(0.0);
+    expect(listener.consumed[1].transportTime).toBeCloseTo(0.1);
   });
 
   it('advance does not re-generate consumed window', () => {

@@ -24,7 +24,11 @@ export class Timer {
   private _scheduleFrame(): void {
     this._rafId = requestAnimationFrame(() => {
       if (!this._running) return;
-      this._onTick();
+      try {
+        this._onTick();
+      } catch (err) {
+        console.warn('[waveform-playlist] Timer tick error:', String(err));
+      }
       this._scheduleFrame();
     });
   }

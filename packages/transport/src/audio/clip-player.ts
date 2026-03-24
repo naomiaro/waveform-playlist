@@ -7,8 +7,6 @@ export interface ClipEvent extends SchedulerEvent {
   trackId: string;
   clipId: string;
   audioBuffer: AudioBuffer;
-  /** When to start the source (audioContext time) */
-  audioTime: number;
   /** Offset into the audioBuffer (seconds) */
   offset: number;
   /** Duration to play (seconds) */
@@ -60,7 +58,6 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
 
   updateTrack(trackId: string, track: ClipTrack): void {
     this._tracks.set(trackId, { track, clips: track.clips });
-    // Silence only this track's active sources
     this._silenceTrack(trackId);
   }
 
@@ -89,12 +86,6 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         if (clipStartTime < fromTime) continue;
         if (clipStartTime >= toTime) continue;
 
-        // Offset into the audio buffer
-        const offset = clipOffsetTime;
-
-        // Duration: full clip duration from its start
-        const duration = clipDuration;
-
         const fadeInDuration = clip.fadeIn
           ? this._sampleTimeline.samplesToSeconds(clip.fadeIn.duration ?? 0)
           : 0;
@@ -106,9 +97,9 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
           trackId,
           clipId: clip.id,
           audioBuffer: clip.audioBuffer,
-          audioTime: clipStartTime,
-          offset,
-          duration,
+          transportTime: clipStartTime,
+          offset: clipOffsetTime,
+          duration: clipDuration,
           gain: clip.gain,
           fadeInDuration,
           fadeOutDuration,
@@ -121,13 +112,27 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
 
   consume(event: ClipEvent): void {
     const trackNode = this._trackNodes.get(event.trackId);
-    if (!trackNode) return;
+    if (!trackNode) {
+      console.warn(
+        '[waveform-playlist] ClipPlayer.consume: no TrackNode for trackId "' +
+          event.trackId +
+          '", clipId "' +
+          event.clipId +
+          '" — clip will not play'
+      );
+      return;
+    }
+
+    // Guard against invalid offset
+    if (event.offset >= event.audioBuffer.duration) {
+      return;
+    }
 
     const source = this._audioContext.createBufferSource();
     source.buffer = event.audioBuffer;
 
     // Convert transport time → AudioContext.currentTime for scheduling
-    const when = this._toAudioTime(event.audioTime);
+    const when = this._toAudioTime(event.transportTime);
 
     // Create a gain node for per-clip gain and fades
     const gainNode = this._audioContext.createGain();
@@ -160,8 +165,11 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
       this._activeSources.delete(source);
       try {
         gainNode.disconnect();
-      } catch {
-        // Already disconnected
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] ClipPlayer: error disconnecting gain node:',
+          String(err)
+        );
       }
     });
 
@@ -169,7 +177,6 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   }
 
   onPositionJump(newTime: number): void {
-    // Stop all active sources
     this.silence();
 
     // Re-schedule mid-clip sources for clips that span the new position
@@ -203,11 +210,11 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
             trackId,
             clipId: clip.id,
             audioBuffer: clip.audioBuffer,
-            audioTime: newTime,
+            transportTime: newTime,
             offset,
             duration,
             gain: clip.gain,
-            fadeInDuration: 0, // No fade-in on mid-clip start
+            fadeInDuration: 0,
             fadeOutDuration,
           });
         }
@@ -219,13 +226,19 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     for (const [source, { gainNode }] of this._activeSources) {
       try {
         source.stop();
-      } catch {
-        // Already stopped
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] ClipPlayer.silence: error stopping source:',
+          String(err)
+        );
       }
       try {
         gainNode.disconnect();
-      } catch {
-        // Already disconnected
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] ClipPlayer.silence: error disconnecting:',
+          String(err)
+        );
       }
     }
     this._activeSources.clear();
@@ -236,13 +249,19 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
       if (info.trackId === trackId) {
         try {
           source.stop();
-        } catch {
-          // Already stopped
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] ClipPlayer._silenceTrack: error stopping source:',
+            String(err)
+          );
         }
         try {
           info.gainNode.disconnect();
-        } catch {
-          // Already disconnected
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] ClipPlayer._silenceTrack: error disconnecting:',
+            String(err)
+          );
         }
         this._activeSources.delete(source);
       }

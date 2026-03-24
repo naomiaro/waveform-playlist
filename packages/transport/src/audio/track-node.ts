@@ -3,7 +3,7 @@ export class TrackNode {
   private _volumeNode: GainNode;
   private _panNode: StereoPannerNode;
   private _muteNode: GainNode;
-  private _output: AudioNode;
+  private _destination: AudioNode | null = null;
   private _effectsInput: AudioNode | null = null;
 
   constructor(id: string, audioContext: AudioContext) {
@@ -12,10 +12,7 @@ export class TrackNode {
     this._panNode = audioContext.createStereoPanner();
     this._muteNode = audioContext.createGain();
 
-    // Default output is the mute node itself — caller connects to master
-    this._output = this._muteNode;
-
-    // Wire: volume → pan → mute → output
+    // Wire: volume → pan → mute (caller connects output via connectOutput)
     this._volumeNode.connect(this._panNode);
     this._panNode.connect(this._muteNode);
   }
@@ -27,7 +24,8 @@ export class TrackNode {
 
   /** Connect this track's output to a destination (master node) */
   connectOutput(destination: AudioNode): void {
-    this._output.connect(destination);
+    this._destination = destination;
+    this._muteNode.connect(destination);
   }
 
   setVolume(value: number): void {
@@ -43,7 +41,11 @@ export class TrackNode {
   }
 
   connectEffects(effectsInput: AudioNode): void {
-    // Disconnect mute from current output
+    // Clean up previous effects connection first
+    if (this._effectsInput) {
+      this.disconnectEffects();
+    }
+    // Disconnect mute from destination
     this._muteNode.disconnect();
     // Route mute → effects input
     this._muteNode.connect(effectsInput);
@@ -51,17 +53,24 @@ export class TrackNode {
   }
 
   disconnectEffects(): void {
-    if (this._effectsInput) {
+    if (this._effectsInput && this._destination) {
       this._muteNode.disconnect();
-      // Restore direct routing: mute → output
-      this._muteNode.connect(this._output);
+      // Restore direct routing: mute → destination
+      this._muteNode.connect(this._destination);
       this._effectsInput = null;
     }
   }
 
   dispose(): void {
-    this._volumeNode.disconnect();
-    this._panNode.disconnect();
-    this._muteNode.disconnect();
+    for (const node of [this._volumeNode, this._panNode, this._muteNode]) {
+      try {
+        node.disconnect();
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] TrackNode.dispose: error disconnecting node:',
+          String(err)
+        );
+      }
+    }
   }
 }

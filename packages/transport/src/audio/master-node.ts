@@ -18,6 +18,13 @@ export class MasterNode {
   }
 
   dispose(): void {
-    this._gainNode.disconnect();
+    try {
+      this._gainNode.disconnect();
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] MasterNode.dispose: error disconnecting:',
+        String(err)
+      );
+    }
   }
 }

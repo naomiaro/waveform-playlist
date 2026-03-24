@@ -78,16 +78,22 @@ describe('TrackNode', () => {
     expect(muteNode.connect).toHaveBeenCalledWith(effectsInput);
   });
 
-  it('disconnectEffects restores direct routing', () => {
+  it('disconnectEffects restores routing to destination', () => {
     const node = new TrackNode('track-1', ctx);
+    const destination = { connect: vi.fn(), disconnect: vi.fn() } as any;
+    node.connectOutput(destination);
+
     const effectsInput = { connect: vi.fn(), disconnect: vi.fn() } as any;
     node.connectEffects(effectsInput);
     node.disconnectEffects();
 
     const gainCalls = (ctx.createGain as any).mock.results;
     const muteNode = gainCalls[1].value;
-    // muteNode should be reconnected to output (last connect call)
-    expect(muteNode.connect).toHaveBeenCalledTimes(2); // effects + restore
+    // muteNode should be reconnected to destination (connectOutput + effects + restore)
+    expect(muteNode.connect).toHaveBeenCalledTimes(3);
+    // Last connect call should be to the destination, not to muteNode itself
+    const lastConnectCall = muteNode.connect.mock.calls[2][0];
+    expect(lastConnectCall).toBe(destination);
   });
 
   it('dispose disconnects all nodes', () => {

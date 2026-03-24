@@ -97,7 +97,7 @@ describe('ClipPlayer', () => {
 
     const events = player.generate(0, 0.5);
     expect(events.length).toBe(1);
-    expect(events[0].audioTime).toBe(0);
+    expect(events[0].transportTime).toBe(0);
     expect(events[0].offset).toBe(0);
     expect(events[0].duration).toBeCloseTo(1);
   });

@@ -11,19 +11,20 @@ import { MetronomePlayer } from './audio/metronome-player';
 import { MasterNode } from './audio/master-node';
 import { TrackNode } from './audio/track-node';
 
-type TransportEventType =
-  | 'play'
-  | 'pause'
-  | 'stop'
-  | 'loop'
-  | 'tempochange';
+export interface TransportEvents {
+  play: () => void;
+  pause: () => void;
+  stop: () => void;
+  loop: () => void;
+  tempochange: () => void;
+}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-type EventCallback = Function;
+type TransportEventType = keyof TransportEvents;
 
 export class Transport {
   private _audioContext: AudioContext;
   private _clock: Clock;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _scheduler: Scheduler<any>;
   private _timer: Timer;
   private _sampleTimeline: SampleTimeline;
@@ -38,12 +39,12 @@ export class Transport {
   private _mutedTrackIds: Set<string> = new Set();
   private _playing = false;
   private _endTime: number | undefined;
-  private _listeners: Map<TransportEventType, Set<EventCallback>> = new Map();
+  private _listeners: Map<
+    TransportEventType,
+    Set<TransportEvents[TransportEventType]>
+  > = new Map();
 
-  constructor(
-    audioContext: AudioContext,
-    options: TransportOptions = {}
-  ) {
+  constructor(audioContext: AudioContext, options: TransportOptions = {}) {
     this._audioContext = audioContext;
 
     const sampleRate = options.sampleRate ?? audioContext.sampleRate;
@@ -52,8 +53,44 @@ export class Transport {
     const beatsPerBar = options.beatsPerBar ?? 4;
     const lookahead = options.schedulerLookahead ?? 0.2;
 
+    // Validate constructor inputs at system boundary
+    if (sampleRate <= 0) {
+      throw new Error(
+        '[waveform-playlist] Transport: sampleRate must be positive, got ' +
+          sampleRate
+      );
+    }
+    if (ppqn <= 0 || !Number.isInteger(ppqn)) {
+      throw new Error(
+        '[waveform-playlist] Transport: ppqn must be a positive integer, got ' +
+          ppqn
+      );
+    }
+    if (tempo <= 0) {
+      throw new Error(
+        '[waveform-playlist] Transport: tempo must be positive, got ' + tempo
+      );
+    }
+    if (beatsPerBar <= 0 || !Number.isInteger(beatsPerBar)) {
+      throw new Error(
+        '[waveform-playlist] Transport: beatsPerBar must be a positive integer, got ' +
+          beatsPerBar
+      );
+    }
+    if (lookahead <= 0) {
+      throw new Error(
+        '[waveform-playlist] Transport: schedulerLookahead must be positive, got ' +
+          lookahead
+      );
+    }
+
     this._clock = new Clock(audioContext);
-    this._scheduler = new Scheduler({ lookahead });
+    this._scheduler = new Scheduler({
+      lookahead,
+      onLoop: (loopStartTime: number) => {
+        this._clock.seekTo(loopStartTime);
+      },
+    });
     this._sampleTimeline = new SampleTimeline(sampleRate);
     this._tickTimeline = new TickTimeline(ppqn);
     this._tempoMap = new TempoMap(ppqn, tempo);
@@ -164,6 +201,8 @@ export class Transport {
 
     if (wasPlaying) {
       this._clock.start();
+      // Re-create sources for clips spanning the seek position
+      this._clipPlayer.onPositionJump(time);
       this._timer.start();
     }
   }
@@ -272,16 +311,24 @@ export class Transport {
 
   setTrackVolume(trackId: string, volume: number): void {
     const node = this._trackNodes.get(trackId);
-    if (node) {
-      node.setVolume(volume);
+    if (!node) {
+      console.warn(
+        '[waveform-playlist] setTrackVolume: unknown trackId "' + trackId + '"'
+      );
+      return;
     }
+    node.setVolume(volume);
   }
 
   setTrackPan(trackId: string, pan: number): void {
     const node = this._trackNodes.get(trackId);
-    if (node) {
-      node.setPan(pan);
+    if (!node) {
+      console.warn(
+        '[waveform-playlist] setTrackPan: unknown trackId "' + trackId + '"'
+      );
+      return;
     }
+    node.setPan(pan);
   }
 
   setTrackMute(trackId: string, muted: boolean): void {
@@ -344,28 +391,40 @@ export class Transport {
 
   connectTrackOutput(trackId: string, node: AudioNode): void {
     const trackNode = this._trackNodes.get(trackId);
-    if (trackNode) {
-      trackNode.connectEffects(node);
+    if (!trackNode) {
+      console.warn(
+        '[waveform-playlist] connectTrackOutput: unknown trackId "' +
+          trackId +
+          '"'
+      );
+      return;
     }
+    trackNode.connectEffects(node);
   }
 
   disconnectTrackOutput(trackId: string): void {
     const trackNode = this._trackNodes.get(trackId);
-    if (trackNode) {
-      trackNode.disconnectEffects();
+    if (!trackNode) {
+      console.warn(
+        '[waveform-playlist] disconnectTrackOutput: unknown trackId "' +
+          trackId +
+          '"'
+      );
+      return;
     }
+    trackNode.disconnectEffects();
   }
 
   // --- Events ---
 
-  on(event: TransportEventType, cb: EventCallback): void {
+  on<K extends TransportEventType>(event: K, cb: TransportEvents[K]): void {
     if (!this._listeners.has(event)) {
       this._listeners.set(event, new Set());
     }
     this._listeners.get(event)!.add(cb);
   }
 
-  off(event: TransportEventType, cb: EventCallback): void {
+  off<K extends TransportEventType>(event: K, cb: TransportEvents[K]): void {
     this._listeners.get(event)?.delete(cb);
   }
 
@@ -404,7 +463,14 @@ export class Transport {
     const listeners = this._listeners.get(event);
     if (listeners) {
       for (const cb of listeners) {
-        cb();
+        try {
+          cb();
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] Transport "' + event + '" listener threw:',
+            String(err)
+          );
+        }
       }
     }
   }

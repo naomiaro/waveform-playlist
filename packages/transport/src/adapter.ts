@@ -17,6 +17,11 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   async init(): Promise<void> {
+    if (this._audioContext.state === 'closed') {
+      throw new Error(
+        '[waveform-playlist] Cannot init: AudioContext is closed'
+      );
+    }
     if (this._audioContext.state === 'suspended') {
       await this._audioContext.resume();
     }

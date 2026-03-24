@@ -7,6 +7,7 @@ function createMockSource() {
   return {
     buffer: null as AudioBuffer | null,
     connect: vi.fn(),
+    disconnect: vi.fn(),
     start: vi.fn(),
     stop: vi.fn(),
     addEventListener: vi.fn(),
@@ -59,9 +60,9 @@ describe('MetronomePlayer', () => {
     const events = player.generate(0, 1.1);
     // Should get beats at 0.0, 0.5, 1.0
     expect(events.length).toBe(3);
-    expect(events[0].audioTime).toBeCloseTo(0.0);
-    expect(events[1].audioTime).toBeCloseTo(0.5);
-    expect(events[2].audioTime).toBeCloseTo(1.0);
+    expect(events[0].transportTime).toBeCloseTo(0.0);
+    expect(events[1].transportTime).toBeCloseTo(0.5);
+    expect(events[2].transportTime).toBeCloseTo(1.0);
   });
 
   it('accent on beat 1 of each bar', () => {

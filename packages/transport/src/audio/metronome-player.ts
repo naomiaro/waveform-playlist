@@ -65,12 +65,12 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     const firstBeatTick = Math.ceil(fromTicks / ppqn) * ppqn;
 
     for (let tick = firstBeatTick; tick < toTicks; tick += ppqn) {
-      const audioTime = this._tempoMap.ticksToSeconds(tick);
+      const transportTime = this._tempoMap.ticksToSeconds(tick);
       const ticksPerBar = this._tickTimeline.ticksPerBar(this._beatsPerBar);
       const isAccent = tick % ticksPerBar === 0;
 
       events.push({
-        audioTime,
+        transportTime,
         isAccent,
         buffer: isAccent ? this._accentBuffer : this._normalBuffer,
       });
@@ -87,9 +87,17 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     this._activeSources.add(source);
     source.addEventListener('ended', () => {
       this._activeSources.delete(source);
+      try {
+        source.disconnect();
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] MetronomePlayer: error disconnecting source:',
+          String(err)
+        );
+      }
     });
 
-    source.start(this._toAudioTime(event.audioTime));
+    source.start(this._toAudioTime(event.transportTime));
   }
 
   onPositionJump(_newTime: number): void {
@@ -100,8 +108,19 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     for (const source of this._activeSources) {
       try {
         source.stop();
-      } catch {
-        // Already stopped
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] MetronomePlayer.silence: error stopping source:',
+          String(err)
+        );
+      }
+      try {
+        source.disconnect();
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] MetronomePlayer.silence: error disconnecting:',
+          String(err)
+        );
       }
     }
     this._activeSources.clear();

@@ -1,8 +1,6 @@
-// packages/transport/src/types.ts
-
 export interface SchedulerEvent {
-  /** Audio time when this event should be realized */
-  audioTime: number;
+  /** Transport time (elapsed seconds from timeline start) when this event should be realized */
+  transportTime: number;
 }
 
 export interface SchedulerListener<T extends SchedulerEvent> {
@@ -34,12 +32,15 @@ export interface TempoEntry {
   tick: number;
   /** Beats per minute */
   bpm: number;
-  /** Cached cumulative seconds up to this tick (for O(log n) lookup) */
-  secondsAtTick: number;
+  /** Cached cumulative seconds up to this tick (for O(log n) lookup). Derived — do not set manually. */
+  readonly secondsAtTick: number;
 }
 
 export interface TransportPosition {
+  /** 1-indexed bar number */
   bar: number;
+  /** 1-indexed beat within bar */
   beat: number;
+  /** Sub-beat tick (0 to ppqn-1) */
   tick: number;
 }
