@@ -1,0 +1,97 @@
+import type { TempoEntry } from '../types';
+
+export class TempoMap {
+  private _ppqn: number;
+  private _entries: TempoEntry[];
+
+  constructor(ppqn: number = 960, initialBpm: number = 120) {
+    this._ppqn = ppqn;
+    this._entries = [{ tick: 0, bpm: initialBpm, secondsAtTick: 0 }];
+  }
+
+  getTempo(atTick: number = 0): number {
+    const entry = this._entryAt(atTick);
+    return entry.bpm;
+  }
+
+  setTempo(bpm: number, atTick: number = 0): void {
+    if (atTick === 0) {
+      this._entries[0].bpm = bpm;
+      this._recomputeCache(0);
+      return;
+    }
+    // Find insertion point
+    let i = this._entries.length - 1;
+    while (i > 0 && this._entries[i].tick > atTick) i--;
+
+    if (this._entries[i].tick === atTick) {
+      this._entries[i].bpm = bpm;
+    } else {
+      const secondsAtTick = this._ticksToSecondsInternal(atTick);
+      this._entries.splice(i + 1, 0, { tick: atTick, bpm, secondsAtTick });
+      i = i + 1;
+    }
+    this._recomputeCache(i);
+  }
+
+  ticksToSeconds(ticks: number): number {
+    return this._ticksToSecondsInternal(ticks);
+  }
+
+  secondsToTicks(seconds: number): number {
+    // Binary search for the entry whose secondsAtTick is <= seconds
+    let lo = 0;
+    let hi = this._entries.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this._entries[mid].secondsAtTick <= seconds) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    const entry = this._entries[lo];
+    const secondsIntoSegment = seconds - entry.secondsAtTick;
+    const ticksPerSecond = (entry.bpm / 60) * this._ppqn;
+    return entry.tick + secondsIntoSegment * ticksPerSecond;
+  }
+
+  beatsToSeconds(beats: number): number {
+    return this.ticksToSeconds(beats * this._ppqn);
+  }
+
+  secondsToBeats(seconds: number): number {
+    return this.secondsToTicks(seconds) / this._ppqn;
+  }
+
+  private _ticksToSecondsInternal(ticks: number): number {
+    const entry = this._entryAt(ticks);
+    const ticksIntoSegment = ticks - entry.tick;
+    const secondsPerTick = 60 / (entry.bpm * this._ppqn);
+    return entry.secondsAtTick + ticksIntoSegment * secondsPerTick;
+  }
+
+  private _entryAt(tick: number): TempoEntry {
+    let lo = 0;
+    let hi = this._entries.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this._entries[mid].tick <= tick) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return this._entries[lo];
+  }
+
+  private _recomputeCache(fromIndex: number): void {
+    for (let i = Math.max(1, fromIndex); i < this._entries.length; i++) {
+      const prev = this._entries[i - 1];
+      const curr = this._entries[i];
+      const tickDelta = curr.tick - prev.tick;
+      const secondsPerTick = 60 / (prev.bpm * this._ppqn);
+      curr.secondsAtTick = prev.secondsAtTick + tickDelta * secondsPerTick;
+    }
+  }
+}
