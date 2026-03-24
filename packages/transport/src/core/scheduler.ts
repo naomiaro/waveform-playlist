@@ -85,17 +85,11 @@ export class Scheduler<T extends SchedulerEvent> {
           try {
             listener.consume(event);
           } catch (err) {
-            console.warn(
-              '[waveform-playlist] Scheduler: error consuming event:',
-              String(err)
-            );
+            console.warn('[waveform-playlist] Scheduler: error consuming event:', String(err));
           }
         }
       } catch (err) {
-        console.warn(
-          '[waveform-playlist] Scheduler: error generating events:',
-          String(err)
-        );
+        console.warn('[waveform-playlist] Scheduler: error generating events:', String(err));
       }
     }
   }

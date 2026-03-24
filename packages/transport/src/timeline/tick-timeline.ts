@@ -28,12 +28,7 @@ export class TickTimeline {
     return { bar, beat, tick };
   }
 
-  fromPosition(
-    bar: number,
-    beat: number,
-    tick: number,
-    beatsPerBar: number
-  ): number {
+  fromPosition(bar: number, beat: number, tick: number, beatsPerBar: number): number {
     const ticksPerBar = this.ticksPerBar(beatsPerBar);
     return (bar - 1) * ticksPerBar + (beat - 1) * this._ppqn + tick;
   }

@@ -72,10 +72,7 @@ function makeClip(overrides: Partial<AudioClip> = {}): AudioClip {
   };
 }
 
-function makeTrack(
-  clips: AudioClip[],
-  overrides: Partial<ClipTrack> = {}
-): ClipTrack {
+function makeTrack(clips: AudioClip[], overrides: Partial<ClipTrack> = {}): ClipTrack {
   return {
     id: 'track-1',
     name: 'Track 1',

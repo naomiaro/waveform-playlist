@@ -45,13 +45,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('generate produces beat events at correct times', () => {
-    const player = new MetronomePlayer(
-      ctx,
-      tempoMap,
-      tickTimeline,
-      destination,
-      (t) => t
-    );
+    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -66,13 +60,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('accent on beat 1 of each bar', () => {
-    const player = new MetronomePlayer(
-      ctx,
-      tempoMap,
-      tickTimeline,
-      destination,
-      (t) => t
-    );
+    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     const accent = createMockBuffer();
@@ -90,13 +78,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('setEnabled(false) produces no events', () => {
-    const player = new MetronomePlayer(
-      ctx,
-      tempoMap,
-      tickTimeline,
-      destination,
-      (t) => t
-    );
+    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
     player.setEnabled(false);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
     player.setBeatsPerBar(4);
@@ -106,13 +88,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('consume creates and starts a source', () => {
-    const player = new MetronomePlayer(
-      ctx,
-      tempoMap,
-      tickTimeline,
-      destination,
-      (t) => t
-    );
+    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -126,13 +102,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('silence stops active sources', () => {
-    const player = new MetronomePlayer(
-      ctx,
-      tempoMap,
-      tickTimeline,
-      destination,
-      (t) => t
-    );
+    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -146,13 +116,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('onPositionJump clears active sources', () => {
-    const player = new MetronomePlayer(
-      ctx,
-      tempoMap,
-      tickTimeline,
-      destination,
-      (t) => t
-    );
+    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());

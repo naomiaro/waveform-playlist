@@ -30,10 +30,8 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   private _toAudioTime: (transportTime: number) => number;
   private _tracks: Map<string, TrackClipState> = new Map();
   private _trackNodes: Map<string, TrackNode> = new Map();
-  private _activeSources: Map<
-    AudioBufferSourceNode,
-    { trackId: string; gainNode: GainNode }
-  > = new Map();
+  private _activeSources: Map<AudioBufferSourceNode, { trackId: string; gainNode: GainNode }> =
+    new Map();
 
   constructor(
     audioContext: AudioContext,
@@ -45,10 +43,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     this._toAudioTime = toAudioTime;
   }
 
-  setTracks(
-    tracks: ClipTrack[],
-    trackNodes: Map<string, TrackNode>
-  ): void {
+  setTracks(tracks: ClipTrack[], trackNodes: Map<string, TrackNode>): void {
     this._tracks.clear();
     this._trackNodes = trackNodes;
     for (const track of tracks) {
@@ -69,15 +64,9 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         if (clip.durationSamples === 0) continue;
         if (!clip.audioBuffer) continue;
 
-        const clipStartTime = this._sampleTimeline.samplesToSeconds(
-          clip.startSample
-        );
-        const clipDuration = this._sampleTimeline.samplesToSeconds(
-          clip.durationSamples
-        );
-        const clipOffsetTime = this._sampleTimeline.samplesToSeconds(
-          clip.offsetSamples
-        );
+        const clipStartTime = this._sampleTimeline.samplesToSeconds(clip.startSample);
+        const clipDuration = this._sampleTimeline.samplesToSeconds(clip.durationSamples);
+        const clipOffsetTime = this._sampleTimeline.samplesToSeconds(clip.offsetSamples);
 
         // Only schedule when the clip START falls within this window.
         // Clips that started in a previous window are already playing
@@ -141,10 +130,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     // Apply fades (AudioParam scheduling uses AudioContext time)
     if (event.fadeInDuration > 0) {
       gainNode.gain.setValueAtTime(0, when);
-      gainNode.gain.linearRampToValueAtTime(
-        event.gain,
-        when + event.fadeInDuration
-      );
+      gainNode.gain.linearRampToValueAtTime(event.gain, when + event.fadeInDuration);
     }
     if (event.fadeOutDuration > 0) {
       const fadeOutStart = when + event.duration - event.fadeOutDuration;
@@ -166,10 +152,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
       try {
         gainNode.disconnect();
       } catch (err) {
-        console.warn(
-          '[waveform-playlist] ClipPlayer: error disconnecting gain node:',
-          String(err)
-        );
+        console.warn('[waveform-playlist] ClipPlayer: error disconnecting gain node:', String(err));
       }
     });
 
@@ -185,16 +168,10 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         if (clip.durationSamples === 0) continue;
         if (!clip.audioBuffer) continue;
 
-        const clipStartTime = this._sampleTimeline.samplesToSeconds(
-          clip.startSample
-        );
-        const clipDuration = this._sampleTimeline.samplesToSeconds(
-          clip.durationSamples
-        );
+        const clipStartTime = this._sampleTimeline.samplesToSeconds(clip.startSample);
+        const clipDuration = this._sampleTimeline.samplesToSeconds(clip.durationSamples);
         const clipEndTime = clipStartTime + clipDuration;
-        const clipOffsetTime = this._sampleTimeline.samplesToSeconds(
-          clip.offsetSamples
-        );
+        const clipOffsetTime = this._sampleTimeline.samplesToSeconds(clip.offsetSamples);
 
         // Check if clip spans the new position
         if (clipStartTime <= newTime && clipEndTime > newTime) {
@@ -227,18 +204,12 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
       try {
         source.stop();
       } catch (err) {
-        console.warn(
-          '[waveform-playlist] ClipPlayer.silence: error stopping source:',
-          String(err)
-        );
+        console.warn('[waveform-playlist] ClipPlayer.silence: error stopping source:', String(err));
       }
       try {
         gainNode.disconnect();
       } catch (err) {
-        console.warn(
-          '[waveform-playlist] ClipPlayer.silence: error disconnecting:',
-          String(err)
-        );
+        console.warn('[waveform-playlist] ClipPlayer.silence: error disconnecting:', String(err));
       }
     }
     this._activeSources.clear();

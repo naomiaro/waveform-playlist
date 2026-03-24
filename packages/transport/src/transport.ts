@@ -39,10 +39,7 @@ export class Transport {
   private _mutedTrackIds: Set<string> = new Set();
   private _playing = false;
   private _endTime: number | undefined;
-  private _listeners: Map<
-    TransportEventType,
-    Set<TransportEvents[TransportEventType]>
-  > = new Map();
+  private _listeners: Map<TransportEventType, Set<TransportEvents[TransportEventType]>> = new Map();
 
   constructor(audioContext: AudioContext, options: TransportOptions = {}) {
     this._audioContext = audioContext;
@@ -56,31 +53,25 @@ export class Transport {
     // Validate constructor inputs at system boundary
     if (sampleRate <= 0) {
       throw new Error(
-        '[waveform-playlist] Transport: sampleRate must be positive, got ' +
-          sampleRate
+        '[waveform-playlist] Transport: sampleRate must be positive, got ' + sampleRate
       );
     }
     if (ppqn <= 0 || !Number.isInteger(ppqn)) {
       throw new Error(
-        '[waveform-playlist] Transport: ppqn must be a positive integer, got ' +
-          ppqn
+        '[waveform-playlist] Transport: ppqn must be a positive integer, got ' + ppqn
       );
     }
     if (tempo <= 0) {
-      throw new Error(
-        '[waveform-playlist] Transport: tempo must be positive, got ' + tempo
-      );
+      throw new Error('[waveform-playlist] Transport: tempo must be positive, got ' + tempo);
     }
     if (beatsPerBar <= 0 || !Number.isInteger(beatsPerBar)) {
       throw new Error(
-        '[waveform-playlist] Transport: beatsPerBar must be a positive integer, got ' +
-          beatsPerBar
+        '[waveform-playlist] Transport: beatsPerBar must be a positive integer, got ' + beatsPerBar
       );
     }
     if (lookahead <= 0) {
       throw new Error(
-        '[waveform-playlist] Transport: schedulerLookahead must be positive, got ' +
-          lookahead
+        '[waveform-playlist] Transport: schedulerLookahead must be positive, got ' + lookahead
       );
     }
 
@@ -99,14 +90,9 @@ export class Transport {
     this._masterNode.output.connect(audioContext.destination);
 
     // Bind toAudioTime so players can convert transport time → AudioContext time
-    const toAudioTime = (transportTime: number) =>
-      this._clock.toAudioTime(transportTime);
+    const toAudioTime = (transportTime: number) => this._clock.toAudioTime(transportTime);
 
-    this._clipPlayer = new ClipPlayer(
-      audioContext,
-      this._sampleTimeline,
-      toAudioTime
-    );
+    this._clipPlayer = new ClipPlayer(audioContext, this._sampleTimeline, toAudioTime);
     this._metronomePlayer = new MetronomePlayer(
       audioContext,
       this._tempoMap,
@@ -281,9 +267,7 @@ export class Transport {
   }
 
   updateTrack(trackId: string, track: ClipTrack): void {
-    this._tracks = this._tracks.map((t) =>
-      t.id === trackId ? track : t
-    );
+    this._tracks = this._tracks.map((t) => (t.id === trackId ? track : t));
 
     const node = this._trackNodes.get(trackId);
     if (node) {
@@ -312,9 +296,7 @@ export class Transport {
   setTrackVolume(trackId: string, volume: number): void {
     const node = this._trackNodes.get(trackId);
     if (!node) {
-      console.warn(
-        '[waveform-playlist] setTrackVolume: unknown trackId "' + trackId + '"'
-      );
+      console.warn('[waveform-playlist] setTrackVolume: unknown trackId "' + trackId + '"');
       return;
     }
     node.setVolume(volume);
@@ -323,9 +305,7 @@ export class Transport {
   setTrackPan(trackId: string, pan: number): void {
     const node = this._trackNodes.get(trackId);
     if (!node) {
-      console.warn(
-        '[waveform-playlist] setTrackPan: unknown trackId "' + trackId + '"'
-      );
+      console.warn('[waveform-playlist] setTrackPan: unknown trackId "' + trackId + '"');
       return;
     }
     node.setPan(pan);
@@ -392,11 +372,7 @@ export class Transport {
   connectTrackOutput(trackId: string, node: AudioNode): void {
     const trackNode = this._trackNodes.get(trackId);
     if (!trackNode) {
-      console.warn(
-        '[waveform-playlist] connectTrackOutput: unknown trackId "' +
-          trackId +
-          '"'
-      );
+      console.warn('[waveform-playlist] connectTrackOutput: unknown trackId "' + trackId + '"');
       return;
     }
     trackNode.connectEffects(node);
@@ -405,11 +381,7 @@ export class Transport {
   disconnectTrackOutput(trackId: string): void {
     const trackNode = this._trackNodes.get(trackId);
     if (!trackNode) {
-      console.warn(
-        '[waveform-playlist] disconnectTrackOutput: unknown trackId "' +
-          trackId +
-          '"'
-      );
+      console.warn('[waveform-playlist] disconnectTrackOutput: unknown trackId "' + trackId + '"');
       return;
     }
     trackNode.disconnectEffects();

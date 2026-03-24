@@ -28,10 +28,7 @@ export class Clock {
 
   getTime(): number {
     if (this._running) {
-      return (
-        this._clockTimeAtStart +
-        (this._audioContext.currentTime - this._audioTimeAtStart)
-      );
+      return this._clockTimeAtStart + (this._audioContext.currentTime - this._audioTimeAtStart);
     }
     return this._clockTimeAtStart;
   }
