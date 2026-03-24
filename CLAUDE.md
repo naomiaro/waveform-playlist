@@ -349,7 +349,7 @@ const LazyExample = createLazyExample(() =>
 25. **Grep Comments When Renaming APIs** — When renaming an option or prop across files (e.g., `progressive` → `immediate`), also grep for the old name in comments. Mechanical find-replace on code misses adjacent comments that describe the old behavior.
 26. **Prefer Props Over Mount/Unmount for Optional Providers** — If a provider controls both data (e.g., snap config) and rendering (e.g., timescale mode), add a mode prop instead of conditionally mounting/unmounting. Unmounting tears down the subtree and loses state; a prop switch is cheaper and keeps context consumers stable.
 27. **Stop Before Clear** — Always call `stop()` before clearing tracks. Clearing React state without stopping Tone.js Transport leaves orphaned audio playing. Use `ClearAllButton` (from `@waveform-playlist/browser`) which handles this automatically via `usePlaylistControls().stop()`.
-28. **Tone.js Panner Stereo Preservation** — `new Panner(pan)` defaults to `channelCount: 1`, downmixing stereo to mono at 1/√2 gain. Use `new Panner({ pan, channelCount: 2 })` for audio tracks with stereo content. MIDI/SoundFont tracks use mono synths so `channelCount: 1` is fine.
+28. **StereoPanner Stereo Preservation** — Both Tone.js `Panner` and native `StereoPannerNode` default to `channelCount: 1`, downmixing stereo to mono at 1/√2 gain. Always set `channelCount: 2` for audio tracks with stereo content.
 29. **Never Use Tone.js `addAudioWorkletModule`** — Tone.js caches a single `_workletPromise` per context. Only the first URL is loaded; subsequent calls with different URLs are silently skipped. Always use `rawContext.audioWorklet.addModule(url)` directly. `context.createAudioWorkletNode()` is still fine for node creation.
 30. **No Manual `external` in tsup Configs** — tsup auto-externalizes `dependencies` and `peerDependencies` (including deep imports like `react/jsx-runtime`). Never add a manual `external` list — it drifts when dependencies change, causing duplicate instances at runtime (#317). All 13 packages use tsup with no `external` field.
 31. **Dynamic Import Tone.js Outside Playout Package** — `import * as Tone from 'tone'` eagerly creates a default context with AudioWorklet nodes, which fails before user gesture. Outside the playout package (which handles init via `getGlobalContext()`), use `import type` for types and `await import('tone')` inside effects after AudioContext is running. Call `Tone.setContext(new Tone.Context(audioContext))` to share the native AudioContext.
@@ -391,8 +391,9 @@ const LazyExample = createLazyExample(() =>
 - **Roadmap & Progress:** `TODO.md`
 - **Architecture Details:** `PROJECT_STRUCTURE.md`
 - **Main branch:** `main`
-- **Current work:** `experimental/native-transport`
+- **Current work:** `main`
 - **Dev server:** `http://localhost:3000/` (Docusaurus)
+- **dawcore uses `@dawcore/transport`** — No Tone.js dependency. Native `AudioContext` for decode, playback, and recording. The `audioContext` property on `<daw-editor>` accepts a consumer-provided context.
 
 ---
 
@@ -408,7 +409,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 - `packages/annotations/CLAUDE.md` — Integration context, annotation provider pattern
 - `packages/worklets/CLAUDE.md` — AudioWorklet processors (metering, recording)
 - `packages/spectrogram/CLAUDE.md` — Integration context, SpectrogramChannel index
-- `packages/dawcore/CLAUDE.md` — Lit Web Components, element types, CSS theming, engine lifecycle
+- `packages/dawcore/CLAUDE.md` — Lit Web Components, native AudioContext (no Tone.js), element types, CSS theming
 - `packages/transport/CLAUDE.md` — Native Web Audio transport, scheduler, clock, PlayoutAdapter bridge
 - `website/CLAUDE.md` — Docusaurus site, CSS pitfalls, custom pages
 
