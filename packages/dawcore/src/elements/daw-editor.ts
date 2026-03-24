@@ -784,7 +784,6 @@ export class DawEditorElement extends LitElement {
   async play(startTime?: number) {
     try {
       const engine = await this._ensureEngine();
-      // Always init — adapter awaits pending rebuild init if needed,
       // Always init — resumes AudioContext if suspended (requires user gesture).
       await engine.init();
       engine.play(startTime);

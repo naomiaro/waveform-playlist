@@ -130,11 +130,11 @@ The reference library (webaudio-transport) avoids this entirely by not implement
 
 ### dawcore (`<daw-editor>`)
 
-Set `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx)` before tracks load. The editor uses this factory instead of `createToneAdapter()` when building the engine.
+Set `editor.audioContext = new AudioContext({ sampleRate: 48000 })` before tracks load. The editor uses `NativePlayoutAdapter` internally — no Tone.js dependency.
 
 ### dawcore dev pages
 
-Only `multiclip.html` uses the native transport. `record.html` and `index.html` still use `createToneAdapter()`.
+All dev pages use the native transport. `multiclip.html` passes a custom AudioContext; `index.html` and `record.html` use the editor's default.
 
 ### React (WaveformPlaylistContext)
 

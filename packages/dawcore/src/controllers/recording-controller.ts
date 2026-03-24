@@ -29,7 +29,7 @@ export interface RecordingSession {
   readonly channelCount: number;
   readonly bits: Bits;
   isFirstMessage: boolean;
-  /** Latency samples to skip in live preview (outputLatency + lookAhead). */
+  /** Latency samples to skip in live preview (outputLatency only). */
   readonly latencySamples: number;
   readonly wasOverdub: boolean;
   /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
