@@ -21,10 +21,30 @@ export interface TransportOptions {
   ppqn?: number;
   /** Initial tempo in BPM. Default: 120 */
   tempo?: number;
-  /** Beats per bar. Default: 4 */
-  beatsPerBar?: number;
+  /** Time signature numerator. Default: 4 */
+  numerator?: number;
+  /** Time signature denominator. Default: 4 */
+  denominator?: number;
   /** How far ahead to schedule audio, in seconds. Default: 0.2 */
   schedulerLookahead?: number;
+}
+
+/** Public return type for getMeter() */
+export interface MeterSignature {
+  numerator: number;
+  denominator: number;
+}
+
+/** Storage entry for MeterMap */
+export interface MeterEntry {
+  /** Tick position where this meter starts */
+  tick: number;
+  /** Time signature numerator (e.g., 6 in 6/8) */
+  numerator: number;
+  /** Time signature denominator (e.g., 8 in 6/8) */
+  denominator: number;
+  /** Cached cumulative bar count from tick 0 to this entry. Derived — do not set manually. */
+  readonly barAtTick: number;
 }
 
 export interface TempoEntry {

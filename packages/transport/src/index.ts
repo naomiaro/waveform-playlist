@@ -5,6 +5,8 @@ export type {
   TransportOptions,
   TempoEntry,
   TransportPosition,
+  MeterSignature,
+  MeterEntry,
 } from './types';
 
 export { Clock } from './core/clock';
