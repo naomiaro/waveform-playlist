@@ -91,6 +91,7 @@ Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (requir
 - **No Tone.js in the signal path** — all audio nodes are native Web Audio.
 - **`_activeSources` cleanup** — ClipPlayer uses `ended` event listener for automatic cleanup. MetronomePlayer clicks are short one-shots.
 - **rAF exclusively** — no setTimeout/setInterval anywhere. The lookahead window (200ms) provides sufficient scheduling headroom.
+- **Scheduler lookahead ≠ perceptible latency** — The 200ms lookahead is scheduling headroom only. `source.start(when)` uses precise `AudioContext.currentTime` values, so audio plays at the exact right time. Recording latency compensation only needs `outputLatency`, not `outputLatency + lookahead`.
 
 ## Critical Gotchas
 

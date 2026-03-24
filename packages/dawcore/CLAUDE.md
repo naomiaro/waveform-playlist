@@ -47,6 +47,7 @@
 - **Worklet loading** — `rawContext.audioWorklet.addModule(recordingProcessorUrl)` (native API, not Tone.js which caches single module).
 - **Recording uses native AudioContext** — `RecordingController` accesses `host.audioContext` directly for `createMediaStreamSource()` and `new AudioWorkletNode()`. No Tone.js wrapper needed.
 - **Worklet requires `start` command** — `recording-processor` defaults `isRecording=false`. Must `port.postMessage({ command: 'start', channelCount })` after connecting source→worklet. Without it, no data flows. Do NOT send `sampleRate` — the worklet uses its global `sampleRate`.
+- **Worklet registration tied to AudioContext identity** — `_workletLoadedCtx` stores the context that had `addModule()` called. If `editor.audioContext` is swapped, the new context needs re-registration. A simple boolean flag goes stale.
 - **Handler ordering critical** — Set `workletNode.port.onmessage` BEFORE `source.connect(workletNode)` and `postMessage({ command: 'start' })`. The worklet can flush data immediately; messages before handler is wired are silently dropped.
 - **Use `createClip()` not `createClipFromSeconds()` for recorded clips** — Recording session provides exact integer samples. The seconds round-trip (`samples/rateA → seconds → Math.round(seconds*rateB)`) drifts when `effectiveSampleRate` differs from `audioBuffer.sampleRate`.
 - **`RecordingHost` must declare all host dependencies** — Any property or method the controller accesses on the host must be on the `RecordingHost` interface. No `as any` casts — the editor satisfies the interface directly. `_addRecordedClip?` is optional (runtime check), `shadowRoot` comes from `HTMLElement` intersection.
@@ -97,6 +98,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 **`audioContext` JS property** — Optional `AudioContext` on `<daw-editor>`. When set before tracks load, the editor uses it for decode, playback (via `NativePlayoutAdapter`), and recording. When not set, the editor creates its own `AudioContext({ sampleRate })` lazily on first audio operation.
 
 Example: `editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });`
+
+- **Close owned AudioContext on disconnect** — `disconnectedCallback` calls `_ownedAudioContext.close()`. Skip when consumer provided an external context (they own its lifecycle).
 
 ## Ported Utilities
 
