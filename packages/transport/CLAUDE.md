@@ -33,8 +33,8 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 ### Dual Coordinate System
 
 - **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples).
-- **TickTimeline** — PPQN positions (default 960). `toPosition(ticks, beatsPerBar)` → `{ bar, beat, tick }` (1-indexed bars and beats).
 - **TempoMap** — converts between ticks and seconds. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
+- **MeterMap** — time signature entries at tick positions. See MeterMap section below.
 
 Both coordinate systems convert to seconds at the scheduler boundary. The scheduler only works in seconds.
 
@@ -48,7 +48,7 @@ Parallel to TempoMap, stores time signature entries at tick positions. Each entr
 
 - **Beat unit from denominator:** `ticksPerBeat = ppqn * (4 / denominator)`. A denominator of 4 gives one quarter-note beat; 8 gives one eighth-note beat.
 - **Bar boundary constraint:** `setMeter(numerator, denominator, atTick?)` snaps `atTick` to the nearest preceding bar boundary in the current meter. This keeps bar numbers consistent for all subsequent entries.
-- **Conversions:** `barToTick(bar)` walks the entry list accumulating bar counts; `tickToBar(tick)` is the inverse. Both return 1-indexed bar numbers matching `TickTimeline.toPosition()`.
+- **Conversions:** `barToTick(bar)` walks the entry list accumulating bar counts; `tickToBar(tick)` is the inverse. Both return 1-indexed bar numbers.
 - **`clearMeters()`** removes all entries and resets to the initial meter.
 
 `MetronomePlayer.generate()` queries the MeterMap per beat to determine accent placement (beat 1 of each bar) and beat unit duration.

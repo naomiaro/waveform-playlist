@@ -34,10 +34,10 @@ This transport uses native Web Audio exclusively, receiving the `AudioContext` f
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  Timeline Layer                                       │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────┐   │   │
-│  │  │ SampleTimeline│  │ TickTimeline │  │ TempoMap │   │   │
-│  │  │ samples↔secs  │  │ PPQN ticks  │  │ tick↔sec │   │   │
-│  │  └──────────────┘  └──────────────┘  └──────────┘   │   │
+│  │  ┌──────────────┐  ┌──────────┐  ┌──────────┐       │   │
+│  │  │ SampleTimeline│  │ TempoMap │  │ MeterMap │       │   │
+│  │  │ samples↔secs  │  │ tick↔sec │  │ time sig │       │   │
+│  │  └──────────────┘  └──────────┘  └──────────┘       │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -125,14 +125,14 @@ This conversion happens inside `consume()` — events carry transport time, and 
 Audio clips and music events live in different coordinate spaces:
 
 - **SampleTimeline** — Audio clips use absolute sample positions (`startSample`, `durationSamples`). Position does NOT change when tempo changes.
-- **TickTimeline** — Metronome and MIDI events use PPQN ticks (default 960 ticks per quarter note). Position is relative to beats and bars.
 - **TempoMap** — Converts between ticks and seconds. Supports tempo changes at arbitrary tick positions with cached cumulative seconds for O(log n) lookups.
+- **MeterMap** — Time signature entries at tick positions. Determines beat unit (from denominator) and bar length (from numerator). See Meter Map section below.
 
 Both coordinate systems convert to seconds at the scheduler boundary. The scheduler itself only works in seconds.
 
 ## Meter Map
 
-The transport maintains two independent musical timelines:
+The transport maintains two independent musical maps:
 
 - **TempoMap** — maps ticks to seconds. Answers "how many seconds is beat N?"
 - **MeterMap** — maps ticks to bar/beat structure. Answers "what bar is tick N in, and how many beats per bar?"

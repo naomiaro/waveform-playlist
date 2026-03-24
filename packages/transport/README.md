@@ -123,8 +123,6 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 | `denominator` | `4` | Beat unit (time signature denominator) |
 | `schedulerLookahead` | `0.2` | How far ahead to schedule (seconds) |
 
-> **Note:** `beatsPerBar` is deprecated. Use `numerator`/`denominator` instead.
-
 **Playback:**
 - `play(startTime?, endTime?)` — Start or resume playback
 - `pause()` — Pause, preserving position
@@ -155,7 +153,6 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setMeter(numerator, denominator, atTick?)` / `getMeter(atTick?)`
 - `removeMeter(atTick)` / `clearMeters()`
 - `barToTick(bar)` / `tickToBar(tick)`
-- `setBeatsPerBar(beats)` _(deprecated — use `setMeter`)_
 
 **Metronome:**
 - `setMetronomeEnabled(enabled)`
