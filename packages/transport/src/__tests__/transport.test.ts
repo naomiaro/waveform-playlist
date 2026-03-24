@@ -130,6 +130,30 @@ describe('Transport', () => {
     expect(transport.getCurrentTime()).toBeCloseTo(2);
   });
 
+  it('play after pause re-schedules mid-clip sources', () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    const clip = makeClip({
+      startSample: 0,
+      durationSamples: 96000, // 2s clip
+    });
+    const track = makeTrack([clip]);
+    transport.setTracks([track]);
+
+    transport.play();
+    (ctx as any).currentTime = 11; // 1s into playback
+    transport.pause();
+    // After pause, all sources are silenced
+
+    (ctx as any).currentTime = 12;
+    transport.play(); // resume
+
+    // Should have created a mid-clip source via onPositionJump
+    // (clip started at 0, current time is 1s, so mid-clip at offset 1s)
+    const sourceCount = (ctx.createBufferSource as any).mock.results.length;
+    expect(sourceCount).toBeGreaterThanOrEqual(1);
+  });
+
   it('stop resets position to 0', () => {
     const ctx = mockAudioContext(10);
     const transport = new Transport(ctx);

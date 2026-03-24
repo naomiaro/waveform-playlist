@@ -106,11 +106,23 @@ export class Transport {
 
     if (startTime !== undefined) {
       this._clock.seekTo(startTime);
-      this._scheduler.reset(startTime);
     }
+
+    // Always reset scheduler to current position — after pause, the old
+    // rightEdge is stale and clips whose startTime is before it won't
+    // be picked up by generate().
+    const currentTime = this._clock.getTime();
+    this._scheduler.reset(currentTime);
 
     this._endTime = endTime;
     this._clock.start();
+
+    // Re-create sources for clips spanning the current position.
+    // After pause, silence() killed all active sources. generate() only
+    // picks up clips whose startTime falls in the window, so clips that
+    // started before the current position need mid-clip sources.
+    this._clipPlayer.onPositionJump(currentTime);
+
     this._timer.start();
     this._playing = true;
     this._emit('play');
