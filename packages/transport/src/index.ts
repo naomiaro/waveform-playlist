@@ -8,3 +8,4 @@ export type {
 } from './types';
 
 export { Clock } from './core/clock';
+export { Scheduler, type SchedulerOptions } from './core/scheduler';
