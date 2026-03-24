@@ -78,25 +78,22 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         const clipDuration = this._sampleTimeline.samplesToSeconds(
           clip.durationSamples
         );
-        const clipEndTime = clipStartTime + clipDuration;
         const clipOffsetTime = this._sampleTimeline.samplesToSeconds(
           clip.offsetSamples
         );
 
-        // Skip clips entirely before or after the window
-        if (clipEndTime <= fromTime) continue;
+        // Only schedule when the clip START falls within this window.
+        // Clips that started in a previous window are already playing
+        // (AudioBufferSourceNode runs for its full duration).
+        // Mid-clip starts (seek, loop wrap) are handled by onPositionJump().
+        if (clipStartTime < fromTime) continue;
         if (clipStartTime >= toTime) continue;
 
-        // Compute effective start
-        const effectiveStart = Math.max(clipStartTime, fromTime);
-
         // Offset into the audio buffer
-        const offsetIntoClip = effectiveStart - clipStartTime;
-        const offset = clipOffsetTime + offsetIntoClip;
+        const offset = clipOffsetTime;
 
-        // Duration: play from effective start to clip end (not window end)
-        // The scheduler generates once; the source plays its full duration
-        const duration = clipEndTime - effectiveStart;
+        // Duration: full clip duration from its start
+        const duration = clipDuration;
 
         const fadeInDuration = clip.fadeIn
           ? this._sampleTimeline.samplesToSeconds(clip.fadeIn.duration ?? 0)
@@ -109,7 +106,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
           trackId,
           clipId: clip.id,
           audioBuffer: clip.audioBuffer,
-          audioTime: effectiveStart,
+          audioTime: clipStartTime,
           offset,
           duration,
           gain: clip.gain,

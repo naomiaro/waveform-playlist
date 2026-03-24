@@ -208,7 +208,23 @@ describe('ClipPlayer', () => {
     expect(events.length).toBe(0);
   });
 
-  it('generates mid-clip event when window starts inside clip', () => {
+  it('does not re-generate for clips already playing (start before window)', () => {
+    const clip = makeClip({
+      startSample: 0,
+      durationSamples: 96000, // 2s clip starting at 0
+      offsetSamples: 0,
+    });
+    const track = makeTrack([clip]);
+    const trackNode = createMockTrackNode('track-1');
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
+    player.setTracks([track], new Map([['track-1', trackNode]]));
+
+    // Window [0.5, 0.7) — clip started at 0, already scheduled
+    const events = player.generate(0.5, 0.7);
+    expect(events.length).toBe(0);
+  });
+
+  it('mid-clip playback is handled by onPositionJump, not generate', () => {
     const clip = makeClip({
       startSample: 0,
       durationSamples: 96000, // 2s
@@ -219,10 +235,13 @@ describe('ClipPlayer', () => {
     const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
-    const events = player.generate(0.5, 0.7);
-    expect(events.length).toBe(1);
-    // Should start at 0.5 with offset into the audio buffer
-    expect(events[0].audioTime).toBeCloseTo(0.5);
-    expect(events[0].offset).toBeCloseTo(0.5);
+    // onPositionJump creates mid-clip source
+    player.onPositionJump(0.5);
+    // A source should be created for mid-clip playback
+    expect((ctx.createBufferSource as any).mock.results.length).toBe(1);
+    const source = (ctx.createBufferSource as any).mock.results[0].value;
+    const [_when, offset, duration] = source.start.mock.calls[0];
+    expect(offset).toBeCloseTo(0.5);
+    expect(duration).toBeCloseTo(1.5); // remaining clip
   });
 });
