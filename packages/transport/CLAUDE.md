@@ -1,0 +1,114 @@
+# Transport Package (`@waveform-playlist/transport`)
+
+**Purpose:** Native Web Audio transport — replaces Tone.js Transport/scheduling with zero dependencies. Tone.js remains available only for effects (optional, consumer-side).
+
+**Architecture:** Layered: core (clock/scheduler/timer) → timeline (samples/ticks/tempo) → audio (track nodes/clip player/metronome) → transport (orchestrator) → adapter (PlayoutAdapter bridge).
+
+**Build:** Uses tsup — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
+
+**Testing:** vitest unit tests in `src/__tests__/`. Run with `cd packages/transport && npx vitest run`. 85 tests across 11 files.
+
+**Zero dependencies.** `@waveform-playlist/core` and `@waveform-playlist/engine` are peer deps (types only at runtime).
+
+## Core Layer
+
+### Clock
+
+Tracks elapsed time relative to `AudioContext.currentTime`. Pure calculation — safe to call from any frame at any frequency. `seekTo(time)` works both while running (resets reference point) and stopped (sets position for next start). `stop()` accumulates elapsed time so `start()` resumes from the paused position.
+
+### Scheduler
+
+Sliding window event generation. `advance(currentTime)` expands the window to `currentTime + lookahead` and generates/consumes events only for the new portion (`rightEdge` tracking prevents re-generation).
+
+**Loop handling:** When the window crosses `loopEnd`, generates up to the boundary, calls `onPositionJump(loopStart)` on all listeners, then continues from `loopStart` to fill remaining lookahead. All in one tick — seamless audio.
+
+**Listener contract:** `SchedulerListener<T>` has four methods: `generate()`, `consume()`, `onPositionJump()`, `silence()`. Both `ClipPlayer` and `MetronomePlayer` implement this.
+
+### Timer
+
+Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeout` or `setInterval`. The scheduler's 200ms lookahead absorbs any frame timing jitter.
+
+## Timeline Layer
+
+### Dual Coordinate System
+
+- **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples).
+- **TickTimeline** — PPQN positions (default 960). `toPosition(ticks, beatsPerBar)` → `{ bar, beat, tick }` (1-indexed bars and beats).
+- **TempoMap** — converts between ticks and seconds. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
+
+Both coordinate systems convert to seconds at the scheduler boundary. The scheduler only works in seconds.
+
+### TempoMap Cache Invalidation
+
+`setTempo(bpm, atTick)` recomputes `secondsAtTick` from the insertion point forward. For single-tempo use (typical), this is a no-op — one entry at tick 0.
+
+## Audio Layer
+
+### TrackNode Signal Chain
+
+```
+clip source → GainNode (volume) → StereoPannerNode → GainNode (mute) → [effects hook] → output
+```
+
+Mute uses a separate GainNode (0/1) so volume and mute are independent. `connectEffects(node)` inserts any AudioNode chain between mute and output.
+
+### ClipPlayer
+
+Implements `SchedulerListener<ClipEvent>`. `generate()` finds clips overlapping the time window. `consume()` creates native `AudioBufferSourceNode`, applies per-clip gain via GainNode, handles fade in/out via `linearRampToValueAtTime`. `onPositionJump()` stops all active sources and creates mid-clip sources for clips spanning the new position.
+
+**Skips:** Clips with `durationSamples === 0` or missing `audioBuffer` (peaks-first rendering).
+
+**Per-track updates:** `updateTrack(trackId, track)` silences only that track's active sources, letting the next scheduler tick re-generate.
+
+### MetronomePlayer
+
+Implements `SchedulerListener<MetronomeEvent>`. Converts seconds window to ticks via TempoMap, walks beat grid, generates accent clicks on beat 1 of each bar.
+
+## Transport (Top-Level API)
+
+Orchestrates all layers. Key flows:
+- **play()** — `clock.seekTo(startTime)` if provided, `clock.start()`, `timer.start()`
+- **pause()** — `timer.stop()`, `clock.stop()`, silence all listeners. Position preserved.
+- **stop()** — `timer.stop()`, `clock.reset()`, silence all. Position returns to 0.
+- **seek()** — stop timer, silence, `clock.seekTo()`, `scheduler.reset()`, restart timer if was playing.
+
+### Solo Logic
+
+When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute()`. Explicit mute takes precedence — a track that is both soloed AND muted stays muted.
+
+### Effects Hook
+
+`connectTrackOutput(trackId, node)` accepts any AudioNode chain (Tone.js effects, WAM plugins, native nodes). The transport has zero knowledge of Tone.js.
+
+## NativePlayoutAdapter
+
+Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (required + optional: `addTrack`, `removeTrack`, `updateTrack`). `init()` resumes suspended AudioContext. `transport` getter exposes the Transport for direct access to tempo, metronome, and effects hooks.
+
+## Patterns
+
+- **AudioContext received from consumer** — sidesteps all Tone.js/Firefox context creation issues. `new AudioContext({ sampleRate, latencyHint })` works natively.
+- **`silence()` on stop/seek** — listeners are responsible for stopping their active sources. `AudioBufferSourceNode.stop()` is instantaneous.
+- **No Tone.js in the signal path** — all audio nodes are native Web Audio.
+- **`_activeSources` cleanup** — ClipPlayer uses `ended` event listener for automatic cleanup. MetronomePlayer clicks are short one-shots.
+- **rAF exclusively** — no setTimeout/setInterval anywhere. The lookahead window (200ms) provides sufficient scheduling headroom.
+
+## What This Solves
+
+| Problem | Solution |
+|---------|----------|
+| Sample rate control | Native `AudioContext({ sampleRate })` — no wrapper |
+| Firefox AudioListener | No `standardized-audio-context` needed |
+| Ghost tick bugs | Our own scheduler, no Tone.js Clock |
+| Metronome | Built-in as MetronomePlayer |
+| Latency hint | Native `AudioContext({ latencyHint })` |
+| Effects lock-in | Plugin hook accepts any AudioNode chain |
+
+## Integration
+
+### dawcore (`<daw-editor>`)
+
+Set `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx)` before tracks load. The editor uses this factory instead of `createToneAdapter()` when building the engine.
+
+### React (WaveformPlaylistContext)
+
+Not yet integrated. Future work: pass `NativePlayoutAdapter` via the engine's `adapter` option.
