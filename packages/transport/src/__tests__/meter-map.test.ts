@@ -80,4 +80,122 @@ describe('MeterMap', () => {
     const mm = new MeterMap(960);
     expect(() => mm.setMeter(4, 4, -1)).toThrow();
   });
+
+  it('setMeter at bar boundary inserts entry', () => {
+    const mm = new MeterMap(960); // 4/4, ticksPerBar = 3840
+    mm.setMeter(7, 8, 3840); // switch to 7/8 at bar 2
+    expect(mm.getMeter(0).numerator).toBe(4);
+    expect(mm.getMeter(3840).numerator).toBe(7);
+    expect(mm.getMeter(3840).denominator).toBe(8);
+  });
+
+  it('setMeter snaps to bar boundary with warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mm = new MeterMap(960); // 4/4, ticksPerBar = 3840
+    mm.setMeter(3, 4, 1000); // mid-bar → snaps to 3840
+    expect(warnSpy).toHaveBeenCalled();
+    expect(mm.getMeter(3840).numerator).toBe(3);
+    // No entry at the original tick — it was snapped
+    expect(mm.getMeter(1000).numerator).toBe(4); // still 4/4
+    warnSpy.mockRestore();
+  });
+
+  it('setMeter at tick 0 preserves downstream entries', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840); // bar 2 = 7/8
+    mm.setMeter(6, 8); // change tick 0 to 6/8
+    expect(mm.getMeter(0).numerator).toBe(6);
+    expect(mm.getMeter(3840).numerator).toBe(7); // still 7/8
+  });
+
+  it('clearMeters preserves non-default initial meter', () => {
+    const mm = new MeterMap(960, 6, 8);
+    mm.setMeter(4, 4, 2880);
+    mm.clearMeters();
+    expect(mm.getMeter().numerator).toBe(6);
+    expect(mm.getMeter().denominator).toBe(8);
+  });
+
+  it('barToTick round-trips after removeMeter', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840);
+    mm.removeMeter(3840);
+    // After removal, back to 4/4 everywhere
+    expect(mm.barToTick(2)).toBe(3840);
+    expect(mm.barToTick(3)).toBe(7680);
+    expect(mm.tickToBar(3840)).toBe(2);
+  });
+
+  it('barToTick with single meter', () => {
+    const mm = new MeterMap(960); // 4/4
+    expect(mm.barToTick(1)).toBe(0);
+    expect(mm.barToTick(2)).toBe(3840);
+    expect(mm.barToTick(3)).toBe(7680);
+  });
+
+  it('barToTick with mixed meters', () => {
+    const mm = new MeterMap(960); // 4/4
+    mm.setMeter(7, 8, 3840); // bar 2 starts 7/8 (ticksPerBar = 3360)
+    expect(mm.barToTick(1)).toBe(0);      // bar 1: 4/4
+    expect(mm.barToTick(2)).toBe(3840);   // bar 2: 7/8 starts
+    expect(mm.barToTick(3)).toBe(3840 + 3360); // bar 3: still 7/8
+  });
+
+  it('tickToBar with single meter', () => {
+    const mm = new MeterMap(960);
+    expect(mm.tickToBar(0)).toBe(1);
+    expect(mm.tickToBar(3840)).toBe(2);
+    expect(mm.tickToBar(5000)).toBe(2); // mid-bar 2
+  });
+
+  it('tickToBar with mixed meters', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840);
+    expect(mm.tickToBar(0)).toBe(1);
+    expect(mm.tickToBar(3840)).toBe(2);
+    expect(mm.tickToBar(3840 + 3360)).toBe(3);
+  });
+
+  it('isBarBoundary', () => {
+    const mm = new MeterMap(960); // 4/4
+    expect(mm.isBarBoundary(0)).toBe(true);
+    expect(mm.isBarBoundary(960)).toBe(false); // beat 2
+    expect(mm.isBarBoundary(3840)).toBe(true); // bar 2
+  });
+
+  it('isBarBoundary with 6/8', () => {
+    const mm = new MeterMap(960, 6, 8); // ticksPerBar = 2880
+    expect(mm.isBarBoundary(0)).toBe(true);
+    expect(mm.isBarBoundary(480)).toBe(false); // beat 2 (eighth note)
+    expect(mm.isBarBoundary(2880)).toBe(true); // bar 2
+  });
+
+  it('removeMeter removes entry', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840);
+    mm.removeMeter(3840);
+    expect(mm.getMeter(3840).numerator).toBe(4); // back to 4/4
+  });
+
+  it('removeMeter at tick 0 throws', () => {
+    const mm = new MeterMap(960);
+    expect(() => mm.removeMeter(0)).toThrow();
+  });
+
+  it('clearMeters resets to single entry', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840);
+    mm.setMeter(3, 4, 7200);
+    mm.clearMeters();
+    expect(mm.getMeter(3840).numerator).toBe(4); // default 4/4
+  });
+
+  it('barToTick round-trips with tickToBar', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840);
+    for (let bar = 1; bar <= 10; bar++) {
+      const tick = mm.barToTick(bar);
+      expect(mm.tickToBar(tick)).toBe(bar);
+    }
+  });
 });
