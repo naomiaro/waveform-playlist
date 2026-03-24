@@ -44,24 +44,20 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     this._normalBuffer = normal;
   }
 
-  generate(fromTime: number, toTime: number): MetronomeEvent[] {
+  generate(fromTick: number, toTick: number): MetronomeEvent[] {
     if (!this._enabled || !this._accentBuffer || !this._normalBuffer) {
       return [];
     }
 
     const events: MetronomeEvent[] = [];
 
-    // Convert time window to ticks
-    const fromTicks = this._tempoMap.secondsToTicks(fromTime);
-    const toTicks = this._tempoMap.secondsToTicks(toTime);
-
     // Snap to first beat: align to beat grid anchored at the active meter entry
-    let entry = this._meterMap.getEntryAt(fromTicks);
-    let beatSize = this._meterMap.ticksPerBeat(fromTicks);
-    const tickIntoSection = fromTicks - entry.tick;
+    let entry = this._meterMap.getEntryAt(fromTick);
+    let beatSize = this._meterMap.ticksPerBeat(fromTick);
+    const tickIntoSection = fromTick - entry.tick;
     let tick = entry.tick + Math.ceil(tickIntoSection / beatSize) * beatSize;
 
-    while (tick < toTicks) {
+    while (tick < toTick) {
       // Re-snap at meter boundaries
       const currentEntry = this._meterMap.getEntryAt(tick);
       if (currentEntry.tick !== entry.tick) {
@@ -70,10 +66,9 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
       }
 
       const isAccent = this._meterMap.isBarBoundary(tick);
-      const transportTime = this._tempoMap.ticksToSeconds(tick);
 
       events.push({
-        transportTime,
+        tick,
         isAccent,
         buffer: isAccent ? this._accentBuffer : this._normalBuffer,
       });
@@ -103,10 +98,11 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
       }
     });
 
-    source.start(this._toAudioTime(event.transportTime));
+    const transportTime = this._tempoMap.ticksToSeconds(event.tick);
+    source.start(this._toAudioTime(transportTime));
   }
 
-  onPositionJump(_newTime: number): void {
+  onPositionJump(_newTick: number): void {
     this.silence();
   }
 

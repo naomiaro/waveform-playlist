@@ -49,13 +49,13 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    // At 120 BPM, beats are at 0, 0.5, 1.0, 1.5, 2.0...
-    const events = player.generate(0, 1.1);
-    // Should get beats at 0.0, 0.5, 1.0
+    // At 120 BPM, 960 PPQN: 1 beat = 960 ticks = 0.5s
+    // generate(0, 2112) covers ticks 0..2111 → beats at 0, 960, 1920
+    const events = player.generate(0, 2112);
     expect(events.length).toBe(3);
-    expect(events[0].transportTime).toBeCloseTo(0.0);
-    expect(events[1].transportTime).toBeCloseTo(0.5);
-    expect(events[2].transportTime).toBeCloseTo(1.0);
+    expect(events[0].tick).toBe(0);
+    expect(events[1].tick).toBe(960);
+    expect(events[2].tick).toBe(1920);
   });
 
   it('accent on beat 1 of each bar', () => {
@@ -66,14 +66,14 @@ describe('MetronomePlayer', () => {
     const normal = createMockBuffer();
     player.setClickSounds(accent, normal);
 
-    // At 120 BPM, 4/4, bar = 4 beats = 2s
-    const events = player.generate(0, 2.1);
-    // Beats: 0.0(accent), 0.5, 1.0, 1.5, 2.0(accent)
-    expect(events[0].isAccent).toBe(true);
-    expect(events[1].isAccent).toBe(false);
-    expect(events[2].isAccent).toBe(false);
-    expect(events[3].isAccent).toBe(false);
-    expect(events[4].isAccent).toBe(true);
+    // At 120 BPM, 4/4: 1 bar = 4 beats = 3840 ticks = 2s
+    // generate(0, 4032) covers ticks 0..4031 → beats at 0, 960, 1920, 2880, 3840
+    const events = player.generate(0, 4032);
+    expect(events[0].isAccent).toBe(true);  // beat 1 of bar 1
+    expect(events[1].isAccent).toBe(false); // beat 2
+    expect(events[2].isAccent).toBe(false); // beat 3
+    expect(events[3].isAccent).toBe(false); // beat 4
+    expect(events[4].isAccent).toBe(true);  // beat 1 of bar 2
   });
 
   it('setEnabled(false) produces no events', () => {
@@ -81,7 +81,7 @@ describe('MetronomePlayer', () => {
     player.setEnabled(false);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    const events = player.generate(0, 2);
+    const events = player.generate(0, 3840);
     expect(events.length).toBe(0);
   });
 
@@ -90,7 +90,8 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    const events = player.generate(0, 0.2);
+    // 0.2s = 384 ticks at 120 BPM, 960 PPQN
+    const events = player.generate(0, 384);
     expect(events.length).toBe(1);
     player.consume(events[0]);
 
@@ -103,7 +104,7 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    const events = player.generate(0, 0.2);
+    const events = player.generate(0, 384);
     player.consume(events[0]);
     player.silence();
 
@@ -116,9 +117,10 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    const events = player.generate(0, 0.2);
+    const events = player.generate(0, 384);
     player.consume(events[0]);
-    player.onPositionJump(1.0);
+    // 1.0s = 1920 ticks at 120 BPM, 960 PPQN
+    player.onPositionJump(1920);
 
     const source = (ctx.createBufferSource as any).mock.results[0].value;
     expect(source.stop).toHaveBeenCalledTimes(1);
@@ -130,12 +132,12 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    // At 120 BPM, 6/8: beat = eighth note = 0.25s
-    const events = player.generate(0, 0.6);
-    // Should get beats at 0.0, 0.25, 0.5 (3 eighth-note beats)
+    // At 120 BPM, 6/8: beat = eighth note = 480 ticks = 0.25s
+    // generate(0, 1152) covers 0..1151 → beats at 0, 480, 960
+    const events = player.generate(0, 1152);
     expect(events.length).toBe(3);
-    expect(events[0].transportTime).toBeCloseTo(0.0);
-    expect(events[1].transportTime).toBeCloseTo(0.25);
+    expect(events[0].tick).toBe(0);
+    expect(events[1].tick).toBe(480);
   });
 
   it('accents on bar boundaries with mixed meters', () => {
@@ -145,12 +147,13 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    // Bar 1 (4/4): beats at 0, 0.5, 1.0, 1.5 — accent at 0
-    // Bar 2 (3/4): beats at 2.0, 2.5, 3.0 — accent at 2.0
-    const events = player.generate(0, 3.1);
-    expect(events[0].isAccent).toBe(true); // beat 1 of bar 1
+    // Bar 1 (4/4): beats at 0, 960, 1920, 2880 — accent at 0
+    // Bar 2 (3/4): beats at 3840, 4800, 5760 — accent at 3840
+    // generate(0, 5952) covers 0..5951
+    const events = player.generate(0, 5952);
+    expect(events[0].isAccent).toBe(true);  // beat 1 of bar 1
     expect(events[1].isAccent).toBe(false); // beat 2
-    expect(events[4].isAccent).toBe(true); // beat 1 of bar 2 (3/4)
+    expect(events[4].isAccent).toBe(true);  // beat 1 of bar 2 (3/4)
     // Bar 2 should have 3 beats (not 4)
     expect(events[5].isAccent).toBe(false); // beat 2 of bar 2
     expect(events[6].isAccent).toBe(false); // beat 3 of bar 2
@@ -163,30 +166,54 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    // At 120 BPM: bar 1 (4/4) beats every 0.5s, bar 2 (6/8) beats every 0.25s
-    const events = player.generate(0, 3.5);
+    // Bar 1 (4/4): quarter-note beats every 960 ticks (0, 960, 1920, 2880)
+    // Bar 2 (6/8): eighth-note beats every 480 ticks starting at 3840
+    // generate(0, 6720) covers 0..6719
+    const events = player.generate(0, 6720);
 
-    // Bar 1: 4 quarter-note beats (0.0, 0.5, 1.0, 1.5)
-    expect(events[0].transportTime).toBeCloseTo(0.0);
-    expect(events[1].transportTime).toBeCloseTo(0.5);
-    expect(events[3].transportTime).toBeCloseTo(1.5);
+    // Bar 1: quarter-note beats
+    expect(events[0].tick).toBe(0);
+    expect(events[1].tick).toBe(960);
+    expect(events[3].tick).toBe(2880);
 
-    // Bar 2: 6 eighth-note beats starting at 2.0 (0.25s apart)
-    expect(events[4].transportTime).toBeCloseTo(2.0);
-    expect(events[5].transportTime).toBeCloseTo(2.25);
-    expect(events[6].transportTime).toBeCloseTo(2.5);
+    // Bar 2: eighth-note beats starting at 3840
+    expect(events[4].tick).toBe(3840);
+    expect(events[5].tick).toBe(4320);
+    expect(events[6].tick).toBe(4800);
   });
 
-  it('generate with mid-beat fromTime snaps to next beat', () => {
+  it('generate with mid-beat fromTick snaps to next beat', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    // At 120 BPM, 4/4: beats at 0.0, 0.5, 1.0, 1.5...
-    // Starting mid-beat at 0.3 should snap to 0.5
-    const events = player.generate(0.3, 1.1);
-    expect(events.length).toBe(2); // 0.5, 1.0
-    expect(events[0].transportTime).toBeCloseTo(0.5);
-    expect(events[1].transportTime).toBeCloseTo(1.0);
+    // At 120 BPM, 4/4: beats at 0, 960, 1920...
+    // 0.3s = 576 ticks — mid-beat, should snap to next beat at 960
+    // generate(576, 2112) → beats at 960, 1920
+    const events = player.generate(576, 2112);
+    expect(events.length).toBe(2);
+    expect(events[0].tick).toBe(960);
+    expect(events[1].tick).toBe(1920);
+  });
+
+  it('8-bar loop generates exactly 8 downbeats (half-open interval)', () => {
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
+    player.setEnabled(true);
+    player.setClickSounds(createMockBuffer(), createMockBuffer());
+
+    // 8 bars of 4/4 at 960 PPQN = 8 * 4 * 960 = 30720 ticks
+    // Half-open interval [0, 30720) — tick 30720 (bar 9 beat 1) must NOT be included
+    const events = player.generate(0, 30720);
+
+    // 8 bars × 4 beats = 32 total beats
+    expect(events.length).toBe(32);
+
+    // Exactly 8 downbeats (one per bar)
+    const downbeats = events.filter((e) => e.isAccent);
+    expect(downbeats.length).toBe(8);
+
+    // First downbeat at tick 0, last at tick 7 * 3840 = 26880
+    expect(downbeats[0].tick).toBe(0);
+    expect(downbeats[7].tick).toBe(26880);
   });
 });
