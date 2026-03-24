@@ -92,6 +92,12 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 **Lit controller lifecycle gotcha:** `hostConnected()` fires during `connectedCallback()`, BEFORE the first `willUpdate()`. Controllers that read properties set from attributes must defer work with `requestAnimationFrame` (as `ViewportController` and `AudioResumeController` do), otherwise the property will still be `undefined`.
 
+## Pluggable Audio Backend
+
+**`adapterFactory` JS property** — Optional function `() => PlayoutAdapter` on `<daw-editor>`. When set before tracks load, `_buildEngine` uses it instead of `createToneAdapter()`. Enables swapping Tone.js for `NativePlayoutAdapter` or custom backends without modifying dawcore source.
+
+Example: `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx);`
+
 ## Ported Utilities
 
 - `peak-rendering.ts` — `aggregatePeaks`, `calculateBarRects`, `calculateFirstBarPosition` (from `ui-components`)

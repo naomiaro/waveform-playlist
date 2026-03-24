@@ -171,6 +171,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Build packages**: `pnpm build` - Build all packages
 - **TypeScript check**: `pnpm typecheck` (enforced in build scripts)
 - **Lint**: `pnpm lint` - Prettier check + ESLint across all packages. **Always run before committing.** This is a root-only script; run from repo root or use `pnpm -w lint`. Fix formatting issues with `pnpm format`.
+- **New packages**: After adding a new `packages/*/package.json`, run `pnpm install` and commit `pnpm-lock.yaml`. CI uses `--frozen-lockfile` and will fail if the lockfile is stale.
 - **Dev server**: `pnpm --filter website start` - Docusaurus dev server
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
@@ -390,7 +391,7 @@ const LazyExample = createLazyExample(() =>
 - **Roadmap & Progress:** `TODO.md`
 - **Architecture Details:** `PROJECT_STRUCTURE.md`
 - **Main branch:** `main`
-- **Current work:** `transport-synced-playout`
+- **Current work:** `experimental/native-transport`
 - **Dev server:** `http://localhost:3000/` (Docusaurus)
 
 ---
@@ -408,6 +409,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 - `packages/worklets/CLAUDE.md` — AudioWorklet processors (metering, recording)
 - `packages/spectrogram/CLAUDE.md` — Integration context, SpectrogramChannel index
 - `packages/dawcore/CLAUDE.md` — Lit Web Components, element types, CSS theming, engine lifecycle
+- `packages/transport/CLAUDE.md` — Native Web Audio transport, scheduler, clock, PlayoutAdapter bridge
 - `website/CLAUDE.md` — Docusaurus site, CSS pitfalls, custom pages
 
 ---
