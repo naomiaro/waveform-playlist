@@ -62,9 +62,7 @@ export class Scheduler<T extends SchedulerEvent> {
 
   /** Advance the scheduling window. Takes seconds (from Clock), converts to ticks. */
   advance(currentTimeSeconds: number): void {
-    const targetTick = this._tempoMap.secondsToTicks(
-      currentTimeSeconds + this._lookahead
-    );
+    const targetTick = this._tempoMap.secondsToTicks(currentTimeSeconds + this._lookahead);
 
     if (this._loopEnabled && this._loopEnd > this._loopStart) {
       const loopDuration = this._loopEnd - this._loopStart;

@@ -27,7 +27,7 @@ export class SampleTimeline {
   ticksToSamples(ticks: number): number {
     if (!this._tempoMap) {
       throw new Error(
-        '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first',
+        '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first'
       );
     }
     return Math.round(this._tempoMap.ticksToSeconds(ticks) * this._sampleRate);
@@ -36,7 +36,7 @@ export class SampleTimeline {
   samplesToTicks(samples: number): number {
     if (!this._tempoMap) {
       throw new Error(
-        '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first',
+        '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first'
       );
     }
     return this._tempoMap.secondsToTicks(samples / this._sampleRate);

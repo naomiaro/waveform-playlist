@@ -237,7 +237,6 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         }
       }
     }
-
   }
 
   silence(): void {

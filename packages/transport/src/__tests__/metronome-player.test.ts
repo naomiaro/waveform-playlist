@@ -69,11 +69,11 @@ describe('MetronomePlayer', () => {
     // At 120 BPM, 4/4: 1 bar = 4 beats = 3840 ticks = 2s
     // generate(0, 4032) covers ticks 0..4031 → beats at 0, 960, 1920, 2880, 3840
     const events = player.generate(0, 4032);
-    expect(events[0].isAccent).toBe(true);  // beat 1 of bar 1
+    expect(events[0].isAccent).toBe(true); // beat 1 of bar 1
     expect(events[1].isAccent).toBe(false); // beat 2
     expect(events[2].isAccent).toBe(false); // beat 3
     expect(events[3].isAccent).toBe(false); // beat 4
-    expect(events[4].isAccent).toBe(true);  // beat 1 of bar 2
+    expect(events[4].isAccent).toBe(true); // beat 1 of bar 2
   });
 
   it('setEnabled(false) produces no events', () => {
@@ -151,9 +151,9 @@ describe('MetronomePlayer', () => {
     // Bar 2 (3/4): beats at 3840, 4800, 5760 — accent at 3840
     // generate(0, 5952) covers 0..5951
     const events = player.generate(0, 5952);
-    expect(events[0].isAccent).toBe(true);  // beat 1 of bar 1
+    expect(events[0].isAccent).toBe(true); // beat 1 of bar 1
     expect(events[1].isAccent).toBe(false); // beat 2
-    expect(events[4].isAccent).toBe(true);  // beat 1 of bar 2 (3/4)
+    expect(events[4].isAccent).toBe(true); // beat 1 of bar 2 (3/4)
     // Bar 2 should have 3 beats (not 4)
     expect(events[5].isAccent).toBe(false); // beat 2 of bar 2
     expect(events[6].isAccent).toBe(false); // beat 3 of bar 2

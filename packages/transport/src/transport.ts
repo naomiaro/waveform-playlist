@@ -492,7 +492,12 @@ export class Transport {
 
     const toAudioTime = (transportTime: number) => this._clock.toAudioTime(transportTime);
 
-    this._clipPlayer = new ClipPlayer(audioContext, this._sampleTimeline, this._tempoMap, toAudioTime);
+    this._clipPlayer = new ClipPlayer(
+      audioContext,
+      this._sampleTimeline,
+      this._tempoMap,
+      toAudioTime
+    );
     this._metronomePlayer = new MetronomePlayer(
       audioContext,
       this._tempoMap,
