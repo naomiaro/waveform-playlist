@@ -1,0 +1,188 @@
+// packages/transport/src/timeline/meter-map.ts
+import type { MeterEntry, MeterSignature } from '../types';
+
+interface MutableMeterEntry {
+  tick: number;
+  numerator: number;
+  denominator: number;
+  barAtTick: number;
+}
+
+function isPowerOf2(n: number): boolean {
+  return n > 0 && (n & (n - 1)) === 0;
+}
+
+export class MeterMap {
+  private _ppqn: number;
+  private _entries: MutableMeterEntry[];
+
+  constructor(ppqn: number, numerator: number = 4, denominator: number = 4) {
+    this._ppqn = ppqn;
+    this._entries = [{ tick: 0, numerator, denominator, barAtTick: 0 }];
+  }
+
+  get ppqn(): number {
+    return this._ppqn;
+  }
+
+  getMeter(atTick: number = 0): MeterSignature {
+    const entry = this._entryAt(atTick);
+    return { numerator: entry.numerator, denominator: entry.denominator };
+  }
+
+  setMeter(numerator: number, denominator: number, atTick: number = 0): void {
+    this._validateMeter(numerator, denominator);
+
+    if (atTick < 0) {
+      throw new Error('[waveform-playlist] MeterMap: atTick must be non-negative, got ' + atTick);
+    }
+
+    if (atTick === 0) {
+      this._entries[0] = { ...this._entries[0], numerator, denominator };
+      this._recomputeCache(0);
+      return;
+    }
+
+    // Snap to bar boundary of preceding meter
+    const snapped = this._snapToBarBoundary(atTick);
+    if (snapped !== atTick) {
+      console.warn(
+        '[waveform-playlist] MeterMap.setMeter: tick ' + atTick +
+        ' is not on a bar boundary, snapped to ' + snapped
+      );
+    }
+
+    let i = this._entries.length - 1;
+    while (i > 0 && this._entries[i].tick > snapped) i--;
+
+    if (this._entries[i].tick === snapped) {
+      this._entries[i] = { ...this._entries[i], numerator, denominator };
+    } else {
+      const barAtTick = this._computeBarAtTick(snapped);
+      this._entries.splice(i + 1, 0, { tick: snapped, numerator, denominator, barAtTick });
+      i = i + 1;
+    }
+    this._recomputeCache(i);
+  }
+
+  removeMeter(atTick: number): void {
+    if (atTick === 0) {
+      throw new Error('[waveform-playlist] MeterMap: cannot remove meter at tick 0');
+    }
+    const idx = this._entries.findIndex(e => e.tick === atTick);
+    if (idx > 0) {
+      this._entries.splice(idx, 1);
+      this._recomputeCache(idx);
+    }
+  }
+
+  clearMeters(): void {
+    const first = this._entries[0];
+    this._entries = [{ ...first, barAtTick: 0 }];
+  }
+
+  ticksPerBeat(atTick: number = 0): number {
+    const entry = this._entryAt(atTick);
+    return this._ppqn * (4 / entry.denominator);
+  }
+
+  ticksPerBar(atTick: number = 0): number {
+    const entry = this._entryAt(atTick);
+    return entry.numerator * this._ppqn * (4 / entry.denominator);
+  }
+
+  barToTick(bar: number): number {
+    const targetBar = bar - 1; // 0-indexed
+    for (let i = 0; i < this._entries.length; i++) {
+      const nextBar = (i < this._entries.length - 1)
+        ? this._entries[i + 1].barAtTick
+        : Infinity;
+      if (targetBar < nextBar) {
+        const barsInto = targetBar - this._entries[i].barAtTick;
+        const tpb = this._ticksPerBarForEntry(this._entries[i]);
+        return this._entries[i].tick + barsInto * tpb;
+      }
+    }
+    const last = this._entries[this._entries.length - 1];
+    const barsInto = targetBar - last.barAtTick;
+    return last.tick + barsInto * this._ticksPerBarForEntry(last);
+  }
+
+  tickToBar(tick: number): number {
+    const entry = this._entryAt(tick);
+    const ticksInto = tick - entry.tick;
+    const tpb = this._ticksPerBarForEntry(entry);
+    return entry.barAtTick + Math.floor(ticksInto / tpb) + 1; // 1-indexed
+  }
+
+  isBarBoundary(tick: number): boolean {
+    const entry = this._entryAt(tick);
+    const ticksInto = tick - entry.tick;
+    const tpb = this._ticksPerBarForEntry(entry);
+    return ticksInto % tpb === 0;
+  }
+
+  /** Internal: get the full entry at a tick (for MetronomePlayer beat grid anchoring) */
+  getEntryAt(tick: number): MeterEntry {
+    return this._entryAt(tick);
+  }
+
+  private _entryAt(tick: number): MutableMeterEntry {
+    let lo = 0;
+    let hi = this._entries.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this._entries[mid].tick <= tick) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return this._entries[lo];
+  }
+
+  private _ticksPerBarForEntry(entry: MutableMeterEntry): number {
+    return entry.numerator * this._ppqn * (4 / entry.denominator);
+  }
+
+  private _snapToBarBoundary(atTick: number): number {
+    const entry = this._entryAt(atTick);
+    const tpb = this._ticksPerBarForEntry(entry);
+    const ticksInto = atTick - entry.tick;
+    if (ticksInto % tpb === 0) return atTick;
+    // Snap forward to next bar boundary
+    return entry.tick + Math.ceil(ticksInto / tpb) * tpb;
+  }
+
+  private _computeBarAtTick(tick: number): number {
+    const entry = this._entryAt(tick);
+    const ticksInto = tick - entry.tick;
+    const tpb = this._ticksPerBarForEntry(entry);
+    return entry.barAtTick + ticksInto / tpb;
+  }
+
+  private _recomputeCache(fromIndex: number): void {
+    for (let i = Math.max(1, fromIndex); i < this._entries.length; i++) {
+      const prev = this._entries[i - 1];
+      const tickDelta = this._entries[i].tick - prev.tick;
+      const tpb = this._ticksPerBarForEntry(prev);
+      this._entries[i] = {
+        ...this._entries[i],
+        barAtTick: prev.barAtTick + tickDelta / tpb,
+      };
+    }
+  }
+
+  private _validateMeter(numerator: number, denominator: number): void {
+    if (!Number.isInteger(numerator) || numerator < 1 || numerator > 32) {
+      throw new Error(
+        '[waveform-playlist] MeterMap: numerator must be an integer 1-32, got ' + numerator
+      );
+    }
+    if (!isPowerOf2(denominator) || denominator > 32) {
+      throw new Error(
+        '[waveform-playlist] MeterMap: denominator must be a power of 2 (1-32), got ' + denominator
+      );
+    }
+  }
+}
