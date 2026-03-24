@@ -1,15 +1,15 @@
 export interface SchedulerEvent {
-  /** Transport time (elapsed seconds from timeline start) when this event should be realized */
-  transportTime: number;
+  /** Tick position (integer) on the timeline */
+  tick: number;
 }
 
 export interface SchedulerListener<T extends SchedulerEvent> {
-  /** Generate events in the time window [fromTime, toTime) */
-  generate(fromTime: number, toTime: number): T[];
+  /** Generate events in the tick window [fromTick, toTick) */
+  generate(fromTick: number, toTick: number): T[];
   /** Realize an event (create audio nodes, start sources) */
   consume(event: T): void;
   /** Position jumped (loop/seek) — stop active sources, re-schedule */
-  onPositionJump(newTime: number): void;
+  onPositionJump(newTick: number): void;
   /** Stop all active audio immediately */
   silence(): void;
 }
