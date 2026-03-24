@@ -20,3 +20,4 @@ export {
   MetronomePlayer,
   type MetronomeEvent,
 } from './audio/metronome-player';
+export { Transport } from './transport';
