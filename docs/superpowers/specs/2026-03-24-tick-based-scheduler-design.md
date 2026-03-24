@@ -62,13 +62,26 @@ class Scheduler<T> {
 ### SchedulerListener Interface
 
 ```typescript
-interface SchedulerListener<T> {
-  generate(fromTick: number, toTick: number): T[];  // was (fromSeconds, toSeconds)
-  consume(event: T, audioTime: number): void;        // unchanged
+interface SchedulerEvent {
+  tick: number;  // was transportTime: number (seconds)
+}
+
+interface SchedulerListener<T extends SchedulerEvent> {
+  generate(fromTick: number, toTick: number): T[];      // was (fromSeconds, toSeconds)
+  consume(event: T): void;                               // unchanged signature
+  onPositionJump(newTick: number): void;                 // was (newTimeSeconds)
+  silence(): void;                                       // unchanged
 }
 ```
 
-The Scheduler converts ticks -> seconds via TempoMap for the `audioTime` parameter in `consume()`.
+**Breaking changes to the listener contract:**
+
+- `generate()`: receives integer ticks instead of float seconds.
+- `SchedulerEvent`: `tick: number` replaces `transportTime: number`. Each listener converts tick -> audio time internally via its existing `_toAudioTime` helper + TempoMap.
+- `onPositionJump()`: receives integer ticks instead of float seconds. Each listener converts to its native unit internally (MetronomePlayer: no-op since it works in ticks; ClipPlayer: ticks -> samples via SampleTimeline).
+- `consume()` and `silence()`: unchanged.
+
+The Scheduler stays free of audio-context concerns. Listeners own the tick -> seconds conversion for audio scheduling.
 
 ### MetronomePlayer
 
@@ -91,7 +104,7 @@ generate(fromTick: number, toTick: number): MetronomeEvent[] {
 }
 ```
 
-`MetronomeEvent` stores `tick: number` instead of `transportTime: number`. The Scheduler handles tick -> seconds conversion for `consume()`.
+`MetronomeEvent` stores `tick: number` instead of `transportTime: number`. `consume()` converts `tick` -> audio time internally via `this._toAudioTime(this._tempoMap.ticksToSeconds(event.tick))`.
 
 ### ClipPlayer
 
@@ -115,7 +128,14 @@ class ClipPlayer implements SchedulerListener<ClipEvent> {
     // Skip zero-duration events
   }
 
-  consume(event: ClipEvent, audioTime: number): void {
+  // onPositionJump receives ticks, converts to samples for mid-clip source creation
+  onPositionJump(newTick: number): void {
+    const newSample = this._sampleTimeline.ticksToSamples(newTick);
+    // Re-create sources for clips spanning newSample (existing logic, now in samples)
+  }
+
+  consume(event: ClipEvent): void {
+    const audioTime = this._toAudioTime(this._tempoMap.ticksToSeconds(event.tick));
     const offset = event.offsetSamples / this._sampleRate;
     const duration = event.durationSamples / this._sampleRate;
     source.start(audioTime, offset, duration);
@@ -155,6 +175,8 @@ secondsToTicks(seconds: number): number {
 
 At 960 PPQN and 120 BPM, one tick = ~0.52ms. Rounding to the nearest tick is inaudible (< 1 sample at 48kHz).
 
+**Round-trip guarantee:** `secondsToTicks(ticksToSeconds(tick))` should equal `tick` for all practical values. At float64 precision this holds for ticks up to ~2^43, well beyond any realistic timeline. Tests should use `toBe()` (exact) instead of `toBeCloseTo()`.
+
 ### Transport API
 
 ```typescript
@@ -193,13 +215,13 @@ Scheduler (ticks) --- advance() ---> generate(fromTick, toTick)
   |                          MetronomePlayer: pure tick math
   |                          ClipPlayer: ticks -> samples, pure sample math
   v
-consume(event, audioTime) <-- Scheduler converts tick -> seconds via TempoMap
+consume(event) -- each listener converts event.tick -> audioTime internally
   |
   v
 AudioBufferSourceNode.start(audioTime, ...) <-- final seconds for Web Audio
 ```
 
-Seconds -> ticks happens once (Clock -> Scheduler in `advance()`, or caller -> Transport in `setLoop()`). Ticks -> seconds happens once (Scheduler -> `consume()` for audio scheduling). Everything in between is integer math.
+Seconds -> ticks happens once (Clock -> Scheduler in `advance()`, or caller -> Transport in `setLoop()`). Ticks -> seconds happens once per listener in `consume()` for audio scheduling. Everything in between is integer math.
 
 ## Error Handling
 
@@ -239,6 +261,7 @@ Seconds -> ticks happens once (Clock -> Scheduler in `advance()`, or caller -> T
 - TempoMap `secondsToTicks()` returns integer
 - SampleTimeline new tick <-> sample methods
 - Transport dual API (`setLoop`, `setLoopSeconds`, `setLoopSamples`)
+- `NativePlayoutAdapter.setLoop()` updated to call `transport.setLoopSeconds()` (adapter receives seconds from engine)
 - All affected tests updated
 
 ### Out of Scope
