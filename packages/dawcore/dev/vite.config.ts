@@ -15,6 +15,7 @@ export default defineConfig({
       '@waveform-playlist/core': path.resolve(repoRoot, 'packages/core/src/index.ts'),
       '@waveform-playlist/engine': path.resolve(repoRoot, 'packages/engine/src/index.ts'),
       '@waveform-playlist/playout': path.resolve(repoRoot, 'packages/playout/src/index.ts'),
+      '@waveform-playlist/transport': path.resolve(repoRoot, 'packages/transport/src/index.ts'),
     },
   },
   server: {

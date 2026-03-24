@@ -86,6 +86,8 @@ export class DawEditorElement extends LitElement {
   _selectionStartTime = 0;
   _selectionEndTime = 0;
   _currentTime = 0;
+  /** Optional adapter factory. When set, _buildEngine uses this instead of createToneAdapter(). */
+  adapterFactory: (() => import('@waveform-playlist/engine').PlayoutAdapter) | null = null;
   _engine: PlaylistEngine | null = null;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
@@ -698,12 +700,20 @@ export class DawEditorElement extends LitElement {
     return this._enginePromise;
   }
   private async _buildEngine() {
-    const [{ PlaylistEngine }, { createToneAdapter }] = await Promise.all([
-      import('@waveform-playlist/engine'),
-      import('@waveform-playlist/playout'),
-    ]);
+    let adapter: import('@waveform-playlist/engine').PlayoutAdapter;
+    let PlaylistEngine: typeof import('@waveform-playlist/engine').PlaylistEngine;
 
-    const adapter = createToneAdapter();
+    if (this.adapterFactory) {
+      adapter = this.adapterFactory();
+      ({ PlaylistEngine } = await import('@waveform-playlist/engine'));
+    } else {
+      const [engineMod, playoutMod] = await Promise.all([
+        import('@waveform-playlist/engine'),
+        import('@waveform-playlist/playout'),
+      ]);
+      PlaylistEngine = engineMod.PlaylistEngine;
+      adapter = playoutMod.createToneAdapter();
+    }
     const engine = new PlaylistEngine({
       adapter,
       sampleRate: this.effectiveSampleRate,
