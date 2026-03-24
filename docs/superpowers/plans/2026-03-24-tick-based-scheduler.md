@@ -524,7 +524,6 @@ export class Scheduler<T extends SchedulerEvent> {
 
   /** Advance the scheduling window. Takes seconds (from Clock), converts to ticks. */
   advance(currentTimeSeconds: number): void {
-    const currentTick = this._tempoMap.secondsToTicks(currentTimeSeconds);
     const targetTick = this._tempoMap.secondsToTicks(
       currentTimeSeconds + this._lookahead
     );
@@ -1154,6 +1153,8 @@ export interface ClipEvent extends SchedulerEvent {
   trackId: string;
   clipId: string;
   audioBuffer: AudioBuffer;
+  /** Clip position on the timeline (integer samples) */
+  startSample: number;
   /** Offset into the audioBuffer (integer samples) */
   offsetSamples: number;
   /** Duration to play (integer samples) */
@@ -1255,6 +1256,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
           trackId,
           clipId: clip.id,
           audioBuffer: clip.audioBuffer,
+          startSample: clip.startSample,
           offsetSamples: clip.offsetSamples,
           durationSamples,
           gain: clip.gain,
@@ -1342,9 +1344,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   onPositionJump(newTick: number): void {
     this.silence();
 
-    const sampleRate = this._sampleTimeline.sampleRate;
     const newSample = this._sampleTimeline.ticksToSamples(newTick);
-    const newTimeSeconds = this._tempoMap.ticksToSeconds(newTick);
 
     // Re-schedule mid-clip sources for clips that span the new position
     for (const [trackId, state] of this._tracks) {
@@ -1663,6 +1663,59 @@ git commit -m "feat(transport): adapter.setLoop calls transport.setLoopSeconds"
 
 ---
 
+### Task 8b: Fix existing transport.test.ts for tick-based setLoop
+
+**Files:**
+- Modify: `packages/transport/src/__tests__/transport.test.ts:221-226,361-367`
+
+- [ ] **Step 1: Update setLoop test to use setLoopSeconds**
+
+In `packages/transport/src/__tests__/transport.test.ts`, line 221-226:
+
+```typescript
+// Before:
+it('setLoop configures loop region', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setLoop(true, 1, 3);
+    // Should not throw
+});
+
+// After:
+it('setLoopSeconds configures loop region', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setLoopSeconds(true, 1, 3);
+    // Should not throw
+});
+```
+
+- [ ] **Step 2: Update timeToTick round-trip test to use toBe**
+
+Line 361-367:
+
+```typescript
+// Before:
+expect(transport.timeToTick(time)).toBeCloseTo(tick);
+
+// After:
+expect(transport.timeToTick(time)).toBe(tick);
+```
+
+- [ ] **Step 3: Run test to verify it passes**
+
+Run: `cd packages/transport && npx vitest run src/__tests__/transport.test.ts`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add packages/transport/src/__tests__/transport.test.ts
+git commit -m "test(transport): update existing tests for tick-based setLoop API"
+```
+
+---
+
 ### Task 9: Full build and test verification
 
 - [ ] **Step 1: Run all transport tests**
@@ -1719,4 +1772,22 @@ Add note about the three loop APIs:
 ```bash
 git add packages/transport/CLAUDE.md
 git commit -m "docs(transport): update CLAUDE.md for tick-based scheduler"
+```
+
+---
+
+### Task 11: Version bump to 0.0.3
+
+**Files:**
+- Modify: `packages/transport/package.json`
+
+- [ ] **Step 1: Bump version**
+
+In `packages/transport/package.json`, change `"version"` from `"0.0.2"` to `"0.0.3"`.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add packages/transport/package.json
+git commit -m "chore(transport): bump to 0.0.3 — tick-based scheduler (breaking)"
 ```
