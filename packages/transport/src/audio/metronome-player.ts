@@ -1,6 +1,6 @@
 import type { SchedulerEvent, SchedulerListener } from '../types';
 import type { TempoMap } from '../timeline/tempo-map';
-import type { TickTimeline } from '../timeline/tick-timeline';
+import { MeterMap } from '../timeline/meter-map';
 
 export interface MetronomeEvent extends SchedulerEvent {
   isAccent: boolean;
@@ -10,11 +10,10 @@ export interface MetronomeEvent extends SchedulerEvent {
 export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
   private _audioContext: AudioContext;
   private _tempoMap: TempoMap;
-  private _tickTimeline: TickTimeline;
+  private _meterMap: MeterMap;
   private _destination: AudioNode;
   private _toAudioTime: (transportTime: number) => number;
   private _enabled = false;
-  private _beatsPerBar = 4;
   private _accentBuffer: AudioBuffer | null = null;
   private _normalBuffer: AudioBuffer | null = null;
   private _activeSources: Set<AudioBufferSourceNode> = new Set();
@@ -22,13 +21,13 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
   constructor(
     audioContext: AudioContext,
     tempoMap: TempoMap,
-    tickTimeline: TickTimeline,
+    meterMap: MeterMap,
     destination: AudioNode,
     toAudioTime: (transportTime: number) => number
   ) {
     this._audioContext = audioContext;
     this._tempoMap = tempoMap;
-    this._tickTimeline = tickTimeline;
+    this._meterMap = meterMap;
     this._destination = destination;
     this._toAudioTime = toAudioTime;
   }
@@ -40,8 +39,9 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     }
   }
 
+  /** @deprecated Use meterMap.setMeter(beats, 4) instead */
   setBeatsPerBar(beats: number): void {
-    this._beatsPerBar = beats;
+    this._meterMap.setMeter(beats, 4);
   }
 
   setClickSounds(accent: AudioBuffer, normal: AudioBuffer): void {
@@ -55,25 +55,36 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     }
 
     const events: MetronomeEvent[] = [];
-    const ppqn = this._tickTimeline.ppqn;
 
     // Convert time window to ticks
     const fromTicks = this._tempoMap.secondsToTicks(fromTime);
     const toTicks = this._tempoMap.secondsToTicks(toTime);
 
-    // Find first beat at or after fromTicks
-    const firstBeatTick = Math.ceil(fromTicks / ppqn) * ppqn;
+    // Snap to first beat: align to beat grid anchored at the active meter entry
+    let entry = this._meterMap.getEntryAt(fromTicks);
+    let beatSize = this._meterMap.ticksPerBeat(fromTicks);
+    const tickIntoSection = fromTicks - entry.tick;
+    let tick = entry.tick + Math.ceil(tickIntoSection / beatSize) * beatSize;
 
-    for (let tick = firstBeatTick; tick < toTicks; tick += ppqn) {
+    while (tick < toTicks) {
+      // Re-snap at meter boundaries
+      const currentEntry = this._meterMap.getEntryAt(tick);
+      if (currentEntry.tick !== entry.tick) {
+        entry = currentEntry;
+        beatSize = this._meterMap.ticksPerBeat(tick);
+      }
+
+      const isAccent = this._meterMap.isBarBoundary(tick);
       const transportTime = this._tempoMap.ticksToSeconds(tick);
-      const ticksPerBar = this._tickTimeline.ticksPerBar(this._beatsPerBar);
-      const isAccent = tick % ticksPerBar === 0;
 
       events.push({
         transportTime,
         isAccent,
         buffer: isAccent ? this._accentBuffer : this._normalBuffer,
       });
+
+      beatSize = this._meterMap.ticksPerBeat(tick);
+      tick += beatSize;
     }
 
     return events;

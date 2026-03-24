@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MetronomePlayer } from '../audio/metronome-player';
 import { TempoMap } from '../timeline/tempo-map';
-import { TickTimeline } from '../timeline/tick-timeline';
+import { MeterMap } from '../timeline/meter-map';
 
 function createMockSource() {
   return {
@@ -34,18 +34,18 @@ function createMockBuffer(): AudioBuffer {
 describe('MetronomePlayer', () => {
   let ctx: AudioContext;
   let tempoMap: TempoMap;
-  let tickTimeline: TickTimeline;
+  let meterMap: MeterMap;
   let destination: AudioNode;
 
   beforeEach(() => {
     ctx = createMockAudioContext();
     tempoMap = new TempoMap(960, 120);
-    tickTimeline = new TickTimeline(960);
+    meterMap = new MeterMap(960);
     destination = { connect: vi.fn() } as unknown as AudioNode;
   });
 
   it('generate produces beat events at correct times', () => {
-    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -60,7 +60,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('accent on beat 1 of each bar', () => {
-    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     const accent = createMockBuffer();
@@ -78,7 +78,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('setEnabled(false) produces no events', () => {
-    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(false);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
     player.setBeatsPerBar(4);
@@ -88,7 +88,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('consume creates and starts a source', () => {
-    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -102,7 +102,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('silence stops active sources', () => {
-    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -116,7 +116,7 @@ describe('MetronomePlayer', () => {
   });
 
   it('onPositionJump clears active sources', () => {
-    const player = new MetronomePlayer(ctx, tempoMap, tickTimeline, destination, (t) => t);
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
     player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -127,5 +127,58 @@ describe('MetronomePlayer', () => {
 
     const source = (ctx.createBufferSource as any).mock.results[0].value;
     expect(source.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('generates beats using MeterMap beat size (6/8 = eighth notes)', () => {
+    const sixEightMap = new MeterMap(960, 6, 8);
+    const player = new MetronomePlayer(ctx, tempoMap, sixEightMap, destination, (t) => t);
+    player.setEnabled(true);
+    player.setClickSounds(createMockBuffer(), createMockBuffer());
+
+    // At 120 BPM, 6/8: beat = eighth note = 0.25s
+    const events = player.generate(0, 0.6);
+    // Should get beats at 0.0, 0.25, 0.5 (3 eighth-note beats)
+    expect(events.length).toBe(3);
+    expect(events[0].transportTime).toBeCloseTo(0.0);
+    expect(events[1].transportTime).toBeCloseTo(0.25);
+  });
+
+  it('accents on bar boundaries with mixed meters', () => {
+    const mixedMap = new MeterMap(960);
+    mixedMap.setMeter(3, 4, 3840); // switch to 3/4 at bar 2
+    const player = new MetronomePlayer(ctx, tempoMap, mixedMap, destination, (t) => t);
+    player.setEnabled(true);
+    player.setClickSounds(createMockBuffer(), createMockBuffer());
+
+    // Bar 1 (4/4): beats at 0, 0.5, 1.0, 1.5 — accent at 0
+    // Bar 2 (3/4): beats at 2.0, 2.5, 3.0 — accent at 2.0
+    const events = player.generate(0, 3.1);
+    expect(events[0].isAccent).toBe(true);  // beat 1 of bar 1
+    expect(events[1].isAccent).toBe(false); // beat 2
+    expect(events[4].isAccent).toBe(true);  // beat 1 of bar 2 (3/4)
+    // Bar 2 should have 3 beats (not 4)
+    expect(events[5].isAccent).toBe(false); // beat 2 of bar 2
+    expect(events[6].isAccent).toBe(false); // beat 3 of bar 2
+  });
+
+  it('beat step size changes at meter boundary within scheduling window', () => {
+    const mixedMap = new MeterMap(960);
+    mixedMap.setMeter(6, 8, 3840); // switch to 6/8 at bar 2
+    const player = new MetronomePlayer(ctx, tempoMap, mixedMap, destination, (t) => t);
+    player.setEnabled(true);
+    player.setClickSounds(createMockBuffer(), createMockBuffer());
+
+    // At 120 BPM: bar 1 (4/4) beats every 0.5s, bar 2 (6/8) beats every 0.25s
+    const events = player.generate(0, 3.5);
+
+    // Bar 1: 4 quarter-note beats (0.0, 0.5, 1.0, 1.5)
+    expect(events[0].transportTime).toBeCloseTo(0.0);
+    expect(events[1].transportTime).toBeCloseTo(0.5);
+    expect(events[3].transportTime).toBeCloseTo(1.5);
+
+    // Bar 2: 6 eighth-note beats starting at 2.0 (0.25s apart)
+    expect(events[4].transportTime).toBeCloseTo(2.0);
+    expect(events[5].transportTime).toBeCloseTo(2.25);
+    expect(events[6].transportTime).toBeCloseTo(2.5);
   });
 });

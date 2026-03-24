@@ -6,6 +6,7 @@ import { Timer } from './core/timer';
 import { SampleTimeline } from './timeline/sample-timeline';
 import { TickTimeline } from './timeline/tick-timeline';
 import { TempoMap } from './timeline/tempo-map';
+import { MeterMap } from './timeline/meter-map';
 import { ClipPlayer } from './audio/clip-player';
 import { MetronomePlayer } from './audio/metronome-player';
 import { MasterNode } from './audio/master-node';
@@ -29,6 +30,7 @@ export class Transport {
   private _timer: Timer;
   private _sampleTimeline: SampleTimeline;
   private _tickTimeline: TickTimeline;
+  private _meterMap: MeterMap;
   private _tempoMap: TempoMap;
   private _clipPlayer!: ClipPlayer;
   private _metronomePlayer!: MetronomePlayer;
@@ -61,6 +63,7 @@ export class Transport {
     });
     this._sampleTimeline = new SampleTimeline(sampleRate);
     this._tickTimeline = new TickTimeline(ppqn);
+    this._meterMap = new MeterMap(ppqn, beatsPerBar, 4);
     this._tempoMap = new TempoMap(ppqn, tempo);
 
     this._initAudioGraph(audioContext, beatsPerBar);
@@ -427,11 +430,10 @@ export class Transport {
     this._metronomePlayer = new MetronomePlayer(
       audioContext,
       this._tempoMap,
-      this._tickTimeline,
+      this._meterMap,
       this._masterNode.input,
       toAudioTime
     );
-    this._metronomePlayer.setBeatsPerBar(beatsPerBar);
 
     this._scheduler.addListener(this._clipPlayer);
     this._scheduler.addListener(this._metronomePlayer);
