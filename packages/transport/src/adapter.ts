@@ -86,7 +86,7 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   setLoop(enabled: boolean, start: number, end: number): void {
-    this._transport.setLoop(enabled, start, end);
+    this._transport.setLoopSeconds(enabled, start, end);
   }
 
   dispose(): void {
