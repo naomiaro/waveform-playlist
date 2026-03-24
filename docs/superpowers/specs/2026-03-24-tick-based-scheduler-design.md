@@ -28,14 +28,21 @@ An 8-bar loop generates exactly 8 downbeats per cycle.
 
 ### Scheduler
 
-Stores `_loopStart`, `_loopEnd`, and `_rightEdge` as **integer ticks**. Takes `TempoMap` as a constructor dependency.
+Stores `_loopStart`, `_loopEnd`, and `_rightEdge` as **integer ticks**. Takes `TempoMap` as a new constructor dependency.
 
 ```typescript
-class Scheduler<T> {
+interface SchedulerOptions {
+  lookahead?: number;  // seconds (unchanged, default 0.2)
+  onLoop?: (loopStartTimeSeconds: number) => void;  // stays in seconds for Clock.seekTo()
+}
+
+class Scheduler<T extends SchedulerEvent> {
   private _loopStart: number;    // integer ticks
   private _loopEnd: number;      // integer ticks
   private _rightEdge: number;    // integer ticks
   private _tempoMap: TempoMap;
+
+  constructor(tempoMap: TempoMap, options?: SchedulerOptions);
 
   setLoop(enabled: boolean, startTick: number, endTick: number): void;
   setLoopSeconds(enabled: boolean, startSec: number, endSec: number): void;
@@ -43,9 +50,11 @@ class Scheduler<T> {
   advance(currentTimeSeconds: number): void {
     const currentTick = this._tempoMap.secondsToTicks(currentTimeSeconds);
     const targetTick = this._tempoMap.secondsToTicks(
-      currentTimeSeconds + this._lookahead
+      currentTimeSeconds + this._lookahead  // lookahead added in seconds, then converted
     );
-    // Loop wrap logic — integer comparisons
+
+    // Non-loop path: generate if targetTick > _rightEdge
+    // Loop path: integer comparisons
     // distToEnd = _loopEnd - _rightEdge (integer subtraction)
   }
 
@@ -57,7 +66,7 @@ class Scheduler<T> {
 
 **Loop wrap:** After wrap, `_rightEdge = _loopStart` (integer assignment). No accumulated drift across loops.
 
-**`onLoop` callback:** Passes seconds to the Clock for seeking: `this._onLoop(this._tempoMap.ticksToSeconds(this._loopStart))`.
+**`onLoop` callback:** The one exception to the ticks-everywhere pattern. Passes seconds to the Clock for seeking: `this._onLoop(this._tempoMap.ticksToSeconds(this._loopStart))`. The `SchedulerOptions.onLoop` signature stays `(loopStartTimeSeconds: number) => void` because the Clock operates in seconds (`Clock.seekTo()` takes seconds).
 
 ### SchedulerListener Interface
 
@@ -77,7 +86,7 @@ interface SchedulerListener<T extends SchedulerEvent> {
 **Breaking changes to the listener contract:**
 
 - `generate()`: receives integer ticks instead of float seconds.
-- `SchedulerEvent`: `tick: number` replaces `transportTime: number`. Each listener converts tick -> audio time internally via its existing `_toAudioTime` helper + TempoMap.
+- `SchedulerEvent`: `tick: number` replaces `transportTime: number`. Each listener converts tick -> audio time internally via its existing `_toAudioTime` helper + TempoMap. The `_toAudioTime` signature stays `(transportTimeSeconds: number) => number` — callers wrap with `tempoMap.ticksToSeconds(event.tick)` before calling it.
 - `onPositionJump()`: receives integer ticks instead of float seconds. Each listener converts to its native unit internally (MetronomePlayer: no-op since it works in ticks; ClipPlayer: ticks -> samples via SampleTimeline).
 - `consume()` and `silence()`: unchanged.
 
@@ -108,7 +117,19 @@ generate(fromTick: number, toTick: number): MetronomeEvent[] {
 
 ### ClipPlayer
 
-Works in **integer samples** as its native unit. Stores loop boundaries in samples.
+Works in **integer samples** as its native unit. Stores loop boundaries in samples. Has two `setLoop` methods: `setLoop(enabled, startTick, endTick)` converts ticks -> samples internally, and `setLoopSamples(enabled, startSample, endSample)` stores samples directly.
+
+**Updated `ClipEvent` interface:**
+
+```typescript
+interface ClipEvent extends SchedulerEvent {
+  tick: number;              // was transportTime (seconds) — inherited from SchedulerEvent
+  offsetSamples: number;     // was offset (seconds)
+  durationSamples: number;   // was duration (seconds)
+  startSample: number;       // clip position on timeline (integer samples)
+  // ... other clip fields (buffer, track info)
+}
+```
 
 ```typescript
 class ClipPlayer implements SchedulerListener<ClipEvent> {
@@ -229,7 +250,7 @@ Seconds -> ticks happens once (Clock -> Scheduler in `advance()`, or caller -> T
 - **Invalid loop:** `start >= end` logs warning, loop not set (existing behavior).
 - **Tempo change while looping:** Loop boundaries are stored as ticks — tick positions don't change when tempo changes. `advance()` converts Clock seconds -> ticks on every call, so tempo changes are picked up automatically.
 - **Zero-duration clips at loop edge:** `durationSamples = _loopEndSamples - clip.startSample` could be 0 — skip, don't schedule.
-- **Stale `advance()` call:** `currentTick <= _rightEdge` means no generation needed (integer comparison).
+- **Stale `advance()` call:** `targetTick <= _rightEdge` means no generation needed (integer comparison). The guard uses `targetTick` (not `currentTick`) to match the current implementation pattern — `currentTick` could be behind `_rightEdge` while `targetTick` (with lookahead) still has valid window.
 
 ## Testing
 
