@@ -1,21 +1,24 @@
 import type { SchedulerEvent, SchedulerListener } from '../types';
+import type { TempoMap } from '../timeline/tempo-map';
 
 export interface SchedulerOptions {
   lookahead?: number;
-  /** Called when the scheduler wraps at loopEnd — Transport uses this to seek the clock */
-  onLoop?: (loopStartTime: number) => void;
+  /** Called when the scheduler wraps at loopEnd — receives loopStart in seconds for Clock.seekTo */
+  onLoop?: (loopStartTimeSeconds: number) => void;
 }
 
 export class Scheduler<T extends SchedulerEvent> {
   private _lookahead: number;
-  private _rightEdge = 0;
+  private _rightEdge = 0; // integer ticks
   private _listeners: Set<SchedulerListener<T>> = new Set();
   private _loopEnabled = false;
-  private _loopStart = 0;
-  private _loopEnd = 0;
-  private _onLoop: ((loopStartTime: number) => void) | undefined;
+  private _loopStart = 0; // integer ticks
+  private _loopEnd = 0; // integer ticks
+  private _onLoop: ((loopStartTimeSeconds: number) => void) | undefined;
+  private _tempoMap: TempoMap;
 
-  constructor(options: SchedulerOptions = {}) {
+  constructor(tempoMap: TempoMap, options: SchedulerOptions = {}) {
+    this._tempoMap = tempoMap;
     this._lookahead = options.lookahead ?? 0.2;
     this._onLoop = options.onLoop;
   }
@@ -28,38 +31,48 @@ export class Scheduler<T extends SchedulerEvent> {
     this._listeners.delete(listener);
   }
 
-  setLoop(enabled: boolean, start: number, end: number): void {
-    if (enabled && start >= end) {
+  /** Primary API — ticks as source of truth */
+  setLoop(enabled: boolean, startTick: number, endTick: number): void {
+    if (enabled && startTick >= endTick) {
       console.warn(
-        '[waveform-playlist] Scheduler.setLoop: start (' +
-          start +
-          ') must be less than end (' +
-          end +
+        '[waveform-playlist] Scheduler.setLoop: startTick (' +
+          startTick +
+          ') must be less than endTick (' +
+          endTick +
           ')'
       );
       return;
     }
     this._loopEnabled = enabled;
-    this._loopStart = start;
-    this._loopEnd = end;
+    this._loopStart = Math.round(startTick);
+    this._loopEnd = Math.round(endTick);
   }
 
-  reset(time: number): void {
-    this._rightEdge = time;
+  /** Convenience — converts seconds to ticks via TempoMap */
+  setLoopSeconds(enabled: boolean, startSec: number, endSec: number): void {
+    const startTick = this._tempoMap.secondsToTicks(startSec);
+    const endTick = this._tempoMap.secondsToTicks(endSec);
+    this.setLoop(enabled, startTick, endTick);
   }
 
-  advance(currentTime: number): void {
-    const targetEdge = currentTime + this._lookahead;
+  /** Reset scheduling cursor. Takes seconds (from Clock), converts to ticks. */
+  reset(timeSeconds: number): void {
+    this._rightEdge = this._tempoMap.secondsToTicks(timeSeconds);
+  }
+
+  /** Advance the scheduling window. Takes seconds (from Clock), converts to ticks. */
+  advance(currentTimeSeconds: number): void {
+    const targetTick = this._tempoMap.secondsToTicks(
+      currentTimeSeconds + this._lookahead
+    );
 
     if (this._loopEnabled && this._loopEnd > this._loopStart) {
       const loopDuration = this._loopEnd - this._loopStart;
-      let remaining = targetEdge - this._rightEdge;
+      let remaining = targetTick - this._rightEdge;
 
-      // Handle multiple loop wraps (loop region shorter than lookahead)
       while (remaining > 0) {
         const distToEnd = this._loopEnd - this._rightEdge;
         if (distToEnd <= 0 || distToEnd > remaining) {
-          // No wrap needed — generate remaining window
           this._generateAndConsume(this._rightEdge, this._rightEdge + remaining);
           this._rightEdge += remaining;
           break;
@@ -67,30 +80,30 @@ export class Scheduler<T extends SchedulerEvent> {
         // Generate up to loopEnd
         this._generateAndConsume(this._rightEdge, this._loopEnd);
         remaining -= distToEnd;
-        // Notify listeners of position jump
+        // Notify listeners of position jump (in ticks)
         for (const listener of this._listeners) {
           listener.onPositionJump(this._loopStart);
         }
-        // Seek clock back to loopStart
-        this._onLoop?.(this._loopStart);
+        // Seek clock back to loopStart (in seconds)
+        this._onLoop?.(this._tempoMap.ticksToSeconds(this._loopStart));
         this._rightEdge = this._loopStart;
 
-        // Guard against infinite loop from zero-length loop regions
+        // Guard against infinite loop
         if (loopDuration <= 0) break;
       }
       return;
     }
 
-    if (targetEdge > this._rightEdge) {
-      this._generateAndConsume(this._rightEdge, targetEdge);
-      this._rightEdge = targetEdge;
+    if (targetTick > this._rightEdge) {
+      this._generateAndConsume(this._rightEdge, targetTick);
+      this._rightEdge = targetTick;
     }
   }
 
-  private _generateAndConsume(from: number, to: number): void {
+  private _generateAndConsume(fromTick: number, toTick: number): void {
     for (const listener of this._listeners) {
       try {
-        const events = listener.generate(from, to);
+        const events = listener.generate(fromTick, toTick);
         for (const event of events) {
           try {
             listener.consume(event);

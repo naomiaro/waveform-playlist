@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Scheduler } from '../core/scheduler';
+import { TempoMap } from '../timeline/tempo-map';
 import type { SchedulerEvent, SchedulerListener } from '../types';
 
 interface TestEvent extends SchedulerEvent {
@@ -11,20 +12,24 @@ function createMockListener(): SchedulerListener<TestEvent> & {
   consumed: TestEvent[];
   jumpedTo: number[];
   silenced: number;
+  generateRanges: Array<[number, number]>;
 } {
   const state = {
     generated: [] as TestEvent[],
     consumed: [] as TestEvent[],
     jumpedTo: [] as number[],
     silenced: 0,
+    generateRanges: [] as Array<[number, number]>,
   };
   return {
     ...state,
-    generate(from, to) {
+    generate(fromTick, toTick) {
+      state.generateRanges.push([fromTick, toTick]);
       const events: TestEvent[] = [];
-      // Generate an event every 0.1s in the window
-      for (let t = Math.ceil(from * 10) / 10; t < to; t += 0.1) {
-        const event = { transportTime: t, id: 'e-' + t.toFixed(1) };
+      const step = 480;
+      const start = Math.ceil(fromTick / step) * step;
+      for (let t = start; t < toTick; t += step) {
+        const event = { tick: t, id: 'e-' + t };
         events.push(event);
         state.generated.push(event);
       }
@@ -33,8 +38,8 @@ function createMockListener(): SchedulerListener<TestEvent> & {
     consume(event) {
       state.consumed.push(event);
     },
-    onPositionJump(time) {
-      state.jumpedTo.push(time);
+    onPositionJump(newTick) {
+      state.jumpedTo.push(newTick);
     },
     silence() {
       state.silenced++;
@@ -42,64 +47,104 @@ function createMockListener(): SchedulerListener<TestEvent> & {
   };
 }
 
-describe('Scheduler', () => {
+describe('Scheduler (tick-based)', () => {
+  const ppqn = 960;
+  const bpm = 120;
+
+  function createScheduler(lookahead = 0.2, onLoop?: (t: number) => void) {
+    const tempoMap = new TempoMap(ppqn, bpm);
+    return new Scheduler<TestEvent>(tempoMap, { lookahead, onLoop });
+  }
+
   it('advance generates and consumes events in lookahead window', () => {
-    const scheduler = new Scheduler<TestEvent>({ lookahead: 0.2 });
+    const scheduler = createScheduler(0.2);
     const listener = createMockListener();
     scheduler.addListener(listener);
-
     scheduler.advance(0);
-    // Should generate events in [0, 0.2): 0.0, 0.1
-    expect(listener.consumed.length).toBe(2);
-    expect(listener.consumed[0].transportTime).toBeCloseTo(0.0);
-    expect(listener.consumed[1].transportTime).toBeCloseTo(0.1);
+    expect(listener.consumed.length).toBe(1);
+    expect(listener.consumed[0].tick).toBe(0);
   });
 
   it('advance does not re-generate consumed window', () => {
-    const scheduler = new Scheduler<TestEvent>({ lookahead: 0.2 });
+    const scheduler = createScheduler(0.2);
     const listener = createMockListener();
     scheduler.addListener(listener);
-
     scheduler.advance(0);
     const count1 = listener.consumed.length;
-    scheduler.advance(0.05); // still within first window
-    // Should generate [0.2, 0.25) — one partial window
+    scheduler.advance(0.05);
     expect(listener.consumed.length).toBeGreaterThanOrEqual(count1);
   });
 
   it('loop: wraps at loopEnd and generates from loopStart', () => {
-    const scheduler = new Scheduler<TestEvent>({ lookahead: 0.3 });
+    const loopCalls: number[] = [];
+    const scheduler = createScheduler(0.3, (t) => loopCalls.push(t));
     const listener = createMockListener();
     scheduler.addListener(listener);
-    scheduler.setLoop(true, 0, 0.5);
-
-    // Advance to near loop end
+    scheduler.setLoop(true, 0, 960);
     scheduler.advance(0.35);
-    // Should have generated events up to 0.5 (loopEnd), then from 0.0 (loopStart)
+    expect(listener.jumpedTo.length).toBe(1);
+    expect(listener.jumpedTo[0]).toBe(0);
+    expect(loopCalls.length).toBe(1);
+    expect(loopCalls[0]).toBeCloseTo(0);
+  });
+
+  it('loop: _rightEdge is exact integer after wrap (no drift)', () => {
+    const scheduler = createScheduler(0.2);
+    const listener = createMockListener();
+    scheduler.addListener(listener);
+    scheduler.setLoop(true, 0, 480);
+    for (let i = 0; i < 100; i++) {
+      scheduler.advance(i * 0.01);
+    }
+    for (const [from] of listener.generateRanges) {
+      expect(Number.isInteger(from)).toBe(true);
+    }
+  });
+
+  it('loop: multi-wrap when lookahead spans multiple loop regions', () => {
+    const scheduler = createScheduler(0.5);
+    const listener = createMockListener();
+    scheduler.addListener(listener);
+    scheduler.setLoop(true, 0, 480);
+    scheduler.advance(0);
+    expect(listener.jumpedTo.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('setLoop rejects start >= end', () => {
+    const scheduler = createScheduler();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    scheduler.setLoop(true, 960, 480);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('setLoopSeconds converts seconds to ticks', () => {
+    const scheduler = createScheduler(0.3);
+    const listener = createMockListener();
+    scheduler.addListener(listener);
+    scheduler.setLoopSeconds(true, 0, 0.5);
+    scheduler.advance(0.35);
     expect(listener.jumpedTo.length).toBe(1);
     expect(listener.jumpedTo[0]).toBe(0);
   });
 
   it('removeListener stops generating for that listener', () => {
-    const scheduler = new Scheduler<TestEvent>({ lookahead: 0.2 });
+    const scheduler = createScheduler();
     const listener = createMockListener();
     scheduler.addListener(listener);
     scheduler.removeListener(listener);
-
     scheduler.advance(0);
     expect(listener.consumed.length).toBe(0);
   });
 
-  it('reset clears edges', () => {
-    const scheduler = new Scheduler<TestEvent>({ lookahead: 0.2 });
+  it('reset clears rightEdge', () => {
+    const scheduler = createScheduler();
     const listener = createMockListener();
     scheduler.addListener(listener);
-
     scheduler.advance(1.0);
     const count1 = listener.consumed.length;
     scheduler.reset(0);
     scheduler.advance(0);
-    // Should re-generate from 0
     expect(listener.consumed.length).toBeGreaterThan(count1);
   });
 });
