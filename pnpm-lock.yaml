@@ -387,6 +387,24 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@20.19.25)(jsdom@28.1.0)
 
+  packages/transport:
+    devDependencies:
+      '@waveform-playlist/core':
+        specifier: workspace:*
+        version: link:../core
+      '@waveform-playlist/engine':
+        specifier: workspace:*
+        version: link:../engine
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.1(typescript@5.6.3)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.6.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.25)(jsdom@28.1.0)
+
   packages/ui-components:
     dependencies:
       '@phosphor-icons/react':
