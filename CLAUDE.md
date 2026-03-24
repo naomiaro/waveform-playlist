@@ -410,7 +410,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 - `packages/worklets/CLAUDE.md` — AudioWorklet processors (metering, recording)
 - `packages/spectrogram/CLAUDE.md` — Integration context, SpectrogramChannel index
 - `packages/dawcore/CLAUDE.md` — Lit Web Components, native AudioContext (no Tone.js), element types, CSS theming
-- `packages/transport/CLAUDE.md` — Native Web Audio transport, scheduler, clock, PlayoutAdapter bridge
+- `packages/transport/CLAUDE.md` — Native Web Audio transport, scheduler, clock, MeterMap, PlayoutAdapter bridge
 - `website/CLAUDE.md` — Docusaurus site, CSS pitfalls, custom pages
 
 ---
