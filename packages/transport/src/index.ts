@@ -15,3 +15,4 @@ export { TickTimeline } from './timeline/tick-timeline';
 export { TempoMap } from './timeline/tempo-map';
 export { MasterNode } from './audio/master-node';
 export { TrackNode } from './audio/track-node';
+export { ClipPlayer, type ClipEvent } from './audio/clip-player';
