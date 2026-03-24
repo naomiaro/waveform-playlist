@@ -12,6 +12,8 @@ import type {
 export interface RecordingOptions {
   trackId?: string;
   bits?: 8 | 16;
+  /** Desired channel count. Falls back to stream's reported channelCount, then 1. */
+  channelCount?: number;
   startSample?: number;
   /** Start playback during recording so user hears existing tracks. */
   overdub?: boolean;
@@ -120,8 +122,15 @@ export class RecordingController implements ReactiveController {
         this._workletLoadedCtx = rawCtx;
       }
 
-      // Detect channel count from stream (not source.channelCount — defaults to 2)
-      const channelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount ?? 1;
+      // Detect channel count from stream (not source.channelCount — defaults to 2 per spec).
+      // Fall back to user-provided channelCount option, then 1.
+      const detectedChannelCount = stream.getAudioTracks()[0]?.getSettings()?.channelCount;
+      if (detectedChannelCount === undefined && options.channelCount) {
+        console.warn(
+          '[dawcore] Could not detect stream channel count, using fallback: ' + options.channelCount
+        );
+      }
+      const channelCount = detectedChannelCount ?? options.channelCount ?? 1;
 
       const startSample =
         options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);

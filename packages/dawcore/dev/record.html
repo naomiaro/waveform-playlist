@@ -205,8 +205,9 @@
         editor._setSelectedTrackId(trackId);
       }
 
-      // Start recording with overdub
-      await editor.startRecording(editor.recordingStream, { overdub: true });
+      // Start recording with overdub — channelCount: 2 as fallback for stereo mics
+      // (some browsers don't report channelCount in getSettings())
+      await editor.startRecording(editor.recordingStream, { overdub: true, channelCount: 2 });
     }, { capture: true }); // capture phase to run before the button's own handler
 
     // Recording events
