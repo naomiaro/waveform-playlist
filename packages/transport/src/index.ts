@@ -9,3 +9,4 @@ export type {
 
 export { Clock } from './core/clock';
 export { Scheduler, type SchedulerOptions } from './core/scheduler';
+export { Timer } from './core/timer';
