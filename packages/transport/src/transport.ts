@@ -356,6 +356,10 @@ export class Transport {
     return this._meterMap.barToTick(bar);
   }
 
+  tickToBar(tick: number): number {
+    return this._meterMap.tickToBar(tick);
+  }
+
   /** Convert transport time (seconds) to tick position, using the tempo map. */
   timeToTick(seconds: number): number {
     return this._tempoMap.secondsToTicks(seconds);

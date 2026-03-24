@@ -326,17 +326,18 @@
           buildBeatDots(currentNumerator);
         }
 
-        // Beat duration depends on the denominator (e.g., 7/8 beats are eighth-notes)
-        const beatDuration = 60 / transport.getTempo(currentTick) * (4 / currentDenominator);
-        const totalBeats = time / beatDuration;
-        const currentBeat = Math.floor(totalBeats % currentNumerator);
+        // Use tick-based position for accurate beat tracking across meter changes.
+        const bar = transport.tickToBar(currentTick);
+        const barStartTick = transport.barToTick(bar);
+        const tickIntoBar = currentTick - barStartTick;
+        const ticksPerBeat = 960 * (4 / currentDenominator);
+        const currentBeat = Math.floor(tickIntoBar / ticksPerBeat);
 
         const dots = beatIndicator.querySelectorAll('.beat-dot');
         dots.forEach((dot, i) => {
           dot.classList.toggle('active', i === currentBeat);
         });
 
-        const bar = Math.floor(totalBeats / currentNumerator) + 1;
         const beat = currentBeat + 1;
         positionEl.textContent = 'Bar ' + bar + ' \u00B7 Beat ' + beat;
       }
