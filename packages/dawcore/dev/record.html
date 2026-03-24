@@ -99,9 +99,13 @@
     }
 
     const micSelect = document.getElementById('mic-select');
-    const audioConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
-
     const FALLBACK_CHANNELS = 2;
+    const audioConstraints = {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      channelCount: { ideal: FALLBACK_CHANNELS },
+    };
 
     function updateMicStatus(stream) {
       const track = stream.getAudioTracks()[0];
