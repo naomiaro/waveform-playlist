@@ -131,6 +131,14 @@ The reference library (webaudio-transport) avoids this entirely by not implement
 
 Set `editor.adapterFactory = () => new NativePlayoutAdapter(audioCtx)` before tracks load. The editor uses this factory instead of `createToneAdapter()` when building the engine.
 
+### dawcore dev pages
+
+Only `multiclip.html` uses the native transport. `record.html` and `index.html` still use `createToneAdapter()`.
+
 ### React (WaveformPlaylistContext)
 
 Not yet integrated. Future work: pass `NativePlayoutAdapter` via the engine's `adapter` option.
+
+## Not Yet Supported
+
+- **Recording** — The transport handles playback only. Recording (mic capture, AudioWorklet, clip creation) is handled by `@waveform-playlist/recording` and dawcore's `RecordingController`, which use the AudioContext directly and don't depend on Tone.js Transport. Recording should work alongside the native transport if the AudioContext is shared, but this path is untested. `record.html` stays on the Tone adapter for now.
