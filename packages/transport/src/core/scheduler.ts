@@ -52,23 +52,33 @@ export class Scheduler<T extends SchedulerEvent> {
     const targetEdge = currentTime + this._lookahead;
 
     if (this._loopEnabled && this._loopEnd > this._loopStart) {
-      // Check if window crosses loop boundary
-      if (this._rightEdge < this._loopEnd && targetEdge >= this._loopEnd) {
+      const loopDuration = this._loopEnd - this._loopStart;
+      let remaining = targetEdge - this._rightEdge;
+
+      // Handle multiple loop wraps (loop region shorter than lookahead)
+      while (remaining > 0) {
+        const distToEnd = this._loopEnd - this._rightEdge;
+        if (distToEnd <= 0 || distToEnd > remaining) {
+          // No wrap needed — generate remaining window
+          this._generateAndConsume(this._rightEdge, this._rightEdge + remaining);
+          this._rightEdge += remaining;
+          break;
+        }
         // Generate up to loopEnd
         this._generateAndConsume(this._rightEdge, this._loopEnd);
+        remaining -= distToEnd;
         // Notify listeners of position jump
         for (const listener of this._listeners) {
           listener.onPositionJump(this._loopStart);
         }
-        // Seek clock back to loopStart so subsequent advance() calls
-        // receive currentTime values within the loop region
+        // Seek clock back to loopStart
         this._onLoop?.(this._loopStart);
-        // Continue from loopStart
-        const remaining = targetEdge - this._loopEnd;
-        this._generateAndConsume(this._loopStart, this._loopStart + remaining);
-        this._rightEdge = this._loopStart + remaining;
-        return;
+        this._rightEdge = this._loopStart;
+
+        // Guard against infinite loop from zero-length loop regions
+        if (loopDuration <= 0) break;
       }
+      return;
     }
 
     if (targetEdge > this._rightEdge) {

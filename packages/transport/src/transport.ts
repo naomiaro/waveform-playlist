@@ -30,9 +30,9 @@ export class Transport {
   private _sampleTimeline: SampleTimeline;
   private _tickTimeline: TickTimeline;
   private _tempoMap: TempoMap;
-  private _clipPlayer: ClipPlayer;
-  private _metronomePlayer: MetronomePlayer;
-  private _masterNode: MasterNode;
+  private _clipPlayer!: ClipPlayer;
+  private _metronomePlayer!: MetronomePlayer;
+  private _masterNode!: MasterNode;
   private _trackNodes: Map<string, TrackNode> = new Map();
   private _tracks: ClipTrack[] = [];
   private _soloedTrackIds: Set<string> = new Set();
@@ -50,30 +50,7 @@ export class Transport {
     const beatsPerBar = options.beatsPerBar ?? 4;
     const lookahead = options.schedulerLookahead ?? 0.2;
 
-    // Validate constructor inputs at system boundary
-    if (sampleRate <= 0) {
-      throw new Error(
-        '[waveform-playlist] Transport: sampleRate must be positive, got ' + sampleRate
-      );
-    }
-    if (ppqn <= 0 || !Number.isInteger(ppqn)) {
-      throw new Error(
-        '[waveform-playlist] Transport: ppqn must be a positive integer, got ' + ppqn
-      );
-    }
-    if (tempo <= 0) {
-      throw new Error('[waveform-playlist] Transport: tempo must be positive, got ' + tempo);
-    }
-    if (beatsPerBar <= 0 || !Number.isInteger(beatsPerBar)) {
-      throw new Error(
-        '[waveform-playlist] Transport: beatsPerBar must be a positive integer, got ' + beatsPerBar
-      );
-    }
-    if (lookahead <= 0) {
-      throw new Error(
-        '[waveform-playlist] Transport: schedulerLookahead must be positive, got ' + lookahead
-      );
-    }
+    Transport._validateOptions(sampleRate, ppqn, tempo, beatsPerBar, lookahead);
 
     this._clock = new Clock(audioContext);
     this._scheduler = new Scheduler({
@@ -86,34 +63,14 @@ export class Transport {
     this._tickTimeline = new TickTimeline(ppqn);
     this._tempoMap = new TempoMap(ppqn, tempo);
 
-    this._masterNode = new MasterNode(audioContext);
-    this._masterNode.output.connect(audioContext.destination);
-
-    // Bind toAudioTime so players can convert transport time → AudioContext time
-    const toAudioTime = (transportTime: number) => this._clock.toAudioTime(transportTime);
-
-    this._clipPlayer = new ClipPlayer(audioContext, this._sampleTimeline, toAudioTime);
-    this._metronomePlayer = new MetronomePlayer(
-      audioContext,
-      this._tempoMap,
-      this._tickTimeline,
-      this._masterNode.input,
-      toAudioTime
-    );
-    this._metronomePlayer.setBeatsPerBar(beatsPerBar);
-
-    this._scheduler.addListener(this._clipPlayer);
-    this._scheduler.addListener(this._metronomePlayer);
+    this._initAudioGraph(audioContext, beatsPerBar);
 
     this._timer = new Timer(() => {
       const time = this._clock.getTime();
-
-      // Check endTime
       if (this._endTime !== undefined && time >= this._endTime) {
         this.stop();
         return;
       }
-
       this._scheduler.advance(time);
     });
   }
@@ -184,6 +141,9 @@ export class Transport {
     this._silenceAll();
     this._clock.seekTo(time);
     this._scheduler.reset(time);
+    // Clear stale endTime — seeking past a previous endTime shouldn't
+    // cause immediate stop on the next play()
+    this._endTime = undefined;
 
     if (wasPlaying) {
       this._clock.start();
@@ -338,6 +298,16 @@ export class Transport {
   // --- Loop ---
 
   setLoop(enabled: boolean, start: number, end: number): void {
+    if (enabled && start >= end) {
+      console.warn(
+        '[waveform-playlist] Transport.setLoop: start (' +
+          start +
+          ') must be less than end (' +
+          end +
+          ')'
+      );
+      return;
+    }
     this._scheduler.setLoop(enabled, start, end);
     this._clipPlayer.setLoop(enabled, start, end);
     this._emit('loop');
@@ -414,6 +384,58 @@ export class Transport {
   }
 
   // --- Private ---
+
+  private static _validateOptions(
+    sampleRate: number,
+    ppqn: number,
+    tempo: number,
+    beatsPerBar: number,
+    lookahead: number
+  ): void {
+    if (sampleRate <= 0) {
+      throw new Error(
+        '[waveform-playlist] Transport: sampleRate must be positive, got ' + sampleRate
+      );
+    }
+    if (ppqn <= 0 || !Number.isInteger(ppqn)) {
+      throw new Error(
+        '[waveform-playlist] Transport: ppqn must be a positive integer, got ' + ppqn
+      );
+    }
+    if (tempo <= 0) {
+      throw new Error('[waveform-playlist] Transport: tempo must be positive, got ' + tempo);
+    }
+    if (beatsPerBar <= 0 || !Number.isInteger(beatsPerBar)) {
+      throw new Error(
+        '[waveform-playlist] Transport: beatsPerBar must be a positive integer, got ' + beatsPerBar
+      );
+    }
+    if (lookahead <= 0) {
+      throw new Error(
+        '[waveform-playlist] Transport: schedulerLookahead must be positive, got ' + lookahead
+      );
+    }
+  }
+
+  private _initAudioGraph(audioContext: AudioContext, beatsPerBar: number): void {
+    this._masterNode = new MasterNode(audioContext);
+    this._masterNode.output.connect(audioContext.destination);
+
+    const toAudioTime = (transportTime: number) => this._clock.toAudioTime(transportTime);
+
+    this._clipPlayer = new ClipPlayer(audioContext, this._sampleTimeline, toAudioTime);
+    this._metronomePlayer = new MetronomePlayer(
+      audioContext,
+      this._tempoMap,
+      this._tickTimeline,
+      this._masterNode.input,
+      toAudioTime
+    );
+    this._metronomePlayer.setBeatsPerBar(beatsPerBar);
+
+    this._scheduler.addListener(this._clipPlayer);
+    this._scheduler.addListener(this._metronomePlayer);
+  }
 
   private _silenceAll(): void {
     this._clipPlayer.silence();

@@ -142,12 +142,21 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     gainNode.gain.value = event.gain;
 
     // Apply fades (AudioParam scheduling uses AudioContext time)
-    if (event.fadeInDuration > 0) {
-      gainNode.gain.setValueAtTime(0, when);
-      gainNode.gain.linearRampToValueAtTime(event.gain, when + event.fadeInDuration);
+    // Clamp fades so they don't overlap (split duration evenly if they would)
+    let fadeIn = event.fadeInDuration;
+    let fadeOut = event.fadeOutDuration;
+    if (fadeIn + fadeOut > event.duration) {
+      const ratio = event.duration / (fadeIn + fadeOut);
+      fadeIn *= ratio;
+      fadeOut *= ratio;
     }
-    if (event.fadeOutDuration > 0) {
-      const fadeOutStart = when + event.duration - event.fadeOutDuration;
+
+    if (fadeIn > 0) {
+      gainNode.gain.setValueAtTime(0, when);
+      gainNode.gain.linearRampToValueAtTime(event.gain, when + fadeIn);
+    }
+    if (fadeOut > 0) {
+      const fadeOutStart = when + event.duration - fadeOut;
       gainNode.gain.setValueAtTime(event.gain, fadeOutStart);
       gainNode.gain.linearRampToValueAtTime(0, when + event.duration);
     }
@@ -230,6 +239,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   }
 
   private _silenceTrack(trackId: string): void {
+    const toDelete: AudioBufferSourceNode[] = [];
     for (const [source, info] of this._activeSources) {
       if (info.trackId === trackId) {
         try {
@@ -248,8 +258,11 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
             String(err)
           );
         }
-        this._activeSources.delete(source);
+        toDelete.push(source);
       }
+    }
+    for (const source of toDelete) {
+      this._activeSources.delete(source);
     }
   }
 }
