@@ -39,11 +39,6 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     }
   }
 
-  /** @deprecated Use meterMap.setMeter(beats, 4) instead */
-  setBeatsPerBar(beats: number): void {
-    this._meterMap.setMeter(beats, 4);
-  }
-
   setClickSounds(accent: AudioBuffer, normal: AudioBuffer): void {
     this._accentBuffer = accent;
     this._normalBuffer = normal;

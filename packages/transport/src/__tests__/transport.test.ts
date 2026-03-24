@@ -312,13 +312,7 @@ describe('Transport', () => {
     expect(transport.barToTick(2)).toBe(3840); // 4/4 default
   });
 
-  it('setBeatsPerBar backwards compat calls setMeter', () => {
-    const ctx = mockAudioContext();
-    const transport = new Transport(ctx);
-    transport.setBeatsPerBar(3);
-    expect(transport.getMeter().numerator).toBe(3);
-    expect(transport.getMeter().denominator).toBe(4);
-  });
+
 
   it('removeMeter fires meterchange event', () => {
     const ctx = mockAudioContext();

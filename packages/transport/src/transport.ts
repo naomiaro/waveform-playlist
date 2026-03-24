@@ -370,11 +370,6 @@ export class Transport {
     return this._tempoMap.ticksToSeconds(tick);
   }
 
-  /** @deprecated Use setMeter(beats, 4) instead */
-  setBeatsPerBar(beats: number): void {
-    this.setMeter(beats, 4);
-  }
-
   // --- Metronome ---
 
   setMetronomeEnabled(enabled: boolean): void {

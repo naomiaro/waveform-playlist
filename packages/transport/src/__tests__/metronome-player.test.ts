@@ -47,7 +47,6 @@ describe('MetronomePlayer', () => {
   it('generate produces beat events at correct times', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
-    player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
     // At 120 BPM, beats are at 0, 0.5, 1.0, 1.5, 2.0...
@@ -62,7 +61,7 @@ describe('MetronomePlayer', () => {
   it('accent on beat 1 of each bar', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
-    player.setBeatsPerBar(4);
+
     const accent = createMockBuffer();
     const normal = createMockBuffer();
     player.setClickSounds(accent, normal);
@@ -81,7 +80,7 @@ describe('MetronomePlayer', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(false);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
-    player.setBeatsPerBar(4);
+
 
     const events = player.generate(0, 2);
     expect(events.length).toBe(0);
@@ -90,7 +89,6 @@ describe('MetronomePlayer', () => {
   it('consume creates and starts a source', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
-    player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
     const events = player.generate(0, 0.2);
@@ -104,7 +102,6 @@ describe('MetronomePlayer', () => {
   it('silence stops active sources', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
-    player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
     const events = player.generate(0, 0.2);
@@ -118,7 +115,6 @@ describe('MetronomePlayer', () => {
   it('onPositionJump clears active sources', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
-    player.setBeatsPerBar(4);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
     const events = player.generate(0, 0.2);

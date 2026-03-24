@@ -277,7 +277,7 @@
       if (!e.target.dataset.beats) return;
       beatsPerBar = Number(e.target.dataset.beats);
       denominator = beatsPerBar >= 6 ? 8 : 4;
-      transport.setBeatsPerBar(beatsPerBar);
+      transport.setMeter(beatsPerBar, denominator);
       buildBeatDots(beatsPerBar);
       timeSigsEl.querySelectorAll('button').forEach(btn => {
         btn.classList.toggle('selected', Number(btn.dataset.beats) === beatsPerBar);
