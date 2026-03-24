@@ -61,12 +61,21 @@ export class Transport {
     this._masterNode = new MasterNode(audioContext);
     this._masterNode.output.connect(audioContext.destination);
 
-    this._clipPlayer = new ClipPlayer(audioContext, this._sampleTimeline);
+    // Bind toAudioTime so players can convert transport time → AudioContext time
+    const toAudioTime = (transportTime: number) =>
+      this._clock.toAudioTime(transportTime);
+
+    this._clipPlayer = new ClipPlayer(
+      audioContext,
+      this._sampleTimeline,
+      toAudioTime
+    );
     this._metronomePlayer = new MetronomePlayer(
       audioContext,
       this._tempoMap,
       this._tickTimeline,
-      this._masterNode.input
+      this._masterNode.input,
+      toAudioTime
     );
     this._metronomePlayer.setBeatsPerBar(beatsPerBar);
 

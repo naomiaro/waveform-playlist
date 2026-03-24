@@ -72,6 +72,27 @@ describe('Clock', () => {
     expect(clock.getTime()).toBe(7);
   });
 
+  it('toAudioTime converts transport time to AudioContext time', () => {
+    const ctx = mockAudioContext(100);
+    const clock = new Clock(ctx);
+    clock.start();
+    (ctx as any).currentTime = 102;
+    // Transport time is 2.0. Event at transport time 2.5 is 0.5s in the future.
+    // AudioContext time for that event = 102 + (2.5 - 2.0) = 102.5
+    expect(clock.toAudioTime(2.5)).toBeCloseTo(102.5);
+  });
+
+  it('toAudioTime works after seek', () => {
+    const ctx = mockAudioContext(100);
+    const clock = new Clock(ctx);
+    clock.start();
+    clock.seekTo(10); // jump to transport time 10
+    (ctx as any).currentTime = 101;
+    // Transport time is 11.0 (10 + 1 elapsed). Event at 11.5 is 0.5s ahead.
+    // AudioContext time = 101 + (11.5 - 11.0) = 101.5
+    expect(clock.toAudioTime(11.5)).toBeCloseTo(101.5);
+  });
+
   it('isRunning reflects state', () => {
     const ctx = mockAudioContext(0);
     const clock = new Clock(ctx);

@@ -12,6 +12,7 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
   private _tempoMap: TempoMap;
   private _tickTimeline: TickTimeline;
   private _destination: AudioNode;
+  private _toAudioTime: (transportTime: number) => number;
   private _enabled = false;
   private _beatsPerBar = 4;
   private _accentBuffer: AudioBuffer | null = null;
@@ -22,12 +23,14 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     audioContext: AudioContext,
     tempoMap: TempoMap,
     tickTimeline: TickTimeline,
-    destination: AudioNode
+    destination: AudioNode,
+    toAudioTime: (transportTime: number) => number
   ) {
     this._audioContext = audioContext;
     this._tempoMap = tempoMap;
     this._tickTimeline = tickTimeline;
     this._destination = destination;
+    this._toAudioTime = toAudioTime;
   }
 
   setEnabled(enabled: boolean): void {
@@ -86,7 +89,7 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
       this._activeSources.delete(source);
     });
 
-    source.start(event.audioTime);
+    source.start(this._toAudioTime(event.audioTime));
   }
 
   onPositionJump(_newTime: number): void {

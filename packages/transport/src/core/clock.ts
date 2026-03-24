@@ -45,6 +45,14 @@ export class Clock {
     }
   }
 
+  /**
+   * Convert transport time to AudioContext.currentTime space.
+   * Used by players to schedule AudioBufferSourceNode.start(when).
+   */
+  toAudioTime(transportTime: number): number {
+    return this._audioContext.currentTime + (transportTime - this.getTime());
+  }
+
   isRunning(): boolean {
     return this._running;
   }

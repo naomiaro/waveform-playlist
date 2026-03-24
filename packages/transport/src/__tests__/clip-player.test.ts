@@ -92,7 +92,7 @@ describe('ClipPlayer', () => {
     const clip = makeClip({ startSample: 0, durationSamples: 48000 }); // 0-1s
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(0, 0.5);
@@ -106,7 +106,7 @@ describe('ClipPlayer', () => {
     const clip = makeClip({ durationSamples: 0 });
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(0, 1);
@@ -117,7 +117,7 @@ describe('ClipPlayer', () => {
     const clip = makeClip({ audioBuffer: undefined });
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(0, 1);
@@ -127,7 +127,7 @@ describe('ClipPlayer', () => {
   it('generate returns [] for empty tracks', () => {
     const track = makeTrack([]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(0, 1);
@@ -138,7 +138,7 @@ describe('ClipPlayer', () => {
     const clip = makeClip({ startSample: 0, durationSamples: 48000, offsetSamples: 0 });
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(0, 0.2);
@@ -158,7 +158,7 @@ describe('ClipPlayer', () => {
     const clip = makeClip();
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(0, 0.2);
@@ -178,7 +178,7 @@ describe('ClipPlayer', () => {
     });
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // First consume an event
@@ -201,7 +201,7 @@ describe('ClipPlayer', () => {
     });
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(1.0, 1.2); // window after clip
@@ -216,7 +216,7 @@ describe('ClipPlayer', () => {
     });
     const track = makeTrack([clip]);
     const trackNode = createMockTrackNode('track-1');
-    const player = new ClipPlayer(ctx, sampleTimeline);
+    const player = new ClipPlayer(ctx, sampleTimeline, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     const events = player.generate(0.5, 0.7);

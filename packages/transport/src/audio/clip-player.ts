@@ -29,6 +29,7 @@ interface TrackClipState {
 export class ClipPlayer implements SchedulerListener<ClipEvent> {
   private _audioContext: AudioContext;
   private _sampleTimeline: SampleTimeline;
+  private _toAudioTime: (transportTime: number) => number;
   private _tracks: Map<string, TrackClipState> = new Map();
   private _trackNodes: Map<string, TrackNode> = new Map();
   private _activeSources: Map<
@@ -36,9 +37,14 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     { trackId: string; gainNode: GainNode }
   > = new Map();
 
-  constructor(audioContext: AudioContext, sampleTimeline: SampleTimeline) {
+  constructor(
+    audioContext: AudioContext,
+    sampleTimeline: SampleTimeline,
+    toAudioTime: (transportTime: number) => number
+  ) {
     this._audioContext = audioContext;
     this._sampleTimeline = sampleTimeline;
+    this._toAudioTime = toAudioTime;
   }
 
   setTracks(
@@ -123,26 +129,25 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     const source = this._audioContext.createBufferSource();
     source.buffer = event.audioBuffer;
 
+    // Convert transport time → AudioContext.currentTime for scheduling
+    const when = this._toAudioTime(event.audioTime);
+
     // Create a gain node for per-clip gain and fades
     const gainNode = this._audioContext.createGain();
     gainNode.gain.value = event.gain;
 
-    // Apply fades
+    // Apply fades (AudioParam scheduling uses AudioContext time)
     if (event.fadeInDuration > 0) {
-      gainNode.gain.setValueAtTime(0, event.audioTime);
+      gainNode.gain.setValueAtTime(0, when);
       gainNode.gain.linearRampToValueAtTime(
         event.gain,
-        event.audioTime + event.fadeInDuration
+        when + event.fadeInDuration
       );
     }
     if (event.fadeOutDuration > 0) {
-      const fadeOutStart =
-        event.audioTime + event.duration - event.fadeOutDuration;
+      const fadeOutStart = when + event.duration - event.fadeOutDuration;
       gainNode.gain.setValueAtTime(event.gain, fadeOutStart);
-      gainNode.gain.linearRampToValueAtTime(
-        0,
-        event.audioTime + event.duration
-      );
+      gainNode.gain.linearRampToValueAtTime(0, when + event.duration);
     }
 
     source.connect(gainNode);
@@ -163,7 +168,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
       }
     });
 
-    source.start(event.audioTime, event.offset, event.duration);
+    source.start(when, event.offset, event.duration);
   }
 
   onPositionJump(newTime: number): void {

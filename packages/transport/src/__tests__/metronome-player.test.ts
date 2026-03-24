@@ -48,7 +48,8 @@ describe('MetronomePlayer', () => {
       ctx,
       tempoMap,
       tickTimeline,
-      destination
+      destination,
+      (t) => t
     );
     player.setEnabled(true);
     player.setBeatsPerBar(4);
@@ -68,7 +69,8 @@ describe('MetronomePlayer', () => {
       ctx,
       tempoMap,
       tickTimeline,
-      destination
+      destination,
+      (t) => t
     );
     player.setEnabled(true);
     player.setBeatsPerBar(4);
@@ -91,7 +93,8 @@ describe('MetronomePlayer', () => {
       ctx,
       tempoMap,
       tickTimeline,
-      destination
+      destination,
+      (t) => t
     );
     player.setEnabled(false);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -106,7 +109,8 @@ describe('MetronomePlayer', () => {
       ctx,
       tempoMap,
       tickTimeline,
-      destination
+      destination,
+      (t) => t
     );
     player.setEnabled(true);
     player.setBeatsPerBar(4);
@@ -125,7 +129,8 @@ describe('MetronomePlayer', () => {
       ctx,
       tempoMap,
       tickTimeline,
-      destination
+      destination,
+      (t) => t
     );
     player.setEnabled(true);
     player.setBeatsPerBar(4);
@@ -144,7 +149,8 @@ describe('MetronomePlayer', () => {
       ctx,
       tempoMap,
       tickTimeline,
-      destination
+      destination,
+      (t) => t
     );
     player.setEnabled(true);
     player.setBeatsPerBar(4);
