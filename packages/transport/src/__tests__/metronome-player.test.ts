@@ -112,18 +112,19 @@ describe('MetronomePlayer', () => {
     expect(source.stop).toHaveBeenCalledTimes(1);
   });
 
-  it('onPositionJump clears active sources', () => {
+  it('onPositionJump does not silence — clicks are short one-shots', () => {
     const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
     const events = player.generate(0, 384);
     player.consume(events[0]);
-    // 1.0s = 1920 ticks at 120 BPM, 960 PPQN
     player.onPositionJump(1920);
 
+    // Clicks should NOT be stopped on position jump — they finish naturally.
+    // Only silence() (stop/pause) kills active sources.
     const source = (ctx.createBufferSource as any).mock.results[0].value;
-    expect(source.stop).toHaveBeenCalledTimes(1);
+    expect(source.stop).not.toHaveBeenCalled();
   });
 
   it('generates beats using MeterMap beat size (6/8 = eighth notes)', () => {

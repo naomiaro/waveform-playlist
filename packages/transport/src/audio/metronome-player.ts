@@ -103,7 +103,10 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
   }
 
   onPositionJump(_newTick: number): void {
-    this.silence();
+    // Don't silence — clicks are short one-shots that finish naturally.
+    // Calling silence() here kills clicks scheduled in the lookahead window
+    // that haven't played yet, causing the last beat before a loop wrap
+    // to be cut off.
   }
 
   silence(): void {
