@@ -109,7 +109,7 @@
       const ctxRate = editor.effectiveSampleRate;
       const micRate = settings.sampleRate;
       const micRateStr = micRate ? micRate + 'Hz' : 'unknown Hz';
-      const ch = settings.channelCount ?? FALLBACK_CHANNELS;
+      const ch = settings.channelCount ?? 1;
       const rateNote = micRate && micRate !== ctxRate ? ' (resampling)' : '';
       micStatus.textContent = ch + 'ch ' + micRateStr + ' \u2192 ' + ctxRate + 'Hz' + rateNote;
       addLog('Mic: ' + track.label + ' ' + ch + 'ch ' + micRateStr + ', ctx ' + ctxRate + 'Hz' + rateNote);
