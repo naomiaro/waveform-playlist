@@ -13,3 +13,5 @@ export { Timer } from './core/timer';
 export { SampleTimeline } from './timeline/sample-timeline';
 export { TickTimeline } from './timeline/tick-timeline';
 export { TempoMap } from './timeline/tempo-map';
+export { MasterNode } from './audio/master-node';
+export { TrackNode } from './audio/track-node';
