@@ -66,11 +66,28 @@ editor.adapterFactory = () => new NativePlayoutAdapter(audioContext);
 ```typescript
 const transport = new Transport(audioContext, {
   tempo: 120,
-  beatsPerBar: 4,
+  numerator: 4,
+  denominator: 4,
 });
 
 transport.setMetronomeEnabled(true);
 transport.setMetronomeClickSounds(accentBuffer, normalBuffer);
+transport.play();
+```
+
+### Mixed Meter
+
+```typescript
+const transport = new Transport(audioContext, { tempo: 120, numerator: 4, denominator: 4 });
+
+// Switch to 7/8 at bar 5
+transport.setMeter(7, 8, transport.barToTick(5));
+
+// Query active meter at any tick
+const { numerator, denominator } = transport.getMeter(transport.barToTick(5));
+// → { numerator: 7, denominator: 8 }
+
+transport.setMetronomeEnabled(true);
 transport.play();
 ```
 
@@ -102,8 +119,11 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 | `sampleRate` | `audioContext.sampleRate` | Sample rate for timeline conversions |
 | `ppqn` | `960` | Ticks per quarter note |
 | `tempo` | `120` | Initial tempo in BPM |
-| `beatsPerBar` | `4` | Beats per bar |
+| `numerator` | `4` | Beats per bar (time signature numerator) |
+| `denominator` | `4` | Beat unit (time signature denominator) |
 | `schedulerLookahead` | `0.2` | How far ahead to schedule (seconds) |
+
+> **Note:** `beatsPerBar` is deprecated. Use `numerator`/`denominator` instead.
 
 **Playback:**
 - `play(startTime?, endTime?)` — Start or resume playback
@@ -129,9 +149,15 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 **Loop:**
 - `setLoop(enabled, start, end)` — Set loop region in seconds
 
-**Tempo & Metronome:**
-- `setTempo(bpm)` / `getTempo()`
-- `setBeatsPerBar(beats)`
+**Tempo & Meter:**
+- `setTempo(bpm, atTick?)` / `getTempo(atTick?)`
+- `clearTempos()` — remove all tempo entries
+- `setMeter(numerator, denominator, atTick?)` / `getMeter(atTick?)`
+- `removeMeter(atTick)` / `clearMeters()`
+- `barToTick(bar)` / `tickToBar(tick)`
+- `setBeatsPerBar(beats)` _(deprecated — use `setMeter`)_
+
+**Metronome:**
 - `setMetronomeEnabled(enabled)`
 - `setMetronomeClickSounds(accent, normal)`
 

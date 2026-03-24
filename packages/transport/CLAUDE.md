@@ -42,6 +42,17 @@ Both coordinate systems convert to seconds at the scheduler boundary. The schedu
 
 `setTempo(bpm, atTick)` recomputes `secondsAtTick` from the insertion point forward. For single-tempo use (typical), this is a no-op — one entry at tick 0.
 
+### MeterMap
+
+Parallel to TempoMap, stores time signature entries at tick positions. Each entry: `{ tick, numerator, denominator, barAtTick }`.
+
+- **Beat unit from denominator:** `ticksPerBeat = ppqn * (4 / denominator)`. A denominator of 4 gives one quarter-note beat; 8 gives one eighth-note beat.
+- **Bar boundary constraint:** `setMeter(numerator, denominator, atTick?)` snaps `atTick` to the nearest preceding bar boundary in the current meter. This keeps bar numbers consistent for all subsequent entries.
+- **Conversions:** `barToTick(bar)` walks the entry list accumulating bar counts; `tickToBar(tick)` is the inverse. Both return 1-indexed bar numbers matching `TickTimeline.toPosition()`.
+- **`clearMeters()`** removes all entries and resets to the initial meter.
+
+`MetronomePlayer.generate()` queries the MeterMap per beat to determine accent placement (beat 1 of each bar) and beat unit duration.
+
 ## Audio Layer
 
 ### TrackNode Signal Chain
