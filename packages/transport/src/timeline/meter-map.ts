@@ -66,6 +66,7 @@ export class MeterMap {
       this._entries.splice(i + 1, 0, { tick: snapped, numerator, denominator, barAtTick });
       i = i + 1;
     }
+    this._resnapDownstreamEntries(i);
     this._recomputeCache(i);
   }
 

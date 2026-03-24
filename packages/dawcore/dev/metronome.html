@@ -198,7 +198,7 @@
     import { Transport } from '@dawcore/transport';
 
     const audioCtx = new AudioContext({ sampleRate: 48000 });
-    const transport = new Transport(audioCtx, { tempo: 120, beatsPerBar: 4 });
+    const transport = new Transport(audioCtx, { tempo: 120, numerator: 4, denominator: 4 });
 
     let beatsPerBar = 4;
     let denominator = 4;
