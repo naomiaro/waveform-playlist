@@ -92,6 +92,28 @@ Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (requir
 - **`_activeSources` cleanup** — ClipPlayer uses `ended` event listener for automatic cleanup. MetronomePlayer clicks are short one-shots.
 - **rAF exclusively** — no setTimeout/setInterval anywhere. The lookahead window (200ms) provides sufficient scheduling headroom.
 
+## Critical Gotchas
+
+### Transport Time vs AudioContext Time
+
+`AudioBufferSourceNode.start(when)` and `AudioParam` scheduling methods expect `when` in `AudioContext.currentTime` space (absolute hardware time, e.g., 100.5). The scheduler generates events in **transport time** (elapsed seconds from timeline start, e.g., 0.5). Without conversion, all clips in the lookahead window fire immediately (past timestamps).
+
+**Fix:** `Clock.toAudioTime(transportTime)` converts: `audioContext.currentTime + (transportTime - clock.getTime())`. Both `ClipPlayer` and `MetronomePlayer` receive this as a constructor parameter.
+
+### Generate-Once Scheduling
+
+`ClipPlayer.generate()` must only create events when a clip's `startTime` falls within the scheduling window `[fromTime, toTime)`. Clips that started in a previous window are already playing — their `AudioBufferSourceNode` runs for its full duration. Re-generating for overlapping clips creates duplicate stacking sources that ramp volume.
+
+Mid-clip playback (seek, loop wrap, resume from pause) is handled by `onPositionJump()`, not `generate()`.
+
+### Pause/Resume Requires Position Jump
+
+After `pause()`, `silence()` kills all active sources. On `play()` (resume), the scheduler's `rightEdge` still thinks those clips are scheduled. `generate()` won't recreate them because their `startTime` is in the past.
+
+**Fix:** `play()` always resets the scheduler to the current position and calls `clipPlayer.onPositionJump()` to create mid-clip sources. Effectively treats resume as "seek to current position."
+
+The reference library (webaudio-transport) avoids this entirely by not implementing pause — only stop + start.
+
 ## What This Solves
 
 | Problem | Solution |
