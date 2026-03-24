@@ -24,6 +24,10 @@ Sliding window event generation. `advance(currentTime)` expands the window to `c
 
 **Listener contract:** `SchedulerListener<T>` has four methods: `generate()`, `consume()`, `onPositionJump()`, `silence()`. Both `ClipPlayer` and `MetronomePlayer` implement this.
 
+**Tick-based internals (v0.0.3):** Loop boundaries (`_loopStart`, `_loopEnd`) and the scheduling cursor (`_rightEdge`) are integer ticks. `advance()` converts Clock seconds → ticks via TempoMap at entry, then uses integer comparisons for loop wrap logic. `onLoop` callback converts back to seconds for `Clock.seekTo()`. This eliminates float precision drift at loop boundaries.
+
+**Loop APIs:** `setLoop(enabled, startTick, endTick)` is the primary tick-based API. `setLoopSeconds()` and `setLoopSamples()` are convenience methods that convert at the boundary. `NativePlayoutAdapter.setLoop()` calls `setLoopSeconds()` since the engine speaks seconds.
+
 ### Timer
 
 Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeout` or `setInterval`. The scheduler's 200ms lookahead absorbs any frame timing jitter.
@@ -36,7 +40,7 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 - **TempoMap** — converts between ticks and seconds. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
 - **MeterMap** — time signature entries at tick positions. See MeterMap section below.
 
-Both coordinate systems convert to seconds at the scheduler boundary. The scheduler only works in seconds.
+SampleTimeline converts between samples, seconds, and ticks (via TempoMap). The Scheduler works in integer ticks — seconds from the Clock are converted at the top of `advance()`. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples.
 
 ### TempoMap Cache Invalidation
 
