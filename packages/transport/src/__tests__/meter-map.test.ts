@@ -100,12 +100,14 @@ describe('MeterMap', () => {
     warnSpy.mockRestore();
   });
 
-  it('setMeter at tick 0 preserves downstream entries', () => {
+  it('setMeter at tick 0 preserves downstream entries (re-snapped)', () => {
     const mm = new MeterMap(960);
-    mm.setMeter(7, 8, 3840); // bar 2 = 7/8
-    mm.setMeter(6, 8); // change tick 0 to 6/8
+    mm.setMeter(7, 8, 3840); // bar 2 in 4/4
+    mm.setMeter(6, 8); // change tick 0 to 6/8 (ticksPerBar=2880)
     expect(mm.getMeter(0).numerator).toBe(6);
-    expect(mm.getMeter(3840).numerator).toBe(7); // still 7/8
+    // 3840 is not on a 6/8 bar boundary — entry re-snapped to 5760 (2*2880)
+    expect(mm.getMeter(3840).numerator).toBe(6); // still 6/8 at 3840
+    expect(mm.getMeter(5760).numerator).toBe(7); // 7/8 moved here
   });
 
   it('clearMeters preserves non-default initial meter', () => {
@@ -197,5 +199,54 @@ describe('MeterMap', () => {
       const tick = mm.barToTick(bar);
       expect(mm.tickToBar(tick)).toBe(bar);
     }
+  });
+
+  it('setMeter at tick 0 re-snaps downstream entries', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840); // bar 2 in 4/4
+    mm.setMeter(6, 8); // change tick 0 to 6/8 (ticksPerBar=2880)
+    // 3840 is not on a 6/8 bar boundary (3840/2880=1.33)
+    // Should snap to 2880*2=5760
+    // Verify barToTick still round-trips
+    const bar2Tick = mm.barToTick(2);
+    expect(mm.tickToBar(bar2Tick)).toBe(2);
+    // barAtTick should be integer
+    expect(Number.isInteger(mm.tickToBar(bar2Tick))).toBe(true);
+  });
+
+  it('setMeter updating an existing non-zero entry recomputes cache', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840);
+    // Update the same tick with different meter
+    mm.setMeter(5, 4, 3840);
+    expect(mm.getMeter(3840).numerator).toBe(5);
+    expect(mm.getMeter(3840).denominator).toBe(4);
+    // barToTick should still work
+    expect(mm.barToTick(2)).toBe(3840);
+    expect(mm.tickToBar(3840)).toBe(2);
+  });
+
+  it('barToTick throws for bar < 1', () => {
+    const mm = new MeterMap(960);
+    expect(() => mm.barToTick(0)).toThrow();
+    expect(() => mm.barToTick(-1)).toThrow();
+  });
+
+  it('removeMeter warns for non-existent tick', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mm = new MeterMap(960);
+    mm.removeMeter(9999);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no entry at tick'));
+    warnSpy.mockRestore();
+  });
+
+  it('isBarBoundary with mixed meters: old bar boundary is not bar boundary in new meter', () => {
+    const mm = new MeterMap(960);
+    mm.setMeter(7, 8, 3840); // bar 2 starts 7/8 (ticksPerBar=3360)
+    // 7680 was bar 3 in 4/4 (2*3840), but in 7/8 section:
+    // 7680 - 3840 = 3840, 3840 % 3360 = 480 ≠ 0
+    expect(mm.isBarBoundary(7680)).toBe(false);
+    // Actual bar 3 in 7/8: 3840 + 3360 = 7200
+    expect(mm.isBarBoundary(7200)).toBe(true);
   });
 });

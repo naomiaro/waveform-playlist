@@ -177,4 +177,17 @@ describe('MetronomePlayer', () => {
     expect(events[5].transportTime).toBeCloseTo(2.25);
     expect(events[6].transportTime).toBeCloseTo(2.5);
   });
+
+  it('generate with mid-beat fromTime snaps to next beat', () => {
+    const player = new MetronomePlayer(ctx, tempoMap, meterMap, destination, (t) => t);
+    player.setEnabled(true);
+    player.setClickSounds(createMockBuffer(), createMockBuffer());
+
+    // At 120 BPM, 4/4: beats at 0.0, 0.5, 1.0, 1.5...
+    // Starting mid-beat at 0.3 should snap to 0.5
+    const events = player.generate(0.3, 1.1);
+    expect(events.length).toBe(2); // 0.5, 1.0
+    expect(events[0].transportTime).toBeCloseTo(0.5);
+    expect(events[1].transportTime).toBeCloseTo(1.0);
+  });
 });

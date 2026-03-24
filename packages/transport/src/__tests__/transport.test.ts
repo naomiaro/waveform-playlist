@@ -331,6 +331,43 @@ describe('Transport', () => {
     expect(transport.getMeter().denominator).toBe(8);
   });
 
+  it('clearMeters fires meterchange and resets state', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setMeter(7, 8, 3840);
+    const onMeter = vi.fn();
+    transport.on('meterchange', onMeter);
+    transport.clearMeters();
+    expect(onMeter).toHaveBeenCalledTimes(1);
+    expect(transport.getMeter().numerator).toBe(4);
+  });
+
+  it('clearTempos fires tempochange', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setTempo(140, 3840);
+    const onTempo = vi.fn();
+    transport.on('tempochange', onTempo);
+    transport.clearTempos();
+    expect(onTempo).toHaveBeenCalledTimes(1);
+    expect(transport.getTempo()).toBe(120);
+  });
+
+  it('tickToBar delegates to MeterMap', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    expect(transport.tickToBar(0)).toBe(1);
+    expect(transport.tickToBar(3840)).toBe(2);
+  });
+
+  it('timeToTick and tickToTime round-trip', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    const tick = 3840;
+    const time = transport.tickToTime(tick);
+    expect(transport.timeToTick(time)).toBeCloseTo(tick);
+  });
+
   it('addTrack adds a single track', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

@@ -47,7 +47,7 @@ Both coordinate systems convert to seconds at the scheduler boundary. The schedu
 Parallel to TempoMap, stores time signature entries at tick positions. Each entry: `{ tick, numerator, denominator, barAtTick }`.
 
 - **Beat unit from denominator:** `ticksPerBeat = ppqn * (4 / denominator)`. A denominator of 4 gives one quarter-note beat; 8 gives one eighth-note beat.
-- **Bar boundary constraint:** `setMeter(numerator, denominator, atTick?)` snaps `atTick` to the nearest preceding bar boundary in the current meter. This keeps bar numbers consistent for all subsequent entries.
+- **Bar boundary constraint:** `setMeter(numerator, denominator, atTick?)` snaps `atTick` forward to the next bar boundary if not already on one. This keeps bar numbers consistent for all subsequent entries.
 - **Conversions:** `barToTick(bar)` walks the entry list accumulating bar counts; `tickToBar(tick)` is the inverse. Both return 1-indexed bar numbers.
 - **`clearMeters()`** removes all entries and resets to the initial meter.
 

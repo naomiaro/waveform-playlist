@@ -39,6 +39,8 @@ export class MeterMap {
 
     if (atTick === 0) {
       this._entries[0] = { ...this._entries[0], numerator, denominator };
+      // Re-snap downstream entries to bar boundaries of the new meter
+      this._resnapDownstreamEntries(0);
       this._recomputeCache(0);
       return;
     }
@@ -75,6 +77,8 @@ export class MeterMap {
     if (idx > 0) {
       this._entries.splice(idx, 1);
       this._recomputeCache(idx);
+    } else if (idx === -1) {
+      console.warn('[waveform-playlist] MeterMap.removeMeter: no entry at tick ' + atTick);
     }
   }
 
@@ -94,6 +98,9 @@ export class MeterMap {
   }
 
   barToTick(bar: number): number {
+    if (bar < 1) {
+      throw new Error('[waveform-playlist] MeterMap: bar must be >= 1, got ' + bar);
+    }
     const targetBar = bar - 1; // 0-indexed
     for (let i = 0; i < this._entries.length; i++) {
       const nextBar = i < this._entries.length - 1 ? this._entries[i + 1].barAtTick : Infinity;
@@ -103,6 +110,7 @@ export class MeterMap {
         return this._entries[i].tick + barsInto * tpb;
       }
     }
+    // Unreachable — last iteration always matches (nextBar = Infinity)
     const last = this._entries[this._entries.length - 1];
     const barsInto = targetBar - last.barAtTick;
     return last.tick + barsInto * this._ticksPerBarForEntry(last);
@@ -170,6 +178,30 @@ export class MeterMap {
         ...this._entries[i],
         barAtTick: prev.barAtTick + tickDelta / tpb,
       };
+    }
+  }
+
+  /**
+   * After changing a meter entry, re-snap downstream entries to bar boundaries
+   * of their preceding meter so barAtTick stays integer.
+   */
+  private _resnapDownstreamEntries(fromIndex: number): void {
+    for (let i = Math.max(1, fromIndex + 1); i < this._entries.length; i++) {
+      const prev = this._entries[i - 1];
+      const tpb = this._ticksPerBarForEntry(prev);
+      const tick = this._entries[i].tick;
+      const ticksIntoPrev = tick - prev.tick;
+      if (ticksIntoPrev % tpb !== 0) {
+        const snapped = prev.tick + Math.ceil(ticksIntoPrev / tpb) * tpb;
+        console.warn(
+          '[waveform-playlist] MeterMap: meter change moved entry from tick ' +
+            tick +
+            ' to ' +
+            snapped +
+            ' (bar boundary alignment)'
+        );
+        this._entries[i] = { ...this._entries[i], tick: snapped };
+      }
     }
   }
 
