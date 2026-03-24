@@ -153,9 +153,9 @@ describe('MetronomePlayer', () => {
     // Bar 1 (4/4): beats at 0, 0.5, 1.0, 1.5 — accent at 0
     // Bar 2 (3/4): beats at 2.0, 2.5, 3.0 — accent at 2.0
     const events = player.generate(0, 3.1);
-    expect(events[0].isAccent).toBe(true);  // beat 1 of bar 1
+    expect(events[0].isAccent).toBe(true); // beat 1 of bar 1
     expect(events[1].isAccent).toBe(false); // beat 2
-    expect(events[4].isAccent).toBe(true);  // beat 1 of bar 2 (3/4)
+    expect(events[4].isAccent).toBe(true); // beat 1 of bar 2 (3/4)
     // Bar 2 should have 3 beats (not 4)
     expect(events[5].isAccent).toBe(false); // beat 2 of bar 2
     expect(events[6].isAccent).toBe(false); // beat 3 of bar 2

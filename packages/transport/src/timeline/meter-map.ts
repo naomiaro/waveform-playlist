@@ -47,8 +47,10 @@ export class MeterMap {
     const snapped = this._snapToBarBoundary(atTick);
     if (snapped !== atTick) {
       console.warn(
-        '[waveform-playlist] MeterMap.setMeter: tick ' + atTick +
-        ' is not on a bar boundary, snapped to ' + snapped
+        '[waveform-playlist] MeterMap.setMeter: tick ' +
+          atTick +
+          ' is not on a bar boundary, snapped to ' +
+          snapped
       );
     }
 
@@ -69,7 +71,7 @@ export class MeterMap {
     if (atTick === 0) {
       throw new Error('[waveform-playlist] MeterMap: cannot remove meter at tick 0');
     }
-    const idx = this._entries.findIndex(e => e.tick === atTick);
+    const idx = this._entries.findIndex((e) => e.tick === atTick);
     if (idx > 0) {
       this._entries.splice(idx, 1);
       this._recomputeCache(idx);
@@ -94,9 +96,7 @@ export class MeterMap {
   barToTick(bar: number): number {
     const targetBar = bar - 1; // 0-indexed
     for (let i = 0; i < this._entries.length; i++) {
-      const nextBar = (i < this._entries.length - 1)
-        ? this._entries[i + 1].barAtTick
-        : Infinity;
+      const nextBar = i < this._entries.length - 1 ? this._entries[i + 1].barAtTick : Infinity;
       if (targetBar < nextBar) {
         const barsInto = targetBar - this._entries[i].barAtTick;
         const tpb = this._ticksPerBarForEntry(this._entries[i]);

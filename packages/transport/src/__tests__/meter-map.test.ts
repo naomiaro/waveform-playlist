@@ -136,8 +136,8 @@ describe('MeterMap', () => {
   it('barToTick with mixed meters', () => {
     const mm = new MeterMap(960); // 4/4
     mm.setMeter(7, 8, 3840); // bar 2 starts 7/8 (ticksPerBar = 3360)
-    expect(mm.barToTick(1)).toBe(0);      // bar 1: 4/4
-    expect(mm.barToTick(2)).toBe(3840);   // bar 2: 7/8 starts
+    expect(mm.barToTick(1)).toBe(0); // bar 1: 4/4
+    expect(mm.barToTick(2)).toBe(3840); // bar 2: 7/8 starts
     expect(mm.barToTick(3)).toBe(3840 + 3360); // bar 3: still 7/8
   });
 
