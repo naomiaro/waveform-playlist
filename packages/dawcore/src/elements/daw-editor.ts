@@ -279,6 +279,14 @@ export class DawEditorElement extends LitElement {
     } catch (err) {
       console.warn('[dawcore] Error disposing engine: ' + String(err));
     }
+    // Close owned AudioContext to release hardware resources.
+    // Skip when consumer provided an external context (they own its lifecycle).
+    if (this._ownedAudioContext) {
+      this._ownedAudioContext.close().catch((err) => {
+        console.warn('[dawcore] Error closing AudioContext: ' + String(err));
+      });
+      this._ownedAudioContext = null;
+    }
   }
   willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has('eagerResume')) {
@@ -777,7 +785,7 @@ export class DawEditorElement extends LitElement {
     try {
       const engine = await this._ensureEngine();
       // Always init — adapter awaits pending rebuild init if needed,
-      // and Tone.start() is a no-op if already running.
+      // Always init — resumes AudioContext if suspended (requires user gesture).
       await engine.init();
       engine.play(startTime);
       this._startPlayhead();
@@ -819,7 +827,7 @@ export class DawEditorElement extends LitElement {
       return;
     }
     if (this._isPlaying) {
-      // Tone.js needs stop+play to reschedule audio sources at new position
+      // Transport needs stop+play to reschedule audio sources at new position
       this.stop();
       this.play(time);
     } else {

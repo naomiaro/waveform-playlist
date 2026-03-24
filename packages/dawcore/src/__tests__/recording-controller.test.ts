@@ -118,6 +118,33 @@ describe('RecordingController', () => {
     expect(mockSource.connect).toHaveBeenCalledWith(mockWorkletNode);
   });
 
+  it('creates AudioWorkletNode with correct context, processor, and channel options', async () => {
+    const controller = new RecordingController(host);
+    const stream = createMockStream(2);
+
+    await controller.startRecording(stream, { trackId: 'track-1' });
+
+    expect(AudioWorkletNode).toHaveBeenCalledWith(
+      host.audioContext,
+      'recording-processor',
+      expect.objectContaining({
+        channelCount: 2,
+        channelCountMode: 'explicit',
+      })
+    );
+  });
+
+  it('only calls addModule once across multiple recordings', async () => {
+    const controller = new RecordingController(host);
+
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    controller.stopRecording();
+    host._selectedTrackId = 'track-2';
+    await controller.startRecording(createMockStream(), { trackId: 'track-2' });
+
+    expect(host.audioContext.audioWorklet.addModule).toHaveBeenCalledTimes(1);
+  });
+
   it('startRecording warns and returns when no trackId', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const controller = new RecordingController(host);

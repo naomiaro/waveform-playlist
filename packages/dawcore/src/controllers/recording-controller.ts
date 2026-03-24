@@ -70,7 +70,7 @@ export interface RecordingHost extends ReactiveControllerHost {
 export class RecordingController implements ReactiveController {
   private _host: RecordingHost & HTMLElement;
   private _sessions = new Map<string, RecordingSession>();
-  private _workletLoaded = false;
+  private _workletLoadedCtx: AudioContext | null = null;
 
   constructor(host: RecordingHost & HTMLElement) {
     this._host = host;
@@ -105,16 +105,18 @@ export class RecordingController implements ReactiveController {
     }
 
     const bits: Bits = options.bits ?? 16;
-    const rawCtx = this._host.audioContext;
-
-    // Resolve editor sample rate from AudioContext before computing startSample
-    this._host.resolveAudioContextSampleRate(rawCtx.sampleRate);
 
     try {
-      // Load worklet via native API (not Tone.js addAudioWorkletModule — caches single URL)
-      if (!this._workletLoaded) {
+      const rawCtx = this._host.audioContext;
+
+      // Resolve editor sample rate from AudioContext before computing startSample
+      this._host.resolveAudioContextSampleRate(rawCtx.sampleRate);
+
+      // Load worklet via native API — guard tied to context identity so a
+      // swapped AudioContext gets the module re-registered.
+      if (!this._workletLoadedCtx || this._workletLoadedCtx !== rawCtx) {
         await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
-        this._workletLoaded = true;
+        this._workletLoadedCtx = rawCtx;
       }
 
       // Detect channel count from stream (not source.channelCount — defaults to 2)
