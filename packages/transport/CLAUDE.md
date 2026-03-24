@@ -172,7 +172,3 @@ Consumers create an `OfflineAudioContext`, a separate `Transport` instance, and 
 5. Wire into React (`WaveformPlaylistContext`)
 6. Make Tone.js adapter the legacy path, native the default
 
-## Reference Projects
-
-- **webaudio-transport** (`/Users/naomiaro/Code/webaudio-transport`) — sliding window scheduler, generator/consumer pattern, metronome as player, tempo map. No pause — only stop + start.
-- **openDAW** (`/Users/naomiaro/Code/openDAWOriginal`) — block-based processing, global loop + per-clip loop, PPQN timeline, discontinuous position jumps
