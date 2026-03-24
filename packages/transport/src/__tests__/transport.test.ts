@@ -218,10 +218,10 @@ describe('Transport', () => {
     // track-2 should be effectively muted (solo active, track-2 not soloed)
   });
 
-  it('setLoop configures loop region', () => {
+  it('setLoopSeconds configures loop region', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
-    transport.setLoop(true, 1, 3);
+    transport.setLoopSeconds(true, 1, 3);
     // Should not throw
   });
 
@@ -363,7 +363,7 @@ describe('Transport', () => {
     const transport = new Transport(ctx);
     const tick = 3840;
     const time = transport.tickToTime(tick);
-    expect(transport.timeToTick(time)).toBeCloseTo(tick);
+    expect(transport.timeToTick(time)).toBe(tick);
   });
 
   it('addTrack adds a single track', () => {
