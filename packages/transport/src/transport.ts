@@ -388,16 +388,16 @@ export class Transport {
 
   // --- Meter ---
 
-  setMeter(numerator: number, denominator: number, atTick?: number): void {
+  setMeter(numerator: number, denominator: number, atTick?: Tick): void {
     this._meterMap.setMeter(numerator, denominator, atTick);
     this._emit('meterchange');
   }
 
-  getMeter(atTick?: number): MeterSignature {
+  getMeter(atTick?: Tick): MeterSignature {
     return this._meterMap.getMeter(atTick);
   }
 
-  removeMeter(atTick: number): void {
+  removeMeter(atTick: Tick): void {
     this._meterMap.removeMeter(atTick);
     this._emit('meterchange');
   }
@@ -412,22 +412,22 @@ export class Transport {
     this._emit('tempochange');
   }
 
-  barToTick(bar: number): number {
+  barToTick(bar: number): Tick {
     return this._meterMap.barToTick(bar);
   }
 
-  tickToBar(tick: number): number {
+  tickToBar(tick: Tick): number {
     return this._meterMap.tickToBar(tick);
   }
 
   /** Convert transport time (seconds) to tick position, using the tempo map. */
-  timeToTick(seconds: number): number {
+  timeToTick(seconds: number): Tick {
     return this._tempoMap.secondsToTicks(seconds);
   }
 
   /** Convert tick position to transport time (seconds), using the tempo map. */
-  tickToTime(tick: number): number {
-    return this._tempoMap.ticksToSeconds(tick as Tick);
+  tickToTime(tick: Tick): number {
+    return this._tempoMap.ticksToSeconds(tick);
   }
 
   // --- Metronome ---

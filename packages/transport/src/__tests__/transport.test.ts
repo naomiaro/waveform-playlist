@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Transport } from '../transport';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { Tick } from '../types';
 
 function createMockSource() {
   return {
@@ -301,7 +302,7 @@ describe('Transport', () => {
     const transport = new Transport(ctx);
     const onMeter = vi.fn();
     transport.on('meterchange', onMeter);
-    transport.setMeter(3, 4, 3840);
+    transport.setMeter(3, 4, 3840 as Tick);
     expect(onMeter).toHaveBeenCalledTimes(1);
   });
 
@@ -315,10 +316,10 @@ describe('Transport', () => {
   it('removeMeter fires meterchange event', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
-    transport.setMeter(7, 8, 3840);
+    transport.setMeter(7, 8, 3840 as Tick);
     const onMeter = vi.fn();
     transport.on('meterchange', onMeter);
-    transport.removeMeter(3840);
+    transport.removeMeter(3840 as Tick);
     expect(onMeter).toHaveBeenCalledTimes(1);
   });
 
@@ -332,7 +333,7 @@ describe('Transport', () => {
   it('clearMeters fires meterchange and resets state', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
-    transport.setMeter(7, 8, 3840);
+    transport.setMeter(7, 8, 3840 as Tick);
     const onMeter = vi.fn();
     transport.on('meterchange', onMeter);
     transport.clearMeters();
@@ -354,14 +355,14 @@ describe('Transport', () => {
   it('tickToBar delegates to MeterMap', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
-    expect(transport.tickToBar(0)).toBe(1);
-    expect(transport.tickToBar(3840)).toBe(2);
+    expect(transport.tickToBar(0 as Tick)).toBe(1);
+    expect(transport.tickToBar(3840 as Tick)).toBe(2);
   });
 
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
-    const tick = 3840;
+    const tick = 3840 as Tick;
     const time = transport.tickToTime(tick);
     expect(transport.timeToTick(time)).toBe(tick);
   });

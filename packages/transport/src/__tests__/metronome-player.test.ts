@@ -144,7 +144,7 @@ describe('MetronomePlayer', () => {
 
   it('accents on bar boundaries with mixed meters', () => {
     const mixedMap = new MeterMap(960);
-    mixedMap.setMeter(3, 4, 3840); // switch to 3/4 at bar 2
+    mixedMap.setMeter(3, 4, 3840 as Tick); // switch to 3/4 at bar 2
     const player = new MetronomePlayer(ctx, tempoMap, mixedMap, destination, (t) => t);
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
@@ -163,7 +163,7 @@ describe('MetronomePlayer', () => {
 
   it('beat step size changes at meter boundary within scheduling window', () => {
     const mixedMap = new MeterMap(960);
-    mixedMap.setMeter(6, 8, 3840); // switch to 6/8 at bar 2
+    mixedMap.setMeter(6, 8, 3840 as Tick); // switch to 6/8 at bar 2
     const player = new MetronomePlayer(ctx, tempoMap, mixedMap, destination, (t) => t);
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());

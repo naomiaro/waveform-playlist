@@ -25,12 +25,12 @@ export class MeterMap {
     return this._ppqn;
   }
 
-  getMeter(atTick: number = 0): MeterSignature {
+  getMeter(atTick: Tick = 0 as Tick): MeterSignature {
     const entry = this._entryAt(atTick);
     return { numerator: entry.numerator, denominator: entry.denominator };
   }
 
-  setMeter(numerator: number, denominator: number, atTick: number = 0): void {
+  setMeter(numerator: number, denominator: number, atTick: Tick = 0 as Tick): void {
     this._validateMeter(numerator, denominator);
 
     if (atTick < 0) {
@@ -70,7 +70,7 @@ export class MeterMap {
     this._recomputeCache(i);
   }
 
-  removeMeter(atTick: number): void {
+  removeMeter(atTick: Tick): void {
     if (atTick === 0) {
       throw new Error('[waveform-playlist] MeterMap: cannot remove meter at tick 0');
     }
@@ -88,17 +88,17 @@ export class MeterMap {
     this._entries = [{ ...first, barAtTick: 0 }];
   }
 
-  ticksPerBeat(atTick: number = 0): number {
+  ticksPerBeat(atTick: Tick = 0 as Tick): number {
     const entry = this._entryAt(atTick);
     return this._ppqn * (4 / entry.denominator);
   }
 
-  ticksPerBar(atTick: number = 0): number {
+  ticksPerBar(atTick: Tick = 0 as Tick): number {
     const entry = this._entryAt(atTick);
     return entry.numerator * this._ppqn * (4 / entry.denominator);
   }
 
-  barToTick(bar: number): number {
+  barToTick(bar: number): Tick {
     if (bar < 1) {
       throw new Error('[waveform-playlist] MeterMap: bar must be >= 1, got ' + bar);
     }
@@ -108,20 +108,20 @@ export class MeterMap {
       if (targetBar < nextBar) {
         const barsInto = targetBar - this._entries[i].barAtTick;
         const tpb = this._ticksPerBarForEntry(this._entries[i]);
-        return this._entries[i].tick + barsInto * tpb;
+        return (this._entries[i].tick + barsInto * tpb) as Tick;
       }
     }
-    return 0; // unreachable — last iteration always matches (nextBar = Infinity)
+    return 0 as Tick; // unreachable — last iteration always matches (nextBar = Infinity)
   }
 
-  tickToBar(tick: number): number {
+  tickToBar(tick: Tick): number {
     const entry = this._entryAt(tick);
     const ticksInto = tick - entry.tick;
     const tpb = this._ticksPerBarForEntry(entry);
     return entry.barAtTick + Math.floor(ticksInto / tpb) + 1; // 1-indexed
   }
 
-  isBarBoundary(tick: number): boolean {
+  isBarBoundary(tick: Tick): boolean {
     const entry = this._entryAt(tick);
     const ticksInto = tick - entry.tick;
     const tpb = this._ticksPerBarForEntry(entry);
@@ -129,11 +129,11 @@ export class MeterMap {
   }
 
   /** Internal: get the full entry at a tick (for MetronomePlayer beat grid anchoring) */
-  getEntryAt(tick: number): MeterEntry {
+  getEntryAt(tick: Tick): MeterEntry {
     return this._entryAt(tick);
   }
 
-  private _entryAt(tick: number): MutableMeterEntry {
+  private _entryAt(tick: Tick): MutableMeterEntry {
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {
@@ -151,16 +151,16 @@ export class MeterMap {
     return entry.numerator * this._ppqn * (4 / entry.denominator);
   }
 
-  private _snapToBarBoundary(atTick: number): number {
+  private _snapToBarBoundary(atTick: Tick): Tick {
     const entry = this._entryAt(atTick);
     const tpb = this._ticksPerBarForEntry(entry);
     const ticksInto = atTick - entry.tick;
     if (ticksInto % tpb === 0) return atTick;
     // Snap forward to next bar boundary
-    return entry.tick + Math.ceil(ticksInto / tpb) * tpb;
+    return (entry.tick + Math.ceil(ticksInto / tpb) * tpb) as Tick;
   }
 
-  private _computeBarAtTick(tick: number): number {
+  private _computeBarAtTick(tick: Tick): number {
     const entry = this._entryAt(tick);
     const ticksInto = tick - entry.tick;
     const tpb = this._ticksPerBarForEntry(entry);

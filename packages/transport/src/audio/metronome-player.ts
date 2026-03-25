@@ -58,22 +58,23 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     let tick = entry.tick + Math.ceil(tickIntoSection / beatSize) * beatSize;
 
     while (tick < toTick) {
+      const tickPos = tick as Tick;
       // Re-snap at meter boundaries
-      const currentEntry = this._meterMap.getEntryAt(tick);
+      const currentEntry = this._meterMap.getEntryAt(tickPos);
       if (currentEntry.tick !== entry.tick) {
         entry = currentEntry;
-        beatSize = this._meterMap.ticksPerBeat(tick);
+        beatSize = this._meterMap.ticksPerBeat(tickPos);
       }
 
-      const isAccent = this._meterMap.isBarBoundary(tick);
+      const isAccent = this._meterMap.isBarBoundary(tickPos);
 
       events.push({
-        tick: tick as Tick,
+        tick: tickPos,
         isAccent,
         buffer: isAccent ? this._accentBuffer : this._normalBuffer,
       });
 
-      beatSize = this._meterMap.ticksPerBeat(tick);
+      beatSize = this._meterMap.ticksPerBeat(tickPos);
       tick += beatSize;
     }
 
