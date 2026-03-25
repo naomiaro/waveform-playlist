@@ -216,6 +216,11 @@ export class TempoMap {
    * Inverse of _ticksToSecondsLinear: given seconds, return ticks.
    * Closed-form via exponential: bpmAtTick = bpm0 * exp(seconds * deltaBpm * ppqn / (60 * T))
    * then ticks = (bpmAtTick - bpm0) * T / deltaBpm
+   *
+   * Note: exp(log(x)) has ~1 ULP floating-point error, so round-trips depend on
+   * Math.round() in the caller (secondsToTicks). This is sufficient for all tested
+   * BPM ranges (10–300 BPM) but is not algebraically exact like the previous
+   * trapezoidal/quadratic approach was.
    */
   private _secondsToTicksLinear(
     seconds: number,
@@ -272,10 +277,12 @@ export class TempoMap {
     slope: number
   ): number {
     if (totalSegmentTicks === 0 || seconds === 0) return 0;
-    // Binary search: find ticks such that _ticksToSecondsCurve(ticks) ≈ seconds
+    // Binary search: find ticks such that _ticksToSecondsCurve(ticks) ≈ seconds.
+    // 20 iterations gives precision of totalSegmentTicks/2^20 ≈ 0.03 ticks for
+    // an 8-bar segment — well under the 1-tick rounding threshold.
     let lo = 0;
     let hi = totalSegmentTicks;
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 20; i++) {
       const mid = (lo + hi) / 2;
       const midSeconds = this._ticksToSecondsCurve(mid, bpm0, bpm1, totalSegmentTicks, slope);
       if (midSeconds < seconds) {
