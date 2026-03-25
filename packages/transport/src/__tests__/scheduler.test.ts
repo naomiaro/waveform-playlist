@@ -51,7 +51,10 @@ describe('Scheduler (tick-based)', () => {
   const ppqn = 960;
   const bpm = 120;
 
-  function createScheduler(lookahead = 0.2, onLoop?: (t: number) => void) {
+  function createScheduler(
+    lookahead = 0.2,
+    onLoop?: (loopStartSec: number, loopEndSec: number) => void
+  ) {
     const tempoMap = new TempoMap(ppqn, bpm);
     return new Scheduler<TestEvent>(tempoMap, { lookahead, onLoop });
   }
@@ -76,16 +79,19 @@ describe('Scheduler (tick-based)', () => {
   });
 
   it('loop: wraps at loopEnd and generates from loopStart', () => {
-    const loopCalls: number[] = [];
-    const scheduler = createScheduler(0.3, (t) => loopCalls.push(t));
+    const loopCalls: Array<[number, number]> = [];
+    const scheduler = createScheduler(0.3, (start, end) => loopCalls.push([start, end]));
     const listener = createMockListener();
     scheduler.addListener(listener);
+    // Loop [0, 960) ticks = [0, 0.5s) at 120 BPM
     scheduler.setLoop(true, 0, 960);
     scheduler.advance(0.35);
     expect(listener.jumpedTo.length).toBe(1);
     expect(listener.jumpedTo[0]).toBe(0);
     expect(loopCalls.length).toBe(1);
-    expect(loopCalls[0]).toBeCloseTo(0);
+    // onLoop receives both loopStart and loopEnd in seconds
+    expect(loopCalls[0][0]).toBeCloseTo(0); // loopStart = 0s
+    expect(loopCalls[0][1]).toBeCloseTo(0.5); // loopEnd = 960 ticks = 0.5s
   });
 
   it('loop: _rightEdge is exact integer after wrap (no drift)', () => {

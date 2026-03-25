@@ -35,6 +35,16 @@ export class Scheduler<T extends SchedulerEvent> {
 
   /** Primary API — ticks as source of truth */
   setLoop(enabled: boolean, startTick: number, endTick: number): void {
+    if (enabled && (!Number.isFinite(startTick) || !Number.isFinite(endTick))) {
+      console.warn(
+        '[waveform-playlist] Scheduler.setLoop: non-finite tick values (' +
+          startTick +
+          ', ' +
+          endTick +
+          ')'
+      );
+      return;
+    }
     if (enabled && startTick >= endTick) {
       console.warn(
         '[waveform-playlist] Scheduler.setLoop: startTick (' +
