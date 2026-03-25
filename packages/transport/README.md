@@ -10,6 +10,7 @@ Native Web Audio transport for multi-track audio scheduling, looping, tempo, and
 - **Built-in metronome** — Beat-grid click scheduling with accent on beat 1. Just another scheduler listener.
 - **Per-track signal chain** — Native GainNode (volume) → StereoPannerNode → GainNode (mute) → effects hook → master output.
 - **Effects plugin hook** — `connectTrackOutput(trackId, node)` inserts any `AudioNode` chain (Tone.js effects, WAM plugins, native nodes).
+- **Type-safe coordinates** — Branded `Tick` and `Sample` types prevent accidentally passing seconds where ticks or samples are expected. Zero runtime cost.
 - **PlayoutAdapter bridge** — `NativePlayoutAdapter` implements the `PlayoutAdapter` interface from `@waveform-playlist/engine`.
 
 ## Installation
@@ -145,9 +146,9 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setMasterVolume(volume)`
 
 **Loop:**
-- `setLoop(enabled, startTick, endTick)` — Set loop region in ticks (primary API)
+- `setLoop(enabled, startTick: Tick, endTick: Tick)` — Set loop region in ticks (primary API)
 - `setLoopSeconds(enabled, start, end)` — Set loop region in seconds (convenience)
-- `setLoopSamples(enabled, startSample, endSample)` — Set loop region in samples (convenience)
+- `setLoopSamples(enabled, startSample: Sample, endSample: Sample)` — Set loop region in samples (convenience)
 
 **Tempo & Meter:**
 - `setTempo(bpm, atTick?)` / `getTempo(atTick?)`

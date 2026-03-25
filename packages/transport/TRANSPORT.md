@@ -82,17 +82,22 @@ The scheduler runs 200ms ahead of real-time audio. This means:
 Both `ClipPlayer` and `MetronomePlayer` implement the same interface:
 
 ```typescript
+type Tick = number & { readonly [__tick]: never };   // branded — zero runtime cost
+type Sample = number & { readonly [__sample]: never };
+
 interface SchedulerEvent {
-  tick: number;  // integer tick position on the timeline
+  tick: Tick;  // integer tick position on the timeline
 }
 
 interface SchedulerListener<T extends SchedulerEvent> {
-  generate(fromTick: number, toTick: number): T[];
+  generate(fromTick: Tick, toTick: Tick): T[];
   consume(event: T): void;
-  onPositionJump(newTick: number): void;
+  onPositionJump(newTick: Tick): void;
   silence(): void;
 }
 ```
+
+`Tick` and `Sample` are branded types that prevent accidentally passing seconds where ticks or samples are expected. They are plain `number` at runtime — the brand exists only at compile time. Conversion functions are the canonical producers: `secondsToTicks()` returns `Tick`, `secondsToSamples()` returns `Sample`. Tests use `as Tick` / `as Sample` casts for literal values.
 
 - **`generate()`** — Produce events for a tick window `[fromTick, toTick)`. Called by the scheduler when the window expands. Each listener converts ticks to its native unit internally (MetronomePlayer stays in ticks, ClipPlayer converts to samples).
 - **`consume()`** — Realize an event — create `AudioBufferSourceNode`, connect to audio graph, call `source.start()`. Each listener converts `event.tick` → seconds → audio time internally.
@@ -128,8 +133,8 @@ This conversion happens inside `consume()` — events carry transport time, and 
 
 Audio clips and music events live in different coordinate spaces:
 
-- **SampleTimeline** — Audio clips use absolute sample positions (`startSample`, `durationSamples`). Position does NOT change when tempo changes.
-- **TempoMap** — Converts between ticks and seconds. Supports tempo changes at arbitrary tick positions with cached cumulative seconds for O(log n) lookups.
+- **SampleTimeline** — Audio clips use absolute sample positions (`startSample`, `durationSamples`), typed as `Sample`. Position does NOT change when tempo changes. Also converts between ticks and samples via TempoMap (`ticksToSamples()` / `samplesToTicks()`).
+- **TempoMap** — Converts between ticks and seconds. `secondsToTicks()` returns branded `Tick`; `ticksToSeconds()` accepts `Tick`. Supports tempo changes at arbitrary tick positions with cached cumulative seconds for O(log n) lookups.
 - **MeterMap** — Time signature entries at tick positions. Determines beat unit (from denominator) and bar length (from numerator). See Meter Map section below.
 
 The scheduler works in integer ticks — `advance()` converts Clock seconds → ticks via TempoMap at entry. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples via SampleTimeline.
