@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MetronomePlayer } from '../audio/metronome-player';
 import { TempoMap } from '../timeline/tempo-map';
 import { MeterMap } from '../timeline/meter-map';
+import type { Tick } from '../types';
 
 function createMockSource() {
   return {
@@ -51,7 +52,7 @@ describe('MetronomePlayer', () => {
 
     // At 120 BPM, 960 PPQN: 1 beat = 960 ticks = 0.5s
     // generate(0, 2112) covers ticks 0..2111 → beats at 0, 960, 1920
-    const events = player.generate(0, 2112);
+    const events = player.generate(0 as Tick, 2112 as Tick);
     expect(events.length).toBe(3);
     expect(events[0].tick).toBe(0);
     expect(events[1].tick).toBe(960);
@@ -68,7 +69,7 @@ describe('MetronomePlayer', () => {
 
     // At 120 BPM, 4/4: 1 bar = 4 beats = 3840 ticks = 2s
     // generate(0, 4032) covers ticks 0..4031 → beats at 0, 960, 1920, 2880, 3840
-    const events = player.generate(0, 4032);
+    const events = player.generate(0 as Tick, 4032 as Tick);
     expect(events[0].isAccent).toBe(true); // beat 1 of bar 1
     expect(events[1].isAccent).toBe(false); // beat 2
     expect(events[2].isAccent).toBe(false); // beat 3
@@ -81,7 +82,7 @@ describe('MetronomePlayer', () => {
     player.setEnabled(false);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    const events = player.generate(0, 3840);
+    const events = player.generate(0 as Tick, 3840 as Tick);
     expect(events.length).toBe(0);
   });
 
@@ -91,7 +92,7 @@ describe('MetronomePlayer', () => {
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
     // 0.2s = 384 ticks at 120 BPM, 960 PPQN
-    const events = player.generate(0, 384);
+    const events = player.generate(0 as Tick, 384 as Tick);
     expect(events.length).toBe(1);
     player.consume(events[0]);
 
@@ -104,7 +105,7 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    const events = player.generate(0, 384);
+    const events = player.generate(0 as Tick, 384 as Tick);
     player.consume(events[0]);
     player.silence();
 
@@ -117,9 +118,9 @@ describe('MetronomePlayer', () => {
     player.setEnabled(true);
     player.setClickSounds(createMockBuffer(), createMockBuffer());
 
-    const events = player.generate(0, 384);
+    const events = player.generate(0 as Tick, 384 as Tick);
     player.consume(events[0]);
-    player.onPositionJump(1920);
+    player.onPositionJump(1920 as Tick);
 
     // Clicks should NOT be stopped on position jump — they finish naturally.
     // Only silence() (stop/pause) kills active sources.
@@ -135,7 +136,7 @@ describe('MetronomePlayer', () => {
 
     // At 120 BPM, 6/8: beat = eighth note = 480 ticks = 0.25s
     // generate(0, 1152) covers 0..1151 → beats at 0, 480, 960
-    const events = player.generate(0, 1152);
+    const events = player.generate(0 as Tick, 1152 as Tick);
     expect(events.length).toBe(3);
     expect(events[0].tick).toBe(0);
     expect(events[1].tick).toBe(480);
@@ -151,7 +152,7 @@ describe('MetronomePlayer', () => {
     // Bar 1 (4/4): beats at 0, 960, 1920, 2880 — accent at 0
     // Bar 2 (3/4): beats at 3840, 4800, 5760 — accent at 3840
     // generate(0, 5952) covers 0..5951
-    const events = player.generate(0, 5952);
+    const events = player.generate(0 as Tick, 5952 as Tick);
     expect(events[0].isAccent).toBe(true); // beat 1 of bar 1
     expect(events[1].isAccent).toBe(false); // beat 2
     expect(events[4].isAccent).toBe(true); // beat 1 of bar 2 (3/4)
@@ -170,7 +171,7 @@ describe('MetronomePlayer', () => {
     // Bar 1 (4/4): quarter-note beats every 960 ticks (0, 960, 1920, 2880)
     // Bar 2 (6/8): eighth-note beats every 480 ticks starting at 3840
     // generate(0, 6720) covers 0..6719
-    const events = player.generate(0, 6720);
+    const events = player.generate(0 as Tick, 6720 as Tick);
 
     // Bar 1: quarter-note beats
     expect(events[0].tick).toBe(0);
@@ -191,7 +192,7 @@ describe('MetronomePlayer', () => {
     // At 120 BPM, 4/4: beats at 0, 960, 1920...
     // 0.3s = 576 ticks — mid-beat, should snap to next beat at 960
     // generate(576, 2112) → beats at 960, 1920
-    const events = player.generate(576, 2112);
+    const events = player.generate(576 as Tick, 2112 as Tick);
     expect(events.length).toBe(2);
     expect(events[0].tick).toBe(960);
     expect(events[1].tick).toBe(1920);
@@ -204,7 +205,7 @@ describe('MetronomePlayer', () => {
 
     // 8 bars of 4/4 at 960 PPQN = 8 * 4 * 960 = 30720 ticks
     // Half-open interval [0, 30720) — tick 30720 (bar 9 beat 1) must NOT be included
-    const events = player.generate(0, 30720);
+    const events = player.generate(0 as Tick, 30720 as Tick);
 
     // 8 bars × 4 beats = 32 total beats
     expect(events.length).toBe(32);

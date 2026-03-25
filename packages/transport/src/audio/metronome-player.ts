@@ -44,7 +44,7 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     this._normalBuffer = normal;
   }
 
-  generate(fromTick: number, toTick: number): MetronomeEvent[] {
+  generate(fromTick: Tick, toTick: Tick): MetronomeEvent[] {
     if (!this._enabled || !this._accentBuffer || !this._normalBuffer) {
       return [];
     }
@@ -102,7 +102,7 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     source.start(this._toAudioTime(transportTime));
   }
 
-  onPositionJump(_newTick: number): void {
+  onPositionJump(_newTick: Tick): void {
     // Don't silence — clicks are short one-shots that finish naturally.
     // Calling silence() here kills clicks scheduled in the lookahead window
     // that haven't played yet, causing the last beat before a loop wrap
