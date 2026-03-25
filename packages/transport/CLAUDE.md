@@ -40,7 +40,7 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 ## Tempo Automation
 
-`TempoInterpolation` type: `'step'` (instant, default), `'linear'` (exact trapezoidal formula), `{ type: 'curve', slope }` (Möbius-Ease, not yet implemented — throws). `setTempo(bpm, atTick, { interpolation })` third param is optional for backwards compat. `secondsToTicks` inverse uses closed-form quadratic. First entry is always `'step'` (no previous to ramp from). `_recomputeCache` accounts for interpolation type per segment.
+`TempoInterpolation` type: `'step'` (instant, default), `'linear'` (exact logarithmic integral, exponential inverse), `{ type: 'curve', slope }` (Möbius-Ease, slope 0-1 exclusive, subdivided trapezoidal + binary search inverse). `setTempo(bpm, atTick, { interpolation })` third param is optional for backwards compat. First entry is always `'step'` (no previous to ramp from). `_recomputeCache` accounts for interpolation type per segment.
 
 ## Timeline Layer
 
