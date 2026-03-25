@@ -38,6 +38,10 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 `Tick` and `Sample` are branded `number` types in `types.ts` — zero runtime cost, compile-time only. Conversion functions are the canonical producers: `secondsToTicks()` → `Tick`, `secondsToSamples()` → `Sample`. Internal fields stay `number`; casts (`as Tick`) only at API boundaries and in tests for literals. MeterMap public methods accept/return `Tick`. Internal arithmetic stays `number` with `as Tick` at return points.
 
+## Tempo Automation
+
+`TempoInterpolation` type: `'step'` (instant, default), `'linear'` (trapezoidal, exact), `{ type: 'curve', slope }` (Möbius-Ease, not yet implemented — throws). `setTempo(bpm, atTick, { interpolation })` third param is optional for backwards compat. Linear ramps use exact trapezoidal formula (no iterative stepping); inverse uses closed-form quadratic. First entry is always `'step'` (no previous to ramp from). `_recomputeCache` accounts for interpolation type per segment. Inspired by openDAW's `VaryingTempoMap` but uses trapezoidal integration instead of grid-stepping.
+
 ## Timeline Layer
 
 ### Dual Coordinate System
