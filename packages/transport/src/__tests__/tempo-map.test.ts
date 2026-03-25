@@ -233,11 +233,13 @@ describe('TempoMap curve interpolation', () => {
     // At midpoint, both should give ~150 BPM
     expect(tmCurve.getTempo(1920 as Tick)).toBeCloseTo(tmLinear.getTempo(1920 as Tick), 1);
 
-    // Total duration should be approximately equal (within 1% — subdivided
-    // trapezoidal on a nonlinear BPM function has inherent approximation error)
+    // Total duration should match closely — curve(0.5) uses the Möbius fast
+    // path (returns x), so BPM values are identical to linear. The only
+    // difference is subdivided trapezoidal vs exact ln() integration.
+    // At 64 subdivisions the error is ~0.011ms (< 1 sample at 48kHz).
     const curveSec = tmCurve.ticksToSeconds(3840 as Tick);
     const linearSec = tmLinear.ticksToSeconds(3840 as Tick);
-    expect(Math.abs(curveSec - linearSec) / linearSec).toBeLessThan(0.05);
+    expect(Math.abs(curveSec - linearSec) * 1000).toBeLessThan(0.1); // within 0.1ms
   });
 
   it('curve round-trips via binary search inverse', () => {
