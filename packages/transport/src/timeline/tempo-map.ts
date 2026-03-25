@@ -191,11 +191,9 @@ export class TempoMap {
   }
 
   /**
-   * Trapezoidal approximation for a linear BPM ramp.
-   * Returns seconds for `ticks` ticks into a segment ramping from bpm0 to bpm1
-   * over totalSegmentTicks. The exact integral uses ln(bpm1/bpm0), but the
-   * trapezoidal formula is simpler, has a closed-form inverse (quadratic),
-   * and round-trips exactly. Error is sub-millisecond for typical DAW ramps.
+   * Exact integration for a linear BPM ramp using the logarithmic formula.
+   * For bpm(t) = bpm0 + r*t where r = (bpm1-bpm0)/T:
+   *   seconds = (T * 60) / (ppqn * (bpm1-bpm0)) * ln(bpmAtTick / bpm0)
    */
   private _ticksToSecondsLinear(
     ticks: number,
@@ -204,19 +202,20 @@ export class TempoMap {
     totalSegmentTicks: number
   ): number {
     if (totalSegmentTicks === 0) return 0;
-    // BPM at the point we're measuring
     const bpmAtTick = bpm0 + (bpm1 - bpm0) * (ticks / totalSegmentTicks);
-    // Degenerate case: no ramp
-    if (Math.abs(bpm0 - bpmAtTick) < 1e-10) {
+    // Degenerate case: no ramp (avoids ln(1)/0 = 0/0)
+    if (Math.abs(bpm1 - bpm0) < 1e-10) {
       return (ticks * 60) / (bpm0 * this._ppqn);
     }
-    // Trapezoidal: seconds = ticks * 60/ppqn * (1/bpm0 + 1/bpmAtTick) / 2
-    return (((ticks * 60) / this._ppqn) * (1 / bpm0 + 1 / bpmAtTick)) / 2;
+    // Exact: ∫₀ᵗ 60/(ppqn * bpm(u)) du = (T * 60 / (ppqn * deltaBpm)) * ln(bpmAtTick/bpm0)
+    const deltaBpm = bpm1 - bpm0;
+    return ((totalSegmentTicks * 60) / (this._ppqn * deltaBpm)) * Math.log(bpmAtTick / bpm0);
   }
 
   /**
-   * Inverse of _ticksToSecondsLinear: given seconds into a linear ramp segment,
-   * return ticks. Solves the quadratic arising from the trapezoidal formula.
+   * Inverse of _ticksToSecondsLinear: given seconds, return ticks.
+   * Closed-form via exponential: bpmAtTick = bpm0 * exp(seconds * deltaBpm * ppqn / (60 * T))
+   * then ticks = (bpmAtTick - bpm0) * T / deltaBpm
    */
   private _secondsToTicksLinear(
     seconds: number,
@@ -225,33 +224,13 @@ export class TempoMap {
     totalSegmentTicks: number
   ): number {
     if (totalSegmentTicks === 0 || seconds === 0) return 0;
-    const k = 60 / this._ppqn;
     // Degenerate case: no ramp
     if (Math.abs(bpm1 - bpm0) < 1e-10) {
-      return (seconds / k) * bpm0;
+      return (seconds * bpm0 * this._ppqn) / 60;
     }
-    // From the trapezoidal formula:
-    //   s = t * k * (1/bpm0 + 1/(bpm0 + (bpm1-bpm0)*t/T)) / 2
-    // Let r = (bpm1-bpm0)/T, so bpmAtT = bpm0 + r*t
-    //   s = t * k / 2 * (1/bpm0 + 1/(bpm0 + r*t))
-    //   2*s/k = t * (1/bpm0 + 1/(bpm0 + r*t))
-    //   2*s/k = t/bpm0 + t/(bpm0 + r*t)
-    // Let u = bpm0 + r*t, then t = (u - bpm0)/r
-    //   2*s/k = (u - bpm0)/(r*bpm0) + (u - bpm0)/(r*u)
-    //   2*s*r/k = (u - bpm0)/bpm0 + (u - bpm0)/u
-    //   2*s*r/k = (u - bpm0) * (1/bpm0 + 1/u)
-    //   2*s*r/k = (u - bpm0) * (u + bpm0) / (bpm0 * u)
-    //   2*s*r/k = (u² - bpm0²) / (bpm0 * u)
-    //   2*s*r*bpm0/k * u = u² - bpm0²
-    //   u² - (2*s*r*bpm0/k)*u - bpm0² = 0
-    // Quadratic in u: a=1, b=-(2*s*r*bpm0/k), c=-bpm0²
-    const r = (bpm1 - bpm0) / totalSegmentTicks;
-    const B = -((2 * seconds * r * bpm0) / k);
-    const C = -(bpm0 * bpm0);
-    const discriminant = B * B - 4 * C;
-    const u = (-B + Math.sqrt(discriminant)) / 2;
-    // t = (u - bpm0) / r
-    return (u - bpm0) / r;
+    const deltaBpm = bpm1 - bpm0;
+    const bpmAtTick = bpm0 * Math.exp((seconds * deltaBpm * this._ppqn) / (60 * totalSegmentTicks));
+    return ((bpmAtTick - bpm0) / deltaBpm) * totalSegmentTicks;
   }
 
   /**
@@ -264,7 +243,7 @@ export class TempoMap {
     bpm0: number,
     bpm1: number,
     totalSegmentTicks: number,
-    slope: number,
+    slope: number
   ): number {
     if (totalSegmentTicks === 0 || ticks === 0) return 0;
     const n = CURVE_SUBDIVISIONS;
@@ -275,7 +254,7 @@ export class TempoMap {
       const progress = (dt * i) / totalSegmentTicks;
       const curBpm = bpm0 + curveNormalizedAt(progress, slope) * (bpm1 - bpm0);
       // Trapezoidal rule for this subdivision
-      seconds += (dt * 60) / this._ppqn * (1 / prevBpm + 1 / curBpm) / 2;
+      seconds += (((dt * 60) / this._ppqn) * (1 / prevBpm + 1 / curBpm)) / 2;
       prevBpm = curBpm;
     }
     return seconds;
@@ -290,7 +269,7 @@ export class TempoMap {
     bpm0: number,
     bpm1: number,
     totalSegmentTicks: number,
-    slope: number,
+    slope: number
   ): number {
     if (totalSegmentTicks === 0 || seconds === 0) return 0;
     // Binary search: find ticks such that _ticksToSecondsCurve(ticks) ≈ seconds
@@ -333,7 +312,11 @@ export class TempoMap {
         segmentSeconds = this._ticksToSecondsLinear(tickDelta, prev.bpm, entry.bpm, tickDelta);
       } else if (typeof entry.interpolation === 'object') {
         segmentSeconds = this._ticksToSecondsCurve(
-          tickDelta, prev.bpm, entry.bpm, tickDelta, entry.interpolation.slope
+          tickDelta,
+          prev.bpm,
+          entry.bpm,
+          tickDelta,
+          entry.interpolation.slope
         );
       } else {
         // Step: constant BPM from previous entry

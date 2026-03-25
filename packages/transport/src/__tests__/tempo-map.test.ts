@@ -68,9 +68,9 @@ describe('TempoMap linear interpolation', () => {
     // At tick 0: 0 seconds
     expect(tm.ticksToSeconds(0 as Tick)).toBe(0);
 
-    // At tick 3840 (end of ramp): trapezoidal formula
-    // seconds = ticks * 60/ppqn * (1/bpm0 + 1/bpm1) / 2 ≈ 1.857
-    const expected = (((3840 * 60) / 960) * (1 / 120 + 1 / 140)) / 2;
+    // At tick 3840 (end of ramp): exact logarithmic formula
+    // seconds = (T * 60 / (ppqn * deltaBpm)) * ln(bpm1 / bpm0)
+    const expected = ((3840 * 60) / (960 * 20)) * Math.log(140 / 120);
     expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(expected);
   });
 
@@ -102,8 +102,8 @@ describe('TempoMap linear interpolation', () => {
 
     // Midpoint: 1920 ticks into a 120→60 ramp over 3840 ticks
     // BPM at midpoint: 120 + (60 - 120) * (1920/3840) = 90
-    // seconds = 1920 * 60/960 * (1/120 + 1/90) / 2
-    const expected = (((1920 * 60) / 960) * (1 / 120 + 1 / 90)) / 2;
+    // exact: (T * 60 / (ppqn * deltaBpm)) * ln(bpmAtTick / bpm0)
+    const expected = ((3840 * 60) / (960 * -60)) * Math.log(90 / 120);
     expect(tm.ticksToSeconds(1920 as Tick)).toBeCloseTo(expected);
   });
 
@@ -117,8 +117,8 @@ describe('TempoMap linear interpolation', () => {
     const secondsAtBar2 = (3840 * 60) / (120 * 960);
     expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(secondsAtBar2);
 
-    // At bar 4 (tick 7680): step + linear ramp
-    const rampSeconds = (((3840 * 60) / 960) * (1 / 100 + 1 / 160)) / 2;
+    // At bar 4 (tick 7680): step + linear ramp (exact logarithmic)
+    const rampSeconds = ((3840 * 60) / (960 * 60)) * Math.log(160 / 100);
     expect(tm.ticksToSeconds(7680 as Tick)).toBeCloseTo(secondsAtBar2 + rampSeconds);
   });
 
