@@ -153,9 +153,10 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 **Tempo & Meter:**
 - `setTempo(bpm, atTick?)` / `getTempo(atTick?)`
 - `clearTempos()` — remove all tempo entries
-- `setMeter(numerator, denominator, atTick?)` / `getMeter(atTick?)`
-- `removeMeter(atTick)` / `clearMeters()`
-- `barToTick(bar)` / `tickToBar(tick)`
+- `setMeter(numerator, denominator, atTick?: Tick)` / `getMeter(atTick?: Tick)`
+- `removeMeter(atTick: Tick)` / `clearMeters()`
+- `barToTick(bar): Tick` / `tickToBar(tick: Tick)`
+- `timeToTick(seconds): Tick` / `tickToTime(tick: Tick)`
 
 **Metronome:**
 - `setMetronomeEnabled(enabled)`
