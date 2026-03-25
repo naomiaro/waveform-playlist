@@ -4,6 +4,7 @@ import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { TrackNode } from '../audio/track-node';
 import { SampleTimeline } from '../timeline/sample-timeline';
 import { TempoMap } from '../timeline/tempo-map';
+import type { Sample } from '../types';
 
 // At 120 BPM, 960 PPQN, 48kHz:
 // 0.5s = 960 ticks  = 24000 samples
@@ -249,7 +250,7 @@ describe('ClipPlayer', () => {
     const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
     // setLoopSamples: loop ends at 48000 samples = 1s
-    player.setLoopSamples(true, 0, 48000);
+    player.setLoopSamples(true, 0 as Sample, 48000 as Sample);
 
     // Window [0, 384) ticks = [0, 0.2s)
     const events = player.generate(0, 384);

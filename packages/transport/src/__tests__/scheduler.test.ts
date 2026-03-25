@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Scheduler } from '../core/scheduler';
 import { TempoMap } from '../timeline/tempo-map';
-import type { SchedulerEvent, SchedulerListener } from '../types';
+import type { SchedulerEvent, SchedulerListener, Tick } from '../types';
 
 interface TestEvent extends SchedulerEvent {
   id: string;
@@ -29,7 +29,7 @@ function createMockListener(): SchedulerListener<TestEvent> & {
       const step = 480;
       const start = Math.ceil(fromTick / step) * step;
       for (let t = start; t < toTick; t += step) {
-        const event = { tick: t, id: 'e-' + t };
+        const event = { tick: t as Tick, id: 'e-' + t };
         events.push(event);
         state.generated.push(event);
       }
@@ -86,7 +86,7 @@ describe('Scheduler (tick-based)', () => {
     const listener = createMockListener();
     scheduler.addListener(listener);
     // Loop [0, 960) ticks = [0, 0.5s) at 120 BPM
-    scheduler.setLoop(true, 0, 960);
+    scheduler.setLoop(true, 0 as Tick, 960 as Tick);
     scheduler.advance(0.35);
     expect(listener.jumpedTo.length).toBe(1);
     expect(listener.jumpedTo[0]).toBe(0);
@@ -101,7 +101,7 @@ describe('Scheduler (tick-based)', () => {
     const scheduler = createScheduler(0.2);
     const listener = createMockListener();
     scheduler.addListener(listener);
-    scheduler.setLoop(true, 0, 480);
+    scheduler.setLoop(true, 0 as Tick, 480 as Tick);
     for (let i = 0; i < 100; i++) {
       scheduler.advance(i * 0.01);
     }
@@ -114,7 +114,7 @@ describe('Scheduler (tick-based)', () => {
     const scheduler = createScheduler(0.5);
     const listener = createMockListener();
     scheduler.addListener(listener);
-    scheduler.setLoop(true, 0, 480);
+    scheduler.setLoop(true, 0 as Tick, 480 as Tick);
     scheduler.advance(0);
     expect(listener.jumpedTo.length).toBeGreaterThanOrEqual(2);
   });
@@ -122,7 +122,7 @@ describe('Scheduler (tick-based)', () => {
   it('setLoop rejects start >= end', () => {
     const scheduler = createScheduler();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    scheduler.setLoop(true, 960, 480);
+    scheduler.setLoop(true, 960 as Tick, 480 as Tick);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

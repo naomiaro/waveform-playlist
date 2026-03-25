@@ -1,5 +1,7 @@
 // packages/transport/src/index.ts
 export type {
+  Tick,
+  Sample,
   SchedulerEvent,
   SchedulerListener,
   TransportOptions,

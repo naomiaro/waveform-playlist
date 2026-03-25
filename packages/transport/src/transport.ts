@@ -1,5 +1,5 @@
 import type { ClipTrack } from '@waveform-playlist/core';
-import type { TransportOptions, MeterSignature } from './types';
+import type { Tick, Sample, TransportOptions, MeterSignature } from './types';
 import { Clock } from './core/clock';
 import { Scheduler } from './core/scheduler';
 import { Timer } from './core/timer';
@@ -319,7 +319,7 @@ export class Transport {
   // --- Loop ---
 
   /** Primary loop API — ticks as source of truth */
-  setLoop(enabled: boolean, startTick: number, endTick: number): void {
+  setLoop(enabled: boolean, startTick: Tick, endTick: Tick): void {
     if (enabled && startTick >= endTick) {
       console.warn(
         '[waveform-playlist] Transport.setLoop: startTick (' +
@@ -345,7 +345,7 @@ export class Transport {
   }
 
   /** Convenience — sets loop in samples */
-  setLoopSamples(enabled: boolean, startSample: number, endSample: number): void {
+  setLoopSamples(enabled: boolean, startSample: Sample, endSample: Sample): void {
     if (enabled && (!Number.isFinite(startSample) || !Number.isFinite(endSample))) {
       console.warn(
         '[waveform-playlist] Transport.setLoopSamples: non-finite sample values (' +
@@ -427,7 +427,7 @@ export class Transport {
 
   /** Convert tick position to transport time (seconds), using the tempo map. */
   tickToTime(tick: number): number {
-    return this._tempoMap.ticksToSeconds(tick);
+    return this._tempoMap.ticksToSeconds(tick as Tick);
   }
 
   // --- Metronome ---

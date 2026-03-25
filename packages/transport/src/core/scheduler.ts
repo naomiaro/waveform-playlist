@@ -1,4 +1,4 @@
-import type { SchedulerEvent, SchedulerListener } from '../types';
+import type { Tick, SchedulerEvent, SchedulerListener } from '../types';
 import type { TempoMap } from '../timeline/tempo-map';
 
 export interface SchedulerOptions {
@@ -37,7 +37,7 @@ export class Scheduler<T extends SchedulerEvent> {
   }
 
   /** Primary API — ticks as source of truth */
-  setLoop(enabled: boolean, startTick: number, endTick: number): void {
+  setLoop(enabled: boolean, startTick: Tick, endTick: Tick): void {
     if (enabled && (!Number.isFinite(startTick) || !Number.isFinite(endTick))) {
       console.warn(
         '[waveform-playlist] Scheduler.setLoop: non-finite tick values (' +
@@ -95,13 +95,13 @@ export class Scheduler<T extends SchedulerEvent> {
         remaining -= distToEnd;
         // Notify listeners of position jump (in ticks)
         for (const listener of this._listeners) {
-          listener.onPositionJump(this._loopStart);
+          listener.onPositionJump(this._loopStart as Tick);
         }
         // Seek clock — passes the currentTimeSeconds snapshot so Transport
         // uses the same clock reading as advance(), not a live re-read.
         this._onLoop?.(
-          this._tempoMap.ticksToSeconds(this._loopStart),
-          this._tempoMap.ticksToSeconds(this._loopEnd),
+          this._tempoMap.ticksToSeconds(this._loopStart as Tick),
+          this._tempoMap.ticksToSeconds(this._loopEnd as Tick),
           currentTimeSeconds
         );
         this._rightEdge = this._loopStart;
@@ -121,7 +121,7 @@ export class Scheduler<T extends SchedulerEvent> {
   private _generateAndConsume(fromTick: number, toTick: number): void {
     for (const listener of this._listeners) {
       try {
-        const events = listener.generate(fromTick, toTick);
+        const events = listener.generate(fromTick as Tick, toTick as Tick);
         for (const event of events) {
           try {
             listener.consume(event);

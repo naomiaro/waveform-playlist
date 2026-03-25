@@ -1,5 +1,5 @@
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { SchedulerEvent, SchedulerListener } from '../types';
+import type { Tick, Sample, SchedulerEvent, SchedulerListener } from '../types';
 import type { SampleTimeline } from '../timeline/sample-timeline';
 import type { TempoMap } from '../timeline/tempo-map';
 import type { TrackNode } from './track-node';
@@ -9,17 +9,17 @@ export interface ClipEvent extends SchedulerEvent {
   clipId: string;
   audioBuffer: AudioBuffer;
   /** Clip position on timeline (integer samples) */
-  startSample: number;
+  startSample: Sample;
   /** Offset into audioBuffer (integer samples) */
-  offsetSamples: number;
+  offsetSamples: Sample;
   /** Duration to play (integer samples) */
-  durationSamples: number;
+  durationSamples: Sample;
   /** Clip gain multiplier */
   gain: number;
   /** Fade in duration (integer samples) */
-  fadeInDurationSamples: number;
+  fadeInDurationSamples: Sample;
   /** Fade out duration (integer samples) */
-  fadeOutDurationSamples: number;
+  fadeOutDurationSamples: Sample;
 }
 
 interface TrackClipState {
@@ -61,13 +61,13 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
 
   /** Set loop region using ticks. startTick is unused — loop clamping only needs
    *  the end boundary; mid-clip restart at loopStart is handled by onPositionJump. */
-  setLoop(enabled: boolean, _startTick: number, endTick: number): void {
+  setLoop(enabled: boolean, _startTick: Tick, endTick: Tick): void {
     this._loopEnabled = enabled;
     this._loopEndSamples = this._sampleTimeline.ticksToSamples(endTick);
   }
 
   /** Set loop region using samples directly */
-  setLoopSamples(enabled: boolean, _startSample: number, endSample: number): void {
+  setLoopSamples(enabled: boolean, _startSample: Sample, endSample: Sample): void {
     this._loopEnabled = enabled;
     this._loopEndSamples = endSample;
   }
@@ -80,8 +80,8 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   generate(fromTick: number, toTick: number): ClipEvent[] {
     const events: ClipEvent[] = [];
 
-    const fromSample = this._sampleTimeline.ticksToSamples(fromTick);
-    const toSample = this._sampleTimeline.ticksToSamples(toTick);
+    const fromSample = this._sampleTimeline.ticksToSamples(fromTick as Tick);
+    const toSample = this._sampleTimeline.ticksToSamples(toTick as Tick);
 
     for (const [trackId, state] of this._tracks) {
       for (const clip of state.clips) {
@@ -107,19 +107,19 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
           durationSamples = this._loopEndSamples - clipStartSample;
         }
 
-        const clipTick = this._sampleTimeline.samplesToTicks(clipStartSample);
+        const clipTick = this._sampleTimeline.samplesToTicks(clipStartSample as Sample);
 
         events.push({
           trackId,
           clipId: clip.id,
           audioBuffer: clip.audioBuffer,
           tick: clipTick,
-          startSample: clipStartSample,
-          offsetSamples: clip.offsetSamples,
-          durationSamples,
+          startSample: clipStartSample as Sample,
+          offsetSamples: clip.offsetSamples as Sample,
+          durationSamples: durationSamples as Sample,
           gain: clip.gain,
-          fadeInDurationSamples,
-          fadeOutDurationSamples,
+          fadeInDurationSamples: fadeInDurationSamples as Sample,
+          fadeOutDurationSamples: fadeOutDurationSamples as Sample,
         });
       }
     }
@@ -213,7 +213,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   onPositionJump(newTick: number): void {
     this.silence();
 
-    const newSample = this._sampleTimeline.ticksToSamples(newTick);
+    const newSample = this._sampleTimeline.ticksToSamples(newTick as Tick);
 
     // Re-schedule mid-clip sources for clips that span the new position
     for (const [trackId, state] of this._tracks) {
@@ -242,13 +242,13 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
             trackId,
             clipId: clip.id,
             audioBuffer: clip.audioBuffer,
-            tick: newTick,
-            startSample: newSample,
-            offsetSamples,
-            durationSamples,
+            tick: newTick as Tick,
+            startSample: newSample as Sample,
+            offsetSamples: offsetSamples as Sample,
+            durationSamples: durationSamples as Sample,
             gain: clip.gain,
-            fadeInDurationSamples: 0,
-            fadeOutDurationSamples,
+            fadeInDurationSamples: 0 as Sample,
+            fadeOutDurationSamples: fadeOutDurationSamples as Sample,
           });
         }
       }

@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { SampleTimeline } from '../timeline/sample-timeline';
 import { TempoMap } from '../timeline/tempo-map';
+import type { Tick, Sample } from '../types';
 
 describe('SampleTimeline', () => {
   it('samplesToSeconds converts at given rate', () => {
     const st = new SampleTimeline(48000);
-    expect(st.samplesToSeconds(48000)).toBe(1);
-    expect(st.samplesToSeconds(24000)).toBe(0.5);
-    expect(st.samplesToSeconds(0)).toBe(0);
+    expect(st.samplesToSeconds(48000 as Sample)).toBe(1);
+    expect(st.samplesToSeconds(24000 as Sample)).toBe(0.5);
+    expect(st.samplesToSeconds(0 as Sample)).toBe(0);
   });
 
   it('secondsToSamples converts at given rate', () => {
@@ -20,7 +21,7 @@ describe('SampleTimeline', () => {
   it('round-trips accurately', () => {
     const st = new SampleTimeline(44100);
     const samples = 123456;
-    expect(st.secondsToSamples(st.samplesToSeconds(samples))).toBe(samples);
+    expect(st.secondsToSamples(st.samplesToSeconds(samples as Sample))).toBe(samples);
   });
 
   it('sampleRate getter returns rate', () => {
@@ -35,18 +36,18 @@ describe('SampleTimeline tick conversions', () => {
     const st = new SampleTimeline(48000);
     st.setTempoMap(tempoMap);
     // 960 ticks = 0.5s at 120 BPM = 24000 samples at 48kHz
-    expect(st.ticksToSamples(960)).toBe(24000);
-    expect(st.ticksToSamples(1920)).toBe(48000);
-    expect(st.ticksToSamples(0)).toBe(0);
+    expect(st.ticksToSamples(960 as Tick)).toBe(24000);
+    expect(st.ticksToSamples(1920 as Tick)).toBe(48000);
+    expect(st.ticksToSamples(0 as Tick)).toBe(0);
   });
 
   it('samplesToTicks converts via seconds', () => {
     const tempoMap = new TempoMap(960, 120);
     const st = new SampleTimeline(48000);
     st.setTempoMap(tempoMap);
-    expect(st.samplesToTicks(24000)).toBe(960);
-    expect(st.samplesToTicks(48000)).toBe(1920);
-    expect(st.samplesToTicks(0)).toBe(0);
+    expect(st.samplesToTicks(24000 as Sample)).toBe(960);
+    expect(st.samplesToTicks(48000 as Sample)).toBe(1920);
+    expect(st.samplesToTicks(0 as Sample)).toBe(0);
   });
 
   it('tick-sample round-trip is exact', () => {
@@ -54,11 +55,11 @@ describe('SampleTimeline tick conversions', () => {
     const st = new SampleTimeline(48000);
     st.setTempoMap(tempoMap);
     const ticks = 4800;
-    expect(st.samplesToTicks(st.ticksToSamples(ticks))).toBe(ticks);
+    expect(st.samplesToTicks(st.ticksToSamples(ticks as Tick))).toBe(ticks);
   });
 
   it('ticksToSamples throws if no tempoMap set', () => {
     const st = new SampleTimeline(48000);
-    expect(() => st.ticksToSamples(960)).toThrow();
+    expect(() => st.ticksToSamples(960 as Tick)).toThrow();
   });
 });

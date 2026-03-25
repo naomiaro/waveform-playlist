@@ -1,4 +1,4 @@
-import type { SchedulerEvent, SchedulerListener } from '../types';
+import type { Tick, SchedulerEvent, SchedulerListener } from '../types';
 import type { TempoMap } from '../timeline/tempo-map';
 import { MeterMap } from '../timeline/meter-map';
 
@@ -68,7 +68,7 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
       const isAccent = this._meterMap.isBarBoundary(tick);
 
       events.push({
-        tick,
+        tick: tick as Tick,
         isAccent,
         buffer: isAccent ? this._accentBuffer : this._normalBuffer,
       });

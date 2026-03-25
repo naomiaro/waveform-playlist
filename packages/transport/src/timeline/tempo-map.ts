@@ -1,8 +1,8 @@
-import type { TempoEntry } from '../types';
+import type { Tick, TempoEntry } from '../types';
 
 /** Mutable internal version of TempoEntry (exported interface has readonly secondsAtTick) */
 interface MutableTempoEntry {
-  tick: number;
+  tick: Tick;
   bpm: number;
   secondsAtTick: number;
 }
@@ -13,7 +13,7 @@ export class TempoMap {
 
   constructor(ppqn: number = 960, initialBpm: number = 120) {
     this._ppqn = ppqn;
-    this._entries = [{ tick: 0, bpm: initialBpm, secondsAtTick: 0 }];
+    this._entries = [{ tick: 0 as Tick, bpm: initialBpm, secondsAtTick: 0 }];
   }
 
   getTempo(atTick: number = 0): number {
@@ -35,17 +35,17 @@ export class TempoMap {
       this._entries[i] = { ...this._entries[i], bpm };
     } else {
       const secondsAtTick = this._ticksToSecondsInternal(atTick);
-      this._entries.splice(i + 1, 0, { tick: atTick, bpm, secondsAtTick });
+      this._entries.splice(i + 1, 0, { tick: atTick as Tick, bpm, secondsAtTick });
       i = i + 1;
     }
     this._recomputeCache(i);
   }
 
-  ticksToSeconds(ticks: number): number {
+  ticksToSeconds(ticks: Tick): number {
     return this._ticksToSecondsInternal(ticks);
   }
 
-  secondsToTicks(seconds: number): number {
+  secondsToTicks(seconds: number): Tick {
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {
@@ -59,11 +59,11 @@ export class TempoMap {
     const entry = this._entries[lo];
     const secondsIntoSegment = seconds - entry.secondsAtTick;
     const ticksPerSecond = (entry.bpm / 60) * this._ppqn;
-    return Math.round(entry.tick + secondsIntoSegment * ticksPerSecond);
+    return Math.round(entry.tick + secondsIntoSegment * ticksPerSecond) as Tick;
   }
 
   beatsToSeconds(beats: number): number {
-    return this.ticksToSeconds(beats * this._ppqn);
+    return this.ticksToSeconds((beats * this._ppqn) as Tick);
   }
 
   secondsToBeats(seconds: number): number {
@@ -72,7 +72,7 @@ export class TempoMap {
 
   clearTempos(): void {
     const first = this._entries[0];
-    this._entries = [{ tick: 0, bpm: first.bpm, secondsAtTick: 0 }];
+    this._entries = [{ tick: 0 as Tick, bpm: first.bpm, secondsAtTick: 0 }];
   }
 
   private _ticksToSecondsInternal(ticks: number): number {

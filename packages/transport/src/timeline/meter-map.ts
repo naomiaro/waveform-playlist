@@ -1,8 +1,8 @@
 // packages/transport/src/timeline/meter-map.ts
-import type { MeterEntry, MeterSignature } from '../types';
+import type { Tick, MeterEntry, MeterSignature } from '../types';
 
 interface MutableMeterEntry {
-  tick: number;
+  tick: Tick;
   numerator: number;
   denominator: number;
   barAtTick: number;
@@ -18,7 +18,7 @@ export class MeterMap {
 
   constructor(ppqn: number, numerator: number = 4, denominator: number = 4) {
     this._ppqn = ppqn;
-    this._entries = [{ tick: 0, numerator, denominator, barAtTick: 0 }];
+    this._entries = [{ tick: 0 as Tick, numerator, denominator, barAtTick: 0 }];
   }
 
   get ppqn(): number {
@@ -63,7 +63,7 @@ export class MeterMap {
       this._entries[i] = { ...this._entries[i], numerator, denominator };
     } else {
       const barAtTick = this._computeBarAtTick(snapped);
-      this._entries.splice(i + 1, 0, { tick: snapped, numerator, denominator, barAtTick });
+      this._entries.splice(i + 1, 0, { tick: snapped as Tick, numerator, denominator, barAtTick });
       i = i + 1;
     }
     this._resnapDownstreamEntries(i);
@@ -198,7 +198,7 @@ export class MeterMap {
             snapped +
             ' (bar boundary alignment)'
         );
-        this._entries[i] = { ...this._entries[i], tick: snapped };
+        this._entries[i] = { ...this._entries[i], tick: snapped as Tick };
       }
     }
   }

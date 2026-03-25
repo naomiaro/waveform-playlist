@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Transport } from '../transport';
+import type { Tick, Sample } from '../types';
 
 function createMockAudioContext() {
   return {
@@ -32,7 +33,7 @@ describe('Transport loop APIs', () => {
   it('setLoop accepts ticks as primary API', () => {
     const ctx = createMockAudioContext();
     const transport = new Transport(ctx);
-    expect(() => transport.setLoop(true, 0, 3840)).not.toThrow();
+    expect(() => transport.setLoop(true, 0 as Tick, 3840 as Tick)).not.toThrow();
   });
 
   it('setLoopSeconds converts seconds to ticks', () => {
@@ -44,6 +45,6 @@ describe('Transport loop APIs', () => {
   it('setLoopSamples converts samples to ticks', () => {
     const ctx = createMockAudioContext();
     const transport = new Transport(ctx);
-    expect(() => transport.setLoopSamples(true, 0, 96000)).not.toThrow();
+    expect(() => transport.setLoopSamples(true, 0 as Sample, 96000 as Sample)).not.toThrow();
   });
 });

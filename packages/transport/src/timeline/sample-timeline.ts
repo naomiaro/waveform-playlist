@@ -1,3 +1,4 @@
+import type { Tick, Sample } from '../types';
 import type { TempoMap } from './tempo-map';
 
 export class SampleTimeline {
@@ -16,24 +17,24 @@ export class SampleTimeline {
     this._tempoMap = tempoMap;
   }
 
-  samplesToSeconds(samples: number): number {
+  samplesToSeconds(samples: Sample): number {
     return samples / this._sampleRate;
   }
 
-  secondsToSamples(seconds: number): number {
-    return Math.round(seconds * this._sampleRate);
+  secondsToSamples(seconds: number): Sample {
+    return Math.round(seconds * this._sampleRate) as Sample;
   }
 
-  ticksToSamples(ticks: number): number {
+  ticksToSamples(ticks: Tick): Sample {
     if (!this._tempoMap) {
       throw new Error(
         '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first'
       );
     }
-    return Math.round(this._tempoMap.ticksToSeconds(ticks) * this._sampleRate);
+    return Math.round(this._tempoMap.ticksToSeconds(ticks) * this._sampleRate) as Sample;
   }
 
-  samplesToTicks(samples: number): number {
+  samplesToTicks(samples: Sample): Tick {
     if (!this._tempoMap) {
       throw new Error(
         '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first'
