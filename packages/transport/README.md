@@ -103,6 +103,13 @@ transport.setTempo(160, transport.barToTick(9), { interpolation: 'linear' });
 // Query interpolated BPM at any position
 transport.getTempo(transport.barToTick(5)); // 130 BPM (midway through ramp)
 
+// Curved ramp: ease-in (slow start, fast end)
+transport.clearTempos();
+transport.setTempo(80);
+transport.setTempo(160, transport.barToTick(9), {
+  interpolation: { type: 'curve', slope: 0.2 },  // concave
+});
+
 // Mix step and linear: jump to 80 BPM at bar 4, ramp to 140 at bar 8
 transport.clearTempos();
 transport.setTempo(120);
@@ -169,7 +176,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setLoopSamples(enabled, startSample: Sample, endSample: Sample)` — Set loop region in samples (convenience)
 
 **Tempo & Meter:**
-- `setTempo(bpm, atTick?, options?)` / `getTempo(atTick?: Tick)` — options: `{ interpolation: 'step' | 'linear' }`
+- `setTempo(bpm, atTick?, options?)` / `getTempo(atTick?: Tick)` — options: `{ interpolation: 'step' | 'linear' | { type: 'curve', slope } }`
 - `clearTempos()` — remove all tempo entries
 - `setMeter(numerator, denominator, atTick?: Tick)` / `getMeter(atTick?: Tick)`
 - `removeMeter(atTick: Tick)` / `clearMeters()`

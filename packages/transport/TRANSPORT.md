@@ -144,8 +144,8 @@ The scheduler works in integer ticks — `advance()` converts Clock seconds → 
 TempoMap entries carry an `interpolation` field describing how to arrive at this entry from the previous:
 
 - **`'step'`** (default) — Instant jump. Constant BPM within the segment. Simple formula: `seconds = ticks * 60 / (bpm * ppqn)`.
-- **`'linear'`** — Linear ramp from previous BPM to this BPM. Uses exact trapezoidal formula: `seconds = ticks * 60/ppqn * (1/bpm0 + 1/bpmAtTick) / 2`. The inverse (`secondsToTicks`) solves a closed-form quadratic — no iterative stepping needed.
-- **`{ type: 'curve', slope }`** — Reserved for future Möbius-Ease curves (not yet implemented).
+- **`'linear'`** — Linear ramp from previous BPM to this BPM. Uses exact logarithmic integral: `seconds = (T * 60 / (ppqn * deltaBpm)) * ln(bpmAtTick / bpm0)`. Inverse uses exponential — both closed-form, zero approximation error.
+- **`{ type: 'curve', slope }`** — Möbius-Ease curve. `slope` controls shape (0–1 exclusive): below 0.5 = concave (slow start, fast end), 0.5 = linear, above 0.5 = convex (fast start, slow end). Uses subdivided trapezoidal integration (64 intervals); inverse uses binary search.
 
 `getTempo(atTick)` returns the interpolated BPM at any position within a ramp. The `secondsAtTick` cache on each entry accounts for the interpolation type of that segment, so O(log n) lookup still works.
 
