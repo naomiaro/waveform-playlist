@@ -110,6 +110,13 @@ transport.setTempo(160, transport.barToTick(9), {
   interpolation: { type: 'curve', slope: 0.2 },  // concave
 });
 
+// Curved ramp: ease-out (fast start, slow end)
+transport.clearTempos();
+transport.setTempo(80);
+transport.setTempo(160, transport.barToTick(9), {
+  interpolation: { type: 'curve', slope: 0.8 },  // convex
+});
+
 // Mix step and linear: jump to 80 BPM at bar 4, ramp to 140 at bar 8
 transport.clearTempos();
 transport.setTempo(120);
