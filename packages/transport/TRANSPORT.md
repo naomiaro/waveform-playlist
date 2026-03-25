@@ -139,6 +139,18 @@ Audio clips and music events live in different coordinate spaces:
 
 The scheduler works in integer ticks — `advance()` converts Clock seconds → ticks via TempoMap at entry. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples via SampleTimeline.
 
+## Tempo Automation
+
+TempoMap entries carry an `interpolation` field describing how to arrive at this entry from the previous:
+
+- **`'step'`** (default) — Instant jump. Constant BPM within the segment. Simple formula: `seconds = ticks * 60 / (bpm * ppqn)`.
+- **`'linear'`** — Linear ramp from previous BPM to this BPM. Uses exact trapezoidal formula: `seconds = ticks * 60/ppqn * (1/bpm0 + 1/bpmAtTick) / 2`. The inverse (`secondsToTicks`) solves a closed-form quadratic — no iterative stepping needed.
+- **`{ type: 'curve', slope }`** — Reserved for future Möbius-Ease curves (not yet implemented).
+
+`getTempo(atTick)` returns the interpolated BPM at any position within a ramp. The `secondsAtTick` cache on each entry accounts for the interpolation type of that segment, so O(log n) lookup still works.
+
+The first entry is always `'step'` — there is no previous entry to ramp from.
+
 ## Meter Map
 
 The transport maintains two independent musical maps:

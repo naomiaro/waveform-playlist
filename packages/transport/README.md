@@ -92,6 +92,24 @@ transport.setMetronomeEnabled(true);
 transport.play();
 ```
 
+### Tempo Automation
+
+```typescript
+const transport = new Transport(audioContext, { tempo: 100 });
+
+// Linear ramp from 100 to 160 BPM over 8 bars
+transport.setTempo(160, transport.barToTick(9), { interpolation: 'linear' });
+
+// Query interpolated BPM at any position
+transport.getTempo(transport.barToTick(5)); // ~137.5 BPM (midway through ramp)
+
+// Mix step and linear: jump to 80 BPM at bar 4, ramp to 140 at bar 8
+transport.clearTempos();
+transport.setTempo(120);
+transport.setTempo(80, transport.barToTick(5));  // step (instant jump)
+transport.setTempo(140, transport.barToTick(9), { interpolation: 'linear' });  // ramp
+```
+
 ### Effects
 
 ```typescript
@@ -151,7 +169,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setLoopSamples(enabled, startSample: Sample, endSample: Sample)` — Set loop region in samples (convenience)
 
 **Tempo & Meter:**
-- `setTempo(bpm, atTick?)` / `getTempo(atTick?)`
+- `setTempo(bpm, atTick?, options?)` / `getTempo(atTick?: Tick)` — options: `{ interpolation: 'step' | 'linear' }`
 - `clearTempos()` — remove all tempo entries
 - `setMeter(numerator, denominator, atTick?: Tick)` / `getMeter(atTick?: Tick)`
 - `removeMeter(atTick: Tick)` / `clearMeters()`
