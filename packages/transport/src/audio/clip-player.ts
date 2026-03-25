@@ -145,6 +145,15 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
 
     // Guard against invalid offset
     if (offsetSeconds >= event.audioBuffer.duration) {
+      console.warn(
+        '[waveform-playlist] ClipPlayer.consume: offset (' +
+          offsetSeconds +
+          's) exceeds audioBuffer.duration (' +
+          event.audioBuffer.duration +
+          's) for clipId "' +
+          event.clipId +
+          '" — clip will not play'
+      );
       return;
     }
 
@@ -218,7 +227,13 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         if (clipStartSample <= newSample && clipEndSample > newSample) {
           const offsetIntoClipSamples = newSample - clipStartSample;
           const offsetSamples = clip.offsetSamples + offsetIntoClipSamples;
-          const durationSamples = clipEndSample - newSample;
+          let durationSamples = clipEndSample - newSample;
+
+          // Clamp at loop boundary (same as generate)
+          if (this._loopEnabled && newSample + durationSamples > this._loopEndSamples) {
+            durationSamples = this._loopEndSamples - newSample;
+          }
+          if (durationSamples <= 0) continue;
 
           const fadeOutDurationSamples = clip.fadeOut ? (clip.fadeOut.duration ?? 0) : 0;
 

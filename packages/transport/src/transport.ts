@@ -344,9 +344,21 @@ export class Transport {
 
   /** Convenience — sets loop in samples */
   setLoopSamples(enabled: boolean, startSample: number, endSample: number): void {
-    this._clipPlayer.setLoopSamples(enabled, startSample, endSample);
+    if (enabled && startSample >= endSample) {
+      console.warn(
+        '[waveform-playlist] Transport.setLoopSamples: startSample (' +
+          startSample +
+          ') must be less than endSample (' +
+          endSample +
+          ')'
+      );
+      return;
+    }
     const startTick = this._sampleTimeline.samplesToTicks(startSample);
     const endTick = this._sampleTimeline.samplesToTicks(endSample);
+    this._loopEnabled = enabled;
+    this._loopStartSeconds = this._tempoMap.ticksToSeconds(startTick);
+    this._clipPlayer.setLoopSamples(enabled, startSample, endSample);
     this._scheduler.setLoop(enabled, startTick, endTick);
     this._emit('loop');
   }
