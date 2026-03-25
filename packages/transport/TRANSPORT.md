@@ -82,22 +82,26 @@ The scheduler runs 200ms ahead of real-time audio. This means:
 Both `ClipPlayer` and `MetronomePlayer` implement the same interface:
 
 ```typescript
+interface SchedulerEvent {
+  tick: number;  // integer tick position on the timeline
+}
+
 interface SchedulerListener<T extends SchedulerEvent> {
-  generate(fromTime: number, toTime: number): T[];
+  generate(fromTick: number, toTick: number): T[];
   consume(event: T): void;
-  onPositionJump(newTime: number): void;
+  onPositionJump(newTick: number): void;
   silence(): void;
 }
 ```
 
-- **`generate()`** — Produce events for a time window. Called by the scheduler when the window expands.
-- **`consume()`** — Realize an event — create `AudioBufferSourceNode`, connect to audio graph, call `source.start()`.
-- **`onPositionJump()`** — Position discontinuity (seek, loop wrap, resume from pause). Stop active sources, create mid-clip sources for clips spanning the new position.
+- **`generate()`** — Produce events for a tick window `[fromTick, toTick)`. Called by the scheduler when the window expands. Each listener converts ticks to its native unit internally (MetronomePlayer stays in ticks, ClipPlayer converts to samples).
+- **`consume()`** — Realize an event — create `AudioBufferSourceNode`, connect to audio graph, call `source.start()`. Each listener converts `event.tick` → seconds → audio time internally.
+- **`onPositionJump()`** — Position discontinuity (seek, loop wrap, resume from pause). ClipPlayer stops active sources and creates mid-clip sources for clips spanning the new position. MetronomePlayer is a no-op (clicks are short one-shots that finish naturally).
 - **`silence()`** — Emergency stop. Kill all active audio immediately.
 
 ### Generate-Once Scheduling
 
-A clip is only scheduled when its `startTime` falls within the scheduling window `[fromTime, toTime)`. Once an `AudioBufferSourceNode` is created, it plays for its full duration — the scheduler doesn't re-generate for it.
+A clip is only scheduled when its `startSample` falls within the scheduling window `[fromTick, toTick)` (converted to samples internally). Once an `AudioBufferSourceNode` is created, it plays for its full duration — the scheduler doesn't re-generate for it.
 
 Clips that started in a previous window are already playing. Mid-clip playback (seek, loop, resume) is handled by `onPositionJump()`, which creates new sources at the correct buffer offset.
 
@@ -128,7 +132,7 @@ Audio clips and music events live in different coordinate spaces:
 - **TempoMap** — Converts between ticks and seconds. Supports tempo changes at arbitrary tick positions with cached cumulative seconds for O(log n) lookups.
 - **MeterMap** — Time signature entries at tick positions. Determines beat unit (from denominator) and bar length (from numerator). See Meter Map section below.
 
-Both coordinate systems convert to seconds at the scheduler boundary. The scheduler itself only works in seconds.
+The scheduler works in integer ticks — `advance()` converts Clock seconds → ticks via TempoMap at entry. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples via SampleTimeline.
 
 ## Meter Map
 
@@ -163,7 +167,7 @@ A denominator of `4` gives a quarter-note beat (standard). A denominator of `8` 
 
 ### MetronomePlayer Integration
 
-`MetronomePlayer.generate(fromTime, toTime)` converts the time window to ticks via `TempoMap`, then walks the beat grid. For each beat tick, it queries `MeterMap.getMeter(tick)` to determine:
+`MetronomePlayer.generate(fromTick, toTick)` receives ticks directly from the Scheduler and walks the beat grid. For each beat tick, it queries `MeterMap.getMeter(tick)` to determine:
 
 1. The beat unit duration (ticks per beat → seconds via TempoMap)
 2. Whether this beat is beat 1 of a bar (→ accent click) or an inner beat (→ normal click)
@@ -233,13 +237,14 @@ Key design choices:
 
 ### Loop
 
-The scheduler detects when the lookahead window crosses `loopEnd`:
+The scheduler detects when the lookahead window (in ticks) crosses `loopEnd`:
 
-1. Generate events up to `loopEnd` (clip durations clamped at boundary)
-2. Call `onPositionJump(loopStart)` on all listeners — stops sources, creates mid-clip sources
-3. Seek clock to `loopStart` so subsequent `advance()` calls receive correct time
-4. Continue generating from `loopStart` to fill remaining lookahead
-5. Handles multiple wraps per tick for loop regions shorter than the lookahead
+1. Generate events up to `loopEnd` (clip durations clamped at boundary in samples)
+2. Call `onPositionJump(loopStart)` on all listeners — ClipPlayer stops sources and creates mid-clip sources; MetronomePlayer is a no-op (clicks finish naturally)
+3. Seek clock to `loopStart - timeToBoundary` where `timeToBoundary = loopEnd - clockTime` in seconds. This offset ensures post-wrap events schedule at the boundary's audio time, not at "now" (the advance runs ahead of real time by the lookahead)
+4. Continue generating from `loopStart` to fill remaining lookahead — events use the adjusted clock so `toAudioTime()` maps correctly
+5. Handles multiple wraps per advance for loop regions shorter than the lookahead
+6. `getCurrentTime()` clamps to `loopStart` during the brief window after wrap when the clock is behind (the lookahead offset)
 
 ## Solo Logic
 

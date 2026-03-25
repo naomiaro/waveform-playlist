@@ -145,7 +145,9 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setMasterVolume(volume)`
 
 **Loop:**
-- `setLoop(enabled, start, end)` — Set loop region in seconds
+- `setLoop(enabled, startTick, endTick)` — Set loop region in ticks (primary API)
+- `setLoopSeconds(enabled, start, end)` — Set loop region in seconds (convenience)
+- `setLoopSamples(enabled, startSample, endSample)` — Set loop region in samples (convenience)
 
 **Tempo & Meter:**
 - `setTempo(bpm, atTick?)` / `getTempo(atTick?)`
