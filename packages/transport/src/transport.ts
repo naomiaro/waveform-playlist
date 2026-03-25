@@ -1,5 +1,5 @@
 import type { ClipTrack } from '@waveform-playlist/core';
-import type { Tick, Sample, TransportOptions, MeterSignature } from './types';
+import type { Tick, Sample, TransportOptions, MeterSignature, TempoInterpolation } from './types';
 import { Clock } from './core/clock';
 import { Scheduler } from './core/scheduler';
 import { Timer } from './core/timer';
@@ -377,8 +377,8 @@ export class Transport {
 
   // --- Tempo ---
 
-  setTempo(bpm: number, atTick?: Tick): void {
-    this._tempoMap.setTempo(bpm, atTick);
+  setTempo(bpm: number, atTick?: Tick, options?: { interpolation?: TempoInterpolation }): void {
+    this._tempoMap.setTempo(bpm, atTick, options);
     this._emit('tempochange');
   }
 
