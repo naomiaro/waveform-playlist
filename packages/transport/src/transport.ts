@@ -63,12 +63,14 @@ export class Transport {
 
     this._scheduler = new Scheduler(this._tempoMap, {
       lookahead,
-      onLoop: (loopStartSeconds: number, loopEndSeconds: number) => {
+      onLoop: (loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => {
         // The wrap fires in the middle of advance(), which runs ahead of
         // real time by the lookahead.  Post-wrap events use toAudioTime()
         // which reads the clock, so the seek target must place loopStart
         // at the audio-time of the boundary — not at "now".
-        const timeToBoundary = loopEndSeconds - this._clock.getTime();
+        // Uses the currentTimeSeconds snapshot from advance() to avoid
+        // re-reading the live AudioContext.currentTime (sub-ms drift).
+        const timeToBoundary = loopEndSeconds - currentTimeSeconds;
         this._clock.seekTo(loopStartSeconds - timeToBoundary);
       },
     });
@@ -344,6 +346,16 @@ export class Transport {
 
   /** Convenience — sets loop in samples */
   setLoopSamples(enabled: boolean, startSample: number, endSample: number): void {
+    if (enabled && (!Number.isFinite(startSample) || !Number.isFinite(endSample))) {
+      console.warn(
+        '[waveform-playlist] Transport.setLoopSamples: non-finite sample values (' +
+          startSample +
+          ', ' +
+          endSample +
+          ')'
+      );
+      return;
+    }
     if (enabled && startSample >= endSample) {
       console.warn(
         '[waveform-playlist] Transport.setLoopSamples: startSample (' +

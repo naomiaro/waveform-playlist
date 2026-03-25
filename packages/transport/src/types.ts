@@ -8,7 +8,9 @@ export interface SchedulerListener<T extends SchedulerEvent> {
   generate(fromTick: number, toTick: number): T[];
   /** Realize an event (create audio nodes, start sources) */
   consume(event: T): void;
-  /** Position jumped (loop/seek) — stop active sources, re-schedule */
+  /** Position jumped (loop/seek) — listeners may stop and re-schedule as appropriate
+   *  (ClipPlayer stops sources and creates mid-clip restarts; MetronomePlayer is a no-op
+   *  since clicks are short one-shots that finish naturally) */
   onPositionJump(newTick: number): void;
   /** Stop all active audio immediately */
   silence(): void;

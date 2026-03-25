@@ -59,7 +59,8 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     }
   }
 
-  /** Set loop region using ticks — endTick is converted to samples via sampleTimeline */
+  /** Set loop region using ticks. startTick is unused — loop clamping only needs
+   *  the end boundary; mid-clip restart at loopStart is handled by onPositionJump. */
   setLoop(enabled: boolean, _startTick: number, endTick: number): void {
     this._loopEnabled = enabled;
     this._loopEndSamples = this._sampleTimeline.ticksToSamples(endTick);

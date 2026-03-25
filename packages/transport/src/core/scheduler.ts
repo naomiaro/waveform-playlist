@@ -4,9 +4,10 @@ import type { TempoMap } from '../timeline/tempo-map';
 export interface SchedulerOptions {
   lookahead?: number;
   /** Called when the scheduler wraps at loopEnd.
-   *  Receives loopStart and loopEnd in seconds so the Transport can
-   *  compute the correct clock seek target (accounting for lookahead offset). */
-  onLoop?: (loopStartSeconds: number, loopEndSeconds: number) => void;
+   *  Receives loopStart, loopEnd, and the currentTimeSeconds snapshot from
+   *  advance() so the Transport can compute the correct clock seek target
+   *  without re-reading the live AudioContext.currentTime. */
+  onLoop?: (loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => void;
 }
 
 export class Scheduler<T extends SchedulerEvent> {
@@ -16,7 +17,9 @@ export class Scheduler<T extends SchedulerEvent> {
   private _loopEnabled = false;
   private _loopStart = 0; // integer ticks
   private _loopEnd = 0; // integer ticks
-  private _onLoop: ((loopStartSeconds: number, loopEndSeconds: number) => void) | undefined;
+  private _onLoop:
+    | ((loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => void)
+    | undefined;
   private _tempoMap: TempoMap;
 
   constructor(tempoMap: TempoMap, options: SchedulerOptions = {}) {
@@ -94,11 +97,12 @@ export class Scheduler<T extends SchedulerEvent> {
         for (const listener of this._listeners) {
           listener.onPositionJump(this._loopStart);
         }
-        // Seek clock back to loopStart (passes both boundaries so Transport
-        // can compute the correct seek target accounting for lookahead offset)
+        // Seek clock — passes the currentTimeSeconds snapshot so Transport
+        // uses the same clock reading as advance(), not a live re-read.
         this._onLoop?.(
           this._tempoMap.ticksToSeconds(this._loopStart),
-          this._tempoMap.ticksToSeconds(this._loopEnd)
+          this._tempoMap.ticksToSeconds(this._loopEnd),
+          currentTimeSeconds
         );
         this._rightEdge = this._loopStart;
 

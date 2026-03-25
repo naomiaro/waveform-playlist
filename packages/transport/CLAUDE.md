@@ -105,7 +105,7 @@ Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (requir
 ## Patterns
 
 - **AudioContext received from consumer** — sidesteps all Tone.js/Firefox context creation issues. `new AudioContext({ sampleRate, latencyHint })` works natively.
-- **Convenience API variants must mirror primary** — `setLoopSamples` and `setLoopSeconds` bypass `setLoop` for performance. Any state updates or validation in the primary method (`_loopEnabled`, `_loopStartSeconds`, start >= end guard) must be duplicated in convenience variants.
+- **Convenience API variants must mirror primary** — `setLoopSeconds` delegates to `setLoop` (inherits all validation). `setLoopSamples` bypasses `setLoop` and calls `_clipPlayer.setLoopSamples` + `_scheduler.setLoop` directly, so it must duplicate all state updates and validation from the primary (`_loopEnabled`, `_loopStartSeconds`, `isFinite` guard, start >= end guard).
 - **`silence()` on stop/seek** — listeners are responsible for stopping their active sources. `AudioBufferSourceNode.stop()` is instantaneous.
 - **No Tone.js in the signal path** — all audio nodes are native Web Audio.
 - **`_activeSources` cleanup** — ClipPlayer uses `ended` event listener for automatic cleanup. MetronomePlayer clicks are short one-shots.
