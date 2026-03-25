@@ -24,7 +24,9 @@ Sliding window event generation. `advance(currentTime)` expands the window to `c
 
 **Listener contract:** `SchedulerListener<T>` has four methods: `generate()`, `consume()`, `onPositionJump()`, `silence()`. Both `ClipPlayer` and `MetronomePlayer` implement this.
 
-**Tick-based internals (v0.0.3):** Loop boundaries (`_loopStart`, `_loopEnd`) and the scheduling cursor (`_rightEdge`) are integer ticks. `advance()` converts Clock seconds → ticks via TempoMap at entry, then uses integer comparisons for loop wrap logic. `onLoop` callback converts back to seconds for `Clock.seekTo()`. This eliminates float precision drift at loop boundaries.
+**Tick-based internals (v0.0.3):** Loop boundaries (`_loopStart`, `_loopEnd`) and the scheduling cursor (`_rightEdge`) are integer ticks. `advance()` converts Clock seconds → ticks via TempoMap at entry, then uses integer comparisons for loop wrap logic. This eliminates float precision drift at loop boundaries. All time windows use half-open intervals: `[fromTick, toTick)`.
+
+**Clock seek offset at loop wrap:** The `onLoop` callback seeks the clock to `loopStart - (loopEnd - clockTime)`, not just `loopStart`. Since advance runs ahead by the lookahead (~200ms), post-wrap events need `toAudioTime()` to map them to the boundary's audio time, not to "now". `getCurrentTime()` clamps to `loopStart` during the brief window when the clock is behind.
 
 **Loop APIs:** `setLoop(enabled, startTick, endTick)` is the primary tick-based API. `setLoopSeconds()` and `setLoopSamples()` are convenience methods that convert at the boundary. `NativePlayoutAdapter.setLoop()` calls `setLoopSeconds()` since the engine speaks seconds.
 
@@ -36,8 +38,8 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 ### Dual Coordinate System
 
-- **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples).
-- **TempoMap** — converts between ticks and seconds. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
+- **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples). Also `ticksToSamples()` / `samplesToTicks()` via TempoMap (requires `setTempoMap()` before use).
+- **TempoMap** — converts between ticks and seconds. `secondsToTicks()` returns `Math.round()` (integer). `ticksToSeconds()` stays float for audio scheduling. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
 - **MeterMap** — time signature entries at tick positions. See MeterMap section below.
 
 SampleTimeline converts between samples, seconds, and ticks (via TempoMap). The Scheduler works in integer ticks — seconds from the Clock are converted at the top of `advance()`. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples.
@@ -70,7 +72,7 @@ Mute uses a separate GainNode (0/1) so volume and mute are independent. `connect
 
 ### ClipPlayer
 
-Implements `SchedulerListener<ClipEvent>`. `generate()` finds clips overlapping the time window. `consume()` creates native `AudioBufferSourceNode`, applies per-clip gain via GainNode, handles fade in/out via `linearRampToValueAtTime`. `onPositionJump()` stops all active sources and creates mid-clip sources for clips spanning the new position.
+Implements `SchedulerListener<ClipEvent>`. `generate(fromTick, toTick)` converts ticks to samples via `SampleTimeline.ticksToSamples()`, finds clips whose `startSample` falls in the window, and does loop clamping in integer samples (`_loopEndSamples`). Has two loop setters: `setLoop(startTick, endTick)` converts via SampleTimeline, `setLoopSamples(startSample, endSample)` stores directly. `consume()` converts `event.tick` → seconds → audio time, then samples → seconds for `source.start(when, offset, duration)`. `onPositionJump(newTick)` converts to samples, stops all active sources, and creates mid-clip sources for clips spanning the new position.
 
 **Skips:** Clips with `durationSamples === 0` or missing `audioBuffer` (peaks-first rendering).
 
@@ -78,7 +80,7 @@ Implements `SchedulerListener<ClipEvent>`. `generate()` finds clips overlapping 
 
 ### MetronomePlayer
 
-Implements `SchedulerListener<MetronomeEvent>`. Converts seconds window to ticks via TempoMap, walks beat grid, generates accent clicks on beat 1 of each bar.
+Implements `SchedulerListener<MetronomeEvent>`. Receives integer ticks directly from the Scheduler, walks beat grid, generates accent clicks on beat 1 of each bar. `consume()` converts `event.tick` → seconds → audio time. `onPositionJump()` is a no-op — clicks are short one-shots (40-50ms) that finish naturally; silencing them on loop wrap kills the last beat before the boundary.
 
 ## Transport (Top-Level API)
 
@@ -119,7 +121,7 @@ Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (requir
 
 ### Generate-Once Scheduling
 
-`ClipPlayer.generate()` must only create events when a clip's `startTime` falls within the scheduling window `[fromTime, toTime)`. Clips that started in a previous window are already playing — their `AudioBufferSourceNode` runs for its full duration. Re-generating for overlapping clips creates duplicate stacking sources that ramp volume.
+`ClipPlayer.generate()` must only create events when a clip's `startSample` falls within the scheduling window (converted from ticks to samples). Clips that started in a previous window are already playing — their `AudioBufferSourceNode` runs for its full duration. Re-generating for overlapping clips creates duplicate stacking sources that ramp volume.
 
 Mid-clip playback (seek, loop wrap, resume from pause) is handled by `onPositionJump()`, not `generate()`.
 
@@ -160,7 +162,7 @@ Not yet integrated. Future work: pass `NativePlayoutAdapter` via the engine's `a
 
 ### Clips Spanning Loop Boundary
 
-When a clip starts before `loopEnd` and extends past it, `generate()` clamps `duration` to `loopEnd - clipStartTime`. The `AudioBufferSourceNode` stops exactly at `loopEnd`. After `onPositionJump(loopStart)`, if the clip also spans `loopStart`, a new mid-clip source is created. No duplicate sources — the first was clamped.
+When a clip starts before `loopEnd` and extends past it, `generate()` clamps `durationSamples` to `loopEndSamples - clipStartSample` (integer subtraction). The `AudioBufferSourceNode` stops exactly at the boundary. After `onPositionJump(loopStartTick)`, if the clip also spans `loopStart`, a new mid-clip source is created. No duplicate sources — the first was clamped. Zero-duration clips at the boundary (`durationSamples <= 0`) are skipped.
 
 ### Empty Tracks and Missing AudioBuffers
 
