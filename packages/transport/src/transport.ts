@@ -40,6 +40,8 @@ export class Transport {
   private _mutedTrackIds: Set<string> = new Set();
   private _playing = false;
   private _endTime: number | undefined;
+  private _loopEnabled = false;
+  private _loopStartSeconds = 0;
   private _listeners: Map<TransportEventType, Set<TransportEvents[TransportEventType]>> = new Map();
 
   constructor(audioContext: AudioContext, options: TransportOptions = {}) {
@@ -61,8 +63,13 @@ export class Transport {
 
     this._scheduler = new Scheduler(this._tempoMap, {
       lookahead,
-      onLoop: (loopStartTimeSeconds: number) => {
-        this._clock.seekTo(loopStartTimeSeconds);
+      onLoop: (loopStartSeconds: number, loopEndSeconds: number) => {
+        // The wrap fires in the middle of advance(), which runs ahead of
+        // real time by the lookahead.  Post-wrap events use toAudioTime()
+        // which reads the clock, so the seek target must place loopStart
+        // at the audio-time of the boundary — not at "now".
+        const timeToBoundary = loopEndSeconds - this._clock.getTime();
+        this._clock.seekTo(loopStartSeconds - timeToBoundary);
       },
     });
     this._sampleTimeline.setTempoMap(this._tempoMap);
@@ -160,7 +167,13 @@ export class Transport {
   }
 
   getCurrentTime(): number {
-    return this._clock.getTime();
+    const t = this._clock.getTime();
+    // After a loop wrap, the clock is briefly behind loopStart (the seek
+    // target accounts for lookahead offset). Clamp for display purposes.
+    if (this._loopEnabled && t < this._loopStartSeconds) {
+      return this._loopStartSeconds;
+    }
+    return t;
   }
 
   isPlaying(): boolean {
@@ -315,6 +328,8 @@ export class Transport {
       );
       return;
     }
+    this._loopEnabled = enabled;
+    this._loopStartSeconds = this._tempoMap.ticksToSeconds(startTick);
     this._scheduler.setLoop(enabled, startTick, endTick);
     this._clipPlayer.setLoop(enabled, startTick, endTick);
     this._emit('loop');

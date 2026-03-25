@@ -3,8 +3,10 @@ import type { TempoMap } from '../timeline/tempo-map';
 
 export interface SchedulerOptions {
   lookahead?: number;
-  /** Called when the scheduler wraps at loopEnd — receives loopStart in seconds for Clock.seekTo */
-  onLoop?: (loopStartTimeSeconds: number) => void;
+  /** Called when the scheduler wraps at loopEnd.
+   *  Receives loopStart and loopEnd in seconds so the Transport can
+   *  compute the correct clock seek target (accounting for lookahead offset). */
+  onLoop?: (loopStartSeconds: number, loopEndSeconds: number) => void;
 }
 
 export class Scheduler<T extends SchedulerEvent> {
@@ -14,7 +16,7 @@ export class Scheduler<T extends SchedulerEvent> {
   private _loopEnabled = false;
   private _loopStart = 0; // integer ticks
   private _loopEnd = 0; // integer ticks
-  private _onLoop: ((loopStartTimeSeconds: number) => void) | undefined;
+  private _onLoop: ((loopStartSeconds: number, loopEndSeconds: number) => void) | undefined;
   private _tempoMap: TempoMap;
 
   constructor(tempoMap: TempoMap, options: SchedulerOptions = {}) {
@@ -82,8 +84,12 @@ export class Scheduler<T extends SchedulerEvent> {
         for (const listener of this._listeners) {
           listener.onPositionJump(this._loopStart);
         }
-        // Seek clock back to loopStart (in seconds)
-        this._onLoop?.(this._tempoMap.ticksToSeconds(this._loopStart));
+        // Seek clock back to loopStart (passes both boundaries so Transport
+        // can compute the correct seek target accounting for lookahead offset)
+        this._onLoop?.(
+          this._tempoMap.ticksToSeconds(this._loopStart),
+          this._tempoMap.ticksToSeconds(this._loopEnd)
+        );
         this._rightEdge = this._loopStart;
 
         // Guard against infinite loop
