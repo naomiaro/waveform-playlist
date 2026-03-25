@@ -77,11 +77,11 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     this._silenceTrack(trackId);
   }
 
-  generate(fromTick: number, toTick: number): ClipEvent[] {
+  generate(fromTick: Tick, toTick: Tick): ClipEvent[] {
     const events: ClipEvent[] = [];
 
-    const fromSample = this._sampleTimeline.ticksToSamples(fromTick as Tick);
-    const toSample = this._sampleTimeline.ticksToSamples(toTick as Tick);
+    const fromSample = this._sampleTimeline.ticksToSamples(fromTick);
+    const toSample = this._sampleTimeline.ticksToSamples(toTick);
 
     for (const [trackId, state] of this._tracks) {
       for (const clip of state.clips) {
@@ -210,10 +210,10 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     source.start(when, offsetSeconds, durationSeconds);
   }
 
-  onPositionJump(newTick: number): void {
+  onPositionJump(newTick: Tick): void {
     this.silence();
 
-    const newSample = this._sampleTimeline.ticksToSamples(newTick as Tick);
+    const newSample = this._sampleTimeline.ticksToSamples(newTick);
 
     // Re-schedule mid-clip sources for clips that span the new position
     for (const [trackId, state] of this._tracks) {

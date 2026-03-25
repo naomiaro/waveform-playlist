@@ -72,6 +72,7 @@ export interface TransportPosition {
   /** 1-indexed beat within bar */
   beat: number;
   /** Sub-beat tick remainder (0 to ppqn-1). Named subTick to avoid
-   *  collision with SchedulerEvent.tick (absolute timeline position). */
-  subTick: Tick;
+   *  collision with SchedulerEvent.tick (absolute timeline position).
+   *  Not branded Tick — a remainder within a beat, not an absolute position. */
+  subTick: number;
 }

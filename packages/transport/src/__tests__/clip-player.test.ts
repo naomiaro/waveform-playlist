@@ -4,7 +4,7 @@ import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { TrackNode } from '../audio/track-node';
 import { SampleTimeline } from '../timeline/sample-timeline';
 import { TempoMap } from '../timeline/tempo-map';
-import type { Sample } from '../types';
+import type { Tick, Sample } from '../types';
 
 // At 120 BPM, 960 PPQN, 48kHz:
 // 0.5s = 960 ticks  = 24000 samples
@@ -107,7 +107,7 @@ describe('ClipPlayer', () => {
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // Window [0, 960 ticks) = [0, 0.5s)
-    const events = player.generate(0, 960);
+    const events = player.generate(0 as Tick, 960 as Tick);
     expect(events.length).toBe(1);
     expect(events[0].tick).toBe(0);
     expect(events[0].durationSamples).toBe(48000);
@@ -120,7 +120,7 @@ describe('ClipPlayer', () => {
     const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
-    const events = player.generate(0, 1920);
+    const events = player.generate(0 as Tick, 1920 as Tick);
     expect(events.length).toBe(0);
   });
 
@@ -131,7 +131,7 @@ describe('ClipPlayer', () => {
     const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
-    const events = player.generate(0, 1920);
+    const events = player.generate(0 as Tick, 1920 as Tick);
     expect(events.length).toBe(0);
   });
 
@@ -141,7 +141,7 @@ describe('ClipPlayer', () => {
     const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
-    const events = player.generate(0, 1920);
+    const events = player.generate(0 as Tick, 1920 as Tick);
     expect(events.length).toBe(0);
   });
 
@@ -153,7 +153,7 @@ describe('ClipPlayer', () => {
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // Window [0, 384 ticks) = [0, 0.2s)
-    const events = player.generate(0, 384);
+    const events = player.generate(0 as Tick, 384 as Tick);
     expect(events.length).toBe(1);
 
     player.consume(events[0]);
@@ -174,7 +174,7 @@ describe('ClipPlayer', () => {
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // Window [0, 384 ticks) = [0, 0.2s)
-    const events = player.generate(0, 384);
+    const events = player.generate(0 as Tick, 384 as Tick);
     player.consume(events[0]);
 
     player.silence();
@@ -195,11 +195,11 @@ describe('ClipPlayer', () => {
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // First consume an event
-    const events = player.generate(0, 384);
+    const events = player.generate(0 as Tick, 384 as Tick);
     player.consume(events[0]);
 
     // Jump to mid-clip (tick 960 = 0.5s)
-    player.onPositionJump(960);
+    player.onPositionJump(960 as Tick);
     const source = (ctx.createBufferSource as any).mock.results[0].value;
     expect(source.stop).toHaveBeenCalledTimes(1);
 
@@ -218,7 +218,7 @@ describe('ClipPlayer', () => {
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // Window [1920, 2304) ticks = [1.0s, 1.2s) — after clip ends at 0.5s
-    const events = player.generate(1920, 2304);
+    const events = player.generate(1920 as Tick, 2304 as Tick);
     expect(events.length).toBe(0);
   });
 
@@ -234,7 +234,7 @@ describe('ClipPlayer', () => {
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // Window [960, 1344) ticks = [0.5s, 0.7s) — clip started at 0, already scheduled
-    const events = player.generate(960, 1344);
+    const events = player.generate(960 as Tick, 1344 as Tick);
     expect(events.length).toBe(0);
   });
 
@@ -253,7 +253,7 @@ describe('ClipPlayer', () => {
     player.setLoopSamples(true, 0 as Sample, 48000 as Sample);
 
     // Window [0, 384) ticks = [0, 0.2s)
-    const events = player.generate(0, 384);
+    const events = player.generate(0 as Tick, 384 as Tick);
     expect(events.length).toBe(1);
     // Duration should be clamped to 48000 samples (1s), not full 96000 (2s)
     expect(events[0].durationSamples).toBe(48000);
@@ -271,7 +271,7 @@ describe('ClipPlayer', () => {
     player.setTracks([track], new Map([['track-1', trackNode]]));
 
     // onPositionJump at tick 960 = 0.5s
-    player.onPositionJump(960);
+    player.onPositionJump(960 as Tick);
     // A source should be created for mid-clip playback
     expect((ctx.createBufferSource as any).mock.results.length).toBe(1);
     const source = (ctx.createBufferSource as any).mock.results[0].value;
