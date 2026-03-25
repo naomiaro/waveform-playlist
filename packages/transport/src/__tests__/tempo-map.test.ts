@@ -60,7 +60,7 @@ describe('TempoMap', () => {
 });
 
 describe('TempoMap linear interpolation', () => {
-  it('linear ramp: ticksToSeconds uses trapezoidal integration', () => {
+  it('linear ramp: ticksToSeconds uses exact logarithmic formula', () => {
     const tm = new TempoMap(960, 120);
     // Ramp from 120 to 140 BPM over 1 bar (3840 ticks)
     tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
@@ -279,5 +279,61 @@ describe('TempoMap curve interpolation', () => {
 
     expect(tm.getTempo(0 as Tick)).toBe(120);
     expect(tm.getTempo(3840 as Tick)).toBe(180);
+  });
+
+  it('descending curve round-trips (bpm0 > bpm1)', () => {
+    const tm = new TempoMap(960, 180);
+    tm.setTempo(80, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const tick = Math.round(3840 * 4 * fraction) as Tick;
+      const seconds = tm.ticksToSeconds(tick);
+      expect(Math.abs(tm.secondsToTicks(seconds) - tick)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('convex curve round-trips (slope > 0.5)', () => {
+    const tm = new TempoMap(960, 100);
+    tm.setTempo(200, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.8 } });
+
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const tick = Math.round(3840 * 4 * fraction) as Tick;
+      const seconds = tm.ticksToSeconds(tick);
+      expect(Math.abs(tm.secondsToTicks(seconds) - tick)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('mixed curve + linear + step segments', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(160, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    tm.setTempo(100, 7680 as Tick, { interpolation: 'linear' });
+    tm.setTempo(100, 11520 as Tick); // step (stays at 100)
+
+    // Round-trips within each segment type
+    for (const tick of [1920, 5760, 9600] as Tick[]) {
+      const seconds = tm.ticksToSeconds(tick);
+      expect(Math.abs(tm.secondsToTicks(seconds) - tick)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('degenerate curve (same BPM) matches step', () => {
+    const tmCurve = new TempoMap(960, 120);
+    tmCurve.setTempo(120, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+
+    const tmStep = new TempoMap(960, 120);
+    tmStep.setTempo(120, 3840 as Tick);
+
+    expect(tmCurve.ticksToSeconds(3840 as Tick)).toBeCloseTo(tmStep.ticksToSeconds(3840 as Tick));
+  });
+
+  it('curve duration bounded by constant-BPM extremes', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+
+    const curveSec = tm.ticksToSeconds(3840 as Tick);
+    const fastSec = (3840 * 60) / (180 * 960); // all at fastest BPM
+    const slowSec = (3840 * 60) / (120 * 960); // all at slowest BPM
+    expect(curveSec).toBeGreaterThan(fastSec);
+    expect(curveSec).toBeLessThan(slowSec);
   });
 });
