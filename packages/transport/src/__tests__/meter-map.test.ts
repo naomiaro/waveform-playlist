@@ -1,7 +1,7 @@
 // packages/transport/src/__tests__/meter-map.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import type { Tick } from '../types';
 import { MeterMap } from '../timeline/meter-map';
+import type { Tick } from '../types';
 
 describe('MeterMap', () => {
   it('defaults to 4/4', () => {
