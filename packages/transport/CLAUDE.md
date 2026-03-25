@@ -105,6 +105,7 @@ Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (requir
 ## Patterns
 
 - **AudioContext received from consumer** — sidesteps all Tone.js/Firefox context creation issues. `new AudioContext({ sampleRate, latencyHint })` works natively.
+- **Convenience API variants must mirror primary** — `setLoopSamples` and `setLoopSeconds` bypass `setLoop` for performance. Any state updates or validation in the primary method (`_loopEnabled`, `_loopStartSeconds`, start >= end guard) must be duplicated in convenience variants.
 - **`silence()` on stop/seek** — listeners are responsible for stopping their active sources. `AudioBufferSourceNode.stop()` is instantaneous.
 - **No Tone.js in the signal path** — all audio nodes are native Web Audio.
 - **`_activeSources` cleanup** — ClipPlayer uses `ended` event listener for automatic cleanup. MetronomePlayer clicks are short one-shots.
@@ -153,6 +154,8 @@ Set `editor.audioContext = new AudioContext({ sampleRate: 48000 })` before track
 ### dawcore dev pages
 
 All dev pages use the native transport. `multiclip.html` passes a custom AudioContext; `index.html` and `record.html` use the editor's default.
+
+**Gotcha:** Dev pages call `Transport` methods directly (not via the adapter). When Transport APIs change (e.g., `setLoop` switching from seconds to ticks), dev pages break silently. Always grep `packages/dawcore/dev/` for changed method names.
 
 ### React (WaveformPlaylistContext)
 
