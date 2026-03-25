@@ -34,6 +34,10 @@ Sliding window event generation. `advance(currentTime)` expands the window to `c
 
 Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeout` or `setInterval`. The scheduler's 200ms lookahead absorbs any frame timing jitter.
 
+## Branded Types
+
+`Tick` and `Sample` are branded `number` types in `types.ts` — zero runtime cost, compile-time only. Conversion functions are the canonical producers: `secondsToTicks()` → `Tick`, `secondsToSamples()` → `Sample`. Internal fields stay `number`; casts (`as Tick`) only at API boundaries and in tests for literals. MeterMap methods are not yet branded (deferred — heavy internal arithmetic).
+
 ## Timeline Layer
 
 ### Dual Coordinate System
