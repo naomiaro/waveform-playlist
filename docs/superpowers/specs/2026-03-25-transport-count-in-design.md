@@ -137,14 +137,14 @@ isCountingIn(): boolean
 The existing `_emit` method signature changes to support parameterized events:
 
 ```typescript
-// TransportEvents updated — countIn takes a payload, others remain () => void
+// TransportEvents updated — payloads added to tempochange, meterchange, and new count-in events
 interface TransportEvents {
   play: () => void;
   pause: () => void;
   stop: () => void;
   loop: () => void;
-  tempochange: () => void;
-  meterchange: () => void;
+  tempochange: (event: { bpm: number; atTick: Tick }) => void;
+  meterchange: (event: { numerator: number; denominator: number; atTick: Tick }) => void;
   countIn: (event: CountInEventData) => void;
   countInEnd: () => void;
 }
@@ -154,6 +154,20 @@ private _emit<K extends TransportEventType>(event: K, ...args: Parameters<Transp
 ```
 
 This uses `Parameters<>` to extract the argument tuple for each event type. Existing `_emit('play')` calls continue to work with zero args. `_emit('countIn', { beat: 1, totalBeats: 4 })` passes the payload.
+
+**Existing event payload additions:**
+
+- `tempochange` now receives `{ bpm, atTick }` — the new BPM and the tick position where it was set. Consumers no longer need to call `getTempo()` after receiving the event.
+- `meterchange` now receives `{ numerator, denominator, atTick }` — the new time signature and position. Consumers no longer need to call `getMeter()` after the event.
+- Backwards compatible: existing listeners with `() => void` signatures ignore the payload via rest args.
+
+**Call sites updated:**
+
+- `setTempo()` → `this._emit('tempochange', { bpm, atTick: atTick ?? 0 as Tick })`
+- `setMeter()` → `this._emit('meterchange', { numerator, denominator, atTick: atTick ?? 0 as Tick })`
+- `clearTempos()` → `this._emit('tempochange', { bpm: this._tempoMap.getTempo(), atTick: 0 as Tick })`
+- `clearMeters()` → `this._emit('meterchange', { ...this._meterMap.getMeter(), atTick: 0 as Tick })`
+- `removeMeter()` → `this._emit('meterchange', { ...this._meterMap.getMeter(atTick), atTick })`
 
 **Modified `play()` flow:**
 
@@ -307,6 +321,11 @@ Option 2 chosen: cleanest separation, no changes to existing listeners, easy to 
 - `play()` during count-in is no-op
 - `dispose()` cleans up count-in scheduler, timer, player
 - `setCountInBars(1.5)` rounds to 2
+- `tempochange` event includes `{ bpm, atTick }` payload
+- `meterchange` event includes `{ numerator, denominator, atTick }` payload
+- `clearTempos()` emits `tempochange` with current default BPM
+- `clearMeters()` emits `meterchange` with current default meter
+- Existing `() => void` listeners still work (backwards compat)
 
 ## Non-Goals
 
