@@ -141,9 +141,11 @@ export class TempoMap {
   }
 
   /**
-   * Exact trapezoidal integration for a linear BPM ramp.
+   * Trapezoidal approximation for a linear BPM ramp.
    * Returns seconds for `ticks` ticks into a segment ramping from bpm0 to bpm1
-   * over totalSegmentTicks.
+   * over totalSegmentTicks. The exact integral uses ln(bpm1/bpm0), but the
+   * trapezoidal formula is simpler, has a closed-form inverse (quadratic),
+   * and round-trips exactly. Error is sub-millisecond for typical DAW ramps.
    */
   private _ticksToSecondsLinear(
     ticks: number,

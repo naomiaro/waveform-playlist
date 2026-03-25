@@ -101,7 +101,7 @@ const transport = new Transport(audioContext, { tempo: 100 });
 transport.setTempo(160, transport.barToTick(9), { interpolation: 'linear' });
 
 // Query interpolated BPM at any position
-transport.getTempo(transport.barToTick(5)); // ~137.5 BPM (midway through ramp)
+transport.getTempo(transport.barToTick(5)); // 130 BPM (midway through ramp)
 
 // Mix step and linear: jump to 80 BPM at bar 4, ramp to 140 at bar 8
 transport.clearTempos();
