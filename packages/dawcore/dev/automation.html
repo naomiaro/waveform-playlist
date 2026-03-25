@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — tempo automation demo</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+      max-width: 700px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 0.95rem;
+      color: #888;
+      margin: 0 0 10px 0;
+      font-weight: normal;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    button {
+      cursor: pointer;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid currentColor;
+      padding: 6px 14px;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+    button:hover { opacity: 0.8; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.active {
+      background: #63C75F;
+      color: #0f0f1a;
+      border-color: #63C75F;
+    }
+    .presets {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .presets button {
+      font-size: 0.85rem;
+      padding: 6px 14px;
+    }
+    .presets button.selected {
+      background: #c49a6c;
+      color: #0f0f1a;
+      border-color: #c49a6c;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .pattern-desc {
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      color: #666;
+      min-height: 1.4em;
+      margin-top: 4px;
+    }
+    canvas {
+      width: 100%;
+      height: 150px;
+      border-radius: 4px;
+      border: 1px solid #2a2a3e;
+      margin-bottom: 16px;
+    }
+    .tempo-display {
+      font-family: 'Courier New', monospace;
+      font-size: 1.4rem;
+      color: #c49a6c;
+      margin: 8px 0;
+    }
+    .tempo-display span {
+      font-size: 0.7rem;
+      color: #888;
+    }
+    #position {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 8px;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #2a2a3e;
+      margin: 24px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>tempo automation demo</h1>
+
+  <div class="section">
+    <h2>Pattern</h2>
+    <div class="presets" id="pattern-grid"></div>
+    <div class="pattern-desc" id="pattern-desc"></div>
+  </div>
+
+  <canvas id="tempo-canvas"></canvas>
+
+  <div class="tempo-display" id="tempo-display">120 <span>BPM</span></div>
+  <div id="position"></div>
+
+  <div class="controls">
+    <button id="play-btn">Play</button>
+    <button id="stop-btn" disabled>Stop</button>
+    <button id="metronome-btn" class="active">Metronome</button>
+  </div>
+
+  <script type="module">
+    import { Transport } from '@dawcore/transport';
+
+    const audioCtx = new AudioContext({ sampleRate: 48000 });
+    const transport = new Transport(audioCtx, { tempo: 120, numerator: 4, denominator: 4 });
+
+    const BAR = 3840; // 4/4 at 960 PPQN
+    const NUM_BARS = 8;
+    const TOTAL_TICKS = BAR * NUM_BARS;
+    const BPM_MIN = 60;
+    const BPM_MAX = 200;
+    const CANVAS_HEIGHT = 150;
+
+    let isPlaying = false;
+
+    // --- Click sounds ---
+    function createClickBuffer(frequency, duration, gain) {
+      const length = Math.floor(audioCtx.sampleRate * duration);
+      const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        const t = i / audioCtx.sampleRate;
+        const envelope = Math.exp(-t * 40);
+        data[i] = Math.sin(2 * Math.PI * frequency * t) * envelope * gain;
+      }
+      return buffer;
+    }
+
+    const accentClick = createClickBuffer(1200, 0.05, 0.8);
+    const normalClick = createClickBuffer(800, 0.04, 0.5);
+    transport.setMetronomeClickSounds(accentClick, normalClick);
+    transport.setMetronomeEnabled(true);
+
+    // --- Patterns ---
+    const PATTERNS = [
+      {
+        name: 'Accelerando',
+        description: '100 → 160 BPM linear over 8 bars',
+        points: [
+          { tick: 0, bpm: 100, interpolation: 'linear' },
+          { tick: BAR * 8, bpm: 160, interpolation: 'linear' },
+        ],
+      },
+      {
+        name: 'Ritardando',
+        description: '140 → 80 BPM linear over 8 bars',
+        points: [
+          { tick: 0, bpm: 140, interpolation: 'linear' },
+          { tick: BAR * 8, bpm: 80, interpolation: 'linear' },
+        ],
+      },
+      {
+        name: 'Stepped',
+        description: '120 / 140 / 100 / 160 — jumps every 2 bars',
+        points: [
+          { tick: 0, bpm: 120, interpolation: 'step' },
+          { tick: BAR * 2, bpm: 140, interpolation: 'step' },
+          { tick: BAR * 4, bpm: 100, interpolation: 'step' },
+          { tick: BAR * 6, bpm: 160, interpolation: 'step' },
+        ],
+      },
+      {
+        name: 'Ramp & Return',
+        description: '100 → 180 at bar 4, back to 100 at bar 8',
+        points: [
+          { tick: 0, bpm: 100, interpolation: 'linear' },
+          { tick: BAR * 4, bpm: 180, interpolation: 'linear' },
+          { tick: BAR * 8, bpm: 100, interpolation: 'linear' },
+        ],
+      },
+    ];
+
+    let activePatternIndex = 0;
+
+    function applyPattern(pattern) {
+      transport.stop();
+      transport.clearTempos();
+
+      // First point sets the base tempo (always step — first entry)
+      transport.setTempo(pattern.points[0].bpm);
+
+      // Subsequent points set tempo with interpolation
+      for (let i = 1; i < pattern.points.length; i++) {
+        const point = pattern.points[i];
+        transport.setTempo(point.bpm, point.tick, {
+          interpolation: point.interpolation,
+        });
+      }
+
+      // Loop over 8 bars
+      transport.setLoop(true, 0, transport.barToTick(NUM_BARS + 1));
+    }
+
+    // --- Canvas ---
+    const canvas = document.getElementById('tempo-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function getBpmAtTick(pattern, tick) {
+      const points = pattern.points;
+      // Find the segment
+      let prev = points[0];
+      for (let i = 1; i < points.length; i++) {
+        if (tick < points[i].tick) {
+          const next = points[i];
+          if (next.interpolation === 'linear') {
+            const t = (tick - prev.tick) / (next.tick - prev.tick);
+            return prev.bpm + (next.bpm - prev.bpm) * t;
+          }
+          return prev.bpm;
+        }
+        prev = points[i];
+      }
+      return prev.bpm;
+    }
+
+    function drawCanvas(pattern, playheadTick) {
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.clientWidth;
+      const height = CANVAS_HEIGHT;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+
+      // Background
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, width, height);
+
+      const toX = (tick) => (tick / TOTAL_TICKS) * width;
+      const toY = (bpm) => height - ((bpm - BPM_MIN) / (BPM_MAX - BPM_MIN)) * height;
+
+      // BPM grid
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#555';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      for (let bpm = BPM_MIN; bpm <= BPM_MAX; bpm += 20) {
+        const y = toY(bpm);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+        ctx.fillText('' + bpm, width - 4, y - 2);
+      }
+      ctx.textAlign = 'left';
+
+      // Bar lines
+      ctx.strokeStyle = '#333';
+      for (let bar = 0; bar <= NUM_BARS; bar++) {
+        const x = toX(bar * BAR);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+        if (bar < NUM_BARS) {
+          ctx.fillStyle = '#666';
+          ctx.font = '11px sans-serif';
+          ctx.fillText('' + (bar + 1), x + 4, height - 4);
+        }
+      }
+
+      // Tempo curve
+      const points = pattern.points;
+      ctx.strokeStyle = '#c49a6c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+        const x = toX(point.tick);
+        const y = toY(point.bpm);
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          const prev = points[i - 1];
+          if (prev.interpolation === 'step' || point.interpolation === 'step') {
+            // Step: horizontal then vertical
+            ctx.lineTo(x, toY(prev.bpm));
+            ctx.lineTo(x, y);
+          } else {
+            // Linear: straight line
+            ctx.lineTo(x, y);
+          }
+        }
+      }
+
+      // Extend last point to end
+      const lastPoint = points[points.length - 1];
+      if (lastPoint.tick < TOTAL_TICKS) {
+        ctx.lineTo(toX(TOTAL_TICKS), toY(lastPoint.bpm));
+      }
+      ctx.stroke();
+
+      // Dots at tempo points
+      ctx.fillStyle = '#c49a6c';
+      for (const point of points) {
+        if (point.tick <= TOTAL_TICKS) {
+          ctx.beginPath();
+          ctx.arc(toX(point.tick), toY(point.bpm), 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Playhead
+      if (isPlaying && playheadTick >= 0) {
+        const px = toX(playheadTick % TOTAL_TICKS);
+        ctx.strokeStyle = '#d08070';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, height);
+        ctx.stroke();
+      }
+    }
+
+    // --- UI ---
+    const patternGrid = document.getElementById('pattern-grid');
+    const patternDesc = document.getElementById('pattern-desc');
+    const tempoDisplay = document.getElementById('tempo-display');
+    const positionEl = document.getElementById('position');
+    const playBtn = document.getElementById('play-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const metronomeBtn = document.getElementById('metronome-btn');
+
+    function updateTempoDisplay(bpm) {
+      tempoDisplay.textContent = '';
+      tempoDisplay.appendChild(document.createTextNode(Math.round(bpm) + ' '));
+      const span = document.createElement('span');
+      span.textContent = 'BPM';
+      tempoDisplay.appendChild(span);
+    }
+
+    function selectPattern(index) {
+      activePatternIndex = index;
+      const pattern = PATTERNS[index];
+      applyPattern(pattern);
+      patternDesc.textContent = pattern.description;
+      patternGrid.querySelectorAll('button').forEach((btn, i) => {
+        btn.classList.toggle('selected', i === index);
+      });
+      updateTempoDisplay(pattern.points[0].bpm);
+      drawCanvas(pattern, -1);
+    }
+
+    // Build pattern buttons
+    PATTERNS.forEach((pattern, index) => {
+      const btn = document.createElement('button');
+      btn.textContent = pattern.name;
+      btn.addEventListener('click', async () => {
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        const wasPlaying = isPlaying;
+        selectPattern(index);
+        if (wasPlaying) {
+          transport.play();
+          isPlaying = true;
+          uiSetPlaying(true);
+        }
+      });
+      patternGrid.appendChild(btn);
+    });
+
+    function uiSetPlaying(playing) {
+      isPlaying = playing;
+      playBtn.disabled = playing;
+      stopBtn.disabled = !playing;
+      playBtn.classList.toggle('active', playing);
+      if (!playing) {
+        positionEl.textContent = '';
+        drawCanvas(PATTERNS[activePatternIndex], -1);
+      }
+    }
+
+    playBtn.addEventListener('click', async () => {
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      transport.play();
+      uiSetPlaying(true);
+    });
+
+    stopBtn.addEventListener('click', () => {
+      transport.stop();
+      uiSetPlaying(false);
+      updateTempoDisplay(PATTERNS[activePatternIndex].points[0].bpm);
+    });
+
+    let metronomeEnabled = true;
+    metronomeBtn.addEventListener('click', () => {
+      metronomeEnabled = !metronomeEnabled;
+      transport.setMetronomeEnabled(metronomeEnabled);
+      metronomeBtn.classList.toggle('active', metronomeEnabled);
+      metronomeBtn.textContent = metronomeEnabled ? 'Metronome' : 'Metronome Off';
+    });
+
+    // --- Animation loop ---
+    function tick() {
+      if (isPlaying) {
+        const time = transport.getCurrentTime();
+        const currentTick = transport.timeToTick(time);
+        const pattern = PATTERNS[activePatternIndex];
+        const bpm = getBpmAtTick(pattern, currentTick % TOTAL_TICKS);
+        updateTempoDisplay(bpm);
+
+        const bar = transport.tickToBar(currentTick);
+        positionEl.textContent = 'Bar ' + bar;
+
+        drawCanvas(pattern, currentTick);
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // --- Init ---
+    selectPattern(0);
+  </script>
+</body>
+</html>
