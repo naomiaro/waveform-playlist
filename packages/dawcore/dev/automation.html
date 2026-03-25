@@ -191,6 +191,22 @@
           { tick: BAR * 8, bpm: 100, interpolation: 'linear' },
         ],
       },
+      {
+        name: 'Ease In',
+        description: '80 → 160 BPM concave curve (slow start, fast end)',
+        points: [
+          { tick: 0, bpm: 80, interpolation: { type: 'curve', slope: 0.2 } },
+          { tick: BAR * 8, bpm: 160, interpolation: { type: 'curve', slope: 0.2 } },
+        ],
+      },
+      {
+        name: 'Ease Out',
+        description: '80 → 160 BPM convex curve (fast start, slow end)',
+        points: [
+          { tick: 0, bpm: 80, interpolation: { type: 'curve', slope: 0.8 } },
+          { tick: BAR * 8, bpm: 160, interpolation: { type: 'curve', slope: 0.8 } },
+        ],
+      },
     ];
 
     let activePatternIndex = 0;
@@ -218,18 +234,32 @@
     const canvas = document.getElementById('tempo-canvas');
     const ctx = canvas.getContext('2d');
 
+    // Möbius-Ease: maps x in [0,1] to [0,1] with slope controlling shape
+    function curveNormalized(x, slope) {
+      if (slope > 0.499999 && slope < 0.500001) return x;
+      const p = Math.max(1e-15, Math.min(1 - 1e-15, slope));
+      return ((p * p) / (1 - p * 2)) * (Math.pow((1 - p) / p, 2 * x) - 1);
+    }
+
+    function interpolateBpm(prev, next, progress) {
+      if (next.interpolation === 'linear') {
+        return prev.bpm + (next.bpm - prev.bpm) * progress;
+      }
+      if (typeof next.interpolation === 'object' && next.interpolation.type === 'curve') {
+        const t = curveNormalized(progress, next.interpolation.slope);
+        return prev.bpm + (next.bpm - prev.bpm) * t;
+      }
+      return prev.bpm; // step
+    }
+
     function getBpmAtTick(pattern, tick) {
       const points = pattern.points;
-      // Find the segment
       let prev = points[0];
       for (let i = 1; i < points.length; i++) {
         if (tick < points[i].tick) {
           const next = points[i];
-          if (next.interpolation === 'linear') {
-            const t = (tick - prev.tick) / (next.tick - prev.tick);
-            return prev.bpm + (next.bpm - prev.bpm) * t;
-          }
-          return prev.bpm;
+          const progress = (tick - prev.tick) / (next.tick - prev.tick);
+          return interpolateBpm(prev, next, progress);
         }
         prev = points[i];
       }
@@ -298,10 +328,20 @@
           ctx.moveTo(x, y);
         } else {
           const prev = points[i - 1];
-          if (prev.interpolation === 'step' || point.interpolation === 'step') {
+          if (point.interpolation === 'step') {
             // Step: horizontal then vertical
             ctx.lineTo(x, toY(prev.bpm));
             ctx.lineTo(x, y);
+          } else if (typeof point.interpolation === 'object' && point.interpolation.type === 'curve') {
+            // Curve: draw many small segments for smooth Möbius-Ease
+            const steps = 64;
+            const slope = point.interpolation.slope;
+            for (let s = 1; s <= steps; s++) {
+              const progress = s / steps;
+              const tick = prev.tick + (point.tick - prev.tick) * progress;
+              const bpm = prev.bpm + curveNormalized(progress, slope) * (point.bpm - prev.bpm);
+              ctx.lineTo(toX(tick), toY(bpm));
+            }
           } else {
             // Linear: straight line
             ctx.lineTo(x, y);
