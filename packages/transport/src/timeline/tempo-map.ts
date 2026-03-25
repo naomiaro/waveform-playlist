@@ -278,11 +278,12 @@ export class TempoMap {
   ): number {
     if (totalSegmentTicks === 0 || seconds === 0) return 0;
     // Binary search: find ticks such that _ticksToSecondsCurve(ticks) ≈ seconds.
-    // 20 iterations gives precision of totalSegmentTicks/2^20 ≈ 0.03 ticks for
-    // an 8-bar segment — well under the 1-tick rounding threshold.
+    // Need totalSegmentTicks / 2^N < 0.5 for Math.round() to land on the right
+    // tick. Iterations = ceil(log2(2 * totalSegmentTicks)), clamped to [1, 40].
+    const iterations = Math.min(40, Math.max(1, Math.ceil(Math.log2(2 * totalSegmentTicks))));
     let lo = 0;
     let hi = totalSegmentTicks;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < iterations; i++) {
       const mid = (lo + hi) / 2;
       const midSeconds = this._ticksToSecondsCurve(mid, bpm0, bpm1, totalSegmentTicks, slope);
       if (midSeconds < seconds) {
