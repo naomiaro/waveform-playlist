@@ -1,5 +1,20 @@
 import type { Tick, TempoInterpolation } from '../types';
 
+const CURVE_EPSILON = 1e-15;
+/** Number of subdivisions for trapezoidal integration over curved segments */
+const CURVE_SUBDIVISIONS = 64;
+
+/**
+ * Möbius-Ease curve: maps x in [0,1] to [0,1] with shape controlled by slope.
+ * slope = 0.5 → linear. slope < 0.5 → concave. slope > 0.5 → convex.
+ * Reference: http://werner.yellowcouch.org/Papers/fastenv12/index.html
+ */
+function curveNormalizedAt(x: number, slope: number): number {
+  if (slope > 0.499999 && slope < 0.500001) return x;
+  const p = Math.max(CURVE_EPSILON, Math.min(1 - CURVE_EPSILON, slope));
+  return ((p * p) / (1 - p * 2)) * (Math.pow((1 - p) / p, 2 * x) - 1);
+}
+
 /** Mutable internal version of TempoEntry (exported interface has readonly fields) */
 interface MutableTempoEntry {
   tick: Tick;
@@ -29,7 +44,12 @@ export class TempoMap {
     const interpolation = options?.interpolation ?? 'step';
 
     if (typeof interpolation === 'object' && interpolation.type === 'curve') {
-      throw new Error('[waveform-playlist] TempoMap: curve interpolation is not yet supported');
+      const s = interpolation.slope;
+      if (!Number.isFinite(s) || s <= 0 || s >= 1) {
+        throw new Error(
+          '[waveform-playlist] TempoMap: curve slope must be between 0 and 1 (exclusive), got ' + s
+        );
+      }
     }
 
     if (atTick === 0) {
@@ -70,7 +90,6 @@ export class TempoMap {
     const entry = this._entries[lo];
     const secondsIntoSegment = seconds - entry.secondsAtTick;
 
-    // Check if next entry exists and uses linear interpolation
     const nextEntry = lo < this._entries.length - 1 ? this._entries[lo + 1] : null;
     if (nextEntry && nextEntry.interpolation === 'linear') {
       return Math.round(
@@ -80,6 +99,19 @@ export class TempoMap {
             entry.bpm,
             nextEntry.bpm,
             nextEntry.tick - entry.tick
+          )
+      ) as Tick;
+    }
+
+    if (nextEntry && typeof nextEntry.interpolation === 'object') {
+      return Math.round(
+        entry.tick +
+          this._secondsToTicksCurve(
+            secondsIntoSegment,
+            entry.bpm,
+            nextEntry.bpm,
+            nextEntry.tick - entry.tick,
+            nextEntry.interpolation.slope
           )
       ) as Tick;
     }
@@ -106,14 +138,19 @@ export class TempoMap {
   private _getTempoAt(atTick: Tick): number {
     const entryIndex = this._entryIndexAt(atTick);
     const entry = this._entries[entryIndex];
-
-    // Check if next entry uses linear interpolation — if so, we're inside a ramp
     const nextEntry = entryIndex < this._entries.length - 1 ? this._entries[entryIndex + 1] : null;
-    if (nextEntry && nextEntry.interpolation === 'linear') {
+
+    if (nextEntry && nextEntry.interpolation !== 'step') {
       const segmentTicks = nextEntry.tick - entry.tick;
       const ticksInto = atTick - entry.tick;
       if (segmentTicks > 0) {
-        return entry.bpm + (nextEntry.bpm - entry.bpm) * (ticksInto / segmentTicks);
+        const progress = ticksInto / segmentTicks;
+        if (nextEntry.interpolation === 'linear') {
+          return entry.bpm + (nextEntry.bpm - entry.bpm) * progress;
+        }
+        // Curve (Möbius-Ease)
+        const t = curveNormalizedAt(progress, nextEntry.interpolation.slope);
+        return entry.bpm + (nextEntry.bpm - entry.bpm) * t;
       }
     }
 
@@ -124,14 +161,27 @@ export class TempoMap {
     const entryIndex = this._entryIndexAt(ticks);
     const entry = this._entries[entryIndex];
     const ticksIntoSegment = ticks - entry.tick;
-
-    // Check if next entry uses linear interpolation
     const nextEntry = entryIndex < this._entries.length - 1 ? this._entries[entryIndex + 1] : null;
+
     if (nextEntry && nextEntry.interpolation === 'linear') {
       const segmentTicks = nextEntry.tick - entry.tick;
       return (
         entry.secondsAtTick +
         this._ticksToSecondsLinear(ticksIntoSegment, entry.bpm, nextEntry.bpm, segmentTicks)
+      );
+    }
+
+    if (nextEntry && typeof nextEntry.interpolation === 'object') {
+      const segmentTicks = nextEntry.tick - entry.tick;
+      return (
+        entry.secondsAtTick +
+        this._ticksToSecondsCurve(
+          ticksIntoSegment,
+          entry.bpm,
+          nextEntry.bpm,
+          segmentTicks,
+          nextEntry.interpolation.slope
+        )
       );
     }
 
@@ -204,6 +254,60 @@ export class TempoMap {
     return (u - bpm0) / r;
   }
 
+  /**
+   * Subdivided trapezoidal integration for a Möbius-Ease tempo curve.
+   * The BPM at progress p is: bpm0 + curveNormalizedAt(p, slope) * (bpm1 - bpm0).
+   * We subdivide into CURVE_SUBDIVISIONS intervals and apply trapezoidal rule.
+   */
+  private _ticksToSecondsCurve(
+    ticks: number,
+    bpm0: number,
+    bpm1: number,
+    totalSegmentTicks: number,
+    slope: number,
+  ): number {
+    if (totalSegmentTicks === 0 || ticks === 0) return 0;
+    const n = CURVE_SUBDIVISIONS;
+    const dt = ticks / n;
+    let seconds = 0;
+    let prevBpm = bpm0;
+    for (let i = 1; i <= n; i++) {
+      const progress = (dt * i) / totalSegmentTicks;
+      const curBpm = bpm0 + curveNormalizedAt(progress, slope) * (bpm1 - bpm0);
+      // Trapezoidal rule for this subdivision
+      seconds += (dt * 60) / this._ppqn * (1 / prevBpm + 1 / curBpm) / 2;
+      prevBpm = curBpm;
+    }
+    return seconds;
+  }
+
+  /**
+   * Inverse of _ticksToSecondsCurve: given seconds into a curved segment,
+   * return ticks. Uses binary search since there's no closed-form inverse.
+   */
+  private _secondsToTicksCurve(
+    seconds: number,
+    bpm0: number,
+    bpm1: number,
+    totalSegmentTicks: number,
+    slope: number,
+  ): number {
+    if (totalSegmentTicks === 0 || seconds === 0) return 0;
+    // Binary search: find ticks such that _ticksToSecondsCurve(ticks) ≈ seconds
+    let lo = 0;
+    let hi = totalSegmentTicks;
+    for (let i = 0; i < 50; i++) {
+      const mid = (lo + hi) / 2;
+      const midSeconds = this._ticksToSecondsCurve(mid, bpm0, bpm1, totalSegmentTicks, slope);
+      if (midSeconds < seconds) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    return (lo + hi) / 2;
+  }
+
   private _entryIndexAt(tick: Tick): number {
     let lo = 0;
     let hi = this._entries.length - 1;
@@ -226,8 +330,11 @@ export class TempoMap {
 
       let segmentSeconds: number;
       if (entry.interpolation === 'linear') {
-        // Linear ramp: use trapezoidal integration
         segmentSeconds = this._ticksToSecondsLinear(tickDelta, prev.bpm, entry.bpm, tickDelta);
+      } else if (typeof entry.interpolation === 'object') {
+        segmentSeconds = this._ticksToSecondsCurve(
+          tickDelta, prev.bpm, entry.bpm, tickDelta, entry.interpolation.slope
+        );
       } else {
         // Step: constant BPM from previous entry
         const secondsPerTick = 60 / (prev.bpm * this._ppqn);
