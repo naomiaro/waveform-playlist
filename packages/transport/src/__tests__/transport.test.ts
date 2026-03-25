@@ -283,9 +283,9 @@ describe('Transport', () => {
   it('setTempo with atTick schedules tempo change', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
-    transport.setTempo(140, 3840); // 140 BPM at bar 2
-    expect(transport.getTempo(0)).toBe(120); // default
-    expect(transport.getTempo(3840)).toBe(140);
+    transport.setTempo(140, 3840 as Tick); // 140 BPM at bar 2
+    expect(transport.getTempo(0 as Tick)).toBe(120); // default
+    expect(transport.getTempo(3840 as Tick)).toBe(140);
   });
 
   it('setMeter changes time signature', () => {
@@ -344,7 +344,7 @@ describe('Transport', () => {
   it('clearTempos fires tempochange', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
-    transport.setTempo(140, 3840);
+    transport.setTempo(140, 3840 as Tick);
     const onTempo = vi.fn();
     transport.on('tempochange', onTempo);
     transport.clearTempos();

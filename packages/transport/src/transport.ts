@@ -377,12 +377,12 @@ export class Transport {
 
   // --- Tempo ---
 
-  setTempo(bpm: number, atTick?: number): void {
+  setTempo(bpm: number, atTick?: Tick): void {
     this._tempoMap.setTempo(bpm, atTick);
     this._emit('tempochange');
   }
 
-  getTempo(atTick?: number): number {
+  getTempo(atTick?: Tick): number {
     return this._tempoMap.getTempo(atTick);
   }
 

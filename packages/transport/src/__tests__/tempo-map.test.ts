@@ -38,7 +38,7 @@ describe('TempoMap', () => {
   it('multiple tempos: second region uses new tempo', () => {
     const tm = new TempoMap(960, 120);
     // At tick 1920 (1s at 120BPM), switch to 60 BPM
-    tm.setTempo(60, 1920);
+    tm.setTempo(60, 1920 as Tick);
     // First 1920 ticks at 120 BPM = 1.0s
     expect(tm.ticksToSeconds(1920 as Tick)).toBeCloseTo(1.0);
     // Next 960 ticks at 60 BPM = 1.0s (total: 2.0s)
@@ -47,7 +47,7 @@ describe('TempoMap', () => {
 
   it('secondsToTicks with multiple tempos', () => {
     const tm = new TempoMap(960, 120);
-    tm.setTempo(60, 1920);
+    tm.setTempo(60, 1920 as Tick);
     expect(tm.secondsToTicks(1.0)).toBe(1920);
     expect(tm.secondsToTicks(2.0)).toBe(2880);
   });

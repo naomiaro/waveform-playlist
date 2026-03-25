@@ -16,12 +16,12 @@ export class TempoMap {
     this._entries = [{ tick: 0 as Tick, bpm: initialBpm, secondsAtTick: 0 }];
   }
 
-  getTempo(atTick: number = 0): number {
+  getTempo(atTick: Tick = 0 as Tick): number {
     const entry = this._entryAt(atTick);
     return entry.bpm;
   }
 
-  setTempo(bpm: number, atTick: number = 0): void {
+  setTempo(bpm: number, atTick: Tick = 0 as Tick): void {
     if (atTick === 0) {
       this._entries[0] = { ...this._entries[0], bpm };
       this._recomputeCache(0);
@@ -35,7 +35,7 @@ export class TempoMap {
       this._entries[i] = { ...this._entries[i], bpm };
     } else {
       const secondsAtTick = this._ticksToSecondsInternal(atTick);
-      this._entries.splice(i + 1, 0, { tick: atTick as Tick, bpm, secondsAtTick });
+      this._entries.splice(i + 1, 0, { tick: atTick, bpm, secondsAtTick });
       i = i + 1;
     }
     this._recomputeCache(i);
@@ -75,14 +75,14 @@ export class TempoMap {
     this._entries = [{ tick: 0 as Tick, bpm: first.bpm, secondsAtTick: 0 }];
   }
 
-  private _ticksToSecondsInternal(ticks: number): number {
+  private _ticksToSecondsInternal(ticks: Tick): number {
     const entry = this._entryAt(ticks);
     const ticksIntoSegment = ticks - entry.tick;
     const secondsPerTick = 60 / (entry.bpm * this._ppqn);
     return entry.secondsAtTick + ticksIntoSegment * secondsPerTick;
   }
 
-  private _entryAt(tick: number): TempoEntry {
+  private _entryAt(tick: Tick): TempoEntry {
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {
