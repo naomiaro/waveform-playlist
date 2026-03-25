@@ -69,18 +69,7 @@ describe('TempoMap linear interpolation', () => {
     expect(tm.ticksToSeconds(0 as Tick)).toBe(0);
 
     // At tick 3840 (end of ramp): trapezoidal formula
-    // seconds = 3840 * 60/960 * (1/120 + 1/140) / 2
-    // = 4 * (1/120 + 1/140) / 2
-    // = 4 * (7/840 + 6/840) / 2
-    // = 4 * (13/840) / 2
-    // = 4 * 13/1680
-    // ≈ 0.030952... * 4 = wait let me recalc
-    // = 3840/960 * 60 * (1/120 + 1/140) / 2
-    // = 4 * 60 * (1/120 + 1/140) / 2
-    // = 240 * (0.008333 + 0.007143) / 2
-    // = 240 * 0.015476 / 2
-    // = 240 * 0.007738
-    // ≈ 1.85714
+    // seconds = ticks * 60/ppqn * (1/bpm0 + 1/bpm1) / 2 ≈ 1.857
     const expected = (((3840 * 60) / 960) * (1 / 120 + 1 / 140)) / 2;
     expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(expected);
   });
@@ -166,6 +155,59 @@ describe('TempoMap linear interpolation', () => {
     tm.setTempo(140, 3840 as Tick);
 
     // Should behave as step — constant 120 BPM until tick 3840
+    const expected = (3840 * 60) / (120 * 960);
+    expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(expected);
+  });
+
+  it('clearTempos resets after linear entries', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    tm.clearTempos();
+
+    // Should revert to constant 120 BPM
+    expect(tm.getTempo(0 as Tick)).toBe(120);
+    expect(tm.getTempo(1920 as Tick)).toBe(120);
+    const expected = (3840 * 60) / (120 * 960);
+    expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(expected);
+  });
+
+  it('setTempo at tick 0 with linear is coerced to step', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(140, 0 as Tick, { interpolation: 'linear' });
+
+    // First entry is always step — no previous entry to ramp from
+    expect(tm.getTempo(0 as Tick)).toBe(140);
+    const expected = (960 * 60) / (140 * 960);
+    expect(tm.ticksToSeconds(960 as Tick)).toBeCloseTo(expected);
+  });
+
+  it('extreme ramp ratio round-trips (10 to 300 BPM)', () => {
+    const tm = new TempoMap(960, 10);
+    tm.setTempo(300, (3840 * 4) as Tick, { interpolation: 'linear' });
+
+    for (const fraction of [0.1, 0.25, 0.5, 0.75, 0.9]) {
+      const tick = Math.round(3840 * 4 * fraction) as Tick;
+      const seconds = tm.ticksToSeconds(tick);
+      expect(tm.secondsToTicks(seconds)).toBe(tick);
+    }
+  });
+
+  it('getTempo beyond last linear entry returns that entry BPM', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
+
+    // Beyond the ramp: should return 140 (the last entry's BPM)
+    expect(tm.getTempo(7680 as Tick)).toBe(140);
+  });
+
+  it('overwrite linear entry with step at same tick', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
+    // Overwrite with step
+    tm.setTempo(140, 3840 as Tick);
+
+    // Should now be step — constant 120 BPM until tick 3840
+    expect(tm.getTempo(1920 as Tick)).toBe(120);
     const expected = (3840 * 60) / (120 * 960);
     expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(expected);
   });
