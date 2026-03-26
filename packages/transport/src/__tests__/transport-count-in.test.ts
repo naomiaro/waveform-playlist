@@ -219,7 +219,9 @@ describe('Transport Count-In', () => {
     // Drive the rAF loop — advance time past count-in duration
     // 1 bar of 4/4 at 120 BPM = 2 seconds
     (ctx as any).currentTime = 12.5; // 2.5s after start
-    for (const cb of rafCallbacks) {
+    // Snapshot callbacks to avoid infinite growth — each rAF schedules another
+    const snapshot = [...rafCallbacks];
+    for (const cb of snapshot) {
       cb(performance.now());
     }
 
@@ -227,6 +229,8 @@ describe('Transport Count-In', () => {
     expect(countInEvents.length).toBe(4);
     expect(countInEvents[0]).toEqual({ beat: 1, totalBeats: 4 });
     expect(countInEvents[3]).toEqual({ beat: 4, totalBeats: 4 });
+
+    transport.stop();
   });
 
   it('countInEnd event fires after count-in completes', () => {
@@ -242,7 +246,8 @@ describe('Transport Count-In', () => {
 
     // Drive past count-in
     (ctx as any).currentTime = 12.5;
-    for (const cb of rafCallbacks) {
+    const snapshot = [...rafCallbacks];
+    for (const cb of snapshot) {
       cb(performance.now());
     }
 
@@ -250,5 +255,7 @@ describe('Transport Count-In', () => {
     // After count-in ends, should be playing normally
     expect(transport.isCountingIn()).toBe(false);
     expect(transport.isPlaying()).toBe(true);
+
+    transport.stop();
   });
 });

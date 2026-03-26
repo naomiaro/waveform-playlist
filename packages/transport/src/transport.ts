@@ -65,6 +65,7 @@ export class Transport {
   private _recording = false;
   private _countingIn = false;
   private _countInStartPosition = 0;
+  private _countInDuration = 0;
   private _countInPlayer!: CountInPlayer;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _countInScheduler: Scheduler<any> | null = null;
@@ -114,7 +115,15 @@ export class Transport {
     this._timer = new Timer(() => {
       const time = this._clock.getTime();
       if (this._countingIn) {
+        console.log('[count-in] timer tick: clockTime=' + time.toFixed(4) + ' countInDuration=' + this._countInDuration.toFixed(4));
         this._countInScheduler?.advance(time);
+        // Transition when the full bar duration has elapsed — not when the
+        // last beat is consumed. This gives the last beat its full ring-out
+        // and places the transition exactly at the bar boundary.
+        if (time >= this._countInDuration) {
+          console.log('[count-in] bar duration reached, finishing count-in');
+          this._finishCountIn();
+        }
         return;
       }
       if (this._endTime !== undefined && time >= this._endTime) {
@@ -715,8 +724,16 @@ export class Transport {
     const meter = this._meterMap.getMeter(playPositionTick);
     const totalBeats = meter.numerator * this._countInBars;
 
-    // Create a dedicated TempoMap for the count-in with the tempo at the play position.
-    const countInTempoMap = new TempoMap(this._ppqn, this._tempoMap.getTempo(playPositionTick));
+    // Calculate full bar duration in seconds — transition happens at the bar
+    // boundary, not when the last beat is consumed. This gives the last beat
+    // its full ring-out time.
+    const bpmAtPosition = this._tempoMap.getTempo(playPositionTick);
+    const ticksPerBeat = this._ppqn * (4 / meter.denominator);
+    const countInTicks = totalBeats * ticksPerBeat;
+    const countInTempoMap = new TempoMap(this._ppqn, bpmAtPosition);
+    this._countInDuration = countInTempoMap.ticksToSeconds(countInTicks as Tick);
+
+    console.log('[count-in] _startCountIn: currentTime=' + currentTime + ' playPositionTick=' + playPositionTick + ' meter=' + meter.numerator + '/' + meter.denominator + ' totalBeats=' + totalBeats + ' bars=' + this._countInBars + ' countInDuration=' + this._countInDuration.toFixed(4) + ' lookahead=' + this._schedulerLookahead);
 
     this._countInScheduler = new Scheduler(countInTempoMap, {
       lookahead: this._schedulerLookahead,
@@ -731,7 +748,7 @@ export class Transport {
         this._emit('countIn', { beat, totalBeats: total });
       },
       onComplete: () => {
-        this._finishCountIn();
+        // No-op — completion is now driven by timer tick checking _countInDuration
       },
     });
 
@@ -744,30 +761,22 @@ export class Transport {
   }
 
   private _finishCountIn(): void {
+    console.log('[count-in] _finishCountIn: audioCtx.currentTime=' + this._audioContext.currentTime.toFixed(4) + ' clockTime=' + this._clock.getTime().toFixed(4) + ' activeSources=' + this._countInPlayer['_activeSources'].size);
     this._countInScheduler?.removeListener(this._countInPlayer);
     // Don't silence — clicks are short one-shots (~40ms) that finish naturally.
-    // Calling silence() here kills the last beat before it plays.
     this._countingIn = false;
-    // Stop the timer to terminate the count-in rAF chain.
-    // Normal playback timer is restarted via microtask so the current
-    // rAF iteration completes first (prevents infinite for...of expansion in tests).
-    this._timer.stop();
     this._emit('countInEnd');
 
-    // Transition to normal playback at original position
+    // Transition to normal playback at original position.
+    // The timer is already running (driving the count-in scheduler via the
+    // _countingIn branch). Setting _countingIn=false above makes the next
+    // tick fall through to the main scheduler branch — no stop/restart needed.
     this._clock.seekTo(this._countInStartPosition);
     const currentTime = this._clock.getTime();
     this._scheduler.reset(currentTime);
     const currentTick = this._tempoMap.secondsToTicks(currentTime);
     this._clipPlayer.onPositionJump(currentTick);
     this._emit('play');
-
-    // Restart the timer after the current synchronous tick completes
-    Promise.resolve().then(() => {
-      if (this._playing && !this._countingIn) {
-        this._timer.start();
-      }
-    });
   }
 
   private _cancelCountIn(): void {

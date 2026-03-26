@@ -62,6 +62,8 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
       return [];
     }
 
+    console.log('[count-in] generate: fromTick=' + fromTick + ' toTick=' + toTick + ' beatsGenerated=' + this._beatsGenerated + '/' + this._totalBeats);
+
     const events: CountInEvent[] = [];
     const meterMap = this._meterMap;
 
@@ -115,12 +117,15 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
     });
 
     const transportTime = this._tempoMap.ticksToSeconds(event.tick);
-    source.start(this._toAudioTime(transportTime));
+    const audioTime = this._toAudioTime(transportTime);
+    console.log('[count-in] consume: beat=' + event.beat + '/' + event.totalBeats + ' tick=' + event.tick + ' transportTime=' + transportTime.toFixed(4) + ' audioTime=' + audioTime.toFixed(4) + ' audioCtx.currentTime=' + this._audioContext.currentTime.toFixed(4));
+    source.start(audioTime);
 
     this._onBeat?.(event.beat, event.totalBeats);
 
     this._beatsConsumed++;
     if (this._beatsConsumed === this._totalBeats) {
+      console.log('[count-in] all beats consumed, calling onComplete');
       this._onComplete?.();
     }
   }
