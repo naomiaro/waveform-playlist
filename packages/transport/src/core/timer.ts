@@ -29,7 +29,10 @@ export class Timer {
       } catch (err) {
         console.warn('[waveform-playlist] Timer tick error:', String(err));
       }
-      this._scheduleFrame();
+      // Check _running again — _onTick() may have called stop()
+      if (this._running) {
+        this._scheduleFrame();
+      }
     });
   }
 }

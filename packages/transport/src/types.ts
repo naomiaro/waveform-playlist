@@ -37,6 +37,10 @@ export interface TransportOptions {
   denominator?: number;
   /** How far ahead to schedule audio, in seconds. Default: 0.2 */
   schedulerLookahead?: number;
+  /** Accent click frequency in Hz. Default: 1000 */
+  accentFrequency?: number;
+  /** Normal click frequency in Hz. Default: 800 */
+  normalFrequency?: number;
 }
 
 /** Public return type for getMeter() */

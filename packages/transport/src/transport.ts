@@ -1,5 +1,5 @@
 import type { ClipTrack } from '@waveform-playlist/core';
-import type { Tick, Sample, TransportOptions, MeterSignature, CountInEventData } from './types';
+import type { Tick, Sample, TransportOptions, MeterSignature, CountInMode, CountInEventData } from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
 import { Scheduler } from './core/scheduler';
@@ -9,6 +9,8 @@ import { TempoMap } from './timeline/tempo-map';
 import { MeterMap } from './timeline/meter-map';
 import { ClipPlayer } from './audio/clip-player';
 import { MetronomePlayer } from './audio/metronome-player';
+import { CountInPlayer } from './audio/count-in-player';
+import { createDefaultClickSounds } from './audio/click-sounds';
 import { MasterNode } from './audio/master-node';
 import { TrackNode } from './audio/track-node';
 
@@ -49,6 +51,21 @@ export class Transport {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _listeners: Map<TransportEventType, Set<(...args: any[]) => void>> = new Map();
 
+  // --- Count-In state ---
+  private _countInEnabled = false;
+  private _countInBars = 1;
+  private _countInMode: CountInMode = 'recording-only';
+  private _recording = false;
+  private _countingIn = false;
+  private _countInStartPosition = 0;
+  private _countInPlayer!: CountInPlayer;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _countInScheduler: Scheduler<any> | null = null;
+  private _accentBuffer: AudioBuffer | null = null;
+  private _normalBuffer: AudioBuffer | null = null;
+  private _schedulerLookahead: number = 0.2;
+  private _ppqn: number = 960;
+
   constructor(audioContext: AudioContext, options: TransportOptions = {}) {
     this._audioContext = audioContext;
 
@@ -58,6 +75,9 @@ export class Transport {
     const numerator = options.numerator ?? 4;
     const denominator = options.denominator ?? 4;
     const lookahead = options.schedulerLookahead ?? 0.2;
+
+    this._ppqn = ppqn;
+    this._schedulerLookahead = lookahead;
 
     Transport._validateOptions(sampleRate, ppqn, tempo, numerator, denominator, lookahead);
 
@@ -82,9 +102,14 @@ export class Transport {
     this._sampleTimeline.setTempoMap(this._tempoMap);
 
     this._initAudioGraph(audioContext);
+    this._initCountIn(audioContext, options);
 
     this._timer = new Timer(() => {
       const time = this._clock.getTime();
+      if (this._countingIn) {
+        this._countInScheduler?.advance(time);
+        return;
+      }
       if (this._endTime !== undefined && time >= this._endTime) {
         this.stop();
         return;
@@ -104,6 +129,12 @@ export class Transport {
 
     if (startTime !== undefined) {
       this._clock.seekTo(startTime);
+    }
+
+    // Check if count-in should activate
+    if (this._shouldCountIn()) {
+      this._startCountIn(endTime);
+      return;
     }
 
     // Always reset scheduler to current position — after pause, the old
@@ -130,6 +161,14 @@ export class Transport {
   pause(): void {
     if (!this._playing) return;
 
+    if (this._countingIn) {
+      this._cancelCountIn();
+      this._clock.stop();
+      this._playing = false;
+      this._emit('pause');
+      return;
+    }
+
     this._timer.stop();
     this._clock.stop();
     this._silenceAll();
@@ -139,6 +178,9 @@ export class Transport {
 
   stop(): void {
     const wasPlaying = this._playing;
+    if (this._countingIn) {
+      this._cancelCountIn();
+    }
     this._timer.stop();
     this._clock.reset();
     this._scheduler.reset(0);
@@ -152,8 +194,14 @@ export class Transport {
 
   seek(time: number): void {
     const wasPlaying = this._playing;
+    const wasCountingIn = this._countingIn;
 
-    if (wasPlaying) {
+    if (wasCountingIn) {
+      this._cancelCountIn();
+      this._playing = false;
+    }
+
+    if (wasPlaying && !wasCountingIn) {
       this._timer.stop();
     }
 
@@ -164,7 +212,8 @@ export class Transport {
     // cause immediate stop on the next play()
     this._endTime = undefined;
 
-    if (wasPlaying) {
+    // Resume playback only if was playing normally (not counting in)
+    if (wasPlaying && !wasCountingIn) {
       this._clock.start();
       // Re-create sources for clips spanning the seek position
       const seekTick = this._tempoMap.secondsToTicks(time);
@@ -174,6 +223,9 @@ export class Transport {
   }
 
   getCurrentTime(): number {
+    if (this._countingIn) {
+      return this._countInStartPosition;
+    }
     const t = this._clock.getTime();
     // After a loop wrap, the clock is briefly behind loopStart (the seek
     // target accounts for lookahead offset). Clamp for display purposes.
@@ -453,7 +505,42 @@ export class Transport {
   }
 
   setMetronomeClickSounds(accent: AudioBuffer, normal: AudioBuffer): void {
+    this._accentBuffer = accent;
+    this._normalBuffer = normal;
     this._metronomePlayer.setClickSounds(accent, normal);
+  }
+
+  // --- Count-In ---
+
+  setCountIn(enabled: boolean): void {
+    this._countInEnabled = enabled;
+  }
+
+  setCountInBars(bars: number): void {
+    const rounded = Math.round(bars);
+    if (rounded < 1) {
+      console.warn('[waveform-playlist] Transport.setCountInBars: clamping ' + bars + ' to 1');
+      this._countInBars = 1;
+      return;
+    }
+    if (rounded > 8) {
+      console.warn('[waveform-playlist] Transport.setCountInBars: clamping ' + bars + ' to 8');
+      this._countInBars = 8;
+      return;
+    }
+    this._countInBars = rounded;
+  }
+
+  setCountInMode(mode: CountInMode): void {
+    this._countInMode = mode;
+  }
+
+  setRecording(recording: boolean): void {
+    this._recording = recording;
+  }
+
+  isCountingIn(): boolean {
+    return this._countingIn;
   }
 
   // --- Effects Hook ---
@@ -567,9 +654,115 @@ export class Transport {
     this._scheduler.addListener(this._metronomePlayer);
   }
 
+  private _initCountIn(audioContext: AudioContext, options: TransportOptions): void {
+    const toAudioTime = (transportTime: number) => this._clock.toAudioTime(transportTime);
+    this._countInPlayer = new CountInPlayer(
+      audioContext,
+      this._tempoMap,
+      this._masterNode.input,
+      toAudioTime
+    );
+
+    try {
+      const { accent, normal } = createDefaultClickSounds(audioContext, {
+        accentFrequency: options.accentFrequency,
+        normalFrequency: options.normalFrequency,
+      });
+      this._accentBuffer = accent;
+      this._normalBuffer = normal;
+      this._metronomePlayer.setClickSounds(accent, normal);
+    } catch (err) {
+      console.warn('[waveform-playlist] Transport: failed to create default click sounds:', String(err));
+    }
+  }
+
+  private _shouldCountIn(): boolean {
+    if (!this._countInEnabled) return false;
+    if (!this._accentBuffer || !this._normalBuffer) {
+      console.warn('[waveform-playlist] Transport: count-in skipped — no click sounds loaded');
+      return false;
+    }
+    if (this._countInMode === 'recording-only' && !this._recording) return false;
+    return true;
+  }
+
+  private _startCountIn(endTime?: number): void {
+    const currentTime = this._clock.getTime();
+    this._countInStartPosition = currentTime;
+    this._countingIn = true;
+    this._playing = true;
+    this._endTime = endTime;
+
+    const playPositionTick = this._tempoMap.secondsToTicks(currentTime);
+    const meter = this._meterMap.getMeter(playPositionTick);
+    const totalBeats = meter.numerator * this._countInBars;
+
+    // Create a dedicated TempoMap for the count-in with the tempo at the play position.
+    const countInTempoMap = new TempoMap(this._ppqn, this._tempoMap.getTempo(playPositionTick));
+
+    this._countInScheduler = new Scheduler(countInTempoMap, {
+      lookahead: this._schedulerLookahead,
+    });
+
+    this._countInPlayer.configure({
+      totalBeats,
+      accentBuffer: this._accentBuffer!,
+      normalBuffer: this._normalBuffer!,
+      meterMap: this._meterMap,
+      onBeat: (beat, total) => {
+        this._emit('countIn', { beat, totalBeats: total });
+      },
+      onComplete: () => {
+        this._finishCountIn();
+      },
+    });
+
+    this._countInScheduler.addListener(this._countInPlayer);
+    this._countInScheduler.reset(0);
+    this._clock.seekTo(0);
+    this._clock.start();
+    // Use the main timer to drive the count-in scheduler (avoids spawning a second rAF chain)
+    this._timer.start();
+  }
+
+  private _finishCountIn(): void {
+    this._countInScheduler?.removeListener(this._countInPlayer);
+    this._countInPlayer.silence();
+    this._countingIn = false;
+    // Stop the timer to terminate the count-in rAF chain.
+    // Normal playback timer is restarted via microtask so the current
+    // rAF iteration completes first (prevents infinite for...of expansion in tests).
+    this._timer.stop();
+    this._emit('countInEnd');
+
+    // Transition to normal playback at original position
+    this._clock.seekTo(this._countInStartPosition);
+    const currentTime = this._clock.getTime();
+    this._scheduler.reset(currentTime);
+    const currentTick = this._tempoMap.secondsToTicks(currentTime);
+    this._clipPlayer.onPositionJump(currentTick);
+    this._emit('play');
+
+    // Restart the timer after the current synchronous tick completes
+    Promise.resolve().then(() => {
+      if (this._playing && !this._countingIn) {
+        this._timer.start();
+      }
+    });
+  }
+
+  private _cancelCountIn(): void {
+    this._countInPlayer.silence();
+    this._countInScheduler?.removeListener(this._countInPlayer);
+    this._countingIn = false;
+    // Stop the main timer (which was driving the count-in scheduler)
+    this._timer.stop();
+  }
+
   private _silenceAll(): void {
     this._clipPlayer.silence();
     this._metronomePlayer.silence();
+    this._countInPlayer.silence();
   }
 
   private _applyMuteState(): void {
