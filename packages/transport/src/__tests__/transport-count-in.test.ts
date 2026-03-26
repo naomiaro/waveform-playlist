@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Transport } from '../transport';
-import type { Tick, CountInEventData } from '../types';
+import type { CountInEventData } from '../types';
 
 let rafCallbacks: Array<(time: number) => void>;
 let rafId: number;
