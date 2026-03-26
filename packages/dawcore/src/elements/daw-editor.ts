@@ -966,10 +966,15 @@ export class DawEditorElement extends LitElement {
     const playhead = this._getPlayhead();
     if (!playhead || !this._engine) return;
     const engine = this._engine;
+    // Subtract outputLatency so the playhead matches when audio reaches
+    // the speakers, not when it's processed. Safari reports ~15ms;
+    // Chrome ~3ms. Falls back to 0 if not supported.
+    const outputLatency =
+      'outputLatency' in this.audioContext ? (this.audioContext as AudioContext).outputLatency : 0;
     playhead.startAnimation(
-      () => engine.getCurrentTime(),
+      () => Math.max(0, engine.getCurrentTime() - outputLatency),
       this.effectiveSampleRate,
-      this.samplesPerPixel
+      this.samplesPerPixel,
     );
   }
   _stopPlayhead() {
