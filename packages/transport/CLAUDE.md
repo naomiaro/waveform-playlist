@@ -90,6 +90,18 @@ Implements `SchedulerListener<ClipEvent>`. `generate(fromTick, toTick)` converts
 
 Implements `SchedulerListener<MetronomeEvent>`. Receives integer ticks directly from the Scheduler, walks beat grid, generates accent clicks on beat 1 of each bar. `consume()` converts `event.tick` → seconds → audio time. `onPositionJump()` is a no-op — clicks are short one-shots (40-50ms) that finish naturally; silencing them on loop wrap kills the last beat before the boundary.
 
+### CountInPlayer
+
+`CountInPlayer` implements `SchedulerListener<CountInEvent>`. Temporary listener — added to a dedicated count-in scheduler only during the pre-play phase.
+
+**Dedicated Tick Space and TempoMap:** The count-in scheduler operates in its **own tick space starting at tick 0** with a **dedicated TempoMap** locked to the BPM at the play position. This avoids using the main TempoMap, which may have a different tempo at tick 0 vs the play position (multi-tempo sessions).
+
+**Timer-Driven Bar Boundary Transition:** Count-in completion is driven by the timer tick checking `_countInDuration` (full bar in seconds), NOT by `onComplete` from `CountInPlayer.consume()`. The `consume()` callback fires when the last beat is *scheduled* (in the lookahead window), which is ~200ms before it actually *plays*. Transitioning on consume would start the metronome before the last count-in click is heard. The timer tick checks `time >= _countInDuration` and calls `_finishCountIn()`, placing the transition exactly at the bar boundary.
+
+**One-Shot Completion (No Silence):** `_finishCountIn()` does NOT call `_countInPlayer.silence()`. Same pattern as MetronomePlayer's `onPositionJump()` no-op — clicks are short one-shots (~40ms) that finish naturally. Calling `silence()` kills clicks scheduled in the lookahead window that haven't played yet.
+
+**Default Click Sounds:** `createDefaultClickSounds(audioContext, { accentFrequency?, normalFrequency? })` synthesizes sine wave AudioBuffers with exponential decay. Called in constructor — MetronomePlayer gets default sounds out of the box (behavior change from requiring explicit `setMetronomeClickSounds()`). `setMetronomeClickSounds()` overrides both metronome and count-in sounds.
+
 ## Transport (Top-Level API)
 
 Orchestrates all layers. Key flows:
@@ -141,6 +153,10 @@ After `pause()`, `silence()` kills all active sources. On `play()` (resume), the
 **Fix:** `play()` always resets the scheduler to the current position and calls `clipPlayer.onPositionJump()` to create mid-clip sources. Effectively treats resume as "seek to current position."
 
 The reference library (webaudio-transport) avoids this entirely by not implementing pause — only stop + start.
+
+### rAF Test Snapshot Pattern
+
+Tests that drive the Timer via `requestAnimationFrame` stubs must snapshot the callback array before iterating: `const snapshot = [...rafCallbacks]; for (const cb of snapshot) { cb(...); }`. Iterating `rafCallbacks` directly causes infinite growth — each callback schedules another via `_scheduleFrame()`. Always call `transport.stop()` after driving the loop to prevent zombie timers.
 
 ## What This Solves
 
