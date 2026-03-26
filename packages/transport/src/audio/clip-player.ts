@@ -79,6 +79,9 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
 
   generate(fromTick: Tick, toTick: Tick): ClipEvent[] {
     const events: ClipEvent[] = [];
+    // Only log when events are actually found (avoid flooding)
+    let loggedFrom = fromTick;
+    let loggedTo = toTick;
 
     const fromSample = this._sampleTimeline.ticksToSamples(fromTick);
     const toSample = this._sampleTimeline.ticksToSamples(toTick);
@@ -124,6 +127,10 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
       }
     }
 
+    if (events.length > 0) {
+      console.log('[clip-player] generate: from=' + loggedFrom + ' to=' + loggedTo + ' events=' + events.length + ' clips=[' + events.map(e => e.clipId).join(',') + ']');
+    }
+
     return events;
   }
 
@@ -164,6 +171,8 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     // Convert tick → seconds → AudioContext.currentTime for scheduling
     const transportSeconds = this._tempoMap.ticksToSeconds(event.tick);
     const when = this._toAudioTime(transportSeconds);
+
+    console.log('[clip-player] consume: clip=' + event.clipId + ' tick=' + event.tick + ' when=' + when.toFixed(4) + ' ctx.now=' + this._audioContext.currentTime.toFixed(4) + ' delta=' + ((when - this._audioContext.currentTime) * 1000).toFixed(1) + 'ms sources=' + this._activeSources.size);
 
     // Create a gain node for per-clip gain and fades
     const gainNode = this._audioContext.createGain();
@@ -211,6 +220,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   }
 
   onPositionJump(newTick: Tick): void {
+    console.log('[clip-player] onPositionJump: newTick=' + newTick + ' ctx.now=' + this._audioContext.currentTime.toFixed(4));
     this.silence();
 
     const newSample = this._sampleTimeline.ticksToSamples(newTick);
@@ -224,8 +234,10 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         const clipStartSample = clip.startSample;
         const clipEndSample = clipStartSample + clip.durationSamples;
 
-        // Check if clip spans the new position
-        if (clipStartSample <= newSample && clipEndSample > newSample) {
+        // Check if clip spans the new position (started BEFORE, still playing).
+        // Clips starting exactly AT the new position are handled by generate(),
+        // not here — strict < prevents double-scheduling.
+        if (clipStartSample < newSample && clipEndSample > newSample) {
           const offsetIntoClipSamples = newSample - clipStartSample;
           const offsetSamples = clip.offsetSamples + offsetIntoClipSamples;
           let durationSamples = clipEndSample - newSample;
