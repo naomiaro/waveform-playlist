@@ -29,7 +29,6 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
 
   private _totalBeats = 0;
   private _beatsGenerated = 0;
-  private _beatsConsumed = 0;
   private _accentBuffer: AudioBuffer | null = null;
   private _normalBuffer: AudioBuffer | null = null;
   private _meterMap: MeterMap | null = null;
@@ -50,7 +49,6 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
   configure(config: CountInConfig): void {
     this._totalBeats = config.totalBeats;
     this._beatsGenerated = 0;
-    this._beatsConsumed = 0;
     this._accentBuffer = config.accentBuffer;
     this._normalBuffer = config.normalBuffer;
     this._meterMap = config.meterMap;
@@ -132,10 +130,9 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
       );
     }
 
-    // Beat tracking stays outside try/catch so count-in can still
-    // complete even if one beat fails to schedule audio.
+    // Beat callback stays outside try/catch so count-in events still
+    // fire even if one beat fails to schedule audio.
     this._onBeat?.(event.beat, event.totalBeats);
-    this._beatsConsumed++;
   }
 
   onPositionJump(_newTick: Tick): void {

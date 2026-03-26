@@ -746,6 +746,10 @@ export class Transport {
     const ticksPerBeat = this._ppqn * (4 / meter.denominator);
     const countInTicks = totalBeats * ticksPerBeat;
     const countInTempoMap = new TempoMap(this._ppqn, bpmAtPosition);
+    // Dedicated MeterMap locked to the meter at the play position — same
+    // isolation as countInTempoMap. The count-in scheduler's tick space starts
+    // at 0, so the main MeterMap's entries would be misinterpreted.
+    const countInMeterMap = new MeterMap(this._ppqn, meter.numerator, meter.denominator);
     this._countInDuration = countInTempoMap.ticksToSeconds(countInTicks as Tick);
 
     this._countInScheduler = new Scheduler(countInTempoMap, {
@@ -756,7 +760,7 @@ export class Transport {
       totalBeats,
       accentBuffer: this._accentBuffer!,
       normalBuffer: this._normalBuffer!,
-      meterMap: this._meterMap,
+      meterMap: countInMeterMap,
       tempoMap: countInTempoMap,
       onBeat: (beat, total) => {
         this._emit('countIn', { beat, totalBeats: total });
@@ -773,6 +777,7 @@ export class Transport {
 
   private _finishCountIn(): void {
     this._countInScheduler?.removeListener(this._countInPlayer);
+    this._countInScheduler = null;
     // Don't silence — clicks are short one-shots (~40ms) that finish naturally.
     this._countingIn = false;
     this._emit('countInEnd');
@@ -792,6 +797,7 @@ export class Transport {
   private _cancelCountIn(): void {
     this._countInPlayer.silence();
     this._countInScheduler?.removeListener(this._countInPlayer);
+    this._countInScheduler = null;
     this._countingIn = false;
     // Stop the main timer (which was driving the count-in scheduler)
     this._timer.stop();
