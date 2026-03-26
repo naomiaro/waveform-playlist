@@ -141,6 +141,27 @@
       min-height: 1.4em;
       margin-top: 4px;
     }
+    .count-in-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .count-in-controls select {
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid #444;
+      padding: 4px 8px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    #count-in-display {
+      font-family: 'Courier New', monospace;
+      font-size: 1.4rem;
+      color: #d08070;
+      min-height: 1.6em;
+      margin: 8px 0;
+      letter-spacing: 0.1em;
+    }
   </style>
 </head>
 <body>
@@ -176,6 +197,20 @@
       <button data-beats="6">6/8</button>
       <button data-beats="7">7/8</button>
     </div>
+  </div>
+
+  <div class="section">
+    <label>Count-In</label>
+    <div class="count-in-controls">
+      <button id="count-in-btn">Off</button>
+      <select id="count-in-bars">
+        <option value="1" selected>1 bar</option>
+        <option value="2">2 bars</option>
+        <option value="3">3 bars</option>
+        <option value="4">4 bars</option>
+      </select>
+    </div>
+    <div id="count-in-display"></div>
   </div>
 
   <div class="beat-indicator" id="beat-indicator"></div>
@@ -235,6 +270,32 @@
     const stopBtn = document.getElementById('stop-btn');
     const sequenceGrid = document.getElementById('sequence-grid');
     const sequenceDesc = document.getElementById('sequence-desc');
+    const countInBtn = document.getElementById('count-in-btn');
+    const countInBarsSelect = document.getElementById('count-in-bars');
+    const countInDisplay = document.getElementById('count-in-display');
+
+    // --- Count-In ---
+    let countInEnabled = false;
+
+    countInBtn.addEventListener('click', () => {
+      countInEnabled = !countInEnabled;
+      transport.setCountIn(countInEnabled);
+      transport.setCountInMode('always');
+      countInBtn.textContent = countInEnabled ? 'On' : 'Off';
+      countInBtn.classList.toggle('active', countInEnabled);
+    });
+
+    countInBarsSelect.addEventListener('change', () => {
+      transport.setCountInBars(Number(countInBarsSelect.value));
+    });
+
+    transport.on('countIn', (event) => {
+      countInDisplay.textContent = event.beat + ' / ' + event.totalBeats;
+    });
+
+    transport.on('countInEnd', () => {
+      countInDisplay.textContent = '';
+    });
 
     // --- Beat dots ---
     function buildBeatDots(n) {
@@ -308,6 +369,7 @@
       activeSequence = null;
       sequenceGrid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
       sequenceDesc.textContent = '';
+      countInDisplay.textContent = '';
       uiSetPlaying(false);
     });
 
