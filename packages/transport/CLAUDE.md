@@ -96,6 +96,8 @@ Implements `SchedulerListener<MetronomeEvent>`. Receives integer ticks directly 
 
 **Dedicated Tick Space and TempoMap:** The count-in scheduler operates in its **own tick space starting at tick 0** with a **dedicated TempoMap** locked to the BPM at the play position. This avoids using the main TempoMap, which may have a different tempo at tick 0 vs the play position (multi-tempo sessions).
 
+**TempoMap Coupling:** `CountInPlayer.consume()` must use the **same TempoMap** as the count-in scheduler for `ticksToSeconds()` conversion. The dedicated TempoMap is passed via `configure({ tempoMap })`, replacing the main TempoMap from construction. If `consume()` uses a different TempoMap than the one generating ticks, clicks are timed wrong in multi-tempo sessions.
+
 **Timer-Driven Bar Boundary Transition:** Count-in completion is driven by the timer tick checking `_countInDuration` (full bar in seconds), NOT by `onComplete` from `CountInPlayer.consume()`. The `consume()` callback fires when the last beat is *scheduled* (in the lookahead window), which is ~200ms before it actually *plays*. Transitioning on consume would start the metronome before the last count-in click is heard. The timer tick checks `time >= _countInDuration` and calls `_finishCountIn()`, placing the transition exactly at the bar boundary.
 
 **One-Shot Completion (No Silence):** `_finishCountIn()` does NOT call `_countInPlayer.silence()`. Same pattern as MetronomePlayer's `onPositionJump()` no-op — clicks are short one-shots (~40ms) that finish naturally. Calling `silence()` kills clicks scheduled in the lookahead window that haven't played yet.
