@@ -1,5 +1,12 @@
 import type { ClipTrack } from '@waveform-playlist/core';
-import type { Tick, Sample, TransportOptions, MeterSignature, CountInMode, CountInEventData } from './types';
+import type {
+  Tick,
+  Sample,
+  TransportOptions,
+  MeterSignature,
+  CountInMode,
+  CountInEventData,
+} from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
 import { Scheduler } from './core/scheduler';
@@ -442,7 +449,7 @@ export class Transport {
     if (this._loopEnabled) {
       this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
     }
-    this._emit('tempochange', { bpm, atTick: atTick ?? 0 as Tick });
+    this._emit('tempochange', { bpm, atTick: atTick ?? (0 as Tick) });
   }
 
   getTempo(atTick?: Tick): number {
@@ -453,7 +460,7 @@ export class Transport {
 
   setMeter(numerator: number, denominator: number, atTick?: Tick): void {
     this._meterMap.setMeter(numerator, denominator, atTick);
-    this._emit('meterchange', { numerator, denominator, atTick: atTick ?? 0 as Tick });
+    this._emit('meterchange', { numerator, denominator, atTick: atTick ?? (0 as Tick) });
   }
 
   getMeter(atTick?: Tick): MeterSignature {
@@ -463,13 +470,21 @@ export class Transport {
   removeMeter(atTick: Tick): void {
     this._meterMap.removeMeter(atTick);
     const meter = this._meterMap.getMeter(atTick);
-    this._emit('meterchange', { numerator: meter.numerator, denominator: meter.denominator, atTick });
+    this._emit('meterchange', {
+      numerator: meter.numerator,
+      denominator: meter.denominator,
+      atTick,
+    });
   }
 
   clearMeters(): void {
     this._meterMap.clearMeters();
     const meter = this._meterMap.getMeter();
-    this._emit('meterchange', { numerator: meter.numerator, denominator: meter.denominator, atTick: 0 as Tick });
+    this._emit('meterchange', {
+      numerator: meter.numerator,
+      denominator: meter.denominator,
+      atTick: 0 as Tick,
+    });
   }
 
   clearTempos(): void {
@@ -672,7 +687,10 @@ export class Transport {
       this._normalBuffer = normal;
       this._metronomePlayer.setClickSounds(accent, normal);
     } catch (err) {
-      console.warn('[waveform-playlist] Transport: failed to create default click sounds:', String(err));
+      console.warn(
+        '[waveform-playlist] Transport: failed to create default click sounds:',
+        String(err)
+      );
     }
   }
 

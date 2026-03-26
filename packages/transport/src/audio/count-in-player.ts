@@ -110,10 +110,7 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
       try {
         source.disconnect();
       } catch (err) {
-        console.warn(
-          '[waveform-playlist] CountInPlayer: error disconnecting source:',
-          String(err)
-        );
+        console.warn('[waveform-playlist] CountInPlayer: error disconnecting source:', String(err));
       }
     });
 
