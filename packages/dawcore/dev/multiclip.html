@@ -166,6 +166,9 @@
 
     // --- Safari AudioContext diagnostics ---
     const ctx = editor.audioContext;
+    addLog('outputLatency=' + ('outputLatency' in ctx ? (ctx.outputLatency * 1000).toFixed(1) + 'ms' : 'NOT SUPPORTED') +
+           ' baseLatency=' + ('baseLatency' in ctx ? (ctx.baseLatency * 1000).toFixed(1) + 'ms' : 'NOT SUPPORTED') +
+           ' sampleRate=' + ctx.sampleRate);
     editor.addEventListener('daw-play', () => {
       const t0 = performance.now();
       const ctxTime0 = ctx.currentTime;
