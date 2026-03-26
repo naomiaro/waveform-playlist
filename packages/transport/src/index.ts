@@ -10,6 +10,8 @@ export type {
   TransportPosition,
   MeterSignature,
   MeterEntry,
+  CountInMode,
+  CountInEventData,
 } from './types';
 
 export { Clock } from './core/clock';

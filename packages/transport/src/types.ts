@@ -83,3 +83,14 @@ export interface TransportPosition {
    *  Not branded Tick — a remainder within a beat, not an absolute position. */
   subTick: number;
 }
+
+/** Count-in mode: 'always' plays count-in on every play(), 'recording-only' only when recording. */
+export type CountInMode = 'always' | 'recording-only';
+
+/** Payload emitted with the 'countIn' transport event. */
+export interface CountInEventData {
+  /** Current beat number (1-indexed) */
+  beat: number;
+  /** Total number of beats in the count-in */
+  totalBeats: number;
+}
