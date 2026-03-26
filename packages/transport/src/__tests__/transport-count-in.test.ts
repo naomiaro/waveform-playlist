@@ -258,4 +258,108 @@ describe('Transport Count-In', () => {
 
     transport.stop();
   });
+
+  it('2-bar count-in emits 8 beats in 4/4', () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+    transport.setCountInBars(2);
+
+    const countInEvents: CountInEventData[] = [];
+    transport.on('countIn', (event) => {
+      countInEvents.push(event);
+    });
+
+    transport.play();
+
+    // 2 bars of 4/4 at 120 BPM = 4 seconds
+    (ctx as any).currentTime = 14.5; // 4.5s after start
+    const snapshot = [...rafCallbacks];
+    for (const cb of snapshot) {
+      cb(performance.now());
+    }
+
+    expect(countInEvents.length).toBe(8);
+    expect(countInEvents[0]).toEqual({ beat: 1, totalBeats: 8 });
+    expect(countInEvents[7]).toEqual({ beat: 8, totalBeats: 8 });
+
+    transport.stop();
+  });
+
+  it('count-in with 3/4 meter emits 3 beats per bar', () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    transport.setMeter(3, 4);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+
+    const countInEvents: CountInEventData[] = [];
+    transport.on('countIn', (event) => {
+      countInEvents.push(event);
+    });
+
+    transport.play();
+
+    // 1 bar of 3/4 at 120 BPM = 1.5 seconds
+    (ctx as any).currentTime = 12; // 2s after start (past 1.5s duration)
+    const snapshot = [...rafCallbacks];
+    for (const cb of snapshot) {
+      cb(performance.now());
+    }
+
+    expect(countInEvents.length).toBe(3);
+    expect(countInEvents[0]).toEqual({ beat: 1, totalBeats: 3 });
+    expect(countInEvents[2]).toEqual({ beat: 3, totalBeats: 3 });
+
+    transport.stop();
+  });
+
+  it('finishCountIn restores play position and emits play event', () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+    transport.seek(5);
+
+    const onPlay = vi.fn();
+    transport.on('play', onPlay);
+
+    transport.play();
+    expect(transport.getCurrentTime()).toBe(5); // frozen during count-in
+
+    // Drive past count-in
+    (ctx as any).currentTime = 12.5;
+    const snapshot = [...rafCallbacks];
+    for (const cb of snapshot) {
+      cb(performance.now());
+    }
+
+    // After count-in, position restored and play event emitted
+    expect(onPlay).toHaveBeenCalledTimes(1);
+    expect(transport.isPlaying()).toBe(true);
+    expect(transport.isCountingIn()).toBe(false);
+    // getCurrentTime should be near the original seek position (5s)
+    // (clock was seeked back, so it should be close to 5)
+    expect(transport.getCurrentTime()).toBeCloseTo(5, 0);
+
+    transport.stop();
+  });
+
+  it('play event is NOT emitted at count-in start', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+
+    const onPlay = vi.fn();
+    transport.on('play', onPlay);
+
+    transport.play();
+    // play event should NOT fire during count-in — only after it completes
+    expect(onPlay).not.toHaveBeenCalled();
+    expect(transport.isCountingIn()).toBe(true);
+
+    transport.stop();
+  });
 });
