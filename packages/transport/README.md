@@ -7,7 +7,8 @@ Native Web Audio transport for multi-track audio scheduling, looping, tempo, and
 - **Native Web Audio** — No Tone.js, no `standardized-audio-context`. Direct `AudioContext` with full `sampleRate` and `latencyHint` control.
 - **Sliding window scheduler** — Schedules audio 200ms ahead via `requestAnimationFrame` for glitch-free playback.
 - **Dual timeline** — Sample-absolute positions for audio clips, PPQN tick positions for metronome/MIDI.
-- **Built-in metronome** — Beat-grid click scheduling with accent on beat 1. Just another scheduler listener.
+- **Built-in metronome** — Beat-grid click scheduling with accent on beat 1. Default synthesized click sounds out of the box.
+- **Count-in (pre-roll)** — Configurable bars of click sounds before playback begins. Beat-by-beat events for UI countdown.
 - **Per-track signal chain** — Native GainNode (volume) → StereoPannerNode → GainNode (mute) → effects hook → master output.
 - **Effects plugin hook** — `connectTrackOutput(trackId, node)` inserts any `AudioNode` chain (Tone.js effects, WAM plugins, native nodes).
 - **Type-safe coordinates** — Branded `Tick` and `Sample` types prevent accidentally passing seconds where ticks or samples are expected. Zero runtime cost.
@@ -71,9 +72,31 @@ const transport = new Transport(audioContext, {
   denominator: 4,
 });
 
+// Default click sounds are built in — just enable and play
 transport.setMetronomeEnabled(true);
-transport.setMetronomeClickSounds(accentBuffer, normalBuffer);
 transport.play();
+
+// Override with custom click sounds
+transport.setMetronomeClickSounds(accentBuffer, normalBuffer);
+```
+
+### Count-In
+
+```typescript
+transport.setCountIn(true);
+transport.setCountInBars(1);           // 1–8 bars, default 1
+transport.setCountInMode('always');    // 'always' | 'recording-only' (default)
+
+// Beat-by-beat events for UI countdown
+transport.on('countIn', ({ beat, totalBeats }) => {
+  console.log(beat + ' / ' + totalBeats);  // "1 / 4", "2 / 4", ...
+});
+
+transport.on('countInEnd', () => {
+  console.log('Playback starting');
+});
+
+transport.play();  // Plays count-in clicks, then starts playback
 ```
 
 ### Mixed Meter
@@ -155,6 +178,8 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 | `numerator` | `4` | Beats per bar (time signature numerator) |
 | `denominator` | `4` | Beat unit (time signature denominator) |
 | `schedulerLookahead` | `0.2` | How far ahead to schedule (seconds) |
+| `accentFrequency` | `1000` | Default accent click frequency (Hz) |
+| `normalFrequency` | `800` | Default normal click frequency (Hz) |
 
 **Playback:**
 - `play(startTime?, endTime?)` — Start or resume playback
@@ -192,7 +217,14 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 
 **Metronome:**
 - `setMetronomeEnabled(enabled)`
-- `setMetronomeClickSounds(accent, normal)`
+- `setMetronomeClickSounds(accent, normal)` — overrides default synthesized sounds
+
+**Count-In:**
+- `setCountIn(enabled)` — enable/disable count-in
+- `setCountInBars(bars)` — number of bars (1–8, default 1)
+- `setCountInMode(mode)` — `'recording-only'` (default) or `'always'`
+- `setRecording(recording)` — consumer signals recording state (for `'recording-only'` mode)
+- `isCountingIn()` — whether count-in is active
 
 **Effects:**
 - `connectTrackOutput(trackId, node)` — Insert effects chain
@@ -200,7 +232,10 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 
 **Events:**
 - `on(event, callback)` / `off(event, callback)`
-- Events: `play`, `pause`, `stop`, `loop`, `tempochange`
+- Events: `play`, `pause`, `stop`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`
+- `tempochange` payload: `{ bpm: number, atTick: Tick }`
+- `meterchange` payload: `{ numerator: number, denominator: number, atTick: Tick }`
+- `countIn` payload: `{ beat: number, totalBeats: number }`
 
 **Cleanup:**
 - `dispose()` — Stop playback, disconnect all nodes, remove listeners
