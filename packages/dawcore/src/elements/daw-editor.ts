@@ -978,7 +978,7 @@ export class DawEditorElement extends LitElement {
         return Math.max(0, engine.getCurrentTime() - latency);
       },
       this.effectiveSampleRate,
-      this.samplesPerPixel,
+      this.samplesPerPixel
     );
   }
   _stopPlayhead() {
