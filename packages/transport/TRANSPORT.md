@@ -275,7 +275,7 @@ When count-in is enabled, pressing play triggers audible metronome clicks for a 
 
 CountInPlayer implements `SchedulerListener<CountInEvent>` — same contract as ClipPlayer and MetronomePlayer. It is a **temporary** listener, added to a **dedicated count-in scheduler** only during the pre-play phase.
 
-**Dedicated tick space:** The count-in scheduler operates in its own coordinate system starting at tick 0, with a dedicated `TempoMap` locked to the BPM at the play position. This prevents multi-tempo sessions from using the wrong tempo for count-in clicks.
+**Dedicated tick space:** The count-in scheduler operates in its own coordinate system starting at tick 0, with a dedicated `TempoMap` locked to the BPM at the play position and a dedicated `MeterMap` locked to the meter at the play position. Both prevent multi-tempo/multi-meter sessions from misinterpreting count-in ticks as main-timeline positions.
 
 **Default click sounds:** `createDefaultClickSounds()` synthesizes sine wave AudioBuffers with exponential decay (accent: 1000 Hz/40ms, normal: 800 Hz/30ms). Loaded in the constructor — both MetronomePlayer and CountInPlayer use them out of the box. `setMetronomeClickSounds()` overrides both.
 
@@ -285,7 +285,7 @@ CountInPlayer implements `SchedulerListener<CountInEvent>` — same contract as 
 2. If yes:
    - Set `_countingIn = true`, `_playing = true`, store `_countInStartPosition`
    - Calculate `_countInDuration` (full bar duration in seconds)
-   - Create dedicated TempoMap + Scheduler for the count-in
+   - Create dedicated TempoMap + MeterMap + Scheduler for the count-in
    - Configure `CountInPlayer` with beat count, click sounds, `onBeat` callback
    - Seek clock to 0, start timer — count-in scheduler generates beat events
 3. Timer tick: advance count-in scheduler, check `time >= _countInDuration`
