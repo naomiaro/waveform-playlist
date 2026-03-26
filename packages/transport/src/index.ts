@@ -24,5 +24,6 @@ export { MasterNode } from './audio/master-node';
 export { TrackNode } from './audio/track-node';
 export { ClipPlayer, type ClipEvent } from './audio/clip-player';
 export { MetronomePlayer, type MetronomeEvent } from './audio/metronome-player';
+export type { CountInEvent } from './audio/count-in-player';
 export { Transport, type TransportEvents } from './transport';
 export { NativePlayoutAdapter } from './adapter';
