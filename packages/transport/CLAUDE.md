@@ -146,7 +146,7 @@ Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (requir
 - **`_activeSources` cleanup** — ClipPlayer uses `ended` event listener for automatic cleanup. MetronomePlayer clicks are short one-shots.
 - **rAF exclusively** — no setTimeout/setInterval anywhere. The lookahead window (200ms) provides sufficient scheduling headroom.
 - **Scheduler lookahead ≠ perceptible latency** — The 200ms lookahead is scheduling headroom only. `source.start(when)` uses precise `AudioContext.currentTime` values, so audio plays at the exact right time. Recording latency compensation only needs `outputLatency`, not `outputLatency + lookahead`.
-- **Safari AudioContext Warmup** — `audioContext.resume()` resolves but Safari's audio thread may not be ready to output samples. `NativePlayoutAdapter.init()` waits for `currentTime` to advance past `outputLatency` before returning. Without this, clips scheduled at time 0 have audible start delay on Safari.
+- **Safari AudioContext Warmup** — `audioContext.resume()` resolves but Safari's audio thread may not be ready to output samples. `NativePlayoutAdapter.init()` waits for `currentTime` to advance past `outputLatency` (fallback 20ms) before returning, with a 2s timeout and `state === 'closed'` guard to prevent infinite hang. Without this, clips scheduled at time 0 have audible start delay on Safari.
 - **onPositionJump Strict Less-Than** — `ClipPlayer.onPositionJump` uses strict `<` (not `<=`) for clip start boundary: `clipStartSample < newSample`. Clips starting exactly AT the position are handled by `generate()`, not `onPositionJump`. Using `<=` causes double-scheduling (both produce the same clip).
 
 ## Critical Gotchas
