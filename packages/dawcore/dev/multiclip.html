@@ -164,6 +164,52 @@
       }
     });
 
+    // --- Safari AudioContext diagnostics ---
+    const ctx = editor.audioContext;
+    editor.addEventListener('daw-play', () => {
+      const t0 = performance.now();
+      const ctxTime0 = ctx.currentTime;
+      const state0 = ctx.state;
+
+      // Sample audioContext.currentTime over the next second to detect stalls
+      let samples = [];
+      let samplingId;
+      const sample = () => {
+        const elapsed = performance.now() - t0;
+        const ctxElapsed = ctx.currentTime - ctxTime0;
+        samples.push({ elapsed: elapsed.toFixed(1), ctxElapsed: ctxElapsed.toFixed(4), state: ctx.state });
+        if (elapsed < 1000) {
+          samplingId = requestAnimationFrame(sample);
+        } else {
+          console.log('[safari-debug] AudioContext timing samples (first 1s):');
+          console.table(samples);
+
+          // Check for initial stall: how long before ctx.currentTime started advancing?
+          const firstAdvance = samples.find(s => parseFloat(s.ctxElapsed) > 0.001);
+          if (firstAdvance) {
+            addLog('ctx.currentTime started advancing at +' + firstAdvance.elapsed + 'ms (state at play: ' + state0 + ')');
+          } else {
+            addLog('WARNING: ctx.currentTime did NOT advance in first 1s');
+          }
+
+          // Check outputLatency
+          addLog('outputLatency=' + (ctx.outputLatency ? (ctx.outputLatency * 1000).toFixed(1) + 'ms' : 'N/A') +
+                 ' baseLatency=' + (ctx.baseLatency ? (ctx.baseLatency * 1000).toFixed(1) + 'ms' : 'N/A') +
+                 ' sampleRate=' + ctx.sampleRate);
+        }
+      };
+      samplingId = requestAnimationFrame(sample);
+
+      // Clean up on stop
+      const cleanup = () => {
+        cancelAnimationFrame(samplingId);
+        editor.removeEventListener('daw-stop', cleanup);
+        editor.removeEventListener('daw-pause', cleanup);
+      };
+      editor.addEventListener('daw-stop', cleanup);
+      editor.addEventListener('daw-pause', cleanup);
+    });
+
     // Editor events
     editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
     editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
