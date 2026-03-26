@@ -106,6 +106,17 @@ Implements `SchedulerListener<MetronomeEvent>`. Receives integer ticks directly 
 
 **Default Click Sounds:** `createDefaultClickSounds(audioContext, { accentFrequency?, normalFrequency? })` synthesizes sine wave AudioBuffers with exponential decay. Called in constructor — MetronomePlayer gets default sounds out of the box (behavior change from requiring explicit `setMetronomeClickSounds()`). `setMetronomeClickSounds()` overrides both metronome and count-in sounds.
 
+**Edge Cases:**
+
+| Case | Behavior |
+|------|----------|
+| No click sounds loaded | Count-in skipped, play proceeds normally. Console warn. |
+| Stop/pause during count-in | Cancel entirely, silence clicks, no `countInEnd` emitted. |
+| Seek during count-in | Cancel count-in, seek to new position, stop playback. |
+| Loop wrap | Count-in only on initial `play()`, never on loop wrap. |
+| `play()` during count-in | No-op — `_playing` is `true` at count-in start. |
+| `setCountInBars` out of range | Clamped to `MIN_COUNT_IN_BARS`–`MAX_COUNT_IN_BARS` with warn. Non-integer rounded. |
+
 ## Transport (Top-Level API)
 
 Orchestrates all layers. Key flows:
