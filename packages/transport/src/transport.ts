@@ -745,7 +745,8 @@ export class Transport {
 
   private _finishCountIn(): void {
     this._countInScheduler?.removeListener(this._countInPlayer);
-    this._countInPlayer.silence();
+    // Don't silence — clicks are short one-shots (~40ms) that finish naturally.
+    // Calling silence() here kills the last beat before it plays.
     this._countingIn = false;
     // Stop the timer to terminate the count-in rAF chain.
     // Normal playback timer is restarted via microtask so the current
