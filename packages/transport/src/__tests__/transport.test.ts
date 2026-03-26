@@ -383,4 +383,97 @@ describe('Transport', () => {
     transport.setTracks([track]);
     transport.removeTrack('track-1');
   });
+
+  it('tempochange event includes bpm and atTick payload', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    const onTempo = vi.fn();
+    transport.on('tempochange', onTempo);
+    transport.setTempo(140, 3840 as Tick);
+    expect(onTempo).toHaveBeenCalledWith({ bpm: 140, atTick: 3840 });
+  });
+
+  it('tempochange at tick 0 uses default tick', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    const onTempo = vi.fn();
+    transport.on('tempochange', onTempo);
+    transport.setTempo(140);
+    expect(onTempo).toHaveBeenCalledWith({ bpm: 140, atTick: 0 });
+  });
+
+  it('meterchange event includes numerator, denominator, and atTick payload', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    const onMeter = vi.fn();
+    transport.on('meterchange', onMeter);
+    transport.setMeter(3, 4, 3840 as Tick);
+    expect(onMeter).toHaveBeenCalledWith({
+      numerator: 3,
+      denominator: 4,
+      atTick: 3840,
+    });
+  });
+
+  it('meterchange at tick 0 uses default tick', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    const onMeter = vi.fn();
+    transport.on('meterchange', onMeter);
+    transport.setMeter(6, 8);
+    expect(onMeter).toHaveBeenCalledWith({
+      numerator: 6,
+      denominator: 8,
+      atTick: 0,
+    });
+  });
+
+  it('clearTempos emits tempochange with default BPM', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setTempo(140, 3840 as Tick);
+    const onTempo = vi.fn();
+    transport.on('tempochange', onTempo);
+    transport.clearTempos();
+    expect(onTempo).toHaveBeenCalledWith({ bpm: 120, atTick: 0 });
+  });
+
+  it('clearMeters emits meterchange with default meter', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setMeter(7, 8, 3840 as Tick);
+    const onMeter = vi.fn();
+    transport.on('meterchange', onMeter);
+    transport.clearMeters();
+    expect(onMeter).toHaveBeenCalledWith({
+      numerator: 4,
+      denominator: 4,
+      atTick: 0,
+    });
+  });
+
+  it('removeMeter emits meterchange with meter at removed tick', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    transport.setMeter(7, 8, 3840 as Tick);
+    const onMeter = vi.fn();
+    transport.on('meterchange', onMeter);
+    transport.removeMeter(3840 as Tick);
+    // After removal, meter at 3840 falls back to default 4/4
+    expect(onMeter).toHaveBeenCalledWith({
+      numerator: 4,
+      denominator: 4,
+      atTick: 3840,
+    });
+  });
+
+  it('existing () => void listeners still work after payload addition', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    const noArgListener = vi.fn();
+    transport.on('tempochange', noArgListener as any);
+    transport.setTempo(140);
+    // Should not throw — extra args are ignored
+    expect(noArgListener).toHaveBeenCalledTimes(1);
+  });
 });

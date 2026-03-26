@@ -1,5 +1,5 @@
 import type { ClipTrack } from '@waveform-playlist/core';
-import type { Tick, Sample, TransportOptions, MeterSignature } from './types';
+import type { Tick, Sample, TransportOptions, MeterSignature, CountInEventData } from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
 import { Scheduler } from './core/scheduler';
@@ -17,8 +17,10 @@ export interface TransportEvents {
   pause: () => void;
   stop: () => void;
   loop: () => void;
-  tempochange: () => void;
-  meterchange: () => void;
+  tempochange: (event: { bpm: number; atTick: Tick }) => void;
+  meterchange: (event: { numerator: number; denominator: number; atTick: Tick }) => void;
+  countIn: (event: CountInEventData) => void;
+  countInEnd: () => void;
 }
 
 type TransportEventType = keyof TransportEvents;
@@ -44,7 +46,8 @@ export class Transport {
   private _loopEnabled = false;
   private _loopStartTick: Tick = 0 as Tick;
   private _loopStartSeconds = 0;
-  private _listeners: Map<TransportEventType, Set<TransportEvents[TransportEventType]>> = new Map();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _listeners: Map<TransportEventType, Set<(...args: any[]) => void>> = new Map();
 
   constructor(audioContext: AudioContext, options: TransportOptions = {}) {
     this._audioContext = audioContext;
@@ -387,7 +390,7 @@ export class Transport {
     if (this._loopEnabled) {
       this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
     }
-    this._emit('tempochange');
+    this._emit('tempochange', { bpm, atTick: atTick ?? 0 as Tick });
   }
 
   getTempo(atTick?: Tick): number {
@@ -398,7 +401,7 @@ export class Transport {
 
   setMeter(numerator: number, denominator: number, atTick?: Tick): void {
     this._meterMap.setMeter(numerator, denominator, atTick);
-    this._emit('meterchange');
+    this._emit('meterchange', { numerator, denominator, atTick: atTick ?? 0 as Tick });
   }
 
   getMeter(atTick?: Tick): MeterSignature {
@@ -407,12 +410,14 @@ export class Transport {
 
   removeMeter(atTick: Tick): void {
     this._meterMap.removeMeter(atTick);
-    this._emit('meterchange');
+    const meter = this._meterMap.getMeter(atTick);
+    this._emit('meterchange', { numerator: meter.numerator, denominator: meter.denominator, atTick });
   }
 
   clearMeters(): void {
     this._meterMap.clearMeters();
-    this._emit('meterchange');
+    const meter = this._meterMap.getMeter();
+    this._emit('meterchange', { numerator: meter.numerator, denominator: meter.denominator, atTick: 0 as Tick });
   }
 
   clearTempos(): void {
@@ -420,7 +425,7 @@ export class Transport {
     if (this._loopEnabled) {
       this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
     }
-    this._emit('tempochange');
+    this._emit('tempochange', { bpm: this._tempoMap.getTempo(), atTick: 0 as Tick });
   }
 
   barToTick(bar: number): Tick {
@@ -477,11 +482,13 @@ export class Transport {
     if (!this._listeners.has(event)) {
       this._listeners.set(event, new Set());
     }
-    this._listeners.get(event)!.add(cb);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this._listeners.get(event)!.add(cb as (...args: any[]) => void);
   }
 
   off<K extends TransportEventType>(event: K, cb: TransportEvents[K]): void {
-    this._listeners.get(event)?.delete(cb);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this._listeners.get(event)?.delete(cb as (...args: any[]) => void);
   }
 
   // --- Dispose ---
@@ -577,12 +584,16 @@ export class Transport {
     }
   }
 
-  private _emit(event: TransportEventType): void {
+  private _emit<K extends TransportEventType>(
+    event: K,
+    ...args: Parameters<TransportEvents[K]>
+  ): void {
     const listeners = this._listeners.get(event);
     if (listeners) {
       for (const cb of listeners) {
         try {
-          cb();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (cb as (...a: any[]) => void)(...args);
         } catch (err) {
           console.warn(
             '[waveform-playlist] Transport "' + event + '" listener threw:',
