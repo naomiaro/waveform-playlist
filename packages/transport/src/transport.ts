@@ -160,6 +160,7 @@ export class Transport {
     this._scheduler.reset(currentTime);
 
     this._endTime = endTime;
+
     this._clock.start();
 
     // Re-create sources for clips spanning the current position.

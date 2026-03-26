@@ -22,6 +22,25 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
     }
     if (this._audioContext.state === 'suspended') {
       await this._audioContext.resume();
+      // Safari's audio thread may not be ready to output audio immediately
+      // after resume() resolves. Wait for currentTime to advance past the
+      // output latency, indicating the hardware pipeline is warm.
+      const warmupTarget =
+        'outputLatency' in this._audioContext
+          ? (this._audioContext as AudioContext).outputLatency
+          : 0.02; // 20ms fallback
+      if (this._audioContext.currentTime < warmupTarget) {
+        await new Promise<void>((resolve) => {
+          const check = () => {
+            if (this._audioContext.currentTime >= warmupTarget) {
+              resolve();
+            } else {
+              requestAnimationFrame(check);
+            }
+          };
+          requestAnimationFrame(check);
+        });
+      }
     }
   }
 
