@@ -30,9 +30,26 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
           ? (this._audioContext as AudioContext).outputLatency
           : 0.02; // 20ms fallback
       if (this._audioContext.currentTime < warmupTarget) {
+        const MAX_WARMUP_MS = 2000;
         await new Promise<void>((resolve) => {
+          const startMs = performance.now();
           const check = () => {
             if (this._audioContext.currentTime >= warmupTarget) {
+              resolve();
+            } else if (
+              this._audioContext.state === 'closed' ||
+              performance.now() - startMs > MAX_WARMUP_MS
+            ) {
+              console.warn(
+                '[waveform-playlist] AudioContext warmup timed out' +
+                  ' (currentTime=' +
+                  this._audioContext.currentTime +
+                  ', target=' +
+                  warmupTarget +
+                  ', state=' +
+                  this._audioContext.state +
+                  '). Proceeding without warmup.'
+              );
               resolve();
             } else {
               requestAnimationFrame(check);
