@@ -115,13 +115,11 @@ export class Transport {
     this._timer = new Timer(() => {
       const time = this._clock.getTime();
       if (this._countingIn) {
-        console.log('[count-in] timer tick: clockTime=' + time.toFixed(4) + ' countInDuration=' + this._countInDuration.toFixed(4));
         this._countInScheduler?.advance(time);
         // Transition when the full bar duration has elapsed — not when the
         // last beat is consumed. This gives the last beat its full ring-out
         // and places the transition exactly at the bar boundary.
         if (time >= this._countInDuration) {
-          console.log('[count-in] bar duration reached, finishing count-in');
           this._finishCountIn();
         }
         return;
@@ -733,8 +731,6 @@ export class Transport {
     const countInTempoMap = new TempoMap(this._ppqn, bpmAtPosition);
     this._countInDuration = countInTempoMap.ticksToSeconds(countInTicks as Tick);
 
-    console.log('[count-in] _startCountIn: currentTime=' + currentTime + ' playPositionTick=' + playPositionTick + ' meter=' + meter.numerator + '/' + meter.denominator + ' totalBeats=' + totalBeats + ' bars=' + this._countInBars + ' countInDuration=' + this._countInDuration.toFixed(4) + ' lookahead=' + this._schedulerLookahead);
-
     this._countInScheduler = new Scheduler(countInTempoMap, {
       lookahead: this._schedulerLookahead,
     });
@@ -761,7 +757,6 @@ export class Transport {
   }
 
   private _finishCountIn(): void {
-    console.log('[count-in] _finishCountIn: audioCtx.currentTime=' + this._audioContext.currentTime.toFixed(4) + ' clockTime=' + this._clock.getTime().toFixed(4) + ' activeSources=' + this._countInPlayer['_activeSources'].size);
     this._countInScheduler?.removeListener(this._countInPlayer);
     // Don't silence — clicks are short one-shots (~40ms) that finish naturally.
     this._countingIn = false;
