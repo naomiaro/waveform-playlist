@@ -37,7 +37,7 @@ function createMockPannerNode() {
 }
 
 function mockAudioContext(): AudioContext {
-  return {
+  const ctx = {
     sampleRate: 48000,
     currentTime: 0,
     state: 'suspended',
@@ -45,8 +45,14 @@ function mockAudioContext(): AudioContext {
     createGain: vi.fn(() => createMockGainNode()),
     createStereoPanner: vi.fn(() => createMockPannerNode()),
     createBufferSource: vi.fn(() => createMockSource()),
-    resume: vi.fn(() => Promise.resolve()),
-  } as unknown as AudioContext;
+    resume: vi.fn(() => {
+      // Simulate AudioContext advancing after resume (needed for warmup wait)
+      ctx.currentTime = 1.0;
+      ctx.state = 'running';
+      return Promise.resolve();
+    }),
+  };
+  return ctx as unknown as AudioContext;
 }
 
 function makeClip(overrides: Partial<AudioClip> = {}): AudioClip {

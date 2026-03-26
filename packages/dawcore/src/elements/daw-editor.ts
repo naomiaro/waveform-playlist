@@ -974,7 +974,7 @@ export class DawEditorElement extends LitElement {
     playhead.startAnimation(
       () => Math.max(0, engine.getCurrentTime() - outputLatency),
       this.effectiveSampleRate,
-      this.samplesPerPixel,
+      this.samplesPerPixel
     );
   }
   _stopPlayhead() {

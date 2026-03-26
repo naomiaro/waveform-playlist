@@ -164,12 +164,6 @@
       }
     });
 
-    // --- AudioContext latency info ---
-    const ctx = editor.audioContext;
-    addLog('outputLatency=' + ('outputLatency' in ctx ? (ctx.outputLatency * 1000).toFixed(1) + 'ms' : 'N/A') +
-           ' baseLatency=' + ('baseLatency' in ctx ? (ctx.baseLatency * 1000).toFixed(1) + 'ms' : 'N/A') +
-           ' sampleRate=' + ctx.sampleRate);
-
     // Editor events
     editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
     editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
