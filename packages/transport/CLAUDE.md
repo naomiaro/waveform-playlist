@@ -135,7 +135,7 @@ When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute
 
 ## NativePlayoutAdapter
 
-Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (required + optional: `addTrack`, `removeTrack`, `updateTrack`). `init()` resumes suspended AudioContext. `transport` getter exposes the Transport for direct access to tempo, metronome, and effects hooks.
+Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (required + optional: `addTrack`, `removeTrack`, `updateTrack`). `init()` resumes suspended AudioContext and waits for Safari warmup (see Patterns). `transport` getter exposes the Transport for direct access to tempo, metronome, and effects hooks.
 
 ## Patterns
 

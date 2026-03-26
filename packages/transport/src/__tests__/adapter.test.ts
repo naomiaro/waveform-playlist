@@ -138,6 +138,85 @@ describe('NativePlayoutAdapter', () => {
     expect(ctx.resume).toHaveBeenCalled();
   });
 
+  it('init warmup loop polls until currentTime advances', async () => {
+    const ctx = mockAudioContext();
+    // Override: resume does NOT advance currentTime (simulates Safari warmup)
+    let rafCallback: ((time: number) => void) | null = null;
+    (ctx as any).resume = vi.fn(() => {
+      (ctx as any).state = 'running';
+      // currentTime stays at 0 — warmup loop must poll
+      return Promise.resolve();
+    });
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((cb: (time: number) => void) => {
+        rafCallback = cb;
+        return 1;
+      })
+    );
+
+    const adapter = new NativePlayoutAdapter(ctx);
+    let resolved = false;
+    const initPromise = adapter.init().then(() => {
+      resolved = true;
+    });
+
+    // Wait for resume() microtask to settle
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Warmup should be polling — not yet resolved
+    expect(resolved).toBe(false);
+    expect(rafCallback).not.toBeNull();
+
+    // Advance currentTime past warmup target and fire the rAF callback
+    (ctx as any).currentTime = 0.05;
+    rafCallback!(0);
+
+    await initPromise;
+    expect(resolved).toBe(true);
+  });
+
+  it('init warmup times out after max wait', async () => {
+    const ctx = mockAudioContext();
+    (ctx as any).resume = vi.fn(() => {
+      (ctx as any).state = 'running';
+      return Promise.resolve();
+    });
+
+    // Mock performance.now to jump past timeout
+    const originalNow = performance.now;
+    let mockNow = 0;
+    vi.stubGlobal('performance', { now: () => mockNow });
+
+    let rafCallback: ((time: number) => void) | null = null;
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((cb: (time: number) => void) => {
+        rafCallback = cb;
+        return 1;
+      })
+    );
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const adapter = new NativePlayoutAdapter(ctx);
+    const initPromise = adapter.init();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Jump past 2s timeout and fire callback
+    mockNow = 3000;
+    rafCallback!(0);
+
+    await initPromise;
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('warmup timed out'));
+
+    warnSpy.mockRestore();
+    vi.stubGlobal('performance', { now: originalNow });
+  });
+
   it('init skips resume for running AudioContext', async () => {
     const ctx = mockAudioContext();
     (ctx as any).state = 'running';

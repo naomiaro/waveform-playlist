@@ -968,11 +968,12 @@ export class DawEditorElement extends LitElement {
     const engine = this._engine;
     // Subtract outputLatency so the playhead matches when audio reaches
     // the speakers, not when it's processed. Safari reports ~15ms;
-    // Chrome ~3ms. Read per-frame since outputLatency is a dynamic property
-    // (can change on device switch, Bluetooth codec change, etc.).
-    const ctx = this.audioContext;
+    // Chrome ~3ms. Both audioContext and outputLatency are read per-frame:
+    // audioContext can be replaced (setter), outputLatency is dynamic
+    // (device switch, Bluetooth codec change).
     playhead.startAnimation(
       () => {
+        const ctx = this.audioContext;
         const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
         return Math.max(0, engine.getCurrentTime() - latency);
       },
@@ -983,7 +984,12 @@ export class DawEditorElement extends LitElement {
   _stopPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead) return;
-    playhead.stopAnimation(this._currentTime, this.effectiveSampleRate, this.samplesPerPixel);
+    // Apply same outputLatency offset as _startPlayhead so the resting
+    // position matches the last animated position (no visual snap on stop).
+    const ctx = this.audioContext;
+    const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+    const time = Math.max(0, this._currentTime - latency);
+    playhead.stopAnimation(time, this.effectiveSampleRate, this.samplesPerPixel);
   }
   private _getPlayhead(): DawPlayheadElement | null {
     return this.shadowRoot?.querySelector('daw-playhead') as DawPlayheadElement | null;

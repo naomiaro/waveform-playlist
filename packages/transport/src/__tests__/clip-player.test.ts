@@ -259,6 +259,26 @@ describe('ClipPlayer', () => {
     expect(events[0].durationSamples).toBe(48000);
   });
 
+  it('onPositionJump does not schedule clips starting exactly at the jump position', () => {
+    // Clip starts at 0.5s (24000 samples), jump to exactly 0.5s (tick 960)
+    // onPositionJump uses strict < so clips starting AT the position are
+    // left for generate() — prevents double-scheduling.
+    const clip = makeClip({
+      startSample: 24000,
+      durationSamples: 48000, // 1s clip
+      offsetSamples: 0,
+    });
+    const track = makeTrack([clip]);
+    const trackNode = createMockTrackNode('track-1');
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([track], new Map([['track-1', trackNode]]));
+
+    // Jump to exactly where the clip starts (tick 960 = sample 24000)
+    player.onPositionJump(960 as Tick);
+    // No source should be created — the clip starts AT the position, not before
+    expect((ctx.createBufferSource as any).mock.results.length).toBe(0);
+  });
+
   it('mid-clip playback is handled by onPositionJump, not generate', () => {
     const clip = makeClip({
       startSample: 0,
