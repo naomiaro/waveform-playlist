@@ -1,7 +1,7 @@
 import type { ClipTrack } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { Transport } from './transport';
-import type { TransportOptions } from './types';
+import type { TransportOptions, CountInMode } from './types';
 
 export class NativePlayoutAdapter implements PlayoutAdapter {
   private _transport: Transport;
@@ -87,6 +87,26 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
 
   setLoop(enabled: boolean, start: number, end: number): void {
     this._transport.setLoopSeconds(enabled, start, end);
+  }
+
+  setCountIn(enabled: boolean): void {
+    this._transport.setCountIn(enabled);
+  }
+
+  setCountInBars(bars: number): void {
+    this._transport.setCountInBars(bars);
+  }
+
+  setCountInMode(mode: CountInMode): void {
+    this._transport.setCountInMode(mode);
+  }
+
+  setRecording(recording: boolean): void {
+    this._transport.setRecording(recording);
+  }
+
+  isCountingIn(): boolean {
+    return this._transport.isCountingIn();
   }
 
   dispose(): void {
