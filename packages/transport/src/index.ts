@@ -12,6 +12,8 @@ export type {
   MeterEntry,
   CountInMode,
   CountInEventData,
+  TempoChangeEventData,
+  MeterChangeEventData,
 } from './types';
 
 export { Clock } from './core/clock';

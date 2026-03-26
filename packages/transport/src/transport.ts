@@ -6,6 +6,8 @@ import type {
   MeterSignature,
   CountInMode,
   CountInEventData,
+  TempoChangeEventData,
+  MeterChangeEventData,
 } from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
@@ -26,8 +28,8 @@ export interface TransportEvents {
   pause: () => void;
   stop: () => void;
   loop: () => void;
-  tempochange: (event: { bpm: number; atTick: Tick }) => void;
-  meterchange: (event: { numerator: number; denominator: number; atTick: Tick }) => void;
+  tempochange: (event: TempoChangeEventData) => void;
+  meterchange: (event: MeterChangeEventData) => void;
   countIn: (event: CountInEventData) => void;
   countInEnd: () => void;
 }
@@ -534,20 +536,33 @@ export class Transport {
 
   // --- Count-In ---
 
+  static readonly MIN_COUNT_IN_BARS = 1;
+  static readonly MAX_COUNT_IN_BARS = 8;
+
   setCountIn(enabled: boolean): void {
     this._countInEnabled = enabled;
   }
 
   setCountInBars(bars: number): void {
     const rounded = Math.round(bars);
-    if (rounded < 1) {
-      console.warn('[waveform-playlist] Transport.setCountInBars: clamping ' + bars + ' to 1');
-      this._countInBars = 1;
+    if (rounded < Transport.MIN_COUNT_IN_BARS) {
+      console.warn(
+        '[waveform-playlist] Transport.setCountInBars: clamping ' +
+          bars +
+          ' to ' +
+          Transport.MIN_COUNT_IN_BARS
+      );
+      this._countInBars = Transport.MIN_COUNT_IN_BARS;
       return;
     }
-    if (rounded > 8) {
-      console.warn('[waveform-playlist] Transport.setCountInBars: clamping ' + bars + ' to 8');
-      this._countInBars = 8;
+    if (rounded > Transport.MAX_COUNT_IN_BARS) {
+      console.warn(
+        '[waveform-playlist] Transport.setCountInBars: clamping ' +
+          bars +
+          ' to ' +
+          Transport.MAX_COUNT_IN_BARS
+      );
+      this._countInBars = Transport.MAX_COUNT_IN_BARS;
       return;
     }
     this._countInBars = rounded;
@@ -695,8 +710,10 @@ export class Transport {
       this._metronomePlayer.setClickSounds(accent, normal);
     } catch (err) {
       console.warn(
-        '[waveform-playlist] Transport: failed to create default click sounds:',
-        String(err)
+        '[waveform-playlist] Transport: failed to create default click sounds. ' +
+          'Metronome and count-in will be silent until setMetronomeClickSounds() is called. ' +
+          'Error: ' +
+          String(err)
       );
     }
   }
@@ -740,11 +757,9 @@ export class Transport {
       accentBuffer: this._accentBuffer!,
       normalBuffer: this._normalBuffer!,
       meterMap: this._meterMap,
+      tempoMap: countInTempoMap,
       onBeat: (beat, total) => {
         this._emit('countIn', { beat, totalBeats: total });
-      },
-      onComplete: () => {
-        // No-op — completion is now driven by timer tick checking _countInDuration
       },
     });
 

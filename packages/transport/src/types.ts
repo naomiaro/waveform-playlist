@@ -91,10 +91,30 @@ export interface TransportPosition {
 /** Count-in mode: 'always' plays count-in on every play(), 'recording-only' only when recording. */
 export type CountInMode = 'always' | 'recording-only';
 
-/** Payload emitted with the 'countIn' transport event. */
+/** Payload emitted with the 'countIn' transport event.
+ *  Example: beat=1, totalBeats=4 means "first of four beats". */
 export interface CountInEventData {
   /** Current beat number (1-indexed) */
   beat: number;
   /** Total number of beats in the count-in */
   totalBeats: number;
+}
+
+/** Payload emitted with the 'tempochange' transport event. */
+export interface TempoChangeEventData {
+  /** The new BPM value */
+  bpm: number;
+  /** Tick position where the tempo was set */
+  atTick: Tick;
+}
+
+/** Payload emitted with the 'meterchange' transport event.
+ *  After removeMeter/clearMeters, reflects the resulting meter at that position. */
+export interface MeterChangeEventData {
+  /** Time signature numerator */
+  numerator: number;
+  /** Time signature denominator */
+  denominator: number;
+  /** Tick position where the meter was set or removed */
+  atTick: Tick;
 }

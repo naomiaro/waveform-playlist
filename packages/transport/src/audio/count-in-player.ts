@@ -14,8 +14,10 @@ interface CountInConfig {
   accentBuffer: AudioBuffer;
   normalBuffer: AudioBuffer;
   meterMap: MeterMap;
+  /** TempoMap for tick→seconds conversion in consume(). Must match the
+   *  count-in scheduler's TempoMap (locked to BPM at the play position). */
+  tempoMap: TempoMap;
   onBeat: (beat: number, totalBeats: number) => void;
-  onComplete: () => void;
 }
 
 export class CountInPlayer implements SchedulerListener<CountInEvent> {
@@ -32,7 +34,6 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
   private _normalBuffer: AudioBuffer | null = null;
   private _meterMap: MeterMap | null = null;
   private _onBeat: ((beat: number, totalBeats: number) => void) | null = null;
-  private _onComplete: (() => void) | null = null;
 
   constructor(
     audioContext: AudioContext,
@@ -53,8 +54,8 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
     this._accentBuffer = config.accentBuffer;
     this._normalBuffer = config.normalBuffer;
     this._meterMap = config.meterMap;
+    this._tempoMap = config.tempoMap;
     this._onBeat = config.onBeat;
-    this._onComplete = config.onComplete;
   }
 
   generate(fromTick: Tick, toTick: Tick): CountInEvent[] {
@@ -100,29 +101,41 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
   }
 
   consume(event: CountInEvent): void {
-    const source = this._audioContext.createBufferSource();
-    source.buffer = event.buffer;
-    source.connect(this._destination);
+    try {
+      const source = this._audioContext.createBufferSource();
+      source.buffer = event.buffer;
+      source.connect(this._destination);
 
-    this._activeSources.add(source);
-    source.addEventListener('ended', () => {
-      this._activeSources.delete(source);
-      try {
-        source.disconnect();
-      } catch (err) {
-        console.warn('[waveform-playlist] CountInPlayer: error disconnecting source:', String(err));
-      }
-    });
+      this._activeSources.add(source);
+      source.addEventListener('ended', () => {
+        this._activeSources.delete(source);
+        try {
+          source.disconnect();
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] CountInPlayer: error disconnecting source:',
+            String(err)
+          );
+        }
+      });
 
-    const transportTime = this._tempoMap.ticksToSeconds(event.tick);
-    source.start(this._toAudioTime(transportTime));
-
-    this._onBeat?.(event.beat, event.totalBeats);
-
-    this._beatsConsumed++;
-    if (this._beatsConsumed === this._totalBeats) {
-      this._onComplete?.();
+      const transportTime = this._tempoMap.ticksToSeconds(event.tick);
+      source.start(this._toAudioTime(transportTime));
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] CountInPlayer.consume: failed to schedule beat ' +
+          event.beat +
+          '/' +
+          event.totalBeats +
+          ': ' +
+          String(err)
+      );
     }
+
+    // Beat tracking stays outside try/catch so count-in can still
+    // complete even if one beat fails to schedule audio.
+    this._onBeat?.(event.beat, event.totalBeats);
+    this._beatsConsumed++;
   }
 
   onPositionJump(_newTick: Tick): void {

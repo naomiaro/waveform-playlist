@@ -36,6 +36,15 @@ export function createDefaultClickSounds(
   const accentFreq = options?.accentFrequency ?? DEFAULT_ACCENT_FREQUENCY;
   const normalFreq = options?.normalFrequency ?? DEFAULT_NORMAL_FREQUENCY;
 
+  if (accentFreq <= 0 || normalFreq <= 0) {
+    console.warn(
+      '[waveform-playlist] createDefaultClickSounds: frequency must be positive, got accent=' +
+        accentFreq +
+        ' normal=' +
+        normalFreq
+    );
+  }
+
   return {
     accent: synthesizeClick(audioContext, accentFreq, ACCENT_DURATION),
     normal: synthesizeClick(audioContext, normalFreq, NORMAL_DURATION),

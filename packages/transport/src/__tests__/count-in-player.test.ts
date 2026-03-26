@@ -56,8 +56,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 3840 as Tick);
     expect(events.length).toBe(4);
@@ -71,8 +71,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap: threeQuarterMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 2880 as Tick);
     expect(events.length).toBe(3);
@@ -86,8 +86,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap: sixEightMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 2880 as Tick);
     expect(events.length).toBe(6);
@@ -100,8 +100,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 3840 as Tick);
     expect(events[0].isAccent).toBe(true);
@@ -119,8 +119,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 3840 as Tick);
     expect(events[0].beat).toBe(1);
@@ -138,8 +138,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 7680 as Tick);
     expect(events.length).toBe(8);
@@ -155,8 +155,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap,
+      tempoMap,
       onBeat,
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 3840 as Tick);
     for (const event of events) {
@@ -167,24 +167,25 @@ describe('CountInPlayer', () => {
     expect(onBeat).toHaveBeenNthCalledWith(4, 4, 4);
   });
 
-  it('onComplete fires after last beat consumed', () => {
-    const onComplete = vi.fn();
+  it('consume tracks beats consumed via onBeat', () => {
+    const onBeat = vi.fn();
     const player = new CountInPlayer(ctx, tempoMap, destination, (t) => t);
     player.configure({
       totalBeats: 4,
       accentBuffer,
       normalBuffer,
       meterMap,
-      onBeat: vi.fn(),
-      onComplete,
+      tempoMap,
+      onBeat,
     });
     const events = player.generate(0 as Tick, 3840 as Tick);
     player.consume(events[0]);
+    expect(onBeat).toHaveBeenCalledTimes(1);
     player.consume(events[1]);
     player.consume(events[2]);
-    expect(onComplete).not.toHaveBeenCalled();
     player.consume(events[3]);
-    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onBeat).toHaveBeenCalledTimes(4);
+    expect(onBeat).toHaveBeenLastCalledWith(4, 4);
   });
 
   it('silence stops all active sources', () => {
@@ -194,8 +195,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 960 as Tick);
     player.consume(events[0]);
@@ -211,8 +212,8 @@ describe('CountInPlayer', () => {
       accentBuffer,
       normalBuffer,
       meterMap,
+      tempoMap,
       onBeat: vi.fn(),
-      onComplete: vi.fn(),
     });
     const events = player.generate(0 as Tick, 3840 as Tick);
     expect(events.length).toBe(2);
