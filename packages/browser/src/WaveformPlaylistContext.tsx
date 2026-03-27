@@ -81,6 +81,16 @@ export interface TrackState {
 // Split contexts for performance optimization
 // Animation context contains playback state and timing refs — no per-frame state updates
 
+/** Per-frame data passed to registered animation callbacks. */
+export interface FrameData {
+  /** Raw engine time (for state/logic — NOT for visual positioning). */
+  time: number;
+  /** time - outputLatency (for DOM positioning — matches speaker output). */
+  visualTime: number;
+  sampleRate: number;
+  samplesPerPixel: number;
+}
+
 export interface PlaybackAnimationContextValue {
   isPlaying: boolean;
   currentTime: number;
@@ -90,6 +100,10 @@ export interface PlaybackAnimationContextValue {
   audioStartPositionRef: React.RefObject<number>; // Audio position when playback started
   /** Returns current playback time from engine (auto-wraps at loop boundaries). */
   getPlaybackTime: () => number;
+  /** Register a per-frame callback driven by the single animation loop. */
+  registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
+  /** Unregister a per-frame callback. */
+  unregisterFrameCallback: (id: string) => void;
 }
 
 export interface PlaylistStateContextValue {
@@ -360,6 +374,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const playbackEndTimeRef = useRef<number | null>(null); // Audio position where playback should stop (for selections)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isAutomaticScrollRef = useRef<boolean>(false);
+  // Animation frame callback registry — components register per-frame DOM update
+  // callbacks instead of running their own rAF loops. Single loop drives all.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const frameCallbacksRef = useRef<Map<string, (data: FrameData) => void>>(new Map());
   const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
   const activeAnnotationIdRef = useRef<string | null>(null);
   // Engine clip operations guard: tracks reference from the last engine statechange.
@@ -1004,12 +1022,26 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     return (audioStartPositionRef.current ?? 0) + elapsed;
   }, []);
 
+  const registerFrameCallback = useCallback((id: string, cb: (data: FrameData) => void) => {
+    frameCallbacksRef.current.set(id, cb);
+  }, []);
+
+  const unregisterFrameCallback = useCallback((id: string) => {
+    frameCallbacksRef.current.delete(id);
+  }, []);
+
   // Animation loop
   const startAnimationLoop = useCallback(() => {
     const updateTime = () => {
       // Get current time from engine (auto-wraps at loop boundaries via Transport.seconds)
       const time = getPlaybackTime();
       currentTimeRef.current = time;
+
+      // Compute visual time once — all visual consumers use this same value.
+      // Subtracts outputLatency so DOM positions match speaker output.
+      const ctx = getGlobalAudioContext();
+      const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+      const visualTime = Math.max(0, time - latency);
 
       // Handle annotation playback based on continuous play mode
       const currentAnnotations = annotationsRef.current;
@@ -1052,15 +1084,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         }
       }
 
-      // Handle automatic scroll - continuously center the playhead.
-      // Use outputLatency-compensated time so scroll aligns with the visual
-      // playhead position (AnimatedPlayhead applies the same offset).
+      // Handle automatic scroll — uses shared visualTime for alignment with playhead
       if (isAutomaticScrollRef.current && scrollContainerRef.current && duration > 0) {
         const container = scrollContainerRef.current;
         const sr = sampleRateRef.current;
-        const ctx = getGlobalAudioContext();
-        const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-        const visualTime = Math.max(0, time - latency);
         const pixelPosition = (visualTime * sr) / samplesPerPixelRef.current;
         const containerWidth = container.clientWidth;
 
@@ -1097,6 +1124,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         setActiveAnnotationId(null);
         return;
       }
+      // Drive registered per-frame callbacks (playhead, progress overlays, time display)
+      const sr = sampleRateRef.current;
+      const spp = samplesPerPixelRef.current;
+      const frameData: FrameData = { time, visualTime, sampleRate: sr, samplesPerPixel: spp };
+      for (const cb of frameCallbacksRef.current.values()) {
+        cb(frameData);
+      }
+
       startAnimationFrameLoop(updateTime);
     };
     startAnimationFrameLoop(updateTime);
@@ -1405,6 +1440,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       playbackStartTimeRef,
       audioStartPositionRef,
       getPlaybackTime,
+      registerFrameCallback,
+      unregisterFrameCallback,
     }),
     [
       isPlaying,
@@ -1413,6 +1450,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       playbackStartTimeRef,
       audioStartPositionRef,
       getPlaybackTime,
+      registerFrameCallback,
+      unregisterFrameCallback,
     ]
   );
 

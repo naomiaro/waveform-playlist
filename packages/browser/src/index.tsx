@@ -13,7 +13,7 @@ export {
   usePlaylistControls,
   usePlaylistData,
 } from './WaveformPlaylistContext';
-export type { WaveformTrack, TrackState } from './WaveformPlaylistContext';
+export type { WaveformTrack, TrackState, FrameData } from './WaveformPlaylistContext';
 
 // Export MediaElement-based provider (single-track with playback rate control)
 export {

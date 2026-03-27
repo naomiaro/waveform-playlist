@@ -55,35 +55,22 @@ const PositionDisplay = styled.span`
  */
 export const AudioPosition: React.FC<{ className?: string }> = ({ className }) => {
   const timeRef = useRef<HTMLSpanElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const { isPlaying, currentTimeRef, getPlaybackTime } = usePlaybackAnimation();
+  const { isPlaying, currentTimeRef, registerFrameCallback, unregisterFrameCallback } =
+    usePlaybackAnimation();
   const { timeFormat: format } = usePlaylistData();
 
+  // Register per-frame callback during playback — uses raw time for display
   useEffect(() => {
-    const updateTime = () => {
-      if (timeRef.current) {
-        const time = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
-        timeRef.current.textContent = formatTime(time, format);
-      }
-
-      if (isPlaying) {
-        animationFrameRef.current = requestAnimationFrame(updateTime);
-      }
-    };
-
+    const id = 'audio-position';
     if (isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(updateTime);
-    } else {
-      updateTime();
+      registerFrameCallback(id, ({ time }) => {
+        if (timeRef.current) {
+          timeRef.current.textContent = formatTime(time, format);
+        }
+      });
     }
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
-  }, [isPlaying, format, currentTimeRef, getPlaybackTime]);
+    return () => unregisterFrameCallback(id);
+  }, [isPlaying, format, registerFrameCallback, unregisterFrameCallback]);
 
   // Update when stopped (for seeks)
   useEffect(() => {
