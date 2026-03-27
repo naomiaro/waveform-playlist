@@ -1009,13 +1009,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // Only applied during playback (getPlaybackTime is only called while playing).
     // The stopped-state path (currentTimeRef) must NOT be compensated —
     // subtracting from stored position would shift the next play() start time.
-    try {
-      const ctx = getGlobalAudioContext();
-      const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-      time = Math.max(0, time - latency);
-    } catch {
-      // getGlobalAudioContext() can throw if context not yet created — skip compensation
-    }
+    const ctx = getGlobalAudioContext();
+    const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+    time = Math.max(0, time - latency);
     return time;
   }, []);
 
