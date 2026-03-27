@@ -140,10 +140,23 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   // visibleChunkIndices changes only when chunks mount/unmount, not on every scroll pixel.
   // useLayoutEffect so canvas drawing completes before the browser paints —
   // prevents flicker from clearRect being visible for one frame.
+  // Compute a fingerprint of the drawing parameters — when this changes,
+  // all chunks need redrawing. When only visibleChunkIndices changes,
+  // existing chunks can be skipped (only new mounts need drawing).
+  // Include data identity in fingerprint (length + first sample as proxy)
+  const dataId = data ? `${data.length}-${data[0]}` : 'empty';
+  const drawVersion =
+    `${dataId}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${index}` +
+    `-${waveformColorToCss(waveOutlineColor)}-${waveformColorToCss(waveFillColor)}`;
+
   useLayoutEffect(() => {
     const step = barWidth + barGap;
 
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
+      // Skip chunks already drawn with the current parameters.
+      // data-draw-version is stamped after drawing; cleared when the
+      // canvas remounts (new DOM element) or when drawVersion changes.
+      if (canvas.dataset.drawVersion === drawVersion) continue;
       const globalPixelOffset = canvasIdx * MAX_CANVAS_WIDTH;
 
       const ctx = canvas.getContext('2d');
@@ -194,6 +207,8 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
             }
           }
         }
+
+        canvas.dataset.drawVersion = drawVersion;
       }
     }
   }, [
@@ -207,6 +222,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     length,
     barWidth,
     barGap,
+    drawVersion,
     drawMode,
     visibleChunkIndices,
     index,
