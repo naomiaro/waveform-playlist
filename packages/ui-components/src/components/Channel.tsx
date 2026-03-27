@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useLayoutEffect } from 'react';
+import React, { FunctionComponent, useLayoutEffect, useRef } from 'react';
 import styled from 'styled-components';
 import type { Peaks, Bits } from '@waveform-playlist/core';
 import {
@@ -140,13 +140,21 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   // visibleChunkIndices changes only when chunks mount/unmount, not on every scroll pixel.
   // useLayoutEffect so canvas drawing completes before the browser paints —
   // prevents flicker from clearRect being visible for one frame.
+  // Track data reference changes with a monotonic counter — typed arrays
+  // with the same length/values but different references must trigger a
+  // redraw (e.g., trim produces new array with same length + first sample).
+  const dataVersionRef = useRef(0);
+  const prevDataRef = useRef(data);
+  if (prevDataRef.current !== data) {
+    dataVersionRef.current += 1;
+    prevDataRef.current = data;
+  }
+
   // Compute a fingerprint of the drawing parameters — when this changes,
   // all chunks need redrawing. When only visibleChunkIndices changes,
   // existing chunks can be skipped (only new mounts need drawing).
-  // Include data identity in fingerprint (length + first sample as proxy)
-  const dataId = data ? `${data.length}-${data[0]}` : 'empty';
   const drawVersion =
-    `${dataId}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${index}` +
+    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${index}` +
     `-${waveformColorToCss(waveOutlineColor)}-${waveformColorToCss(waveFillColor)}`;
 
   useLayoutEffect(() => {
