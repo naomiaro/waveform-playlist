@@ -80,7 +80,6 @@ export interface PlaylistEngineOptions {
  */
 export interface EngineEvents {
   statechange: (state: EngineState) => void;
-  timeupdate: (time: number) => void;
   play: () => void;
   pause: () => void;
   stop: () => void;

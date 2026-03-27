@@ -734,9 +734,6 @@ export class DawEditorElement extends LitElement {
         syncPeaksForChangedClips(this, engineState.tracks);
       }
     });
-    engine.on('timeupdate', (time: number) => {
-      this._currentTime = time;
-    });
     engine.on('stop', () => {
       this._currentTime = engine.getCurrentTime();
       this._stopPlayhead();
@@ -899,6 +896,10 @@ export class DawEditorElement extends LitElement {
   // --- Recording ---
   recordingStream: MediaStream | null = null;
   get currentTime(): number {
+    // During playback, read live from engine (not cached _currentTime)
+    if (this._isPlaying && this._engine) {
+      return this._engine.getCurrentTime();
+    }
     return this._currentTime;
   }
   get isRecording(): boolean {

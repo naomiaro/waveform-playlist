@@ -40,7 +40,6 @@ export class PlaylistEngine {
   private _isLoopEnabled = false;
   private _tracksVersion = 0;
   private _adapter: PlayoutAdapter | null;
-  private _animFrameId: number | null = null;
   private _disposed = false;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private _listeners: Map<string, Set<Function>> = new Map();
@@ -512,14 +511,12 @@ export class PlaylistEngine {
     }
 
     this._isPlaying = true;
-    this._startTimeUpdateLoop();
     this._emit('play');
     this._emitStateChange();
   }
 
   pause(): void {
     this._isPlaying = false;
-    this._stopTimeUpdateLoop();
     this._adapter?.pause();
     if (this._adapter) {
       this._currentTime = this._adapter.getCurrentTime();
@@ -531,7 +528,6 @@ export class PlaylistEngine {
   stop(): void {
     this._isPlaying = false;
     this._currentTime = this._playStartPosition;
-    this._stopTimeUpdateLoop();
     this._adapter?.setLoop(false, this._loopStart, this._loopEnd);
     this._adapter?.stop();
     this._emit('stop');
@@ -667,7 +663,6 @@ export class PlaylistEngine {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
-    this._stopTimeUpdateLoop();
     try {
       this._adapter?.dispose();
     } catch (err) {
@@ -743,30 +738,5 @@ export class PlaylistEngine {
 
   private _emitStateChange(): void {
     this._emit('statechange', this.getState());
-  }
-
-  private _startTimeUpdateLoop(): void {
-    // Guard for Node.js / SSR environments where RAF is unavailable
-    if (typeof requestAnimationFrame === 'undefined') return;
-
-    this._stopTimeUpdateLoop();
-
-    const tick = () => {
-      if (this._disposed || !this._isPlaying) return;
-      if (this._adapter) {
-        this._currentTime = this._adapter.getCurrentTime();
-        this._emit('timeupdate', this._currentTime);
-      }
-      this._animFrameId = requestAnimationFrame(tick);
-    };
-
-    this._animFrameId = requestAnimationFrame(tick);
-  }
-
-  private _stopTimeUpdateLoop(): void {
-    if (this._animFrameId !== null && typeof cancelAnimationFrame !== 'undefined') {
-      cancelAnimationFrame(this._animFrameId);
-      this._animFrameId = null;
-    }
   }
 }
