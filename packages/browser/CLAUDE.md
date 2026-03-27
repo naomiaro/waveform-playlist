@@ -137,9 +137,14 @@ const rebuildChain = useCallback(() => {
 
 ## Playhead outputLatency Compensation
 
-`getPlaybackTime()` subtracts `audioContext.outputLatency` so animated playheads match when audio reaches speakers (Safari ~15ms, Chrome ~3ms). Applied inside `getPlaybackTime()` so all consumers (`AnimatedPlayhead`, `ChannelWithProgress`) benefit automatically. Falls back to 0 via try/catch if context not yet created.
+`getPlaybackTime()` returns **raw engine time** — no latency subtraction. Compensation is applied at the visual layer only, in each consumer's rAF callback during playback (`isPlaying` guard):
+- `AnimatedPlayhead` — subtracts `outputLatency` for playhead position
+- `ChannelWithProgress` — subtracts `outputLatency` for progress overlay
+- Auto-scroll (in animation loop) — subtracts `outputLatency` for scroll target
 
-**Do NOT compensate `currentTimeRef`** — the stopped-state path must use raw engine time. Subtracting `outputLatency` from `currentTimeRef` shifts the stored position, causing the next `play()` to start from the wrong time.
+**All three must stay aligned.** If any visual consumer uses raw time while others compensate, they disagree by `outputLatency` pixels per frame, causing jitter.
+
+**Do NOT compensate `currentTimeRef` or pause position** — state storage must use raw engine time. Subtracting `outputLatency` from stored positions shifts the next `play()` start time and compounds on every pause/resume cycle.
 
 ## Engine State Subscription Pattern
 
