@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import * as Tone from 'tone';
 import {
@@ -88,26 +88,24 @@ const AUDIO_CONFIGS: AudioTrackConfig[] = TRACK_CONFIGS.map((tc) => ({
 
 export function MirSpectrogramExample() {
   const { theme } = useDocusaurusTheme();
-  const [userTracks, setUserTracks] = useState<ClipTrack[]>([]);
-  const [removedBaseIds, setRemovedBaseIds] = useState<Set<string>>(new Set());
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const baseTracksLoadedRef = useRef(false);
 
   const { tracks: baseTracks, loading, error } = useAudioTracks(AUDIO_CONFIGS, { immediate: true });
 
-  const filteredBaseTracks = baseTracks.filter(t => !removedBaseIds.has(t.id));
-  const allTracks = [...filteredBaseTracks, ...userTracks];
+  // Seed tracks from baseTracks when loading completes (once)
+  if (!loading && baseTracks.length > 0 && !baseTracksLoadedRef.current) {
+    baseTracksLoadedRef.current = true;
+    setTracks(baseTracks);
+  }
 
   const handleRemoveTrack = useCallback((index: number) => {
-    if (index < filteredBaseTracks.length) {
-      setRemovedBaseIds(prev => new Set([...prev, filteredBaseTracks[index].id]));
-    } else {
-      setUserTracks(prev => prev.filter((_, i) => i !== index - filteredBaseTracks.length));
-    }
-  }, [filteredBaseTracks]);
+    setTracks(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleClearAll = useCallback(() => {
-    setUserTracks([]);
-    setRemovedBaseIds(new Set(baseTracks.map(t => t.id)));
-  }, [baseTracks]);
+    setTracks([]);
+  }, []);
 
   const addFiles = async (files: File[]) => {
     const audioContext = Tone.getContext().rawContext as AudioContext;
@@ -131,7 +129,7 @@ export function MirSpectrogramExample() {
           pan: 0,
           spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG,
         });
-        setUserTracks(prev => [...prev, newTrack]);
+        setTracks(prev => [...prev, newTrack]);
       } catch (err) {
         console.error('Error loading audio file:', file.name, err);
       }
@@ -153,9 +151,10 @@ export function MirSpectrogramExample() {
 
       {loading && <div style={{ padding: '1rem', opacity: 0.7 }}>Loading tracks...</div>}
 
-      {allTracks.length > 0 && (
+      {tracks.length > 0 && (
         <WaveformPlaylistProvider
-          tracks={allTracks}
+          tracks={tracks}
+          onTracksChange={setTracks}
           sampleRate={48000}
           theme={theme}
           timescale
