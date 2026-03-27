@@ -127,7 +127,7 @@ const clip = createClipFromSeconds({
   - `PlaylistEngine.ts` — Composes operations with state + events
 - **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
-- **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `EngineState` (state snapshot incl. `tracksVersion`), `EngineEvents` (statechange, timeupdate, play/pause/stop)
+- **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `EngineState` (state snapshot incl. `tracksVersion`), `EngineEvents` (statechange, play/pause/stop)
 - **State Ownership:** Engine owns selection, loop, selectedTrackId, zoom, masterVolume, and tracks (for clip mutations). React subscribes to `statechange` events.
 - **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` update internal tracks, sync adapter via `adapter.setTracks()`, and emit `statechange`. The browser package's provider mirrors updated tracks back to the parent via `onTracksChange`.
   - `moveClip()` returns constrained delta (number). Accepts optional `skipAdapter` parameter to skip adapter sync during high-frequency drags.

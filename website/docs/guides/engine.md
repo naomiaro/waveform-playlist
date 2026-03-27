@@ -249,7 +249,6 @@ engine.off(event, listener): void;
 | Event | Listener Signature | When |
 |-------|--------------------|------|
 | `statechange` | `(state: EngineState) => void` | Any state mutation |
-| `timeupdate` | `(time: number) => void` | Every animation frame during playback |
 | `play` | `() => void` | Playback starts |
 | `pause` | `() => void` | Playback pauses |
 | `stop` | `() => void` | Playback stops |
@@ -620,7 +619,6 @@ interface PlayoutAdapter {
 ```typescript
 interface EngineEvents {
   statechange: (state: EngineState) => void;
-  timeupdate: (time: number) => void;
   play: () => void;
   pause: () => void;
   stop: () => void;
