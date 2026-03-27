@@ -89,6 +89,10 @@
 
 **Why:** `useEffect` runs after browser paint. Since canvas drawing calls `clearRect` first, users see one frame of blank canvas before the redraw. This causes visible flicker on initial load, zoom changes, and during recording (~60fps peak updates). Layout thrashing is not a concern because ClipContainer and channel Wrapper both set explicit `width`/`height` via `.attrs()` — the browser knows container dimensions before canvases mount.
 
+## Canvas Draw Version Stamping
+
+`Channel.tsx` stamps each canvas with `canvas.dataset.drawVersion` after drawing. The `useLayoutEffect` skips canvases whose stamp matches the current `drawVersion` fingerprint (derived from data, bits, colors, dimensions, drawMode). Only newly mounted canvases (no stamp) or canvases after a parameter change (stamp mismatch) get redrawn. Without this, changing `visibleChunkIndices` redraws ALL mounted chunks — causing 23ms+ spikes with multiple tracks at fine zoom.
+
 ## Horizontal Virtual Scrolling (Phase 4)
 
 **Decision:** Viewport-aware canvas rendering — only mount canvas chunks visible in the scroll container + buffer.
