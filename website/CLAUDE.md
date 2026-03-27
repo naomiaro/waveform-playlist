@@ -50,6 +50,7 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 
 - **Multi-track examples must use `deferEngineRebuild={loading}`** — Without it, the engine rebuilds on every track decode (up to N times for N tracks), creating race conditions that cause duplicate audio on play/pause/play cycles.
 - **Tone.js in example components must use dynamic import** — `import * as Tone from 'tone'` triggers AudioWorklet errors on page load. Use `import type * as ToneNs from 'tone'` for types, then `const Tone = await import('tone')` inside effects after `AudioContext.state === 'running'`.
+- **Examples must pass `onTracksChange` to `WaveformPlaylistProvider`** — Without it, engine track mutations (from statechange) trigger "UI will revert on next render" warning. On the next React render, old tracks are passed back, causing engine rebuild mid-playback (audio interruption, playhead jitter). The only exception is truly read-only examples with no interactive clips or track mutations.
 
 ## Guide Documentation Drift
 
