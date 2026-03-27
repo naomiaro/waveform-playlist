@@ -109,8 +109,10 @@ export function MirSpectrogramExample() {
 
   const addFiles = async (files: File[]) => {
     const audioContext = Tone.getContext().rawContext as AudioContext;
-    for (const file of files) {
-      try {
+    // Decode all files in parallel, then add all tracks at once
+    // (avoids N engine rebuilds for N dropped files)
+    const results = await Promise.allSettled(
+      files.map(async (file) => {
         const arrayBuffer = await file.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         const clip = createClipFromSeconds({
@@ -120,7 +122,7 @@ export function MirSpectrogramExample() {
           offset: 0,
           name: file.name.replace(/\.[^/.]+$/, ''),
         });
-        const newTrack = createTrack({
+        return createTrack({
           name: file.name.replace(/\.[^/.]+$/, ''),
           clips: [clip],
           muted: false,
@@ -129,10 +131,17 @@ export function MirSpectrogramExample() {
           pan: 0,
           spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG,
         });
-        setTracks(prev => [...prev, newTrack]);
-      } catch (err) {
-        console.error('Error loading audio file:', file.name, err);
-      }
+      })
+    );
+    const newTracks = results
+      .filter((r): r is PromiseFulfilledResult<ClipTrack> => r.status === 'fulfilled')
+      .map((r) => r.value);
+    const failed = results.filter((r) => r.status === 'rejected');
+    for (const f of failed) {
+      console.error('Error loading audio file:', (f as PromiseRejectedResult).reason);
+    }
+    if (newTracks.length > 0) {
+      setTracks((prev) => [...prev, ...newTracks]);
     }
   };
 
