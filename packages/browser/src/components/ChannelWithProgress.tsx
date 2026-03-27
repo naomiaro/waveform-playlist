@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useId, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import {
   clipPixelWidth as computeClipPixelWidth,
@@ -98,6 +98,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   ...smartChannelProps
 }) => {
   const progressRef = useRef<HTMLDivElement>(null);
+  const callbackId = useId();
   const theme = useTheme() as WaveformPlaylistTheme;
   const { waveHeight } = usePlaylistInfo();
 
@@ -117,9 +118,8 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
 
   // Register per-frame callback during playback — no own rAF loop
   useEffect(() => {
-    const id = 'progress-' + clipStartSample + '-' + clipDurationSamples;
     if (isPlaying) {
-      registerFrameCallback(id, ({ visualTime }) => {
+      registerFrameCallback(callbackId, ({ visualTime }) => {
         if (progressRef.current) {
           const currentSample = visualTime * sampleRate;
           const clipEndSample = clipStartSample + clipDurationSamples;
@@ -139,12 +139,13 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
         }
       });
     }
-    return () => unregisterFrameCallback(id);
+    return () => unregisterFrameCallback(callbackId);
   }, [
     isPlaying,
     sampleRate,
     clipStartSample,
     clipDurationSamples,
+    callbackId,
     registerFrameCallback,
     unregisterFrameCallback,
   ]);
