@@ -1052,11 +1052,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         }
       }
 
-      // Handle automatic scroll - continuously center the playhead
+      // Handle automatic scroll - continuously center the playhead.
+      // Use outputLatency-compensated time so scroll aligns with the visual
+      // playhead position (AnimatedPlayhead applies the same offset).
       if (isAutomaticScrollRef.current && scrollContainerRef.current && duration > 0) {
         const container = scrollContainerRef.current;
         const sr = sampleRateRef.current;
-        const pixelPosition = (time * sr) / samplesPerPixelRef.current;
+        const ctx = getGlobalAudioContext();
+        const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+        const visualTime = Math.max(0, time - latency);
+        const pixelPosition = (visualTime * sr) / samplesPerPixelRef.current;
         const containerWidth = container.clientWidth;
 
         // Continuously scroll to keep playhead centered
