@@ -878,7 +878,7 @@ export class DawEditorElement extends LitElement {
   splitAtPlayhead(): boolean {
     return performSplitAtPlayhead({
       effectiveSampleRate: this.effectiveSampleRate,
-      currentTime: this._currentTime,
+      currentTime: this.currentTime,
       isPlaying: this._isPlaying,
       engine: this._engine,
       dispatchEvent: (e: Event) => this.dispatchEvent(e),
