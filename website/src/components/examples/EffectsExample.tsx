@@ -4,6 +4,7 @@ import { FileDropZone } from '../FileDropZone';
 
 import JSZip from 'jszip';
 import { type ClipTrack } from '@waveform-playlist/core';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
@@ -507,7 +508,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
     const audioFiles = files.filter(file => file.type.startsWith('audio/'));
     if (audioFiles.length === 0) return;
 
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioContext = getGlobalAudioContext();
     const newTracks = await decodeAudioFiles(audioContext, audioFiles);
     if (newTracks.length > 0) onAddTracks(newTracks);
   }, [onAddTracks]);

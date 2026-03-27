@@ -46,10 +46,16 @@ export async function decodeAudioFiles(
     .filter((r): r is PromiseFulfilledResult<ClipTrack> => r.status === 'fulfilled')
     .map((r) => r.value);
 
-  const failed = results.filter((r) => r.status === 'rejected');
-  for (const f of failed) {
-    console.error('[waveform-playlist] Error decoding audio file:', (f as PromiseRejectedResult).reason);
-  }
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.error(
+        '[waveform-playlist] Error decoding audio file: ' +
+          files[i].name +
+          ' — ' +
+          String(r.reason),
+      );
+    }
+  });
 
   return tracks;
 }

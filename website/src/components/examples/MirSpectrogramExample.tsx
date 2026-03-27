@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import * as Tone from 'tone';
 import {
@@ -94,10 +94,12 @@ export function MirSpectrogramExample() {
   const { tracks: baseTracks, loading, error } = useAudioTracks(AUDIO_CONFIGS, { immediate: true });
 
   // Seed tracks from baseTracks when loading completes (once)
-  if (!loading && baseTracks.length > 0 && !baseTracksLoadedRef.current) {
-    baseTracksLoadedRef.current = true;
-    setTracks(baseTracks);
-  }
+  useEffect(() => {
+    if (!loading && baseTracks.length > 0 && !baseTracksLoadedRef.current) {
+      baseTracksLoadedRef.current = true;
+      setTracks(baseTracks);
+    }
+  }, [loading, baseTracks]);
 
   const handleRemoveTrack = useCallback((index: number) => {
     setTracks(prev => prev.filter((_, i) => i !== index));
