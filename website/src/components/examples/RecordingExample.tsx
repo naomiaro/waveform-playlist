@@ -14,8 +14,9 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import styled from 'styled-components';
 import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { createTrack, type ClipTrack } from '@waveform-playlist/core';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
+import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -389,30 +390,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       if (audioFiles.length === 0) return;
 
       const audioContext = getGlobalAudioContext();
-
-      for (const file of audioFiles) {
-        const arrayBuffer = await file.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: 0,
-          name: file.name,
-        });
-
-        const newTrack = createTrack({
-          name: file.name,
-          clips: [clip],
-          muted: false,
-          soloed: false,
-          volume: 1.0,
-          pan: 0,
-        });
-
-        setTracks([...tracks, newTrack]);
-      }
+      const newTracks = await decodeAudioFiles(audioContext, audioFiles);
+      if (newTracks.length > 0) setTracks(prev => [...prev, ...newTracks]);
     },
-    [tracks, setTracks]
+    [setTracks]
   );
 
   const handleRemoveTrack = useCallback(

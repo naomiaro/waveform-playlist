@@ -21,11 +21,11 @@ import {
   usePlaylistControls,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import { createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 import type { ClipTrack } from '@waveform-playlist/core';
 import { useMidiTracks } from '@waveform-playlist/midi';
 import type { MidiTrackConfig } from '@waveform-playlist/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
+import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 
@@ -320,21 +320,8 @@ export function MidiExample() {
 
   const addAudioFiles = React.useCallback(async (files: File[]) => {
     const audioContext = Tone.getContext().rawContext as AudioContext;
-    for (const file of files) {
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      const clip = createClipFromSeconds({
-        audioBuffer,
-        startTime: 0,
-        duration: audioBuffer.duration,
-        offset: 0,
-      });
-      const newTrack = createTrack({
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        clips: [clip],
-      });
-      setUserAudioTracks((prev) => [...prev, newTrack]);
-    }
+    const newTracks = await decodeAudioFiles(audioContext, files);
+    if (newTracks.length > 0) setUserAudioTracks((prev) => [...prev, ...newTracks]);
   }, []);
 
   const handleFiles = React.useCallback(
@@ -365,6 +352,14 @@ export function MidiExample() {
     setUserAudioTracks([]);
     setRemovedTrackIds(new Set());
   }, []);
+
+  // Mirror engine mutations back to userAudioTracks state.
+  // MIDI tracks (in allTracks) are managed by useMidiTracks; only audio tracks are updated.
+  const handleTracksChange = React.useCallback((updatedTracks: ClipTrack[]) => {
+    const midiTrackIds = new Set(allTracks.map((t) => t.id));
+    const updatedAudioTracks = updatedTracks.filter((t) => !midiTrackIds.has(t.id));
+    setUserAudioTracks(updatedAudioTracks);
+  }, [allTracks]);
 
   if (error) {
     return (
@@ -409,6 +404,7 @@ export function MidiExample() {
         <WaveformPlaylistProvider
           tracks={filteredTracks}
           sampleRate={48000}
+          onTracksChange={handleTracksChange}
           samplesPerPixel={2048}
           mono
           theme={{ ...theme, ...gradientTheme }}

@@ -5,6 +5,7 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import * as Tone from 'tone';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -463,57 +464,19 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [addAnnotationAtPlayhead]);
 
-  // Load audio files PROGRESSIVELY - each track appears as it loads
-  const loadAudioFiles = async (files: File[]) => {
-    setIsLoadingAudio(true);
-    const audioContext = Tone.getContext().rawContext as AudioContext;
-    const audioFiles = Array.from(files).filter((file) =>
-      file.type.startsWith('audio/')
-    );
-
-    // Load each file independently (not Promise.all) so tracks appear one by one
-    audioFiles.forEach(async (file) => {
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: 0,
-          duration: audioBuffer.duration,
-          offset: 0,
-          name: file.name.replace(/\.[^/.]+$/, ''),
-        });
-
-        const newTrack = createTrack({
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          clips: [clip],
-          muted: false,
-          soloed: false,
-          volume: 1,
-          pan: 0,
-        });
-
-        // Add this track immediately - use callback form to get latest tracks
-        onTracksChange(prevTracks => [...prevTracks, newTrack]);
-      } catch (error) {
-        console.error('Error loading audio file:', file.name, error);
-      }
-    });
-
-    // Clear loading state after a short delay (files load asynchronously)
-    setTimeout(() => setIsLoadingAudio(false), 500);
-  };
-
   // Handle dropped/selected audio files
   const handleFiles = useCallback(
-    (files: File[]) => {
+    async (files: File[]) => {
       const audioFiles = files.filter((f) => f.type.startsWith('audio/'));
-      if (audioFiles.length > 0) {
-        loadAudioFiles(audioFiles);
-      }
+      if (audioFiles.length === 0) return;
+
+      setIsLoadingAudio(true);
+      const audioContext = Tone.getContext().rawContext as AudioContext;
+      const newTracks = await decodeAudioFiles(audioContext, audioFiles);
+      if (newTracks.length > 0) onTracksChange(prevTracks => [...prevTracks, ...newTracks]);
+      setIsLoadingAudio(false);
     },
-    [tracks]
+    [onTracksChange]
   );
 
   // Handle JSON upload

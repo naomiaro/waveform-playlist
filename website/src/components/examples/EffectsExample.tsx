@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
 
 import JSZip from 'jszip';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { type ClipTrack } from '@waveform-playlist/core';
+import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -507,37 +508,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
     if (audioFiles.length === 0) return;
 
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const newTracks: ClipTrack[] = [];
-
-    for (const file of audioFiles) {
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: 0,
-          name: file.name,
-        });
-
-        const newTrack = createTrack({
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          clips: [clip],
-          muted: false,
-          soloed: false,
-          volume: 1.0,
-          pan: 0,
-        });
-
-        newTracks.push(newTrack);
-      } catch (error) {
-        console.error('Error loading audio file:', file.name, error);
-      }
-    }
-
-    if (newTracks.length > 0) {
-      onAddTracks(newTracks);
-    }
+    const newTracks = await decodeAudioFiles(audioContext, audioFiles);
+    if (newTracks.length > 0) onAddTracks(newTracks);
   }, [onAddTracks]);
 
   return (
@@ -766,6 +738,7 @@ export function EffectsExample() {
       <WaveformPlaylistProvider
         tracks={tracksWithEffects}
         sampleRate={48000}
+        onTracksChange={setTracks}
         samplesPerPixel={512}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         waveHeight={100}
