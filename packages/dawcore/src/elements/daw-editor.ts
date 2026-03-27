@@ -734,6 +734,9 @@ export class DawEditorElement extends LitElement {
         syncPeaksForChangedClips(this, engineState.tracks);
       }
     });
+    engine.on('pause', () => {
+      this._currentTime = engine.getCurrentTime();
+    });
     engine.on('stop', () => {
       this._currentTime = engine.getCurrentTime();
       this._stopPlayhead();
