@@ -154,7 +154,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   // all chunks need redrawing. When only visibleChunkIndices changes,
   // existing chunks can be skipped (only new mounts need drawing).
   const drawVersion =
-    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${index}` +
+    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}` +
     `-${waveformColorToCss(waveOutlineColor)}-${waveformColorToCss(waveFillColor)}`;
 
   useLayoutEffect(() => {
