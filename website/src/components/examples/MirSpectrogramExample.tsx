@@ -17,11 +17,11 @@ import {
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
 import type { SpectrogramConfig, RenderMode, ClipTrack } from '@waveform-playlist/core';
-import { createTrack, createClipFromSeconds } from '@waveform-playlist/core';
 import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 import type { AudioTrackConfig } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
+import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -109,37 +109,9 @@ export function MirSpectrogramExample() {
 
   const addFiles = async (files: File[]) => {
     const audioContext = Tone.getContext().rawContext as AudioContext;
-    // Decode all files in parallel, then add all tracks at once
-    // (avoids N engine rebuilds for N dropped files)
-    const results = await Promise.allSettled(
-      files.map(async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: 0,
-          duration: audioBuffer.duration,
-          offset: 0,
-          name: file.name.replace(/\.[^/.]+$/, ''),
-        });
-        return createTrack({
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          clips: [clip],
-          muted: false,
-          soloed: false,
-          volume: 1,
-          pan: 0,
-          spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG,
-        });
-      })
-    );
-    const newTracks = results
-      .filter((r): r is PromiseFulfilledResult<ClipTrack> => r.status === 'fulfilled')
-      .map((r) => r.value);
-    const failed = results.filter((r) => r.status === 'rejected');
-    for (const f of failed) {
-      console.error('Error loading audio file:', (f as PromiseRejectedResult).reason);
-    }
+    const newTracks = await decodeAudioFiles(audioContext, files, {
+      trackDefaults: { spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG },
+    });
     if (newTracks.length > 0) {
       setTracks((prev) => [...prev, ...newTracks]);
     }
