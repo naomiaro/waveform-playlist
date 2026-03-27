@@ -50,7 +50,7 @@ const PositionDisplay = styled.span`
 
 /**
  * Audio position display that uses the playlist context.
- * Uses requestAnimationFrame for smooth 60fps updates during playback.
+ * Updates via the shared animation frame registry — no own rAF loop.
  * Direct DOM manipulation avoids React re-renders.
  */
 export const AudioPosition: React.FC<{ className?: string }> = ({ className }) => {

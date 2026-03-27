@@ -376,7 +376,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const isAutomaticScrollRef = useRef<boolean>(false);
   // Animation frame callback registry — components register per-frame DOM update
   // callbacks instead of running their own rAF loops. Single loop drives all.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const frameCallbacksRef = useRef<Map<string, (data: FrameData) => void>>(new Map());
   const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
   const activeAnnotationIdRef = useRef<string | null>(null);

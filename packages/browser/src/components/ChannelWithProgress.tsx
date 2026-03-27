@@ -87,7 +87,7 @@ export interface ChannelWithProgressProps extends SmartChannelProps {
 /**
  * SmartChannel wrapper that adds an animated progress overlay.
  * The progress overlay shows the "played" portion of the waveform.
- * Uses requestAnimationFrame for smooth 60fps animation without React re-renders.
+ * Updates via the shared animation frame registry — no own rAF loop.
  */
 export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   clipStartSample,
@@ -119,9 +119,9 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   // Register per-frame callback during playback — no own rAF loop
   useEffect(() => {
     if (isPlaying) {
-      registerFrameCallback(callbackId, ({ visualTime }) => {
+      registerFrameCallback(callbackId, ({ visualTime, sampleRate: sr }) => {
         if (progressRef.current) {
-          const currentSample = visualTime * sampleRate;
+          const currentSample = visualTime * sr;
           const clipEndSample = clipStartSample + clipDurationSamples;
 
           let ratio = 0;
@@ -142,7 +142,6 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     return () => unregisterFrameCallback(callbackId);
   }, [
     isPlaying,
-    sampleRate,
     clipStartSample,
     clipDurationSamples,
     callbackId,

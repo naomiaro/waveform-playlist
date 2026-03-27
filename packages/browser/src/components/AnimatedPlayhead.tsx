@@ -36,15 +36,15 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff
   useEffect(() => {
     const id = 'playhead';
     if (isPlaying) {
-      registerFrameCallback(id, ({ visualTime }) => {
+      registerFrameCallback(id, ({ visualTime, sampleRate: sr, samplesPerPixel: spp }) => {
         if (playheadRef.current) {
-          const px = (visualTime * sampleRate) / samplesPerPixel;
+          const px = (visualTime * sr) / spp;
           playheadRef.current.style.transform = `translate3d(${px}px, 0, 0)`;
         }
       });
     }
     return () => unregisterFrameCallback(id);
-  }, [isPlaying, sampleRate, samplesPerPixel, registerFrameCallback, unregisterFrameCallback]);
+  }, [isPlaying, registerFrameCallback, unregisterFrameCallback]);
 
   // Update position when not playing (seeks, stops, etc.) — no rAF needed
   useEffect(() => {
