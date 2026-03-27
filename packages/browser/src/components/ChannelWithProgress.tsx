@@ -4,6 +4,7 @@ import {
   clipPixelWidth as computeClipPixelWidth,
   type MidiNoteData,
 } from '@waveform-playlist/core';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import {
   SmartChannel,
   type SmartChannelProps,
@@ -118,7 +119,13 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   useEffect(() => {
     const updateProgress = () => {
       if (progressRef.current) {
-        const currentTime = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
+        let currentTime = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
+        // Subtract outputLatency during playback so progress matches speaker output
+        if (isPlaying) {
+          const ctx = getGlobalAudioContext();
+          const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+          currentTime = Math.max(0, currentTime - latency);
+        }
         const currentSample = currentTime * sampleRate;
         const clipEndSample = clipStartSample + clipDurationSamples;
 

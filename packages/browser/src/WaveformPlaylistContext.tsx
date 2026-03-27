@@ -989,30 +989,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Falls back to manual calculation when engine is unavailable.
   const getPlaybackTimeFallbackWarnedRef = useRef(false);
   const getPlaybackTime = useCallback(() => {
-    let time: number;
     if (engineRef.current) {
-      time = engineRef.current.getCurrentTime();
-    } else {
-      // Fallback: manual calculation (does not handle loop wrapping)
-      if (!getPlaybackTimeFallbackWarnedRef.current) {
-        getPlaybackTimeFallbackWarnedRef.current = true;
-        console.warn(
-          '[waveform-playlist] getPlaybackTime called without engine. ' +
-            'Falling back to manual elapsed time (loop wrapping will not work).'
-        );
-      }
-      const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
-      time = (audioStartPositionRef.current ?? 0) + elapsed;
+      return engineRef.current.getCurrentTime();
     }
-    // Subtract outputLatency so playhead matches when audio reaches speakers,
-    // not when it's processed. Safari reports ~15ms vs Chrome's ~3ms.
-    // Only applied during playback (getPlaybackTime is only called while playing).
-    // The stopped-state path (currentTimeRef) must NOT be compensated —
-    // subtracting from stored position would shift the next play() start time.
-    const ctx = getGlobalAudioContext();
-    const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-    time = Math.max(0, time - latency);
-    return time;
+    // Fallback: manual calculation (does not handle loop wrapping)
+    if (!getPlaybackTimeFallbackWarnedRef.current) {
+      getPlaybackTimeFallbackWarnedRef.current = true;
+      console.warn(
+        '[waveform-playlist] getPlaybackTime called without engine. ' +
+          'Falling back to manual elapsed time (loop wrapping will not work).'
+      );
+    }
+    const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
+    return (audioStartPositionRef.current ?? 0) + elapsed;
   }, []);
 
   // Animation loop

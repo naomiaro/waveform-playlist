@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 
 const PlayheadLine = styled.div.attrs<{ $color: string; $width: number }>((props) => ({
   style: {
@@ -36,7 +37,15 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff
   useEffect(() => {
     const updatePosition = () => {
       if (playheadRef.current) {
-        const time = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
+        let time = isPlaying ? getPlaybackTime() : (currentTimeRef.current ?? 0);
+        // Subtract outputLatency during playback so playhead matches when audio
+        // reaches speakers. Do NOT compensate when stopped (currentTimeRef must
+        // stay raw — shifting it would cause play() to start from the wrong time).
+        if (isPlaying) {
+          const ctx = getGlobalAudioContext();
+          const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+          time = Math.max(0, time - latency);
+        }
         const position = (time * sampleRate) / samplesPerPixel;
         playheadRef.current.style.transform = `translate3d(${position}px, 0, 0)`;
       }
