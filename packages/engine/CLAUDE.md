@@ -8,7 +8,7 @@
 
 **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 
-**Key types:** `PlayoutAdapter` (pluggable audio backend interface), `EngineState` (state snapshot), `EngineEvents` (statechange, timeupdate, play/pause/stop).
+**Key types:** `PlayoutAdapter` (pluggable audio backend interface), `EngineState` (state snapshot), `EngineEvents` (statechange, play/pause/stop).
 
 **Operations:** `clipOperations.ts` (drag constraints, trim, split), `viewportOperations.ts` (bounds, chunks, scroll threshold), `timelineOperations.ts` (duration, zoom, seek).
 
@@ -46,7 +46,7 @@
 - **`undoLimit`** — Constructor option via `PlaylistEngineOptions`, `readonly` field. Default 100.
 - **Console warn diagnostics** — `moveClip`, `trimClip`, `splitClip` log `console.warn('[waveform-playlist/engine] methodName: ...')` on invalid track/clip IDs. Tests exercising these paths must mock `console.warn`.
 - **`tracksVersion` counter** — Monotonic counter in `EngineState` that increments only on track mutations (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). Does NOT increment on selection/zoom/volume/loop changes. Used by the provider to detect track-specific statechange events and skip `loadAudio` rebuilds.
-- **Testing animation-frame code** — `_startTimeUpdateLoop` uses `requestAnimationFrame`, unavailable in Node.js. Use `vi.stubGlobal('requestAnimationFrame', vi.fn((cb) => { rafCallbacks.push(cb); return rafCallbacks.length; }))` and `vi.unstubAllGlobals()` in cleanup. Fire ticks manually via `rafCallbacks[rafCallbacks.length - 1](performance.now())`.
+- **Engine is headless — no rAF loop** — `PlaylistEngine` has no `requestAnimationFrame` dependency. Consumers drive their own animation loops and call `engine.getCurrentTime()` per-frame. The `timeupdate` event was removed — poll `getCurrentTime()` instead.
 - **Track audio state persistence** — `setTrackVolume/setTrackMute/setTrackSolo/setTrackPan` must update `this._tracks[]` in addition to forwarding to the adapter.
 - **Clip operations use `updateTrack`, not `setTracks`** — `moveClip`, `trimClip`, `splitClip` call `_updateTrackOnAdapter(trackId)` which uses `adapter.updateTrack()` when available, falling back to `adapter.setTracks()`. This rebuilds only the affected track's clips on the adapter — other tracks keep playing uninterrupted.
 - **`addTrack()` uses incremental adapter path** — When `adapter.addTrack` is defined, `PlaylistEngine.addTrack()` calls it instead of `adapter.setTracks()`. The `PlayoutAdapter.addTrack` method is optional (`addTrack?`) for backwards compatibility.
