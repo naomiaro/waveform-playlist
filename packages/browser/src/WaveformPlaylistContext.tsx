@@ -1091,8 +1091,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         const pixelPosition = (visualTime * sr) / samplesPerPixelRef.current;
         const containerWidth = container.clientWidth;
 
-        // Continuously scroll to keep playhead centered
-        const targetScrollLeft = Math.max(0, pixelPosition - containerWidth / 2);
+        // Continuously scroll to keep playhead centered.
+        // Math.round prevents sub-pixel jitter — browsers round scrollLeft to
+        // integers, so alternating between N.4 and N.6 causes 1px wobble.
+        const targetScrollLeft = Math.round(Math.max(0, pixelPosition - containerWidth / 2));
         container.scrollLeft = targetScrollLeft;
       }
 
