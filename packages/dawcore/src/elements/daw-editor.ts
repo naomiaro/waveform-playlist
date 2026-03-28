@@ -1132,6 +1132,7 @@ export class DawEditorElement extends LitElement {
             : ''}
           ${orderedTracks.length > 0 && this.scaleMode === 'beats'
             ? html`<daw-grid
+                style="top: ${this.timescale ? 30 : 0}px;"
                 .ticksPerPixel=${this.ticksPerPixel}
                 .timeSignature=${this.timeSignature}
                 .ppqn=${this.ppqn}
