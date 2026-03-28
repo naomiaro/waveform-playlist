@@ -116,9 +116,10 @@ export class ClipPointerHandler {
       const anchorTick = (anchorSeconds * h.bpm * h.ppqn) / 60;
       const deltaTicks = totalDeltaPx * h.ticksPerPixel;
       const targetTick = anchorTick + deltaTicks;
-      const snappedTick = h.snapTo !== 'off'
-        ? snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn)
-        : targetTick;
+      const snappedTick =
+        h.snapTo !== 'off'
+          ? snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn)
+          : targetTick;
       const snappedSeconds = (snappedTick * 60) / (h.bpm * h.ppqn);
       const snappedSample = Math.round(snappedSeconds * h.effectiveSampleRate);
       return snappedSample - anchorSample;
@@ -247,9 +248,7 @@ export class ClipPointerHandler {
       const incrementalDeltaSamples = totalSnappedDelta - this._cumulativeDeltaSamples;
       if (incrementalDeltaSamples !== 0) {
         // Track constrained delta (not raw) so undo transactions are accurate
-        const applied = engine.moveClip(
-          this._trackId, this._clipId, incrementalDeltaSamples, true
-        );
+        const applied = engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples, true);
         this._cumulativeDeltaSamples += applied;
       }
     } else {
@@ -259,9 +258,10 @@ export class ClipPointerHandler {
       // Anchor = the boundary edge being dragged
       // Left trim: snap the left edge (startSample)
       // Right trim: snap the right edge (startSample + durationSamples)
-      const anchor = boundary === 'left'
-        ? this._originalStartSample
-        : this._originalStartSample + this._originalDurationSamples;
+      const anchor =
+        boundary === 'left'
+          ? this._originalStartSample
+          : this._originalStartSample + this._originalDurationSamples;
       const rawDeltaSamples = this._snapDeltaToSamples(totalDeltaPx, anchor);
       const deltaSamples = engine.constrainTrimDelta(
         this._trackId,

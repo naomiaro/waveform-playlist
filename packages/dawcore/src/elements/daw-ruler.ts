@@ -99,7 +99,12 @@ export class DawRulerElement extends LitElement {
         })}
         ${this.scaleMode === 'beats'
           ? beatsLabels.map(
-              (t) => html`<span class="label ${t.pixel > 0 ? 'centered' : ''}" style="left: ${t.pixel > 0 ? t.pixel : t.pixel + 4}px;">${t.label}</span>`
+              (t) =>
+                html`<span
+                  class="label ${t.pixel > 0 ? 'centered' : ''}"
+                  style="left: ${t.pixel > 0 ? t.pixel : t.pixel + 4}px;"
+                  >${t.label}</span
+                >`
             )
           : temporalLabels.map(
               ({ pix, text }) =>
@@ -145,11 +150,7 @@ export class DawRulerElement extends LitElement {
           if (localX < 0 || localX >= canvasWidth) continue;
 
           const tickH =
-            tick.type === 'major'
-              ? h * 0.6
-              : tick.type === 'minor'
-                ? h * 0.35
-                : h * 0.15;
+            tick.type === 'major' ? h * 0.6 : tick.type === 'minor' ? h * 0.35 : h * 0.15;
 
           ctx.globalAlpha = tick.type === 'major' ? 1.0 : 0.5;
           ctx.beginPath();

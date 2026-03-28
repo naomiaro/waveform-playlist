@@ -137,9 +137,8 @@ export class DawGridElement extends LitElement {
         for (let i = 0; i < majorTicks.length; i++) {
           if (majorTicks[i].barIndex % 2 === 1) {
             const x = majorTicks[i].pixel - chunkLeft;
-            const nextX = i + 1 < majorTicks.length
-              ? majorTicks[i + 1].pixel - chunkLeft
-              : x + pixelsPerBar; // last bar: extend by pixelsPerBar
+            const nextX =
+              i + 1 < majorTicks.length ? majorTicks[i + 1].pixel - chunkLeft : x + pixelsPerBar; // last bar: extend by pixelsPerBar
             ctx.fillRect(x, 0, nextX - x, this.height);
           }
         }
@@ -163,7 +162,6 @@ export class DawGridElement extends LitElement {
     }
   }
 }
-
 
 declare global {
   interface HTMLElementTagNameMap {
