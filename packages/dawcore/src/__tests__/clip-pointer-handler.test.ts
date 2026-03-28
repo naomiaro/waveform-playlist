@@ -36,10 +36,17 @@ function createMockHost(
 
   return {
     samplesPerPixel: 1024,
+    renderSamplesPerPixel: 1024,
     effectiveSampleRate: 48000,
     interactiveClips: true,
     engine,
     shadowRoot: shadow,
+    scaleMode: 'temporal' as const,
+    ticksPerPixel: 24,
+    bpm: 120,
+    ppqn: 960,
+    timeSignature: [4, 4] as [number, number],
+    snapTo: 'off' as const,
     dispatchEvent: vi.fn((event: Event) => {
       events.push(event);
       return true;

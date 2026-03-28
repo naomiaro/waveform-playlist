@@ -1,3 +1,5 @@
+import { snapTickToGrid } from '@waveform-playlist/core';
+import type { SnapTo } from '@waveform-playlist/core';
 import { DRAG_THRESHOLD } from './constants';
 
 /** Snapshot of a clip's bounds for trim constraint computation. */
@@ -45,10 +47,18 @@ export interface ClipPeakSlice {
 /** Host interface required by ClipPointerHandler. */
 export interface ClipPointerHost {
   readonly samplesPerPixel: number;
+  /** In beats mode, the tick-derived SPP used for rendering. */
+  readonly renderSamplesPerPixel: number;
   readonly effectiveSampleRate: number;
   readonly interactiveClips: boolean;
   readonly engine: ClipEngineContract | null;
   readonly shadowRoot: ShadowRoot | null;
+  readonly scaleMode: 'temporal' | 'beats';
+  readonly ticksPerPixel: number;
+  readonly bpm: number;
+  readonly ppqn: number;
+  readonly timeSignature: [number, number];
+  readonly snapTo: SnapTo;
   dispatchEvent(event: Event): boolean;
   /** Re-extract peaks for a clip at new offset/duration from cached WaveformData. */
   reextractClipPeaks(
@@ -77,7 +87,6 @@ export class ClipPointerHandler {
   private _trackId = '';
   private _startPx = 0;
   private _isDragging = false;
-  private _lastDeltaPx = 0;
   private _cumulativeDeltaSamples = 0;
   // Trim visual feedback: snapshot of original clip state
   private _clipContainer: HTMLElement | null = null;
@@ -86,9 +95,34 @@ export class ClipPointerHandler {
   private _originalWidth = 0;
   private _originalOffsetSamples = 0;
   private _originalDurationSamples = 0;
+  private _originalStartSample = 0;
 
   constructor(host: ClipPointerHost) {
     this._host = host;
+  }
+
+  /**
+   * In beats mode, snap a total pixel delta so that the resulting clip
+   * position lands on a grid boundary. Returns the delta in samples.
+   * In temporal mode, returns the raw pixel-to-sample conversion.
+   */
+  private _snapDeltaToSamples(totalDeltaPx: number): number {
+    const h = this._host;
+    if (h.scaleMode === 'beats' && h.snapTo !== 'off') {
+      // Convert original start position to ticks
+      const startSeconds = this._originalStartSample / h.effectiveSampleRate;
+      const startTick = (startSeconds * h.bpm * h.ppqn) / 60;
+      // Convert pixel delta to tick delta
+      const deltaTicks = totalDeltaPx * h.ticksPerPixel;
+      // Snap the target position (not the delta)
+      const targetTick = startTick + deltaTicks;
+      const snappedTick = snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn);
+      // Convert snapped position back to samples and compute delta
+      const snappedSeconds = (snappedTick * 60) / (h.bpm * h.ppqn);
+      const snappedSample = Math.round(snappedSeconds * h.effectiveSampleRate);
+      return snappedSample - this._originalStartSample;
+    }
+    return Math.round(totalDeltaPx * h.samplesPerPixel);
   }
 
   /** Returns true if a drag interaction is currently in progress. */
@@ -139,12 +173,21 @@ export class ClipPointerHandler {
     this._trackId = trackId;
     this._startPx = e.clientX;
     this._isDragging = false;
-    this._lastDeltaPx = 0;
+
     this._cumulativeDeltaSamples = 0;
 
+    // Snapshot clip start position for snap calculations
+    const engine = this._host.engine;
+    if (engine) {
+      const bounds = engine.getClipBounds(trackId, clipId);
+      if (bounds) {
+        this._originalStartSample = bounds.startSample;
+      }
+    }
+
     // Group all drag mutations into one undo step
-    if (this._host.engine) {
-      this._host.engine.beginTransaction();
+    if (engine) {
+      engine.beginTransaction();
     } else {
       console.warn(
         '[dawcore] beginDrag: engine unavailable, drag mutations will not be grouped for undo'
@@ -196,26 +239,29 @@ export class ClipPointerHandler {
     if (!engine) return;
 
     if (this._mode === 'move') {
-      // Move: send incremental deltas per-frame with skipAdapter=true.
-      // Adapter synced once via updateTrack() at drag end.
-      const incrementalDeltaPx = totalDeltaPx - this._lastDeltaPx;
-      this._lastDeltaPx = totalDeltaPx;
-      const incrementalDeltaSamples = Math.round(incrementalDeltaPx * this._host.samplesPerPixel);
-      // Track constrained delta (not raw) so undo transactions are accurate
-      const applied = engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples, true);
-      this._cumulativeDeltaSamples += applied;
+      // Move: compute total snapped delta from original position, then derive
+      // the incremental from what's already been applied to the engine.
+      const totalSnappedDelta = this._snapDeltaToSamples(totalDeltaPx);
+      const incrementalDeltaSamples = totalSnappedDelta - this._cumulativeDeltaSamples;
+      if (incrementalDeltaSamples !== 0) {
+        // Track constrained delta (not raw) so undo transactions are accurate
+        const applied = engine.moveClip(
+          this._trackId, this._clipId, incrementalDeltaSamples, true
+        );
+        this._cumulativeDeltaSamples += applied;
+      }
     } else {
       // Trim: constrain delta using engine's full collision/bounds logic,
       // then track for visual feedback. Engine called once at pointerup.
       const boundary = this._mode === 'trim-left' ? 'left' : 'right';
-      const rawDeltaSamples = Math.round(totalDeltaPx * this._host.samplesPerPixel);
+      const rawDeltaSamples = this._snapDeltaToSamples(totalDeltaPx);
       const deltaSamples = engine.constrainTrimDelta(
         this._trackId,
         this._clipId,
         boundary,
         rawDeltaSamples
       );
-      const deltaPx = Math.round(deltaSamples / this._host.samplesPerPixel);
+      const deltaPx = Math.round(deltaSamples / this._host.renderSamplesPerPixel);
 
       this._cumulativeDeltaSamples = deltaSamples;
 
@@ -376,12 +422,13 @@ export class ClipPointerHandler {
     this._trackId = '';
     this._startPx = 0;
     this._isDragging = false;
-    this._lastDeltaPx = 0;
+
     this._cumulativeDeltaSamples = 0;
     this._clipContainer = null;
     this._originalLeft = 0;
     this._originalWidth = 0;
     this._originalOffsetSamples = 0;
     this._originalDurationSamples = 0;
+    this._originalStartSample = 0;
   }
 }

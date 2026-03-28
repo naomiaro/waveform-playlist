@@ -153,6 +153,9 @@ export class DawEditorElement extends LitElement {
   get engine() {
     return this._engine;
   }
+  get renderSamplesPerPixel() {
+    return this._renderSpp;
+  }
   /** Re-extract peaks for a clip at new offset/duration from cached WaveformData. */
   reextractClipPeaks(clipId: string, offsetSamples: number, durationSamples: number) {
     const buf = this._clipBuffers.get(clipId);
