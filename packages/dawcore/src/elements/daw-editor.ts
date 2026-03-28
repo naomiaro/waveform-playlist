@@ -1139,7 +1139,7 @@ export class DawEditorElement extends LitElement {
                 .visibleStart=${this._viewport.visibleStart}
                 .visibleEnd=${this._viewport.visibleEnd}
                 .length=${this._totalWidth}
-                .height=${orderedTracks.reduce((sum, t) => sum + t.trackHeight, 0)}
+                .height=${orderedTracks.reduce((sum, t) => sum + t.trackHeight + 1, 0)}
               ></daw-grid>`
             : ''}
           ${orderedTracks.length > 0
