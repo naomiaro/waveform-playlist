@@ -225,6 +225,16 @@ export class DawEditorElement extends LitElement {
   resolveAudioContextSampleRate(rate: number) {
     if (!this._resolvedSampleRate) this._resolvedSampleRate = rate;
   }
+  /**
+   * In beats mode, derive samplesPerPixel from ticksPerPixel so that
+   * clip positions, waveforms, and the tick-space grid all align.
+   */
+  private get _renderSpp(): number {
+    if (this.scaleMode === 'beats') {
+      return (60 * this.effectiveSampleRate * this.ticksPerPixel) / (this.ppqn * this.bpm);
+    }
+    return this.samplesPerPixel;
+  }
   private get _totalWidth(): number {
     if (this.scaleMode === 'beats') {
       const totalTicks = (this._duration * this.bpm * this.ppqn) / 60;
@@ -960,9 +970,10 @@ export class DawEditorElement extends LitElement {
     // Position stays at startSample (same as finalized clip).
     const audibleSamples = Math.max(0, rs.totalSamples - rs.latencySamples);
     if (audibleSamples === 0) return '';
-    const latencyPixels = Math.floor(rs.latencySamples / this.samplesPerPixel);
-    const left = Math.floor(rs.startSample / this.samplesPerPixel);
-    const w = Math.floor(audibleSamples / this.samplesPerPixel);
+    const renderSpp = this._renderSpp;
+    const latencyPixels = Math.floor(rs.latencySamples / renderSpp);
+    const left = Math.floor(rs.startSample / renderSpp);
+    const w = Math.floor(audibleSamples / renderSpp);
     return rs.peaks.map((chPeaks, ch) => {
       // Slice peaks to skip latency prefix (2 entries per pixel: min/max)
       const slicedPeaks = latencyPixels > 0 ? chPeaks.slice(latencyPixels * 2) : chPeaks;
@@ -1041,8 +1052,9 @@ export class DawEditorElement extends LitElement {
   // --- Render ---
   render() {
     const sr = this.effectiveSampleRate;
-    const selStartPx = (this._selectionStartTime * sr) / this.samplesPerPixel;
-    const selEndPx = (this._selectionEndTime * sr) / this.samplesPerPixel;
+    const spp = this._renderSpp;
+    const selStartPx = (this._selectionStartTime * sr) / spp;
+    const selEndPx = (this._selectionEndTime * sr) / spp;
 
     // Precompute track info once for both controls column and timeline
     const orderedTracks = this._getOrderedTracks().map(([trackId, track]) => {
@@ -1097,7 +1109,7 @@ export class DawEditorElement extends LitElement {
         >
           ${orderedTracks.length > 0 && this.timescale
             ? html`<daw-ruler
-                .samplesPerPixel=${this.samplesPerPixel}
+                .samplesPerPixel=${spp}
                 .sampleRate=${this.effectiveSampleRate}
                 .duration=${this._duration}
                 .scaleMode=${this.scaleMode}
@@ -1135,9 +1147,9 @@ export class DawEditorElement extends LitElement {
                   const width = clipPixelWidth(
                     clip.startSample,
                     clip.durationSamples,
-                    this.samplesPerPixel
+                    spp
                   );
-                  const clipLeft = Math.floor(clip.startSample / this.samplesPerPixel);
+                  const clipLeft = Math.floor(clip.startSample / spp);
                   const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
                   const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
                   const chH = this.waveHeight;
