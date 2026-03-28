@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { snapToTicks, snapTickToGrid, computeMusicalTicks } from '../utils/musicalTicks';
-import type { SnapTo, MusicalTickParams } from '../utils/musicalTicks';
+import type { MusicalTickParams } from '../utils/musicalTicks';
 
 const PPQN = 960;
 
