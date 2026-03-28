@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { snapToTicks, snapTickToGrid } from '../utils/musicalTicks';
-import type { SnapTo } from '../utils/musicalTicks';
+import { snapToTicks, snapTickToGrid, computeMusicalTicks } from '../utils/musicalTicks';
+import type { SnapTo, MusicalTickParams } from '../utils/musicalTicks';
 
 const PPQN = 960;
 
@@ -171,5 +171,168 @@ describe('snapTickToGrid', () => {
 
   it('tick already on grid returns same value', () => {
     expect(snapTickToGrid(1920, '1/2', ts, PPQN)).toBe(1920);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeMusicalTicks
+// ---------------------------------------------------------------------------
+// At 4/4, 960 PPQN:
+//   ticksPerBeat = 960, ticksPerBar = 3840
+//   ticksPerEighth = 480, ticksPerSixteenth = 240
+// ---------------------------------------------------------------------------
+describe('computeMusicalTicks', () => {
+  const ts44: [number, number] = [4, 4];
+
+  it('generates bar ticks at bar zoom (ticksPerPixel=200)', () => {
+    // pixelsPerBar = 3840 / 200 = 19.2 (≥8), pixelsPerBeat = 960 / 200 = 4.8 (<8) → 'bar' zoom
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 200,
+      startPixel: 0,
+      endPixel: 400,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    expect(result.zoomLevel).toBe('bar');
+    expect(result.ticks.length).toBeGreaterThan(0);
+    // All ticks at bar zoom should be 'bar' level
+    result.ticks.forEach((t) => expect(t.level).toBe('bar'));
+  });
+
+  it('generates beat ticks at beat zoom (ticksPerPixel=100)', () => {
+    // pixelsPerBeat = 960 / 100 = 9.6 (≥8), pixelsPerEighth = 480/100=4.8 (<8) → 'beat' zoom
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 100,
+      startPixel: 0,
+      endPixel: 400,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    expect(result.zoomLevel).toBe('beat');
+    expect(result.ticks.length).toBeGreaterThan(0);
+    // Should have both bar and beat level ticks
+    const levels = new Set(result.ticks.map((t) => t.level));
+    expect(levels.has('bar')).toBe(true);
+    expect(levels.has('beat')).toBe(true);
+  });
+
+  it('filters ticks to visible range only', () => {
+    // ticksPerPixel=200, bar zoom — only bars within [100, 300] pixels
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 200,
+      startPixel: 100,
+      endPixel: 300,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    result.ticks.forEach((t) => {
+      expect(t.pixel).toBeGreaterThanOrEqual(100);
+      expect(t.pixel).toBeLessThanOrEqual(300);
+    });
+  });
+
+  it('ticks are sorted by pixel', () => {
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 100,
+      startPixel: 0,
+      endPixel: 500,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    for (let i = 1; i < result.ticks.length; i++) {
+      expect(result.ticks[i].pixel).toBeGreaterThanOrEqual(result.ticks[i - 1].pixel);
+    }
+  });
+
+  it('bar ticks have sequential indices for striping', () => {
+    // bar zoom: ticksPerPixel=200, multiple bars visible
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 200,
+      startPixel: 0,
+      endPixel: 1000,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    const barTicks = result.ticks.filter((t) => t.level === 'bar');
+    // Indices should be consecutive integers (may not start at 0 if viewport doesn't start at 0)
+    for (let i = 1; i < barTicks.length; i++) {
+      expect(barTicks[i].index).toBe(barTicks[i - 1].index + 1);
+    }
+  });
+
+  it('coarse zoom has coarseBarStep > 1', () => {
+    // pixelsPerBar = 3840 / 5000 = 0.768 (<8) → 'coarse' zoom
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 5000,
+      startPixel: 0,
+      endPixel: 1000,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    expect(result.zoomLevel).toBe('coarse');
+    expect(result.coarseBarStep).toBeDefined();
+    expect(result.coarseBarStep).toBeGreaterThan(1);
+  });
+
+  it('includes all levels at sixteenth zoom', () => {
+    // pixelsPerSixteenth = 240 / 10 = 24 (≥8) → 'sixteenth' zoom
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 10,
+      startPixel: 0,
+      endPixel: 500,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    expect(result.zoomLevel).toBe('sixteenth');
+    const levels = new Set(result.ticks.map((t) => t.level));
+    expect(levels.has('bar')).toBe(true);
+    expect(levels.has('beat')).toBe(true);
+    expect(levels.has('eighth')).toBe(true);
+    expect(levels.has('sixteenth')).toBe(true);
+  });
+
+  it('returns correct pixelsPerBar and pixelsPerBeat', () => {
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 100,
+      startPixel: 0,
+      endPixel: 100,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    expect(result.pixelsPerBar).toBeCloseTo(3840 / 100);
+    expect(result.pixelsPerBeat).toBeCloseTo(960 / 100);
+  });
+
+  it('bar ticks have labels', () => {
+    const params: MusicalTickParams = {
+      timeSignature: ts44,
+      ticksPerPixel: 200,
+      startPixel: 0,
+      endPixel: 500,
+      ppqn: PPQN,
+    };
+    const result = computeMusicalTicks(params);
+
+    const barTicks = result.ticks.filter((t) => t.level === 'bar');
+    barTicks.forEach((t) => {
+      expect(t.label).toBeDefined();
+      expect(t.label).not.toBe('');
+    });
   });
 });
