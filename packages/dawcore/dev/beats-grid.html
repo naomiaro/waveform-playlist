@@ -78,71 +78,74 @@
     <daw-grid></daw-grid>
     <daw-keyboard-shortcuts playback splitting undo></daw-keyboard-shortcuts>
 
-    <!-- Kick: two clips with a gap -->
+    <!-- All clip positions are bar-aligned at 126 BPM, 4/4 -->
+    <!-- 1 bar = 1.904762s, 1 beat = 0.476190s -->
+
+    <!-- Kick: bars 1-4 and bars 7-10 -->
     <daw-track name="Kick">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/01_Kick.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/01_Kick.dat"
-        start="0" duration="8" offset="0"></daw-clip>
+        start="0" duration="7.619048" offset="0"></daw-clip>
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/01_Kick.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/01_Kick.dat"
-        start="12" duration="8" offset="8"></daw-clip>
+        start="11.428571" duration="7.619048" offset="7.619048"></daw-clip>
     </daw-track>
 
-    <!-- HiHat: one clip starting mid-timeline -->
+    <!-- HiHat: bars 3-8 -->
     <daw-track name="HiHat">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/02_HiHat1.dat"
-        start="4" duration="12" offset="4"></daw-clip>
+        start="3.809524" duration="11.428571" offset="3.809524"></daw-clip>
     </daw-track>
 
-    <!-- Claps: two clips -->
+    <!-- Claps: bars 5-6 and bars 9-10 -->
     <daw-track name="Claps">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/04_Claps.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/04_Claps.dat"
-        start="8" duration="4" offset="0"></daw-clip>
+        start="7.619048" duration="3.809524" offset="0"></daw-clip>
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/04_Claps.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/04_Claps.dat"
-        start="16" duration="4" offset="4"></daw-clip>
+        start="15.238095" duration="3.809524" offset="3.809524"></daw-clip>
     </daw-track>
 
-    <!-- Shakers: two clips with gap -->
+    <!-- Shakers: bars 1-3 and bars 6-8 -->
     <daw-track name="Shakers">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/07_Shakers.dat"
-        start="0" duration="6" offset="0"></daw-clip>
+        start="0" duration="5.714286" offset="0"></daw-clip>
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/07_Shakers.dat"
-        start="10" duration="6" offset="6"></daw-clip>
+        start="9.52381" duration="5.714286" offset="5.714286"></daw-clip>
     </daw-track>
 
-    <!-- Bass: one long clip spanning the full timeline -->
+    <!-- Bass: bars 1-10 -->
     <daw-track name="Bass">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/08_Bass.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/08_Bass.dat"
-        start="0" duration="20" offset="0"></daw-clip>
+        start="0" duration="19.047619" offset="0"></daw-clip>
     </daw-track>
 
-    <!-- Synth1: two clips with offset -->
+    <!-- Synth1: bars 3-6 and bars 8-10 -->
     <daw-track name="Synth 1">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat"
-        start="4" duration="8" offset="2"></daw-clip>
+        start="3.809524" duration="7.619048" offset="1.904762"></daw-clip>
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat"
-        start="14" duration="6" offset="10"></daw-clip>
+        start="13.333333" duration="5.714286" offset="9.52381"></daw-clip>
     </daw-track>
 
-    <!-- Synth2: three clips -->
+    <!-- Synth2: bars 1-2, bars 5-6, and bars 9-10 -->
     <daw-track name="Synth 2">
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/11_Synth2.dat"
-        start="0" duration="4" offset="0"></daw-clip>
+        start="0" duration="3.809524" offset="0"></daw-clip>
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/11_Synth2.dat"
-        start="8" duration="4" offset="4"></daw-clip>
+        start="7.619048" duration="3.809524" offset="3.809524"></daw-clip>
       <daw-clip src="/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus"
         peaks-src="/media/audio/AlbertKader_Ubiquitous/11_Synth2.dat"
-        start="16" duration="4" offset="8"></daw-clip>
+        start="15.238095" duration="3.809524" offset="7.619048"></daw-clip>
     </daw-track>
   </daw-editor>
 
