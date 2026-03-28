@@ -51,7 +51,7 @@ export function syncPeaksForChangedClips(host: ClipPeakSyncHost, tracks: ClipTra
 
       // Update cached state
       host._clipBuffers = new Map(host._clipBuffers).set(clip.id, audioBuffer);
-      host._clipOffsets.set(clip.id, {
+      host._clipOffsets = new Map(host._clipOffsets).set(clip.id, {
         offsetSamples: clip.offsetSamples,
         durationSamples: clip.durationSamples,
       });

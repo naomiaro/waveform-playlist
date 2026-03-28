@@ -97,7 +97,7 @@ export interface MusicalTickParams {
 }
 
 /** Minimum pixels per musical unit before switching to a coarser zoom level. */
-const MIN_PIXELS_PER_UNIT = 8;
+export const MIN_PIXELS_PER_UNIT = 8;
 
 /** Minimum pixels between beat labels for readable text. */
 const MIN_PIXELS_PER_LABEL = 60;

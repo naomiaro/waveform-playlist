@@ -123,7 +123,7 @@ export class ClipPointerHandler {
       const snappedSample = Math.round(snappedSeconds * h.effectiveSampleRate);
       return snappedSample - anchorSample;
     }
-    return Math.round(totalDeltaPx * h.samplesPerPixel);
+    return Math.round(totalDeltaPx * h.renderSamplesPerPixel);
   }
 
   /** Returns true if a drag interaction is currently in progress. */

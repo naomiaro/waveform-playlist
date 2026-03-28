@@ -45,6 +45,7 @@ export class PointerHandler {
   private _host: PointerHandlerHost;
   private _isDragging = false;
   private _dragStartPx = 0;
+  private _dragStartTime = 0;
   private _timeline: HTMLElement | null = null;
   // Cached from onPointerDown to avoid forced layout reflows at 60fps during drag
   private _timelineRect: DOMRect | null = null;
@@ -135,11 +136,13 @@ export class PointerHandler {
 
     if (!this._isDragging && Math.abs(currentPx - this._dragStartPx) > DRAG_THRESHOLD) {
       this._isDragging = true;
+      // Cache snapped start time once — don't recompute every frame
+      this._dragStartTime = this._pxToTime(this._dragStartPx);
     }
 
     if (this._isDragging) {
       const h = this._host;
-      const startTime = this._pxToTime(this._dragStartPx);
+      const startTime = this._dragStartTime;
       const endTime = this._pxToTime(currentPx);
       // Mutate host fields directly (not @state) and update <daw-selection>
       // imperatively to avoid triggering Lit re-renders at 60fps during drag

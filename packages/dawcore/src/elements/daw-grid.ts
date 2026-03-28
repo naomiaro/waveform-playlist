@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { MIN_PIXELS_PER_UNIT } from '@waveform-playlist/core';
 import type { MusicalTickData } from '@waveform-playlist/core';
 import { getCachedMusicalTicks } from '../utils/musical-tick-cache';
 import { getVisibleChunkIndices } from '../utils/viewport';
@@ -128,15 +129,18 @@ export class DawGridElement extends LitElement {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.scale(dpr, dpr);
 
-      // Zebra stripes: alternate every other bar (Audacity uses 2% white)
+      // Zebra stripes: use barIndex from tick data for exact alignment with grid lines.
+      // Draw a stripe from each odd-barIndex major tick to the next major tick.
       if (pixelsPerBar >= MIN_PIXELS_PER_UNIT) {
         ctx.fillStyle = barHighlight;
-        const firstBar = Math.floor(chunkLeft / pixelsPerBar);
-        const lastBar = Math.ceil((chunkLeft + canvasWidth) / pixelsPerBar);
-        for (let bar = firstBar; bar <= lastBar; bar++) {
-          if (bar % 2 === 1) {
-            const x = bar * pixelsPerBar - chunkLeft;
-            ctx.fillRect(x, 0, pixelsPerBar, this.height);
+        const majorTicks = ticks.filter((t) => t.type === 'major');
+        for (let i = 0; i < majorTicks.length; i++) {
+          if (majorTicks[i].barIndex % 2 === 1) {
+            const x = majorTicks[i].pixel - chunkLeft;
+            const nextX = i + 1 < majorTicks.length
+              ? majorTicks[i + 1].pixel - chunkLeft
+              : x + pixelsPerBar; // last bar: extend by pixelsPerBar
+            ctx.fillRect(x, 0, nextX - x, this.height);
           }
         }
       }
@@ -160,8 +164,6 @@ export class DawGridElement extends LitElement {
   }
 }
 
-// Reuse threshold from musicalTicks — bar stripes need bars to be visible
-const MIN_PIXELS_PER_UNIT = 8;
 
 declare global {
   interface HTMLElementTagNameMap {

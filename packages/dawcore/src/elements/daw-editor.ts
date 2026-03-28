@@ -1109,8 +1109,19 @@ export class DawEditorElement extends LitElement {
   render() {
     const sr = this.effectiveSampleRate;
     const spp = this._renderSpp;
-    const selStartPx = (this._selectionStartTime * sr) / spp;
-    const selEndPx = (this._selectionEndTime * sr) / spp;
+    // In beats mode, derive selection pixels from tick space (same as clip positions)
+    // to avoid 1-2px quantization error from the sample round-trip.
+    let selStartPx: number;
+    let selEndPx: number;
+    if (this.scaleMode === 'beats') {
+      const startTick = (this._selectionStartTime * this.bpm * this.ppqn) / 60;
+      const endTick = (this._selectionEndTime * this.bpm * this.ppqn) / 60;
+      selStartPx = startTick / this.ticksPerPixel;
+      selEndPx = endTick / this.ticksPerPixel;
+    } else {
+      selStartPx = (this._selectionStartTime * sr) / spp;
+      selEndPx = (this._selectionEndTime * sr) / spp;
+    }
 
     // Precompute track info once for both controls column and timeline
     const orderedTracks = this._getOrderedTracks().map(([trackId, track]) => {
