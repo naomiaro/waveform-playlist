@@ -12,6 +12,7 @@
 - `isConnected` is a readonly getter in happy-dom — cannot be set via `Object.assign` on elements. Append the element to `document.body` instead.
 - Mocks for async functions (e.g., `resumeGlobalAudioContext`) must return `Promise.resolve()`, not `undefined`. Calling `.catch()` on `undefined` crashes.
 - `canvas.getContext('2d')` returns `null` in happy-dom. Tests must mock it: `vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx as any)` where `mockCtx` has `clearRect`, `resetTransform`, `scale`, `fillStyle`, `fillRect` as `vi.fn()`.
+- `PointerHandlerHost` and `ClipPointerHost` test mocks must include beats-mode fields (`scaleMode`, `ticksPerPixel`, `bpm`, `ppqn`, `timeSignature`, `snapTo`, `renderSamplesPerPixel`). Default to `scaleMode: 'temporal'`, `snapTo: 'off'` for non-beats tests.
 
 **Dev page:** `pnpm dev:page` starts Vite at `http://localhost:5173/dev/index.html`. Uses `website/static/` as publicDir for audio files.
 
@@ -210,3 +211,12 @@ Example: `editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHin
 - `experimentalDecorators: true` and `useDefineForClassFields: false` in tsconfig — required for Lit's `@property` and `@customElement` decorators
 - Light DOM elements override `createRenderRoot()` to return `this`
 - `<daw-track>` defers `daw-track-connected` dispatch via `setTimeout(, 0)` so the editor's `connectedCallback` (which registers listeners) has time to run
+
+## Beats & Bars Grid Mode
+
+- **`scale-mode="beats"` on `<daw-editor>`** — Tick-linear x-axis where a quarter note is always the same width regardless of tempo. Zoom = `ticksPerPixel` (not `samplesPerPixel`).
+- **`_renderSpp` getter** — In beats mode, derives `samplesPerPixel` from `ticksPerPixel`: `(60 * sampleRate * ticksPerPixel) / (ppqn * bpm)`. ALL rendering paths (clip positions, peak generation, trim visual feedback, peak sync) must use `_renderSpp`, never raw `samplesPerPixel`. Missing this causes coordinate mismatches (playhead racing ahead, coarse waveforms after trim, etc.).
+- **Three-tier tick hierarchy** — `major` (bars: always labeled, grid lines at 10%), `minor` (beats: labeled when ≥60px, grid lines at 6%), `minorMinor` (subdivisions: ruler ticks only, no grid lines). Types in `@waveform-playlist/core` as `TickType`.
+- **Snap absolute position, not delta** — `snapTickToGrid` must snap the clip's absolute target position to the grid, not the drag delta. Delta-snapping preserves off-grid offsets permanently. `_snapDeltaToSamples(deltaPx, anchorSample)` takes the anchor (startSample for move/left-trim, startSample+durationSamples for right-trim).
+- **`<daw-grid>` element** — Shadow DOM, chunked 1000px canvases (same pattern as `<daw-waveform>`). Positioned behind tracks via `z-index: 0`. Track rows go transparent via `:host([scale-mode="beats"]) .track-row { background: transparent }`. Grid top offset = ruler height (30px when `timescale` enabled).
+- **Vite pre-bundles Tone.js** — Even though dawcore has no Tone.js dependency, Vite's dep scanner finds it in the workspace `node_modules`. `optimizeDeps.exclude: ['tone']` in `dev/vite.config.ts` prevents loading.
