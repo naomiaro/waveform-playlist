@@ -84,6 +84,12 @@ function createMockHost(
     shadowRoot: shadow,
     requestUpdate: vi.fn(),
     _clipHandler: null,
+    scaleMode: 'temporal' as const,
+    ticksPerPixel: 4,
+    bpm: 120,
+    ppqn: 960,
+    timeSignature: [4, 4] as [number, number],
+    snapTo: 'off' as const,
     events,
     ...overrides,
   };
