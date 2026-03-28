@@ -37,9 +37,10 @@ export class DawRulerElement extends LitElement {
     .label {
       position: absolute;
       font-size: 0.7rem;
+      line-height: 1;
       white-space: nowrap;
       color: var(--daw-ruler-color, #c49a6c);
-      top: 2px;
+      top: 1px;
     }
     .label.centered {
       transform: translateX(-50%);
@@ -136,23 +137,24 @@ export class DawRulerElement extends LitElement {
       ctx.lineWidth = 1;
 
       if (this.scaleMode === 'beats' && this._musicalTickData) {
-        // Audacity tick heights: major=full, minor=1/4, minorMinor=1/8
+        // Ticks draw upward from the bottom. Leave top ~40% for labels.
+        // major=60%, minor=35%, minorMinor=15%
+        const h = this.rulerHeight;
         for (const tick of this._musicalTickData.ticks) {
           const localX = tick.pixel - globalOffset;
           if (localX < 0 || localX >= canvasWidth) continue;
 
           const tickH =
             tick.type === 'major'
-              ? this.rulerHeight
+              ? h * 0.6
               : tick.type === 'minor'
-                ? this.rulerHeight / 4
-                : this.rulerHeight / 8;
+                ? h * 0.35
+                : h * 0.15;
 
-          // Major ticks full opacity, minor 50%, minorMinor 50%
           ctx.globalAlpha = tick.type === 'major' ? 1.0 : 0.5;
           ctx.beginPath();
-          ctx.moveTo(localX + 0.5, this.rulerHeight);
-          ctx.lineTo(localX + 0.5, this.rulerHeight - tickH);
+          ctx.moveTo(localX + 0.5, h);
+          ctx.lineTo(localX + 0.5, h - tickH);
           ctx.stroke();
         }
         ctx.globalAlpha = 1.0;
