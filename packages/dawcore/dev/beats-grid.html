@@ -73,7 +73,7 @@
 
   <script type="module" src="/src/index.ts"></script>
 
-  <daw-editor id="editor" scale-mode="beats" ticks-per-pixel="4" bpm="120"
+  <daw-editor id="editor" scale-mode="beats" ticks-per-pixel="24" bpm="120"
               samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers interactive-clips>
     <daw-grid></daw-grid>
     <daw-keyboard-shortcuts playback splitting undo></daw-keyboard-shortcuts>
@@ -155,7 +155,7 @@
     <span class="separator"></span>
     <button id="zoom-in">+</button>
     <button id="zoom-out">&minus;</button>
-    <span id="zoom-level" class="label">4 tpp</span>
+    <span id="zoom-level" class="label">24 tpp</span>
     <span class="separator"></span>
     <label class="label" for="bpm-input">BPM</label>
     <input id="bpm-input" type="number" min="20" max="300" value="120"
@@ -193,7 +193,7 @@
     }
 
     // Zoom controls (ticks-per-pixel)
-    const tppLevels = [0.5, 1, 2, 4, 8, 16, 32, 64];
+    const tppLevels = [2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128];
     const zoomLabel = document.getElementById('zoom-level');
     function updateZoomLabel() {
       zoomLabel.textContent = editor.ticksPerPixel + ' tpp';

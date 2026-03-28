@@ -74,7 +74,7 @@ export class DawEditorElement extends LitElement {
   @property({ type: String, attribute: 'scale-mode' })
   scaleMode: 'temporal' | 'beats' = 'temporal';
   @property({ type: Number, attribute: 'ticks-per-pixel' })
-  ticksPerPixel = 4;
+  ticksPerPixel = 24;
   @property({ type: Number }) bpm = 120;
   @property({ attribute: false })
   timeSignature: [number, number] = [4, 4];

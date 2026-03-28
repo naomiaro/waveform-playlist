@@ -27,6 +27,7 @@ export const clipStyles = css`
   .clip-container {
     position: absolute;
     overflow: hidden;
+    background: var(--daw-track-background, #16213e);
   }
   .clip-header {
     position: relative;
