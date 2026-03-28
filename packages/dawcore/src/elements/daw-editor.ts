@@ -1163,12 +1163,22 @@ export class DawEditorElement extends LitElement {
               >
                 ${t.track.clips.map((clip) => {
                   const peakData = this._peaksData.get(clip.id);
-                  const width = clipPixelWidth(
-                    clip.startSample,
-                    clip.durationSamples,
-                    spp
-                  );
-                  const clipLeft = Math.floor(clip.startSample / spp);
+                  // In beats mode, derive pixel positions from tick space to
+                  // match grid lines exactly. The sample→spp path introduces
+                  // 1-2px quantization error from integer sample rounding.
+                  let clipLeft: number;
+                  let width: number;
+                  if (this.scaleMode === 'beats') {
+                    const startSec = clip.startSample / sr;
+                    const durSec = clip.durationSamples / sr;
+                    const startTick = (startSec * this.bpm * this.ppqn) / 60;
+                    const endTick = ((startSec + durSec) * this.bpm * this.ppqn) / 60;
+                    clipLeft = Math.round(startTick / this.ticksPerPixel);
+                    width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
+                  } else {
+                    clipLeft = Math.floor(clip.startSample / spp);
+                    width = clipPixelWidth(clip.startSample, clip.durationSamples, spp);
+                  }
                   const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
                   const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
                   const chH = this.waveHeight;

@@ -271,7 +271,17 @@ export class ClipPointerHandler {
         boundary,
         rawDeltaSamples
       );
-      const deltaPx = Math.round(deltaSamples / this._host.renderSamplesPerPixel);
+      // Convert sample delta to pixels — use tick space in beats mode
+      // to avoid quantization drift from the sample round-trip.
+      let deltaPx: number;
+      if (this._host.scaleMode === 'beats') {
+        const h = this._host;
+        const deltaSec = deltaSamples / h.effectiveSampleRate;
+        const deltaTicks = (deltaSec * h.bpm * h.ppqn) / 60;
+        deltaPx = Math.round(deltaTicks / h.ticksPerPixel);
+      } else {
+        deltaPx = Math.round(deltaSamples / this._host.renderSamplesPerPixel);
+      }
 
       this._cumulativeDeltaSamples = deltaSamples;
 
