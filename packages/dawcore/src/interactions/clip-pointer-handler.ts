@@ -102,25 +102,26 @@ export class ClipPointerHandler {
   }
 
   /**
-   * In beats mode, snap a total pixel delta so that the resulting clip
-   * position lands on a grid boundary. Returns the delta in samples.
-   * In temporal mode, returns the raw pixel-to-sample conversion.
+   * Convert a pixel delta to samples, snapping in tick space when in beats mode.
+   *
+   * The anchor is the absolute sample position being moved (e.g., clip start
+   * for move/left-trim, clip end for right-trim). Snapping the absolute
+   * position — not just the delta — ensures clips land exactly on grid lines
+   * even if they started off-grid.
    */
-  private _snapDeltaToSamples(totalDeltaPx: number): number {
+  private _snapDeltaToSamples(totalDeltaPx: number, anchorSample: number): number {
     const h = this._host;
     if (h.scaleMode === 'beats') {
-      // In beats mode, always convert through tick space
-      const startSeconds = this._originalStartSample / h.effectiveSampleRate;
-      const startTick = (startSeconds * h.bpm * h.ppqn) / 60;
+      const anchorSeconds = anchorSample / h.effectiveSampleRate;
+      const anchorTick = (anchorSeconds * h.bpm * h.ppqn) / 60;
       const deltaTicks = totalDeltaPx * h.ticksPerPixel;
-      const targetTick = startTick + deltaTicks;
-      // Snap to grid if enabled, otherwise use raw target tick
+      const targetTick = anchorTick + deltaTicks;
       const snappedTick = h.snapTo !== 'off'
         ? snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn)
         : targetTick;
       const snappedSeconds = (snappedTick * 60) / (h.bpm * h.ppqn);
       const snappedSample = Math.round(snappedSeconds * h.effectiveSampleRate);
-      return snappedSample - this._originalStartSample;
+      return snappedSample - anchorSample;
     }
     return Math.round(totalDeltaPx * h.samplesPerPixel);
   }
@@ -241,20 +242,29 @@ export class ClipPointerHandler {
     if (this._mode === 'move') {
       // Move: compute total snapped delta from original position, then derive
       // the incremental from what's already been applied to the engine.
-      const totalSnappedDelta = this._snapDeltaToSamples(totalDeltaPx);
+      // Anchor = clip start position (move shifts the whole clip)
+      const totalSnappedDelta = this._snapDeltaToSamples(totalDeltaPx, this._originalStartSample);
       const incrementalDeltaSamples = totalSnappedDelta - this._cumulativeDeltaSamples;
+      console.log('[move] totalSnapped=' + totalSnappedDelta + ' cumulative=' + this._cumulativeDeltaSamples + ' incremental=' + incrementalDeltaSamples);
       if (incrementalDeltaSamples !== 0) {
         // Track constrained delta (not raw) so undo transactions are accurate
         const applied = engine.moveClip(
           this._trackId, this._clipId, incrementalDeltaSamples, true
         );
+        console.log('[move] applied=' + applied);
         this._cumulativeDeltaSamples += applied;
       }
     } else {
       // Trim: constrain delta using engine's full collision/bounds logic,
       // then track for visual feedback. Engine called once at pointerup.
       const boundary = this._mode === 'trim-left' ? 'left' : 'right';
-      const rawDeltaSamples = this._snapDeltaToSamples(totalDeltaPx);
+      // Anchor = the boundary edge being dragged
+      // Left trim: snap the left edge (startSample)
+      // Right trim: snap the right edge (startSample + durationSamples)
+      const anchor = boundary === 'left'
+        ? this._originalStartSample
+        : this._originalStartSample + this._originalDurationSamples;
+      const rawDeltaSamples = this._snapDeltaToSamples(totalDeltaPx, anchor);
       const deltaSamples = engine.constrainTrimDelta(
         this._trackId,
         this._clipId,
