@@ -243,6 +243,9 @@ export class DawEditorElement extends LitElement {
       :host([scale-mode='beats']) .track-row {
         background: transparent;
       }
+      :host([scale-mode='beats']) .track-row.selected .clip-container {
+        box-shadow: inset 0 0 0 1000px rgba(99, 199, 95, 0.06);
+      }
       .timeline.drag-over {
         outline: 2px dashed var(--daw-selection-color, rgba(99, 199, 95, 0.3));
         outline-offset: -2px;
