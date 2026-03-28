@@ -51,6 +51,30 @@ export class DawPlayheadElement extends LitElement {
       this._line.style.transform = `translate3d(${px}px, 0, 0)`;
     }
   }
+
+  startBeatsAnimation(
+    getTime: () => number,
+    bpm: number,
+    ppqn: number,
+    ticksPerPixel: number
+  ) {
+    const ticksPerSecond = (bpm * ppqn) / 60;
+    this._animation.start(() => {
+      const time = getTime();
+      const px = (time * ticksPerSecond) / ticksPerPixel;
+      if (this._line) {
+        this._line.style.transform = `translate3d(${px}px, 0, 0)`;
+      }
+    });
+  }
+
+  stopBeatsAnimation(time: number, bpm: number, ppqn: number, ticksPerPixel: number) {
+    this._animation.stop();
+    const px = (time * bpm * ppqn) / (60 * ticksPerPixel);
+    if (this._line) {
+      this._line.style.transform = `translate3d(${px}px, 0, 0)`;
+    }
+  }
 }
 
 declare global {
