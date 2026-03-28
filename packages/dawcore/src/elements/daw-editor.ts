@@ -234,7 +234,11 @@ export class DawEditorElement extends LitElement {
    */
   private get _renderSpp(): number {
     if (this.scaleMode === 'beats') {
-      return (60 * this.effectiveSampleRate * this.ticksPerPixel) / (this.ppqn * this.bpm);
+      const spp = (60 * this.effectiveSampleRate * this.ticksPerPixel) / (this.ppqn * this.bpm);
+      // Floor at the peak pipeline's base scale so peaks can always be extracted.
+      // Without this, fine zoom levels request a scale finer than what WaveformData
+      // can resample to, causing blank waveforms.
+      return this._minSamplesPerPixel > 0 ? Math.max(spp, this._minSamplesPerPixel) : spp;
     }
     return this.samplesPerPixel;
   }

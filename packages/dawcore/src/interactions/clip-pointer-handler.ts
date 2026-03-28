@@ -108,16 +108,16 @@ export class ClipPointerHandler {
    */
   private _snapDeltaToSamples(totalDeltaPx: number): number {
     const h = this._host;
-    if (h.scaleMode === 'beats' && h.snapTo !== 'off') {
-      // Convert original start position to ticks
+    if (h.scaleMode === 'beats') {
+      // In beats mode, always convert through tick space
       const startSeconds = this._originalStartSample / h.effectiveSampleRate;
       const startTick = (startSeconds * h.bpm * h.ppqn) / 60;
-      // Convert pixel delta to tick delta
       const deltaTicks = totalDeltaPx * h.ticksPerPixel;
-      // Snap the target position (not the delta)
       const targetTick = startTick + deltaTicks;
-      const snappedTick = snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn);
-      // Convert snapped position back to samples and compute delta
+      // Snap to grid if enabled, otherwise use raw target tick
+      const snappedTick = h.snapTo !== 'off'
+        ? snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn)
+        : targetTick;
       const snappedSeconds = (snappedTick * 60) / (h.bpm * h.ppqn);
       const snappedSample = Math.round(snappedSeconds * h.effectiveSampleRate);
       return snappedSample - this._originalStartSample;
