@@ -161,7 +161,7 @@ export class DawEditorElement extends LitElement {
     const singleClipOffsets = new Map([[clipId, { offsetSamples, durationSamples }]]);
     const result = this._peakPipeline.reextractPeaks(
       singleClipBuffers,
-      this.samplesPerPixel,
+      this._renderSpp,
       this.mono,
       singleClipOffsets
     );
@@ -330,17 +330,28 @@ export class DawEditorElement extends LitElement {
     if (changedProperties.has('eagerResume')) {
       this._audioResume.target = this.eagerResume;
     }
-    // Restart playhead animation with new samplesPerPixel if playing
-    if (changedProperties.has('samplesPerPixel') && this._isPlaying) {
+    // Restart playhead animation when zoom or beats params change during playback
+    if (
+      (changedProperties.has('samplesPerPixel') ||
+        changedProperties.has('ticksPerPixel') ||
+        changedProperties.has('bpm')) &&
+      this._isPlaying
+    ) {
       this._startPlayhead();
     }
     // Re-extract peaks at new zoom level from cached WaveformData (near-instant).
     // For worker-generated peaks, baseScale (128) is finest; for pre-computed .dat
     // peaks (only cached when rates match), the file's scale is the limit.
-    if (changedProperties.has('samplesPerPixel') && this._clipBuffers.size > 0) {
+    // In beats mode, _renderSpp changes when ticksPerPixel or bpm changes.
+    const zoomChanged =
+      changedProperties.has('samplesPerPixel') ||
+      changedProperties.has('ticksPerPixel') ||
+      changedProperties.has('bpm') ||
+      changedProperties.has('scaleMode');
+    if (zoomChanged && this._clipBuffers.size > 0) {
       const re = this._peakPipeline.reextractPeaks(
         this._clipBuffers,
-        this.samplesPerPixel,
+        this._renderSpp,
         this.mono,
         this._clipOffsets
       );
@@ -562,7 +573,7 @@ export class DawEditorElement extends LitElement {
             sampleRate: wdRate,
             sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
           });
-          const effectiveScale = Math.max(this.samplesPerPixel, waveformData.scale);
+          const effectiveScale = Math.max(this._renderSpp, waveformData.scale);
           const peakData = extractPeaks(
             waveformData,
             effectiveScale,
@@ -637,7 +648,7 @@ export class DawEditorElement extends LitElement {
         });
         const peakData = await this._peakPipeline.generatePeaks(
           audioBuffer,
-          this.samplesPerPixel,
+          this._renderSpp,
           this.mono,
           clip.offsetSamples,
           clip.durationSamples

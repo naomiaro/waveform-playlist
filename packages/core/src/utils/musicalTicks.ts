@@ -23,11 +23,7 @@ export type SnapTo =
  * denominator.  Triplet subdivisions use × 2/3 of the corresponding straight
  * value.  'bar' and 'beat' depend on the time signature.  'off' returns 0.
  */
-export function snapToTicks(
-  snapTo: SnapTo,
-  timeSignature: [number, number],
-  ppqn = 960
-): number {
+export function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppqn = 960): number {
   switch (snapTo) {
     case 'bar':
       return ticksPerBar(timeSignature, ppqn);
@@ -97,6 +93,9 @@ export interface MusicalTickParams {
 
 /** Minimum pixels per musical unit before switching to a coarser zoom level. */
 const MIN_PIXELS_PER_UNIT = 8;
+
+/** Minimum pixels per musical unit before showing a text label for that level. */
+const MIN_PIXELS_PER_LABEL = 60;
 
 /**
  * Determines the zoom level and computes which tick lines to render for a
@@ -190,14 +189,12 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
     }
     const index = Math.round(tick / ticksPerLevel);
 
-    // Add a label for bar lines always; beat lines at beat zoom or finer.
+    // Bar lines always get a label (bar number).
+    // Beat lines only get labels when there is enough space for readable text.
     let label: string | undefined;
     if (level === 'bar') {
       label = ticksToBarBeatLabel(tick, timeSignature, ppqn);
-    } else if (
-      level === 'beat' &&
-      (zoomLevel === 'beat' || zoomLevel === 'eighth' || zoomLevel === 'sixteenth')
-    ) {
+    } else if (level === 'beat' && pixelsPerBeat >= MIN_PIXELS_PER_LABEL) {
       label = ticksToBarBeatLabel(tick, timeSignature, ppqn);
     }
 
