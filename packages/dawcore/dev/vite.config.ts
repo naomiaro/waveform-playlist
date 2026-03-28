@@ -17,6 +17,9 @@ export default defineConfig({
       '@dawcore/transport': path.resolve(repoRoot, 'packages/transport/src/index.ts'),
     },
   },
+  optimizeDeps: {
+    exclude: ['tone'],
+  },
   server: {
     port: 5173,
     open: false,
