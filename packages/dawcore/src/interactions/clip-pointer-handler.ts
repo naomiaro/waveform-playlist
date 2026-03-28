@@ -245,13 +245,11 @@ export class ClipPointerHandler {
       // Anchor = clip start position (move shifts the whole clip)
       const totalSnappedDelta = this._snapDeltaToSamples(totalDeltaPx, this._originalStartSample);
       const incrementalDeltaSamples = totalSnappedDelta - this._cumulativeDeltaSamples;
-      console.log('[move] totalSnapped=' + totalSnappedDelta + ' cumulative=' + this._cumulativeDeltaSamples + ' incremental=' + incrementalDeltaSamples);
       if (incrementalDeltaSamples !== 0) {
         // Track constrained delta (not raw) so undo transactions are accurate
         const applied = engine.moveClip(
           this._trackId, this._clipId, incrementalDeltaSamples, true
         );
-        console.log('[move] applied=' + applied);
         this._cumulativeDeltaSamples += applied;
       }
     } else {

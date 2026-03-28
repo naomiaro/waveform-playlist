@@ -73,12 +73,41 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
   @property({ type: String, attribute: 'scale-mode' })
   scaleMode: 'temporal' | 'beats' = 'temporal';
-  @property({ type: Number, attribute: 'ticks-per-pixel' })
-  ticksPerPixel = 24;
-  @property({ type: Number }) bpm = 120;
+  @property({ type: Number, attribute: 'ticks-per-pixel', noAccessor: true })
+  get ticksPerPixel(): number {
+    return this._ticksPerPixel;
+  }
+  set ticksPerPixel(value: number) {
+    const old = this._ticksPerPixel;
+    if (!Number.isFinite(value) || value <= 0) return;
+    this._ticksPerPixel = value;
+    this.requestUpdate('ticksPerPixel', old);
+  }
+  private _ticksPerPixel = 24;
+  @property({ type: Number, noAccessor: true })
+  get bpm(): number {
+    return this._bpm;
+  }
+  set bpm(value: number) {
+    const old = this._bpm;
+    if (!Number.isFinite(value) || value <= 0) return;
+    this._bpm = value;
+    this.requestUpdate('bpm', old);
+  }
+  private _bpm = 120;
   @property({ attribute: false })
   timeSignature: [number, number] = [4, 4];
-  @property({ type: Number }) ppqn = 960;
+  @property({ type: Number, noAccessor: true })
+  get ppqn(): number {
+    return this._ppqn;
+  }
+  set ppqn(value: number) {
+    const old = this._ppqn;
+    if (!Number.isFinite(value) || value <= 0) return;
+    this._ppqn = value;
+    this.requestUpdate('ppqn', old);
+  }
+  private _ppqn = 960;
   @property({ type: String, attribute: 'snap-to' })
   snapTo: SnapTo = 'off';
   /** Desired sample rate. Creates a cross-browser AudioContext at this rate.
@@ -234,7 +263,10 @@ export class DawEditorElement extends LitElement {
    */
   private get _renderSpp(): number {
     if (this.scaleMode === 'beats') {
-      const spp = (60 * this.effectiveSampleRate * this.ticksPerPixel) / (this.ppqn * this.bpm);
+      // Round to integer — WaveformData.resample() uses integer scale math.
+      const spp = Math.ceil(
+        (60 * this.effectiveSampleRate * this.ticksPerPixel) / (this.ppqn * this.bpm)
+      );
       // Floor at the peak pipeline's base scale so peaks can always be extracted.
       // Without this, fine zoom levels request a scale finer than what WaveformData
       // can resample to, causing blank waveforms.

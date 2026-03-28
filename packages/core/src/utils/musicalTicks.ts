@@ -109,6 +109,11 @@ const MIN_PIXELS_PER_LABEL = 60;
 export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData {
   const { timeSignature, ticksPerPixel, startPixel, endPixel, ppqn = 960 } = params;
 
+  // Guard against invalid inputs that would cause division by zero or infinite loops
+  if (ticksPerPixel <= 0 || ppqn <= 0 || timeSignature[1] <= 0) {
+    return { ticks: [], pixelsPerBar: 0, pixelsPerBeat: 0, zoomLevel: 'coarse' };
+  }
+
   const tpBeat = ticksPerBeat(timeSignature, ppqn);
   const tpBar = ticksPerBar(timeSignature, ppqn);
   const tpEighth = ppqn / 2;
@@ -220,5 +225,6 @@ export function snapTickToGrid(
 ): number {
   if (snapTo === 'off') return tick;
   const gridSize = snapToTicks(snapTo, timeSignature, ppqn);
+  if (gridSize <= 0) return tick;
   return Math.round(tick / gridSize) * gridSize;
 }
