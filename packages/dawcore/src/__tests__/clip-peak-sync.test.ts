@@ -44,7 +44,7 @@ function makeAudioBuffer(): AudioBuffer {
 
 function createMockHost(overrides: Partial<ClipPeakSyncHost> = {}): ClipPeakSyncHost {
   return {
-    samplesPerPixel: 1024,
+    renderSamplesPerPixel: 1024,
     mono: false,
     _clipBuffers: new Map(),
     _clipOffsets: new Map(),

@@ -3,7 +3,8 @@ import type { PeakPipeline } from '../workers/peakPipeline';
 
 /** Host interface for clip peak synchronization. */
 export interface ClipPeakSyncHost {
-  readonly samplesPerPixel: number;
+  /** The effective samplesPerPixel for rendering (tick-derived in beats mode). */
+  readonly renderSamplesPerPixel: number;
   readonly mono: boolean;
   _clipBuffers: Map<string, AudioBuffer>;
   _clipOffsets: Map<string, { offsetSamples: number; durationSamples: number }>;
@@ -59,7 +60,7 @@ export function syncPeaksForChangedClips(host: ClipPeakSyncHost, tracks: ClipTra
       host._peakPipeline
         .generatePeaks(
           audioBuffer,
-          host.samplesPerPixel,
+          host.renderSamplesPerPixel,
           host.mono,
           clip.offsetSamples,
           clip.durationSamples
