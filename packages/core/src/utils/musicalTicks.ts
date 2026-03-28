@@ -52,22 +52,27 @@ export function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppq
   }
 }
 
-/** Zoom level based on how many pixels span a musical unit. */
-export type TickLevel = 'bar' | 'beat' | 'eighth' | 'sixteenth';
+/**
+ * Three-tier tick hierarchy (following Audacity's model):
+ *   major      — Bar boundaries. Always labeled, strongest grid lines.
+ *   minor      — Beat boundaries. Labeled when wide enough, medium grid lines.
+ *   minorMinor — Subdivisions (eighths, sixteenths). Never labeled, ruler ticks only (no grid).
+ */
+export type TickType = 'major' | 'minor' | 'minorMinor';
 
-/** Zoom level category used to select which ticks to render. */
+/** Zoom level category used to select which subdivision to iterate at. */
 export type ZoomLevel = 'coarse' | 'bar' | 'beat' | 'eighth' | 'sixteenth';
 
-/** A single musical tick with its pixel position, level, optional label, and global index. */
+/** A single musical tick with rendering metadata. */
 export interface MusicalTick {
   /** Pixel position of the tick in the timeline. */
   pixel: number;
-  /** Musical level of the tick (bar, beat, eighth, or sixteenth). */
-  level: TickLevel;
-  /** Human-readable label (present for bar lines and beat lines at beat zoom or finer). */
+  /** Three-tier type: major (bar), minor (beat), minorMinor (subdivision). */
+  type: TickType;
+  /** Human-readable label. Present for major ticks always; minor ticks when zoomed in. */
   label?: string;
-  /** 0-based global index at this level, useful for odd/even striping. */
-  index: number;
+  /** 0-based global bar index (for alternating bar-level striping). */
+  barIndex: number;
 }
 
 /** Result of computeMusicalTicks(). */
@@ -94,7 +99,7 @@ export interface MusicalTickParams {
 /** Minimum pixels per musical unit before switching to a coarser zoom level. */
 const MIN_PIXELS_PER_UNIT = 8;
 
-/** Minimum pixels per musical unit before showing a text label for that level. */
+/** Minimum pixels between beat labels for readable text. */
 const MIN_PIXELS_PER_LABEL = 60;
 
 /**
@@ -164,45 +169,32 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
       continue;
     }
 
-    // Classify the level of this tick (highest applicable level wins).
-    let level: TickLevel;
+    // Classify into three-tier hierarchy (Audacity model):
+    //   major      = bar boundary
+    //   minor      = beat boundary
+    //   minorMinor = subdivision (eighth, sixteenth)
+    let type: TickType;
     if (tick % tpBar === 0) {
-      level = 'bar';
+      type = 'major';
     } else if (tick % tpBeat === 0) {
-      level = 'beat';
-    } else if (tick % tpEighth === 0) {
-      level = 'eighth';
+      type = 'minor';
     } else {
-      level = 'sixteenth';
+      type = 'minorMinor';
     }
 
-    // Compute the 0-based global index at the classified level.
-    let ticksPerLevel: number;
-    if (level === 'bar') {
-      ticksPerLevel = tpBar;
-    } else if (level === 'beat') {
-      ticksPerLevel = tpBeat;
-    } else if (level === 'eighth') {
-      ticksPerLevel = tpEighth;
-    } else {
-      ticksPerLevel = tpSixteenth;
-    }
-    const index = Math.round(tick / ticksPerLevel);
+    // Bar index for alternating bar-level zebra stripes
+    const barIndex = Math.floor(tick / tpBar);
 
-    // Bar lines always get a label (bar number).
-    // Beat lines only get labels when there is enough space for readable text.
+    // Labels: major always, minor only when wide enough, minorMinor never
     let label: string | undefined;
-    if (level === 'bar') {
+    if (type === 'major') {
       label = ticksToBarBeatLabel(tick, timeSignature, ppqn);
-    } else if (level === 'beat' && pixelsPerBeat >= MIN_PIXELS_PER_LABEL) {
+    } else if (type === 'minor' && pixelsPerBeat >= MIN_PIXELS_PER_LABEL) {
       label = ticksToBarBeatLabel(tick, timeSignature, ppqn);
     }
 
-    ticks.push({ pixel, level, index, ...(label !== undefined ? { label } : {}) });
+    ticks.push({ pixel, type, barIndex, ...(label !== undefined ? { label } : {}) });
   }
-
-  // Ensure ticks are sorted by pixel position.
-  ticks.sort((a, b) => a.pixel - b.pixel);
 
   const result: MusicalTickData = {
     ticks,

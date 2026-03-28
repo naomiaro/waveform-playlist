@@ -52,12 +52,7 @@ export class DawPlayheadElement extends LitElement {
     }
   }
 
-  startBeatsAnimation(
-    getTime: () => number,
-    bpm: number,
-    ppqn: number,
-    ticksPerPixel: number
-  ) {
+  startBeatsAnimation(getTime: () => number, bpm: number, ppqn: number, ticksPerPixel: number) {
     const ticksPerSecond = (bpm * ppqn) / 60;
     this._animation.start(() => {
       const time = getTime();

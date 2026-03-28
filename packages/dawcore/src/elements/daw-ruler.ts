@@ -76,9 +76,7 @@ export class DawRulerElement extends LitElement {
     const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
 
     const beatsLabels =
-      this.scaleMode === 'beats'
-        ? (this._musicalTickData?.ticks.filter((t) => t.label) ?? [])
-        : [];
+      this.scaleMode === 'beats' ? (this._musicalTickData?.ticks.filter((t) => t.label) ?? []) : [];
     const temporalLabels = this.scaleMode !== 'beats' ? (this._tickData?.labels ?? []) : [];
 
     return html`
@@ -100,7 +98,8 @@ export class DawRulerElement extends LitElement {
               (t) => html`<span class="label" style="left: ${t.pixel + 4}px;">${t.label}</span>`
             )
           : temporalLabels.map(
-              ({ pix, text }) => html`<span class="label" style="left: ${pix + 4}px;">${text}</span>`
+              ({ pix, text }) =>
+                html`<span class="label" style="left: ${pix + 4}px;">${text}</span>`
             )}
       </div>
     `;
@@ -134,22 +133,26 @@ export class DawRulerElement extends LitElement {
       ctx.lineWidth = 1;
 
       if (this.scaleMode === 'beats' && this._musicalTickData) {
+        // Audacity tick heights: major=full, minor=1/4, minorMinor=1/8
         for (const tick of this._musicalTickData.ticks) {
           const localX = tick.pixel - globalOffset;
           if (localX < 0 || localX >= canvasWidth) continue;
-          const heightFraction =
-            tick.level === 'bar'
-              ? 1.0
-              : tick.level === 'beat'
-                ? 0.5
-                : tick.level === 'eighth'
-                  ? 0.3
-                  : 0.2;
+
+          const tickH =
+            tick.type === 'major'
+              ? this.rulerHeight
+              : tick.type === 'minor'
+                ? this.rulerHeight / 4
+                : this.rulerHeight / 8;
+
+          // Major ticks full opacity, minor 50%, minorMinor 50%
+          ctx.globalAlpha = tick.type === 'major' ? 1.0 : 0.5;
           ctx.beginPath();
           ctx.moveTo(localX + 0.5, this.rulerHeight);
-          ctx.lineTo(localX + 0.5, this.rulerHeight * (1 - heightFraction));
+          ctx.lineTo(localX + 0.5, this.rulerHeight - tickH);
           ctx.stroke();
         }
+        ctx.globalAlpha = 1.0;
       } else if (this._tickData) {
         for (const [pix, height] of this._tickData.canvasInfo) {
           const localX = pix - globalOffset;

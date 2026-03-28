@@ -80,7 +80,12 @@ describe('getCachedMusicalTicks', () => {
 
   it('treats undefined ppqn the same as 960', () => {
     const withExplicit = { ...params, ppqn: 960 };
-    const withUndefined = { timeSignature: [4, 4] as [number, number], ticksPerPixel: 4, startPixel: 0, endPixel: 1000 };
+    const withUndefined = {
+      timeSignature: [4, 4] as [number, number],
+      ticksPerPixel: 4,
+      startPixel: 0,
+      endPixel: 1000,
+    };
     getCachedMusicalTicks(withExplicit);
     getCachedMusicalTicks(withUndefined);
     expect(computeMusicalTicks).toHaveBeenCalledTimes(1);

@@ -48,7 +48,7 @@ describe('DawGridElement', () => {
 
   it('has expected default property values', () => {
     const el = document.createElement('daw-grid') as any;
-    expect(el.ticksPerPixel).toBe(4);
+    expect(el.ticksPerPixel).toBe(24);
     expect(el.timeSignature).toEqual([4, 4]);
     expect(el.ppqn).toBe(960);
     expect(el.visibleStart).toBe(-Infinity);

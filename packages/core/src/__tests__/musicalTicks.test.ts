@@ -197,8 +197,8 @@ describe('computeMusicalTicks', () => {
 
     expect(result.zoomLevel).toBe('bar');
     expect(result.ticks.length).toBeGreaterThan(0);
-    // All ticks at bar zoom should be 'bar' level
-    result.ticks.forEach((t) => expect(t.level).toBe('bar'));
+    // All ticks at bar zoom should be major (bar boundaries)
+    result.ticks.forEach((t) => expect(t.type).toBe('major'));
   });
 
   it('generates beat ticks at beat zoom (ticksPerPixel=100)', () => {
@@ -214,10 +214,10 @@ describe('computeMusicalTicks', () => {
 
     expect(result.zoomLevel).toBe('beat');
     expect(result.ticks.length).toBeGreaterThan(0);
-    // Should have both bar and beat level ticks
-    const levels = new Set(result.ticks.map((t) => t.level));
-    expect(levels.has('bar')).toBe(true);
-    expect(levels.has('beat')).toBe(true);
+    // Should have both major (bar) and minor (beat) ticks
+    const types = new Set(result.ticks.map((t) => t.type));
+    expect(types.has('major')).toBe(true);
+    expect(types.has('minor')).toBe(true);
   });
 
   it('filters ticks to visible range only', () => {
@@ -263,10 +263,10 @@ describe('computeMusicalTicks', () => {
     };
     const result = computeMusicalTicks(params);
 
-    const barTicks = result.ticks.filter((t) => t.level === 'bar');
-    // Indices should be consecutive integers (may not start at 0 if viewport doesn't start at 0)
-    for (let i = 1; i < barTicks.length; i++) {
-      expect(barTicks[i].index).toBe(barTicks[i - 1].index + 1);
+    const majorTicks = result.ticks.filter((t) => t.type === 'major');
+    // Bar indices should be consecutive integers
+    for (let i = 1; i < majorTicks.length; i++) {
+      expect(majorTicks[i].barIndex).toBe(majorTicks[i - 1].barIndex + 1);
     }
   });
 
@@ -298,11 +298,10 @@ describe('computeMusicalTicks', () => {
     const result = computeMusicalTicks(params);
 
     expect(result.zoomLevel).toBe('sixteenth');
-    const levels = new Set(result.ticks.map((t) => t.level));
-    expect(levels.has('bar')).toBe(true);
-    expect(levels.has('beat')).toBe(true);
-    expect(levels.has('eighth')).toBe(true);
-    expect(levels.has('sixteenth')).toBe(true);
+    const types = new Set(result.ticks.map((t) => t.type));
+    expect(types.has('major')).toBe(true);
+    expect(types.has('minor')).toBe(true);
+    expect(types.has('minorMinor')).toBe(true);
   });
 
   it('returns correct pixelsPerBar and pixelsPerBeat', () => {
@@ -329,8 +328,8 @@ describe('computeMusicalTicks', () => {
     };
     const result = computeMusicalTicks(params);
 
-    const barTicks = result.ticks.filter((t) => t.level === 'bar');
-    barTicks.forEach((t) => {
+    const majorTicks = result.ticks.filter((t) => t.type === 'major');
+    majorTicks.forEach((t) => {
       expect(t.label).toBeDefined();
       expect(t.label).not.toBe('');
     });

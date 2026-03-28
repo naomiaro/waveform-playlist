@@ -1,54 +1,30 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { MusicalTickData, ZoomLevel } from '@waveform-playlist/core';
+import type { MusicalTickData } from '@waveform-playlist/core';
 import { getCachedMusicalTicks } from '../utils/musical-tick-cache';
 import { getVisibleChunkIndices } from '../utils/viewport';
 
 const MAX_CANVAS_WIDTH = 1000;
 
-/** Opacity for each tick level. */
-const LEVEL_OPACITY: Record<string, number> = {
-  bar: 1.0,
-  beat: 0.6,
-  eighth: 0.4,
-  sixteenth: 0.3,
-};
-
 /**
- * Returns the stripe width in pixels for the current zoom level.
- * Returns 0 when no stripes should be drawn (coarse zoom).
- */
-function getStripeWidth(data: MusicalTickData): number {
-  switch (data.zoomLevel as ZoomLevel) {
-    case 'bar':
-      return data.pixelsPerBar;
-    case 'beat':
-      return data.pixelsPerBeat;
-    case 'eighth':
-      return data.pixelsPerBeat / 2;
-    case 'sixteenth':
-      return data.pixelsPerBeat / 4;
-    case 'coarse':
-    default:
-      return 0;
-  }
-}
-
-/**
- * `<daw-grid>` renders a musical grid overlay (alternating stripe fills +
- * vertical tick lines) using chunked 1000px canvases with virtual scrolling.
+ * `<daw-grid>` renders a musical grid overlay behind waveforms using the
+ * Audacity three-tier model:
  *
- * It is a pointer-events-none overlay that sits at z-index 0 behind the
- * waveform and clips.
+ *   - **Zebra stripes**: Alternating bar backgrounds at 2% white opacity.
+ *   - **Major lines** (bars): 10% white opacity, full height.
+ *   - **Minor lines** (beats): 6% white opacity, full height.
+ *   - **MinorMinor** (subdivisions): Ruler ticks only — no grid lines.
+ *
+ * Uses chunked 1000px canvases with virtual scrolling (same as daw-waveform).
  *
  * CSS custom properties:
- *   --daw-grid-odd          Odd-stripe fill color   (default: rgba(255,255,255,0.03))
- *   --daw-grid-even         Even-stripe fill color  (default: rgba(255,255,255,0.06))
- *   --daw-grid-line-color   Vertical line color     (default: rgba(255,255,255,0.1))
+ *   --daw-grid-bar-highlight  Alternating bar fill  (default: rgba(255,255,255,0.02))
+ *   --daw-grid-major-line     Bar line color        (default: rgba(255,255,255,0.1))
+ *   --daw-grid-minor-line     Beat line color       (default: rgba(255,255,255,0.06))
  */
 @customElement('daw-grid')
 export class DawGridElement extends LitElement {
-  @property({ type: Number, attribute: false }) ticksPerPixel = 4;
+  @property({ type: Number, attribute: false }) ticksPerPixel = 24;
   @property({ attribute: false }) timeSignature: [number, number] = [4, 4];
   @property({ type: Number, attribute: false }) ppqn = 960;
   @property({ type: Number, attribute: false }) visibleStart = -Infinity;
@@ -130,17 +106,15 @@ export class DawGridElement extends LitElement {
     if (!canvases) return;
 
     const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
-    const oddColor =
-      getComputedStyle(this).getPropertyValue('--daw-grid-odd').trim() ||
-      'rgba(255,255,255,0.03)';
-    const evenColor =
-      getComputedStyle(this).getPropertyValue('--daw-grid-even').trim() ||
-      'rgba(255,255,255,0.06)';
-    const lineColor =
-      getComputedStyle(this).getPropertyValue('--daw-grid-line-color').trim() ||
-      'rgba(255,255,255,0.1)';
+    const style = getComputedStyle(this);
+    const barHighlight =
+      style.getPropertyValue('--daw-grid-bar-highlight').trim() || 'rgba(255,255,255,0.02)';
+    const majorLine =
+      style.getPropertyValue('--daw-grid-major-line').trim() || 'rgba(255,255,255,0.1)';
+    const minorLine =
+      style.getPropertyValue('--daw-grid-minor-line').trim() || 'rgba(255,255,255,0.06)';
 
-    const stripeWidth = getStripeWidth(this._tickData);
+    const { ticks, pixelsPerBar } = this._tickData;
 
     for (const canvas of canvases) {
       const idx = Number(canvas.dataset.index);
@@ -154,47 +128,40 @@ export class DawGridElement extends LitElement {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.scale(dpr, dpr);
 
-      // Draw alternating stripes when there is a defined stripe width.
-      if (stripeWidth > 0) {
-        // Find the first stripe index whose right edge is visible in this chunk.
-        const firstStripeIdx = Math.floor(chunkLeft / stripeWidth);
-        // Draw enough stripes to cover the canvas width plus one extra stripe
-        // at each side to handle partial-stripe boundaries.
-        const lastStripeIdx = Math.ceil((chunkLeft + canvasWidth) / stripeWidth);
-
-        for (let si = firstStripeIdx; si <= lastStripeIdx; si++) {
-          const globalLeft = si * stripeWidth;
-          const localLeft = globalLeft - chunkLeft;
-          const isOdd = si % 2 === 1;
-
-          ctx.fillStyle = isOdd ? oddColor : evenColor;
-          ctx.fillRect(localLeft, 0, stripeWidth, this.height);
+      // Zebra stripes: alternate every other bar (Audacity uses 2% white)
+      if (pixelsPerBar >= MIN_PIXELS_PER_UNIT) {
+        ctx.fillStyle = barHighlight;
+        const firstBar = Math.floor(chunkLeft / pixelsPerBar);
+        const lastBar = Math.ceil((chunkLeft + canvasWidth) / pixelsPerBar);
+        for (let bar = firstBar; bar <= lastBar; bar++) {
+          if (bar % 2 === 1) {
+            const x = bar * pixelsPerBar - chunkLeft;
+            ctx.fillRect(x, 0, pixelsPerBar, this.height);
+          }
         }
       }
 
-      // Draw vertical tick lines.
+      // Grid lines: major (bars) and minor (beats) only.
+      // Subdivisions (minorMinor) get ruler ticks but no grid lines.
       ctx.lineWidth = 1;
+      for (const tick of ticks) {
+        if (tick.type === 'minorMinor') continue;
 
-      for (const tick of this._tickData.ticks) {
         const localX = tick.pixel - chunkLeft;
         if (localX < 0 || localX >= canvasWidth) continue;
 
-        const opacity = LEVEL_OPACITY[tick.level] ?? 0.3;
-
-        // Parse base color and apply opacity.
-        ctx.strokeStyle = lineColor;
-        ctx.globalAlpha = opacity;
+        ctx.strokeStyle = tick.type === 'major' ? majorLine : minorLine;
         ctx.beginPath();
         ctx.moveTo(localX + 0.5, 0);
         ctx.lineTo(localX + 0.5, this.height);
         ctx.stroke();
       }
-
-      // Reset globalAlpha after drawing.
-      ctx.globalAlpha = 1;
     }
   }
 }
+
+// Reuse threshold from musicalTicks — bar stripes need bars to be visible
+const MIN_PIXELS_PER_UNIT = 8;
 
 declare global {
   interface HTMLElementTagNameMap {
