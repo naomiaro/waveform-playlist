@@ -11,6 +11,8 @@ import type { TrackDescriptor } from '../types';
 
 export interface FileLoaderHost {
   readonly samplesPerPixel: number;
+  /** In beats mode, the tick-derived SPP used for rendering. */
+  readonly renderSamplesPerPixel: number;
   readonly mono: boolean;
   readonly isConnected: boolean;
   _resolvedSampleRate: number | null;
@@ -74,7 +76,7 @@ export async function loadFiles(
       });
       const peakData = await host._peakPipeline.generatePeaks(
         audioBuffer,
-        host.samplesPerPixel,
+        host.renderSamplesPerPixel,
         host.mono,
         clip.offsetSamples,
         clip.durationSamples
