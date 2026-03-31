@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — beat map grid</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 { font-size: 1.2rem; margin-bottom: 8px; }
+    p.desc { font-size: 0.85rem; color: #888; margin-bottom: 16px; line-height: 1.5; }
+    p.desc a { color: #63C75F; }
+    p.desc code { background: #1a1a2e; padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      --daw-selection-color: rgba(99, 199, 95, 0.3);
+      --daw-grid-odd: rgba(255, 255, 255, 0.03);
+      --daw-grid-even: rgba(255, 255, 255, 0.06);
+      --daw-grid-line-color: rgba(255, 255, 255, 0.1);
+      margin-bottom: 12px;
+    }
+    .toolbar {
+      display: flex; gap: 8px; align-items: stretch;
+      margin-bottom: 12px; height: 28px;
+    }
+    .toolbar button, .toolbar select {
+      cursor: pointer; background: #1a1a2e; color: #e0d4c8;
+      border: 1px solid currentColor; padding: 0 10px; font: inherit; line-height: 1;
+    }
+    .toolbar select { padding: 0 6px; }
+    .toolbar .separator { width: 1px; background: rgba(255, 255, 255, 0.15); }
+    .toolbar .label {
+      font-family: 'Courier New', monospace; font-size: 0.75rem;
+      color: #888; display: flex; align-items: center;
+    }
+    .drop-zone {
+      border: 2px dashed #444; border-radius: 8px; padding: 24px;
+      text-align: center; margin-bottom: 16px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .drop-zone.drag-over { border-color: #63C75F; background: rgba(99, 199, 95, 0.05); }
+    .drop-zone.loaded { border-color: #63C75F; border-style: solid; }
+    .drop-zone p { margin: 4px 0; font-size: 0.85rem; color: #888; }
+    .drop-zone .filename { color: #c49a6c; font-family: 'Courier New', monospace; font-size: 0.8rem; }
+    .drop-zone .or { color: #555; font-size: 0.8rem; margin: 8px 0; }
+    .file-input { display: none; }
+    .file-label { display: inline-block; cursor: pointer; color: #63C75F; font-size: 0.85rem; text-decoration: underline; }
+    .drop-zones { display: flex; gap: 16px; }
+    .drop-zones .drop-zone { flex: 1; }
+    .hidden { display: none; }
+    .beat-indicator { display: flex; gap: 8px; margin: 8px 0; }
+    .beat-dot {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #1a1a2e; border: 2px solid #444;
+      transition: background 0.05s, border-color 0.05s;
+    }
+    .beat-dot.accent { border-color: #d08070; }
+    .beat-dot.active { background: #63C75F; border-color: #63C75F; }
+    .beat-dot.active.accent { background: #d08070; border-color: #d08070; }
+    .tempo-display {
+      font-family: 'Courier New', monospace; font-size: 1.4rem;
+      color: #c49a6c; display: inline-block;
+    }
+    .tempo-display span { font-size: 0.75rem; color: #888; }
+    .info {
+      font-family: 'Courier New', monospace; font-size: 0.8rem;
+      color: #888; margin: 4px 0;
+    }
+    #log {
+      margin-top: 12px; font-family: monospace; font-size: 0.75rem;
+      color: #888; max-height: 120px; overflow-y: auto;
+    }
+    input[type="range"] { width: 120px; accent-color: #63C75F; }
+    .status-bar {
+      display: flex; gap: 16px; align-items: center; margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>beat map grid</h1>
+  <p class="desc">
+    Drop an audio file and its <a href="https://github.com/CPJKU/beat_this">Beat This!</a> beat map
+    into a full dawcore editor with variable tempo grid. Generate beat maps with:<br>
+    <code>pipx install git+https://github.com/CPJKU/beat_this.git</code><br>
+    <code>pipx inject beat_this torchcodec</code> (for non-wav formats)<br>
+    <code>beat_this your_song.mp3</code>
+  </p>
+
+  <div class="drop-zones">
+    <div class="drop-zone" id="audio-drop">
+      <p>Drop audio file here</p>
+      <p class="or">or</p>
+      <label class="file-label" for="audio-input">choose file</label>
+      <input class="file-input" type="file" id="audio-input" accept="audio/*" />
+      <p class="filename" id="audio-name"></p>
+    </div>
+    <div class="drop-zone" id="beats-drop">
+      <p>Drop <code>.beats</code> file here</p>
+      <p class="or">or</p>
+      <label class="file-label" for="beats-input">choose file</label>
+      <input class="file-input" type="file" id="beats-input" accept=".beats,.txt" />
+      <p class="filename" id="beats-name"></p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/index.ts"></script>
+
+  <daw-editor id="editor" scale-mode="beats" ticks-per-pixel="24" bpm="120" snap-to="beat"
+              samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers interactive-clips>
+    <daw-grid></daw-grid>
+    <daw-keyboard-shortcuts playback splitting undo></daw-keyboard-shortcuts>
+  </daw-editor>
+
+  <div class="toolbar">
+    <daw-transport for="editor" style="display:contents;">
+      <daw-play-button></daw-play-button>
+      <daw-pause-button></daw-pause-button>
+      <daw-stop-button></daw-stop-button>
+    </daw-transport>
+    <span class="separator"></span>
+    <button id="zoom-in">+</button>
+    <button id="zoom-out">&minus;</button>
+    <span id="zoom-level" class="label">24 tpp</span>
+    <span class="separator"></span>
+    <label class="label" for="snap-select">Snap</label>
+    <select id="snap-select">
+      <option value="off">Off</option>
+      <option value="bar">Bar</option>
+      <option value="beat" selected>Beat</option>
+      <option value="1/2">1/2</option>
+      <option value="1/4">1/4</option>
+      <option value="1/8">1/8</option>
+      <option value="1/16">1/16</option>
+      <option value="1/32">1/32</option>
+      <option value="1/4T">1/4T</option>
+      <option value="1/8T">1/8T</option>
+      <option value="1/16T">1/16T</option>
+    </select>
+    <span class="separator"></span>
+    <label class="label">Metro</label>
+    <input type="range" id="metro-vol" min="0" max="100" value="50" />
+  </div>
+
+  <div id="status-section" class="hidden">
+    <div class="status-bar">
+      <div class="tempo-display" id="tempo-display">-- <span>BPM</span></div>
+      <div class="beat-indicator" id="beat-indicator"></div>
+      <div class="info" id="position"></div>
+    </div>
+    <div class="info" id="stats"></div>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { Transport } from '@dawcore/transport';
+
+    const editor = document.getElementById('editor');
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    editor.audioContext = audioCtx;
+    const transport = new Transport(audioCtx, { tempo: 120, numerator: 4, denominator: 4 });
+
+    // Click sounds
+    function createClickBuffer(frequency, duration, gain) {
+      const length = Math.floor(audioCtx.sampleRate * duration);
+      const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        const t = i / audioCtx.sampleRate;
+        const envelope = Math.exp(-t * 40);
+        data[i] = Math.sin(2 * Math.PI * frequency * t) * envelope * gain;
+      }
+      return buffer;
+    }
+    const accentClick = createClickBuffer(1200, 0.05, 0.8);
+    const normalClick = createClickBuffer(800, 0.04, 0.5);
+    transport.setMetronomeClickSounds(accentClick, normalClick);
+    transport.setMetronomeEnabled(true);
+
+    // State
+    let audioBuffer = null;
+    let audioStartOffset = 0;
+    let pendingAudioFile = null;
+    let pendingBeatsText = null;
+    let isPlaying = false;
+
+    // UI elements
+    const tempoDisplay = document.getElementById('tempo-display');
+    const beatIndicator = document.getElementById('beat-indicator');
+    const positionEl = document.getElementById('position');
+    const statsEl = document.getElementById('stats');
+    const statusSection = document.getElementById('status-section');
+    const logEl = document.getElementById('log');
+
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+      logEl.prepend(line);
+      while (logEl.children.length > 20) logEl.lastChild.remove();
+    }
+
+    // --- Drop zones ---
+    function setupDropZone(zoneId, onFile) {
+      const zone = document.getElementById(zoneId);
+      zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) onFile(file);
+      });
+    }
+
+    function handleAudioFile(file) {
+      pendingAudioFile = file;
+      document.getElementById('audio-name').textContent = file.name;
+      document.getElementById('audio-drop').classList.add('loaded');
+      addLog('audio: ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)');
+      tryLoad();
+    }
+
+    function handleBeatsFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        pendingBeatsText = reader.result;
+        document.getElementById('beats-name').textContent = file.name;
+        document.getElementById('beats-drop').classList.add('loaded');
+        addLog('beats: ' + file.name);
+        tryLoad();
+      };
+      reader.readAsText(file);
+    }
+
+    setupDropZone('audio-drop', handleAudioFile);
+    setupDropZone('beats-drop', handleBeatsFile);
+    document.getElementById('audio-input').addEventListener('change', (e) => {
+      if (e.target.files[0]) handleAudioFile(e.target.files[0]);
+    });
+    document.getElementById('beats-input').addEventListener('change', (e) => {
+      if (e.target.files[0]) handleBeatsFile(e.target.files[0]);
+    });
+
+    // --- Parse beats ---
+    function parseBeats(text) {
+      return text.trim().split('\n').map(line => {
+        const parts = line.trim().split(/\s+/);
+        return { time: parseFloat(parts[0]), beat: parseInt(parts[1]) };
+      }).filter(b => !isNaN(b.time) && !isNaN(b.beat));
+    }
+
+    // --- Build tempo curve ---
+    function buildTempoCurve(beats) {
+      const ppqn = 960;
+      const ticksPerBeat = ppqn;
+
+      const firstDownbeatIdx = beats.findIndex(b => b.beat === 1);
+      if (firstDownbeatIdx < 0) throw new Error('No downbeat (beat 1) found in beat map');
+
+      const pickupBeats = firstDownbeatIdx;
+
+      // Compute BPM from first beat interval for pickup section
+      let pickupBpm = 120;
+      if (firstDownbeatIdx < beats.length - 1) {
+        const interval = beats[firstDownbeatIdx + 1].time - beats[firstDownbeatIdx].time;
+        if (interval > 0.1) pickupBpm = 60 / interval;
+      }
+
+      // Pickup occupies end of bar 1
+      const pickupStartBeat = 4 - pickupBeats;
+      const pickupStartTick = pickupStartBeat * ticksPerBeat;
+
+      // Audio offset: how far into the audio file does tick 0 map to
+      const timeFromZeroToPickup = pickupStartTick * 60 / (ppqn * pickupBpm);
+      const offset = beats[0].time - timeFromZeroToPickup;
+
+      // Build tempo events
+      const tempoEvents = [{ tick: 0, bpm: pickupBpm }];
+      let currentTick = pickupStartTick;
+
+      for (let i = 0; i < beats.length - 1; i++) {
+        const interval = beats[i + 1].time - beats[i].time;
+        if (interval <= 0.05 || interval > 3.0) continue;
+        const bpm = 60 / interval;
+        if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
+        currentTick += ticksPerBeat;
+      }
+
+      const bpms = tempoEvents.map(e => e.bpm).filter(b => b > 30 && b < 300);
+      bpms.sort((a, b) => a - b);
+      const medianBpm = bpms[Math.floor(bpms.length / 2)];
+
+      return { medianBpm, audioStartOffset: offset, pickupBeats, tempoEvents, totalBeats: beats.length };
+    }
+
+    // --- Apply tempo curve ---
+    function applyTempoCurve(curve) {
+      transport.stop();
+      transport.clearTempos();
+      transport.clearMeters();
+      transport.setMeter(4, 4);
+      for (const event of curve.tempoEvents) {
+        transport.setTempo(event.bpm, event.tick);
+      }
+      audioStartOffset = curve.audioStartOffset;
+
+      // Wire variable tempo callbacks to editor
+      const map = transport.tempoMap;
+      editor.secondsToTicks = map.secondsToTicks.bind(map);
+      editor.ticksToSeconds = map.ticksToSeconds.bind(map);
+      editor.bpm = Math.round(curve.medianBpm);
+    }
+
+    // --- Load when both files ready ---
+    async function tryLoad() {
+      if (!pendingAudioFile || !pendingBeatsText) {
+        // Audio-only: add to editor via file drop, use single BPM
+        if (pendingAudioFile && !pendingBeatsText) {
+          addLog('audio loaded without beat map — using single BPM');
+          const result = await editor.loadFiles([pendingAudioFile]);
+          if (result.loaded.length > 0) addLog('track added: ' + result.loaded[0]);
+          pendingAudioFile = null;
+        }
+        return;
+      }
+
+      addLog('processing...');
+
+      // Decode audio
+      const arrayBuf = await pendingAudioFile.arrayBuffer();
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
+      addLog('decoded: ' + audioBuffer.duration.toFixed(1) + 's, ' + audioBuffer.sampleRate + ' Hz');
+
+      // Parse and apply beats
+      const beats = parseBeats(pendingBeatsText);
+      const curve = buildTempoCurve(beats);
+      applyTempoCurve(curve);
+
+      statsEl.textContent = beats.length + ' beats · median ~' +
+        Math.round(curve.medianBpm) + ' BPM · ' +
+        curve.pickupBeats + ' pickup beat(s)';
+
+      // Add audio to editor as a track
+      const result = await editor.loadFiles([pendingAudioFile]);
+      if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
+
+      statusSection.classList.remove('hidden');
+      addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
+
+      // Reset for next load
+      pendingAudioFile = null;
+      pendingBeatsText = null;
+    }
+
+    // --- Zoom controls ---
+    const tppLevels = [8, 12, 16, 24, 32, 48, 64, 96, 128];
+    const zoomLabel = document.getElementById('zoom-level');
+    function updateZoomLabel() { zoomLabel.textContent = editor.ticksPerPixel + ' tpp'; }
+    document.getElementById('zoom-in').addEventListener('click', () => {
+      const idx = tppLevels.indexOf(editor.ticksPerPixel);
+      if (idx > 0) { editor.ticksPerPixel = tppLevels[idx - 1]; updateZoomLabel(); }
+    });
+    document.getElementById('zoom-out').addEventListener('click', () => {
+      const idx = tppLevels.indexOf(editor.ticksPerPixel);
+      if (idx < tppLevels.length - 1) { editor.ticksPerPixel = tppLevels[idx + 1]; updateZoomLabel(); }
+    });
+
+    // Snap control
+    document.getElementById('snap-select').addEventListener('change', (e) => {
+      editor.snapTo = e.target.value;
+      addLog('snap: ' + e.target.value);
+    });
+
+    // Metronome volume
+    document.getElementById('metro-vol').addEventListener('input', (e) => {
+      const vol = e.target.value / 100;
+      const accent = createClickBuffer(1200, 0.05, 0.8 * vol);
+      const normal = createClickBuffer(800, 0.04, 0.5 * vol);
+      transport.setMetronomeClickSounds(accent, normal);
+    });
+
+    // --- Beat indicator ---
+    function buildBeatDots(n) {
+      while (beatIndicator.firstChild) beatIndicator.removeChild(beatIndicator.firstChild);
+      for (let i = 0; i < n; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'beat-dot' + (i === 0 ? ' accent' : '');
+        beatIndicator.appendChild(dot);
+      }
+    }
+    buildBeatDots(4);
+
+    // --- Sync transport with editor playback ---
+    editor.addEventListener('daw-play', () => {
+      isPlaying = true;
+      if (audioBuffer) {
+        transport.play();
+      }
+    });
+    editor.addEventListener('daw-pause', () => {
+      isPlaying = false;
+      transport.pause();
+    });
+    editor.addEventListener('daw-stop', () => {
+      isPlaying = false;
+      transport.stop();
+    });
+
+    // --- Editor events ---
+    editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
+    editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
+    editor.addEventListener('daw-selection', (e) => addLog('selection: ' + e.detail.start.toFixed(3) + ' - ' + e.detail.end.toFixed(3)));
+    editor.addEventListener('daw-clip-move', (e) => addLog('clip-move: ' + e.detail.clipId + ' delta=' + e.detail.deltaSamples));
+    editor.addEventListener('daw-clip-trim', (e) => addLog('clip-trim: ' + e.detail.clipId + ' ' + e.detail.boundary + ' delta=' + e.detail.deltaSamples));
+    editor.addEventListener('daw-clip-split', (e) => addLog('clip-split: ' + e.detail.originalClipId + ' → ' + e.detail.leftClipId + ' + ' + e.detail.rightClipId));
+
+    // --- Animation loop for beat display ---
+    function tick() {
+      if (isPlaying && audioBuffer) {
+        const time = transport.getCurrentTime();
+        const currentTick = transport.timeToTick(time);
+        const bar = transport.tickToBar(currentTick);
+        const barStartTick = transport.barToTick(bar);
+        const tickIntoBar = currentTick - barStartTick;
+        const ticksPerBeat = 960;
+        const currentBeat = Math.floor(tickIntoBar / ticksPerBeat);
+        const bpm = transport.getTempo(currentTick);
+
+        const dots = beatIndicator.querySelectorAll('.beat-dot');
+        dots.forEach((dot, i) => dot.classList.toggle('active', i === currentBeat));
+        positionEl.textContent = 'Bar ' + bar + ' · Beat ' + (currentBeat + 1);
+
+        tempoDisplay.textContent = '';
+        tempoDisplay.appendChild(document.createTextNode(Math.round(bpm) + ' '));
+        const span = document.createElement('span');
+        span.textContent = 'BPM';
+        tempoDisplay.appendChild(span);
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
