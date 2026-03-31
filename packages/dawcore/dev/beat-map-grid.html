@@ -328,6 +328,7 @@
 
         const result = await editor.loadFiles([pendingAudioFile]);
         if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
+
         addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
 
         pendingAudioFile = null;
@@ -389,17 +390,44 @@
     });
 
     // --- Sync transport with editor playback ---
+    // When beats are applied, override the playhead to follow the transport's
+    // tick position directly — no audio offset. The playhead starts at tick 0
+    // and shows the transport's position, even if there's no audio there.
+    function startTransportPlayhead() {
+      const playhead = editor.shadowRoot?.querySelector('daw-playhead');
+      if (playhead && beatsApplied) {
+        playhead.startBeatsAnimationWithMap(
+          () => transport.getCurrentTime(),
+          (s) => transport.timeToTick(s),
+          editor.ticksPerPixel
+        );
+      }
+    }
+    function stopTransportPlayhead() {
+      const playhead = editor.shadowRoot?.querySelector('daw-playhead');
+      if (playhead && beatsApplied) {
+        playhead.stopBeatsAnimationWithMap(
+          transport.getCurrentTime(),
+          (s) => transport.timeToTick(s),
+          editor.ticksPerPixel
+        );
+      }
+    }
+
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
       transport.play();
+      startTransportPlayhead();
     });
     editor.addEventListener('daw-pause', () => {
       isPlaying = false;
       transport.pause();
+      stopTransportPlayhead();
     });
     editor.addEventListener('daw-stop', () => {
       isPlaying = false;
       transport.stop();
+      stopTransportPlayhead();
     });
 
     // --- Editor events ---
