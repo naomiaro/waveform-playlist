@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { ClipTrack, FadeType } from '@waveform-playlist/core';
+import { gainToDb, type ClipTrack, type FadeType } from '@waveform-playlist/core';
 import {
   type EffectsFunction,
   getUnderlyingAudioParam,
@@ -353,13 +353,6 @@ function applyClipFades(
     }
     applyFadeEnvelope(gainParam, fadeOutStart, fadeOutEnd, clipGain, 0, fadeOut.type || 'linear');
   }
-}
-
-/**
- * Convert linear gain to decibels
- */
-function gainToDb(gain: number): number {
-  return 20 * Math.log10(Math.max(gain, 0.0001));
 }
 
 /**

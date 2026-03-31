@@ -13,8 +13,7 @@ import {
   getContext,
 } from 'tone';
 import type { SynthOptions } from 'tone';
-import { Track } from '@waveform-playlist/core';
-import type { MidiNoteData } from '@waveform-playlist/core';
+import { Track, gainToDb, type MidiNoteData } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
 
@@ -111,7 +110,7 @@ export class MidiToneTrack implements PlayableTrack {
     this.track = options.track;
 
     // Create shared track-level Tone.js nodes (same chain as ToneTrack)
-    this.volumeNode = new Volume(this.gainToDb(options.track.gain));
+    this.volumeNode = new Volume(gainToDb(options.track.gain));
     this.panNode = new Panner(options.track.stereoPan);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
     this.volumeNode.chain(this.panNode, this.muteGain);
@@ -277,10 +276,6 @@ export class MidiToneTrack implements PlayableTrack {
     }
   }
 
-  private gainToDb(gain: number): number {
-    return 20 * Math.log10(gain);
-  }
-
   /**
    * No-op for MIDI — schedule guard is for AudioBufferSourceNode ghost tick prevention.
    * Tone.Part handles its own scheduling relative to Transport.
@@ -360,7 +355,7 @@ export class MidiToneTrack implements PlayableTrack {
 
   setVolume(gain: number): void {
     this.track.gain = gain;
-    this.volumeNode.volume.value = this.gainToDb(gain);
+    this.volumeNode.volume.value = gainToDb(gain);
   }
 
   setPan(pan: number): void {
