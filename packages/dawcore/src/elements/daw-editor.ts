@@ -110,6 +110,12 @@ export class DawEditorElement extends LitElement {
   private _ppqn = 960;
   @property({ type: String, attribute: 'snap-to' })
   snapTo: SnapTo = 'off';
+  /** Optional tempo-aware conversion: seconds → PPQN ticks. When provided, enables variable tempo. */
+  @property({ attribute: false })
+  secondsToTicks?: (seconds: number) => number;
+  /** Optional tempo-aware conversion: PPQN ticks → seconds. Required alongside secondsToTicks. */
+  @property({ attribute: false })
+  ticksToSeconds?: (ticks: number) => number;
   /** Desired sample rate. Creates a cross-browser AudioContext at this rate.
    *  Pre-computed .dat peaks render instantly when they match. */
   @property({ type: Number, attribute: 'sample-rate' }) sampleRate = 48000;
@@ -280,9 +286,19 @@ export class DawEditorElement extends LitElement {
     }
     return this.samplesPerPixel;
   }
+  /** Convert seconds to ticks — uses callback if provided, otherwise single-BPM fallback. */
+  _secondsToTicks(seconds: number): number {
+    if (this.secondsToTicks) return this.secondsToTicks(seconds);
+    return (seconds * this.bpm * this.ppqn) / 60;
+  }
+  /** Convert ticks to seconds — uses callback if provided, otherwise single-BPM fallback. */
+  _ticksToSeconds(ticks: number): number {
+    if (this.ticksToSeconds) return this.ticksToSeconds(ticks);
+    return (ticks * 60) / (this.bpm * this.ppqn);
+  }
   private get _totalWidth(): number {
     if (this.scaleMode === 'beats') {
-      const totalTicks = (this._duration * this.bpm * this.ppqn) / 60;
+      const totalTicks = this._secondsToTicks(this._duration);
       return Math.ceil(totalTicks / this.ticksPerPixel);
     }
     return Math.ceil((this._duration * this.effectiveSampleRate) / this.samplesPerPixel);
@@ -379,7 +395,8 @@ export class DawEditorElement extends LitElement {
     if (
       (changedProperties.has('samplesPerPixel') ||
         changedProperties.has('ticksPerPixel') ||
-        changedProperties.has('bpm')) &&
+        changedProperties.has('bpm') ||
+        changedProperties.has('secondsToTicks')) &&
       this._isPlaying
     ) {
       this._startPlayhead();
@@ -392,7 +409,8 @@ export class DawEditorElement extends LitElement {
       changedProperties.has('samplesPerPixel') ||
       changedProperties.has('ticksPerPixel') ||
       changedProperties.has('bpm') ||
-      changedProperties.has('scaleMode');
+      changedProperties.has('scaleMode') ||
+      changedProperties.has('secondsToTicks');
     if (zoomChanged && this._clipBuffers.size > 0) {
       const re = this._peakPipeline.reextractPeaks(
         this._clipBuffers,
@@ -1114,8 +1132,8 @@ export class DawEditorElement extends LitElement {
     let selStartPx: number;
     let selEndPx: number;
     if (this.scaleMode === 'beats') {
-      const startTick = (this._selectionStartTime * this.bpm * this.ppqn) / 60;
-      const endTick = (this._selectionEndTime * this.bpm * this.ppqn) / 60;
+      const startTick = this._secondsToTicks(this._selectionStartTime);
+      const endTick = this._secondsToTicks(this._selectionEndTime);
       selStartPx = startTick / this.ticksPerPixel;
       selEndPx = endTick / this.ticksPerPixel;
     } else {
@@ -1220,8 +1238,8 @@ export class DawEditorElement extends LitElement {
                   if (this.scaleMode === 'beats') {
                     const startSec = clip.startSample / sr;
                     const durSec = clip.durationSamples / sr;
-                    const startTick = (startSec * this.bpm * this.ppqn) / 60;
-                    const endTick = ((startSec + durSec) * this.bpm * this.ppqn) / 60;
+                    const startTick = this._secondsToTicks(startSec);
+                    const endTick = this._secondsToTicks(startSec + durSec);
                     clipLeft = Math.round(startTick / this.ticksPerPixel);
                     width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
                   } else {
