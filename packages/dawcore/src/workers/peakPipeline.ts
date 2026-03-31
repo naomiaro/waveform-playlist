@@ -134,6 +134,25 @@ export class PeakPipeline {
   }
 
   /**
+   * Extract peaks at the base scale from cached WaveformData.
+   * Returns null if no cached data exists for this buffer.
+   * Used by variable-tempo segments which handle stretching themselves.
+   */
+  getBaseScalePeaks(
+    audioBuffer: AudioBuffer,
+    isMono: boolean,
+    offsetSamples?: number,
+    durationSamples?: number
+  ): { peaks: PeakData; scale: number } | null {
+    const cached = this._cache.get(audioBuffer);
+    if (!cached) return null;
+    return {
+      peaks: extractPeaks(cached, cached.scale, isMono, offsetSamples, durationSamples),
+      scale: cached.scale,
+    };
+  }
+
+  /**
    * Return the coarsest (largest) scale among cached WaveformData entries
    * that correspond to the given clip buffers. Returns 0 if none are cached.
    */

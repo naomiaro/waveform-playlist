@@ -1261,36 +1261,51 @@ export class DawEditorElement extends LitElement {
                     clipLeft = Math.floor(clip.startSample / spp);
                     width = clipPixelWidth(clip.startSample, clip.durationSamples, spp);
                   }
-                  // Per-segment waveform rendering for variable tempo
+                  // Per-segment waveform rendering for variable tempo.
+                  // Uses base-scale (128) peaks directly — segments handle stretching,
+                  // so no BPM-dependent intermediate resampling needed.
                   let clipSegments: WaveformSegment[] | undefined;
+                  let segmentChannels: Peaks[] | undefined;
                   if (this.scaleMode === 'beats' && this.secondsToTicks) {
-                    const MIN_RENDER_STEP = 80;
-                    const stepTicks = Math.max(MIN_RENDER_STEP, Math.ceil(this.ticksPerPixel));
-                    const startSec = clip.startSample / sr;
-                    const clipOffsetSec = clip.offsetSamples / sr;
-                    const startTick = this._secondsToTicks(startSec);
-                    const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
-                    const renderSpp = this._renderSpp;
-                    clipSegments = [];
-                    for (let tick = startTick; tick < endTick; tick += stepTicks) {
-                      const segEndTick = Math.min(tick + stepTicks, endTick);
-                      const segStartAudioSec =
-                        this._ticksToSeconds(tick) - startSec + clipOffsetSec;
-                      const segEndAudioSec =
-                        this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
-                      // Convert audio sample positions to peak indices.
-                      // Peaks are relative to clip.offsetSamples at renderSpp resolution.
-                      const segStartSample = Math.round(segStartAudioSec * sr);
-                      const segEndSample = Math.round(segEndAudioSec * sr);
-                      clipSegments.push({
-                        peakStart: (segStartSample - clip.offsetSamples) / renderSpp,
-                        peakEnd: (segEndSample - clip.offsetSamples) / renderSpp,
-                        pixelStart: (tick - startTick) / this.ticksPerPixel,
-                        pixelEnd: (segEndTick - startTick) / this.ticksPerPixel,
-                      });
+                    const audioBuffer = this._clipBuffers.get(clip.id);
+                    const basePeaks = audioBuffer
+                      ? this._peakPipeline.getBaseScalePeaks(
+                          audioBuffer,
+                          this.mono,
+                          clip.offsetSamples,
+                          clip.durationSamples
+                        )
+                      : null;
+                    if (basePeaks) {
+                      const baseScale = basePeaks.scale;
+                      segmentChannels = basePeaks.peaks.data;
+                      const MIN_RENDER_STEP = 80;
+                      const stepTicks = Math.max(MIN_RENDER_STEP, Math.ceil(this.ticksPerPixel));
+                      const startSec = clip.startSample / sr;
+                      const clipOffsetSec = clip.offsetSamples / sr;
+                      const startTick = this._secondsToTicks(startSec);
+                      const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
+                      clipSegments = [];
+                      for (let tick = startTick; tick < endTick; tick += stepTicks) {
+                        const segEndTick = Math.min(tick + stepTicks, endTick);
+                        const segStartAudioSec =
+                          this._ticksToSeconds(tick) - startSec + clipOffsetSec;
+                        const segEndAudioSec =
+                          this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
+                        // Peak indices at base scale (128) — no BPM dependency.
+                        const segStartSample = Math.round(segStartAudioSec * sr);
+                        const segEndSample = Math.round(segEndAudioSec * sr);
+                        clipSegments.push({
+                          peakStart: (segStartSample - clip.offsetSamples) / baseScale,
+                          peakEnd: (segEndSample - clip.offsetSamples) / baseScale,
+                          pixelStart: (tick - startTick) / this.ticksPerPixel,
+                          pixelEnd: (segEndTick - startTick) / this.ticksPerPixel,
+                        });
+                      }
                     }
                   }
-                  const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
+                  const channels: Peaks[] =
+                    segmentChannels ?? peakData?.data ?? [new Int16Array(0)];
                   const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
                   const chH = this.waveHeight;
                   return html` <div
