@@ -275,10 +275,22 @@ export class DawWaveformElement extends LitElement {
         const samplePos = seg.sampleStart + pxInSeg * segSpp;
         const sampleEnd = samplePos + step * segSpp;
 
-        const peak = aggregatePeaks(this._peaks, bits, Math.round(samplePos), Math.round(sampleEnd));
+        const peak = aggregatePeaks(
+          this._peaks,
+          bits,
+          Math.round(samplePos),
+          Math.round(sampleEnd)
+        );
         if (!peak) continue;
 
-        const rects = calculateBarRects(px, this.barWidth, halfHeight, peak.min, peak.max, 'normal');
+        const rects = calculateBarRects(
+          px,
+          this.barWidth,
+          halfHeight,
+          peak.min,
+          peak.max,
+          'normal'
+        );
         for (const r of rects) {
           ctx.fillRect(r.x, r.y, r.width, r.height);
         }
