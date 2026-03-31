@@ -246,37 +246,23 @@
     }
 
     // --- Build tempo curve ---
-    // Audio time = transport time (no offset). Pickup beats fill end of
-    // bar 1, first downbeat at bar 2 beat 1. Initial BPM bridges audio
-    // start (t=0, tick=0) to the first beat's tick position.
+    // Audio time = transport time (no offset). The first beat lands at
+    // its natural tick position based on musicalBpm. Initial BPM is
+    // constant from tick 0 (audio start) to the first beat.
     function buildTempoCurve(beats) {
       const ppqn = 960;
-      const beatsPerBar = 4; // 4/4 time
 
-      // Find first downbeat and count pickup beats
-      const firstDownbeatIdx = beats.findIndex(b => b.beat === 1);
-      const pickupCount = firstDownbeatIdx >= 0 ? firstDownbeatIdx : 0;
+      // Musical BPM from the first beat interval
+      const firstInterval = beats.length > 1
+        ? beats[1].time - beats[0].time : 0.5;
+      const musicalBpm = firstInterval > 0.05 ? 60 / firstInterval : 120;
 
-      // Musical BPM from the first full beat interval
-      const refIdx = firstDownbeatIdx >= 0 ? firstDownbeatIdx : 0;
-      const refInterval = refIdx < beats.length - 1
-        ? beats[refIdx + 1].time - beats[refIdx].time : 0.5;
-      const musicalBpm = refInterval > 0.05 ? 60 / refInterval : 120;
+      // First beat's tick position: where it naturally falls at musicalBpm.
+      // This handles both time-0 starts and songs with silent intros.
+      const firstBeatTick = Math.round(beats[0].time * musicalBpm * ppqn / 60);
 
-      // Only offset to bar 2 when there are actual pickup beats.
-      // No pickups + beat 1 at time 0 → first beat at tick 0.
-      const firstDownbeatTick = pickupCount > 0 ? beatsPerBar * ppqn : 0;
-      const firstBeatTick = firstDownbeatTick - pickupCount * ppqn;
-
-      // Initial BPM: constant from tick 0 to firstBeatTick, covering
-      // audio time 0 to beats[0].time. If audio starts right on a beat
-      // (beats[0].time ≈ 0), use the musical BPM.
-      const firstBeatTime = beats[0].time;
-      const initialBpm = firstBeatTime > 0.01
-        ? (firstBeatTick * 60) / (ppqn * firstBeatTime)
-        : musicalBpm;
-
-      const tempoEvents = [{ tick: 0, bpm: initialBpm }];
+      // Constant musicalBpm from tick 0 to firstBeatTick
+      const tempoEvents = [{ tick: 0, bpm: musicalBpm }];
 
       // Per-beat tempo from the first detected beat onward
       for (let i = 0; i < beats.length - 1; i++) {
