@@ -246,36 +246,49 @@
     }
 
     // --- Build tempo curve ---
-    // Audio time = transport time (no offset). The first beat lands at
-    // its natural tick position based on musicalBpm. Initial BPM is
-    // constant from tick 0 (audio start) to the first beat.
+    // Same proven logic as beat-map.html: pickup beats fill end of bar 1,
+    // first downbeat at bar 2 beat 1. All tempo events at grid-aligned ticks.
     function buildTempoCurve(beats) {
       const ppqn = 960;
+      const ticksPerBeat = ppqn;
 
-      // Musical BPM from the first beat interval
-      const firstInterval = beats.length > 1
-        ? beats[1].time - beats[0].time : 0.5;
-      const musicalBpm = firstInterval > 0.05 ? 60 / firstInterval : 120;
+      const firstDownbeatIdx = beats.findIndex(b => b.beat === 1);
+      if (firstDownbeatIdx < 0) throw new Error('No downbeat (beat 1) found in beat map');
 
-      // First beat's tick position: where it naturally falls at musicalBpm.
-      // This handles both time-0 starts and songs with silent intros.
-      const firstBeatTick = Math.round(beats[0].time * musicalBpm * ppqn / 60);
+      const pickupBeats = firstDownbeatIdx;
 
-      // Constant musicalBpm from tick 0 to firstBeatTick
-      const tempoEvents = [{ tick: 0, bpm: musicalBpm }];
+      // BPM from first full beat interval
+      let pickupBpm = 120;
+      if (firstDownbeatIdx < beats.length - 1) {
+        const interval = beats[firstDownbeatIdx + 1].time - beats[firstDownbeatIdx].time;
+        if (interval > 0.1) pickupBpm = 60 / interval;
+      }
 
-      // Per-beat tempo from the first detected beat onward
+      // Pickup occupies end of bar 1
+      const pickupStartBeat = 4 - pickupBeats;
+      const pickupStartTick = pickupStartBeat * ticksPerBeat;
+
+      // Audio offset: bridges audio file time ↔ transport time
+      const timeFromZeroToPickup = pickupStartTick * 60 / (ppqn * pickupBpm);
+      const audioStartOffset = beats[0].time - timeFromZeroToPickup;
+
+      // Build tempo events — all at grid-aligned ticks
+      const tempoEvents = [{ tick: 0, bpm: pickupBpm }];
+      let currentTick = pickupStartTick;
+
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
         if (interval <= 0.05 || interval > 3.0) continue;
-        tempoEvents.push({ tick: firstBeatTick + i * ppqn, bpm: 60 / interval });
+        const bpm = 60 / interval;
+        if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
+        currentTick += ticksPerBeat;
       }
 
       const bpms = tempoEvents.map(e => e.bpm).filter(b => b > 30 && b < 300);
       bpms.sort((a, b) => a - b);
       const medianBpm = bpms[Math.floor(bpms.length / 2)];
 
-      return { medianBpm, tempoEvents, totalBeats: beats.length };
+      return { medianBpm, audioStartOffset, tempoEvents, totalBeats: beats.length };
     }
 
     // --- Apply tempo curve ---
@@ -288,9 +301,12 @@
         transport.setTempo(event.bpm, event.tick);
       }
 
-      // Pure pass-through: audio time = transport time, no offset.
-      editor.secondsToTicks = (s) => transport.timeToTick(s);
-      editor.ticksToSeconds = (t) => transport.tickToTime(t);
+      // The offset lives in the callbacks — the editor has zero knowledge of it.
+      // audioTime - offset = transportTime. The Transport's tempo map has beats
+      // at grid-aligned ticks, so the waveform aligns with bar lines.
+      const offset = curve.audioStartOffset;
+      editor.secondsToTicks = (s) => transport.timeToTick(s - offset);
+      editor.ticksToSeconds = (t) => transport.tickToTime(t) + offset;
       editor.bpm = Math.round(curve.medianBpm);
     }
 
