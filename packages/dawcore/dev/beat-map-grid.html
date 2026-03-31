@@ -314,9 +314,8 @@
       audioStartOffset = curve.audioStartOffset;
 
       // Wire variable tempo callbacks to editor
-      const map = transport.tempoMap;
-      editor.secondsToTicks = map.secondsToTicks.bind(map);
-      editor.ticksToSeconds = map.ticksToSeconds.bind(map);
+      editor.secondsToTicks = (s) => transport.timeToTick(s);
+      editor.ticksToSeconds = (t) => transport.tickToTime(t);
       editor.bpm = Math.round(curve.medianBpm);
     }
 
