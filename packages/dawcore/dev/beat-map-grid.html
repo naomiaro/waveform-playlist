@@ -247,47 +247,28 @@
     }
 
     // --- Build tempo curve ---
+    // Simple mapping: first beat = tick 0, each beat = ppqn ticks apart.
+    // BPM derived per-beat from the interval to the next beat.
     function buildTempoCurve(beats) {
       const ppqn = 960;
-      const ticksPerBeat = ppqn;
-
-      const firstDownbeatIdx = beats.findIndex(b => b.beat === 1);
-      if (firstDownbeatIdx < 0) throw new Error('No downbeat (beat 1) found in beat map');
-
-      const pickupBeats = firstDownbeatIdx;
-
-      // Compute BPM from first beat interval for pickup section
-      let pickupBpm = 120;
-      if (firstDownbeatIdx < beats.length - 1) {
-        const interval = beats[firstDownbeatIdx + 1].time - beats[firstDownbeatIdx].time;
-        if (interval > 0.1) pickupBpm = 60 / interval;
-      }
-
-      // Pickup occupies end of bar 1
-      const pickupStartBeat = 4 - pickupBeats;
-      const pickupStartTick = pickupStartBeat * ticksPerBeat;
-
-      // Audio offset: how far into the audio file does tick 0 map to
-      const timeFromZeroToPickup = pickupStartTick * 60 / (ppqn * pickupBpm);
-      const offset = beats[0].time - timeFromZeroToPickup;
-
-      // Build tempo events
-      const tempoEvents = [{ tick: 0, bpm: pickupBpm }];
-      let currentTick = pickupStartTick;
+      const tempoEvents = [];
 
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
         if (interval <= 0.05 || interval > 3.0) continue;
-        const bpm = 60 / interval;
-        if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
-        currentTick += ticksPerBeat;
+        tempoEvents.push({ tick: i * ppqn, bpm: 60 / interval });
       }
 
       const bpms = tempoEvents.map(e => e.bpm).filter(b => b > 30 && b < 300);
       bpms.sort((a, b) => a - b);
       const medianBpm = bpms[Math.floor(bpms.length / 2)];
 
-      return { medianBpm, audioStartOffset: offset, pickupBeats, tempoEvents, totalBeats: beats.length };
+      return {
+        medianBpm,
+        audioStartOffset: beats[0].time, // first beat = tick 0
+        tempoEvents,
+        totalBeats: beats.length,
+      };
     }
 
     // --- Apply tempo curve ---
@@ -323,12 +304,16 @@
         beatsApplied = true;
 
         statsEl.textContent = beats.length + ' beats · median ~' +
-          Math.round(curve.medianBpm) + ' BPM · ' +
-          curve.pickupBeats + ' pickup beat(s)';
+          Math.round(curve.medianBpm) + ' BPM';
         statusSection.classList.remove('hidden');
 
         const result = await editor.loadFiles([pendingAudioFile]);
         if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
+
+        // Seek to the first beat so playhead starts at tick 0 (bar 1)
+        editor._currentTime = audioStartOffset;
+        editor._stopPlayhead();
+
         addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
 
         pendingAudioFile = null;
@@ -354,8 +339,7 @@
         beatsApplied = true;
 
         statsEl.textContent = beats.length + ' beats · median ~' +
-          Math.round(curve.medianBpm) + ' BPM · ' +
-          curve.pickupBeats + ' pickup beat(s)';
+          Math.round(curve.medianBpm) + ' BPM';
         statusSection.classList.remove('hidden');
         addLog('ready: ' + curve.tempoEvents.length + ' tempo events (drop audio to add track)');
 
