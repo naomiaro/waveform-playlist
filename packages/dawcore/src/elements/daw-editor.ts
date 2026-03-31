@@ -299,8 +299,11 @@ export class DawEditorElement extends LitElement {
   }
   private get _totalWidth(): number {
     if (this.scaleMode === 'beats') {
-      const totalTicks = this._secondsToTicks(this._duration);
-      return Math.ceil(totalTicks / this.ticksPerPixel);
+      const contentTicks = this._secondsToTicks(this._duration);
+      // Floor at 32 bars so the grid is always visible — DAW convention.
+      const [num] = this.timeSignature;
+      const minTicks = 32 * num * this.ppqn;
+      return Math.ceil(Math.max(contentTicks, minTicks) / this.ticksPerPixel);
     }
     return Math.ceil((this._duration * this.effectiveSampleRate) / this.samplesPerPixel);
   }
@@ -1197,7 +1200,7 @@ export class DawEditorElement extends LitElement {
           @dragleave=${this._onDragLeave}
           @drop=${this._onDrop}
         >
-          ${orderedTracks.length > 0 && this.timescale
+          ${(orderedTracks.length > 0 || this.scaleMode === 'beats') && this.timescale
             ? html`<daw-ruler
                 .samplesPerPixel=${spp}
                 .sampleRate=${this.effectiveSampleRate}
@@ -1209,7 +1212,7 @@ export class DawEditorElement extends LitElement {
                 .totalWidth=${this._totalWidth}
               ></daw-ruler>`
             : ''}
-          ${orderedTracks.length > 0 && this.scaleMode === 'beats'
+          ${this.scaleMode === 'beats'
             ? html`<daw-grid
                 style="top: ${this.timescale ? 30 : 0}px;"
                 .ticksPerPixel=${this.ticksPerPixel}
@@ -1218,10 +1221,12 @@ export class DawEditorElement extends LitElement {
                 .visibleStart=${this._viewport.visibleStart}
                 .visibleEnd=${this._viewport.visibleEnd}
                 .length=${this._totalWidth}
-                .height=${orderedTracks.reduce((sum, t) => sum + t.trackHeight + 1, 0)}
+                .height=${orderedTracks.length > 0
+                  ? orderedTracks.reduce((sum, t) => sum + t.trackHeight + 1, 0)
+                  : this.waveHeight}
               ></daw-grid>`
             : ''}
-          ${orderedTracks.length > 0
+          ${orderedTracks.length > 0 || this.scaleMode === 'beats'
             ? html`<daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
                 <daw-playhead></daw-playhead>`
             : ''}
