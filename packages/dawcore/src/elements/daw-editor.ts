@@ -1075,13 +1075,13 @@ export class DawEditorElement extends LitElement {
     const engine = this._engine;
     const ctx = this.audioContext;
     if (this.scaleMode === 'beats') {
-      playhead.startBeatsAnimation(
+      const secondsToTicksFn = (s: number) => this._secondsToTicks(s);
+      playhead.startBeatsAnimationWithMap(
         () => {
           const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
           return Math.max(0, engine.getCurrentTime() - latency);
         },
-        this.bpm,
-        this.ppqn,
+        secondsToTicksFn,
         this.ticksPerPixel
       );
     } else {
@@ -1099,7 +1099,11 @@ export class DawEditorElement extends LitElement {
     const playhead = this._getPlayhead();
     if (!playhead) return;
     if (this.scaleMode === 'beats') {
-      playhead.stopBeatsAnimation(this._currentTime, this.bpm, this.ppqn, this.ticksPerPixel);
+      playhead.stopBeatsAnimationWithMap(
+        this._currentTime,
+        (s: number) => this._secondsToTicks(s),
+        this.ticksPerPixel
+      );
     } else {
       playhead.stopAnimation(this._currentTime, this.effectiveSampleRate, this.samplesPerPixel);
     }

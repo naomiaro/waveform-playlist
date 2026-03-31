@@ -70,6 +70,33 @@ export class DawPlayheadElement extends LitElement {
       this._line.style.transform = `translate3d(${px}px, 0, 0)`;
     }
   }
+
+  startBeatsAnimationWithMap(
+    getTime: () => number,
+    secondsToTicks: (s: number) => number,
+    ticksPerPixel: number
+  ) {
+    this._animation.start(() => {
+      const time = getTime();
+      const tick = secondsToTicks(time);
+      const px = tick / ticksPerPixel;
+      if (this._line) {
+        this._line.style.transform = `translate3d(${px}px, 0, 0)`;
+      }
+    });
+  }
+
+  stopBeatsAnimationWithMap(
+    time: number,
+    secondsToTicks: (s: number) => number,
+    ticksPerPixel: number
+  ) {
+    this._animation.stop();
+    const px = secondsToTicks(time) / ticksPerPixel;
+    if (this._line) {
+      this._line.style.transform = `translate3d(${px}px, 0, 0)`;
+    }
+  }
 }
 
 declare global {
