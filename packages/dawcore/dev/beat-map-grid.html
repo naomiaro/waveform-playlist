@@ -193,6 +193,31 @@
     let pendingBeatsText = null;
     let isPlaying = false;
 
+    // Create a silent WAV file of the given duration
+    function createSilentWav(durationSec, sampleRate) {
+      const numSamples = Math.ceil(durationSec * sampleRate);
+      const dataSize = numSamples * 2; // 16-bit mono
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+      // RIFF header
+      const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + dataSize, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);       // chunk size
+      view.setUint16(20, 1, true);        // PCM
+      view.setUint16(22, 1, true);        // mono
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true); // byte rate
+      view.setUint16(32, 2, true);        // block align
+      view.setUint16(34, 16, true);       // bits per sample
+      writeStr(36, 'data');
+      view.setUint32(40, dataSize, true);
+      // Sample data is already zeroed (silent)
+      return new File([buffer], 'beat-map-timeline.wav', { type: 'audio/wav' });
+    }
+
     // UI elements
     const tempoDisplay = document.getElementById('tempo-display');
     const beatIndicator = document.getElementById('beat-indicator');
@@ -354,13 +379,18 @@
         return;
       }
 
-      // Beats only: apply tempo curve to editor (updates grid/ruler/playhead)
+      // Beats only: apply tempo curve and add silent placeholder for grid
       if (pendingBeatsText && !pendingAudioFile) {
         addLog('applying beat map...');
         const beats = parseBeats(pendingBeatsText);
         const curve = buildTempoCurve(beats);
         applyTempoCurve(curve);
         beatsApplied = true;
+
+        // Create a silent WAV spanning the beat map so the grid/ruler render.
+        const lastBeatTime = beats[beats.length - 1].time;
+        const silentFile = createSilentWav(lastBeatTime + 1, audioCtx.sampleRate);
+        await editor.loadFiles([silentFile]);
 
         statsEl.textContent = beats.length + ' beats · median ~' +
           Math.round(curve.medianBpm) + ' BPM · ' +
