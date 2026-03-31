@@ -275,7 +275,9 @@ async function renderWithToneEffects(
 
           // Create track-level nodes
           const trackVolume = new Volume(gainToDb(state.volume));
-          const trackPan = new Panner(state.pan);
+          // channelCount: 2 preserves stereo — Tone.js Panner defaults to
+          // channelCount: 1 which forces stereo→mono downmix before panning.
+          const trackPan = new Panner({ pan: state.pan, channelCount: 2 });
           const trackMute = new Gain(state.muted ? 0 : 1);
 
           // Get offline track effects using the creator function
