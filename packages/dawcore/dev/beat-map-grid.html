@@ -320,41 +320,58 @@
       editor.bpm = Math.round(curve.medianBpm);
     }
 
-    // --- Load when both files ready ---
+    // --- Handle loading independently or together ---
+    let beatsApplied = false;
+
     async function tryLoad() {
-      if (!pendingAudioFile || !pendingBeatsText) {
-        // Wait for both files — show status
-        if (pendingAudioFile) addLog('waiting for .beats file...');
-        if (pendingBeatsText) addLog('waiting for audio file...');
+      // Both available: apply beats then load audio with variable tempo
+      if (pendingAudioFile && pendingBeatsText) {
+        addLog('processing both...');
+        const beats = parseBeats(pendingBeatsText);
+        const curve = buildTempoCurve(beats);
+        applyTempoCurve(curve);
+        beatsApplied = true;
+
+        statsEl.textContent = beats.length + ' beats · median ~' +
+          Math.round(curve.medianBpm) + ' BPM · ' +
+          curve.pickupBeats + ' pickup beat(s)';
+        statusSection.classList.remove('hidden');
+
+        const result = await editor.loadFiles([pendingAudioFile]);
+        if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
+        addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
+
+        pendingAudioFile = null;
+        pendingBeatsText = null;
         return;
       }
 
-      addLog('processing...');
+      // Audio only: load immediately with single BPM (no callbacks)
+      if (pendingAudioFile && !pendingBeatsText) {
+        addLog('audio loaded — single BPM (drop .beats to add variable tempo)');
+        const result = await editor.loadFiles([pendingAudioFile]);
+        if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
+        pendingAudioFile = null;
+        return;
+      }
 
-      // Decode audio
-      const arrayBuf = await pendingAudioFile.arrayBuffer();
-      audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
-      addLog('decoded: ' + audioBuffer.duration.toFixed(1) + 's, ' + audioBuffer.sampleRate + ' Hz');
+      // Beats only: apply tempo curve to editor (updates grid/ruler/playhead)
+      if (pendingBeatsText && !pendingAudioFile) {
+        addLog('applying beat map...');
+        const beats = parseBeats(pendingBeatsText);
+        const curve = buildTempoCurve(beats);
+        applyTempoCurve(curve);
+        beatsApplied = true;
 
-      // Parse and apply beats
-      const beats = parseBeats(pendingBeatsText);
-      const curve = buildTempoCurve(beats);
-      applyTempoCurve(curve);
+        statsEl.textContent = beats.length + ' beats · median ~' +
+          Math.round(curve.medianBpm) + ' BPM · ' +
+          curve.pickupBeats + ' pickup beat(s)';
+        statusSection.classList.remove('hidden');
+        addLog('ready: ' + curve.tempoEvents.length + ' tempo events (drop audio to add track)');
 
-      statsEl.textContent = beats.length + ' beats · median ~' +
-        Math.round(curve.medianBpm) + ' BPM · ' +
-        curve.pickupBeats + ' pickup beat(s)';
-
-      // Add audio to editor as a track (callbacks already set)
-      const result = await editor.loadFiles([pendingAudioFile]);
-      if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
-
-      statusSection.classList.remove('hidden');
-      addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
-
-      // Reset for next load
-      pendingAudioFile = null;
-      pendingBeatsText = null;
+        pendingBeatsText = null;
+        return;
+      }
     }
 
     // --- Zoom controls ---
