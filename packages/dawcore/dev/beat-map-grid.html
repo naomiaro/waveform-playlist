@@ -342,7 +342,8 @@
         return;
       }
 
-      // Beats only: apply tempo curve — grid renders automatically in beats mode
+      // Beats only: apply tempo curve for visual preview.
+      // Keep pendingBeatsText so the "Both" path triggers when audio arrives.
       if (pendingBeatsText && !pendingAudioFile) {
         addLog('applying beat map...');
         const beats = parseBeats(pendingBeatsText);
@@ -354,8 +355,6 @@
           Math.round(curve.medianBpm) + ' BPM';
         statusSection.classList.remove('hidden');
         addLog('ready: ' + curve.tempoEvents.length + ' tempo events (drop audio to add track)');
-
-        pendingBeatsText = null;
         return;
       }
     }
