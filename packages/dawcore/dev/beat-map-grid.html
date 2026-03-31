@@ -263,8 +263,9 @@
         ? beats[refIdx + 1].time - beats[refIdx].time : 0.5;
       const musicalBpm = refInterval > 0.05 ? 60 / refInterval : 120;
 
-      // First downbeat at bar 2 beat 1, pickups fill end of bar 1
-      const firstDownbeatTick = beatsPerBar * ppqn; // tick 3840
+      // Only offset to bar 2 when there are actual pickup beats.
+      // No pickups + beat 1 at time 0 → first beat at tick 0.
+      const firstDownbeatTick = pickupCount > 0 ? beatsPerBar * ppqn : 0;
       const firstBeatTick = firstDownbeatTick - pickupCount * ppqn;
 
       // Initial BPM: constant from tick 0 to firstBeatTick, covering
