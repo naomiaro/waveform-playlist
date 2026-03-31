@@ -307,6 +307,11 @@ export class DawEditorElement extends LitElement {
     }
     return Math.ceil((this._duration * this.effectiveSampleRate) / this.samplesPerPixel);
   }
+  /** Grid height when no tracks exist — matches scroll area's rendered height. */
+  private get _emptyGridHeight(): number {
+    const scrollArea = this.shadowRoot?.querySelector('.scroll-area') as HTMLElement | null;
+    return scrollArea?.clientHeight ?? 200;
+  }
   _setSelectedTrackId(trackId: string | null) {
     this._selectedTrackId = trackId;
   }
@@ -1223,7 +1228,7 @@ export class DawEditorElement extends LitElement {
                 .length=${this._totalWidth}
                 .height=${orderedTracks.length > 0
                   ? orderedTracks.reduce((sum, t) => sum + t.trackHeight + 1, 0)
-                  : this.waveHeight}
+                  : this._emptyGridHeight}
               ></daw-grid>`
             : ''}
           ${orderedTracks.length > 0 || this.scaleMode === 'beats'
