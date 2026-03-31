@@ -17,6 +17,7 @@ import './elements/daw-keyboard-shortcuts';
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
 export { DawWaveformElement } from './elements/daw-waveform';
+export type { WaveformSegment } from './elements/daw-waveform';
 export { DawPlayheadElement } from './elements/daw-playhead';
 export { DawTransportElement } from './elements/daw-transport';
 export { DawTransportButton } from './elements/daw-transport-button';
