@@ -177,7 +177,6 @@
     transport.setMetronomeEnabled(true);
 
     // State
-    let audioStartOffset = 0;
     let pendingAudioFile = null;
     let pendingBeatsText = null;
     let isPlaying = false;
@@ -247,28 +246,31 @@
     }
 
     // --- Build tempo curve ---
-    // Simple mapping: first beat = tick 0, each beat = ppqn ticks apart.
-    // BPM derived per-beat from the interval to the next beat.
+    // Audio time = transport time. First beat lands wherever the initial
+    // BPM places it (e.g., 0.5s at 120 BPM = tick 960). No offset needed.
     function buildTempoCurve(beats) {
       const ppqn = 960;
-      const tempoEvents = [];
+      const firstInterval = beats.length > 1 ? beats[1].time - beats[0].time : 0.5;
+      const firstBpm = firstInterval > 0.05 ? 60 / firstInterval : 120;
 
+      // First beat's tick (constant BPM from audio start to first beat)
+      const firstBeatTick = Math.round(beats[0].time * firstBpm * ppqn / 60);
+
+      // Initial BPM covers audio before first beat
+      const tempoEvents = [{ tick: 0, bpm: firstBpm }];
+
+      // Per-beat tempo from the first detected beat onward
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
         if (interval <= 0.05 || interval > 3.0) continue;
-        tempoEvents.push({ tick: i * ppqn, bpm: 60 / interval });
+        tempoEvents.push({ tick: firstBeatTick + i * ppqn, bpm: 60 / interval });
       }
 
       const bpms = tempoEvents.map(e => e.bpm).filter(b => b > 30 && b < 300);
       bpms.sort((a, b) => a - b);
       const medianBpm = bpms[Math.floor(bpms.length / 2)];
 
-      return {
-        medianBpm,
-        audioStartOffset: beats[0].time, // first beat = tick 0
-        tempoEvents,
-        totalBeats: beats.length,
-      };
+      return { medianBpm, tempoEvents, totalBeats: beats.length };
     }
 
     // --- Apply tempo curve ---
@@ -280,14 +282,10 @@
       for (const event of curve.tempoEvents) {
         transport.setTempo(event.bpm, event.tick);
       }
-      audioStartOffset = curve.audioStartOffset;
 
-      // Wire variable tempo callbacks to editor.
-      // The editor works in audio-file time; the transport works in transport time.
-      // audioStartOffset bridges them: transportTime = audioFileTime - audioStartOffset
-      const offset = curve.audioStartOffset;
-      editor.secondsToTicks = (s) => transport.timeToTick(s - offset);
-      editor.ticksToSeconds = (t) => transport.tickToTime(t) + offset;
+      // Pure pass-through: audio time = transport time, no offset.
+      editor.secondsToTicks = (s) => transport.timeToTick(s);
+      editor.ticksToSeconds = (t) => transport.tickToTime(t);
       editor.bpm = Math.round(curve.medianBpm);
     }
 
@@ -309,11 +307,6 @@
 
         const result = await editor.loadFiles([pendingAudioFile]);
         if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
-
-        // Seek to the first beat so playhead starts at tick 0 (bar 1)
-        editor._currentTime = audioStartOffset;
-        editor._stopPlayhead();
-
         addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
 
         pendingAudioFile = null;
