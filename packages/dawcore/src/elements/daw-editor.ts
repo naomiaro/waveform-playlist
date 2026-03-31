@@ -1260,6 +1260,7 @@ export class DawEditorElement extends LitElement {
                     const clipOffsetSec = clip.offsetSamples / sr;
                     const startTick = this._secondsToTicks(startSec);
                     const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
+                    const renderSpp = this._renderSpp;
                     clipSegments = [];
                     for (let tick = startTick; tick < endTick; tick += stepTicks) {
                       const segEndTick = Math.min(tick + stepTicks, endTick);
@@ -1267,9 +1268,13 @@ export class DawEditorElement extends LitElement {
                         this._ticksToSeconds(tick) - startSec + clipOffsetSec;
                       const segEndAudioSec =
                         this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
+                      // Convert audio sample positions to peak indices.
+                      // Peaks are relative to clip.offsetSamples at renderSpp resolution.
+                      const segStartSample = Math.round(segStartAudioSec * sr);
+                      const segEndSample = Math.round(segEndAudioSec * sr);
                       clipSegments.push({
-                        sampleStart: Math.round(segStartAudioSec * sr),
-                        sampleEnd: Math.round(segEndAudioSec * sr),
+                        peakStart: (segStartSample - clip.offsetSamples) / renderSpp,
+                        peakEnd: (segEndSample - clip.offsetSamples) / renderSpp,
                         pixelStart: (tick - startTick) / this.ticksPerPixel,
                         pixelEnd: (segEndTick - startTick) / this.ticksPerPixel,
                       });

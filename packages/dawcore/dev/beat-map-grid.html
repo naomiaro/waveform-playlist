@@ -323,13 +323,9 @@
     // --- Load when both files ready ---
     async function tryLoad() {
       if (!pendingAudioFile || !pendingBeatsText) {
-        // Audio-only: add to editor via file drop, use single BPM
-        if (pendingAudioFile && !pendingBeatsText) {
-          addLog('audio loaded without beat map — using single BPM');
-          const result = await editor.loadFiles([pendingAudioFile]);
-          if (result.loaded.length > 0) addLog('track added: ' + result.loaded[0]);
-          pendingAudioFile = null;
-        }
+        // Wait for both files — show status
+        if (pendingAudioFile) addLog('waiting for .beats file...');
+        if (pendingBeatsText) addLog('waiting for audio file...');
         return;
       }
 
@@ -349,7 +345,7 @@
         Math.round(curve.medianBpm) + ' BPM · ' +
         curve.pickupBeats + ' pickup beat(s)';
 
-      // Add audio to editor as a track
+      // Add audio to editor as a track (callbacks already set)
       const result = await editor.loadFiles([pendingAudioFile]);
       if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
 

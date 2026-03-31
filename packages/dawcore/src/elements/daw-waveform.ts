@@ -4,18 +4,22 @@ import type { Peaks, Bits } from '@waveform-playlist/core';
 import { aggregatePeaks, calculateBarRects } from '../utils/peak-rendering';
 import { getVisibleChunkIndices } from '../utils/viewport';
 
-/** A segment mapping audio samples to a pixel range within the waveform. */
+/** A segment mapping a peak-index range to a pixel range within the waveform. */
 export interface WaveformSegment {
-  sampleStart: number;
-  sampleEnd: number;
+  /** Start position in the peaks array (fractional index). */
+  peakStart: number;
+  /** End position in the peaks array (fractional index). */
+  peakEnd: number;
+  /** Start pixel position within the waveform. */
   pixelStart: number;
+  /** End pixel position within the waveform. */
   pixelEnd: number;
 }
 
 const MAX_CANVAS_WIDTH = 1000;
 
 /** Layout/data properties that require a full redraw when changed. */
-const LAYOUT_PROPS = new Set(['length', 'waveHeight', 'barWidth', 'barGap']);
+const LAYOUT_PROPS = new Set(['length', 'waveHeight', 'barWidth', 'barGap', 'segments']);
 
 /**
  * Group dirty peak indices by canvas chunk. Returns bar-pixel-aligned
@@ -263,24 +267,19 @@ export class DawWaveformElement extends LitElement {
       const localStart = Math.max(0, seg.pixelStart - globalOffset);
       const localEnd = Math.min(canvasWidth, seg.pixelEnd - globalOffset);
       const segPixelWidth = seg.pixelEnd - seg.pixelStart;
-      const segSampleWidth = seg.sampleEnd - seg.sampleStart;
-      if (segPixelWidth <= 0 || segSampleWidth <= 0) continue;
+      const segPeakWidth = seg.peakEnd - seg.peakStart;
+      if (segPixelWidth <= 0 || segPeakWidth <= 0) continue;
 
-      // Per-segment samples-per-pixel ratio
-      const segSpp = segSampleWidth / segPixelWidth;
+      // Per-segment peaks-per-pixel ratio
+      const peaksPerPixel = segPeakWidth / segPixelWidth;
 
       for (let px = Math.floor(localStart); px < Math.ceil(localEnd); px += step) {
-        // Map this pixel back to the segment's sample range
+        // Map this pixel to a peak index range
         const pxInSeg = px + globalOffset - seg.pixelStart;
-        const samplePos = seg.sampleStart + pxInSeg * segSpp;
-        const sampleEnd = samplePos + step * segSpp;
+        const peakPos = seg.peakStart + pxInSeg * peaksPerPixel;
+        const peakEnd = peakPos + step * peaksPerPixel;
 
-        const peak = aggregatePeaks(
-          this._peaks,
-          bits,
-          Math.round(samplePos),
-          Math.round(sampleEnd)
-        );
+        const peak = aggregatePeaks(this._peaks, bits, Math.floor(peakPos), Math.ceil(peakEnd));
         if (!peak) continue;
 
         const rects = calculateBarRects(
