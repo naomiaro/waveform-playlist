@@ -12,6 +12,7 @@ import { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
+import type { WaveformSegment } from './daw-waveform';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
@@ -1250,6 +1251,30 @@ export class DawEditorElement extends LitElement {
                     clipLeft = Math.floor(clip.startSample / spp);
                     width = clipPixelWidth(clip.startSample, clip.durationSamples, spp);
                   }
+                  // Per-segment waveform rendering for variable tempo
+                  let clipSegments: WaveformSegment[] | undefined;
+                  if (this.scaleMode === 'beats' && this.secondsToTicks) {
+                    const MIN_RENDER_STEP = 80;
+                    const stepTicks = Math.max(MIN_RENDER_STEP, Math.ceil(this.ticksPerPixel));
+                    const startSec = clip.startSample / sr;
+                    const clipOffsetSec = clip.offsetSamples / sr;
+                    const startTick = this._secondsToTicks(startSec);
+                    const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
+                    clipSegments = [];
+                    for (let tick = startTick; tick < endTick; tick += stepTicks) {
+                      const segEndTick = Math.min(tick + stepTicks, endTick);
+                      const segStartAudioSec =
+                        this._ticksToSeconds(tick) - startSec + clipOffsetSec;
+                      const segEndAudioSec =
+                        this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
+                      clipSegments.push({
+                        sampleStart: Math.round(segStartAudioSec * sr),
+                        sampleEnd: Math.round(segEndAudioSec * sr),
+                        pixelStart: (tick - startTick) / this.ticksPerPixel,
+                        pixelEnd: (segEndTick - startTick) / this.ticksPerPixel,
+                      });
+                    }
+                  }
                   const channels: Peaks[] = peakData?.data ?? [new Int16Array(0)];
                   const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
                   const chH = this.waveHeight;
@@ -1280,6 +1305,7 @@ export class DawEditorElement extends LitElement {
                           .visibleStart=${this._viewport.visibleStart}
                           .visibleEnd=${this._viewport.visibleEnd}
                           .originX=${clipLeft}
+                          .segments=${clipSegments}
                         ></daw-waveform>`
                     )}
                     ${this.interactiveClips
