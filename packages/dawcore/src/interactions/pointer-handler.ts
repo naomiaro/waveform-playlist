@@ -39,6 +39,8 @@ export interface PointerHandlerHost {
   readonly ppqn: number;
   readonly timeSignature: [number, number];
   readonly snapTo: SnapTo;
+  readonly _secondsToTicks: (seconds: number) => number;
+  readonly _ticksToSeconds: (ticks: number) => number;
 }
 
 export class PointerHandler {
@@ -70,7 +72,7 @@ export class PointerHandler {
     if (h.scaleMode === 'beats') {
       let tick = px * h.ticksPerPixel;
       tick = snapTickToGrid(tick, h.snapTo, h.timeSignature, h.ppqn);
-      return (tick * 60) / (h.bpm * h.ppqn);
+      return h._ticksToSeconds(tick);
     }
     return pixelsToSeconds(px, h.samplesPerPixel, h.effectiveSampleRate);
   }
@@ -78,7 +80,7 @@ export class PointerHandler {
   private _timeToPx(time: number): number {
     const h = this._host;
     if (h.scaleMode === 'beats') {
-      const tick = (time * h.bpm * h.ppqn) / 60;
+      const tick = h._secondsToTicks(time);
       return tick / h.ticksPerPixel;
     }
     return (time * h.effectiveSampleRate) / h.samplesPerPixel;
