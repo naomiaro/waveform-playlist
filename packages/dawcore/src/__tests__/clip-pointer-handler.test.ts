@@ -47,6 +47,8 @@ function createMockHost(
     ppqn: 960,
     timeSignature: [4, 4] as [number, number],
     snapTo: 'off' as const,
+    _secondsToTicks: (s: number) => (s * 120 * 960) / 60,
+    _ticksToSeconds: (t: number) => (t * 60) / (120 * 960),
     dispatchEvent: vi.fn((event: Event) => {
       events.push(event);
       return true;

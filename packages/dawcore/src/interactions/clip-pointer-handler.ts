@@ -59,6 +59,8 @@ export interface ClipPointerHost {
   readonly ppqn: number;
   readonly timeSignature: [number, number];
   readonly snapTo: SnapTo;
+  readonly _secondsToTicks: (seconds: number) => number;
+  readonly _ticksToSeconds: (ticks: number) => number;
   dispatchEvent(event: Event): boolean;
   /** Re-extract peaks for a clip at new offset/duration from cached WaveformData. */
   reextractClipPeaks(
@@ -113,14 +115,14 @@ export class ClipPointerHandler {
     const h = this._host;
     if (h.scaleMode === 'beats') {
       const anchorSeconds = anchorSample / h.effectiveSampleRate;
-      const anchorTick = (anchorSeconds * h.bpm * h.ppqn) / 60;
+      const anchorTick = h._secondsToTicks(anchorSeconds);
       const deltaTicks = totalDeltaPx * h.ticksPerPixel;
       const targetTick = anchorTick + deltaTicks;
       const snappedTick =
         h.snapTo !== 'off'
           ? snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn)
           : targetTick;
-      const snappedSeconds = (snappedTick * 60) / (h.bpm * h.ppqn);
+      const snappedSeconds = h._ticksToSeconds(snappedTick);
       const snappedSample = Math.round(snappedSeconds * h.effectiveSampleRate);
       return snappedSample - anchorSample;
     }
@@ -274,9 +276,11 @@ export class ClipPointerHandler {
       let deltaPx: number;
       if (this._host.scaleMode === 'beats') {
         const h = this._host;
-        const deltaSec = deltaSamples / h.effectiveSampleRate;
-        const deltaTicks = (deltaSec * h.bpm * h.ppqn) / 60;
-        deltaPx = Math.round(deltaTicks / h.ticksPerPixel);
+        const anchorSec = anchor / h.effectiveSampleRate;
+        const anchorTick = h._secondsToTicks(anchorSec);
+        const newSec = anchorSec + deltaSamples / h.effectiveSampleRate;
+        const newTick = h._secondsToTicks(newSec);
+        deltaPx = Math.round((newTick - anchorTick) / h.ticksPerPixel);
       } else {
         deltaPx = Math.round(deltaSamples / this._host.renderSamplesPerPixel);
       }
