@@ -418,16 +418,11 @@
 
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
-      // Sync engine to transport: the engine plays audio at audioStartOffset
-      // so that engine time matches transport time (+ offset).
-      if (beatsApplied && editor._engine) {
-        const engineTime = editor._engine.getCurrentTime();
-        const transportTime = engineTime - lastAudioStartOffset;
-        // If engine is at the wrong position, restart from offset
-        if (Math.abs(transportTime) > 0.05) {
-          editor._engine.stop();
-          editor._engine.play(lastAudioStartOffset);
-        }
+      if (beatsApplied) {
+        // Sync transport to engine: engine starts at audio time 0,
+        // transport must start at the matching transport time.
+        // audioTime - offset = transportTime → 0 - offset = |offset|
+        transport.seek(Math.abs(lastAudioStartOffset));
       }
       transport.play();
       startTransportPlayhead();
@@ -440,10 +435,6 @@
     editor.addEventListener('daw-stop', () => {
       isPlaying = false;
       transport.stop();
-      // Reset engine to offset so next play starts at transport time 0
-      if (beatsApplied) {
-        editor._currentTime = lastAudioStartOffset;
-      }
       stopTransportPlayhead();
     });
 
