@@ -57,15 +57,6 @@
     .drop-zones { display: flex; gap: 16px; }
     .drop-zones .drop-zone { flex: 1; }
     .hidden { display: none; }
-    .beat-indicator { display: flex; gap: 8px; margin: 8px 0; }
-    .beat-dot {
-      width: 20px; height: 20px; border-radius: 50%;
-      background: #1a1a2e; border: 2px solid #444;
-      transition: background 0.05s, border-color 0.05s;
-    }
-    .beat-dot.accent { border-color: #d08070; }
-    .beat-dot.active { background: #63C75F; border-color: #63C75F; }
-    .beat-dot.active.accent { background: #d08070; border-color: #d08070; }
     .tempo-display {
       font-family: 'Courier New', monospace; font-size: 1.4rem;
       color: #c49a6c; display: inline-block;
@@ -153,7 +144,6 @@
   <div id="status-section" class="hidden">
     <div class="status-bar">
       <div class="tempo-display" id="tempo-display">-- <span>BPM</span></div>
-      <div class="beat-indicator" id="beat-indicator"></div>
       <div class="info" id="position"></div>
     </div>
     <div class="info" id="stats"></div>
@@ -187,7 +177,6 @@
     transport.setMetronomeEnabled(true);
 
     // State
-    let audioBuffer = null;
     let audioStartOffset = 0;
     let pendingAudioFile = null;
     let pendingBeatsText = null;
@@ -195,7 +184,6 @@
 
     // UI elements
     const tempoDisplay = document.getElementById('tempo-display');
-    const beatIndicator = document.getElementById('beat-indicator');
     const positionEl = document.getElementById('position');
     const statsEl = document.getElementById('stats');
     const statusSection = document.getElementById('status-section');
@@ -313,9 +301,12 @@
       }
       audioStartOffset = curve.audioStartOffset;
 
-      // Wire variable tempo callbacks to editor
-      editor.secondsToTicks = (s) => transport.timeToTick(s);
-      editor.ticksToSeconds = (t) => transport.tickToTime(t);
+      // Wire variable tempo callbacks to editor.
+      // The editor works in audio-file time; the transport works in transport time.
+      // audioStartOffset bridges them: transportTime = audioFileTime - audioStartOffset
+      const offset = curve.audioStartOffset;
+      editor.secondsToTicks = (s) => transport.timeToTick(s - offset);
+      editor.ticksToSeconds = (t) => transport.tickToTime(t) + offset;
       editor.bpm = Math.round(curve.medianBpm);
     }
 
@@ -400,23 +391,10 @@
       transport.setMetronomeClickSounds(accent, normal);
     });
 
-    // --- Beat indicator ---
-    function buildBeatDots(n) {
-      while (beatIndicator.firstChild) beatIndicator.removeChild(beatIndicator.firstChild);
-      for (let i = 0; i < n; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'beat-dot' + (i === 0 ? ' accent' : '');
-        beatIndicator.appendChild(dot);
-      }
-    }
-    buildBeatDots(4);
-
     // --- Sync transport with editor playback ---
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
-      if (audioBuffer) {
-        transport.play();
-      }
+      transport.play();
     });
     editor.addEventListener('daw-pause', () => {
       isPlaying = false;
@@ -435,20 +413,17 @@
     editor.addEventListener('daw-clip-trim', (e) => addLog('clip-trim: ' + e.detail.clipId + ' ' + e.detail.boundary + ' delta=' + e.detail.deltaSamples));
     editor.addEventListener('daw-clip-split', (e) => addLog('clip-split: ' + e.detail.originalClipId + ' → ' + e.detail.leftClipId + ' + ' + e.detail.rightClipId));
 
-    // --- Animation loop for beat display ---
+    // --- Animation loop for tempo/position display ---
     function tick() {
-      if (isPlaying && audioBuffer) {
+      if (isPlaying && beatsApplied) {
         const time = transport.getCurrentTime();
         const currentTick = transport.timeToTick(time);
         const bar = transport.tickToBar(currentTick);
         const barStartTick = transport.barToTick(bar);
         const tickIntoBar = currentTick - barStartTick;
-        const ticksPerBeat = 960;
-        const currentBeat = Math.floor(tickIntoBar / ticksPerBeat);
+        const currentBeat = Math.floor(tickIntoBar / 960);
         const bpm = transport.getTempo(currentTick);
 
-        const dots = beatIndicator.querySelectorAll('.beat-dot');
-        dots.forEach((dot, i) => dot.classList.toggle('active', i === currentBeat));
         positionEl.textContent = 'Bar ' + bar + ' · Beat ' + (currentBeat + 1);
 
         tempoDisplay.textContent = '';
