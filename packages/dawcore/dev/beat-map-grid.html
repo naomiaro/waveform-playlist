@@ -304,7 +304,8 @@
       // The offset lives in the callbacks — the editor has zero knowledge of it.
       // audioTime - offset = transportTime. The Transport's tempo map has beats
       // at grid-aligned ticks, so the waveform aligns with bar lines.
-      const offset = curve.audioStartOffset;
+      lastAudioStartOffset = curve.audioStartOffset;
+      const offset = lastAudioStartOffset;
       editor.secondsToTicks = (s) => transport.timeToTick(s - offset);
       editor.ticksToSeconds = (t) => transport.tickToTime(t) + offset;
       editor.bpm = Math.round(curve.medianBpm);
@@ -312,6 +313,7 @@
 
     // --- Handle loading independently or together ---
     let beatsApplied = false;
+    let lastAudioStartOffset = 0;
 
     async function tryLoad() {
       // Both available: apply beats then load audio with variable tempo
@@ -416,6 +418,17 @@
 
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
+      // Sync engine to transport: the engine plays audio at audioStartOffset
+      // so that engine time matches transport time (+ offset).
+      if (beatsApplied && editor._engine) {
+        const engineTime = editor._engine.getCurrentTime();
+        const transportTime = engineTime - lastAudioStartOffset;
+        // If engine is at the wrong position, restart from offset
+        if (Math.abs(transportTime) > 0.05) {
+          editor._engine.stop();
+          editor._engine.play(lastAudioStartOffset);
+        }
+      }
       transport.play();
       startTransportPlayhead();
     });
@@ -427,6 +440,10 @@
     editor.addEventListener('daw-stop', () => {
       isPlaying = false;
       transport.stop();
+      // Reset engine to offset so next play starts at transport time 0
+      if (beatsApplied) {
+        editor._currentTime = lastAudioStartOffset;
+      }
       stopTransportPlayhead();
     });
 
