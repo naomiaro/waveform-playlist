@@ -351,14 +351,18 @@ export class PlaylistEngine {
 
     this._tracks = this._tracks.map((t) => {
       if (t.id !== trackId) return t;
-      const newClips = t.clips.map((c: AudioClip, i: number) =>
-        i === clipIndex
-          ? {
-              ...c,
-              startSample: Math.floor(c.startSample + constrainedDelta),
-            }
-          : c
-      );
+      const newClips = t.clips.map((c: AudioClip, i: number) => {
+        if (i !== clipIndex) return c;
+        const newStartSample = Math.floor(c.startSample + constrainedDelta);
+        return {
+          ...c,
+          startSample: newStartSample,
+          startTick:
+            c.startTick !== undefined
+              ? this._secondsToTicks(newStartSample / this._sampleRate)
+              : undefined,
+        };
+      });
       return { ...t, clips: newClips };
     });
 
@@ -400,10 +404,20 @@ export class PlaylistEngine {
 
     const { left, right } = splitClipOp(clip, atSample);
 
+    // Enrich split clips with startTick if the original had one
+    const enrichedLeft =
+      clip.startTick !== undefined
+        ? { ...left, startTick: this._secondsToTicks(left.startSample / this._sampleRate) }
+        : left;
+    const enrichedRight =
+      clip.startTick !== undefined
+        ? { ...right, startTick: this._secondsToTicks(right.startSample / this._sampleRate) }
+        : right;
+
     this._tracks = this._tracks.map((t) => {
       if (t.id !== trackId) return t;
       const newClips = [...t.clips];
-      newClips.splice(clipIndex, 1, left, right);
+      newClips.splice(clipIndex, 1, enrichedLeft, enrichedRight);
       return { ...t, clips: newClips };
     });
 
@@ -456,9 +470,14 @@ export class PlaylistEngine {
       const newClips = t.clips.map((c: AudioClip, i: number) => {
         if (i !== clipIndex) return c;
         if (boundary === 'left') {
+          const newStartSample = c.startSample + constrained;
           return {
             ...c,
-            startSample: c.startSample + constrained,
+            startSample: newStartSample,
+            startTick:
+              c.startTick !== undefined
+                ? this._secondsToTicks(newStartSample / this._sampleRate)
+                : undefined,
             offsetSamples: c.offsetSamples + constrained,
             durationSamples: c.durationSamples - constrained,
           };
