@@ -210,22 +210,23 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 ### Sample-Based Architecture (Phase 3.3)
 
-**Decision:** Store all timing as integer sample counts, not floating-point seconds.
+**Decision:** Store timeline positions as integer ticks (authoritative) and integer samples (derived cache). Duration and offset remain sample-only.
 
-**Why:** Eliminates floating-point precision errors that cause pixel gaps between clips.
+**Why:** Integer samples eliminate floating-point precision errors. Ticks provide tempo-independent timeline positioning for variable-tempo sessions.
 
 **Types:**
 
 ```typescript
 interface AudioClip {
-  startSample: number; // Position on timeline (samples)
+  startTick?: number; // Position on timeline (ticks, authoritative when present)
+  startSample: number; // Position on timeline (samples) — derived cache
   durationSamples: number; // Clip duration (samples)
   offsetSamples: number; // Start within audio file (samples)
   // ... other properties
 }
 ```
 
-**Helper:** Use `createClipFromSeconds()` for backwards compatibility with time-based APIs.
+**Helpers:** `createClip()` when samples known, `createClipFromSeconds()` for time-based APIs, `createClipFromTicks()` for tick-based creation (variable-tempo).
 
 ### Hybrid Canvas + DOM (Phase 3)
 
@@ -361,7 +362,7 @@ const LazyExample = createLazyExample(() =>
 37. **effectiveSampleRate Pattern in dawcore** — `<daw-editor>` `sampleRate` `@property` is an initial hint. Internal calculations use `effectiveSampleRate` getter which returns `_resolvedSampleRate ?? sampleRate`. The resolved rate is set from decoded audio buffers. `PointerHandlerHost` and all pixel/time conversions use `effectiveSampleRate`.
 38. **WaveformData.resample() Only Upsamples** — `WaveformData.resample({ scale })` can only resample to a coarser (larger) scale than the source. Attempting to resample to a finer scale throws. When caching WaveformData, validate `cached.scale <= requestedScale` before returning cache hits.
 39. **Track ID Alignment in dawcore** — `createTrack()` from core generates its own `id` via `generateId()`. The dawcore editor uses a different ID (`<daw-track>.trackId` or `crypto.randomUUID()` for drops) as its map key. Must set `track.id = trackId` after `createTrack()` so engine methods (`setTrackSolo`, `setTrackMute`, etc.) can find the track by ID.
-40. **Prefer `createClip()` Over `createClipFromSeconds()` When Samples Known** — `createClipFromSeconds` round-trips through float seconds: `samples/rate → seconds → Math.round(seconds*rate)`. Safe when the same rate is used for division and multiplication, but drifts silently when rates differ (e.g., `effectiveSampleRate` vs `audioBuffer.sampleRate`). Use `createClip()` with integer samples when available.
+40. **Prefer `createClip()` Over `createClipFromSeconds()` When Samples Known** — `createClipFromSeconds` round-trips through float seconds: `samples/rate → seconds → Math.round(seconds*rate)`. Safe when the same rate is used for division and multiplication, but drifts silently when rates differ (e.g., `effectiveSampleRate` vs `audioBuffer.sampleRate`). Use `createClip()` with integer samples when available. For tick-based creation (variable-tempo), use `createClipFromTicks()` which sets `startTick` as authoritative and derives `startSample`.
 41. **Clip Interaction Adapter Sync** — During clip move drag, pass `skipAdapter=true` to `engine.moveClip()` to avoid 60fps adapter rebuilds. Call `engine.updateTrack(trackId)` once on `pointerup`. Trim uses cumulative delta (engine called once on drop). Split calls engine normally (single operation).
 42. **`composedPath()[0]` vs `closest()` in Shadow DOM** — `composedPath()[0]` returns the deepest clicked element (may be a child like `<span>`). For hit detection on interaction zones (`.clip-header`, `.clip-boundary`), always use `target.closest('.class-name')` to walk up the DOM tree.
 43. **Peak Regeneration After Clip Mutations** — After `splitClip` (new clip IDs) or `trimClip` (changed offset/duration), peaks must be regenerated via `_syncPeaksForChangedClips`. The statechange handler detects changes by comparing `_clipOffsets` cache with current clip state.

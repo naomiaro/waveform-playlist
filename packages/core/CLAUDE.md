@@ -27,7 +27,7 @@ Framework-agnostic types, pure functions, and utilities shared across all packag
 
 ## Key Patterns
 
-**Sample-based architecture:** All timing stored as integer sample counts (`startSample`, `durationSamples`, `offsetSamples`). Use `clipTimeHelpers` for seconds conversion. `clipPixelWidth` uses floor-based endpoint subtraction to guarantee no pixel gaps between adjacent clips.
+**Sample-based architecture with tick authority:** Timeline positions use `startTick` (authoritative, optional) and `startSample` (derived cache). Duration and offset remain sample-only (`durationSamples`, `offsetSamples`). Engine enriches clips missing `startTick` on ingestion. Use `clipTimeHelpers` for seconds conversion. `clipPixelWidth` uses floor-based endpoint subtraction to guarantee no pixel gaps. `createClipFromTicks()` creates clips with authoritative tick positions.
 
 **`gainToDb` vs `gainToNormalized`:** `gainToDb` is the raw gain→dB conversion used by audio nodes (Tone.js `Volume` takes dB). `gainToNormalized` maps gain to 0–1 for UI meters (gain → dB → normalized with configurable floor). Do not duplicate `gainToDb` — it's shared by playout, browser, and dawcore packages.
 
