@@ -268,27 +268,24 @@
         if (interval > 0.1) beatBpm = 60 / interval;
       }
 
-      // How many beats of silence fit before the first beat at beatBpm?
-      // Round up to the next bar boundary so the first downbeat lands on bar N beat 1.
-      const preBeatsAtBeatBpm = (beats[0].time * beatBpm) / 60;
-      const totalPreBeats = pickupBeats + Math.ceil(preBeatsAtBeatBpm - pickupBeats);
-      // Round up to full bars so the downbeat is always beat 1 of a bar
-      const preBars = Math.ceil(totalPreBeats / beatsPerBar);
-      const firstDownbeatTick = preBars * ticksPerBar;
-      const pickupStartTick = firstDownbeatTick - pickupBeats * ticksPerBeat;
+      // Use beatBpm uniformly from tick 0 — no gap BPM needed.
+      // Compute where beat 1 naturally falls at beatBpm, then round up
+      // to the next bar boundary for the downbeat.
+      const naturalFirstBeatTick = Math.round(
+        (beats[0].time * ppqn * beatBpm) / 60
+      );
+      const firstDownbeatBar = Math.max(1, Math.ceil(
+        (naturalFirstBeatTick + pickupBeats * ticksPerBeat) / ticksPerBar
+      ));
+      const firstDownbeatTick = firstDownbeatBar * ticksPerBar;
 
-      // The first beat in the beat map goes at pickupStartTick (if pickups)
-      // or firstDownbeatTick (if no pickups).
-      const firstBeatTick = pickupBeats > 0 ? pickupStartTick : firstDownbeatTick;
+      // Clip starts at the tick where the audio begins — shifted so that
+      // beat 1 in the audio lines up with the bar boundary.
+      const firstBeatTick = firstDownbeatTick - pickupBeats * ticksPerBeat;
+      const clipStartTick = firstBeatTick - naturalFirstBeatTick;
 
-      // Gap BPM: use beatBpm for the gap so the pre-beat region feels natural.
-      // Then compute the exact gap BPM to make ticksToSeconds(firstBeatTick) = beats[0].time.
-      const gapBpm = beats[0].time > 0.001
-        ? (firstBeatTick * 60) / (ppqn * beats[0].time)
-        : beatBpm;
-
-      // Build tempo events — gap BPM from tick 0, then per-beat BPMs
-      const tempoEvents = [{ tick: 0, bpm: gapBpm }];
+      // Build tempo events — beatBpm from tick 0, per-beat BPMs from first beat
+      const tempoEvents = [{ tick: 0, bpm: beatBpm }];
       let currentTick = firstBeatTick;
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
@@ -301,7 +298,7 @@
       bpms.sort((a, b) => a - b);
       const medianBpm = bpms[Math.floor(bpms.length / 2)];
 
-      return { medianBpm, tempoEvents, totalBeats: beats.length };
+      return { medianBpm, tempoEvents, totalBeats: beats.length, firstBeatTick, clipStartTick };
     }
 
     // --- Apply tempo curve ---
@@ -382,7 +379,27 @@
         // Apply tempo to editor's internal Transport (same clock as clips)
         if (beatsApplied) {
           applyTempoToEditorTransport();
-          if (editor.engine) {
+
+          // Reposition clip so first beat aligns with bar boundary.
+          // The clip starts at clipStartTick (not 0) so that beat 1 in the
+          // audio lands on the downbeat tick.
+          if (editor.engine && lastCurve && lastCurve.clipStartTick > 0) {
+            const et = editor.transport;
+            const sr = editor.effectiveSampleRate;
+            const clipStartSec = et
+              ? et.tickToTime(lastCurve.clipStartTick)
+              : (lastCurve.clipStartTick * 60) / (960 * (lastCurve.medianBpm || 120));
+            const clipStartSample = Math.round(clipStartSec * sr);
+            const tracks = [...editor._engineTracks.values()].map(t => ({
+              ...t,
+              clips: t.clips.map(c => ({
+                ...c,
+                startTick: lastCurve.clipStartTick,
+                startSample: clipStartSample,
+              })),
+            }));
+            editor.engine.setTracks(tracks);
+          } else if (editor.engine) {
             editor.engine.setTracks([...editor._engineTracks.values()]);
           }
 
@@ -396,7 +413,6 @@
               addLog('tempo[1]: tick=' + secondEvent.tick + ' bpm=' + secondEvent.bpm.toFixed(1));
               addLog('ticksToSeconds(' + secondEvent.tick + ')=' + et.tickToTime(secondEvent.tick).toFixed(4));
             }
-            // Show clip startTick
             const tracks = editor.engine?.getState().tracks;
             if (tracks?.[0]?.clips?.[0]) {
               const c = tracks[0].clips[0];
@@ -404,7 +420,7 @@
             }
           }
 
-          addLog('synced: editor transport has ' + lastCurve.tempoEvents.length + ' tempo events');
+          addLog('synced: editor transport has ' + (lastCurve?.tempoEvents.length || 0) + ' tempo events');
         } else {
           addLog('audio loaded — single BPM (drop .beats to add variable tempo)');
         }
@@ -476,7 +492,6 @@
 
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
-      // Demo transport runs metronome alongside the editor's transport
       transport.play();
       startTransportPlayhead();
     });
