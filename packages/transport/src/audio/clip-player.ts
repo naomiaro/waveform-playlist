@@ -80,22 +80,23 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
   generate(fromTick: Tick, toTick: Tick): ClipEvent[] {
     const events: ClipEvent[] = [];
 
-    const fromSample = this._sampleTimeline.ticksToSamples(fromTick);
-    const toSample = this._sampleTimeline.ticksToSamples(toTick);
-
     for (const [trackId, state] of this._tracks) {
       for (const clip of state.clips) {
         if (clip.durationSamples === 0) continue;
         if (!clip.audioBuffer) continue;
 
-        const clipStartSample = clip.startSample;
+        // Use startTick when available, fall back to sample-derived tick
+        const clipTick: number =
+          clip.startTick !== undefined
+            ? clip.startTick
+            : (this._sampleTimeline.samplesToTicks(clip.startSample as Sample) as number);
 
         // Only schedule when the clip START falls within this window.
         // Clips that started in a previous window are already playing
         // (AudioBufferSourceNode runs for its full duration).
         // Mid-clip starts (seek, loop wrap) are handled by onPositionJump().
-        if (clipStartSample < fromSample) continue;
-        if (clipStartSample >= toSample) continue;
+        if (clipTick < (fromTick as number)) continue;
+        if (clipTick >= (toTick as number)) continue;
 
         const fadeInDurationSamples = clip.fadeIn ? (clip.fadeIn.duration ?? 0) : 0;
         const fadeOutDurationSamples = clip.fadeOut ? (clip.fadeOut.duration ?? 0) : 0;
@@ -103,18 +104,16 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         // Clamp duration at loopEnd so the source stops exactly at the
         // loop boundary. onPositionJump handles the mid-clip restart.
         let durationSamples = clip.durationSamples;
-        if (this._loopEnabled && clipStartSample + durationSamples > this._loopEndSamples) {
-          durationSamples = this._loopEndSamples - clipStartSample;
+        if (this._loopEnabled && clip.startSample + durationSamples > this._loopEndSamples) {
+          durationSamples = this._loopEndSamples - clip.startSample;
         }
-
-        const clipTick = this._sampleTimeline.samplesToTicks(clipStartSample as Sample);
 
         events.push({
           trackId,
           clipId: clip.id,
           audioBuffer: clip.audioBuffer,
-          tick: clipTick,
-          startSample: clipStartSample as Sample,
+          tick: clipTick as Tick,
+          startSample: clip.startSample as Sample,
           offsetSamples: clip.offsetSamples as Sample,
           durationSamples: durationSamples as Sample,
           gain: clip.gain,
@@ -221,38 +220,42 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         if (clip.durationSamples === 0) continue;
         if (!clip.audioBuffer) continue;
 
-        const clipStartSample = clip.startSample;
-        const clipEndSample = clipStartSample + clip.durationSamples;
+        // Start comparison in ticks (strict < to avoid double-scheduling)
+        const clipTick: number =
+          clip.startTick !== undefined
+            ? clip.startTick
+            : (this._sampleTimeline.samplesToTicks(clip.startSample as Sample) as number);
 
-        // Check if clip spans the new position (started BEFORE, still playing).
-        // Clips starting exactly AT the new position are handled by generate(),
-        // not here — strict < prevents double-scheduling.
-        if (clipStartSample < newSample && clipEndSample > newSample) {
-          const offsetIntoClipSamples = newSample - clipStartSample;
-          const offsetSamples = clip.offsetSamples + offsetIntoClipSamples;
-          let durationSamples = clipEndSample - newSample;
+        if (clipTick >= (newTick as number)) continue; // hasn't started yet
 
-          // Clamp at loop boundary (same as generate)
-          if (this._loopEnabled && newSample + durationSamples > this._loopEndSamples) {
-            durationSamples = this._loopEndSamples - newSample;
-          }
-          if (durationSamples <= 0) continue;
+        // End comparison in samples (duration is audio-file-relative)
+        const clipEndSample = clip.startSample + clip.durationSamples;
+        if (clipEndSample <= (newSample as number)) continue; // already finished
 
-          const fadeOutDurationSamples = clip.fadeOut ? (clip.fadeOut.duration ?? 0) : 0;
+        const offsetIntoClipSamples = (newSample as number) - clip.startSample;
+        const offsetSamples = clip.offsetSamples + offsetIntoClipSamples;
+        let durationSamples = clipEndSample - (newSample as number);
 
-          this.consume({
-            trackId,
-            clipId: clip.id,
-            audioBuffer: clip.audioBuffer,
-            tick: newTick as Tick,
-            startSample: newSample as Sample,
-            offsetSamples: offsetSamples as Sample,
-            durationSamples: durationSamples as Sample,
-            gain: clip.gain,
-            fadeInDurationSamples: 0 as Sample,
-            fadeOutDurationSamples: fadeOutDurationSamples as Sample,
-          });
+        // Clamp at loop boundary (same as generate)
+        if (this._loopEnabled && (newSample as number) + durationSamples > this._loopEndSamples) {
+          durationSamples = this._loopEndSamples - (newSample as number);
         }
+        if (durationSamples <= 0) continue;
+
+        const fadeOutDurationSamples = clip.fadeOut ? (clip.fadeOut.duration ?? 0) : 0;
+
+        this.consume({
+          trackId,
+          clipId: clip.id,
+          audioBuffer: clip.audioBuffer,
+          tick: newTick as Tick,
+          startSample: newSample as Sample,
+          offsetSamples: offsetSamples as Sample,
+          durationSamples: durationSamples as Sample,
+          gain: clip.gain,
+          fadeInDurationSamples: 0 as Sample,
+          fadeOutDurationSamples: fadeOutDurationSamples as Sample,
+        });
       }
     }
   }

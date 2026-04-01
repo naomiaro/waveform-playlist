@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/annotations",
-  "version": "11.3.0",
+  "version": "11.3.1",
   "description": "Annotation support for waveform-playlist",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

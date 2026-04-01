@@ -5,8 +5,9 @@ import {
   clipOffsetTime,
   clipDurationTime,
   clipPixelWidth,
+  trackChannelCount,
 } from '../clipTimeHelpers';
-import type { AudioClip } from '../types';
+import type { AudioClip, ClipTrack } from '../types';
 
 function makeClip(
   overrides: Partial<AudioClip> & {
@@ -150,5 +151,67 @@ describe('clipPixelWidth', () => {
     // Progress overlay must use clipWidth (937), not peaksWidth (750)
     expect(clipWidth).toBe(Math.floor(960000 / 1024));
     expect(peaksWidth).toBe(Math.floor(768000 / 1024));
+  });
+});
+
+function makeTrack(clips: Partial<AudioClip>[]): ClipTrack {
+  return {
+    id: 't1',
+    name: 'Track 1',
+    volume: 1,
+    pan: 0,
+    muted: false,
+    soloed: false,
+    clips: clips.map((c, i) =>
+      makeClip({
+        id: `c${i}`,
+        startSample: 0,
+        durationSamples: 44100,
+        ...c,
+      })
+    ),
+  } as ClipTrack;
+}
+
+function makeFakeBuffer(numberOfChannels: number) {
+  return {
+    numberOfChannels,
+    length: 44100,
+    duration: 1,
+    sampleRate: 44100,
+    getChannelData: () => new Float32Array(),
+  } as unknown as import('../types').AudioBuffer;
+}
+
+describe('trackChannelCount', () => {
+  it('returns 1 for track with no clips', () => {
+    expect(trackChannelCount(makeTrack([]))).toBe(1);
+  });
+
+  it('returns 1 for clips without audioBuffer (peaks-only)', () => {
+    expect(trackChannelCount(makeTrack([{}, {}]))).toBe(1);
+  });
+
+  it('returns 1 for mono clips', () => {
+    const track = makeTrack([{ audioBuffer: makeFakeBuffer(1) }]);
+    expect(trackChannelCount(track)).toBe(1);
+  });
+
+  it('returns 2 for stereo clips', () => {
+    const track = makeTrack([{ audioBuffer: makeFakeBuffer(2) }]);
+    expect(trackChannelCount(track)).toBe(2);
+  });
+
+  it('returns max across mixed mono and stereo clips', () => {
+    const track = makeTrack([
+      { audioBuffer: makeFakeBuffer(1) },
+      { audioBuffer: makeFakeBuffer(2) },
+    ]);
+    expect(trackChannelCount(track)).toBe(2);
+  });
+
+  it('ignores clips without audioBuffer when others have it', () => {
+    const track = makeTrack([{}, { audioBuffer: makeFakeBuffer(2) }]);
+    expect(trackChannelCount(track)).toBe(2);
   });
 });

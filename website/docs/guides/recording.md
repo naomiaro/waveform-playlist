@@ -476,7 +476,7 @@ When exporting recordings, you can choose:
 
 | Option | Description |
 |--------|-------------|
-| `mode: 'master'` | Export all tracks mixed to stereo |
+| `mode: 'master'` | Export all tracks as a mixdown (channel count matches source) |
 | `mode: 'individual'` | Export a single track as a stem |
 | `bitDepth: 16` | Standard CD quality (16-bit PCM) |
 | `bitDepth: 32` | High resolution (32-bit float) |

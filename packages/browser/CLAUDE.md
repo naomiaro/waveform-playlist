@@ -48,6 +48,18 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Documentation:** `website/docs/effects.md`
 
+## WAV Export (useExportWav)
+
+**Single render path:** Export uses `Tone.Offline` exclusively via `renderOffline()`. The offline graph mirrors the live playback topology (`Player → fadeGain → trackVolume → trackPan → trackMute → masterVolume → destination`). Master and per-track effects chains are conditionally inserted when provided.
+
+**Why single path:** Previously had a native `OfflineAudioContext` path (no effects) and a `Tone.Offline` path (with effects). The dual paths diverged — the native path used `StereoPannerNode` (correct stereo) while the Tone path used `Panner` without `channelCount: 2` (stereo→mono downmix). Unifying prevents this class of bug.
+
+**Panner channelCount from source:** Use `trackChannelCount(track)` from core for Panner `channelCount`. Hardcoding `2` upmixes mono tracks to stereo; hardcoding `1` downmixes stereo to mono.
+
+**Output channels from source:** `Offline()` output channel count is derived from `trackChannelCount` across all rendered tracks — not hardcoded to 2.
+
+**Fade types:** All 4 types (linear, exponential, logarithmic, sCurve) are applied via `getUnderlyingAudioParam()` → `applyFadeEnvelope()`. The native `AudioParam` is extracted from the Tone.js `Gain` node.
+
 ## Shared Animation Frame Loop Hook
 
 **Decision:** Centralize requestAnimationFrame lifecycle logic in a shared hook used by both playlist providers.

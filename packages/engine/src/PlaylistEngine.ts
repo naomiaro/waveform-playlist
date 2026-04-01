@@ -38,6 +38,8 @@ export class PlaylistEngine {
   private _loopStart = 0;
   private _loopEnd = 0;
   private _isLoopEnabled = false;
+  private _bpm: number;
+  private _ppqn: number;
   private _tracksVersion = 0;
   private _adapter: PlayoutAdapter | null;
   private _disposed = false;
@@ -70,6 +72,8 @@ export class PlaylistEngine {
       );
     }
     this._zoomIndex = zoomIndex;
+    this._bpm = options.bpm ?? 120;
+    this._ppqn = options.ppqn ?? 960;
   }
 
   // ---------------------------------------------------------------------------
@@ -173,6 +177,8 @@ export class PlaylistEngine {
       loopStart: this._loopStart,
       loopEnd: this._loopEnd,
       isLoopEnabled: this._isLoopEnabled,
+      bpm: this._bpm,
+      ppqn: this._ppqn,
       canUndo: this.canUndo,
       canRedo: this.canRedo,
     };
@@ -184,7 +190,13 @@ export class PlaylistEngine {
 
   setTracks(tracks: ClipTrack[]): void {
     this.clearHistory();
-    this._tracks = [...tracks];
+    this._tracks = tracks.map((track) => ({
+      ...track,
+      clips: track.clips.map((clip) => ({
+        ...clip,
+        startTick: clip.startTick ?? this._secondsToTicks(clip.startSample / this._sampleRate),
+      })),
+    }));
     this._tracksVersion++;
     this._adapter?.setTracks(this._tracks);
     this._emitStateChange();
@@ -547,8 +559,15 @@ export class PlaylistEngine {
     this._emitStateChange();
   }
 
+  setTempo(bpm: number, atTick?: number): void {
+    this._bpm = bpm;
+    this._adapter?.setTempo?.(bpm, atTick);
+    this._recomputeStartSamples();
+    this._emitStateChange();
+  }
+
   getCurrentTime(): number {
-    if (this._isPlaying && this._adapter) {
+    if (this._adapter) {
       return this._adapter.getCurrentTime();
     }
     return this._currentTime;
@@ -734,6 +753,34 @@ export class PlaylistEngine {
     if (!this._isPlaying) return true;
     const t = this._adapter?.getCurrentTime() ?? this._currentTime;
     return t < this._loopEnd;
+  }
+
+  private _ticksToSeconds(tick: number): number {
+    if (this._adapter?.ticksToSeconds) {
+      return this._adapter.ticksToSeconds(tick);
+    }
+    return (tick * 60) / (this._ppqn * this._bpm);
+  }
+
+  private _secondsToTicks(seconds: number): number {
+    if (this._adapter?.secondsToTicks) {
+      return this._adapter.secondsToTicks(seconds);
+    }
+    return Math.round((seconds * this._ppqn * this._bpm) / 60);
+  }
+
+  private _recomputeStartSamples(): void {
+    this._tracks = this._tracks.map((track) => ({
+      ...track,
+      clips: track.clips.map((clip) => {
+        if (clip.startTick === undefined) return clip;
+        return {
+          ...clip,
+          startSample: Math.round(this._ticksToSeconds(clip.startTick) * this._sampleRate),
+        };
+      }),
+    }));
+    this._tracksVersion++;
   }
 
   private _emitStateChange(): void {

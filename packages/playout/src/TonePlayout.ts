@@ -8,6 +8,7 @@ import {
   getContext,
   BaseContext,
 } from 'tone';
+import { gainToDb } from '@waveform-playlist/core';
 import { ToneTrack, ToneTrackOptions, type ClipInfo } from './ToneTrack';
 import { MidiToneTrack, MidiToneTrackOptions } from './MidiToneTrack';
 import type { PlayableTrack } from './MidiToneTrack';
@@ -40,7 +41,7 @@ export class TonePlayout {
   private _loopEnd = 0;
 
   constructor(options: TonePlayoutOptions = {}) {
-    this.masterVolume = new Volume(this.gainToDb(options.masterGain ?? 1));
+    this.masterVolume = new Volume(gainToDb(options.masterGain ?? 1));
 
     // Setup effects chain if provided, otherwise connect directly to destination
     if (options.effects) {
@@ -58,10 +59,6 @@ export class TonePlayout {
         this.manualMuteState.set(track.id, track.muted);
       });
     }
-  }
-
-  private gainToDb(gain: number): number {
-    return 20 * Math.log10(gain);
   }
 
   private clearCompletionEvent(): void {
@@ -320,7 +317,7 @@ export class TonePlayout {
   }
 
   setMasterGain(gain: number): void {
-    this.masterVolume.volume.value = this.gainToDb(gain);
+    this.masterVolume.volume.value = gainToDb(gain);
   }
 
   setSolo(trackId: string, soloed: boolean): void {

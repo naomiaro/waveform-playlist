@@ -7,7 +7,7 @@ import {
   getTransport,
   getContext,
 } from 'tone';
-import { Track, type Fade } from '@waveform-playlist/core';
+import { Track, gainToDb, type Fade } from '@waveform-playlist/core';
 import { applyFadeIn, applyFadeOut, getUnderlyingAudioParam } from './fades';
 
 export type TrackEffectsFunction = (
@@ -32,6 +32,8 @@ export interface ToneTrackOptions {
   track: Track;
   effects?: TrackEffectsFunction;
   destination?: ToneAudioNode;
+  /** Max channel count across clips — sets Panner channelCount. Default: 1 */
+  channelCount?: number;
 }
 
 /** Per-clip scheduling info and audio nodes */
@@ -61,11 +63,12 @@ export class ToneTrack {
     this.track = options.track;
 
     // Create shared track-level Tone.js nodes
-    this.volumeNode = new Volume(this.gainToDb(options.track.gain));
-    // Tone.js Panner defaults to channelCount: 1 + channelCountMode: 'explicit',
-    // which forces stereo→mono downmix (1/√2 attenuation) before panning.
-    // Override to channelCount: 2 to preserve stereo recordings.
-    this.panNode = new Panner({ pan: options.track.stereoPan, channelCount: 2 });
+    this.volumeNode = new Volume(gainToDb(options.track.gain));
+    // Match channelCount to source — Tone.js Panner defaults to 1 (stereo→mono downmix).
+    this.panNode = new Panner({
+      pan: options.track.stereoPan,
+      channelCount: options.channelCount ?? 1,
+    });
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
     // Chain shared Tone.js nodes: Volume → Pan → MuteGain
@@ -514,13 +517,9 @@ export class ToneTrack {
     });
   }
 
-  private gainToDb(gain: number): number {
-    return 20 * Math.log10(gain);
-  }
-
   setVolume(gain: number): void {
     this.track.gain = gain;
-    this.volumeNode.volume.value = this.gainToDb(gain);
+    this.volumeNode.volume.value = gainToDb(gain);
   }
 
   setPan(pan: number): void {

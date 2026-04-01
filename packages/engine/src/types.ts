@@ -26,6 +26,14 @@ export interface PlayoutAdapter {
   setTrackSolo(trackId: string, soloed: boolean): void;
   setTrackPan(trackId: string, pan: number): void;
   setLoop(enabled: boolean, start: number, end: number): void;
+  /** Set tempo at a tick position. First call (or atTick=0) sets the base tempo. */
+  setTempo?(bpm: number, atTick?: number): void;
+  /** Set time signature at a tick position. */
+  setMeter?(numerator: number, denominator: number, atTick?: number): void;
+  /** Convert ticks to seconds using the adapter's tempo map. */
+  ticksToSeconds?(tick: number): number;
+  /** Convert seconds to ticks using the adapter's tempo map. */
+  secondsToTicks?(seconds: number): number;
   dispose(): void;
 }
 
@@ -57,6 +65,10 @@ export interface EngineState {
   loopEnd: number;
   /** Whether loop playback is active. */
   isLoopEnabled: boolean;
+  /** Current base tempo in BPM. */
+  bpm: number;
+  /** Pulses per quarter note. */
+  ppqn: number;
   /** Whether undo is available. */
   canUndo: boolean;
   /** Whether redo is available. */
@@ -73,6 +85,10 @@ export interface PlaylistEngineOptions {
   zoomLevels?: number[];
   /** Maximum number of undo steps (default 100). */
   undoLimit?: number;
+  /** Initial tempo in BPM (default 120). */
+  bpm?: number;
+  /** Pulses per quarter note (default 960). */
+  ppqn?: number;
 }
 
 /**

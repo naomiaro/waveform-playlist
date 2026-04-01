@@ -44,6 +44,16 @@ export function normalizedToDb(normalized: number, floor: number = DEFAULT_FLOOR
 }
 
 /**
+ * Convert a linear gain value to decibels.
+ *
+ * @param gain - Linear gain (0 = silence, 1 = unity)
+ * @returns Decibel value (e.g., 0.5 → ≈ -6.02 dB)
+ */
+export function gainToDb(gain: number): number {
+  return 20 * Math.log10(Math.max(gain, 0.0001));
+}
+
+/**
  * Convert a linear gain value (0-1+) to normalized 0-1 via dB.
  *
  * Combines gain-to-dB (20 * log10) with dBToNormalized for a consistent
@@ -56,6 +66,8 @@ export function normalizedToDb(normalized: number, floor: number = DEFAULT_FLOOR
  */
 export function gainToNormalized(gain: number, floor: number = DEFAULT_FLOOR): number {
   if (gain <= 0) return 0;
+  // Use raw log10 (no clamp) — gain > 0 is guaranteed above,
+  // and dBToNormalized handles -Infinity via its floor check.
   const db = 20 * Math.log10(gain);
   return dBToNormalized(db, floor);
 }

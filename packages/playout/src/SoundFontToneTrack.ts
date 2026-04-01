@@ -1,5 +1,5 @@
 import { Volume, Gain, Panner, Part, ToneAudioNode, getDestination, getContext } from 'tone';
-import { Track } from '@waveform-playlist/core';
+import { Track, gainToDb } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
 import type { PlayableTrack, MidiClipInfo } from './MidiToneTrack';
@@ -57,7 +57,7 @@ export class SoundFontToneTrack implements PlayableTrack {
     this.bankNumber = options.isPercussion ? 128 : 0;
 
     // Create shared track-level Tone.js nodes (same chain as ToneTrack)
-    this.volumeNode = new Volume(this.gainToDb(options.track.gain));
+    this.volumeNode = new Volume(gainToDb(options.track.gain));
     this.panNode = new Panner(options.track.stereoPan);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
     this.volumeNode.chain(this.panNode, this.muteGain);
@@ -202,10 +202,6 @@ export class SoundFontToneTrack implements PlayableTrack {
     source.stop(time + effectiveDuration + releaseVolEnv);
   }
 
-  private gainToDb(gain: number): number {
-    return 20 * Math.log10(gain);
-  }
-
   /**
    * No-op — Tone.Part handles scheduling internally, no ghost tick guard needed.
    */
@@ -271,7 +267,7 @@ export class SoundFontToneTrack implements PlayableTrack {
 
   setVolume(gain: number): void {
     this.track.gain = gain;
-    this.volumeNode.volume.value = this.gainToDb(gain);
+    this.volumeNode.volume.value = gainToDb(gain);
   }
 
   setPan(pan: number): void {

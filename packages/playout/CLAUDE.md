@@ -221,7 +221,7 @@ const analyser = context.createAnalyser();
 
 **Critical:** `new Panner(pan)` defaults to `channelCount: 1` + `channelCountMode: "explicit"` (for standardized-audio-context compat). This forces stereo→mono downmix at 1/√2 gain before panning. Stereo recordings play back ~3dB quieter with identical L/R channels.
 
-**Fix:** `new Panner({ pan, channelCount: 2 })` for `ToneTrack` (audio playback). MidiToneTrack/SoundFontToneTrack use mono synth sources, so `channelCount: 1` is correct there.
+**Fix:** `ToneTrackOptions.channelCount` sets `Panner({ channelCount })`. Callers use `trackChannelCount(track)` from core. MidiToneTrack/SoundFontToneTrack use mono synth sources, so default `channelCount: 1` is correct there.
 
 ## Native AudioContext for sampleRate Control
 

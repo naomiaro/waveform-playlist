@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { dBToNormalized, normalizedToDb, gainToNormalized } from '../utils/dBUtils';
+import { dBToNormalized, normalizedToDb, gainToDb, gainToNormalized } from '../utils/dBUtils';
 
 describe('dBToNormalized', () => {
   it('warns and returns 0 for NaN input', () => {
@@ -81,6 +81,25 @@ describe('normalizedToDb', () => {
   it('round-trips above 0 dB', () => {
     const original = 3;
     expect(normalizedToDb(dBToNormalized(original))).toBeCloseTo(original, 10);
+  });
+});
+
+describe('gainToDb', () => {
+  it('maps unity gain to 0 dB', () => {
+    expect(gainToDb(1)).toBe(0);
+  });
+  it('maps 0.5 to ≈ -6.02 dB', () => {
+    expect(gainToDb(0.5)).toBeCloseTo(-6.0206, 3);
+  });
+  it('maps 2.0 to ≈ +6.02 dB', () => {
+    expect(gainToDb(2)).toBeCloseTo(6.0206, 3);
+  });
+  it('clamps near-zero gain to floor', () => {
+    // gain 0 would be -Infinity, clamped to 0.0001 → -80 dB
+    expect(gainToDb(0)).toBeCloseTo(-80, 0);
+  });
+  it('clamps negative gain to floor', () => {
+    expect(gainToDb(-1)).toBeCloseTo(-80, 0);
   });
 });
 

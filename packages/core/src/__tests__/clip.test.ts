@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createClip,
   createClipFromSeconds,
+  createClipFromTicks,
   createTrack,
   createTimeline,
   getClipsInRange,
@@ -142,6 +143,25 @@ describe('createClip', () => {
     expect(clip.midiProgram).toBe(1);
   });
 
+  it('passes through startTick when provided', () => {
+    const clip = createClip({
+      startSample: 48000,
+      sampleRate: 48000,
+      sourceDurationSamples: 96000,
+      startTick: 960,
+    });
+    expect(clip.startTick).toBe(960);
+  });
+
+  it('leaves startTick undefined when not provided', () => {
+    const clip = createClip({
+      startSample: 48000,
+      sampleRate: 48000,
+      sourceDurationSamples: 96000,
+    });
+    expect(clip.startTick).toBeUndefined();
+  });
+
   it('derives sampleRate from waveformData when not explicit', () => {
     const waveformData = {
       sample_rate: 48000,
@@ -178,6 +198,16 @@ describe('createClipFromSeconds', () => {
     expect(clip.startSample).toBe(Math.round(1.0 * 44100));
     expect(clip.durationSamples).toBe(Math.round(2.0 * 44100));
     expect(clip.offsetSamples).toBe(Math.round(0.5 * 44100));
+  });
+
+  it('passes through startTick when provided', () => {
+    const clip = createClipFromSeconds({
+      startTime: 1.0,
+      sampleRate: 48000,
+      sourceDuration: 2.0,
+      startTick: 960,
+    });
+    expect(clip.startTick).toBe(960);
   });
 
   it('uses Math.ceil for sourceDurationSamples', () => {
@@ -295,6 +325,68 @@ describe('createClipFromSeconds', () => {
     // 3.0 * 48000 = 144000, NOT 132300 — a 8.8% error
     expect(clip.startSample).not.toBe(samples);
     expect(clip.startSample).toBe(Math.round(3.0 * 48000)); // 144000
+  });
+});
+
+// --- createClipFromTicks ---
+
+describe('createClipFromTicks', () => {
+  it('creates a clip with startTick and derives startSample', () => {
+    const clip = createClipFromTicks({
+      startTick: 960,
+      sampleRate: 48000,
+      sourceDurationSamples: 96000,
+      bpm: 120,
+      ppqn: 960,
+    });
+    expect(clip.startTick).toBe(960);
+    expect(clip.startSample).toBe(24000);
+  });
+
+  it('defaults durationSamples to full source duration', () => {
+    const clip = createClipFromTicks({
+      startTick: 0,
+      sampleRate: 48000,
+      sourceDurationSamples: 96000,
+      bpm: 120,
+      ppqn: 960,
+    });
+    expect(clip.durationSamples).toBe(96000);
+  });
+
+  it('uses ticksToSeconds callback when provided', () => {
+    const ticksToSeconds = (tick: number) => tick / 480;
+    const clip = createClipFromTicks({
+      startTick: 480,
+      sampleRate: 48000,
+      sourceDurationSamples: 96000,
+      ticksToSeconds,
+    });
+    expect(clip.startTick).toBe(480);
+    expect(clip.startSample).toBe(48000);
+  });
+
+  it('prefers ticksToSeconds over bpm/ppqn', () => {
+    const ticksToSeconds = (tick: number) => tick / 100;
+    const clip = createClipFromTicks({
+      startTick: 100,
+      sampleRate: 48000,
+      sourceDurationSamples: 96000,
+      ticksToSeconds,
+      bpm: 120,
+      ppqn: 960,
+    });
+    expect(clip.startSample).toBe(48000);
+  });
+
+  it('throws when neither ticksToSeconds nor bpm+ppqn provided', () => {
+    expect(() =>
+      createClipFromTicks({
+        startTick: 960,
+        sampleRate: 48000,
+        sourceDurationSamples: 96000,
+      })
+    ).toThrow('createClipFromTicks');
   });
 });
 

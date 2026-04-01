@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/browser",
-  "version": "11.3.0",
+  "version": "11.3.1",
   "description": "Browser bundle for waveform-playlist with React",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

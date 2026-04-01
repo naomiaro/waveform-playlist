@@ -279,6 +279,69 @@ describe('ClipPlayer', () => {
     expect((ctx.createBufferSource as any).mock.results.length).toBe(0);
   });
 
+  // --- Tick-based scheduling ---
+
+  it('generate uses startTick for matching when present', () => {
+    // Clip at tick 960 (0.5s)
+    const clip = makeClip({ startSample: 24000, startTick: 960, durationSamples: 48000 });
+    const track = makeTrack([clip]);
+    const trackNode = createMockTrackNode('track-1');
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([track], new Map([['track-1', trackNode]]));
+
+    // Window [0, 480) — before clip, should not match
+    expect(player.generate(0 as Tick, 480 as Tick)).toHaveLength(0);
+
+    // Window [480, 1440) — clip at tick 960 should match
+    const events = player.generate(480 as Tick, 1440 as Tick);
+    expect(events).toHaveLength(1);
+    expect(events[0].tick).toBe(960);
+  });
+
+  it('generate uses startTick directly for event.tick', () => {
+    const clip = makeClip({ startSample: 24000, startTick: 960, durationSamples: 48000 });
+    const track = makeTrack([clip]);
+    const trackNode = createMockTrackNode('track-1');
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([track], new Map([['track-1', trackNode]]));
+
+    const events = player.generate(0 as Tick, 1920 as Tick);
+    // event.tick should come from clip.startTick, not derived from samples
+    expect(events[0].tick).toBe(960);
+  });
+
+  it('onPositionJump detects mid-clip using startTick', () => {
+    const clip = makeClip({
+      startSample: 0,
+      startTick: 0,
+      durationSamples: 96000, // 2s
+    });
+    const track = makeTrack([clip]);
+    const trackNode = createMockTrackNode('track-1');
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([track], new Map([['track-1', trackNode]]));
+
+    // Jump to tick 960 — clip starts at tick 0, should create mid-clip source
+    player.onPositionJump(960 as Tick);
+    expect((ctx.createBufferSource as any).mock.results.length).toBe(1);
+  });
+
+  it('onPositionJump skips clips starting at or after jump tick', () => {
+    const clip = makeClip({
+      startSample: 24000,
+      startTick: 960,
+      durationSamples: 48000,
+    });
+    const track = makeTrack([clip]);
+    const trackNode = createMockTrackNode('track-1');
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([track], new Map([['track-1', trackNode]]));
+
+    // Jump to tick 960 — clip starts AT this tick, should not create mid-clip
+    player.onPositionJump(960 as Tick);
+    expect((ctx.createBufferSource as any).mock.results.length).toBe(0);
+  });
+
   it('mid-clip playback is handled by onPositionJump, not generate', () => {
     const clip = makeClip({
       startSample: 0,
