@@ -22,7 +22,7 @@ export type TrackEffectsFunction = (
 export interface ExportOptions extends WavEncoderOptions {
   /** Filename for download (without extension) */
   filename?: string;
-  /** Export mode: 'master' for stereo mix, 'individual' for single track */
+  /** Export mode: 'master' for full mixdown, 'individual' for single track */
   mode?: 'master' | 'individual';
   /** Track index for individual export (only used when mode is 'individual') */
   trackIndex?: number;
@@ -219,8 +219,13 @@ async function renderOffline(
 
   onProgress(0.1);
 
-  // Derive output channel count from source material
-  const outputChannels = tracksToRender.reduce(
+  // Derive output channel count from audible tracks only
+  const audibleTracks = tracksToRender.filter(({ state }) => {
+    if (state.muted && !state.soloed) return false;
+    if (hasSolo && !state.soloed) return false;
+    return true;
+  });
+  const outputChannels = audibleTracks.reduce(
     (max, { track }) => Math.max(max, trackChannelCount(track)),
     1
   );
@@ -305,6 +310,12 @@ async function renderOffline(
               const audioParam = getUnderlyingAudioParam(fadeGain.gain);
               if (audioParam) {
                 applyClipFades(audioParam, clipGain, startTime, clipDuration, fadeIn, fadeOut);
+              } else if (fadeIn || fadeOut) {
+                console.warn(
+                  '[waveform-playlist] Cannot apply fades for clip "' +
+                    (clip.name || clip.id) +
+                    '" - AudioParam not accessible'
+                );
               }
             }
 
@@ -328,7 +339,11 @@ async function renderOffline(
 
   onProgress(0.9);
 
-  return buffer.get() as AudioBuffer;
+  const result = buffer.get();
+  if (!result) {
+    throw new Error('Offline rendering produced no audio buffer');
+  }
+  return result;
 }
 
 /**
@@ -412,6 +427,7 @@ function applyFadeEnvelope(
     }
 
     default:
+      console.warn('[waveform-playlist] Unknown fade type "' + fadeType + '", using linear');
       gainParam.setValueAtTime(startValue, startTime);
       gainParam.linearRampToValueAtTime(endValue, endTime);
   }
