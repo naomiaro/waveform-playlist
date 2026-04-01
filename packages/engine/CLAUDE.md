@@ -14,6 +14,15 @@
 
 **No React, no Tone.js** — zero framework dependencies. Only peer dependency is `@waveform-playlist/core`.
 
+## Tempo Management
+
+- **`setTempo(bpm, atTick?)`** — Updates `_bpm`, forwards to `adapter?.setTempo?.()`, calls `_recomputeStartSamples()`, emits statechange.
+- **`getCurrentTime()` always reads from adapter** — No `_isPlaying` gate. When adapter exists, adapter is the time authority. `_currentTime` is only a fallback for headless/no-adapter mode.
+- **`_ticksToSeconds` / `_secondsToTicks`** — Delegates to `adapter.ticksToSeconds()` / `adapter.secondsToTicks()` when available (multi-tempo via Transport's TempoMap). Falls back to simple single-tempo math.
+- **`_recomputeStartSamples()`** — Immutably maps all tracks/clips, recomputes `startSample` from `startTick` for clips that have `startTick` defined. Increments `tracksVersion`.
+- **`setTracks()` enriches clips** — Clips without `startTick` get it computed from `startSample / sampleRate` via `_secondsToTicks()`. Uses immutable mapping pattern.
+- **Constructor accepts `bpm` and `ppqn`** — Via `PlaylistEngineOptions`. Defaults: 120 BPM, 960 PPQN. Exposed in `EngineState`.
+
 ## Zoom Level Validation
 
 `samplesPerPixel` must exist in the `zoomLevels` array — engine constructor throws if not (`indexOf` check, not `findClosestZoomIndex`). Default zoom levels: `[256, 512, 1024, 2048, 4096, 8192]`. Default `samplesPerPixel`: 1024. When adding examples, always use a value from the zoom levels array.

@@ -137,6 +137,8 @@ When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute
 
 Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (required + optional: `addTrack`, `removeTrack`, `updateTrack`). `init()` resumes suspended AudioContext and waits for Safari warmup (see Patterns). `transport` getter exposes the Transport for direct access to tempo, metronome, and effects hooks.
 
+`setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)` — delegate to the underlying Transport. These enable the engine to forward tempo changes and use the adapter's TempoMap for `startSample` cache recomputation.
+
 ## Patterns
 
 - **AudioContext received from consumer** — sidesteps all Tone.js/Firefox context creation issues. `new AudioContext({ sampleRate, latencyHint })` works natively.
