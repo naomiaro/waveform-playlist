@@ -97,6 +97,13 @@ export interface AudioClip {
   /** Position on timeline where this clip starts (in samples at timeline sampleRate) */
   startSample: number;
 
+  /**
+   * Position on timeline in ticks (authoritative when present).
+   * When set, startSample is a derived cache recomputed from startTick via TempoMap.
+   * Optional for backwards compatibility — engine enriches clips without startTick on ingestion.
+   */
+  startTick?: number;
+
   /** Duration of this clip (in samples) - how much of the audio buffer to play */
   durationSamples: number;
 
@@ -234,6 +241,7 @@ export interface CreateClipOptions {
   /** Audio buffer - optional for peaks-first rendering */
   audioBuffer?: AudioBuffer;
   startSample: number; // Position on timeline (in samples)
+  startTick?: number; // Timeline position in ticks (optional)
   durationSamples?: number; // Defaults to full buffer/source duration (in samples)
   offsetSamples?: number; // Defaults to 0
   gain?: number; // Defaults to 1.0
@@ -265,6 +273,7 @@ export interface CreateClipOptionsSeconds {
   /** Audio buffer - optional for peaks-first rendering */
   audioBuffer?: AudioBuffer;
   startTime: number; // Position on timeline (in seconds)
+  startTick?: number; // Timeline position in ticks (optional)
   duration?: number; // Defaults to full buffer/source duration (in seconds)
   offset?: number; // Defaults to 0 (in seconds)
   gain?: number; // Defaults to 1.0
@@ -284,6 +293,79 @@ export interface CreateClipOptionsSeconds {
   midiChannel?: number;
   /** MIDI program number (0-127). GM instrument for SoundFont playback. */
   midiProgram?: number;
+}
+
+/**
+ * Options for creating a new audio clip from tick position.
+ * startTick is authoritative; startSample is derived.
+ *
+ * Provide either:
+ * - ticksToSeconds callback (for variable-tempo / multi-tempo), or
+ * - bpm + ppqn (for single-tempo convenience)
+ */
+export interface CreateClipOptionsTicks {
+  startTick: number;
+  ticksToSeconds?: (tick: number) => number;
+  bpm?: number;
+  ppqn?: number;
+  audioBuffer?: AudioBuffer;
+  durationSamples?: number;
+  offsetSamples?: number;
+  gain?: number;
+  name?: string;
+  color?: string;
+  fadeIn?: Fade;
+  fadeOut?: Fade;
+  waveformData?: WaveformDataObject;
+  sampleRate?: number;
+  sourceDurationSamples?: number;
+  midiNotes?: MidiNoteData[];
+  midiChannel?: number;
+  midiProgram?: number;
+}
+
+export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip {
+  const { startTick, ticksToSeconds, bpm, ppqn } = options;
+
+  let toSeconds: (tick: number) => number;
+  if (ticksToSeconds) {
+    toSeconds = ticksToSeconds;
+  } else if (bpm !== undefined && ppqn !== undefined) {
+    toSeconds = (tick: number) => (tick * 60) / (ppqn * bpm);
+  } else {
+    throw new Error(
+      'createClipFromTicks: either ticksToSeconds callback or both bpm and ppqn are required'
+    );
+  }
+
+  const sampleRate =
+    options.audioBuffer?.sampleRate ?? options.sampleRate ?? options.waveformData?.sample_rate;
+  if (sampleRate === undefined) {
+    throw new Error(
+      'createClipFromTicks: sampleRate is required when audioBuffer is not provided'
+    );
+  }
+
+  const startSample = Math.round(toSeconds(startTick) * sampleRate);
+
+  return createClip({
+    audioBuffer: options.audioBuffer,
+    startSample,
+    startTick,
+    durationSamples: options.durationSamples,
+    offsetSamples: options.offsetSamples,
+    gain: options.gain,
+    name: options.name,
+    color: options.color,
+    fadeIn: options.fadeIn,
+    fadeOut: options.fadeOut,
+    waveformData: options.waveformData,
+    sampleRate: options.sampleRate,
+    sourceDurationSamples: options.sourceDurationSamples,
+    midiNotes: options.midiNotes,
+    midiChannel: options.midiChannel,
+    midiProgram: options.midiProgram,
+  });
 }
 
 /**
@@ -313,6 +395,7 @@ export function createClip(options: CreateClipOptions): AudioClip {
   const {
     audioBuffer,
     startSample,
+    startTick,
     offsetSamples = 0,
     gain = 1.0,
     name,
@@ -364,6 +447,7 @@ export function createClip(options: CreateClipOptions): AudioClip {
     id: generateId(),
     audioBuffer,
     startSample,
+    startTick,
     durationSamples,
     offsetSamples,
     sampleRate,
@@ -429,6 +513,7 @@ export function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioC
   return createClip({
     audioBuffer,
     startSample: Math.round(startTime * sampleRate),
+    startTick: options.startTick,
     durationSamples: Math.round(duration * sampleRate),
     offsetSamples: Math.round(offset * sampleRate),
     sampleRate,
