@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import {
   gainToDb,
   trackChannelCount,
+  applyFadeIn,
+  applyFadeOut,
   type ClipTrack,
   type FadeType,
 } from '@waveform-playlist/core';
@@ -143,8 +145,9 @@ export function useExportWav(): UseExportWavReturn {
             ? [{ track: tracks[trackIndex!], state: trackStates[trackIndex!], index: trackIndex! }]
             : tracks.map((track, index) => ({ track, state: trackStates[index], index }));
 
-        // Check for solo - if any track is soloed, only play soloed tracks
-        const hasSolo = trackStates.some((state) => state.soloed);
+        // Check for solo - if any track is soloed, only play soloed tracks.
+        // Skip solo logic for individual export — the user explicitly chose the track.
+        const hasSolo = mode === 'master' && trackStates.some((state) => state.soloed);
 
         const reportProgress = (p: number) => {
           setProgress(p);
@@ -244,12 +247,7 @@ async function renderOffline(
           masterVolume.connect(destination);
         }
 
-        for (const { track, state } of tracksToRender) {
-          // Skip muted tracks (unless soloed)
-          if (state.muted && !state.soloed) continue;
-          // If there's a solo and this track isn't soloed, skip it
-          if (hasSolo && !state.soloed) continue;
-
+        for (const { track, state } of audibleTracks) {
           // Track-level nodes mirror ToneTrack: volume → pan → mute
           const trackVolume = new Volume(gainToDb(state.volume));
           // Match channelCount to source material — Tone.js Panner defaults to 1
@@ -348,7 +346,8 @@ async function renderOffline(
 
 /**
  * Apply fade in/out automation to a clip's gain AudioParam.
- * Supports all four fade types: linear, exponential, logarithmic, sCurve.
+ * Delegates to core's applyFadeIn/applyFadeOut for consistent curves
+ * between live playback and offline export.
  */
 function applyClipFades(
   gainParam: AudioParam,
@@ -366,104 +365,17 @@ function applyClipFades(
   }
 
   if (fadeIn) {
-    const fadeInEnd = startTime + fadeIn.duration;
-    applyFadeEnvelope(gainParam, startTime, fadeInEnd, 0, clipGain, fadeIn.type || 'linear');
+    applyFadeIn(gainParam, startTime, fadeIn.duration, fadeIn.type || 'linear', 0, clipGain);
   }
 
   if (fadeOut) {
     const fadeOutStart = startTime + clipDuration - fadeOut.duration;
-    const fadeOutEnd = startTime + clipDuration;
     // Ensure we're at clipGain before fade out starts
     if (!fadeIn || fadeIn.duration < clipDuration - fadeOut.duration) {
       gainParam.setValueAtTime(clipGain, fadeOutStart);
     }
-    applyFadeEnvelope(gainParam, fadeOutStart, fadeOutEnd, clipGain, 0, fadeOut.type || 'linear');
+    applyFadeOut(gainParam, fadeOutStart, fadeOut.duration, fadeOut.type || 'linear', clipGain, 0);
   }
-}
-
-/**
- * Apply a fade envelope to a gain parameter using Web Audio automation
- */
-function applyFadeEnvelope(
-  gainParam: AudioParam,
-  startTime: number,
-  endTime: number,
-  startValue: number,
-  endValue: number,
-  fadeType: FadeType
-): void {
-  const duration = endTime - startTime;
-  if (duration <= 0) return;
-
-  switch (fadeType) {
-    case 'linear':
-      gainParam.setValueAtTime(startValue, startTime);
-      gainParam.linearRampToValueAtTime(endValue, endTime);
-      break;
-
-    case 'exponential': {
-      // Exponential can't handle 0 values, use small value instead
-      const expStart = Math.max(startValue, 0.0001);
-      const expEnd = Math.max(endValue, 0.0001);
-      gainParam.setValueAtTime(expStart, startTime);
-      gainParam.exponentialRampToValueAtTime(expEnd, endTime);
-      // Set to actual 0 if needed
-      if (endValue === 0) {
-        gainParam.setValueAtTime(0, endTime);
-      }
-      break;
-    }
-
-    case 'logarithmic': {
-      const logCurve = generateFadeCurve(startValue, endValue, 256, 'logarithmic');
-      gainParam.setValueCurveAtTime(logCurve, startTime, duration);
-      break;
-    }
-
-    case 'sCurve': {
-      const sCurve = generateFadeCurve(startValue, endValue, 256, 'sCurve');
-      gainParam.setValueCurveAtTime(sCurve, startTime, duration);
-      break;
-    }
-
-    default:
-      console.warn('[waveform-playlist] Unknown fade type "' + fadeType + '", using linear');
-      gainParam.setValueAtTime(startValue, startTime);
-      gainParam.linearRampToValueAtTime(endValue, endTime);
-  }
-}
-
-/**
- * Generate a fade curve for setValueCurveAtTime
- */
-function generateFadeCurve(
-  startValue: number,
-  endValue: number,
-  numPoints: number,
-  curveType: 'logarithmic' | 'sCurve'
-): Float32Array {
-  const curve = new Float32Array(numPoints);
-  const range = endValue - startValue;
-
-  for (let i = 0; i < numPoints; i++) {
-    const t = i / (numPoints - 1); // 0 to 1
-
-    let curveValue: number;
-    if (curveType === 'logarithmic') {
-      if (range > 0) {
-        curveValue = Math.log10(1 + t * 9) / Math.log10(10);
-      } else {
-        curveValue = 1 - Math.log10(1 + (1 - t) * 9) / Math.log10(10);
-      }
-    } else {
-      // S-curve (smoothstep)
-      curveValue = t * t * (3 - 2 * t);
-    }
-
-    curve[i] = startValue + range * curveValue;
-  }
-
-  return curve;
 }
 
 /**
