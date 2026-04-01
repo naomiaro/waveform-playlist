@@ -1,5 +1,10 @@
 import { useState, useCallback } from 'react';
-import { gainToDb, type ClipTrack, type FadeType } from '@waveform-playlist/core';
+import {
+  gainToDb,
+  trackChannelCount,
+  type ClipTrack,
+  type FadeType,
+} from '@waveform-playlist/core';
 import {
   type EffectsFunction,
   getUnderlyingAudioParam,
@@ -214,6 +219,12 @@ async function renderOffline(
 
   onProgress(0.1);
 
+  // Derive output channel count from source material
+  const outputChannels = tracksToRender.reduce(
+    (max, { track }) => Math.max(max, trackChannelCount(track)),
+    1
+  );
+
   let buffer;
   try {
     buffer = await Offline(
@@ -236,9 +247,9 @@ async function renderOffline(
 
           // Track-level nodes mirror ToneTrack: volume → pan → mute
           const trackVolume = new Volume(gainToDb(state.volume));
-          // channelCount: 2 preserves stereo — Tone.js Panner defaults to
-          // channelCount: 1 which forces stereo→mono downmix before panning.
-          const trackPan = new Panner({ pan: state.pan, channelCount: 2 });
+          // Match channelCount to source material — Tone.js Panner defaults to 1
+          // which forces stereo→mono downmix. Use 2 only for stereo sources.
+          const trackPan = new Panner({ pan: state.pan, channelCount: trackChannelCount(track) });
           const trackMute = new Gain(state.muted ? 0 : 1);
 
           // Conditionally insert per-track effects chain
@@ -304,7 +315,7 @@ async function renderOffline(
         transport.start(0);
       },
       duration,
-      2, // stereo
+      outputChannels,
       sampleRate
     );
   } catch (err) {

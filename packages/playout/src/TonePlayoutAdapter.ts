@@ -4,6 +4,7 @@ import {
   clipEndTime,
   clipOffsetTime,
   clipDurationTime,
+  trackChannelCount,
 } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { TonePlayout } from './TonePlayout';
@@ -63,6 +64,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
         clips: clipInfos,
         track: trackObj,
         effects: track.effects,
+        channelCount: trackChannelCount(track),
       });
     }
 

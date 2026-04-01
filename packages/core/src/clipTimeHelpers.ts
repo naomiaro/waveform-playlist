@@ -1,4 +1,4 @@
-import type { AudioClip } from './types';
+import type { AudioClip, ClipTrack } from './types';
 
 /** Clip start position in seconds */
 export function clipStartTime(clip: AudioClip): number {
@@ -18,6 +18,17 @@ export function clipOffsetTime(clip: AudioClip): number {
 /** Clip duration in seconds */
 export function clipDurationTime(clip: AudioClip): number {
   return clip.durationSamples / clip.sampleRate;
+}
+
+/**
+ * Max audio channel count across a track's clips.
+ * Used to set Panner channelCount and offline render output channels.
+ */
+export function trackChannelCount(track: ClipTrack): number {
+  return track.clips.reduce(
+    (max, clip) => Math.max(max, clip.audioBuffer?.numberOfChannels ?? 1),
+    1
+  );
 }
 
 /**
