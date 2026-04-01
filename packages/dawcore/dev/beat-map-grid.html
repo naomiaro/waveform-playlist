@@ -287,19 +287,39 @@
 
     // --- Apply tempo curve ---
     // Single-clock: no offset. Transport time = audio time.
-    function applyTempoCurve(curve) {
-      transport.stop();
-      transport.clearTempos();
-      transport.clearMeters();
-      transport.setMeter(4, 4);
-      for (const event of curve.tempoEvents) {
-        transport.setTempo(event.bpm, event.tick);
-      }
+    // Applies to the demo's standalone transport (for metronome preview)
+    // and — when available — the editor's internal transport (for clip scheduling).
+    let lastCurve = null;
 
-      // Direct pass-through — tick 0 = audio time 0
+    function applyTempoCurve(curve) {
+      lastCurve = curve;
+      applyTempoToTransport(transport, curve);
+
+      // Use the demo transport for callbacks initially.
+      // After loadFiles, applyTempoToEditorTransport replaces these
+      // with the editor's transport (single clock).
       editor.secondsToTicks = (s) => transport.timeToTick(s);
       editor.ticksToSeconds = (t) => transport.tickToTime(t);
       editor.bpm = Math.round(curve.medianBpm);
+    }
+
+    function applyTempoToTransport(t, curve) {
+      t.stop();
+      t.clearTempos();
+      t.clearMeters();
+      t.setMeter(4, 4);
+      for (const event of curve.tempoEvents) {
+        t.setTempo(event.bpm, event.tick);
+      }
+    }
+
+    function applyTempoToEditorTransport() {
+      const editorTransport = editor.transport;
+      if (!editorTransport || !lastCurve) return;
+      applyTempoToTransport(editorTransport, lastCurve);
+      // Switch callbacks to use the editor's transport (same clock as clips)
+      editor.secondsToTicks = (s) => editorTransport.timeToTick(s);
+      editor.ticksToSeconds = (t) => editorTransport.tickToTime(t);
     }
 
     // --- Handle loading independently or together ---
@@ -320,6 +340,14 @@
 
         const result = await editor.loadFiles([pendingAudioFile]);
         if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
+
+        // Now the editor's engine + transport exist. Apply tempo to the
+        // editor's Transport so clip startTick enrichment uses the correct
+        // TempoMap, then re-set tracks to recompute startTick values.
+        applyTempoToEditorTransport();
+        if (editor.engine) {
+          editor.engine.setTracks([...editor._engineTracks.values()]);
+        }
 
         addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
 
@@ -385,22 +413,29 @@
     // When beats are applied, override the playhead to follow the transport's
     // tick position directly — no audio offset. The playhead starts at tick 0
     // and shows the transport's position, even if there's no audio there.
+    // Use editor.transport (single clock) when available, fall back to demo transport.
+    function getActiveTransport() {
+      return editor.transport || transport;
+    }
+
     function startTransportPlayhead() {
       const playhead = editor.shadowRoot?.querySelector('daw-playhead');
+      const t = getActiveTransport();
       if (playhead && beatsApplied) {
         playhead.startBeatsAnimationWithMap(
-          () => transport.getCurrentTime(),
-          (s) => transport.timeToTick(s),
+          () => t.getCurrentTime(),
+          (s) => t.timeToTick(s),
           editor.ticksPerPixel
         );
       }
     }
     function stopTransportPlayhead() {
       const playhead = editor.shadowRoot?.querySelector('daw-playhead');
+      const t = getActiveTransport();
       if (playhead && beatsApplied) {
         playhead.stopBeatsAnimationWithMap(
-          transport.getCurrentTime(),
-          (s) => transport.timeToTick(s),
+          t.getCurrentTime(),
+          (s) => t.timeToTick(s),
           editor.ticksPerPixel
         );
       }
@@ -408,6 +443,7 @@
 
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
+      // Demo transport runs metronome alongside the editor's transport
       transport.play();
       startTransportPlayhead();
     });

@@ -14,6 +14,8 @@ import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
 import type { WaveformSegment } from './daw-waveform';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
+import type { NativePlayoutAdapter } from '@dawcore/transport';
+import type { Transport } from '@dawcore/transport';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
 import { hostStyles, clipStyles } from '../styles/theme';
@@ -168,6 +170,7 @@ export class DawEditorElement extends LitElement {
     return this._ownedAudioContext;
   }
   _engine: PlaylistEngine | null = null;
+  private _adapter: NativePlayoutAdapter | null = null;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
   private _peaksCache = new Map<string, Promise<import('waveform-data').default>>();
@@ -188,6 +191,10 @@ export class DawEditorElement extends LitElement {
   }
   get engine() {
     return this._engine;
+  }
+  /** The adapter's Transport — use for tempo, metronome, and effects. */
+  get transport(): Transport | null {
+    return this._adapter?.transport ?? null;
   }
   get renderSamplesPerPixel() {
     return this._renderSpp;
@@ -819,7 +826,8 @@ export class DawEditorElement extends LitElement {
       import('@waveform-playlist/engine'),
       import('@dawcore/transport'),
     ]);
-    const adapter = new NativePlayoutAdapter(this.audioContext);
+    const adapter = new NativePlayoutAdapter(this.audioContext) as NativePlayoutAdapter;
+    this._adapter = adapter;
     const engine = new PlaylistEngine({
       adapter,
       sampleRate: this.effectiveSampleRate,
@@ -861,6 +869,7 @@ export class DawEditorElement extends LitElement {
       this._engine.dispose();
       this._engine = null;
     }
+    this._adapter = null;
     this._enginePromise = null;
   }
   // --- File Drop ---
