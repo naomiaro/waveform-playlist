@@ -282,7 +282,7 @@
       // Clip starts at the tick where the audio begins — shifted so that
       // beat 1 in the audio lines up with the bar boundary.
       const firstBeatTick = firstDownbeatTick - pickupBeats * ticksPerBeat;
-      const clipStartTick = firstBeatTick - naturalFirstBeatTick;
+      const clipStartTick = Math.max(0, firstBeatTick - naturalFirstBeatTick);
 
       // Build tempo events — beatBpm from tick 0, per-beat BPMs from first beat
       const tempoEvents = [{ tick: 0, bpm: beatBpm }];
@@ -296,7 +296,7 @@
 
       const bpms = tempoEvents.map(e => e.bpm).filter(b => b > 30 && b < 300);
       bpms.sort((a, b) => a - b);
-      const medianBpm = bpms[Math.floor(bpms.length / 2)];
+      const medianBpm = bpms.length > 0 ? bpms[Math.floor(bpms.length / 2)] : beatBpm;
 
       return { medianBpm, tempoEvents, totalBeats: beats.length, firstBeatTick, clipStartTick };
     }
@@ -390,7 +390,7 @@
               ? et.tickToTime(lastCurve.clipStartTick)
               : (lastCurve.clipStartTick * 60) / (960 * (lastCurve.medianBpm || 120));
             const clipStartSample = Math.round(clipStartSec * sr);
-            const tracks = [...editor._engineTracks.values()].map(t => ({
+            const tracks = editor.engine.getState().tracks.map(t => ({
               ...t,
               clips: t.clips.map(c => ({
                 ...c,
@@ -400,7 +400,7 @@
             }));
             editor.engine.setTracks(tracks);
           } else if (editor.engine) {
-            editor.engine.setTracks([...editor._engineTracks.values()]);
+            editor.engine.setTracks(editor.engine.getState().tracks);
           }
 
           // Debug: verify TempoMap consistency

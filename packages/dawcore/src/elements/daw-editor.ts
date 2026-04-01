@@ -175,6 +175,8 @@ export class DawEditorElement extends LitElement {
   }
   _engine: PlaylistEngine | null = null;
   private _adapter: NativePlayoutAdapter | null = null;
+  private _warnedMissingTicksToSeconds = false;
+  private _warnedMissingSecondsToTicks = false;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
   private _peaksCache = new Map<string, Promise<import('waveform-data').default>>();
@@ -301,8 +303,8 @@ export class DawEditorElement extends LitElement {
   /** Convert seconds to ticks — uses callback if provided, otherwise single-BPM fallback. */
   _secondsToTicks(seconds: number): number {
     if (this.secondsToTicks) {
-      if (!this.ticksToSeconds && !(this as any).__warnedMissingPair) {
-        (this as any).__warnedMissingPair = true;
+      if (!this.ticksToSeconds && !this._warnedMissingTicksToSeconds) {
+        this._warnedMissingTicksToSeconds = true;
         console.warn(
           '[waveform-playlist] daw-editor: secondsToTicks is set but ticksToSeconds is missing. Both callbacks are required for variable tempo.'
         );
@@ -314,8 +316,8 @@ export class DawEditorElement extends LitElement {
   /** Convert ticks to seconds — uses callback if provided, otherwise single-BPM fallback. */
   _ticksToSeconds(ticks: number): number {
     if (this.ticksToSeconds) {
-      if (!this.secondsToTicks && !(this as any).__warnedMissingPair) {
-        (this as any).__warnedMissingPair = true;
+      if (!this.secondsToTicks && !this._warnedMissingSecondsToTicks) {
+        this._warnedMissingSecondsToTicks = true;
         console.warn(
           '[waveform-playlist] daw-editor: ticksToSeconds is set but secondsToTicks is missing. Both callbacks are required for variable tempo.'
         );
@@ -846,7 +848,7 @@ export class DawEditorElement extends LitElement {
       import('@waveform-playlist/engine'),
       import('@dawcore/transport'),
     ]);
-    const adapter = new NativePlayoutAdapter(this.audioContext) as NativePlayoutAdapter;
+    const adapter = new NativePlayoutAdapter(this.audioContext);
     this._adapter = adapter;
     // Set tempo on the adapter's Transport BEFORE creating the engine,
     // so engine.setTracks() enriches clips with startTick at the correct BPM.

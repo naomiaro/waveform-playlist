@@ -4,7 +4,7 @@
  */
 
 import type { ClipTrack, PeakData } from '@waveform-playlist/core';
-import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
+import { createClip, createTrack } from '@waveform-playlist/core';
 import type { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackIdDetail, DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
 import type { TrackDescriptor } from '../types';
@@ -58,19 +58,19 @@ export async function loadFiles(
       host._resolvedSampleRate = audioBuffer.sampleRate;
 
       const name = file.name.replace(/\.\w+$/, '');
-      const clip = createClipFromSeconds({
+      const clip = createClip({
         audioBuffer,
-        startTime: 0,
-        duration: audioBuffer.duration,
-        offset: 0,
+        startSample: 0,
+        durationSamples: audioBuffer.length,
+        offsetSamples: 0,
         gain: 1,
         name,
         sampleRate: audioBuffer.sampleRate,
-        sourceDuration: audioBuffer.duration,
+        sourceDurationSamples: audioBuffer.length,
       });
 
       host._clipBuffers = new Map(host._clipBuffers).set(clip.id, audioBuffer);
-      host._clipOffsets.set(clip.id, {
+      host._clipOffsets = new Map(host._clipOffsets).set(clip.id, {
         offsetSamples: clip.offsetSamples,
         durationSamples: clip.durationSamples,
       });

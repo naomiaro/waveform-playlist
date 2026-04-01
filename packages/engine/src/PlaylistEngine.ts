@@ -606,6 +606,7 @@ export class PlaylistEngine {
       console.warn('[waveform-playlist/engine] setTempo: bpm must be a positive finite number');
       return;
     }
+    if (bpm === this._bpm && atTick === undefined) return;
     this._bpm = bpm;
     this._adapter?.setTempo?.(bpm, atTick);
     this._recomputeStartSamples();
@@ -827,7 +828,10 @@ export class PlaylistEngine {
       }),
     }));
     this._tracksVersion++;
-    this._adapter?.setTracks(this._tracks);
+    // Use incremental updates to avoid full playout rebuild during playback
+    for (const track of this._tracks) {
+      this._updateTrackOnAdapter(track.id);
+    }
   }
 
   private _emitStateChange(): void {
