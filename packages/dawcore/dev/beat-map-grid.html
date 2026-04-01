@@ -283,9 +283,10 @@
 
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
-        if (interval <= 0.05 || interval > 3.0) continue;
-        const bpm = 60 / interval;
-        if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
+        if (interval > 0.05 && interval < 3.0) {
+          const bpm = 60 / interval;
+          if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
+        }
         currentTick += ticksPerBeat;
       }
 
@@ -337,47 +338,7 @@
     let beatsApplied = false;
 
     async function tryLoad() {
-      // Both available: apply beats then load audio with variable tempo
-      if (pendingAudioFile && pendingBeatsText) {
-        addLog('processing both...');
-        const beats = parseBeats(pendingBeatsText);
-        const curve = buildTempoCurve(beats);
-        applyTempoCurve(curve);
-        beatsApplied = true;
-
-        statsEl.textContent = beats.length + ' beats · median ~' +
-          Math.round(curve.medianBpm) + ' BPM';
-        statusSection.classList.remove('hidden');
-
-        const result = await editor.loadFiles([pendingAudioFile]);
-        if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
-
-        // Now the editor's engine + transport exist. Apply tempo to the
-        // editor's Transport so clip startTick enrichment uses the correct
-        // TempoMap, then re-set tracks to recompute startTick values.
-        applyTempoToEditorTransport();
-        if (editor.engine) {
-          editor.engine.setTracks([...editor._engineTracks.values()]);
-        }
-
-        addLog('ready: ' + curve.tempoEvents.length + ' tempo events');
-
-        pendingAudioFile = null;
-        pendingBeatsText = null;
-        return;
-      }
-
-      // Audio only: load immediately with single BPM (no callbacks)
-      if (pendingAudioFile && !pendingBeatsText) {
-        addLog('audio loaded — single BPM (drop .beats to add variable tempo)');
-        const result = await editor.loadFiles([pendingAudioFile]);
-        if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
-        pendingAudioFile = null;
-        return;
-      }
-
       // Beats only: apply tempo curve for visual preview.
-      // Keep pendingBeatsText so the "Both" path triggers when audio arrives.
       if (pendingBeatsText && !pendingAudioFile) {
         addLog('applying beat map...');
         const beats = parseBeats(pendingBeatsText);
@@ -389,6 +350,60 @@
           Math.round(curve.medianBpm) + ' BPM';
         statusSection.classList.remove('hidden');
         addLog('ready: ' + curve.tempoEvents.length + ' tempo events (drop audio to add track)');
+        return;
+      }
+
+      // Audio dropped (with or without beats already applied)
+      if (pendingAudioFile) {
+        // Apply beats if not yet applied
+        if (pendingBeatsText && !beatsApplied) {
+          addLog('processing beats + audio...');
+          const beats = parseBeats(pendingBeatsText);
+          const curve = buildTempoCurve(beats);
+          applyTempoCurve(curve);
+          beatsApplied = true;
+
+          statsEl.textContent = beats.length + ' beats · median ~' +
+            Math.round(curve.medianBpm) + ' BPM';
+          statusSection.classList.remove('hidden');
+        }
+
+        // Load audio
+        const result = await editor.loadFiles([pendingAudioFile]);
+        if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
+
+        // Apply tempo to editor's internal Transport (same clock as clips)
+        if (beatsApplied) {
+          applyTempoToEditorTransport();
+          if (editor.engine) {
+            editor.engine.setTracks([...editor._engineTracks.values()]);
+          }
+
+          // Debug: verify TempoMap consistency
+          const et = editor.transport;
+          if (et && lastCurve) {
+            const firstEvent = lastCurve.tempoEvents[0];
+            const secondEvent = lastCurve.tempoEvents.length > 1 ? lastCurve.tempoEvents[1] : null;
+            addLog('tempo[0]: tick=' + firstEvent.tick + ' bpm=' + firstEvent.bpm.toFixed(1));
+            if (secondEvent) {
+              addLog('tempo[1]: tick=' + secondEvent.tick + ' bpm=' + secondEvent.bpm.toFixed(1));
+              addLog('ticksToSeconds(' + secondEvent.tick + ')=' + et.tickToTime(secondEvent.tick).toFixed(4));
+            }
+            // Show clip startTick
+            const tracks = editor.engine?.getState().tracks;
+            if (tracks?.[0]?.clips?.[0]) {
+              const c = tracks[0].clips[0];
+              addLog('clip: startTick=' + c.startTick + ' startSample=' + c.startSample);
+            }
+          }
+
+          addLog('ready: ' + lastCurve.tempoEvents.length + ' tempo events');
+        } else {
+          addLog('audio loaded — single BPM (drop .beats to add variable tempo)');
+        }
+
+        pendingAudioFile = null;
+        pendingBeatsText = null;
         return;
       }
     }
