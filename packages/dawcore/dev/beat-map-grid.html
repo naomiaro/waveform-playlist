@@ -246,35 +246,29 @@
     }
 
     // --- Build tempo curve ---
-    // Same proven logic as beat-map.html: pickup beats fill end of bar 1,
-    // first downbeat at bar 2 beat 1. All tempo events at grid-aligned ticks.
+    // Single-clock: tick 0 = audio time 0 (start of file).
+    // Each beat's tick is computed from its audio time. The TempoMap converts
+    // ticks ↔ seconds directly — no audioStartOffset needed.
     function buildTempoCurve(beats) {
       const ppqn = 960;
       const ticksPerBeat = ppqn;
 
-      const firstDownbeatIdx = beats.findIndex(b => b.beat === 1);
-      if (firstDownbeatIdx < 0) throw new Error('No downbeat (beat 1) found in beat map');
-
-      const pickupBeats = firstDownbeatIdx;
-
-      // BPM from first full beat interval
-      let pickupBpm = 120;
-      if (firstDownbeatIdx < beats.length - 1) {
-        const interval = beats[firstDownbeatIdx + 1].time - beats[firstDownbeatIdx].time;
-        if (interval > 0.1) pickupBpm = 60 / interval;
+      // BPM from first beat interval (used as initial tempo)
+      let initialBpm = 120;
+      if (beats.length >= 2) {
+        const interval = beats[1].time - beats[0].time;
+        if (interval > 0.1) initialBpm = 60 / interval;
       }
 
-      // Pickup occupies end of bar 1
-      const pickupStartBeat = 4 - pickupBeats;
-      const pickupStartTick = pickupStartBeat * ticksPerBeat;
+      // First beat's tick: compute from audio time using initial BPM.
+      // Round to nearest ticksPerBeat so beats land on grid boundaries.
+      const firstBeatTick = Math.round(
+        (beats[0].time * ppqn * initialBpm) / 60 / ticksPerBeat
+      ) * ticksPerBeat;
 
-      // Audio offset: bridges audio file time ↔ transport time
-      const timeFromZeroToPickup = pickupStartTick * 60 / (ppqn * pickupBpm);
-      const audioStartOffset = beats[0].time - timeFromZeroToPickup;
-
-      // Build tempo events — all at grid-aligned ticks
-      const tempoEvents = [{ tick: 0, bpm: pickupBpm }];
-      let currentTick = pickupStartTick;
+      // Build tempo events — one per beat interval
+      const tempoEvents = [{ tick: 0, bpm: initialBpm }];
+      let currentTick = firstBeatTick;
 
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
@@ -288,10 +282,11 @@
       bpms.sort((a, b) => a - b);
       const medianBpm = bpms[Math.floor(bpms.length / 2)];
 
-      return { medianBpm, audioStartOffset, tempoEvents, totalBeats: beats.length };
+      return { medianBpm, tempoEvents, totalBeats: beats.length };
     }
 
     // --- Apply tempo curve ---
+    // Single-clock: no offset. Transport time = audio time.
     function applyTempoCurve(curve) {
       transport.stop();
       transport.clearTempos();
@@ -301,19 +296,14 @@
         transport.setTempo(event.bpm, event.tick);
       }
 
-      // The offset lives in the callbacks — the editor has zero knowledge of it.
-      // audioTime - offset = transportTime. The Transport's tempo map has beats
-      // at grid-aligned ticks, so the waveform aligns with bar lines.
-      lastAudioStartOffset = curve.audioStartOffset;
-      const offset = lastAudioStartOffset;
-      editor.secondsToTicks = (s) => transport.timeToTick(s - offset);
-      editor.ticksToSeconds = (t) => transport.tickToTime(t) + offset;
+      // Direct pass-through — tick 0 = audio time 0
+      editor.secondsToTicks = (s) => transport.timeToTick(s);
+      editor.ticksToSeconds = (t) => transport.tickToTime(t);
       editor.bpm = Math.round(curve.medianBpm);
     }
 
     // --- Handle loading independently or together ---
     let beatsApplied = false;
-    let lastAudioStartOffset = 0;
 
     async function tryLoad() {
       // Both available: apply beats then load audio with variable tempo
@@ -418,12 +408,6 @@
 
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
-      if (beatsApplied) {
-        // Sync transport to engine: engine starts at audio time 0,
-        // transport must start at the matching transport time.
-        // audioTime - offset = transportTime → 0 - offset = |offset|
-        transport.seek(Math.abs(lastAudioStartOffset));
-      }
       transport.play();
       startTransportPlayhead();
     });
