@@ -1276,9 +1276,10 @@ export class DawEditorElement extends LitElement {
                         ? clip.startTick
                         : this._secondsToTicks(clip.startSample / sr);
                     const durSec = clip.durationSamples / sr;
-                    const startSec = clip.startTick !== undefined
-                      ? this._ticksToSeconds(clip.startTick)
-                      : clip.startSample / sr;
+                    const startSec =
+                      clip.startTick !== undefined
+                        ? this._ticksToSeconds(clip.startTick)
+                        : clip.startSample / sr;
                     const endTick = this._secondsToTicks(startSec + durSec);
                     clipLeft = Math.round(startTick / this.ticksPerPixel);
                     width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
@@ -1335,8 +1336,8 @@ export class DawEditorElement extends LitElement {
                       }
                     }
                   }
-                  const channels: Peaks[] =
-                    segmentChannels ?? peakData?.data ?? [new Int16Array(0)];
+                  const channels: Peaks[] = segmentChannels ??
+                    peakData?.data ?? [new Int16Array(0)];
                   const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
                   const chH = this.waveHeight;
                   return html` <div
