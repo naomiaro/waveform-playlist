@@ -268,17 +268,21 @@
         if (interval > 0.1) beatBpm = 60 / interval;
       }
 
-      // First downbeat at bar 2 beat 1. Pickups fill the end of bar 1.
-      const firstDownbeatTick = ticksPerBar; // bar 2 beat 1 = tick 3840
-      const pickupStartBeat = beatsPerBar - pickupBeats;
-      const pickupStartTick = pickupStartBeat * ticksPerBeat;
+      // How many beats of silence fit before the first beat at beatBpm?
+      // Round up to the next bar boundary so the first downbeat lands on bar N beat 1.
+      const preBeatsAtBeatBpm = (beats[0].time * beatBpm) / 60;
+      const totalPreBeats = pickupBeats + Math.ceil(preBeatsAtBeatBpm - pickupBeats);
+      // Round up to full bars so the downbeat is always beat 1 of a bar
+      const preBars = Math.ceil(totalPreBeats / beatsPerBar);
+      const firstDownbeatTick = preBars * ticksPerBar;
+      const pickupStartTick = firstDownbeatTick - pickupBeats * ticksPerBeat;
 
       // The first beat in the beat map goes at pickupStartTick (if pickups)
       // or firstDownbeatTick (if no pickups).
       const firstBeatTick = pickupBeats > 0 ? pickupStartTick : firstDownbeatTick;
 
-      // Gap BPM: covers tick 0 → firstBeatTick so that
-      // ticksToSeconds(firstBeatTick) = beats[0].time exactly.
+      // Gap BPM: use beatBpm for the gap so the pre-beat region feels natural.
+      // Then compute the exact gap BPM to make ticksToSeconds(firstBeatTick) = beats[0].time.
       const gapBpm = beats[0].time > 0.001
         ? (firstBeatTick * 60) / (ppqn * beats[0].time)
         : beatBpm;
