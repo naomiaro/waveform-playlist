@@ -118,8 +118,12 @@ describe('PlaylistEngine', () => {
         makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
       ];
       engine.setTracks(tracks);
-      expect(engine.getState().tracks).toEqual(tracks);
-      expect(engine.getState().duration).toBe(1);
+      // setTracks enriches clips with startTick, so stored tracks differ from input
+      const state = engine.getState();
+      expect(state.tracks).toHaveLength(1);
+      expect(state.tracks[0].id).toBe('t1');
+      expect(state.tracks[0].clips[0].id).toBe('c1');
+      expect(state.duration).toBe(1);
       expect(listener).toHaveBeenCalledTimes(1);
       engine.dispose();
     });
@@ -1278,6 +1282,100 @@ describe('PlaylistEngine', () => {
       expect(state.loopEnd).toBe(0);
       expect(state.isLoopEnabled).toBe(false);
       engine.dispose();
+    });
+  });
+
+  describe('tempo management', () => {
+    it('has default bpm of 120 and ppqn of 960', () => {
+      const engine = new PlaylistEngine();
+      const state = engine.getState();
+      expect(state.bpm).toBe(120);
+      expect(state.ppqn).toBe(960);
+    });
+
+    it('accepts bpm and ppqn in constructor', () => {
+      const engine = new PlaylistEngine({ bpm: 140, ppqn: 480 });
+      const state = engine.getState();
+      expect(state.bpm).toBe(140);
+      expect(state.ppqn).toBe(480);
+    });
+
+    it('setTempo updates bpm and forwards to adapter', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTempo(140);
+      expect(engine.getState().bpm).toBe(140);
+      expect(adapter.setTempo).toHaveBeenCalledWith(140, undefined);
+    });
+
+    it('setTempo with atTick forwards to adapter', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTempo(140, 960);
+      expect(adapter.setTempo).toHaveBeenCalledWith(140, 960);
+    });
+
+    it('setTempo emits statechange', () => {
+      const engine = new PlaylistEngine();
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+      engine.setTempo(140);
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('startTick enrichment', () => {
+    it('setTracks enriches clips without startTick', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter, bpm: 120, ppqn: 960 });
+      engine.setTracks([
+        makeTrack('t1', [
+          makeClip({ id: 'c1', startSample: 24000, durationSamples: 48000 }),
+        ]),
+      ]);
+      const clip = engine.getState().tracks[0].clips[0];
+      // Engine _sampleRate is 48000; 24000 / 48000 = 0.5 seconds
+      // 0.5 * 960 * 120 / 60 = 960 ticks
+      expect(clip.startTick).toBe(960);
+    });
+
+    it('setTracks preserves existing startTick', () => {
+      const engine = new PlaylistEngine({ bpm: 120, ppqn: 960 });
+      engine.setTracks([
+        makeTrack('t1', [
+          makeClip({ id: 'c1', startSample: 24000, durationSamples: 48000, startTick: 500 }),
+        ]),
+      ]);
+      expect(engine.getState().tracks[0].clips[0].startTick).toBe(500);
+    });
+
+    it('setTempo recomputes startSample from startTick', () => {
+      const engine = new PlaylistEngine({ bpm: 120, ppqn: 960 });
+      engine.setTracks([
+        makeTrack('t1', [
+          makeClip({ id: 'c1', startSample: 24000, durationSamples: 48000, startTick: 960 }),
+        ]),
+      ]);
+      // At 120 BPM: 960 ticks → 0.5s → 0.5 * 48000 = 24000 samples
+      expect(engine.getState().tracks[0].clips[0].startSample).toBe(24000);
+
+      engine.setTempo(60);
+      // At 60 BPM: 960 ticks → 1.0s → 1.0 * 48000 = 48000 samples
+      expect(engine.getState().tracks[0].clips[0].startSample).toBe(48000);
+    });
+  });
+
+  describe('getCurrentTime (adapter always)', () => {
+    it('reads from adapter even when not playing', () => {
+      const adapter = createMockAdapter();
+      (adapter.getCurrentTime as ReturnType<typeof vi.fn>).mockReturnValue(2.5);
+      const engine = new PlaylistEngine({ adapter });
+      expect(engine.getCurrentTime()).toBe(2.5);
+    });
+
+    it('returns cached time when no adapter', () => {
+      const engine = new PlaylistEngine();
+      expect(engine.getCurrentTime()).toBe(0);
     });
   });
 
