@@ -341,9 +341,7 @@ export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip 
   const sampleRate =
     options.audioBuffer?.sampleRate ?? options.sampleRate ?? options.waveformData?.sample_rate;
   if (sampleRate === undefined) {
-    throw new Error(
-      'createClipFromTicks: sampleRate is required when audioBuffer is not provided'
-    );
+    throw new Error('createClipFromTicks: sampleRate is required when audioBuffer is not provided');
   }
 
   const startSample = Math.round(toSeconds(startTick) * sampleRate);

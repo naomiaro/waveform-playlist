@@ -150,7 +150,11 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   setMeter(numerator: number, denominator: number, atTick?: number): void {
-    this._transport.setMeter(numerator, denominator, atTick !== undefined ? (atTick as Tick) : undefined);
+    this._transport.setMeter(
+      numerator,
+      denominator,
+      atTick !== undefined ? (atTick as Tick) : undefined
+    );
   }
 
   ticksToSeconds(tick: number): number {

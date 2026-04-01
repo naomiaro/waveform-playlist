@@ -1329,9 +1329,7 @@ describe('PlaylistEngine', () => {
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter, bpm: 120, ppqn: 960 });
       engine.setTracks([
-        makeTrack('t1', [
-          makeClip({ id: 'c1', startSample: 24000, durationSamples: 48000 }),
-        ]),
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 24000, durationSamples: 48000 })]),
       ]);
       const clip = engine.getState().tracks[0].clips[0];
       // Engine _sampleRate is 48000; 24000 / 48000 = 0.5 seconds

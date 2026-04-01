@@ -194,8 +194,7 @@ export class PlaylistEngine {
       ...track,
       clips: track.clips.map((clip) => ({
         ...clip,
-        startTick:
-          clip.startTick ?? this._secondsToTicks(clip.startSample / this._sampleRate),
+        startTick: clip.startTick ?? this._secondsToTicks(clip.startSample / this._sampleRate),
       })),
     }));
     this._tracksVersion++;
@@ -777,9 +776,7 @@ export class PlaylistEngine {
         if (clip.startTick === undefined) return clip;
         return {
           ...clip,
-          startSample: Math.round(
-            this._ticksToSeconds(clip.startTick) * this._sampleRate
-          ),
+          startSample: Math.round(this._ticksToSeconds(clip.startTick) * this._sampleRate),
         };
       }),
     }));
