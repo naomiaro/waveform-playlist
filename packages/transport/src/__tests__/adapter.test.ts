@@ -291,4 +291,43 @@ describe('NativePlayoutAdapter', () => {
     adapter.dispose();
     expect(adapter.isPlaying()).toBe(false);
   });
+
+  // --- Tempo and conversion methods ---
+
+  it('setTempo delegates to transport', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setTempo');
+    adapter.setTempo(140);
+    expect(spy).toHaveBeenCalledWith(140, undefined);
+  });
+
+  it('setTempo with atTick delegates to transport', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setTempo');
+    adapter.setTempo(140, 960);
+    expect(spy).toHaveBeenCalledWith(140, 960);
+  });
+
+  it('ticksToSeconds delegates to transport', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    // Default: 120 BPM, 960 PPQN. 960 ticks = 0.5 seconds
+    expect(adapter.ticksToSeconds(960)).toBeCloseTo(0.5);
+  });
+
+  it('secondsToTicks delegates to transport', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    expect(adapter.secondsToTicks(0.5)).toBe(960);
+  });
+
+  it('setMeter delegates to transport', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setMeter');
+    adapter.setMeter(3, 4);
+    expect(spy).toHaveBeenCalledWith(3, 4, undefined);
+  });
 });
