@@ -247,44 +247,49 @@
 
     // --- Build tempo curve ---
     // Single-clock: tick 0 = audio time 0 (start of file).
-    // Each beat's tick is computed from its audio time. The TempoMap converts
-    // ticks ↔ seconds directly — no audioStartOffset needed.
+    // First downbeat (beat === 1) lands at bar 2 beat 1 (tick 3840 in 4/4).
+    // Pickup beats fill the end of bar 1. A "gap BPM" covers tick 0 to
+    // the first beat so ticksToSeconds maps to the correct audio times.
     function buildTempoCurve(beats) {
       const ppqn = 960;
       const ticksPerBeat = ppqn;
+      const beatsPerBar = 4; // 4/4 time
+      const ticksPerBar = beatsPerBar * ticksPerBeat;
 
-      // BPM from first beat interval (used as beat tempo)
+      const firstDownbeatIdx = beats.findIndex(b => b.beat === 1);
+      if (firstDownbeatIdx < 0) throw new Error('No downbeat (beat 1) found in beat map');
+
+      const pickupBeats = firstDownbeatIdx;
+
+      // BPM from first full beat interval (at the downbeat)
       let beatBpm = 120;
-      if (beats.length >= 2) {
-        const interval = beats[1].time - beats[0].time;
+      if (firstDownbeatIdx < beats.length - 1) {
+        const interval = beats[firstDownbeatIdx + 1].time - beats[firstDownbeatIdx].time;
         if (interval > 0.1) beatBpm = 60 / interval;
       }
 
-      // First beat lands on a grid-aligned tick. Compute a "gap BPM" for the
-      // region from tick 0 to firstBeatTick so that
-      // ticksToSeconds(firstBeatTick) = beats[0].time exactly.
-      const firstBeatTick = Math.round(
-        (beats[0].time * ppqn * beatBpm) / 60 / ticksPerBeat
-      ) * ticksPerBeat;
+      // First downbeat at bar 2 beat 1. Pickups fill the end of bar 1.
+      const firstDownbeatTick = ticksPerBar; // bar 2 beat 1 = tick 3840
+      const pickupStartBeat = beatsPerBar - pickupBeats;
+      const pickupStartTick = pickupStartBeat * ticksPerBeat;
 
-      // Gap BPM: the tempo needed so that firstBeatTick ticks = beats[0].time seconds.
-      // gapBpm = (firstBeatTick * 60) / (ppqn * beats[0].time)
-      // Falls back to beatBpm if first beat is at time 0 (no gap).
+      // The first beat in the beat map goes at pickupStartTick (if pickups)
+      // or firstDownbeatTick (if no pickups).
+      const firstBeatTick = pickupBeats > 0 ? pickupStartTick : firstDownbeatTick;
+
+      // Gap BPM: covers tick 0 → firstBeatTick so that
+      // ticksToSeconds(firstBeatTick) = beats[0].time exactly.
       const gapBpm = beats[0].time > 0.001
         ? (firstBeatTick * 60) / (ppqn * beats[0].time)
         : beatBpm;
 
-      // Build tempo events — gap BPM from tick 0, beat BPM from first beat onward
+      // Build tempo events — gap BPM from tick 0, then per-beat BPMs
       const tempoEvents = [{ tick: 0, bpm: gapBpm }];
-      if (firstBeatTick > 0) {
-        tempoEvents.push({ tick: firstBeatTick, bpm: beatBpm });
-      }
       let currentTick = firstBeatTick;
-
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
         const bpm = 60 / interval;
-        if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
+        tempoEvents.push({ tick: currentTick, bpm });
         currentTick += ticksPerBeat;
       }
 
