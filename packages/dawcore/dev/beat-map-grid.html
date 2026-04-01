@@ -253,21 +253,32 @@
       const ppqn = 960;
       const ticksPerBeat = ppqn;
 
-      // BPM from first beat interval (used as initial tempo)
-      let initialBpm = 120;
+      // BPM from first beat interval (used as beat tempo)
+      let beatBpm = 120;
       if (beats.length >= 2) {
         const interval = beats[1].time - beats[0].time;
-        if (interval > 0.1) initialBpm = 60 / interval;
+        if (interval > 0.1) beatBpm = 60 / interval;
       }
 
-      // First beat's tick: compute from audio time using initial BPM.
-      // Round to nearest ticksPerBeat so beats land on grid boundaries.
+      // First beat lands on a grid-aligned tick. Compute a "gap BPM" for the
+      // region from tick 0 to firstBeatTick so that
+      // ticksToSeconds(firstBeatTick) = beats[0].time exactly.
       const firstBeatTick = Math.round(
-        (beats[0].time * ppqn * initialBpm) / 60 / ticksPerBeat
+        (beats[0].time * ppqn * beatBpm) / 60 / ticksPerBeat
       ) * ticksPerBeat;
 
-      // Build tempo events — one per beat interval
-      const tempoEvents = [{ tick: 0, bpm: initialBpm }];
+      // Gap BPM: the tempo needed so that firstBeatTick ticks = beats[0].time seconds.
+      // gapBpm = (firstBeatTick * 60) / (ppqn * beats[0].time)
+      // Falls back to beatBpm if first beat is at time 0 (no gap).
+      const gapBpm = beats[0].time > 0.001
+        ? (firstBeatTick * 60) / (ppqn * beats[0].time)
+        : beatBpm;
+
+      // Build tempo events — gap BPM from tick 0, beat BPM from first beat onward
+      const tempoEvents = [{ tick: 0, bpm: gapBpm }];
+      if (firstBeatTick > 0) {
+        tempoEvents.push({ tick: firstBeatTick, bpm: beatBpm });
+      }
       let currentTick = firstBeatTick;
 
       for (let i = 0; i < beats.length - 1; i++) {
