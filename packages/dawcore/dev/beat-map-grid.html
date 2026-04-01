@@ -283,10 +283,8 @@
 
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
-        if (interval > 0.05 && interval < 3.0) {
-          const bpm = 60 / interval;
-          if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
-        }
+        const bpm = 60 / interval;
+        if (i > 0) tempoEvents.push({ tick: currentTick, bpm });
         currentTick += ticksPerBeat;
       }
 
