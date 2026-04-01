@@ -388,6 +388,29 @@ describe('createClipFromTicks', () => {
       })
     ).toThrow('createClipFromTicks');
   });
+
+  it('throws when sampleRate cannot be determined', () => {
+    expect(() =>
+      createClipFromTicks({
+        startTick: 0,
+        bpm: 120,
+        ppqn: 960,
+        sourceDurationSamples: 96000,
+      })
+    ).toThrow('sampleRate');
+  });
+
+  it('throws when startTick is negative', () => {
+    expect(() =>
+      createClipFromTicks({
+        startTick: -100,
+        sampleRate: 48000,
+        sourceDurationSamples: 96000,
+        bpm: 120,
+        ppqn: 960,
+      })
+    ).toThrow('non-negative');
+  });
 });
 
 // --- createTrack ---

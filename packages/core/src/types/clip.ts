@@ -327,6 +327,10 @@ export interface CreateClipOptionsTicks {
 export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip {
   const { startTick, ticksToSeconds, bpm, ppqn } = options;
 
+  if (startTick < 0) {
+    throw new Error('createClipFromTicks: startTick must be non-negative');
+  }
+
   let toSeconds: (tick: number) => number;
   if (ticksToSeconds) {
     toSeconds = ticksToSeconds;

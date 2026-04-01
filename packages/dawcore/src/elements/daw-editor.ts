@@ -300,12 +300,28 @@ export class DawEditorElement extends LitElement {
   }
   /** Convert seconds to ticks — uses callback if provided, otherwise single-BPM fallback. */
   _secondsToTicks(seconds: number): number {
-    if (this.secondsToTicks) return this.secondsToTicks(seconds);
+    if (this.secondsToTicks) {
+      if (!this.ticksToSeconds && !(this as any).__warnedMissingPair) {
+        (this as any).__warnedMissingPair = true;
+        console.warn(
+          '[waveform-playlist] daw-editor: secondsToTicks is set but ticksToSeconds is missing. Both callbacks are required for variable tempo.'
+        );
+      }
+      return this.secondsToTicks(seconds);
+    }
     return (seconds * this.bpm * this.ppqn) / 60;
   }
   /** Convert ticks to seconds — uses callback if provided, otherwise single-BPM fallback. */
   _ticksToSeconds(ticks: number): number {
-    if (this.ticksToSeconds) return this.ticksToSeconds(ticks);
+    if (this.ticksToSeconds) {
+      if (!this.secondsToTicks && !(this as any).__warnedMissingPair) {
+        (this as any).__warnedMissingPair = true;
+        console.warn(
+          '[waveform-playlist] daw-editor: ticksToSeconds is set but secondsToTicks is missing. Both callbacks are required for variable tempo.'
+        );
+      }
+      return this.ticksToSeconds(ticks);
+    }
     return (ticks * 60) / (this.bpm * this.ppqn);
   }
   private get _totalWidth(): number {
@@ -1324,12 +1340,16 @@ export class DawEditorElement extends LitElement {
                           this._ticksToSeconds(tick) - startSec + clipOffsetSec;
                         const segEndAudioSec =
                           this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
-                        // Peak indices at base scale (128) — no BPM dependency.
+                        // Peak indices at base scale (128) — clamped to valid range.
                         const segStartSample = Math.round(segStartAudioSec * sr);
                         const segEndSample = Math.round(segEndAudioSec * sr);
+                        const totalPeaks = clip.durationSamples / baseScale;
                         clipSegments.push({
-                          peakStart: (segStartSample - clip.offsetSamples) / baseScale,
-                          peakEnd: (segEndSample - clip.offsetSamples) / baseScale,
+                          peakStart: Math.max(0, (segStartSample - clip.offsetSamples) / baseScale),
+                          peakEnd: Math.min(
+                            totalPeaks,
+                            (segEndSample - clip.offsetSamples) / baseScale
+                          ),
                           pixelStart: (tick - segStartTick) / this.ticksPerPixel,
                           pixelEnd: (segEndTick - segStartTick) / this.ticksPerPixel,
                         });
