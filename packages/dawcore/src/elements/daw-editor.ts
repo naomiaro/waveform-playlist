@@ -95,6 +95,10 @@ export class DawEditorElement extends LitElement {
     const old = this._bpm;
     if (!Number.isFinite(value) || value <= 0) return;
     this._bpm = value;
+    // Forward to engine (which forwards to adapter's Transport)
+    if (this._engine) {
+      this._engine.setTempo(value);
+    }
     this.requestUpdate('bpm', old);
   }
   private _bpm = 120;
@@ -828,10 +832,15 @@ export class DawEditorElement extends LitElement {
     ]);
     const adapter = new NativePlayoutAdapter(this.audioContext) as NativePlayoutAdapter;
     this._adapter = adapter;
+    // Set tempo on the adapter's Transport BEFORE creating the engine,
+    // so engine.setTracks() enriches clips with startTick at the correct BPM.
+    adapter.setTempo(this._bpm);
     const engine = new PlaylistEngine({
       adapter,
       sampleRate: this.effectiveSampleRate,
       samplesPerPixel: this.samplesPerPixel,
+      bpm: this._bpm,
+      ppqn: this._ppqn,
       zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b),
