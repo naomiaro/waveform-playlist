@@ -204,10 +204,17 @@ export class PlaylistEngine {
 
   addTrack(track: ClipTrack): void {
     this._pushUndoSnapshot();
-    this._tracks = [...this._tracks, track];
+    const enriched = {
+      ...track,
+      clips: track.clips.map((clip) => ({
+        ...clip,
+        startTick: clip.startTick ?? this._secondsToTicks(clip.startSample / this._sampleRate),
+      })),
+    };
+    this._tracks = [...this._tracks, enriched];
     this._tracksVersion++;
     if (this._adapter?.addTrack) {
-      this._adapter.addTrack(track);
+      this._adapter.addTrack(enriched);
     } else {
       this._adapter?.setTracks(this._tracks);
     }
@@ -236,16 +243,30 @@ export class PlaylistEngine {
     if (!resolved) return;
     if (track) {
       this._pushUndoSnapshot();
-      this._tracks = this._tracks.map((t) => (t.id === trackId ? track : t));
+      const enriched = {
+        ...track,
+        clips: track.clips.map((clip) => ({
+          ...clip,
+          startTick: clip.startTick ?? this._secondsToTicks(clip.startSample / this._sampleRate),
+        })),
+      };
+      this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
       this._tracksVersion++;
+      // Forward enriched track to adapter
+      if (this._adapter?.updateTrack) {
+        this._adapter.updateTrack(trackId, enriched);
+      } else {
+        this._adapter?.setTracks(this._tracks);
+      }
+      this._emitStateChange();
+      return;
     }
+    // No track arg — just forward existing track to adapter
     if (this._adapter?.updateTrack) {
       this._adapter.updateTrack(trackId, resolved);
     } else {
       this._adapter?.setTracks(this._tracks);
     }
-    // Only emit statechange when internal state actually changed
-    if (track) this._emitStateChange();
   }
 
   /** Internal: update adapter after modifying this._tracks in place. */
