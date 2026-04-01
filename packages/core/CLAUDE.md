@@ -33,6 +33,8 @@ Framework-agnostic types, pure functions, and utilities shared across all packag
 
 **`gainToDb` clamps at 0.0001 (−80 dB):** Prevents `Math.log10(0) = -Infinity`. `gainToNormalized` does NOT use `gainToDb` internally — it computes `20 * Math.log10(gain)` directly because `dBToNormalized` already handles `-Infinity` via its floor check, and the clamp would change normalized output for very small gains.
 
+**`trackChannelCount(track)`:** Returns max `audioBuffer.numberOfChannels` across a track's clips. Used by playout (Panner `channelCount`) and browser (Offline output channels, Panner `channelCount`). Prevents mono→stereo upmix and stereo→mono downmix.
+
 **Fade curves:** `fades.ts` generates `Float32Array` curves for `setValueCurveAtTime`. No Tone.js dependency — works with native `AudioParam`. The browser package's `useExportWav` also uses `applyFadeEnvelope` which delegates to these curve types.
 
 **Keyboard shortcuts:** `handleKeyboardEvent` is a pure function — no React dependency. The `undefined` vs `false` distinction in modifier keys matters: `undefined` = match any state, `false` = must NOT be pressed.

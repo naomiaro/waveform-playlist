@@ -54,7 +54,9 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Why single path:** Previously had a native `OfflineAudioContext` path (no effects) and a `Tone.Offline` path (with effects). The dual paths diverged — the native path used `StereoPannerNode` (correct stereo) while the Tone path used `Panner` without `channelCount: 2` (stereo→mono downmix). Unifying prevents this class of bug.
 
-**Panner channelCount: 2:** Always pass `{ pan, channelCount: 2 }` to Tone.js `Panner` for audio tracks. Matches `ToneTrack.ts` in playout. Without this, stereo is downmixed to mono.
+**Panner channelCount from source:** Use `trackChannelCount(track)` from core for Panner `channelCount`. Hardcoding `2` upmixes mono tracks to stereo; hardcoding `1` downmixes stereo to mono.
+
+**Output channels from source:** `Offline()` output channel count is derived from `trackChannelCount` across all rendered tracks — not hardcoded to 2.
 
 **Fade types:** All 4 types (linear, exponential, logarithmic, sCurve) are applied via `getUnderlyingAudioParam()` → `applyFadeEnvelope()`. The native `AudioParam` is extracted from the Tone.js `Gain` node.
 
