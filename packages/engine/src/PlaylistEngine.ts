@@ -561,6 +561,8 @@ export class PlaylistEngine {
     this._currentTime = this._playStartPosition;
     this._adapter?.setLoop(false, this._loopStart, this._loopEnd);
     this._adapter?.stop();
+    // Seek adapter to play-start position so getCurrentTime() returns it
+    this._adapter?.seek(this._currentTime);
     this._emit('stop');
     this._emitStateChange();
   }
@@ -579,6 +581,10 @@ export class PlaylistEngine {
   }
 
   setTempo(bpm: number, atTick?: number): void {
+    if (!Number.isFinite(bpm) || bpm <= 0) {
+      console.warn('[waveform-playlist/engine] setTempo: bpm must be a positive finite number');
+      return;
+    }
     this._bpm = bpm;
     this._adapter?.setTempo?.(bpm, atTick);
     this._recomputeStartSamples();
@@ -800,6 +806,7 @@ export class PlaylistEngine {
       }),
     }));
     this._tracksVersion++;
+    this._adapter?.setTracks(this._tracks);
   }
 
   private _emitStateChange(): void {
