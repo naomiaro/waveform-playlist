@@ -1251,9 +1251,16 @@ export class DawEditorElement extends LitElement {
                   let clipLeft: number;
                   let width: number;
                   if (this.scaleMode === 'beats') {
-                    const startSec = clip.startSample / sr;
+                    // Use startTick directly when available — stable across BPM changes.
+                    // Fall back to sample→seconds→ticks for clips without startTick.
+                    const startTick =
+                      clip.startTick !== undefined
+                        ? clip.startTick
+                        : this._secondsToTicks(clip.startSample / sr);
                     const durSec = clip.durationSamples / sr;
-                    const startTick = this._secondsToTicks(startSec);
+                    const startSec = clip.startTick !== undefined
+                      ? this._ticksToSeconds(clip.startTick)
+                      : clip.startSample / sr;
                     const endTick = this._secondsToTicks(startSec + durSec);
                     clipLeft = Math.round(startTick / this.ticksPerPixel);
                     width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
@@ -1281,12 +1288,18 @@ export class DawEditorElement extends LitElement {
                       segmentChannels = basePeaks.peaks.data;
                       const MIN_RENDER_STEP = 80;
                       const stepTicks = Math.max(MIN_RENDER_STEP, Math.ceil(this.ticksPerPixel));
-                      const startSec = clip.startSample / sr;
+                      const startSec =
+                        clip.startTick !== undefined
+                          ? this._ticksToSeconds(clip.startTick)
+                          : clip.startSample / sr;
                       const clipOffsetSec = clip.offsetSamples / sr;
-                      const startTick = this._secondsToTicks(startSec);
+                      const segStartTick =
+                        clip.startTick !== undefined
+                          ? clip.startTick
+                          : this._secondsToTicks(startSec);
                       const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
                       clipSegments = [];
-                      for (let tick = startTick; tick < endTick; tick += stepTicks) {
+                      for (let tick = segStartTick; tick < endTick; tick += stepTicks) {
                         const segEndTick = Math.min(tick + stepTicks, endTick);
                         const segStartAudioSec =
                           this._ticksToSeconds(tick) - startSec + clipOffsetSec;
@@ -1298,8 +1311,8 @@ export class DawEditorElement extends LitElement {
                         clipSegments.push({
                           peakStart: (segStartSample - clip.offsetSamples) / baseScale,
                           peakEnd: (segEndSample - clip.offsetSamples) / baseScale,
-                          pixelStart: (tick - startTick) / this.ticksPerPixel,
-                          pixelEnd: (segEndTick - startTick) / this.ticksPerPixel,
+                          pixelStart: (tick - segStartTick) / this.ticksPerPixel,
+                          pixelEnd: (segEndTick - segStartTick) / this.ticksPerPixel,
                         });
                       }
                     }
