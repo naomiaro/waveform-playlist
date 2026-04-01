@@ -47,6 +47,9 @@ function createMockAdapter(): PlayoutAdapter {
     setTrackSolo: vi.fn(),
     setTrackPan: vi.fn(),
     setLoop: vi.fn(),
+    setTempo: vi.fn(),
+    ticksToSeconds: vi.fn((tick: number) => (tick * 60) / (960 * 120)),
+    secondsToTicks: vi.fn((seconds: number) => Math.round((seconds * 960 * 120) / 60)),
     dispose: vi.fn(),
   };
 }
