@@ -322,6 +322,7 @@
       editor.secondsToTicks = (s) => transport.timeToTick(s);
       editor.ticksToSeconds = (t) => transport.tickToTime(t);
       editor.bpm = Math.round(curve.medianBpm);
+      editor.meterEntries = curve.meterChanges;
     }
 
     // --- Handle loading independently or together ---

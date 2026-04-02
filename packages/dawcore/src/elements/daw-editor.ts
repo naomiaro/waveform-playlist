@@ -111,8 +111,11 @@ export class DawEditorElement extends LitElement {
   private _bpm = 120;
   @property({ attribute: false })
   timeSignature: [number, number] = [4, 4];
-  /** Convert timeSignature to MeterEntry array for daw-grid and daw-ruler. */
+  @property({ attribute: false })
+  meterEntries?: MeterEntry[];
+  /** MeterEntries for grid/ruler: explicit meterEntries if set, otherwise derived from timeSignature. */
   private get _meterEntries(): MeterEntry[] {
+    if (this.meterEntries && this.meterEntries.length > 0) return this.meterEntries;
     return [{ tick: 0, numerator: this.timeSignature[0], denominator: this.timeSignature[1] }];
   }
   @property({ type: Number, noAccessor: true })
