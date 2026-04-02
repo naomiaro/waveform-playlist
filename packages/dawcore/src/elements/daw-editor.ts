@@ -1,6 +1,13 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { ClipTrack, FadeType, Peaks, PeakData, SnapTo, MeterEntry } from '@waveform-playlist/core';
+import type {
+  ClipTrack,
+  FadeType,
+  Peaks,
+  PeakData,
+  SnapTo,
+  MeterEntry,
+} from '@waveform-playlist/core';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
 import {
   createClip,

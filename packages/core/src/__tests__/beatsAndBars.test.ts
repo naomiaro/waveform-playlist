@@ -117,7 +117,6 @@ describe('snapToGrid', () => {
   });
 });
 
-
 describe('round-trip: ticks -> samples -> ticks', () => {
   it('is stable at 120 BPM / 48000 Hz', () => {
     const ticks = 192;

@@ -346,17 +346,17 @@ describe('computeMusicalTicks', () => {
       endPixel: 1000,
       ppqn: 960,
     });
-    const majors = result.ticks.filter(t => t.type === 'major');
+    const majors = result.ticks.filter((t) => t.type === 'major');
     expect(majors.length).toBeGreaterThan(0);
     // Bar 1 at tick 0
     expect(majors[0].pixel).toBeCloseTo(0);
     expect(majors[0].label).toBe('1');
     // Bar 2 at tick 3840 (4/4 bar = 3840 ticks)
-    const bar2 = majors.find(t => Math.abs(t.pixel - 38.4) < 0.1);
+    const bar2 = majors.find((t) => Math.abs(t.pixel - 38.4) < 0.1);
     expect(bar2).toBeDefined();
     expect(bar2!.label).toBe('2');
     // Bar 3 at tick 6720 (3840 + 2880 for 3/4 bar)
-    const bar3 = majors.find(t => Math.abs(t.pixel - 67.2) < 0.1);
+    const bar3 = majors.find((t) => Math.abs(t.pixel - 67.2) < 0.1);
     expect(bar3).toBeDefined();
     expect(bar3!.label).toBe('3');
   });

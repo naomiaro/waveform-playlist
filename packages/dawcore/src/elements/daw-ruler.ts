@@ -14,7 +14,9 @@ export class DawRulerElement extends LitElement {
   @property({ type: Number, attribute: false }) rulerHeight = 30;
   @property({ type: String, attribute: false }) scaleMode: 'temporal' | 'beats' = 'temporal';
   @property({ type: Number, attribute: false }) ticksPerPixel = 4;
-  @property({ attribute: false }) meterEntries: MeterEntry[] = [{ tick: 0, numerator: 4, denominator: 4 }];
+  @property({ attribute: false }) meterEntries: MeterEntry[] = [
+    { tick: 0, numerator: 4, denominator: 4 },
+  ];
   @property({ type: Number, attribute: false }) ppqn = 960;
   @property({ type: Number, attribute: false }) totalWidth = 0;
 

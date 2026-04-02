@@ -26,7 +26,9 @@ const MAX_CANVAS_WIDTH = 1000;
 @customElement('daw-grid')
 export class DawGridElement extends LitElement {
   @property({ type: Number, attribute: false }) ticksPerPixel = 24;
-  @property({ attribute: false }) meterEntries: MeterEntry[] = [{ tick: 0, numerator: 4, denominator: 4 }];
+  @property({ attribute: false }) meterEntries: MeterEntry[] = [
+    { tick: 0, numerator: 4, denominator: 4 },
+  ];
   @property({ type: Number, attribute: false }) ppqn = 960;
   @property({ type: Number, attribute: false }) visibleStart = -Infinity;
   @property({ type: Number, attribute: false }) visibleEnd = Infinity;
@@ -117,7 +119,8 @@ export class DawGridElement extends LitElement {
 
     const { ticks, pixelsPerQuarterNote } = this._tickData;
     const firstMeter = this.meterEntries[0] ?? { numerator: 4, denominator: 4 };
-    const approxPixelsPerBar = pixelsPerQuarterNote * firstMeter.numerator * (4 / (firstMeter.denominator ?? 4));
+    const approxPixelsPerBar =
+      pixelsPerQuarterNote * firstMeter.numerator * (4 / (firstMeter.denominator ?? 4));
 
     for (const canvas of canvases) {
       const idx = Number(canvas.dataset.index);

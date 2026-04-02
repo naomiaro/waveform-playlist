@@ -35,7 +35,10 @@ export function getCachedMusicalTicks(params: MusicalTickParams): MusicalTickDat
     return cachedResult;
   }
   cachedResult = computeMusicalTicks(params);
-  cachedParams = { ...params, meterEntries: params.meterEntries.map((e: MeterEntry) => ({ ...e })) };
+  cachedParams = {
+    ...params,
+    meterEntries: params.meterEntries.map((e: MeterEntry) => ({ ...e })),
+  };
   return cachedResult;
 }
 
