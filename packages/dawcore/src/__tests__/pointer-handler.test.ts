@@ -89,6 +89,7 @@ function createMockHost(
     bpm: 120,
     ppqn: 960,
     timeSignature: [4, 4] as [number, number],
+    _meterEntries: [{ tick: 0, numerator: 4, denominator: 4 }],
     snapTo: 'off' as const,
     _secondsToTicks: (s: number) => (s * 120 * 960) / 60,
     _ticksToSeconds: (t: number) => (t * 60) / (120 * 960),

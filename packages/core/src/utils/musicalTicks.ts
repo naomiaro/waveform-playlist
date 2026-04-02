@@ -196,7 +196,7 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
       // Count how many whole bars fit in this segment (for finite segments)
       if (segmentEnd !== Number.MAX_SAFE_INTEGER) {
         const segmentLen = segmentEnd - segmentStart;
-        cumulativeBars += Math.round(segmentLen / tpBar);
+        cumulativeBars += Math.floor(segmentLen / tpBar);
       }
     }
   }
@@ -267,7 +267,7 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
       let label: string | undefined;
       if (type === 'major') {
         label = `${barIndex + 1}`;
-      } else if (type === 'minor' && pixelsPerBeat >= MIN_PIXELS_PER_LABEL) {
+      } else if (type === 'minor' && tpBeat / ticksPerPixel >= MIN_PIXELS_PER_LABEL) {
         const beatInBar = Math.floor((tickOffsetInSegment % tpBar) / tpBeat) + 1;
         label = `${barIndex + 1}.${beatInBar}`;
       }

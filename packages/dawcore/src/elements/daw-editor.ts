@@ -114,7 +114,7 @@ export class DawEditorElement extends LitElement {
   @property({ attribute: false })
   meterEntries?: MeterEntry[];
   /** MeterEntries for grid/ruler: explicit meterEntries if set, otherwise derived from timeSignature. */
-  private get _meterEntries(): MeterEntry[] {
+  get _meterEntries(): MeterEntry[] {
     if (this.meterEntries && this.meterEntries.length > 0) return this.meterEntries;
     return [{ tick: 0, numerator: this.timeSignature[0], denominator: this.timeSignature[1] }];
   }
