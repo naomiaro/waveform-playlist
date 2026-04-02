@@ -27,9 +27,8 @@ export type SnapTo =
  * value.  'bar' and 'beat' depend on the first meter entry's time signature.
  * 'off' returns 0.
  */
-export function snapToTicks(snapTo: SnapTo, meterEntries: MeterEntry[], ppqn = 960): number {
-  const meter = meterEntries[0] ?? { numerator: 4, denominator: 4 };
-  const ts: [number, number] = [meter.numerator, meter.denominator];
+export function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppqn = 960): number {
+  const ts = timeSignature;
   switch (snapTo) {
     case 'bar':
       return ticksPerBar(ts, ppqn);
@@ -127,19 +126,19 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
   // pixelsPerQuarterNote is constant across meters — only depends on ppqn and zoom
   const pixelsPerQuarterNote = ppqn / ticksPerPixel;
 
-  // Use first meter's bar/beat sizes for zoom level determination
-  const firstTs: [number, number] = [firstMeter.numerator, firstMeter.denominator];
-  const firstTpBeat = ticksPerBeat(firstTs, ppqn);
-  const firstTpBar = ticksPerBar(firstTs, ppqn);
+  // Zoom thresholds based on quarter note density (meter-independent)
   const tpEighth = ppqn / 2;
   const tpSixteenth = ppqn / 4;
-
-  const pixelsPerBar = firstTpBar / ticksPerPixel;
-  const pixelsPerBeat = firstTpBeat / ticksPerPixel;
   const pixelsPerEighth = tpEighth / ticksPerPixel;
   const pixelsPerSixteenth = tpSixteenth / ticksPerPixel;
 
-  // Determine zoom level based on pixel density thresholds.
+  // Use first meter's bar/beat sizes for bar/beat zoom thresholds
+  const firstTs: [number, number] = [firstMeter.numerator, firstMeter.denominator];
+  const firstTpBar = ticksPerBar(firstTs, ppqn);
+  const firstTpBeat = ticksPerBeat(firstTs, ppqn);
+  const pixelsPerBar = firstTpBar / ticksPerPixel;
+  const pixelsPerBeat = firstTpBeat / ticksPerPixel;
+
   let zoomLevel: ZoomLevel;
   if (pixelsPerBar < MIN_PIXELS_PER_UNIT) {
     zoomLevel = 'coarse';
@@ -153,15 +152,16 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
     zoomLevel = 'sixteenth';
   }
 
-  // Coarse bar step uses first meter's bar size
+  // Coarse step in quarter notes — meter-independent so all segments
+  // render at the same visual density regardless of time signature.
   let coarseBarStep: number | undefined;
-  let coarseMultiplier = 1;
+  let coarseQuarterNotes = 0;
   if (zoomLevel === 'coarse') {
-    coarseMultiplier = 2;
-    while ((firstTpBar * coarseMultiplier) / ticksPerPixel < MIN_PIXELS_PER_UNIT) {
-      coarseMultiplier *= 2;
+    coarseQuarterNotes = 2;
+    while ((coarseQuarterNotes * ppqn) / ticksPerPixel < MIN_PIXELS_PER_UNIT) {
+      coarseQuarterNotes *= 2;
     }
-    coarseBarStep = coarseMultiplier;
+    coarseBarStep = coarseQuarterNotes;
   }
 
   const startTick = startPixel * ticksPerPixel;
@@ -212,7 +212,7 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
     // Determine step size for this segment
     let stepTicks: number;
     if (zoomLevel === 'coarse') {
-      stepTicks = tpBar * coarseMultiplier;
+      stepTicks = coarseQuarterNotes * ppqn;
     } else if (zoomLevel === 'bar') {
       stepTicks = tpBar;
     } else if (zoomLevel === 'beat') {
@@ -316,7 +316,7 @@ export function snapTickToGrid(
   }
 
   const ts: [number, number] = [meter.numerator, meter.denominator];
-  const gridSize = snapToTicks(snapTo, [{ tick: 0, numerator: ts[0], denominator: ts[1] }], ppqn);
+  const gridSize = snapToTicks(snapTo, ts, ppqn);
   if (gridSize <= 0) return tick;
 
   // Snap relative to the meter's start tick

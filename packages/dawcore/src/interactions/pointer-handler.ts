@@ -37,7 +37,6 @@ export interface PointerHandlerHost {
   readonly ticksPerPixel: number;
   readonly bpm: number;
   readonly ppqn: number;
-  readonly timeSignature: [number, number];
   readonly _meterEntries: MeterEntry[];
   readonly snapTo: SnapTo;
   readonly _secondsToTicks: (seconds: number) => number;

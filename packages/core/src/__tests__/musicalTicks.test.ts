@@ -8,54 +8,54 @@ const PPQN = 960;
 // snapToTicks — 4/4 at 960 PPQN
 // ---------------------------------------------------------------------------
 describe('snapToTicks — 4/4 at 960 PPQN', () => {
-  const meterEntries44 = [{ tick: 0, numerator: 4, denominator: 4 }];
+  const ts44: [number, number] = [4, 4];
 
   it('bar → 3840', () => {
-    expect(snapToTicks('bar', meterEntries44, PPQN)).toBe(3840);
+    expect(snapToTicks('bar', ts44, PPQN)).toBe(3840);
   });
 
   it('beat → 960', () => {
-    expect(snapToTicks('beat', meterEntries44, PPQN)).toBe(960);
+    expect(snapToTicks('beat', ts44, PPQN)).toBe(960);
   });
 
   it('1/2 → 1920', () => {
-    expect(snapToTicks('1/2', meterEntries44, PPQN)).toBe(1920);
+    expect(snapToTicks('1/2', ts44, PPQN)).toBe(1920);
   });
 
   it('1/4 → 960', () => {
-    expect(snapToTicks('1/4', meterEntries44, PPQN)).toBe(960);
+    expect(snapToTicks('1/4', ts44, PPQN)).toBe(960);
   });
 
   it('1/8 → 480', () => {
-    expect(snapToTicks('1/8', meterEntries44, PPQN)).toBe(480);
+    expect(snapToTicks('1/8', ts44, PPQN)).toBe(480);
   });
 
   it('1/16 → 240', () => {
-    expect(snapToTicks('1/16', meterEntries44, PPQN)).toBe(240);
+    expect(snapToTicks('1/16', ts44, PPQN)).toBe(240);
   });
 
   it('1/32 → 120', () => {
-    expect(snapToTicks('1/32', meterEntries44, PPQN)).toBe(120);
+    expect(snapToTicks('1/32', ts44, PPQN)).toBe(120);
   });
 
   it('1/2T → 1280', () => {
-    expect(snapToTicks('1/2T', meterEntries44, PPQN)).toBe(1280);
+    expect(snapToTicks('1/2T', ts44, PPQN)).toBe(1280);
   });
 
   it('1/4T → 640', () => {
-    expect(snapToTicks('1/4T', meterEntries44, PPQN)).toBe(640);
+    expect(snapToTicks('1/4T', ts44, PPQN)).toBe(640);
   });
 
   it('1/8T → 320', () => {
-    expect(snapToTicks('1/8T', meterEntries44, PPQN)).toBe(320);
+    expect(snapToTicks('1/8T', ts44, PPQN)).toBe(320);
   });
 
   it('1/16T → 160', () => {
-    expect(snapToTicks('1/16T', meterEntries44, PPQN)).toBe(160);
+    expect(snapToTicks('1/16T', ts44, PPQN)).toBe(160);
   });
 
   it('off → 0', () => {
-    expect(snapToTicks('off', meterEntries44, PPQN)).toBe(0);
+    expect(snapToTicks('off', ts44, PPQN)).toBe(0);
   });
 });
 
@@ -63,33 +63,33 @@ describe('snapToTicks — 4/4 at 960 PPQN', () => {
 // snapToTicks — 6/8 at 960 PPQN
 // ---------------------------------------------------------------------------
 describe('snapToTicks — 6/8 at 960 PPQN', () => {
-  const meterEntries68 = [{ tick: 0, numerator: 6, denominator: 8 }];
+  const ts68: [number, number] = [6, 8];
 
   // beat = ppqn * (4 / 8) = 480
   // bar  = 6 * 480 = 2880
   it('bar → 2880', () => {
-    expect(snapToTicks('bar', meterEntries68, PPQN)).toBe(2880);
+    expect(snapToTicks('bar', ts68, PPQN)).toBe(2880);
   });
 
   it('beat → 480', () => {
-    expect(snapToTicks('beat', meterEntries68, PPQN)).toBe(480);
+    expect(snapToTicks('beat', ts68, PPQN)).toBe(480);
   });
 
   // Straight subdivisions are always relative to a quarter note (ppqn), independent of time sig
   it('1/4 → 960', () => {
-    expect(snapToTicks('1/4', meterEntries68, PPQN)).toBe(960);
+    expect(snapToTicks('1/4', ts68, PPQN)).toBe(960);
   });
 
   it('1/8 → 480', () => {
-    expect(snapToTicks('1/8', meterEntries68, PPQN)).toBe(480);
+    expect(snapToTicks('1/8', ts68, PPQN)).toBe(480);
   });
 
   it('1/16 → 240', () => {
-    expect(snapToTicks('1/16', meterEntries68, PPQN)).toBe(240);
+    expect(snapToTicks('1/16', ts68, PPQN)).toBe(240);
   });
 
   it('off → 0', () => {
-    expect(snapToTicks('off', meterEntries68, PPQN)).toBe(0);
+    expect(snapToTicks('off', ts68, PPQN)).toBe(0);
   });
 });
 
@@ -97,31 +97,31 @@ describe('snapToTicks — 6/8 at 960 PPQN', () => {
 // snapToTicks — 3/4 at 960 PPQN
 // ---------------------------------------------------------------------------
 describe('snapToTicks — 3/4 at 960 PPQN', () => {
-  const meterEntries34 = [{ tick: 0, numerator: 3, denominator: 4 }];
+  const ts34: [number, number] = [3, 4];
 
   // beat = 960, bar = 3 * 960 = 2880
   it('bar → 2880', () => {
-    expect(snapToTicks('bar', meterEntries34, PPQN)).toBe(2880);
+    expect(snapToTicks('bar', ts34, PPQN)).toBe(2880);
   });
 
   it('beat → 960', () => {
-    expect(snapToTicks('beat', meterEntries34, PPQN)).toBe(960);
+    expect(snapToTicks('beat', ts34, PPQN)).toBe(960);
   });
 
   it('1/4 → 960', () => {
-    expect(snapToTicks('1/4', meterEntries34, PPQN)).toBe(960);
+    expect(snapToTicks('1/4', ts34, PPQN)).toBe(960);
   });
 
   it('1/8 → 480', () => {
-    expect(snapToTicks('1/8', meterEntries34, PPQN)).toBe(480);
+    expect(snapToTicks('1/8', ts34, PPQN)).toBe(480);
   });
 
   it('1/4T → 640', () => {
-    expect(snapToTicks('1/4T', meterEntries34, PPQN)).toBe(640);
+    expect(snapToTicks('1/4T', ts34, PPQN)).toBe(640);
   });
 
   it('off → 0', () => {
-    expect(snapToTicks('off', meterEntries34, PPQN)).toBe(0);
+    expect(snapToTicks('off', ts34, PPQN)).toBe(0);
   });
 });
 

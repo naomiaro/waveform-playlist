@@ -205,7 +205,7 @@ For programmatic `.click()` on file inputs, use `opacity: 0; width: 0; height: 0
 **Architecture:** TimeScale is a pure tick renderer — accepts only `PrecomputedTickData` (`{ widthX, canvasInfo: Map<pixel, height>, timeMarkersWithPositions }`). SmartScale is the presentation layer that computes tick data for both modes.
 
 **Two modes in SmartScale:**
-- **Beats & bars:** PPQN 192 integer math (matching Tone.js). Iterates by beat ticks, converts to samples → pixels. Labels use `ticksToBarBeatLabel()`.
+- **Beats & bars:** PPQN 192 integer math (matching Tone.js). Iterates by beat ticks, converts to samples → pixels. Labels computed inline from bar/beat position.
 - **Temporal:** Uses `timeinfo` map (zoom threshold → marker/bigStep/smallStep in ms). Iterates in pixel space, converts counter to labels via `formatTime()`.
 
 **Why integer PPQN math:** Millisecond-based modular arithmetic (`counter % marker === 0`) breaks with non-integer beat durations (e.g., 119 BPM = 504.20ms/beat — modulo never hits 0). Integer tick space avoids this entirely.

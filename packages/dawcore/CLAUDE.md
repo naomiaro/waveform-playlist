@@ -12,7 +12,7 @@
 - `isConnected` is a readonly getter in happy-dom — cannot be set via `Object.assign` on elements. Append the element to `document.body` instead.
 - Mocks for async functions (e.g., `resumeGlobalAudioContext`) must return `Promise.resolve()`, not `undefined`. Calling `.catch()` on `undefined` crashes.
 - `canvas.getContext('2d')` returns `null` in happy-dom. Tests must mock it: `vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx as any)` where `mockCtx` has `clearRect`, `resetTransform`, `scale`, `fillStyle`, `fillRect` as `vi.fn()`.
-- `PointerHandlerHost` and `ClipPointerHost` test mocks must include beats-mode fields (`scaleMode`, `ticksPerPixel`, `bpm`, `ppqn`, `timeSignature`, `snapTo`, `renderSamplesPerPixel`). Default to `scaleMode: 'temporal'`, `snapTo: 'off'` for non-beats tests.
+- `PointerHandlerHost` and `ClipPointerHost` test mocks must include beats-mode fields (`scaleMode`, `ticksPerPixel`, `bpm`, `ppqn`, `_meterEntries`, `snapTo`, `renderSamplesPerPixel`). Default to `scaleMode: 'temporal'`, `snapTo: 'off'` for non-beats tests.
 
 **Dev page:** `pnpm dev:page` starts Vite at `http://localhost:5173/dev/index.html`. Uses `website/static/` as publicDir for audio files.
 
