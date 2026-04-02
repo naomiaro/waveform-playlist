@@ -152,13 +152,16 @@
   <div id="log"></div>
 
   <script type="module">
-    import { Transport } from '@dawcore/transport';
     import { detectMeterChanges } from '@waveform-playlist/core';
 
     const editor = document.getElementById('editor');
     const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
     editor.audioContext = audioCtx;
-    const transport = new Transport(audioCtx, { tempo: 120, numerator: 4, denominator: 4 });
+
+    // Build engine eagerly so editor.transport is available before tracks load.
+    // This gives us a single transport for metronome, tempo, and clip scheduling.
+    await editor._ensureEngine();
+    const transport = editor.transport;
 
     // Click sounds
     function createClickBuffer(frequency, duration, gain) {
@@ -304,43 +307,24 @@
     }
 
     // --- Apply tempo curve ---
-    // Single-clock: no offset. Transport time = audio time.
-    // Applies to the demo's standalone transport (for metronome preview)
-    // and — when available — the editor's internal transport (for clip scheduling).
+    // Single transport: editor.transport handles metronome, tempo, and clips.
     let lastCurve = null;
 
     function applyTempoCurve(curve) {
       lastCurve = curve;
-      applyTempoToTransport(transport, curve);
-
-      // Use the demo transport for callbacks initially.
-      // After loadFiles, applyTempoToEditorTransport replaces these
-      // with the editor's transport (single clock).
+      transport.stop();
+      transport.clearTempos();
+      transport.clearMeters();
+      transport.setMeter(4, 4);
+      for (const event of curve.tempoEvents) {
+        transport.setTempo(event.bpm, event.tick);
+      }
+      for (const meter of curve.meterChanges) {
+        transport.setMeter(meter.numerator, meter.denominator, meter.tick);
+      }
       editor.secondsToTicks = (s) => transport.timeToTick(s);
       editor.ticksToSeconds = (t) => transport.tickToTime(t);
       editor.bpm = Math.round(curve.medianBpm);
-    }
-
-    function applyTempoToTransport(t, curve) {
-      t.stop();
-      t.clearTempos();
-      t.clearMeters();
-      t.setMeter(4, 4);
-      for (const event of curve.tempoEvents) {
-        t.setTempo(event.bpm, event.tick);
-      }
-      for (const meter of curve.meterChanges) {
-        t.setMeter(meter.numerator, meter.denominator, meter.tick);
-      }
-    }
-
-    function applyTempoToEditorTransport() {
-      const editorTransport = editor.transport;
-      if (!editorTransport || !lastCurve) return;
-      applyTempoToTransport(editorTransport, lastCurve);
-      // Switch callbacks to use the editor's transport (same clock as clips)
-      editor.secondsToTicks = (s) => editorTransport.timeToTick(s);
-      editor.ticksToSeconds = (t) => editorTransport.tickToTime(t);
     }
 
     // --- Handle loading independently or together ---
@@ -381,19 +365,11 @@
         const result = await editor.loadFiles([pendingAudioFile]);
         if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
 
-        // Apply tempo to editor's internal Transport (same clock as clips)
-        if (beatsApplied) {
-          applyTempoToEditorTransport();
-
+        if (beatsApplied && lastCurve) {
           // Reposition clip so first beat aligns with bar boundary.
-          // The clip starts at clipStartTick (not 0) so that beat 1 in the
-          // audio lands on the downbeat tick.
-          if (editor.engine && lastCurve && lastCurve.clipStartTick > 0) {
-            const et = editor.transport;
+          if (lastCurve.clipStartTick > 0 && editor.engine) {
             const sr = editor.effectiveSampleRate;
-            const clipStartSec = et
-              ? et.tickToTime(lastCurve.clipStartTick)
-              : (lastCurve.clipStartTick * 60) / (960 * (lastCurve.medianBpm || 120));
+            const clipStartSec = transport.tickToTime(lastCurve.clipStartTick);
             const clipStartSample = Math.round(clipStartSec * sr);
             const tracks = editor.engine.getState().tracks.map(t => ({
               ...t,
@@ -404,28 +380,8 @@
               })),
             }));
             editor.engine.setTracks(tracks);
-          } else if (editor.engine) {
-            editor.engine.setTracks(editor.engine.getState().tracks);
           }
 
-          // Debug: verify TempoMap consistency
-          const et = editor.transport;
-          if (et && lastCurve) {
-            const firstEvent = lastCurve.tempoEvents[0];
-            const secondEvent = lastCurve.tempoEvents.length > 1 ? lastCurve.tempoEvents[1] : null;
-            addLog('tempo[0]: tick=' + firstEvent.tick + ' bpm=' + firstEvent.bpm.toFixed(1));
-            if (secondEvent) {
-              addLog('tempo[1]: tick=' + secondEvent.tick + ' bpm=' + secondEvent.bpm.toFixed(1));
-              addLog('ticksToSeconds(' + secondEvent.tick + ')=' + et.tickToTime(secondEvent.tick).toFixed(4));
-            }
-            const tracks = editor.engine?.getState().tracks;
-            if (tracks?.[0]?.clips?.[0]) {
-              const c = tracks[0].clips[0];
-              addLog('clip: startTick=' + c.startTick + ' startSample=' + c.startSample);
-            }
-          }
-
-          addLog('synced: editor transport has ' + (lastCurve?.tempoEvents.length || 0) + ' tempo events');
           addLog('meters: ' + lastCurve.meterChanges.map(m => m.numerator + '/' + m.denominator + ' @tick ' + m.tick).join(', '));
         } else {
           addLog('audio loaded — single BPM (drop .beats to add variable tempo)');
@@ -464,33 +420,23 @@
       transport.setMetronomeClickSounds(accent, normal);
     });
 
-    // --- Sync transport with editor playback ---
-    // When beats are applied, override the playhead to follow the transport's
-    // tick position directly — no audio offset. The playhead starts at tick 0
-    // and shows the transport's position, even if there's no audio there.
-    // Use editor.transport (single clock) when available, fall back to demo transport.
-    function getActiveTransport() {
-      return editor.transport || transport;
-    }
-
+    // --- Sync playhead with transport ---
     function startTransportPlayhead() {
       const playhead = editor.shadowRoot?.querySelector('daw-playhead');
-      const t = getActiveTransport();
       if (playhead && beatsApplied) {
         playhead.startBeatsAnimationWithMap(
-          () => t.getCurrentTime(),
-          (s) => t.timeToTick(s),
+          () => transport.getCurrentTime(),
+          (s) => transport.timeToTick(s),
           editor.ticksPerPixel
         );
       }
     }
     function stopTransportPlayhead() {
       const playhead = editor.shadowRoot?.querySelector('daw-playhead');
-      const t = getActiveTransport();
       if (playhead && beatsApplied) {
         playhead.stopBeatsAnimationWithMap(
-          t.getCurrentTime(),
-          (s) => t.timeToTick(s),
+          transport.getCurrentTime(),
+          (s) => transport.timeToTick(s),
           editor.ticksPerPixel
         );
       }
@@ -498,29 +444,19 @@
 
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
-      // Sync demo transport to editor's current time before playing
-      const engineTime = editor.engine?.getCurrentTime() ?? 0;
-      transport.seek(engineTime);
-      transport.play();
       startTransportPlayhead();
     });
     editor.addEventListener('daw-pause', () => {
       isPlaying = false;
-      transport.pause();
       stopTransportPlayhead();
     });
     editor.addEventListener('daw-stop', () => {
       isPlaying = false;
-      transport.stop();
       stopTransportPlayhead();
     });
 
     // --- Editor events ---
-    editor.addEventListener('daw-seek', (e) => {
-      // Keep demo transport in sync so metronome resumes from correct position
-      transport.seek(e.detail.time);
-      addLog('seek: ' + e.detail.time.toFixed(3) + 's');
-    });
+    editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
     editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
     editor.addEventListener('daw-selection', (e) => addLog('selection: ' + e.detail.start.toFixed(3) + ' - ' + e.detail.end.toFixed(3)));
     editor.addEventListener('daw-clip-move', (e) => addLog('clip-move: ' + e.detail.clipId + ' delta=' + e.detail.deltaSamples));
