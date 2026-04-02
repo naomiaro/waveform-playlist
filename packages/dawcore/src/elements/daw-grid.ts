@@ -118,9 +118,6 @@ export class DawGridElement extends LitElement {
       style.getPropertyValue('--daw-grid-minor-line').trim() || 'rgba(255,255,255,0.06)';
 
     const { ticks, pixelsPerQuarterNote } = this._tickData;
-    const firstMeter = this.meterEntries[0] ?? { numerator: 4, denominator: 4 };
-    const approxPixelsPerBar =
-      pixelsPerQuarterNote * firstMeter.numerator * (4 / (firstMeter.denominator ?? 4));
 
     for (const canvas of canvases) {
       const idx = Number(canvas.dataset.index);
@@ -136,16 +133,19 @@ export class DawGridElement extends LitElement {
 
       // Zebra stripes: use barIndex from tick data for exact alignment with grid lines.
       // Draw a stripe from each odd-barIndex major tick to the next major tick.
-      if (approxPixelsPerBar >= MIN_PIXELS_PER_UNIT) {
+      // Threshold: show stripes when a 4-beat bar would be >= MIN_PIXELS_PER_UNIT wide.
+      if (pixelsPerQuarterNote * 4 >= MIN_PIXELS_PER_UNIT) {
         ctx.fillStyle = barHighlight;
         const majorTicks = ticks.filter((t) => t.type === 'major');
         for (let i = 0; i < majorTicks.length; i++) {
           if (majorTicks[i].barIndex % 2 === 1) {
             const x = majorTicks[i].pixel - chunkLeft;
+            // Use actual next major tick pixel for exact bar width (handles variable meter).
+            // Last bar: extend by 4 quarter notes as fallback.
             const nextX =
               i + 1 < majorTicks.length
                 ? majorTicks[i + 1].pixel - chunkLeft
-                : x + approxPixelsPerBar; // last bar: extend by approxPixelsPerBar
+                : x + pixelsPerQuarterNote * 4;
             ctx.fillRect(x, 0, nextX - x, this.height);
           }
         }

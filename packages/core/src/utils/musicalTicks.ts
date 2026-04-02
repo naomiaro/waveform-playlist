@@ -126,23 +126,18 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
   // pixelsPerQuarterNote is constant across meters — only depends on ppqn and zoom
   const pixelsPerQuarterNote = ppqn / ticksPerPixel;
 
-  // Zoom thresholds based on quarter note density (meter-independent)
+  // All zoom thresholds derived from pixelsPerQuarterNote (meter-independent).
+  // Quarter note subdivisions: half = 2×, eighth = 0.5×, sixteenth = 0.25×.
+  // "Bar" threshold uses 4× quarter note (a 4/4 bar) — conservative minimum.
   const tpEighth = ppqn / 2;
   const tpSixteenth = ppqn / 4;
   const pixelsPerEighth = tpEighth / ticksPerPixel;
   const pixelsPerSixteenth = tpSixteenth / ticksPerPixel;
 
-  // Use first meter's bar/beat sizes for bar/beat zoom thresholds
-  const firstTs: [number, number] = [firstMeter.numerator, firstMeter.denominator];
-  const firstTpBar = ticksPerBar(firstTs, ppqn);
-  const firstTpBeat = ticksPerBeat(firstTs, ppqn);
-  const pixelsPerBar = firstTpBar / ticksPerPixel;
-  const pixelsPerBeat = firstTpBeat / ticksPerPixel;
-
   let zoomLevel: ZoomLevel;
-  if (pixelsPerBar < MIN_PIXELS_PER_UNIT) {
+  if (pixelsPerQuarterNote * 4 < MIN_PIXELS_PER_UNIT) {
     zoomLevel = 'coarse';
-  } else if (pixelsPerBeat < MIN_PIXELS_PER_UNIT) {
+  } else if (pixelsPerQuarterNote < MIN_PIXELS_PER_UNIT) {
     zoomLevel = 'bar';
   } else if (pixelsPerEighth < MIN_PIXELS_PER_UNIT) {
     zoomLevel = 'beat';

@@ -214,7 +214,7 @@ describe('computeMusicalTicks', () => {
   const meterEntries44 = [{ tick: 0, numerator: 4, denominator: 4 }];
 
   it('generates bar ticks at bar zoom (ticksPerPixel=200)', () => {
-    // pixelsPerBar = 3840 / 200 = 19.2 (≥8), pixelsPerBeat = 960 / 200 = 4.8 (<8) → 'bar' zoom
+    // pixelsPerQuarterNote = 960 / 200 = 4.8 (<8) → 'bar' zoom (quarter notes too small for beats)
     const params: MusicalTickParams = {
       meterEntries: meterEntries44,
       ticksPerPixel: 200,
@@ -231,7 +231,7 @@ describe('computeMusicalTicks', () => {
   });
 
   it('generates beat ticks at beat zoom (ticksPerPixel=100)', () => {
-    // pixelsPerBeat = 960 / 100 = 9.6 (≥8), pixelsPerEighth = 480/100=4.8 (<8) → 'beat' zoom
+    // pixelsPerQuarterNote = 960 / 100 = 9.6 (≥8), pixelsPerEighth = 480/100=4.8 (<8) → 'beat' zoom
     const params: MusicalTickParams = {
       meterEntries: meterEntries44,
       ticksPerPixel: 100,
@@ -300,7 +300,7 @@ describe('computeMusicalTicks', () => {
   });
 
   it('coarse zoom has coarseBarStep > 1', () => {
-    // pixelsPerBar = 3840 / 5000 = 0.768 (<8) → 'coarse' zoom
+    // pixelsPerQuarterNote = 960 / 5000 = 0.192, * 4 = 0.768 (<8) → 'coarse' zoom
     const params: MusicalTickParams = {
       meterEntries: meterEntries44,
       ticksPerPixel: 5000,
