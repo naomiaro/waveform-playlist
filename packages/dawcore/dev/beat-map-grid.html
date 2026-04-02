@@ -153,6 +153,7 @@
 
   <script type="module">
     import { Transport } from '@dawcore/transport';
+    import { detectMeterChanges } from '@waveform-playlist/core';
 
     const editor = document.getElementById('editor');
     const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
@@ -298,7 +299,8 @@
       bpms.sort((a, b) => a - b);
       const medianBpm = bpms.length > 0 ? bpms[Math.floor(bpms.length / 2)] : beatBpm;
 
-      return { medianBpm, tempoEvents, totalBeats: beats.length, firstBeatTick, clipStartTick };
+      const meterChanges = detectMeterChanges(beats, firstBeatTick, ppqn);
+      return { medianBpm, tempoEvents, totalBeats: beats.length, firstBeatTick, clipStartTick, meterChanges };
     }
 
     // --- Apply tempo curve ---
@@ -326,6 +328,9 @@
       t.setMeter(4, 4);
       for (const event of curve.tempoEvents) {
         t.setTempo(event.bpm, event.tick);
+      }
+      for (const meter of curve.meterChanges) {
+        t.setMeter(meter.numerator, meter.denominator, meter.tick);
       }
     }
 
@@ -421,6 +426,7 @@
           }
 
           addLog('synced: editor transport has ' + (lastCurve?.tempoEvents.length || 0) + ' tempo events');
+          addLog('meters: ' + lastCurve.meterChanges.map(m => m.numerator + '/' + m.denominator + ' @tick ' + m.tick).join(', '));
         } else {
           addLog('audio loaded — single BPM (drop .beats to add variable tempo)');
         }
