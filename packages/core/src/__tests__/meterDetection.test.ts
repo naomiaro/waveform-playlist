@@ -243,4 +243,29 @@ describe('detectMeterChanges', () => {
       expect(result.every((e) => e.denominator === 4)).toBe(true);
     });
   });
+
+  describe('meter change back and forth', () => {
+    it('detects 4/4 → 3/4 → 4/4', () => {
+      // Bar 1: 4/4, Bar 2: 3/4, Bar 3: 4/4
+      const beats = [
+        { time: 0, beat: 1 },
+        { time: 0.5, beat: 2 },
+        { time: 1.0, beat: 3 },
+        { time: 1.5, beat: 4 },
+        { time: 2.0, beat: 1 }, // bar 2: 3/4
+        { time: 2.5, beat: 2 },
+        { time: 3.0, beat: 3 },
+        { time: 3.5, beat: 1 }, // bar 3: back to 4/4
+        { time: 4.0, beat: 2 },
+        { time: 4.5, beat: 3 },
+        { time: 5.0, beat: 4 },
+        { time: 5.5, beat: 1 },
+      ];
+      const result = detectMeterChanges(beats, 0, PPQN);
+      expect(result.length).toBe(3);
+      expect(result[0]).toEqual({ tick: 0, numerator: 4, denominator: 4 });
+      expect(result[1].numerator).toBe(3);
+      expect(result[2].numerator).toBe(4);
+    });
+  });
 });

@@ -172,6 +172,35 @@ describe('snapTickToGrid', () => {
   it('tick already on grid returns same value', () => {
     expect(snapTickToGrid(1920, '1/2', meterEntries44, PPQN)).toBe(1920);
   });
+
+  // Multi-meter snapping
+  const multiMeter = [
+    { tick: 0, numerator: 4, denominator: 4 },
+    { tick: 3840, numerator: 3, denominator: 4 },
+  ];
+
+  it('snaps to bar in 3/4 region relative to meter start', () => {
+    // 3/4 bar = 2880 ticks. Bar 3 starts at 3840 + 2880 = 6720.
+    // Tick 5500 is in the 3/4 region. 5500 - 3840 = 1660, 1660/2880 = 0.576 → rounds to 1 → 3840 + 2880 = 6720
+    expect(snapTickToGrid(5500, 'bar', multiMeter, PPQN)).toBe(6720);
+  });
+
+  it('snaps to beat in 3/4 region relative to meter start', () => {
+    // In 3/4 region (starts at 3840), beat = 960 ticks.
+    // Tick 4500, offset from 3840 = 660, 660/960 = 0.6875 → rounds to 1 → 3840 + 960 = 4800
+    expect(snapTickToGrid(4500, 'beat', multiMeter, PPQN)).toBe(4800);
+  });
+
+  it('tick at meter boundary uses new meter', () => {
+    // Tick 3840 is exactly at the 3/4 boundary.
+    // Snapping to bar: offset = 0, rounds to 0 → 3840
+    expect(snapTickToGrid(3840, 'bar', multiMeter, PPQN)).toBe(3840);
+  });
+
+  it('tick just before meter boundary uses old meter', () => {
+    // Tick 3839 is in the 4/4 region. 3839/3840 ≈ 1 → rounds to 1 → 3840
+    expect(snapTickToGrid(3839, 'bar', multiMeter, PPQN)).toBe(3840);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -359,5 +388,40 @@ describe('computeMusicalTicks', () => {
     const bar3 = majors.find((t) => Math.abs(t.pixel - 67.2) < 0.1);
     expect(bar3).toBeDefined();
     expect(bar3!.label).toBe('3');
+  });
+
+  it('handles meter change back and forth (4/4 → 3/4 → 4/4)', () => {
+    // Bar 1: 4/4 = 3840 ticks. Bar 2: 3/4 = 2880 ticks. Bar 3: 4/4 = 3840 ticks.
+    const result = computeMusicalTicks({
+      meterEntries: [
+        { tick: 0, numerator: 4, denominator: 4 },
+        { tick: 3840, numerator: 3, denominator: 4 },
+        { tick: 6720, numerator: 4, denominator: 4 },
+      ],
+      ticksPerPixel: 100,
+      startPixel: 0,
+      endPixel: 1200,
+      ppqn: 960,
+    });
+    const majors = result.ticks.filter((t) => t.type === 'major');
+    // Bar 1 at tick 0
+    expect(majors[0].label).toBe('1');
+    // Bar 2 at tick 3840
+    const bar2 = majors.find((t) => Math.abs(t.pixel - 38.4) < 0.1);
+    expect(bar2).toBeDefined();
+    expect(bar2!.label).toBe('2');
+    // Bar 3 at tick 6720 (3840 + 2880)
+    const bar3 = majors.find((t) => Math.abs(t.pixel - 67.2) < 0.1);
+    expect(bar3).toBeDefined();
+    expect(bar3!.label).toBe('3');
+    // Bar 4 at tick 10560 (6720 + 3840, back to 4/4)
+    const bar4 = majors.find((t) => Math.abs(t.pixel - 105.6) < 0.1);
+    expect(bar4).toBeDefined();
+    expect(bar4!.label).toBe('4');
+    // barIndex should be sequential
+    const barIndices = majors.map((t) => t.barIndex);
+    for (let i = 1; i < barIndices.length; i++) {
+      expect(barIndices[i]).toBeGreaterThan(barIndices[i - 1]);
+    }
   });
 });
