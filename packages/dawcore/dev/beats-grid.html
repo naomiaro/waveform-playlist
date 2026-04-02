@@ -163,6 +163,8 @@
     <span class="separator"></span>
     <span class="label">4/4</span>
     <span class="separator"></span>
+    <button id="metro-toggle">Metro</button>
+    <span class="separator"></span>
     <label class="label" for="snap-select">Snap</label>
     <select id="snap-select">
       <option value="off">Off</option>
@@ -184,7 +186,38 @@
   <script type="module">
     const editor = document.getElementById('editor');
     // Pass AudioContext at 48000 Hz to match .dat peaks
-    editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    editor.audioContext = audioCtx;
+
+    // Build engine eagerly so editor.transport is available for metronome
+    await editor._ensureEngine();
+    const transport = editor.transport;
+
+    // Metronome click sounds
+    function createClickBuffer(frequency, duration, gain) {
+      const length = Math.floor(audioCtx.sampleRate * duration);
+      const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        const t = i / audioCtx.sampleRate;
+        const envelope = Math.exp(-t * 40);
+        data[i] = Math.sin(2 * Math.PI * frequency * t) * envelope * gain;
+      }
+      return buffer;
+    }
+    const accentClick = createClickBuffer(1200, 0.05, 0.8);
+    const normalClick = createClickBuffer(800, 0.04, 0.5);
+    transport.setMetronomeClickSounds(accentClick, normalClick);
+
+    // Metronome toggle
+    const metroBtn = document.getElementById('metro-toggle');
+    let metronomeEnabled = false;
+    metroBtn.addEventListener('click', () => {
+      metronomeEnabled = !metronomeEnabled;
+      transport.setMetronomeEnabled(metronomeEnabled);
+      metroBtn.style.borderColor = metronomeEnabled ? '#63C75F' : '';
+    });
+
     const log = document.getElementById('log');
 
     function addLog(msg) {
