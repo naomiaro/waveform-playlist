@@ -22,8 +22,9 @@ Framework-agnostic types, pure functions, and utilities shared across all packag
 | `constants.ts` | `MAX_CANVAS_WIDTH` (1000px virtual scroll chunk size) |
 | `utils/conversions.ts` | Unit converters: `samplesToSeconds`, `secondsToSamples`, `samplesToPixels`, `pixelsToSamples`, `pixelsToSeconds`, `secondsToPixels` |
 | `utils/dBUtils.ts` | Decibel utilities: `gainToDb`, `dBToNormalized`, `normalizedToDb`, `gainToNormalized` |
-| `utils/beatsAndBars.ts` | Musical time: `PPQN`, `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `ticksToBarBeatLabel` |
-| `utils/musicalTicks.ts` | Snap-to-grid: `SnapTo` type, `snapToTicks`, `snapToGrid` |
+| `utils/beatsAndBars.ts` | Musical time: `PPQN`, `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid` |
+| `utils/musicalTicks.ts` | Grid ticks + snap: `computeMusicalTicks`, `snapToTicks`, `snapTickToGrid`, `SnapTo`, `MusicalTick`, `MusicalTickData`, `MusicalTickParams`, `TickType`, `ZoomLevel`. Re-exports `MeterEntry`. |
+| `utils/meterDetection.ts` | `MeterEntry` type, `detectMeterChanges()` — extracts time signature changes from beat number sequences |
 
 ## Key Patterns
 
