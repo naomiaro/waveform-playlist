@@ -498,6 +498,9 @@
 
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
+      // Sync demo transport to editor's current time before playing
+      const engineTime = editor.engine?.getCurrentTime() ?? 0;
+      transport.seek(engineTime);
       transport.play();
       startTransportPlayhead();
     });
@@ -513,7 +516,11 @@
     });
 
     // --- Editor events ---
-    editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
+    editor.addEventListener('daw-seek', (e) => {
+      // Keep demo transport in sync so metronome resumes from correct position
+      transport.seek(e.detail.time);
+      addLog('seek: ' + e.detail.time.toFixed(3) + 's');
+    });
     editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
     editor.addEventListener('daw-selection', (e) => addLog('selection: ' + e.detail.start.toFixed(3) + ' - ' + e.detail.end.toFixed(3)));
     editor.addEventListener('daw-clip-move', (e) => addLog('clip-move: ' + e.detail.clipId + ' delta=' + e.detail.deltaSamples));
