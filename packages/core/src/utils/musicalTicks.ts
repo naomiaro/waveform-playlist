@@ -1,4 +1,7 @@
-import { ticksPerBeat, ticksPerBar, ticksToBarBeatLabel } from './beatsAndBars';
+import { ticksPerBeat, ticksPerBar } from './beatsAndBars';
+import type { MeterEntry } from './meterDetection';
+
+export type { MeterEntry } from './meterDetection';
 
 /** All supported snap-to-grid values. */
 export type SnapTo =
@@ -21,14 +24,17 @@ export type SnapTo =
  * Straight subdivisions (1/2, 1/4, 1/8, 1/16, 1/32) are always expressed as
  * fractions of a quarter note (ppqn), independent of the time signature
  * denominator.  Triplet subdivisions use × 2/3 of the corresponding straight
- * value.  'bar' and 'beat' depend on the time signature.  'off' returns 0.
+ * value.  'bar' and 'beat' depend on the first meter entry's time signature.
+ * 'off' returns 0.
  */
-export function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppqn = 960): number {
+export function snapToTicks(snapTo: SnapTo, meterEntries: MeterEntry[], ppqn = 960): number {
+  const meter = meterEntries[0] ?? { numerator: 4, denominator: 4 };
+  const ts: [number, number] = [meter.numerator, meter.denominator];
   switch (snapTo) {
     case 'bar':
-      return ticksPerBar(timeSignature, ppqn);
+      return ticksPerBar(ts, ppqn);
     case 'beat':
-      return ticksPerBeat(timeSignature, ppqn);
+      return ticksPerBeat(ts, ppqn);
     case '1/2':
       return ppqn * 2;
     case '1/4':
@@ -78,8 +84,7 @@ export interface MusicalTick {
 /** Result of computeMusicalTicks(). */
 export interface MusicalTickData {
   ticks: MusicalTick[];
-  pixelsPerBar: number;
-  pixelsPerBeat: number;
+  pixelsPerQuarterNote: number;
   zoomLevel: ZoomLevel;
   /** At 'coarse' zoom: how many bars between rendered tick lines. */
   coarseBarStep?: number;
@@ -87,7 +92,7 @@ export interface MusicalTickData {
 
 /** Parameters for computeMusicalTicks(). */
 export interface MusicalTickParams {
-  timeSignature: [number, number];
+  meterEntries: MeterEntry[];
   /** Ticks per pixel (zoom level — lower value = more zoomed in). */
   ticksPerPixel: number;
   startPixel: number;
@@ -105,22 +110,32 @@ const MIN_PIXELS_PER_LABEL = 60;
 /**
  * Determines the zoom level and computes which tick lines to render for a
  * given viewport. Pure tick arithmetic — no BPM or sample rate required.
+ *
+ * Walks meter entries in segments, so bar/beat boundaries and labels are
+ * correct across meter changes.
  */
 export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData {
-  const { timeSignature, ticksPerPixel, startPixel, endPixel, ppqn = 960 } = params;
+  const { meterEntries, ticksPerPixel, startPixel, endPixel, ppqn = 960 } = params;
+
+  const firstMeter = meterEntries[0] ?? { tick: 0, numerator: 4, denominator: 4 };
 
   // Guard against invalid inputs that would cause division by zero or infinite loops
-  if (ticksPerPixel <= 0 || ppqn <= 0 || timeSignature[1] <= 0) {
-    return { ticks: [], pixelsPerBar: 0, pixelsPerBeat: 0, zoomLevel: 'coarse' };
+  if (ticksPerPixel <= 0 || ppqn <= 0 || firstMeter.denominator <= 0) {
+    return { ticks: [], pixelsPerQuarterNote: 0, zoomLevel: 'coarse' };
   }
 
-  const tpBeat = ticksPerBeat(timeSignature, ppqn);
-  const tpBar = ticksPerBar(timeSignature, ppqn);
+  // pixelsPerQuarterNote is constant across meters — only depends on ppqn and zoom
+  const pixelsPerQuarterNote = ppqn / ticksPerPixel;
+
+  // Use first meter's bar/beat sizes for zoom level determination
+  const firstTs: [number, number] = [firstMeter.numerator, firstMeter.denominator];
+  const firstTpBeat = ticksPerBeat(firstTs, ppqn);
+  const firstTpBar = ticksPerBar(firstTs, ppqn);
   const tpEighth = ppqn / 2;
   const tpSixteenth = ppqn / 4;
 
-  const pixelsPerBar = tpBar / ticksPerPixel;
-  const pixelsPerBeat = tpBeat / ticksPerPixel;
+  const pixelsPerBar = firstTpBar / ticksPerPixel;
+  const pixelsPerBeat = firstTpBeat / ticksPerPixel;
   const pixelsPerEighth = tpEighth / ticksPerPixel;
   const pixelsPerSixteenth = tpSixteenth / ticksPerPixel;
 
@@ -138,73 +153,135 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
     zoomLevel = 'sixteenth';
   }
 
-  // Determine step size in ticks and coarse bar step when zoomed far out.
-  let stepTicks: number;
+  // Coarse bar step uses first meter's bar size
   let coarseBarStep: number | undefined;
-
+  let coarseMultiplier = 1;
   if (zoomLevel === 'coarse') {
-    // Choose the smallest power-of-2 multiple of tpBar that gives ≥8px.
-    let multiplier = 2;
-    while ((tpBar * multiplier) / ticksPerPixel < MIN_PIXELS_PER_UNIT) {
-      multiplier *= 2;
+    coarseMultiplier = 2;
+    while ((firstTpBar * coarseMultiplier) / ticksPerPixel < MIN_PIXELS_PER_UNIT) {
+      coarseMultiplier *= 2;
     }
-    stepTicks = tpBar * multiplier;
-    coarseBarStep = multiplier;
-  } else if (zoomLevel === 'bar') {
-    stepTicks = tpBar;
-  } else if (zoomLevel === 'beat') {
-    stepTicks = tpBeat;
-  } else if (zoomLevel === 'eighth') {
-    stepTicks = tpEighth;
-  } else {
-    stepTicks = tpSixteenth;
+    coarseBarStep = coarseMultiplier;
   }
 
-  // Convert pixel viewport to tick range, align start to step boundary.
   const startTick = startPixel * ticksPerPixel;
   const endTick = endPixel * ticksPerPixel;
-  const firstStep = Math.floor(startTick / stepTicks) * stepTicks;
+
+  // Build the list of meter segments: [start, end) in ticks, with per-segment bar offset
+  const segments: Array<{
+    segmentStartTick: number;
+    segmentEndTick: number;
+    meter: MeterEntry;
+    barOffset: number; // cumulative bar count before this segment
+  }> = [];
+
+  {
+    let cumulativeBars = 0;
+    for (let i = 0; i < meterEntries.length; i++) {
+      const meter = meterEntries[i];
+      const segmentStart = meter.tick;
+      const segmentEnd =
+        i + 1 < meterEntries.length ? meterEntries[i + 1].tick : Number.MAX_SAFE_INTEGER;
+
+      const ts: [number, number] = [meter.numerator, meter.denominator];
+      const tpBar = ticksPerBar(ts, ppqn);
+
+      segments.push({
+        segmentStartTick: segmentStart,
+        segmentEndTick: segmentEnd,
+        meter,
+        barOffset: cumulativeBars,
+      });
+
+      // Count how many whole bars fit in this segment (for finite segments)
+      if (segmentEnd !== Number.MAX_SAFE_INTEGER) {
+        const segmentLen = segmentEnd - segmentStart;
+        cumulativeBars += Math.round(segmentLen / tpBar);
+      }
+    }
+  }
 
   const ticks: MusicalTick[] = [];
 
-  for (let tick = firstStep; tick <= endTick; tick += stepTicks) {
-    const pixel = tick / ticksPerPixel;
+  // Walk each meter segment and emit ticks within the visible range
+  for (const { segmentStartTick, segmentEndTick, meter, barOffset } of segments) {
+    const ts: [number, number] = [meter.numerator, meter.denominator];
+    const tpBeat = ticksPerBeat(ts, ppqn);
+    const tpBar = ticksPerBar(ts, ppqn);
 
-    if (pixel < startPixel || pixel > endPixel) {
+    // Determine step size for this segment
+    let stepTicks: number;
+    if (zoomLevel === 'coarse') {
+      stepTicks = tpBar * coarseMultiplier;
+    } else if (zoomLevel === 'bar') {
+      stepTicks = tpBar;
+    } else if (zoomLevel === 'beat') {
+      stepTicks = tpBeat;
+    } else if (zoomLevel === 'eighth') {
+      stepTicks = tpEighth;
+    } else {
+      stepTicks = tpSixteenth;
+    }
+
+    // Find first step within this segment that is >= startTick
+    // Steps are aligned to segmentStartTick
+    const segmentTickStart = Math.max(segmentStartTick, startTick);
+    const segmentTickEnd = Math.min(segmentEndTick - 1, endTick);
+
+    if (segmentTickStart > segmentTickEnd) {
       continue;
     }
 
-    // Classify into three-tier hierarchy (Audacity model):
-    //   major      = bar boundary
-    //   minor      = beat boundary
-    //   minorMinor = subdivision (eighth, sixteenth)
-    let type: TickType;
-    if (tick % tpBar === 0) {
-      type = 'major';
-    } else if (tick % tpBeat === 0) {
-      type = 'minor';
-    } else {
-      type = 'minorMinor';
+    // First step: align to step boundary relative to segment start
+    const offsetIntoSegment = segmentTickStart - segmentStartTick;
+    const firstStepOffset = Math.floor(offsetIntoSegment / stepTicks) * stepTicks;
+    const firstStepTick = segmentStartTick + firstStepOffset;
+
+    for (
+      let tick = firstStepTick;
+      tick <= segmentTickEnd && tick < segmentEndTick;
+      tick += stepTicks
+    ) {
+      const pixel = tick / ticksPerPixel;
+
+      if (pixel < startPixel || pixel > endPixel) {
+        continue;
+      }
+
+      // Classify into three-tier hierarchy
+      const tickOffsetInSegment = tick - segmentStartTick;
+      let type: TickType;
+      if (tickOffsetInSegment % tpBar === 0) {
+        type = 'major';
+      } else if (tickOffsetInSegment % tpBeat === 0) {
+        type = 'minor';
+      } else {
+        type = 'minorMinor';
+      }
+
+      // Cumulative bar index for zebra striping
+      const barIndexInSegment = Math.floor(tickOffsetInSegment / tpBar);
+      const barIndex = barOffset + barIndexInSegment;
+
+      // Labels: major always, minor only when wide enough, minorMinor never
+      let label: string | undefined;
+      if (type === 'major') {
+        label = `${barIndex + 1}`;
+      } else if (type === 'minor' && pixelsPerBeat >= MIN_PIXELS_PER_LABEL) {
+        const beatInBar = Math.floor((tickOffsetInSegment % tpBar) / tpBeat) + 1;
+        label = `${barIndex + 1}.${beatInBar}`;
+      }
+
+      ticks.push({ pixel, type, barIndex, ...(label !== undefined ? { label } : {}) });
     }
-
-    // Bar index for alternating bar-level zebra stripes
-    const barIndex = Math.floor(tick / tpBar);
-
-    // Labels: major always, minor only when wide enough, minorMinor never
-    let label: string | undefined;
-    if (type === 'major') {
-      label = ticksToBarBeatLabel(tick, timeSignature, ppqn);
-    } else if (type === 'minor' && pixelsPerBeat >= MIN_PIXELS_PER_LABEL) {
-      label = ticksToBarBeatLabel(tick, timeSignature, ppqn);
-    }
-
-    ticks.push({ pixel, type, barIndex, ...(label !== undefined ? { label } : {}) });
   }
+
+  // Sort by pixel (segments are ordered, but floating point steps may cause slight reordering)
+  ticks.sort((a, b) => a.pixel - b.pixel);
 
   const result: MusicalTickData = {
     ticks,
-    pixelsPerBar,
-    pixelsPerBeat,
+    pixelsPerQuarterNote,
     zoomLevel,
     ...(coarseBarStep !== undefined ? { coarseBarStep } : {}),
   };
@@ -215,16 +292,34 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
 /**
  * Snaps a tick position to the nearest grid boundary defined by `snapTo`.
  *
+ * Finds the meter entry active at the tick position and snaps relative to
+ * that meter's segment start.
+ *
  * Returns the original tick unchanged when `snapTo` is 'off'.
  */
 export function snapTickToGrid(
   tick: number,
   snapTo: SnapTo,
-  timeSignature: [number, number],
+  meterEntries: MeterEntry[],
   ppqn = 960
 ): number {
   if (snapTo === 'off') return tick;
-  const gridSize = snapToTicks(snapTo, timeSignature, ppqn);
+
+  // Find the active meter entry for this tick
+  let meter = meterEntries[0] ?? { tick: 0, numerator: 4, denominator: 4 };
+  for (const entry of meterEntries) {
+    if (entry.tick <= tick) {
+      meter = entry;
+    } else {
+      break;
+    }
+  }
+
+  const ts: [number, number] = [meter.numerator, meter.denominator];
+  const gridSize = snapToTicks(snapTo, [{ tick: 0, numerator: ts[0], denominator: ts[1] }], ppqn);
   if (gridSize <= 0) return tick;
-  return Math.round(tick / gridSize) * gridSize;
+
+  // Snap relative to the meter's start tick
+  const offset = tick - meter.tick;
+  return meter.tick + Math.round(offset / gridSize) * gridSize;
 }

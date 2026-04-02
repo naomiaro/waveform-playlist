@@ -6,7 +6,6 @@ import {
   ticksToSamples,
   samplesToTicks,
   snapToGrid,
-  ticksToBarBeatLabel,
 } from '../utils/beatsAndBars';
 
 describe('PPQN', () => {
@@ -118,47 +117,6 @@ describe('snapToGrid', () => {
   });
 });
 
-describe('ticksToBarBeatLabel', () => {
-  it('returns "1" for tick 0 in [4,4]', () => {
-    expect(ticksToBarBeatLabel(0, [4, 4])).toBe('1');
-  });
-
-  it('returns "1.2" for second beat in [4,4]', () => {
-    expect(ticksToBarBeatLabel(192, [4, 4])).toBe('1.2');
-  });
-
-  it('returns "1.3" for third beat in [4,4]', () => {
-    expect(ticksToBarBeatLabel(384, [4, 4])).toBe('1.3');
-  });
-
-  it('returns "1.4" for fourth beat in [4,4]', () => {
-    expect(ticksToBarBeatLabel(576, [4, 4])).toBe('1.4');
-  });
-
-  it('returns "2" for second bar in [4,4]', () => {
-    expect(ticksToBarBeatLabel(768, [4, 4])).toBe('2');
-  });
-
-  it('returns "2.3" for bar 2 beat 3 in [4,4]', () => {
-    expect(ticksToBarBeatLabel(768 + 384, [4, 4])).toBe('2.3');
-  });
-
-  it('works with [3,4] time signature', () => {
-    // Bar 1 = 576 ticks
-    expect(ticksToBarBeatLabel(0, [3, 4])).toBe('1');
-    expect(ticksToBarBeatLabel(192, [3, 4])).toBe('1.2');
-    expect(ticksToBarBeatLabel(384, [3, 4])).toBe('1.3');
-    expect(ticksToBarBeatLabel(576, [3, 4])).toBe('2');
-  });
-
-  it('works with [6,8] time signature', () => {
-    // Beat = 96 ticks, bar = 576 ticks
-    expect(ticksToBarBeatLabel(0, [6, 8])).toBe('1');
-    expect(ticksToBarBeatLabel(96, [6, 8])).toBe('1.2');
-    expect(ticksToBarBeatLabel(480, [6, 8])).toBe('1.6');
-    expect(ticksToBarBeatLabel(576, [6, 8])).toBe('2');
-  });
-});
 
 describe('round-trip: ticks -> samples -> ticks', () => {
   it('is stable at 120 BPM / 48000 Hz', () => {

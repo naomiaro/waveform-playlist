@@ -37,17 +37,3 @@ export function samplesToTicks(
 export function snapToGrid(ticks: number, gridSizeTicks: number): number {
   return Math.round(ticks / gridSizeTicks) * gridSizeTicks;
 }
-
-/** Format ticks as a 1-indexed bar.beat label. Beat 1 shows bar number only (e.g., "3" not "3.1"). */
-export function ticksToBarBeatLabel(
-  ticks: number,
-  timeSignature: [number, number],
-  ppqn = PPQN
-): string {
-  const barTicks = ticksPerBar(timeSignature, ppqn);
-  const beatTicks = ticksPerBeat(timeSignature, ppqn);
-  const bar = Math.floor(ticks / barTicks) + 1;
-  const beatInBar = Math.floor((ticks % barTicks) / beatTicks) + 1;
-  if (beatInBar === 1) return `${bar}`;
-  return `${bar}.${beatInBar}`;
-}
