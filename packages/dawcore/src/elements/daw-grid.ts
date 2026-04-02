@@ -146,9 +146,7 @@ export class DawGridElement extends LitElement {
             const lastBarWidth =
               pixelsPerQuarterNote * lastMeter.numerator * (4 / lastMeter.denominator);
             const nextX =
-              i + 1 < majorTicks.length
-                ? majorTicks[i + 1].pixel - chunkLeft
-                : x + lastBarWidth;
+              i + 1 < majorTicks.length ? majorTicks[i + 1].pixel - chunkLeft : x + lastBarWidth;
             ctx.fillRect(x, 0, nextX - x, this.height);
           }
         }
