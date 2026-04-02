@@ -1,16 +1,31 @@
 import { computeMusicalTicks } from '@waveform-playlist/core';
-import type { MusicalTickParams, MusicalTickData } from '@waveform-playlist/core';
+import type { MusicalTickParams, MusicalTickData, MeterEntry } from '@waveform-playlist/core';
 
 let cachedParams: MusicalTickParams | null = null;
 let cachedResult: MusicalTickData | null = null;
+
+function meterEntriesMatch(
+  a: { tick: number; numerator: number; denominator: number }[],
+  b: { tick: number; numerator: number; denominator: number }[]
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (
+      a[i].tick !== b[i].tick ||
+      a[i].numerator !== b[i].numerator ||
+      a[i].denominator !== b[i].denominator
+    )
+      return false;
+  }
+  return true;
+}
 
 function paramsMatch(a: MusicalTickParams, b: MusicalTickParams): boolean {
   return (
     a.ticksPerPixel === b.ticksPerPixel &&
     a.startPixel === b.startPixel &&
     a.endPixel === b.endPixel &&
-    a.timeSignature[0] === b.timeSignature[0] &&
-    a.timeSignature[1] === b.timeSignature[1] &&
+    meterEntriesMatch(a.meterEntries, b.meterEntries) &&
     (a.ppqn ?? 960) === (b.ppqn ?? 960)
   );
 }
@@ -20,7 +35,7 @@ export function getCachedMusicalTicks(params: MusicalTickParams): MusicalTickDat
     return cachedResult;
   }
   cachedResult = computeMusicalTicks(params);
-  cachedParams = { ...params, timeSignature: [...params.timeSignature] as [number, number] };
+  cachedParams = { ...params, meterEntries: params.meterEntries.map((e: MeterEntry) => ({ ...e })) };
   return cachedResult;
 }
 

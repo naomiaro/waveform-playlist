@@ -21,7 +21,7 @@ describe('DawGridElement', () => {
     el.length = 2000;
     el.height = 100;
     el.ticksPerPixel = 4;
-    el.timeSignature = [4, 4];
+    el.meterEntries = [{ tick: 0, numerator: 4, denominator: 4 }];
     document.body.appendChild(el);
 
     // Wait for Lit update cycle.
@@ -49,7 +49,7 @@ describe('DawGridElement', () => {
   it('has expected default property values', () => {
     const el = document.createElement('daw-grid') as any;
     expect(el.ticksPerPixel).toBe(24);
-    expect(el.timeSignature).toEqual([4, 4]);
+    expect(el.meterEntries).toEqual([{ tick: 0, numerator: 4, denominator: 4 }]);
     expect(el.ppqn).toBe(960);
     expect(el.visibleStart).toBe(-Infinity);
     expect(el.visibleEnd).toBe(Infinity);

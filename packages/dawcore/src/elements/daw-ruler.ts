@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { computeTemporalTicks, type TickData } from '../utils/smart-scale';
 import { getCachedMusicalTicks } from '../utils/musical-tick-cache';
-import type { MusicalTickData } from '@waveform-playlist/core';
+import type { MusicalTickData, MeterEntry } from '@waveform-playlist/core';
 
 const MAX_CANVAS_WIDTH = 1000;
 
@@ -14,7 +14,7 @@ export class DawRulerElement extends LitElement {
   @property({ type: Number, attribute: false }) rulerHeight = 30;
   @property({ type: String, attribute: false }) scaleMode: 'temporal' | 'beats' = 'temporal';
   @property({ type: Number, attribute: false }) ticksPerPixel = 4;
-  @property({ attribute: false }) timeSignature: [number, number] = [4, 4];
+  @property({ attribute: false }) meterEntries: MeterEntry[] = [{ tick: 0, numerator: 4, denominator: 4 }];
   @property({ type: Number, attribute: false }) ppqn = 960;
   @property({ type: Number, attribute: false }) totalWidth = 0;
 
@@ -50,7 +50,7 @@ export class DawRulerElement extends LitElement {
   willUpdate() {
     if (this.scaleMode === 'beats' && this.totalWidth > 0) {
       this._musicalTickData = getCachedMusicalTicks({
-        timeSignature: this.timeSignature,
+        meterEntries: this.meterEntries,
         ticksPerPixel: this.ticksPerPixel,
         startPixel: 0,
         endPixel: this.totalWidth,

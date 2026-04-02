@@ -71,7 +71,12 @@ export class PointerHandler {
     const h = this._host;
     if (h.scaleMode === 'beats') {
       let tick = px * h.ticksPerPixel;
-      tick = snapTickToGrid(tick, h.snapTo, h.timeSignature, h.ppqn);
+      tick = snapTickToGrid(
+        tick,
+        h.snapTo,
+        [{ tick: 0, numerator: h.timeSignature[0], denominator: h.timeSignature[1] }],
+        h.ppqn
+      );
       return h._ticksToSeconds(tick);
     }
     return pixelsToSeconds(px, h.samplesPerPixel, h.effectiveSampleRate);

@@ -6,8 +6,7 @@ vi.mock('@waveform-playlist/core', async () => {
     ...actual,
     computeMusicalTicks: vi.fn((params) => ({
       ticks: [],
-      pixelsPerBar: 3840 / params.ticksPerPixel,
-      pixelsPerBeat: 960 / params.ticksPerPixel,
+      pixelsPerQuarterNote: 960 / params.ticksPerPixel,
       zoomLevel: 'beat',
     })),
   };
@@ -23,7 +22,7 @@ describe('getCachedMusicalTicks', () => {
   });
 
   const params = {
-    timeSignature: [4, 4] as [number, number],
+    meterEntries: [{ tick: 0, numerator: 4, denominator: 4 }],
     ticksPerPixel: 4,
     startPixel: 0,
     endPixel: 1000,
@@ -60,15 +59,15 @@ describe('getCachedMusicalTicks', () => {
     expect(computeMusicalTicks).toHaveBeenCalledTimes(2);
   });
 
-  it('recomputes on changed timeSignature numerator', () => {
+  it('recomputes on changed meterEntries numerator', () => {
     getCachedMusicalTicks(params);
-    getCachedMusicalTicks({ ...params, timeSignature: [3, 4] });
+    getCachedMusicalTicks({ ...params, meterEntries: [{ tick: 0, numerator: 3, denominator: 4 }] });
     expect(computeMusicalTicks).toHaveBeenCalledTimes(2);
   });
 
-  it('recomputes on changed timeSignature denominator', () => {
+  it('recomputes on changed meterEntries denominator', () => {
     getCachedMusicalTicks(params);
-    getCachedMusicalTicks({ ...params, timeSignature: [4, 8] });
+    getCachedMusicalTicks({ ...params, meterEntries: [{ tick: 0, numerator: 4, denominator: 8 }] });
     expect(computeMusicalTicks).toHaveBeenCalledTimes(2);
   });
 
@@ -81,7 +80,7 @@ describe('getCachedMusicalTicks', () => {
   it('treats undefined ppqn the same as 960', () => {
     const withExplicit = { ...params, ppqn: 960 };
     const withUndefined = {
-      timeSignature: [4, 4] as [number, number],
+      meterEntries: [{ tick: 0, numerator: 4, denominator: 4 }],
       ticksPerPixel: 4,
       startPixel: 0,
       endPixel: 1000,
@@ -91,9 +90,9 @@ describe('getCachedMusicalTicks', () => {
     expect(computeMusicalTicks).toHaveBeenCalledTimes(1);
   });
 
-  it('does not mutate the input timeSignature array', () => {
-    const ts: [number, number] = [4, 4];
-    getCachedMusicalTicks({ ...params, timeSignature: ts });
-    expect(ts).toEqual([4, 4]);
+  it('does not mutate the input meterEntries array', () => {
+    const entries = [{ tick: 0, numerator: 4, denominator: 4 }];
+    getCachedMusicalTicks({ ...params, meterEntries: entries });
+    expect(entries).toEqual([{ tick: 0, numerator: 4, denominator: 4 }]);
   });
 });

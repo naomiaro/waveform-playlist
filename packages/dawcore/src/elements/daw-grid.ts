@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { MIN_PIXELS_PER_UNIT } from '@waveform-playlist/core';
-import type { MusicalTickData } from '@waveform-playlist/core';
+import type { MusicalTickData, MeterEntry } from '@waveform-playlist/core';
 import { getCachedMusicalTicks } from '../utils/musical-tick-cache';
 import { getVisibleChunkIndices } from '../utils/viewport';
 
@@ -26,7 +26,7 @@ const MAX_CANVAS_WIDTH = 1000;
 @customElement('daw-grid')
 export class DawGridElement extends LitElement {
   @property({ type: Number, attribute: false }) ticksPerPixel = 24;
-  @property({ attribute: false }) timeSignature: [number, number] = [4, 4];
+  @property({ attribute: false }) meterEntries: MeterEntry[] = [{ tick: 0, numerator: 4, denominator: 4 }];
   @property({ type: Number, attribute: false }) ppqn = 960;
   @property({ type: Number, attribute: false }) visibleStart = -Infinity;
   @property({ type: Number, attribute: false }) visibleEnd = Infinity;
@@ -57,7 +57,7 @@ export class DawGridElement extends LitElement {
     if (this.length > 0) {
       this._tickData = getCachedMusicalTicks({
         ticksPerPixel: this.ticksPerPixel,
-        timeSignature: this.timeSignature,
+        meterEntries: this.meterEntries,
         ppqn: this.ppqn,
         startPixel: 0,
         endPixel: this.length,
@@ -115,7 +115,9 @@ export class DawGridElement extends LitElement {
     const minorLine =
       style.getPropertyValue('--daw-grid-minor-line').trim() || 'rgba(255,255,255,0.06)';
 
-    const { ticks, pixelsPerBar } = this._tickData;
+    const { ticks, pixelsPerQuarterNote } = this._tickData;
+    const firstMeter = this.meterEntries[0] ?? { numerator: 4, denominator: 4 };
+    const approxPixelsPerBar = pixelsPerQuarterNote * firstMeter.numerator * (4 / (firstMeter.denominator ?? 4));
 
     for (const canvas of canvases) {
       const idx = Number(canvas.dataset.index);
@@ -131,14 +133,16 @@ export class DawGridElement extends LitElement {
 
       // Zebra stripes: use barIndex from tick data for exact alignment with grid lines.
       // Draw a stripe from each odd-barIndex major tick to the next major tick.
-      if (pixelsPerBar >= MIN_PIXELS_PER_UNIT) {
+      if (approxPixelsPerBar >= MIN_PIXELS_PER_UNIT) {
         ctx.fillStyle = barHighlight;
         const majorTicks = ticks.filter((t) => t.type === 'major');
         for (let i = 0; i < majorTicks.length; i++) {
           if (majorTicks[i].barIndex % 2 === 1) {
             const x = majorTicks[i].pixel - chunkLeft;
             const nextX =
-              i + 1 < majorTicks.length ? majorTicks[i + 1].pixel - chunkLeft : x + pixelsPerBar; // last bar: extend by pixelsPerBar
+              i + 1 < majorTicks.length
+                ? majorTicks[i + 1].pixel - chunkLeft
+                : x + approxPixelsPerBar; // last bar: extend by approxPixelsPerBar
             ctx.fillRect(x, 0, nextX - x, this.height);
           }
         }

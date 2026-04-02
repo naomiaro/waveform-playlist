@@ -120,7 +120,12 @@ export class ClipPointerHandler {
       const targetTick = anchorTick + deltaTicks;
       const snappedTick =
         h.snapTo !== 'off'
-          ? snapTickToGrid(targetTick, h.snapTo, h.timeSignature, h.ppqn)
+          ? snapTickToGrid(
+              targetTick,
+              h.snapTo,
+              [{ tick: 0, numerator: h.timeSignature[0], denominator: h.timeSignature[1] }],
+              h.ppqn
+            )
           : targetTick;
       const snappedSeconds = h._ticksToSeconds(snappedTick);
       const snappedSample = Math.round(snappedSeconds * h.effectiveSampleRate);
