@@ -162,8 +162,9 @@
     // This gives us a single transport for metronome, tempo, and clip scheduling.
     await editor._ensureEngine();
     const transport = editor.transport;
+    transport.setMetronomeEnabled(true);
 
-    // Click sounds
+    // Click buffer helper for metronome volume control
     function createClickBuffer(frequency, duration, gain) {
       const length = Math.floor(audioCtx.sampleRate * duration);
       const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
@@ -175,10 +176,6 @@
       }
       return buffer;
     }
-    const accentClick = createClickBuffer(1200, 0.05, 0.8);
-    const normalClick = createClickBuffer(800, 0.04, 0.5);
-    transport.setMetronomeClickSounds(accentClick, normalClick);
-    transport.setMetronomeEnabled(true);
 
     // State
     let pendingAudioFile = null;
