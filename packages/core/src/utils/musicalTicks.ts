@@ -85,8 +85,8 @@ export interface MusicalTickData {
   ticks: MusicalTick[];
   pixelsPerQuarterNote: number;
   zoomLevel: ZoomLevel;
-  /** At 'coarse' zoom: how many bars between rendered tick lines. */
-  coarseBarStep?: number;
+  /** At 'coarse' zoom: how many quarter notes between rendered tick lines. */
+  coarseQuarterNoteStep?: number;
 }
 
 /** Parameters for computeMusicalTicks(). */
@@ -149,14 +149,14 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
 
   // Coarse step in quarter notes — meter-independent so all segments
   // render at the same visual density regardless of time signature.
-  let coarseBarStep: number | undefined;
+  let coarseQuarterNoteStep: number | undefined;
   let coarseQuarterNotes = 0;
   if (zoomLevel === 'coarse') {
     coarseQuarterNotes = 2;
     while ((coarseQuarterNotes * ppqn) / ticksPerPixel < MIN_PIXELS_PER_UNIT) {
       coarseQuarterNotes *= 2;
     }
-    coarseBarStep = coarseQuarterNotes;
+    coarseQuarterNoteStep = coarseQuarterNotes;
   }
 
   const startTick = startPixel * ticksPerPixel;
@@ -278,7 +278,7 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
     ticks,
     pixelsPerQuarterNote,
     zoomLevel,
-    ...(coarseBarStep !== undefined ? { coarseBarStep } : {}),
+    ...(coarseQuarterNoteStep !== undefined ? { coarseQuarterNoteStep } : {}),
   };
 
   return result;

@@ -141,11 +141,14 @@ export class DawGridElement extends LitElement {
           if (majorTicks[i].barIndex % 2 === 1) {
             const x = majorTicks[i].pixel - chunkLeft;
             // Use actual next major tick pixel for exact bar width (handles variable meter).
-            // Last bar: extend by 4 quarter notes as fallback.
+            // Last bar: use the last meter entry's numerator for correct width.
+            const lastMeter = this.meterEntries[this.meterEntries.length - 1];
+            const lastBarWidth =
+              pixelsPerQuarterNote * lastMeter.numerator * (4 / lastMeter.denominator);
             const nextX =
               i + 1 < majorTicks.length
                 ? majorTicks[i + 1].pixel - chunkLeft
-                : x + pixelsPerQuarterNote * 4;
+                : x + lastBarWidth;
             ctx.fillRect(x, 0, nextX - x, this.height);
           }
         }

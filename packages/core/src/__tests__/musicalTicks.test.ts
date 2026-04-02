@@ -299,7 +299,7 @@ describe('computeMusicalTicks', () => {
     }
   });
 
-  it('coarse zoom has coarseBarStep > 1', () => {
+  it('coarse zoom has coarseQuarterNoteStep > 1', () => {
     // pixelsPerQuarterNote = 960 / 5000 = 0.192, * 4 = 0.768 (<8) → 'coarse' zoom
     const params: MusicalTickParams = {
       meterEntries: meterEntries44,
@@ -311,8 +311,8 @@ describe('computeMusicalTicks', () => {
     const result = computeMusicalTicks(params);
 
     expect(result.zoomLevel).toBe('coarse');
-    expect(result.coarseBarStep).toBeDefined();
-    expect(result.coarseBarStep).toBeGreaterThan(1);
+    expect(result.coarseQuarterNoteStep).toBeDefined();
+    expect(result.coarseQuarterNoteStep).toBeGreaterThan(1);
   });
 
   it('includes all levels at sixteenth zoom', () => {
