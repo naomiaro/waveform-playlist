@@ -4,8 +4,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { UseRecordingReturn, RecordingOptions } from '../types';
-import { concatenateAudioData, createAudioBuffer } from '../utils/audioBufferUtils';
-import { appendPeaks } from '../utils/peaksGenerator';
+import { concatenateAudioData, createAudioBuffer, appendPeaks } from '@waveform-playlist/core';
 import { getGlobalContext } from '@waveform-playlist/playout';
 import { recordingProcessorUrl } from '@waveform-playlist/worklets';
 

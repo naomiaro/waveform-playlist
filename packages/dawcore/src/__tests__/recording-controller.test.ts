@@ -5,11 +5,15 @@ vi.mock('@waveform-playlist/worklets', () => ({
   recordingProcessorUrl: 'blob:mock-recording-processor',
 }));
 
-vi.mock('@waveform-playlist/recording', () => ({
-  appendPeaks: vi.fn((existing) => existing),
-  concatenateAudioData: vi.fn(() => new Float32Array(0)),
-  createAudioBuffer: vi.fn(() => mockAudioBuffer),
-}));
+vi.mock('@waveform-playlist/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@waveform-playlist/core')>();
+  return {
+    ...actual,
+    appendPeaks: vi.fn((existing) => existing),
+    concatenateAudioData: vi.fn(() => new Float32Array(0)),
+    createAudioBuffer: vi.fn(() => mockAudioBuffer),
+  };
+});
 
 let mockAudioBuffer: any;
 let mockWorkletNode: any;
@@ -375,7 +379,7 @@ describe('RecordingController', () => {
   // --- _onWorkletMessage tests ---
 
   it('worklet message accumulates chunks and totalSamples', async () => {
-    const { appendPeaks: mockAppendPeaks } = await import('@waveform-playlist/recording');
+    const { appendPeaks: mockAppendPeaks } = await import('@waveform-playlist/core');
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
 
@@ -461,7 +465,7 @@ describe('RecordingController', () => {
     // Latency of 0.5s matches 0.5s recording — no usable samples
     host.audioContext.outputLatency = 0.5;
     // Mock createAudioBuffer to return a buffer matching the short recording
-    const { createAudioBuffer } = await import('@waveform-playlist/recording');
+    const { createAudioBuffer } = await import('@waveform-playlist/core');
     vi.mocked(createAudioBuffer).mockReturnValueOnce({
       length: 24000,
       sampleRate: 48000,

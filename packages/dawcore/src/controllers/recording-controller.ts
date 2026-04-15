@@ -1,8 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import type { Bits } from '@waveform-playlist/core';
 import type { DawWaveformElement } from '../elements/daw-waveform';
-import { recordingProcessorUrl } from '@waveform-playlist/worklets';
-import { appendPeaks, concatenateAudioData, createAudioBuffer } from '@waveform-playlist/recording';
+import { appendPeaks, concatenateAudioData, createAudioBuffer } from '@waveform-playlist/core';
 import type {
   DawRecordingStartDetail,
   DawRecordingCompleteDetail,
@@ -118,6 +117,7 @@ export class RecordingController implements ReactiveController {
       // Load worklet via native API — guard tied to context identity so a
       // swapped AudioContext gets the module re-registered.
       if (!this._workletLoadedCtx || this._workletLoadedCtx !== rawCtx) {
+        const { recordingProcessorUrl } = await import('@waveform-playlist/worklets');
         await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
         this._workletLoadedCtx = rawCtx;
       }

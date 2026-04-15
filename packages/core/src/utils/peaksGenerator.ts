@@ -1,10 +1,10 @@
 /**
- * Peak generation for real-time waveform visualization during recording
- * Matches the format used by webaudio-peaks: min/max pairs with bit depth
+ * Peak generation for real-time waveform visualization during recording.
+ * Matches the format used by webaudio-peaks: min/max pairs with bit depth.
  */
 
 /**
- * Generate peaks from audio samples in standard min/max pair format
+ * Generate peaks from audio samples in standard min/max pair format.
  *
  * @param samples - Audio samples to process
  * @param samplesPerPixel - Number of samples to represent in each peak
@@ -43,8 +43,8 @@ export function generatePeaks(
 }
 
 /**
- * Append new peaks to existing peaks array
- * This is used for incremental peak updates during recording
+ * Append new peaks to existing peaks array.
+ * This is used for incremental peak updates during recording.
  */
 export function appendPeaks(
   existingPeaks: Int8Array | Int16Array,
