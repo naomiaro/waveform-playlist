@@ -1,5 +1,3 @@
-// Re-export peak types from core (canonical source of truth)
-export type { Peaks, Bits, PeakData } from '@waveform-playlist/core';
 import type { Peaks, Bits, PeakData } from '@waveform-playlist/core';
 
 /**

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnnotationText } from '@waveform-playlist/annotations';
-import type { AnnotationData, AnnotationAction } from '@waveform-playlist/annotations';
+import type { AnnotationData, AnnotationAction } from '@waveform-playlist/core';
 
 const sampleAnnotations: AnnotationData[] = [
   {

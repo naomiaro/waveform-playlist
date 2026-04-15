@@ -1,14 +1,3 @@
-// Types from core
-export type {
-  AnnotationData,
-  AnnotationFormat,
-  AnnotationListOptions,
-  AnnotationEventMap,
-  AnnotationAction,
-  AnnotationActionOptions,
-  RenderAnnotationItemProps,
-} from '@waveform-playlist/core';
-
 // Parsers
 export { parseAeneas, serializeAeneas } from './parsers/aeneas';
 export type { AeneasFragment } from './parsers/aeneas';
