@@ -117,7 +117,15 @@ export class RecordingController implements ReactiveController {
       // Load worklet via native API — guard tied to context identity so a
       // swapped AudioContext gets the module re-registered.
       if (!this._workletLoadedCtx || this._workletLoadedCtx !== rawCtx) {
-        const { recordingProcessorUrl } = await import('@waveform-playlist/worklets');
+        let recordingProcessorUrl: string;
+        try {
+          ({ recordingProcessorUrl } = await import('@waveform-playlist/worklets'));
+        } catch {
+          throw new Error(
+            'Recording requires @waveform-playlist/worklets. ' +
+              'Install it: npm install @waveform-playlist/worklets'
+          );
+        }
         await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
         this._workletLoadedCtx = rawCtx;
       }

@@ -376,6 +376,36 @@ describe('RecordingController', () => {
     expect(errorEvent!.detail.trackId).toBe('track-1');
   });
 
+  it('dispatches actionable error when @waveform-playlist/worklets is missing', async () => {
+    // Force worklet re-import by clearing the cached context
+    const controller = new RecordingController(host);
+    // Mock dynamic import to simulate missing optional peer dep
+    vi.doMock('@waveform-playlist/worklets', () => {
+      throw new Error('Cannot find module');
+    });
+
+    const events: CustomEvent[] = [];
+    const origDispatch = host.dispatchEvent.bind(host);
+    host.dispatchEvent = vi.fn((e: Event) => {
+      if (e instanceof CustomEvent) events.push(e);
+      return origDispatch(e);
+    });
+
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    expect(controller.isRecording).toBe(false);
+    expect(controller.getSession('track-1')).toBeUndefined();
+    const errorEvent = events.find((e) => e.type === 'daw-recording-error');
+    expect(errorEvent).toBeTruthy();
+    expect(errorEvent!.detail.trackId).toBe('track-1');
+    expect(String(errorEvent!.detail.error)).toContain('@waveform-playlist/worklets');
+
+    // Restore the original mock for subsequent tests
+    vi.doMock('@waveform-playlist/worklets', () => ({
+      recordingProcessorUrl: 'blob:mock-recording-processor',
+    }));
+  });
+
   // --- _onWorkletMessage tests ---
 
   it('worklet message accumulates chunks and totalSamples', async () => {
