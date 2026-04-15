@@ -27,11 +27,3 @@ export type {
   UseRecordingReturn,
   UseMicrophoneAccessReturn,
 } from './types';
-
-// Utilities (canonical source: @waveform-playlist/core)
-export {
-  generatePeaks,
-  appendPeaks,
-  createAudioBuffer,
-  concatenateAudioData,
-} from '@waveform-playlist/core';
