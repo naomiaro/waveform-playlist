@@ -25,6 +25,8 @@ Framework-agnostic types, pure functions, and utilities shared across all packag
 | `utils/beatsAndBars.ts` | Musical time: `PPQN`, `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid` |
 | `utils/musicalTicks.ts` | Grid ticks + snap: `computeMusicalTicks`, `snapToTicks`, `snapTickToGrid`, `SnapTo`, `MusicalTick`, `MusicalTickData`, `MusicalTickParams`, `TickType`, `ZoomLevel`. Re-exports `MeterEntry`. |
 | `utils/meterDetection.ts` | `MeterEntry` type, `detectMeterChanges()` — extracts time signature changes from beat number sequences |
+| `utils/peaksGenerator.ts` | Peak generation: `generatePeaks`, `appendPeaks` — real-time waveform viz during recording |
+| `utils/audioBufferUtils.ts` | AudioBuffer helpers: `concatenateAudioData`, `createAudioBuffer`, `appendToAudioBuffer`, `calculateDuration` |
 
 ## Key Patterns
 

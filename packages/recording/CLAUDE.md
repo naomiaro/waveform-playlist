@@ -4,6 +4,10 @@
 
 Recording uses the global shared AudioContext from `@waveform-playlist/playout` (same as Tone.js).
 
+## Utility Functions Live in Core
+
+`generatePeaks`, `appendPeaks`, `concatenateAudioData`, `createAudioBuffer`, `appendToAudioBuffer`, `calculateDuration` live in `@waveform-playlist/core`. Put new pure audio utilities there, not here.
+
 **Critical:** Context must be resumed on user interaction via `resumeGlobalAudioContext()`
 
 ## MediaStreamSource Per Hook (Firefox Compatibility)
