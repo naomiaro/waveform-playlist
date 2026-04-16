@@ -185,9 +185,6 @@ importers:
       '@waveform-playlist/engine':
         specifier: workspace:*
         version: link:../engine
-      '@waveform-playlist/recording':
-        specifier: workspace:*
-        version: link:../recording
       '@waveform-playlist/worklets':
         specifier: workspace:*
         version: link:../worklets
