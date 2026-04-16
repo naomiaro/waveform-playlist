@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/engine",
-  "version": "11.3.1",
+  "version": "12.0.0",
   "description": "Framework-agnostic engine for waveform-playlist — pure operations and stateful timeline management",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

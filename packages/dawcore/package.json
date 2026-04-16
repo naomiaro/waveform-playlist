@@ -1,6 +1,6 @@
 {
   "name": "@dawcore/components",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Web Components for multi-track audio editing — framework-agnostic",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -29,16 +29,12 @@
     "waveform-data": "^4.5.2"
   },
   "peerDependencies": {
-    "@waveform-playlist/engine": ">=7.0.0",
-    "@waveform-playlist/core": ">=7.0.0",
+    "@waveform-playlist/engine": ">=12.0.0",
+    "@waveform-playlist/core": ">=12.0.0",
     "@dawcore/transport": ">=0.0.1",
-    "@waveform-playlist/worklets": ">=7.0.0",
-    "@waveform-playlist/recording": ">=7.0.0"
+    "@waveform-playlist/worklets": ">=12.0.0"
   },
   "peerDependenciesMeta": {
-    "@waveform-playlist/recording": {
-      "optional": true
-    },
     "@waveform-playlist/worklets": {
       "optional": true
     }
@@ -48,7 +44,6 @@
     "@waveform-playlist/core": "workspace:*",
     "@dawcore/transport": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*",
-    "@waveform-playlist/recording": "workspace:*",
     "happy-dom": "^17.0.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
