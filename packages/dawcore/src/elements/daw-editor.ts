@@ -866,12 +866,16 @@ export class DawEditorElement extends LitElement {
       );
     }
 
+    // Try to set the editor's desired PPQN on the adapter, then sync back.
+    // Adapter is the source of truth — it may ignore the request.
+    adapter.setPpqn?.(this._ppqn);
+    this.ppqn = adapter.ppqn;
+
     const engine = new PlaylistEngine({
       adapter,
       sampleRate: this.effectiveSampleRate,
       samplesPerPixel: this.samplesPerPixel,
       bpm: this._bpm,
-      ppqn: adapter.ppqn ?? this._ppqn,
       zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b),

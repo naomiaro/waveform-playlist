@@ -73,7 +73,8 @@ export class PlaylistEngine {
     }
     this._zoomIndex = zoomIndex;
     this._bpm = options.bpm ?? 120;
-    this._ppqn = options.ppqn ?? 960;
+    // Adapter is the source of truth for PPQN. Headless mode falls back to options.ppqn or 960.
+    this._ppqn = options.adapter?.ppqn ?? options.ppqn ?? 960;
   }
 
   // ---------------------------------------------------------------------------

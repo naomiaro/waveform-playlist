@@ -7,7 +7,9 @@ import type { ClipTrack } from '@waveform-playlist/core';
  */
 export interface PlayoutAdapter {
   readonly audioContext: AudioContext;
-  readonly ppqn?: number;
+  readonly ppqn: number;
+  /** Set the adapter's tick resolution. Optional — adapters with fixed PPQN ignore this. */
+  setPpqn?(ppqn: number): void;
   init(): Promise<void>;
   setTracks(tracks: ClipTrack[]): void;
   /** Incrementally add a single track without rebuilding the entire playout. */
@@ -97,7 +99,7 @@ export interface PlaylistEngineOptions {
   undoLimit?: number;
   /** Initial tempo in BPM (default 120). */
   bpm?: number;
-  /** Pulses per quarter note (default 960). */
+  /** Pulses per quarter note for headless mode (no adapter). When adapter is provided, adapter.ppqn is used instead. */
   ppqn?: number;
 }
 

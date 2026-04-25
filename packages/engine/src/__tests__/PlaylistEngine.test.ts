@@ -39,6 +39,7 @@ const mockAudioContext = {
 function createMockAdapter(): PlayoutAdapter {
   return {
     audioContext: mockAudioContext,
+    ppqn: 960,
     init: vi.fn().mockResolvedValue(undefined),
     setTracks: vi.fn(),
     play: vi.fn(),
@@ -145,6 +146,7 @@ describe('PlaylistEngine', () => {
       const mockSetTracks = vi.fn();
       const adapter = {
         audioContext: mockAudioContext,
+        ppqn: 960,
         init: vi.fn().mockResolvedValue(undefined),
         setTracks: mockSetTracks,
         addTrack: mockAddTrack,
