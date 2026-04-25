@@ -14,11 +14,11 @@
 - `canvas.getContext('2d')` returns `null` in happy-dom. Tests must mock it: `vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx as any)` where `mockCtx` has `clearRect`, `resetTransform`, `scale`, `fillStyle`, `fillRect` as `vi.fn()`.
 - `PointerHandlerHost` and `ClipPointerHost` test mocks must include beats-mode fields (`scaleMode`, `ticksPerPixel`, `bpm`, `ppqn`, `_meterEntries`, `snapTo`, `renderSamplesPerPixel`). Default to `scaleMode: 'temporal'`, `snapTo: 'off'` for non-beats tests.
 
-**Dev page:** `pnpm dev:page` starts Vite at `http://localhost:5173/dev/index.html`. Uses `website/static/` as publicDir for audio files.
+**Dev page:** `pnpm dev:page` starts Vite at `http://localhost:5173/demos.html` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
 
 ## Dev Page Dependencies
 
-- **`pnpm dev:page` resolves peer packages from source** — `dev/vite.config.ts` has `resolve.alias` for core, engine, and transport pointing to `src/index.ts`. Changes are picked up immediately without rebuilding.
+- **`pnpm dev:page` resolves peer packages from source** — `examples/dawcore-native/vite.config.ts` has `resolve.alias` for core, engine, transport, and `@dawcore/components` pointing to `src/index.ts`. Changes are picked up immediately without rebuilding.
 - **Incremental track removal** — `engine.removeTrack(trackId)` uses `adapter.removeTrack()` when available (disposes single track, preserves playback). Falls back to `adapter.setTracks()` (full rebuild, stops Transport).
 
 ## Element Types
@@ -224,7 +224,7 @@ Example: `editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHin
 - **Three-tier tick hierarchy** — `major` (bars: always labeled, grid lines at 10%), `minor` (beats: labeled when ≥60px, grid lines at 6%), `minorMinor` (subdivisions: ruler ticks only, no grid lines). Types in `@waveform-playlist/core` as `TickType`.
 - **Snap absolute position, not delta** — `snapTickToGrid` must snap the clip's absolute target position to the grid, not the drag delta. Delta-snapping preserves off-grid offsets permanently. `_snapDeltaToSamples(deltaPx, anchorSample)` takes the anchor (startSample for move/left-trim, startSample+durationSamples for right-trim).
 - **`<daw-grid>` element** — Shadow DOM, chunked 1000px canvases (same pattern as `<daw-waveform>`). Positioned behind tracks via `z-index: 0`. Track rows go transparent via `:host([scale-mode="beats"]) .track-row { background: transparent }`. Grid top offset = ruler height (30px when `timescale` enabled).
-- **Vite pre-bundles Tone.js** — Even though dawcore has no Tone.js dependency, Vite's dep scanner finds it in the workspace `node_modules`. `optimizeDeps.exclude: ['tone']` in `dev/vite.config.ts` prevents loading.
+- **Vite pre-bundles Tone.js** — Even though dawcore has no Tone.js dependency, Vite's dep scanner finds it in the workspace `node_modules`. `optimizeDeps.exclude: ['tone']` in `examples/dawcore-native/vite.config.ts` prevents loading.
 - **Clip pixel positions from tick space, not samples** — In beats mode, use `clip.startTick / ticksPerPixel` directly when `startTick` is available. Fall back to `startSample → seconds → ticks → ticks/ticksPerPixel` for clips without `startTick`. Never use `startSample / _renderSpp` — the sample round-trip introduces 1-2px quantization error and drifts when BPM changes. Same applies to trim visual feedback `deltaPx`. Temporal mode still uses `startSample / samplesPerPixel`.
 - **Validated beats-mode properties** — `bpm`, `ppqn`, `ticksPerPixel` use `@property({ noAccessor: true })` with custom getters/setters that reject zero, negative, NaN, and Infinity (same pattern as `samplesPerPixel`). Without this, division-by-zero cascades through `_renderSpp`, `_totalWidth`, snap pipeline, and `computeMusicalTicks`. `computeMusicalTicks` and `snapTickToGrid` also have internal guards returning empty/passthrough for zero inputs.
 - **`_renderSpp` uses `Math.ceil`** — The derived value can be non-integer at non-standard BPM. `WaveformData.resample()` uses integer scale math, so rounding up prevents fractional scale issues.

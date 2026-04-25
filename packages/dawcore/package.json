@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev:page": "vite --config dev/vite.config.ts"
+    "dev:page": "vite --config ../../examples/dawcore-native/vite.config.ts"
   },
   "author": "Naomi Aro",
   "license": "MIT",

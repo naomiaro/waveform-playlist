@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>dawcore — beats &amp; bars grid</title>
+  <title>dawcore — multiclip interactions</title>
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -23,40 +23,12 @@
       --daw-ruler-color: #c49a6c;
       --daw-ruler-background: #0f0f1a;
       --daw-selection-color: rgba(99, 199, 95, 0.3);
-      --daw-grid-odd: rgba(255, 255, 255, 0.03);
-      --daw-grid-even: rgba(255, 255, 255, 0.06);
-      --daw-grid-line-color: rgba(255, 255, 255, 0.1);
       margin-bottom: 12px;
     }
-    .toolbar {
+    daw-transport {
       display: flex;
       gap: 8px;
-      align-items: stretch;
       margin-bottom: 12px;
-      height: 28px;
-    }
-    .toolbar button, .toolbar select {
-      cursor: pointer;
-      background: #1a1a2e;
-      color: #e0d4c8;
-      border: 1px solid currentColor;
-      padding: 0 10px;
-      font: inherit;
-      line-height: 1;
-    }
-    .toolbar select {
-      padding: 0 6px;
-    }
-    .toolbar .separator {
-      width: 1px;
-      background: rgba(255, 255, 255, 0.15);
-    }
-    .toolbar .label {
-      font-family: 'Courier New', monospace;
-      font-size: 0.75rem;
-      color: #888;
-      display: flex;
-      align-items: center;
     }
     #log {
       margin-top: 12px;
@@ -69,13 +41,11 @@
   </style>
 </head>
 <body>
-  <h1>dawcore — beats &amp; bars grid</h1>
+  <h1>dawcore — multiclip interactions</h1>
 
-  <script type="module" src="/src/index.ts"></script>
+  <script type="module">import '@dawcore/components';</script>
 
-  <daw-editor id="editor" scale-mode="beats" ticks-per-pixel="24" bpm="126" snap-to="beat"
-              samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers interactive-clips>
-    <daw-grid></daw-grid>
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers interactive-clips>
     <daw-keyboard-shortcuts playback splitting undo></daw-keyboard-shortcuts>
 
     <!-- Kick: two clips with a gap -->
@@ -146,39 +116,16 @@
     </daw-track>
   </daw-editor>
 
-  <div class="toolbar">
+  <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:12px;height:28px;">
     <daw-transport for="editor" style="display:contents;">
       <daw-play-button></daw-play-button>
       <daw-pause-button></daw-pause-button>
       <daw-stop-button></daw-stop-button>
     </daw-transport>
-    <span class="separator"></span>
-    <button id="zoom-in">+</button>
-    <button id="zoom-out">&minus;</button>
-    <span id="zoom-level" class="label">24 tpp</span>
-    <span class="separator"></span>
-    <label class="label" for="bpm-input">BPM</label>
-    <input id="bpm-input" type="number" min="20" max="300" value="126"
-           style="width:60px;background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:0 6px;font:inherit;">
-    <span class="separator"></span>
-    <span class="label">4/4</span>
-    <span class="separator"></span>
-    <button id="metro-toggle">Metro</button>
-    <span class="separator"></span>
-    <label class="label" for="snap-select">Snap</label>
-    <select id="snap-select">
-      <option value="off">Off</option>
-      <option value="bar">Bar</option>
-      <option value="beat" selected>Beat</option>
-      <option value="1/2">1/2</option>
-      <option value="1/4">1/4</option>
-      <option value="1/8">1/8</option>
-      <option value="1/16">1/16</option>
-      <option value="1/32">1/32</option>
-      <option value="1/4T">1/4T</option>
-      <option value="1/8T">1/8T</option>
-      <option value="1/16T">1/16T</option>
-    </select>
+    <span style="width:1px;background:rgba(255,255,255,0.15);"></span>
+    <button id="zoom-in" style="cursor:pointer;background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:0 10px;font:inherit;line-height:1;">+</button>
+    <button id="zoom-out" style="cursor:pointer;background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:0 10px;font:inherit;line-height:1;">&minus;</button>
+    <span id="zoom-level" style="font-family:'Courier New',monospace;font-size:0.75rem;color:#888;display:flex;align-items:center;">1024 spp</span>
   </div>
 
   <div id="log"></div>
@@ -190,20 +137,6 @@
     const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
     const adapter = new NativePlayoutAdapter(audioCtx);
     editor.adapter = adapter;
-
-    // Build engine eagerly so adapter.transport is available for metronome
-    await editor._ensureEngine();
-    const transport = adapter.transport;
-
-    // Metronome toggle
-    const metroBtn = document.getElementById('metro-toggle');
-    let metronomeEnabled = false;
-    metroBtn.addEventListener('click', () => {
-      metronomeEnabled = !metronomeEnabled;
-      transport.setMetronomeEnabled(metronomeEnabled);
-      metroBtn.style.borderColor = metronomeEnabled ? '#63C75F' : '';
-    });
-
     const log = document.getElementById('log');
 
     function addLog(msg) {
@@ -213,40 +146,25 @@
       while (log.children.length > 30) log.lastChild.remove();
     }
 
-    // Zoom controls (ticks-per-pixel)
-    const tppLevels = [8, 12, 16, 24, 32, 48, 64, 96, 128];
+    // Zoom controls
+    const zoomLevels = [128, 256, 512, 1024, 2048, 4096, 8192];
     const zoomLabel = document.getElementById('zoom-level');
     function updateZoomLabel() {
-      zoomLabel.textContent = editor.ticksPerPixel + ' tpp';
+      zoomLabel.textContent = editor.samplesPerPixel + ' spp';
     }
     document.getElementById('zoom-in').addEventListener('click', () => {
-      const idx = tppLevels.indexOf(editor.ticksPerPixel);
+      const idx = zoomLevels.indexOf(editor.samplesPerPixel);
       if (idx > 0) {
-        editor.ticksPerPixel = tppLevels[idx - 1];
+        editor.samplesPerPixel = zoomLevels[idx - 1];
         updateZoomLabel();
       }
     });
     document.getElementById('zoom-out').addEventListener('click', () => {
-      const idx = tppLevels.indexOf(editor.ticksPerPixel);
-      if (idx < tppLevels.length - 1) {
-        editor.ticksPerPixel = tppLevels[idx + 1];
+      const idx = zoomLevels.indexOf(editor.samplesPerPixel);
+      if (idx < zoomLevels.length - 1) {
+        editor.samplesPerPixel = zoomLevels[idx + 1];
         updateZoomLabel();
       }
-    });
-
-    // BPM control
-    document.getElementById('bpm-input').addEventListener('change', (e) => {
-      const bpm = Number(e.target.value);
-      if (bpm >= 20 && bpm <= 300) {
-        editor.bpm = bpm;
-        addLog('bpm: ' + bpm);
-      }
-    });
-
-    // Snap control
-    document.getElementById('snap-select').addEventListener('change', (e) => {
-      editor.snapTo = e.target.value;
-      addLog('snap: ' + e.target.value);
     });
 
     // Editor events

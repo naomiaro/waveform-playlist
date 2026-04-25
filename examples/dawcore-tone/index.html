@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore + Tone.js</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0a0a1a;
+      color: #e0d4c8;
+      font-family: system-ui, sans-serif;
+      padding: 2rem;
+    }
+    h1 { color: #d08070; margin-bottom: 0.5rem; }
+    p { color: #888; margin-bottom: 1.5rem; }
+    daw-editor {
+      display: block;
+      width: 100%;
+      min-height: 200px;
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #888;
+      --daw-ruler-background: #111;
+      --daw-controls-background: #111;
+      --daw-controls-text: #e0d4c8;
+    }
+    code { color: #63C75F; }
+  </style>
+</head>
+<body>
+  <h1>dawcore + Tone.js</h1>
+  <p>
+    Web components powered by <code>createToneAdapter()</code> from
+    <code>@waveform-playlist/playout</code>.
+  </p>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop clip-headers>
+    <daw-track name="Kick" volume="0.8">
+      <daw-clip src="/media/audio/AlbertKader_Ubiquitous/01_Kick.opus" start="0"></daw-clip>
+    </daw-track>
+    <daw-track name="HiHat" volume="0.7">
+      <daw-clip src="/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus" start="0"></daw-clip>
+    </daw-track>
+    <daw-track name="Bass" volume="0.8">
+      <daw-clip src="/media/audio/AlbertKader_Ubiquitous/08_Bass.opus" start="0"></daw-clip>
+    </daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <script type="module">
+    import '@dawcore/components';
+    import { createToneAdapter } from '@waveform-playlist/playout';
+
+    const editor = document.getElementById('editor');
+    const adapter = createToneAdapter();
+    editor.adapter = adapter;
+  </script>
+</body>
+</html>
