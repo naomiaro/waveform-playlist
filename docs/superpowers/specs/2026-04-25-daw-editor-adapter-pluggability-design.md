@@ -73,7 +73,7 @@ private async _buildEngine() {
     sampleRate: this.effectiveSampleRate,
     samplesPerPixel: this.samplesPerPixel,
     bpm: this._bpm,
-    ppqn: this._ppqn,
+    ppqn: adapter.ppqn ?? this._ppqn,
     zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
       .filter((v, i, a) => a.indexOf(v) === i)
       .sort((a, b) => a - b),
@@ -88,17 +88,47 @@ private async _buildEngine() {
 - Remove `@dawcore/transport` from `@dawcore/components` dependencies
 - `@waveform-playlist/engine` remains a dependency (for `PlaylistEngine`)
 
-### 2. `TonePlayoutAdapter` — Tempo/Meter Methods
+### 2. PPQN — Adapter as Authority
+
+The adapter defines the PPQN it operates at. The engine reads it and uses that value.
+
+**`PlayoutAdapter` interface addition:**
+
+```typescript
+interface PlayoutAdapter {
+  readonly ppqn?: number; // adapter's native PPQN — engine uses this
+  // ... existing methods
+}
+```
+
+**How each adapter handles it:**
+
+- **`TonePlayoutAdapter`**: accepts `ppqn` in `ToneAdapterOptions` (default 192, Tone.js native). Sets `Transport.PPQ = ppqn` on init. Exposes via readonly `ppqn` getter.
+- **`NativePlayoutAdapter`**: surfaces the underlying Transport's PPQN via a new `ppqn` getter (Transport already stores it internally, just not exposed on the adapter).
+- **Custom adapters**: if `ppqn` is not implemented, engine falls back to its own default (960).
+
+**`<daw-editor>._buildEngine()`** reads `adapter.ppqn`:
+
+```typescript
+ppqn: adapter.ppqn ?? this._ppqn,
+```
+
+This ensures engine and transport always agree on tick resolution without translation layers.
+
+### 3. `TonePlayoutAdapter` — Tempo/Meter Methods
 
 Add 4 methods to `TonePlayoutAdapter` with single-tempo/meter semantics. Throw on multi-tempo/meter usage (`atTick` parameter).
 
 ```typescript
-// In TonePlayoutAdapter class
+// In TonePlayoutAdapter
 
 private _bpm: number = 120;
-private _ppqn: number = 960;
 private _numerator: number = 4;
 private _denominator: number = 4;
+
+get ppqn(): number {
+  return this._ppqn; // set from options, default 192
+}
 
 setTempo(bpm: number, atTick?: number): void {
   if (atTick !== undefined) {
@@ -133,9 +163,7 @@ secondsToTicks(seconds: number): number {
 }
 ```
 
-**PPQ alignment:** `TonePlayoutAdapter` must accept a `ppqn` option (default 960, matching dawcore). Tone.js Transport defaults to PPQ=192. The adapter's `ticksToSeconds`/`secondsToTicks` use the adapter's own `_ppqn` for conversion math — this is independent of Tone.js Transport's internal PPQ.
-
-### 3. dawcore README Update
+### 4. dawcore README Update
 
 Update `packages/dawcore/README.md`:
 
@@ -143,7 +171,7 @@ Update `packages/dawcore/README.md`:
 - **Remove `transport` getter references.** Replace with direct adapter usage pattern.
 - **Transport-specific features section:** Clarify that metronome, count-in, effects hooks are `NativePlayoutAdapter`-specific. Consumer accesses these on their own adapter reference.
 
-### 4. Website Examples
+### 5. Website Examples
 
 **New example page:** `website/src/pages/examples/dawcore-tone.tsx`
 - dawcore web components (`<daw-editor>`, `<daw-track>`, `<daw-clip>`) with `TonePlayoutAdapter`
@@ -198,9 +226,11 @@ After:
 
 | File | Change |
 |------|--------|
-| `packages/dawcore/src/elements/daw-editor.ts` | Add `adapter` property, remove `transport` getter, update `_buildEngine()`, remove `@dawcore/transport` import |
+| `packages/engine/src/types.ts` | Add optional `readonly ppqn?: number` to `PlayoutAdapter` interface |
+| `packages/dawcore/src/elements/daw-editor.ts` | Add `adapter` property, remove `transport` getter, update `_buildEngine()` to read `adapter.ppqn`, remove `@dawcore/transport` import |
 | `packages/dawcore/package.json` | Remove `@dawcore/transport` from dependencies |
-| `packages/playout/src/TonePlayoutAdapter.ts` | Add `setTempo`, `setMeter`, `ticksToSeconds`, `secondsToTicks` |
+| `packages/playout/src/TonePlayoutAdapter.ts` | Add `ppqn` getter, `setTempo`, `setMeter`, `ticksToSeconds`, `secondsToTicks`. Accept `ppqn` in `ToneAdapterOptions`. |
+| `packages/transport/src/adapter.ts` | Add `ppqn` getter (surface Transport's internal PPQN) |
 | `packages/dawcore/README.md` | Update Quick Start, adapter setup, remove transport getter docs |
 | `packages/dawcore/dev/` | Update dev page to explicit adapter setup |
 | `packages/dawcore/src/__tests__/` | Update tests for new adapter requirement |
