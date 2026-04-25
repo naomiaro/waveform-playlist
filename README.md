@@ -143,18 +143,30 @@ const { startRecording, stopRecording, isRecording } = useIntegratedRecording();
 
 ## Web Components (Experimental)
 
-`@dawcore/components` provides framework-agnostic Web Components for multi-track audio editing — no React required. Built with Lit, using `@dawcore/transport` for native Web Audio playback (no Tone.js dependency).
+`@dawcore/components` provides framework-agnostic Web Components for multi-track audio editing — no React required. Built with Lit, adapter-pluggable: choose between `@dawcore/transport` (native Web Audio) or `@waveform-playlist/playout` (Tone.js).
 
 ```bash
-npm install @dawcore/components
+npm install @dawcore/components @waveform-playlist/core @waveform-playlist/engine
+```
+
+Audio backend (choose one):
+```bash
+npm install @dawcore/transport          # Native Web Audio (recommended)
+# or
+npm install @waveform-playlist/playout tone  # Tone.js (effects, MIDI synths)
 ```
 
 ```html
 <script type="module">
   import '@dawcore/components';
+  import { NativePlayoutAdapter } from '@dawcore/transport';
+
+  const editor = document.querySelector('daw-editor');
+  const adapter = new NativePlayoutAdapter(new AudioContext());
+  editor.adapter = adapter;
 </script>
 
-<daw-editor id="editor" clip-headers interactive-clips timescale file-drop>
+<daw-editor id="editor" clip-headers interactive-clips timescale>
   <daw-track name="Vocals">
     <daw-clip src="/audio/vocals.mp3" start="0" duration="10"></daw-clip>
   </daw-track>
@@ -167,11 +179,11 @@ npm install @dawcore/components
   <daw-stop-button></daw-stop-button>
   <daw-record-button></daw-record-button>
 </daw-transport>
-
 ```
 
 **Features:**
 - Declarative `<daw-track>` and `<daw-clip>` elements with auto-loading
+- Adapter-pluggable — choose Native Web Audio or Tone.js backend
 - Clip move, trim, and split with collision detection
 - Undo/redo with transaction-based grouping
 - Keyboard shortcuts (Space=play/pause, S=split, Cmd/Ctrl+Z=undo)
@@ -180,7 +192,6 @@ npm install @dawcore/components
 - Metronome with mixed meters and tempo changes
 - Tempo automation — linear ramps and Möbius-Ease curves with exact integration
 - Pre-computed peaks for fast initial render
-- Native Web Audio — no Tone.js, full `sampleRate` and `latencyHint` control
 
 **Packages:**
 
@@ -192,16 +203,23 @@ npm install @dawcore/components
 Run the examples locally:
 
 ```bash
-cd packages/dawcore && pnpm dev:page
+pnpm example:dawcore-native  # Native Web Audio — localhost:5173
+pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
 ```
 
-Then open `http://localhost:5173/dev/` — example pages:
+**dawcore-native** example pages:
 
-- [`index.html`](packages/dawcore/dev/index.html) — Basic playback with timescale and file drop
-- [`multiclip.html`](packages/dawcore/dev/multiclip.html) — Multi-clip editing with move, trim, and split
-- [`record.html`](packages/dawcore/dev/record.html) — Recording with overdub
-- [`metronome.html`](packages/dawcore/dev/metronome.html) — Metronome with mixed meters, tempo presets, and looping sequences
-- [`automation.html`](packages/dawcore/dev/automation.html) — Tempo automation with step, linear, and curve presets
+- [`basic.html`](examples/dawcore-native/basic.html) — Basic playback with timescale and file drop
+- [`multiclip.html`](examples/dawcore-native/multiclip.html) — Multi-clip editing with move, trim, and split
+- [`record.html`](examples/dawcore-native/record.html) — Recording with overdub
+- [`metronome.html`](examples/dawcore-native/metronome.html) — Metronome with mixed meters, tempo presets, and looping sequences
+- [`automation.html`](examples/dawcore-native/automation.html) — Tempo automation with step, linear, and curve presets
+
+**dawcore-tone** example pages:
+
+- [`basic.html`](examples/dawcore-tone/basic.html) — Basic playback with Tone.js adapter
+- [`multiclip.html`](examples/dawcore-tone/multiclip.html) — Multi-clip editing with Tone.js
+- [`beats-grid.html`](examples/dawcore-tone/beats-grid.html) — Beats & bars grid with Tone.js
 
 ## Browser Support
 
