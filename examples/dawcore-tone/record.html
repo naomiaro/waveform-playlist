@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore + Tone.js — recording</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #mic-controls {
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #mic-controls button {
+      cursor: pointer;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid currentColor;
+      padding: 4px 8px;
+      font: inherit;
+    }
+    #mic-controls button:hover { opacity: 0.8; }
+    #mic-status {
+      font-size: 0.85rem;
+      color: #888;
+    }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore + Tone.js — recording</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <div id="mic-controls">
+    <button id="mic-btn">Enable Mic</button>
+    <select id="mic-select" disabled style="background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:4px;font:inherit;min-width:200px;">
+      <option value="">No mic access</option>
+    </select>
+    <span id="mic-status" style="font-size:0.7rem;font-family:'Courier New',monospace;color:#888;"></span>
+  </div>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale file-drop>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-record-button></daw-record-button>
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { createToneAdapter } from '@waveform-playlist/playout';
+    const editor = document.getElementById('editor');
+    const adapter = createToneAdapter();
+    editor.adapter = adapter;
+    const log = document.getElementById('log');
+    const micBtn = document.getElementById('mic-btn');
+    const micStatus = document.getElementById('mic-status');
+    const recordBtn = document.querySelector('daw-record-button');
+
+    let trackCounter = 0;
+
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+      log.prepend(line);
+      while (log.children.length > 30) log.lastChild.remove();
+    }
+
+    const micSelect = document.getElementById('mic-select');
+    const audioConstraints = {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      channelCount: { ideal: 2 },
+    };
+
+    function updateMicStatus(stream) {
+      const track = stream.getAudioTracks()[0];
+      const settings = track.getSettings();
+      const ctxRate = editor.effectiveSampleRate;
+      const micRate = settings.sampleRate;
+      const micRateStr = micRate ? micRate + 'Hz' : 'unknown Hz';
+      const ch = settings.channelCount ?? 1;
+      const rateNote = micRate && micRate !== ctxRate ? ' (resampling)' : '';
+      micStatus.textContent = ch + 'ch ' + micRateStr + ' \u2192 ' + ctxRate + 'Hz' + rateNote;
+      addLog('Mic: ' + track.label + ' ' + ch + 'ch ' + micRateStr + ', ctx ' + ctxRate + 'Hz' + rateNote);
+    }
+
+    async function enumerateDevices() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter(d => d.kind === 'audioinput');
+      while (micSelect.firstChild) micSelect.removeChild(micSelect.firstChild);
+      for (const mic of mics) {
+        const opt = document.createElement('option');
+        opt.value = mic.deviceId;
+        opt.textContent = mic.label || 'Microphone ' + (micSelect.options.length + 1);
+        micSelect.appendChild(opt);
+      }
+      micSelect.disabled = mics.length === 0;
+    }
+
+    async function selectDevice(deviceId) {
+      if (editor.recordingStream) {
+        editor.recordingStream.getTracks().forEach(t => t.stop());
+      }
+      const constraints = deviceId
+        ? { audio: { ...audioConstraints, deviceId: { exact: deviceId } } }
+        : { audio: audioConstraints };
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        editor.recordingStream = stream;
+        updateMicStatus(stream);
+      } catch (err) {
+        micStatus.textContent = 'Error: ' + err.message;
+        addLog('Mic error: ' + err.message);
+      }
+    }
+
+    // Initial mic access
+    micBtn.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        editor.recordingStream = stream;
+        micBtn.disabled = true;
+        await enumerateDevices();
+        const currentId = stream.getAudioTracks()[0]?.getSettings()?.deviceId;
+        if (currentId) micSelect.value = currentId;
+        updateMicStatus(stream);
+      } catch (err) {
+        micStatus.textContent = 'Denied: ' + err.message;
+        addLog('Mic access denied: ' + err.message);
+      }
+    });
+
+    // Device switch
+    micSelect.addEventListener('change', () => {
+      if (micSelect.value) selectDevice(micSelect.value);
+    });
+
+    // Hot-plug detection
+    navigator.mediaDevices.addEventListener('devicechange', async () => {
+      if (!micBtn.disabled) return;
+      const prevValue = micSelect.value;
+      await enumerateDevices();
+      if (micSelect.value !== prevValue && micSelect.options.length > 0) {
+        addLog('Device changed \u2014 switching to ' + micSelect.options[0].textContent);
+        selectDevice(micSelect.options[0].value);
+      }
+    });
+
+    // Auto-create track + overdub recording
+    recordBtn.addEventListener('click', async (e) => {
+      // Let the button handle stop if already recording
+      if (editor.isRecording) return;
+
+      e.stopImmediatePropagation();
+
+      if (!editor.recordingStream) {
+        addLog('No mic access — click "Enable Mic" first');
+        return;
+      }
+
+      // Auto-create track if none selected
+      if (!editor.selectedTrackId) {
+        trackCounter++;
+        const name = 'Take ' + trackCounter;
+        const track = document.createElement('daw-track');
+        track.setAttribute('name', name);
+        editor.appendChild(track);
+        addLog('Auto-created track: ' + name);
+
+        const trackId = await new Promise((resolve) => {
+          editor.addEventListener('daw-track-connected', (ev) => {
+            resolve(ev.detail.trackId);
+          }, { once: true });
+        });
+        editor._setSelectedTrackId(trackId);
+      }
+
+      const streamChannels = editor.recordingStream.getAudioTracks()[0]?.getSettings()?.channelCount;
+      await editor.startRecording(editor.recordingStream, {
+        overdub: true,
+        ...(streamChannels && { channelCount: streamChannels }),
+      });
+    }, { capture: true });
+
+    // Recording events
+    editor.addEventListener('daw-recording-start', (e) => {
+      addLog('recording-start: track=' + e.detail.trackId);
+    });
+    editor.addEventListener('daw-recording-complete', (e) => {
+      const d = e.detail;
+      addLog('recording-complete: track=' + d.trackId +
+        ' duration=' + (d.durationSamples / d.audioBuffer.sampleRate).toFixed(2) + 's' +
+        ' offset=' + d.offsetSamples + ' samples' +
+        ' channels=' + d.audioBuffer.numberOfChannels);
+    });
+    editor.addEventListener('daw-recording-error', (e) => {
+      addLog('recording-error: ' + e.detail.error);
+    });
+
+    // Other editor events
+    editor.addEventListener('daw-track-ready', (e) => addLog('track-ready: ' + e.detail.trackId));
+    editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
+    editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
+  </script>
+</body>
+</html>
