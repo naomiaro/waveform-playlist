@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore dev</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+    }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore — dev</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale file-drop>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/05_Claps.opus" name="Claps"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/06_HiHat.opus" name="HiHat"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+    const editor = document.getElementById('editor');
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
+    const log = document.getElementById('log');
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = msg;
+      log.prepend(line);
+      while (log.children.length > 20) log.lastChild.remove();
+    }
+    editor.addEventListener('daw-seek', (e) => addLog('seek: ' + e.detail.time.toFixed(3) + 's'));
+    editor.addEventListener('daw-track-select', (e) => addLog('track-select: ' + e.detail.trackId));
+    editor.addEventListener('daw-selection', (e) => addLog('selection: ' + e.detail.start.toFixed(3) + ' - ' + e.detail.end.toFixed(3)));
+    editor.addEventListener('daw-track-ready', (e) => addLog('track-ready: ' + e.detail.trackId));
+    editor.addEventListener('daw-files-load-error', (e) => addLog('load-error: ' + e.detail.file.name));
+  </script>
+</body>
+</html>
