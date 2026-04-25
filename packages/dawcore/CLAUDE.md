@@ -165,7 +165,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Sample Rate
 
-- `sampleRate` `@property` is an initial hint (default 48000). `_resolvedSampleRate` is set from decoded audio.
+- `sampleRate` is a derived getter reading from `adapter.audioContext.sampleRate` (fallback 48000). `_resolvedSampleRate` is set from decoded audio.
 - **Always use `effectiveSampleRate`** in internal calculations — returns `_resolvedSampleRate ?? sampleRate`.
 - `PointerHandlerHost` uses `effectiveSampleRate`, not `sampleRate`.
 
