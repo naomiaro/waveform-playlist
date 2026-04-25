@@ -37,7 +37,33 @@ get adapter(): PlayoutAdapter | null {
 }
 ```
 
-**Error when missing:**
+**AudioContext comes from the adapter.** The editor no longer creates or owns an AudioContext. Instead, `editor.audioContext` reads from `adapter.audioContext`. This guarantees a single AudioContext shared between the editor (for decode, recording) and the adapter (for playback). The `audioContext` setter and `_ownedAudioContext` are removed.
+
+```typescript
+get audioContext(): AudioContext {
+  if (!this._externalAdapter) {
+    throw new Error(/* adapter required error */);
+  }
+  return this._externalAdapter.audioContext;
+}
+```
+
+Consumer setup with custom AudioContext:
+
+```typescript
+// Tone.js — set context before creating adapter
+const ctx = new AudioContext({ sampleRate: 48000 });
+Tone.setContext(ctx);
+editor.adapter = createToneAdapter();
+// editor.audioContext returns ctx (via Tone.js → adapter)
+
+// Native — pass context to adapter constructor
+const ctx = new AudioContext({ sampleRate: 48000 });
+editor.adapter = new NativePlayoutAdapter(ctx);
+// editor.audioContext returns ctx
+```
+
+**Error when no adapter set:**
 
 ```
 Error: No PlayoutAdapter set on <daw-editor>.
@@ -46,7 +72,7 @@ Install an adapter and set it before use:
   // Option 1: Native Web Audio (no Tone.js)
   npm install @dawcore/transport
   import { NativePlayoutAdapter } from '@dawcore/transport';
-  editor.adapter = new NativePlayoutAdapter(editor.audioContext);
+  editor.adapter = new NativePlayoutAdapter(new AudioContext());
 
   // Option 2: Tone.js (effects, MIDI synths)
   npm install @waveform-playlist/playout
@@ -70,7 +96,7 @@ private async _buildEngine() {
 
   const engine = new PlaylistEngine({
     adapter,
-    sampleRate: this.effectiveSampleRate,
+    sampleRate: this.audioContext.sampleRate,
     samplesPerPixel: this.samplesPerPixel,
     bpm: this._bpm,
     ppqn: adapter.ppqn ?? this._ppqn,
@@ -84,6 +110,10 @@ private async _buildEngine() {
 
 **Remove `transport` getter.** Consumers already hold the adapter reference — no need for the editor to expose it back. This decouples `<daw-editor>` from any specific adapter implementation.
 
+**Remove `audioContext` setter, `_ownedAudioContext`, `_externalAudioContext`.** AudioContext lifecycle is the adapter's responsibility. The editor's `disconnectedCallback` no longer closes a context.
+
+**Remove `sample-rate` attribute.** Sample rate is determined by the adapter's AudioContext. The `sampleRate` property becomes a readonly getter: `return this.audioContext.sampleRate`.
+
 **Dependency changes:**
 - Remove `@dawcore/transport` from `@dawcore/components` dependencies
 - `@waveform-playlist/engine` remains a dependency (for `PlaylistEngine`)
@@ -92,20 +122,21 @@ private async _buildEngine() {
 
 The adapter defines the PPQN it operates at. The engine reads it and uses that value.
 
-**`PlayoutAdapter` interface addition:**
+**`PlayoutAdapter` interface additions:**
 
 ```typescript
 interface PlayoutAdapter {
-  readonly ppqn?: number; // adapter's native PPQN — engine uses this
+  readonly audioContext: AudioContext; // required — single source of truth
+  readonly ppqn?: number;             // adapter's native PPQN — engine uses this
   // ... existing methods
 }
 ```
 
 **How each adapter handles it:**
 
-- **`TonePlayoutAdapter`**: accepts `ppqn` in `ToneAdapterOptions` (default 192, Tone.js native). Sets `Transport.PPQ = ppqn` on init. Exposes via readonly `ppqn` getter.
-- **`NativePlayoutAdapter`**: surfaces the underlying Transport's PPQN via a new `ppqn` getter (Transport already stores it internally, just not exposed on the adapter).
-- **Custom adapters**: if `ppqn` is not implemented, engine falls back to its own default (960).
+- **`TonePlayoutAdapter`**: accepts `ppqn` in `ToneAdapterOptions` (default 192, Tone.js native). Sets `Transport.PPQ = ppqn` on init. Exposes via readonly `ppqn` getter. `audioContext` returns `getGlobalAudioContext()`.
+- **`NativePlayoutAdapter`**: surfaces the underlying Transport's PPQN via a new `ppqn` getter (Transport already stores it internally, just not exposed on the adapter). `audioContext` returns the context passed to its constructor (already stored internally).
+- **Custom adapters**: `audioContext` is required. If `ppqn` is not implemented, engine falls back to its own default (960).
 
 **`<daw-editor>._buildEngine()`** reads `adapter.ppqn`:
 
@@ -192,7 +223,13 @@ All in `@dawcore/components` (currently 0.0.x, pre-1.0):
 
 1. **`adapter` property required** — consumers must set it before use
 2. **`transport` getter removed** — use adapter reference directly
-3. **`@dawcore/transport` no longer auto-installed** — add it explicitly if using `NativePlayoutAdapter`
+3. **`audioContext` setter removed** — AudioContext comes from the adapter
+4. **`sample-rate` attribute removed** — sample rate determined by adapter's AudioContext
+5. **`@dawcore/transport` no longer auto-installed** — add it explicitly if using `NativePlayoutAdapter`
+
+Additionally in `@waveform-playlist/engine`:
+
+6. **`PlayoutAdapter` interface gains `audioContext: AudioContext`** — required property, existing custom adapters must implement it
 
 ## Migration
 
@@ -200,7 +237,7 @@ Before:
 ```html
 <script type="module">
   import '@dawcore/components';
-  // Just works — NativePlayoutAdapter created internally
+  // Just works — NativePlayoutAdapter and AudioContext created internally
 </script>
 ```
 
@@ -211,7 +248,8 @@ After:
   import { NativePlayoutAdapter } from '@dawcore/transport';
 
   const editor = document.querySelector('daw-editor');
-  editor.adapter = new NativePlayoutAdapter(editor.audioContext);
+  const adapter = new NativePlayoutAdapter(new AudioContext());
+  editor.adapter = adapter;
 </script>
 ```
 
