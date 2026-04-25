@@ -136,10 +136,13 @@ export class RecordingController implements ReactiveController {
         let addRecordingWorkletModule: (addModule: (url: string) => Promise<void>) => Promise<void>;
         try {
           ({ addRecordingWorkletModule } = await import('@waveform-playlist/worklets'));
-        } catch {
+        } catch (importErr) {
           throw new Error(
             'Recording requires @waveform-playlist/worklets. ' +
-              'Install it: npm install @waveform-playlist/worklets'
+              'Install it: npm install @waveform-playlist/worklets' +
+              ' (cause: ' +
+              String(importErr) +
+              ')'
           );
         }
         const addModule = this._host.addWorkletModule

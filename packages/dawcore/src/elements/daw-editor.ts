@@ -1090,27 +1090,24 @@ export class DawEditorElement extends LitElement {
   // The RecordingController calls these when available, falling back to native APIs.
 
   addWorkletModule(url: string): Promise<void> {
-    const adapter = this._externalAdapter;
-    if (adapter && 'addWorkletModule' in adapter) {
-      return (adapter as any).addWorkletModule(url);
-    }
-    return this.audioContext.audioWorklet.addModule(url);
+    return (
+      this._externalAdapter?.addWorkletModule?.(url) ??
+      this.audioContext.audioWorklet.addModule(url)
+    );
   }
 
   createAudioWorkletNode(name: string, options?: AudioWorkletNodeOptions): AudioWorkletNode {
-    const adapter = this._externalAdapter;
-    if (adapter && 'createAudioWorkletNode' in adapter) {
-      return (adapter as any).createAudioWorkletNode(name, options);
-    }
-    return new AudioWorkletNode(this.audioContext, name, options);
+    return (
+      this._externalAdapter?.createAudioWorkletNode?.(name, options) ??
+      new AudioWorkletNode(this.audioContext, name, options)
+    );
   }
 
   createMediaStreamSource(stream: MediaStream): MediaStreamAudioSourceNode {
-    const adapter = this._externalAdapter;
-    if (adapter && 'createMediaStreamSource' in adapter) {
-      return (adapter as any).createMediaStreamSource(stream);
-    }
-    return this.audioContext.createMediaStreamSource(stream);
+    return (
+      this._externalAdapter?.createMediaStreamSource?.(stream) ??
+      this.audioContext.createMediaStreamSource(stream)
+    );
   }
 
   async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
