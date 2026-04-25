@@ -13,11 +13,14 @@ import type { ClipInfo } from './ToneTrack';
 import type { MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 import { now } from 'tone';
+import { getGlobalAudioContext } from './audioContext';
 
 export interface ToneAdapterOptions {
   effects?: EffectsFunction;
   /** When provided, MIDI clips use SoundFont sample playback instead of PolySynth */
   soundFontCache?: SoundFontCache;
+  /** Pulses per quarter note. Defaults to 192 (Tone.js native). */
+  ppqn?: number;
 }
 
 export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter {
@@ -29,6 +32,10 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
   let _loopEnd = 0;
   let _audioInitialized = false;
   let _pendingInit: Promise<void> | null = null;
+  const _ppqn = options?.ppqn ?? 192;
+  let _bpm = 120;
+  let _numerator = 4;
+  let _denominator = 4;
 
   // Add a single ClipTrack to the playout (shared by buildPlayout and addTrack)
   function addTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
@@ -339,6 +346,43 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       _loopStart = start;
       _loopEnd = end;
       playout?.setLoop(enabled, start, end);
+    },
+
+    get audioContext(): AudioContext {
+      return getGlobalAudioContext();
+    },
+
+    get ppqn(): number {
+      return _ppqn;
+    },
+
+    setTempo(bpm: number, atTick?: number): void {
+      if (atTick !== undefined) {
+        throw new Error(
+          'Multiple tempo changes not supported by TonePlayoutAdapter. ' +
+            'Use NativePlayoutAdapter from @dawcore/transport for multi-tempo support.'
+        );
+      }
+      _bpm = bpm;
+    },
+
+    setMeter(numerator: number, denominator: number, atTick?: number): void {
+      if (atTick !== undefined) {
+        throw new Error(
+          'Multiple meter changes not supported by TonePlayoutAdapter. ' +
+            'Use NativePlayoutAdapter from @dawcore/transport for multi-meter support.'
+        );
+      }
+      _numerator = numerator;
+      _denominator = denominator;
+    },
+
+    ticksToSeconds(tick: number): number {
+      return (tick * 60) / (_bpm * _ppqn);
+    },
+
+    secondsToTicks(seconds: number): number {
+      return (seconds * _bpm * _ppqn) / 60;
     },
 
     dispose(): void {

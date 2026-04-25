@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock audioContext module
+vi.mock('../audioContext', () => ({
+  getGlobalAudioContext: vi.fn().mockReturnValue({
+    sampleRate: 48000,
+  } as unknown as AudioContext),
+}));
+
 // Mock TonePlayout before importing adapter
 vi.mock('../TonePlayout', () => {
   return {
@@ -541,6 +548,73 @@ describe('createToneAdapter', () => {
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
 
       expect(() => adapter.addTrack!(makeTrack('t1', [clip]))).toThrow('no playout exists');
+    });
+  });
+
+  describe('tempo and meter', () => {
+    it('setTempo sets the BPM', () => {
+      const adapter = createToneAdapter();
+      adapter.setTempo!(120);
+      expect(adapter.ticksToSeconds!(192)).toBeCloseTo(0.5);
+    });
+
+    it('setTempo throws when atTick is provided', () => {
+      const adapter = createToneAdapter();
+      expect(() => adapter.setTempo!(140, 960)).toThrow('Multiple tempo changes not supported');
+    });
+
+    it('setMeter does not throw for single meter', () => {
+      const adapter = createToneAdapter();
+      adapter.setMeter!(3, 4);
+    });
+
+    it('setMeter throws when atTick is provided', () => {
+      const adapter = createToneAdapter();
+      expect(() => adapter.setMeter!(6, 8, 960)).toThrow('Multiple meter changes not supported');
+    });
+
+    it('ticksToSeconds converts using current BPM and ppqn', () => {
+      const adapter = createToneAdapter();
+      // Default: 120 BPM, 192 PPQ → 384 ticks = 2 beats = 1s
+      expect(adapter.ticksToSeconds!(384)).toBeCloseTo(1.0);
+    });
+
+    it('secondsToTicks converts using current BPM and ppqn', () => {
+      const adapter = createToneAdapter();
+      expect(adapter.secondsToTicks!(1.0)).toBeCloseTo(384);
+    });
+
+    it('ticksToSeconds reflects updated BPM', () => {
+      const adapter = createToneAdapter();
+      adapter.setTempo!(60);
+      // At 60 BPM, 192 PPQ: 192 ticks = 1 beat = 1s
+      expect(adapter.ticksToSeconds!(192)).toBeCloseTo(1.0);
+    });
+
+    it('accepts custom ppqn via options', () => {
+      const adapter = createToneAdapter({ ppqn: 960 });
+      // At 120 BPM, 960 PPQ: 960 ticks = 1 beat = 0.5s
+      expect(adapter.ticksToSeconds!(960)).toBeCloseTo(0.5);
+    });
+  });
+
+  describe('audioContext', () => {
+    it('exposes the global audio context', () => {
+      const adapter = createToneAdapter();
+      expect(adapter.audioContext).toBeDefined();
+      expect(adapter.audioContext!.sampleRate).toBe(48000);
+    });
+  });
+
+  describe('ppqn', () => {
+    it('defaults to 192', () => {
+      const adapter = createToneAdapter();
+      expect(adapter.ppqn).toBe(192);
+    });
+
+    it('uses custom ppqn from options', () => {
+      const adapter = createToneAdapter({ ppqn: 960 });
+      expect(adapter.ppqn).toBe(960);
     });
   });
 });
