@@ -18,8 +18,7 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "dev:page": "vite --config ../../examples/dawcore-native/vite.config.ts"
+    "test:watch": "vitest"
   },
   "author": "Naomi Aro",
   "license": "MIT",

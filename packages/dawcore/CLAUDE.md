@@ -14,11 +14,11 @@
 - `canvas.getContext('2d')` returns `null` in happy-dom. Tests must mock it: `vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx as any)` where `mockCtx` has `clearRect`, `resetTransform`, `scale`, `fillStyle`, `fillRect` as `vi.fn()`.
 - `PointerHandlerHost` and `ClipPointerHost` test mocks must include beats-mode fields (`scaleMode`, `ticksPerPixel`, `bpm`, `ppqn`, `_meterEntries`, `snapTo`, `renderSamplesPerPixel`). Default to `scaleMode: 'temporal'`, `snapTo: 'off'` for non-beats tests.
 
-**Dev page:** `pnpm dev:page` starts Vite at `http://localhost:5173/demos.html` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
+**Dev page:** `pnpm example:dawcore-native` starts Vite at `http://localhost:5173/demos.html` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
 
 ## Dev Page Dependencies
 
-- **`pnpm dev:page` resolves peer packages from source** — `examples/dawcore-native/vite.config.ts` has `resolve.alias` for core, engine, transport, and `@dawcore/components` pointing to `src/index.ts`. Changes are picked up immediately without rebuilding.
+- **`pnpm example:dawcore-native` resolves peer packages from source** — `examples/dawcore-native/vite.config.ts` has `resolve.alias` for core, engine, transport, and `@dawcore/components` pointing to `src/index.ts`. Changes are picked up immediately without rebuilding.
 - **Incremental track removal** — `engine.removeTrack(trackId)` uses `adapter.removeTrack()` when available (disposes single track, preserves playback). Falls back to `adapter.setTracks()` (full rebuild, stops Transport).
 
 ## Element Types
