@@ -386,13 +386,8 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     // Tone.js wraps standardized-audio-context. Native AudioWorkletNode constructor
     // rejects it ("parameter 1 is not of type 'BaseAudioContext'").
     // These methods use Tone.js Context wrappers that handle both context types.
-
-    addWorkletModule(url: string): Promise<void> {
-      // Use rawContext.audioWorklet.addModule — NOT Tone.js addAudioWorkletModule
-      // which caches a single _workletPromise per context (silently skips subsequent URLs).
-      const rawCtx = getGlobalContext().rawContext as AudioContext;
-      return rawCtx.audioWorklet.addModule(url);
-    },
+    // Note: addWorkletModule is NOT needed — rawContext.audioWorklet.addModule() works
+    // identically for both native and standardized contexts. Only node/source creation differs.
 
     createAudioWorkletNode(name: string, options?: AudioWorkletNodeOptions): AudioWorkletNode {
       return getGlobalContext().createAudioWorkletNode(name, options);
