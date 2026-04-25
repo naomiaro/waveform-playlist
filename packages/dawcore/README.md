@@ -26,7 +26,14 @@ npm install @dawcore/components
 
 Peer dependencies:
 ```bash
-npm install @waveform-playlist/core @waveform-playlist/engine @dawcore/transport
+npm install @waveform-playlist/core @waveform-playlist/engine
+```
+
+Audio backend (choose one — see [Choosing an Audio Backend](#choosing-an-audio-backend)):
+```bash
+npm install @dawcore/transport          # Native Web Audio (recommended)
+# or
+npm install @waveform-playlist/playout tone  # Tone.js
 ```
 
 Optional (for recording):
@@ -39,6 +46,11 @@ npm install @waveform-playlist/worklets
 ```html
 <script type="module">
   import '@dawcore/components';
+  import { NativePlayoutAdapter } from '@dawcore/transport';
+
+  const editor = document.querySelector('daw-editor');
+  const adapter = new NativePlayoutAdapter(new AudioContext());
+  editor.adapter = adapter;
 </script>
 
 <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale>
@@ -54,7 +66,44 @@ npm install @waveform-playlist/worklets
 </daw-transport>
 ```
 
-That's it. The editor loads audio, generates waveforms, and handles playback.
+The editor loads audio, generates waveforms, and handles playback.
+
+## Choosing an Audio Backend
+
+### Native Web Audio (recommended for most use cases)
+
+No Tone.js dependency. Supports multi-tempo, multi-meter, metronome, count-in, and effects hooks.
+
+```bash
+npm install @dawcore/transport
+```
+
+```javascript
+import { NativePlayoutAdapter } from '@dawcore/transport';
+
+const ctx = new AudioContext({ sampleRate: 48000 });
+const adapter = new NativePlayoutAdapter(ctx);
+editor.adapter = adapter;
+
+// Transport-specific features via adapter reference
+adapter.transport.setMetronomeEnabled(true);
+adapter.transport.setCountIn(true);
+```
+
+### Tone.js (effects, MIDI synths)
+
+Uses Tone.js for audio processing. Single tempo/meter only.
+
+```bash
+npm install @waveform-playlist/playout tone
+```
+
+```javascript
+import { createToneAdapter } from '@waveform-playlist/playout';
+
+const adapter = createToneAdapter();
+editor.adapter = adapter;
+```
 
 ## Multi-Clip Timeline
 
@@ -92,33 +141,20 @@ The `.dat` file renders the waveform immediately. Audio decodes in the backgroun
 
 ## Transport Access
 
-Access the native transport for tempo, metronome, count-in, meter, and effects:
+Transport-specific APIs are on the `NativePlayoutAdapter` reference:
 
 ```javascript
-const editor = document.getElementById('editor');
-
-// Build engine eagerly so transport is available immediately
-await editor._ensureEngine();
-const transport = editor.transport;
-
-// Tempo & meter
-transport.setTempo(140);
-transport.setMeter(3, 4);
-
-// Metronome (default click sounds built in)
-transport.setMetronomeEnabled(true);
-
-// Count-in
-transport.setCountIn(true);
-transport.setCountInBars(1);
-transport.setCountInMode('always');
-
-transport.on('countIn', ({ beat, totalBeats }) => {
-  console.log(beat + '/' + totalBeats);
+// Transport-specific APIs are on the NativePlayoutAdapter
+adapter.transport.setTempo(140);
+adapter.transport.setMeter(3, 4);
+adapter.transport.setMetronomeEnabled(true);
+adapter.transport.setCountIn(true);
+adapter.transport.setCountInBars(1);
+adapter.transport.setCountInMode('always');
+adapter.transport.on('countIn', ({ beat, totalBeats }) => {
+  console.log('Count-in: ' + beat + '/' + totalBeats);
 });
-
-// Effects hook — insert any AudioNode chain
-transport.connectTrackOutput('track-id', reverbNode);
+adapter.transport.connectTrackOutput('track-id', reverbNode);
 ```
 
 ## Programmatic File Loading
@@ -276,14 +312,15 @@ editor.addEventListener('daw-files-load-error', (e) => console.error(e.detail));
 
 ## Custom AudioContext
 
-By default, `<daw-editor>` creates its own `AudioContext` using the `sample-rate` attribute. To provide your own:
+Pass a custom `AudioContext` via the adapter:
 
 ```javascript
-const editor = document.getElementById('editor');
-editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+const ctx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+const adapter = new NativePlayoutAdapter(ctx);
+editor.adapter = adapter;
 ```
 
-Set this before tracks load. The provided context is used for decoding, playback, and recording.
+Set the adapter before tracks load. The provided context is used for decoding, playback, and recording.
 
 ## License
 
