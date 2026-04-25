@@ -37,6 +37,9 @@
   "peerDependenciesMeta": {
     "@waveform-playlist/worklets": {
       "optional": true
+    },
+    "@dawcore/transport": {
+      "optional": true
     }
   },
   "devDependencies": {

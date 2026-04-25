@@ -150,6 +150,20 @@ describe('DawEditorElement', () => {
     expect(el.effectiveSampleRate).toBe(44100);
   });
 
+  describe('adapter pluggability', () => {
+    it('throws when _ensureEngine is called without adapter', async () => {
+      const editor = document.createElement('daw-editor') as any;
+      document.body.appendChild(editor);
+      await expect(editor._ensureEngine()).rejects.toThrow('No PlayoutAdapter set');
+      editor.remove();
+    });
+
+    it('audioContext getter throws without adapter', () => {
+      const editor = document.createElement('daw-editor') as any;
+      expect(() => editor.audioContext).toThrow('No PlayoutAdapter set');
+    });
+  });
+
   it('passes eager-resume="document" to controller target', async () => {
     const docSpy = vi.spyOn(document, 'addEventListener');
     const el = document.createElement('daw-editor') as any;

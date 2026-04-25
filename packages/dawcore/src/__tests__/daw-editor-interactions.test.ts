@@ -176,9 +176,9 @@ describe('effectiveSampleRate', () => {
     expect(el.effectiveSampleRate).toBe(48000);
   });
 
-  it('returns configured sample-rate attribute', () => {
+  it('returns adapter audioContext sampleRate', () => {
     const el = document.createElement('daw-editor') as any;
-    el.sampleRate = 44100;
+    el.adapter = { audioContext: { sampleRate: 44100 } };
     expect(el.effectiveSampleRate).toBe(44100);
   });
 });
