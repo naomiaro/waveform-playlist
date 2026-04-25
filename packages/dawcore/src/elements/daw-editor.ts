@@ -44,6 +44,18 @@ import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
 import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
 import { extractPeaks } from '../workers/waveformDataUtils';
 
+const NO_ADAPTER_ERROR =
+  'No PlayoutAdapter set on <daw-editor>. ' +
+  'Set editor.adapter before use.\n\n' +
+  '  // Option 1: Native Web Audio (no Tone.js)\n' +
+  '  npm install @dawcore/transport\n' +
+  "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
+  '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
+  '  // Option 2: Tone.js (effects, MIDI synths)\n' +
+  '  npm install @waveform-playlist/playout\n' +
+  "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
+  '  editor.adapter = createToneAdapter();';
+
 @customElement('daw-editor')
 export class DawEditorElement extends LitElement {
   @property({ type: Number, attribute: 'samples-per-pixel', noAccessor: true })
@@ -154,6 +166,16 @@ export class DawEditorElement extends LitElement {
   _currentTime = 0;
   @property({ attribute: false })
   set adapter(value: PlayoutAdapter | null) {
+    if (value && value.audioContext.state === 'closed') {
+      console.warn('[dawcore] Adapter AudioContext is already closed. Ignoring.');
+      return;
+    }
+    if (this._engine) {
+      console.warn(
+        '[dawcore] adapter set after engine is built. ' +
+          'The engine will continue using the previous adapter.'
+      );
+    }
     this._externalAdapter = value;
   }
   get adapter(): PlayoutAdapter | null {
@@ -163,18 +185,7 @@ export class DawEditorElement extends LitElement {
 
   get audioContext(): AudioContext {
     if (!this._externalAdapter) {
-      throw new Error(
-        'No PlayoutAdapter set on <daw-editor>. ' +
-          'Set editor.adapter before accessing audioContext.\n\n' +
-          '  // Option 1: Native Web Audio (no Tone.js)\n' +
-          '  npm install @dawcore/transport\n' +
-          "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
-          '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
-          '  // Option 2: Tone.js (effects, MIDI synths)\n' +
-          '  npm install @waveform-playlist/playout\n' +
-          "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
-          '  editor.adapter = createToneAdapter();'
-      );
+      throw new Error(NO_ADAPTER_ERROR);
     }
     return this._externalAdapter.audioContext;
   }
@@ -837,25 +848,23 @@ export class DawEditorElement extends LitElement {
   }
   private async _buildEngine() {
     if (!this._externalAdapter) {
-      throw new Error(
-        'No PlayoutAdapter set on <daw-editor>. ' +
-          'Set editor.adapter before use.\n\n' +
-          '  // Option 1: Native Web Audio (no Tone.js)\n' +
-          '  npm install @dawcore/transport\n' +
-          "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
-          '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
-          '  // Option 2: Tone.js (effects, MIDI synths)\n' +
-          '  npm install @waveform-playlist/playout\n' +
-          "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
-          '  editor.adapter = createToneAdapter();'
-      );
+      throw new Error(NO_ADAPTER_ERROR);
     }
 
     const { PlaylistEngine } = await import('@waveform-playlist/engine');
     const adapter = this._externalAdapter;
 
     // Forward initial tempo if adapter supports it
-    adapter.setTempo?.(this._bpm);
+    if (adapter.setTempo) {
+      adapter.setTempo(this._bpm);
+    } else if (this._bpm !== 120) {
+      console.warn(
+        '[dawcore] Adapter does not implement setTempo. ' +
+          'Initial BPM ' +
+          this._bpm +
+          ' will not be applied — clips may use wrong tempo.'
+      );
+    }
 
     const engine = new PlaylistEngine({
       adapter,

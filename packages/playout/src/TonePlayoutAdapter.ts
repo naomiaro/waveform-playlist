@@ -371,7 +371,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
             'Use NativePlayoutAdapter from @dawcore/transport for multi-meter support.'
         );
       }
-      // Stored for future use — Tone.js timeSignature is metadata-only
+      // No-op — Tone.js timeSignature is metadata-only, not used for scheduling
     },
 
     ticksToSeconds(tick: number): number {
@@ -386,7 +386,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       try {
         playout?.dispose();
       } catch (err) {
-        console.warn('[waveform-playlist] Error disposing playout:', err);
+        console.warn('[waveform-playlist] Error disposing playout: ' + String(err));
       }
       playout = null;
       _isPlaying = false;

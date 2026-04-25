@@ -162,6 +162,27 @@ describe('DawEditorElement', () => {
       const editor = document.createElement('daw-editor') as any;
       expect(() => editor.audioContext).toThrow('No PlayoutAdapter set');
     });
+
+    it('rejects adapter with closed AudioContext', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const editor = document.createElement('daw-editor') as any;
+      editor.adapter = { audioContext: { state: 'closed', sampleRate: 48000 } };
+      expect(editor.adapter).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already closed'));
+      warnSpy.mockRestore();
+    });
+
+    it('warns when adapter set after engine is built', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const editor = document.createElement('daw-editor') as any;
+      // Simulate engine being built
+      editor._engine = {};
+      editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('adapter set after engine is built')
+      );
+      warnSpy.mockRestore();
+    });
   });
 
   it('passes eager-resume="document" to controller target', async () => {

@@ -219,6 +219,66 @@ describe('AudioResumeController', () => {
     warnSpy.mockRestore();
   });
 
+  it('removes listeners and returns when audioContext throws "No PlayoutAdapter set"', () => {
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    Object.defineProperties(el, {
+      addController: { value: vi.fn() },
+      requestUpdate: { value: vi.fn() },
+      updateComplete: { value: Promise.resolve(true) },
+      audioContext: {
+        get() {
+          throw new Error('No PlayoutAdapter set on <daw-editor>.');
+        },
+      },
+    });
+    const throwHost = el as any;
+    const removeSpy = vi.spyOn(throwHost, 'removeEventListener');
+
+    const controller = new AudioResumeController(throwHost);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+
+    throwHost.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    const captureRemovals = removeSpy.mock.calls.filter(
+      ([, , opts]) => (opts as any)?.capture === true
+    );
+    expect(captureRemovals.length).toBeGreaterThanOrEqual(1);
+    throwHost.remove();
+  });
+
+  it('logs warning for unexpected audioContext errors', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    Object.defineProperties(el, {
+      addController: { value: vi.fn() },
+      requestUpdate: { value: vi.fn() },
+      updateComplete: { value: Promise.resolve(true) },
+      audioContext: {
+        get() {
+          throw new TypeError('Cannot read properties of undefined');
+        },
+      },
+    });
+    const throwHost = el as any;
+
+    const controller = new AudioResumeController(throwHost);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+
+    throwHost.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unexpected error accessing audioContext')
+    );
+    throwHost.remove();
+    warnSpy.mockRestore();
+  });
+
   it('ignores stale rAF from previous hostConnected after disconnect/reconnect', () => {
     const addSpy = vi.spyOn(host, 'addEventListener');
     const controller = new AudioResumeController(host);
