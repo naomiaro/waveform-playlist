@@ -165,21 +165,20 @@ export class DawEditorElement extends LitElement {
     if (!this._externalAdapter) {
       throw new Error(
         'No PlayoutAdapter set on <daw-editor>. ' +
-        'Set editor.adapter before accessing audioContext.\n\n' +
-        '  // Option 1: Native Web Audio (no Tone.js)\n' +
-        '  npm install @dawcore/transport\n' +
-        "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
-        '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
-        '  // Option 2: Tone.js (effects, MIDI synths)\n' +
-        '  npm install @waveform-playlist/playout\n' +
-        "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
-        '  editor.adapter = createToneAdapter();'
+          'Set editor.adapter before accessing audioContext.\n\n' +
+          '  // Option 1: Native Web Audio (no Tone.js)\n' +
+          '  npm install @dawcore/transport\n' +
+          "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
+          '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
+          '  // Option 2: Tone.js (effects, MIDI synths)\n' +
+          '  npm install @waveform-playlist/playout\n' +
+          "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
+          '  editor.adapter = createToneAdapter();'
       );
     }
     return this._externalAdapter.audioContext;
   }
   _engine: PlaylistEngine | null = null;
-  private _adapter: PlayoutAdapter | null = null;
   private _warnedMissingTicksToSeconds = false;
   private _warnedMissingSecondsToTicks = false;
   private _enginePromise: Promise<PlaylistEngine> | null = null;
@@ -840,21 +839,20 @@ export class DawEditorElement extends LitElement {
     if (!this._externalAdapter) {
       throw new Error(
         'No PlayoutAdapter set on <daw-editor>. ' +
-        'Set editor.adapter before use.\n\n' +
-        '  // Option 1: Native Web Audio (no Tone.js)\n' +
-        '  npm install @dawcore/transport\n' +
-        "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
-        '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
-        '  // Option 2: Tone.js (effects, MIDI synths)\n' +
-        '  npm install @waveform-playlist/playout\n' +
-        "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
-        '  editor.adapter = createToneAdapter();'
+          'Set editor.adapter before use.\n\n' +
+          '  // Option 1: Native Web Audio (no Tone.js)\n' +
+          '  npm install @dawcore/transport\n' +
+          "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
+          '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
+          '  // Option 2: Tone.js (effects, MIDI synths)\n' +
+          '  npm install @waveform-playlist/playout\n' +
+          "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
+          '  editor.adapter = createToneAdapter();'
       );
     }
 
     const { PlaylistEngine } = await import('@waveform-playlist/engine');
     const adapter = this._externalAdapter;
-    this._adapter = adapter;
 
     // Forward initial tempo if adapter supports it
     adapter.setTempo?.(this._bpm);
@@ -902,7 +900,6 @@ export class DawEditorElement extends LitElement {
       this._engine.dispose();
       this._engine = null;
     }
-    this._adapter = null;
     this._enginePromise = null;
   }
   // --- File Drop ---

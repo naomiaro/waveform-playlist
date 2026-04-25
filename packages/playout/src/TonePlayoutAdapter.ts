@@ -34,8 +34,6 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
   let _pendingInit: Promise<void> | null = null;
   const _ppqn = options?.ppqn ?? 192;
   let _bpm = 120;
-  let _numerator = 4;
-  let _denominator = 4;
 
   // Add a single ClipTrack to the playout (shared by buildPlayout and addTrack)
   function addTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
@@ -366,15 +364,14 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       _bpm = bpm;
     },
 
-    setMeter(numerator: number, denominator: number, atTick?: number): void {
+    setMeter(_numerator: number, _denominator: number, atTick?: number): void {
       if (atTick !== undefined) {
         throw new Error(
           'Multiple meter changes not supported by TonePlayoutAdapter. ' +
             'Use NativePlayoutAdapter from @dawcore/transport for multi-meter support.'
         );
       }
-      _numerator = numerator;
-      _denominator = denominator;
+      // Stored for future use — Tone.js timeSignature is metadata-only
     },
 
     ticksToSeconds(tick: number): number {
