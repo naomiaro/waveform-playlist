@@ -184,14 +184,16 @@
   <div id="log"></div>
 
   <script type="module">
+    import { NativePlayoutAdapter } from '@dawcore/transport';
     const editor = document.getElementById('editor');
     // Pass AudioContext at 48000 Hz to match .dat peaks
     const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
-    editor.audioContext = audioCtx;
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
 
-    // Build engine eagerly so editor.transport is available for metronome
+    // Build engine eagerly so adapter.transport is available for metronome
     await editor._ensureEngine();
-    const transport = editor.transport;
+    const transport = adapter.transport;
 
     // Metronome toggle
     const metroBtn = document.getElementById('metro-toggle');

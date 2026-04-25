@@ -60,8 +60,11 @@
   <div id="log"></div>
 
   <script type="module">
+    import { NativePlayoutAdapter } from '@dawcore/transport';
     const editor = document.getElementById('editor');
-    editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
     const log = document.getElementById('log');
     function addLog(msg) {
       const line = document.createElement('div');

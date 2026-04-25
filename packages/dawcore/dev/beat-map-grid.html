@@ -154,14 +154,17 @@
   <script type="module">
     import { detectMeterChanges } from '@waveform-playlist/core';
 
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+
     const editor = document.getElementById('editor');
     const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
-    editor.audioContext = audioCtx;
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
 
-    // Build engine eagerly so editor.transport is available before tracks load.
+    // Build engine eagerly so adapter.transport is available before tracks load.
     // This gives us a single transport for metronome, tempo, and clip scheduling.
     await editor._ensureEngine();
-    const transport = editor.transport;
+    const transport = adapter.transport;
     transport.setMetronomeEnabled(true);
 
     // Click buffer helper for metronome volume control
