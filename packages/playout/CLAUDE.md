@@ -20,7 +20,7 @@
 
 ## Cross-Context Worklet Bridge
 
-`TonePlayoutAdapter` implements `addWorkletModule`, `createAudioWorkletNode`, `createMediaStreamSource` for dawcore recording compatibility. `addWorkletModule` uses `rawContext.audioWorklet.addModule` (bypasses Tone.js single-module cache). `createAudioWorkletNode` and `createMediaStreamSource` use `getGlobalContext()` (Tone.js Context wrapper) which works with standardized-audio-context.
+`TonePlayoutAdapter` implements `createAudioWorkletNode` and `createMediaStreamSource` for dawcore recording compatibility. These use `getGlobalContext()` (Tone.js Context wrapper) which works with standardized-audio-context. `addWorkletModule` is NOT needed — `rawContext.audioWorklet.addModule()` works identically for both native and standardized contexts.
 
 ## Transport.schedule() Architecture
 
