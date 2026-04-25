@@ -35,7 +35,7 @@ source.connect(workletNode);  // AudioWorklet-based metering/recording
 
 ## AudioWorklet Module Loading
 
-**Rule:** Use `addRecordingWorkletModule((url) => rawCtx.audioWorklet.addModule(url))` from `@waveform-playlist/worklets`. The callback injection pattern (from limiter-audio-worklet) works with both native and standardized-audio-context. Never use Tone.js's `context.addAudioWorkletModule(url)`.
+**Rule:** Use `addRecordingWorkletModule((url) => rawCtx.audioWorklet.addModule(url))` from `@waveform-playlist/worklets`. The callback injection pattern (standardized-audio-context / SAC pattern) works with both native and standardized-audio-context. Never use Tone.js's `context.addAudioWorkletModule(url)`.
 
 **Why:** Tone.js caches a single `_workletPromise` per context. Only the first URL is loaded; subsequent calls with different URLs silently return the cached promise. If `meter-processor` loads first, `recording-processor` is never registered.
 

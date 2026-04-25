@@ -20,7 +20,7 @@
 
 ## Cross-Context Worklet Loading (limiter-audio-worklet Pattern)
 
-`addRecordingWorkletModule(addModuleFn)` and `addMeterWorkletModule(addModuleFn)` accept a callback `(url: string) => Promise<void>` so the caller provides the appropriate `addModule` for their context type. This works with both native `AudioContext` and standardized-audio-context (Tone.js). Follows the pattern from limiter-audio-worklet. Prefer these over importing `recordingProcessorUrl`/`meterProcessorUrl` directly.
+`addRecordingWorkletModule(addModuleFn)` and `addMeterWorkletModule(addModuleFn)` accept a callback `(url: string) => Promise<void>` so the caller provides the appropriate `addModule` for their context type. This works with both native `AudioContext` and standardized-audio-context (Tone.js). Follows the SAC (standardized-audio-context) callback injection pattern. Prefer these over importing `recordingProcessorUrl`/`meterProcessorUrl` directly.
 
 ## Recording Processor Start Message
 

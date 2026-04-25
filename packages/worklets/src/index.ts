@@ -8,7 +8,7 @@ export const recordingProcessorUrl = new URL(
 
 /**
  * Register the recording-processor worklet module on any AudioContext.
- * Follows the limiter-audio-worklet pattern: the caller provides the addModule
+ * Follows the SAC (standardized-audio-context) pattern: the caller provides the addModule
  * callback, so this works with both native AudioContext and standardized-audio-context.
  *
  * ```ts
