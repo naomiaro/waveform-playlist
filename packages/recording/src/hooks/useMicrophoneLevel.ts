@@ -8,7 +8,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getGlobalContext } from '@waveform-playlist/playout';
 import { gainToNormalized } from '@waveform-playlist/core';
-import { meterProcessorUrl, type MeterMessage } from '@waveform-playlist/worklets';
+import { addMeterWorkletModule, type MeterMessage } from '@waveform-playlist/worklets';
 
 /** Peak decay constant — exponential decay for smooth peak hold (~800ms to 1/e at 60fps) */
 const PEAK_DECAY = 0.98;
@@ -130,11 +130,11 @@ export function useMicrophoneLevel(
       const trackSettings = stream.getAudioTracks()[0]?.getSettings();
       const actualChannels = trackSettings?.channelCount ?? channelCount;
 
-      // Load worklet directly on rawContext — Tone.js's addAudioWorkletModule
-      // only loads ONE module per context (caches _workletPromise), silently
-      // skipping subsequent calls with different URLs.
+      // Use addMeterWorkletModule with rawContext.audioWorklet.addModule callback.
+      // Can't use Tone.js addAudioWorkletModule — it caches a single _workletPromise
+      // per context, silently skipping subsequent URLs.
       const rawCtx = context.rawContext as AudioContext;
-      await rawCtx.audioWorklet.addModule(meterProcessorUrl);
+      await addMeterWorkletModule((url) => rawCtx.audioWorklet.addModule(url));
       if (!isMounted) return;
 
       // Use Tone.js's createAudioWorkletNode — avoids rawContext identity issues

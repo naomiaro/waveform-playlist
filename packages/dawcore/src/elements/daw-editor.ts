@@ -1085,6 +1085,34 @@ export class DawEditorElement extends LitElement {
   ) {
     addRecordedClip(this, trackId, buf, startSample, durSamples, offsetSamples);
   }
+  // --- RecordingHost bridge methods for cross-context worklet support ---
+  // These delegate to the adapter's context type (native or standardized-audio-context).
+  // The RecordingController calls these when available, falling back to native APIs.
+
+  addWorkletModule(url: string): Promise<void> {
+    const adapter = this._externalAdapter;
+    if (adapter && 'addWorkletModule' in adapter) {
+      return (adapter as any).addWorkletModule(url);
+    }
+    return this.audioContext.audioWorklet.addModule(url);
+  }
+
+  createAudioWorkletNode(name: string, options?: AudioWorkletNodeOptions): AudioWorkletNode {
+    const adapter = this._externalAdapter;
+    if (adapter && 'createAudioWorkletNode' in adapter) {
+      return (adapter as any).createAudioWorkletNode(name, options);
+    }
+    return new AudioWorkletNode(this.audioContext, name, options);
+  }
+
+  createMediaStreamSource(stream: MediaStream): MediaStreamAudioSourceNode {
+    const adapter = this._externalAdapter;
+    if (adapter && 'createMediaStreamSource' in adapter) {
+      return (adapter as any).createMediaStreamSource(stream);
+    }
+    return this.audioContext.createMediaStreamSource(stream);
+  }
+
   async startRecording(stream?: MediaStream, options?: RecordingOptions): Promise<void> {
     const s = stream ?? this.recordingStream;
     if (!s) {

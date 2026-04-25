@@ -6,7 +6,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { UseRecordingReturn, RecordingOptions } from '../types';
 import { concatenateAudioData, createAudioBuffer, appendPeaks } from '@waveform-playlist/core';
 import { getGlobalContext } from '@waveform-playlist/playout';
-import { recordingProcessorUrl } from '@waveform-playlist/worklets';
+import { addRecordingWorkletModule } from '@waveform-playlist/worklets';
 
 function emptyPeaks(bits: 8 | 16): Int8Array | Int16Array {
   return bits === 8 ? new Int8Array(0) : new Int16Array(0);
@@ -70,12 +70,11 @@ export function useRecording(
 
     try {
       const context = getGlobalContext();
-      // Load the worklet module directly on the raw AudioContext.
-      // Tone.js's addAudioWorkletModule only loads ONE module per context
-      // (caches _workletPromise). If meter-processor was loaded first by
-      // useMicrophoneLevel, recording-processor is silently skipped.
+      // Use addRecordingWorkletModule with rawContext.audioWorklet.addModule callback.
+      // Can't use Tone.js addAudioWorkletModule — it caches a single _workletPromise
+      // per context, silently skipping subsequent URLs.
       const rawCtx = context.rawContext as AudioContext;
-      await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
+      await addRecordingWorkletModule((url) => rawCtx.audioWorklet.addModule(url));
       workletLoadedRef.current = true;
     } catch (err) {
       console.warn('[waveform-playlist] Failed to load AudioWorklet module:', String(err));

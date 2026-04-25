@@ -14,7 +14,13 @@
 
 - `recordingProcessorUrl` — inline Blob URL for recording-processor worklet
 - `meterProcessorUrl` — inline Blob URL for meter-processor worklet
+- `addRecordingWorkletModule(addModuleFn)` — register recording-processor via callback injection (preferred)
+- `addMeterWorkletModule(addModuleFn)` — register meter-processor via callback injection (preferred)
 - `MeterMessage` — `{ peak: number[]; rms: number[] }` interface for worklet→main thread messages
+
+## Cross-Context Worklet Loading (limiter-audio-worklet Pattern)
+
+`addRecordingWorkletModule(addModuleFn)` and `addMeterWorkletModule(addModuleFn)` accept a callback `(url: string) => Promise<void>` so the caller provides the appropriate `addModule` for their context type. This works with both native `AudioContext` and standardized-audio-context (Tone.js). Follows the pattern from limiter-audio-worklet. Prefer these over importing `recordingProcessorUrl`/`meterProcessorUrl` directly.
 
 ## Recording Processor Start Message
 

@@ -66,6 +66,22 @@ export interface RecordingHost extends ReactiveControllerHost {
   play?(startTime?: number): Promise<void>;
   stop?(): void;
   dispatchEvent(event: Event): boolean;
+  /**
+   * Register a worklet module URL on the adapter's AudioContext.
+   * Abstracts native vs standardized-audio-context differences.
+   * When absent, falls back to native audioContext.audioWorklet.addModule().
+   */
+  addWorkletModule?(url: string): Promise<void>;
+  /**
+   * Create an AudioWorkletNode on the adapter's context.
+   * When absent, falls back to new AudioWorkletNode(audioContext, ...).
+   */
+  createAudioWorkletNode?(name: string, options?: AudioWorkletNodeOptions): AudioWorkletNode;
+  /**
+   * Create a MediaStreamSource on the adapter's context.
+   * When absent, falls back to audioContext.createMediaStreamSource().
+   */
+  createMediaStreamSource?(stream: MediaStream): MediaStreamAudioSourceNode;
 }
 
 export class RecordingController implements ReactiveController {
@@ -114,19 +130,22 @@ export class RecordingController implements ReactiveController {
       // Resolve editor sample rate from AudioContext before computing startSample
       this._host.resolveAudioContextSampleRate(rawCtx.sampleRate);
 
-      // Load worklet via native API — guard tied to context identity so a
+      // Load worklet module — guard tied to context identity so a
       // swapped AudioContext gets the module re-registered.
       if (!this._workletLoadedCtx || this._workletLoadedCtx !== rawCtx) {
-        let recordingProcessorUrl: string;
+        let addRecordingWorkletModule: (addModule: (url: string) => Promise<void>) => Promise<void>;
         try {
-          ({ recordingProcessorUrl } = await import('@waveform-playlist/worklets'));
+          ({ addRecordingWorkletModule } = await import('@waveform-playlist/worklets'));
         } catch {
           throw new Error(
             'Recording requires @waveform-playlist/worklets. ' +
               'Install it: npm install @waveform-playlist/worklets'
           );
         }
-        await rawCtx.audioWorklet.addModule(recordingProcessorUrl);
+        const addModule = this._host.addWorkletModule
+          ? (url: string) => this._host.addWorkletModule!(url)
+          : (url: string) => rawCtx.audioWorklet.addModule(url);
+        await addRecordingWorkletModule(addModule);
         this._workletLoadedCtx = rawCtx;
       }
 
@@ -147,12 +166,20 @@ export class RecordingController implements ReactiveController {
       const outputLatency = rawCtx.outputLatency ?? 0;
       const latencySamples = Math.floor(outputLatency * rawCtx.sampleRate);
 
-      // Use native AudioContext methods directly (no Tone.js wrapper)
-      const source = rawCtx.createMediaStreamSource(stream);
-      const workletNode = new AudioWorkletNode(rawCtx, 'recording-processor', {
-        channelCount,
-        channelCountMode: 'explicit' as globalThis.ChannelCountMode,
-      });
+      // Use host methods when available (supports standardized-audio-context),
+      // fall back to native AudioContext methods.
+      const source = this._host.createMediaStreamSource
+        ? this._host.createMediaStreamSource(stream)
+        : rawCtx.createMediaStreamSource(stream);
+      const workletNode = this._host.createAudioWorkletNode
+        ? this._host.createAudioWorkletNode('recording-processor', {
+            channelCount,
+            channelCountMode: 'explicit' as globalThis.ChannelCountMode,
+          })
+        : new AudioWorkletNode(rawCtx, 'recording-processor', {
+            channelCount,
+            channelCountMode: 'explicit' as globalThis.ChannelCountMode,
+          });
 
       // Listen on MediaStreamTrack (not MediaStream — MediaStream has no 'ended' event)
       const audioTrack = stream.getAudioTracks()[0] ?? null;

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('@waveform-playlist/worklets', () => ({
-  recordingProcessorUrl: 'blob:mock-recording-processor',
+  addRecordingWorkletModule: vi.fn(async (addModule: (url: string) => Promise<void>) => {
+    await addModule('blob:mock-recording-processor');
+  }),
 }));
 
 vi.mock('@waveform-playlist/core', async (importOriginal) => {
@@ -402,7 +404,9 @@ describe('RecordingController', () => {
 
     // Restore the original mock for subsequent tests
     vi.doMock('@waveform-playlist/worklets', () => ({
-      recordingProcessorUrl: 'blob:mock-recording-processor',
+      addRecordingWorkletModule: vi.fn(async (addModule: (url: string) => Promise<void>) => {
+        await addModule('blob:mock-recording-processor');
+      }),
     }));
   });
 

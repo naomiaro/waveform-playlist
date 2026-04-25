@@ -13,7 +13,7 @@ import type { ClipInfo } from './ToneTrack';
 import type { MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 import { now } from 'tone';
-import { getGlobalAudioContext } from './audioContext';
+import { getGlobalAudioContext, getGlobalContext } from './audioContext';
 
 export interface ToneAdapterOptions {
   effects?: EffectsFunction;
@@ -380,6 +380,26 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
     secondsToTicks(seconds: number): number {
       return (seconds * _bpm * _ppqn) / 60;
+    },
+
+    // --- Cross-context worklet support ---
+    // Tone.js wraps standardized-audio-context. Native AudioWorkletNode constructor
+    // rejects it ("parameter 1 is not of type 'BaseAudioContext'").
+    // These methods use Tone.js Context wrappers that handle both context types.
+
+    addWorkletModule(url: string): Promise<void> {
+      // Use rawContext.audioWorklet.addModule — NOT Tone.js addAudioWorkletModule
+      // which caches a single _workletPromise per context (silently skips subsequent URLs).
+      const rawCtx = getGlobalContext().rawContext as AudioContext;
+      return rawCtx.audioWorklet.addModule(url);
+    },
+
+    createAudioWorkletNode(name: string, options?: AudioWorkletNodeOptions): AudioWorkletNode {
+      return getGlobalContext().createAudioWorkletNode(name, options);
+    },
+
+    createMediaStreamSource(stream: MediaStream): MediaStreamAudioSourceNode {
+      return getGlobalContext().createMediaStreamSource(stream);
     },
 
     dispose(): void {

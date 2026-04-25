@@ -36,6 +36,14 @@ export interface PlayoutAdapter {
   ticksToSeconds?(tick: number): number;
   /** Convert seconds to ticks using the adapter's tempo map. */
   secondsToTicks?(seconds: number): number;
+  /** Register a worklet module URL on this adapter's AudioContext.
+   *  Abstracts native vs standardized-audio-context differences. */
+  addWorkletModule?(url: string): Promise<void>;
+  /** Create an AudioWorkletNode on this adapter's context.
+   *  Required for standardized-audio-context (Tone.js) compatibility. */
+  createAudioWorkletNode?(name: string, options?: AudioWorkletNodeOptions): AudioWorkletNode;
+  /** Create a MediaStreamSource on this adapter's context. */
+  createMediaStreamSource?(stream: MediaStream): MediaStreamAudioSourceNode;
   dispose(): void;
 }
 

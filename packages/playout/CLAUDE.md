@@ -18,6 +18,10 @@
 
 `TonePlayoutAdapter` implements `setTempo`, `setMeter`, `ticksToSeconds`, `secondsToTicks` with single-tempo/meter semantics. Throws `Error('Multiple tempo changes not supported by TonePlayoutAdapter')` if `atTick` is provided. `ppqn` configurable via `ToneAdapterOptions` (default 192, Tone.js native). `audioContext` getter returns `getGlobalAudioContext()`.
 
+## Cross-Context Worklet Bridge
+
+`TonePlayoutAdapter` implements `addWorkletModule`, `createAudioWorkletNode`, `createMediaStreamSource` for dawcore recording compatibility. `addWorkletModule` uses `rawContext.audioWorklet.addModule` (bypasses Tone.js single-module cache). `createAudioWorkletNode` and `createMediaStreamSource` use `getGlobalContext()` (Tone.js Context wrapper) which works with standardized-audio-context.
+
 ## Transport.schedule() Architecture
 
 **Approach:** Uses `Transport.schedule()` + native `AudioBufferSourceNode` instead of `Player.sync()`. This eliminates three Tone.js private-internal workarounds that the `Player.sync()` approach required:
