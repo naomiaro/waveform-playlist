@@ -168,8 +168,8 @@
     });
 
     // Device switch
-    micSelect.addEventListener('change', () => {
-      if (micSelect.value) selectDevice(micSelect.value);
+    micSelect.addEventListener('change', async () => {
+      if (micSelect.value) await selectDevice(micSelect.value);
     });
 
     // Hot-plug detection
@@ -179,7 +179,7 @@
       await enumerateDevices();
       if (micSelect.value !== prevValue && micSelect.options.length > 0) {
         addLog('Device changed \u2014 switching to ' + micSelect.options[0].textContent);
-        selectDevice(micSelect.options[0].value);
+        await selectDevice(micSelect.options[0].value);
       }
     });
 

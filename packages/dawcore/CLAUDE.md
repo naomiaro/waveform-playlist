@@ -14,7 +14,7 @@
 - `canvas.getContext('2d')` returns `null` in happy-dom. Tests must mock it: `vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx as any)` where `mockCtx` has `clearRect`, `resetTransform`, `scale`, `fillStyle`, `fillRect` as `vi.fn()`.
 - `PointerHandlerHost` and `ClipPointerHost` test mocks must include beats-mode fields (`scaleMode`, `ticksPerPixel`, `bpm`, `ppqn`, `_meterEntries`, `snapTo`, `renderSamplesPerPixel`). Default to `scaleMode: 'temporal'`, `snapTo: 'off'` for non-beats tests.
 
-**Dev page:** `pnpm example:dawcore-native` starts Vite at `http://localhost:5173/demos.html` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
+**Dev page:** `pnpm example:dawcore-native` starts Vite at `http://localhost:5173/` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
 
 ## Dev Page Dependencies
 
@@ -237,5 +237,5 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Callback interface, not TempoMap dependency** — `secondsToTicks`/`ticksToSeconds` optional function properties on `<daw-editor>`. Keeps dawcore decoupled from the transport package. Consumers with a different playout engine provide their own conversion functions. When callbacks are absent, falls back to single-BPM math.
 - **Per-segment waveform rendering** — In beats mode with callbacks, clips are iterated in fine tick steps (~80 ticks). Each step is converted to audio time via callbacks, then peaks are extracted for that sample range into the corresponding pixel range. Uses base-scale (128) peaks directly — no BPM-dependent intermediate resampling.
 - **Beat-map clip positioning** — Use `beatBpm` uniformly from tick 0 (no "gap BPM"). Shift the clip's `startTick` forward so beat 1 in the audio aligns with the next bar boundary. Formula: `clipStartTick = firstDownbeatTick - naturalFirstBeatTick` where `naturalFirstBeatTick = round(beats[0].time * ppqn * beatBpm / 60)`. Gives the metronome a natural tempo throughout.
-- **Single transport — no standalone Transport in demos** — Demo pages that use `<daw-editor>` must use `editor.transport` (via `await editor._ensureEngine()`), not create their own `new Transport()`. Two transports cause metronome/seek desync. The transport is available immediately after `_ensureEngine()` — no need to wait for tracks.
+- **Single transport — no standalone Transport in demos** — Demo pages that use `<daw-editor>` must use `adapter.transport` (for `NativePlayoutAdapter`), not create their own `new Transport()`. Two transports cause metronome/seek desync. The transport is available immediately after the adapter is created — no need to wait for tracks.
 - **`editor.meterEntries` for multi-meter grids** — Set `editor.meterEntries` (from `detectMeterChanges`) so the grid renders correct bar widths. Without this, the grid uses the editor's `timeSignature` (single meter) while the Transport's MeterMap has the real meters — grid and metronome disagree.
