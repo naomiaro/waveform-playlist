@@ -151,7 +151,7 @@ npm install @dawcore/components @waveform-playlist/core @waveform-playlist/engin
 
 Audio backend (choose one):
 ```bash
-npm install @dawcore/transport          # Native Web Audio (recommended)
+npm install @dawcore/transport          # Native Web Audio (multi-tempo, multi-meter, metronome)
 # or
 npm install @waveform-playlist/playout tone  # Tone.js (effects, MIDI synths)
 ```
