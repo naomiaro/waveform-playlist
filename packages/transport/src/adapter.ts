@@ -12,6 +12,14 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
     this._transport = new Transport(audioContext, options);
   }
 
+  get audioContext(): AudioContext {
+    return this._audioContext;
+  }
+
+  get ppqn(): number {
+    return this._transport.ppqn;
+  }
+
   get transport(): Transport {
     return this._transport;
   }

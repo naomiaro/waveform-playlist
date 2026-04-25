@@ -138,6 +138,10 @@ export class Transport {
     return this._audioContext;
   }
 
+  get ppqn(): number {
+    return this._ppqn;
+  }
+
   // --- Playback ---
 
   play(startTime?: number, endTime?: number): void {
