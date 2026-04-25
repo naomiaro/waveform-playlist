@@ -6,6 +6,8 @@ import type { ClipTrack } from '@waveform-playlist/core';
  * (Tone.js, openDAW, HTMLAudioElement, etc.)
  */
 export interface PlayoutAdapter {
+  readonly audioContext: AudioContext;
+  readonly ppqn?: number;
   init(): Promise<void>;
   setTracks(tracks: ClipTrack[]): void;
   /** Incrementally add a single track without rebuilding the entire playout. */
