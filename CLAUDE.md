@@ -179,6 +179,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Lint**: `pnpm lint` - Prettier check + ESLint across all packages. **Always run before committing.** This is a root-only script; run from repo root or use `pnpm -w lint`. Fix formatting issues with `pnpm format`.
 - **New packages**: After adding a new `packages/*/package.json`, run `pnpm install` and commit `pnpm-lock.yaml`. CI uses `--frozen-lockfile` and will fail if the lockfile is stale.
 - **Dev server**: `pnpm --filter website start` - Docusaurus dev server
+- **Example: dawcore-native**: `pnpm example:dawcore-native` — Vite dev server at localhost:5173
+- **Example: dawcore-tone**: `pnpm example:dawcore-tone` — Vite dev server at localhost:5174
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
 - **Vitest cleanup:** `npx vitest run` in pnpm monorepos can leave orphaned Node processes at ~100% CPU. After running tests across multiple packages, verify with `pgrep -f vitest` and kill strays with `pkill -f vitest` if needed.
@@ -270,6 +272,26 @@ interface AudioClip {
 2. Use **Radix UI** or **React Aria** selectively for complex components (headless only)
 3. Build simple components ourselves
 4. Create internal design system with shared theme tokens
+
+### Adapter-Pluggable `<daw-editor>` (Issue #378)
+
+**Decision:** `<daw-editor>` requires an externally-provided `PlayoutAdapter`. No default adapter or AudioContext created.
+
+**Why:** Consumers choose their audio backend — `NativePlayoutAdapter` (native Web Audio, multi-tempo) or `TonePlayoutAdapter` (Tone.js, effects/MIDI). AudioContext owned by the adapter, not the editor.
+
+**Interface:** `PlayoutAdapter` has required `readonly audioContext: AudioContext` and optional `readonly ppqn?: number`. Engine reads `adapter.ppqn` on construction to align tick resolution.
+
+**Breaking changes (dawcore 0.0.x):** `adapter` property required, `transport` getter removed, `audioContext` setter removed, `sample-rate` attribute removed, `@dawcore/transport` is optional peer dep.
+
+### Examples Directory Structure
+
+**Decision:** Standalone Vite examples live in `examples/` at repo root, not inside packages.
+
+**Why:** Decouples examples from package builds. Each example has its own `vite.config.ts` with source aliases. Shares `website/static/` as publicDir for audio assets.
+
+**Structure:**
+- `examples/dawcore-native/` — Web components + NativePlayoutAdapter (moved from `packages/dawcore/dev/`)
+- `examples/dawcore-tone/` — Web components + TonePlayoutAdapter (Tone.js backend)
 
 ### ESLint Baseline (2026-02-13)
 

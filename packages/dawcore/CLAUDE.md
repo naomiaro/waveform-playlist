@@ -98,18 +98,14 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 **Lit controller lifecycle gotcha:** `hostConnected()` fires during `connectedCallback()`, BEFORE the first `willUpdate()`. Controllers that read properties set from attributes must defer work with `requestAnimationFrame` (as `ViewportController` and `AudioResumeController` do), otherwise the property will still be `undefined`.
 
-## Transport Access
+## Adapter Pluggability
 
-- **`editor.transport` getter** — Returns the `NativePlayoutAdapter`'s `Transport` instance (or `null` before engine is built). Use for tempo, metronome, and effects configuration on the same clock that schedules clips.
-- **`editor.bpm` setter forwards to engine** — Calls `engine.setTempo(value)` when engine exists, keeping the adapter's Transport in sync. `_buildEngine` calls `adapter.setTempo(this._bpm)` before creating the engine so initial `setTracks()` enrichment uses the correct BPM.
-
-## AudioContext Ownership
-
-**`audioContext` JS property** — Optional `AudioContext` on `<daw-editor>`. When set before tracks load, the editor uses it for decode, playback (via `NativePlayoutAdapter`), and recording. When not set, the editor creates its own `AudioContext({ sampleRate })` lazily on first audio operation.
-
-Example: `editor.audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 0 });`
-
-- **Close owned AudioContext on disconnect** — `disconnectedCallback` calls `_ownedAudioContext.close()`. Skip when consumer provided an external context (they own its lifecycle).
+- **`editor.adapter` required** — Set a `PlayoutAdapter` before use. No default adapter created. Throws helpful error with install instructions if missing.
+- **AudioContext from adapter** — `editor.audioContext` reads `adapter.audioContext`. No setter, no owned context. Adapter owns the AudioContext lifecycle.
+- **`transport` getter removed** — Consumers access transport-specific APIs on their own adapter reference (e.g., `adapter.transport.setMetronomeEnabled(true)` for `NativePlayoutAdapter`).
+- **`sample-rate` attribute removed** — Sample rate determined by adapter's AudioContext. `sampleRate` is a derived getter.
+- **`editor.bpm` setter forwards to engine** — Calls `engine.setTempo(value)` when engine exists. `_buildEngine` calls `adapter.setTempo?.(this._bpm)` before creating the engine so initial `setTracks()` enrichment uses the correct BPM.
+- **`adapter.ppqn` drives engine** — `_buildEngine` reads `adapter.ppqn ?? this._ppqn` for the engine's PPQN. No translation layer.
 
 ## Ported Utilities
 
