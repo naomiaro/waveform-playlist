@@ -397,6 +397,10 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       return getGlobalContext().createMediaStreamSource(stream);
     },
 
+    get masterOutputNode(): AudioNode | undefined {
+      return playout?.masterOutputNode;
+    },
+
     dispose(): void {
       try {
         playout?.dispose();

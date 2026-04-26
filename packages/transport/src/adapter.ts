@@ -173,6 +173,10 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
     return this._transport.timeToTick(seconds) as number;
   }
 
+  get masterOutputNode(): AudioNode {
+    return this._transport.masterOutputNode;
+  }
+
   dispose(): void {
     this._transport.dispose();
   }

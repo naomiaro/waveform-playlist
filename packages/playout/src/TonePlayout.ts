@@ -320,6 +320,14 @@ export class TonePlayout {
     this.masterVolume.volume.value = gainToDb(gain);
   }
 
+  /** The master output as a native GainNode. Connect analyzers, recorders, etc.
+   *  in parallel — the playout already routes this to Tone.js Destination.
+   *  Uses the native GainNode backing Tone.js Volume's output Gain. */
+  get masterOutputNode(): GainNode {
+    // Volume.output is a Tone.js Gain; Gain.input is the native GainNode
+    return (this.masterVolume.output as any).input as GainNode;
+  }
+
   setSolo(trackId: string, soloed: boolean): void {
     const track = this.tracks.get(trackId);
     if (track) {

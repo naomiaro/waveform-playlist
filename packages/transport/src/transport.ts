@@ -605,6 +605,12 @@ export class Transport {
     trackNode.disconnectEffects();
   }
 
+  /** The master output AudioNode. Connect your own nodes (analyzers, recorders, etc.)
+   *  in parallel. The transport already routes this to audioContext.destination. */
+  get masterOutputNode(): AudioNode {
+    return this._masterNode.output;
+  }
+
   // --- Events ---
 
   on<K extends TransportEventType>(event: K, cb: TransportEvents[K]): void {

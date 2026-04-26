@@ -21,7 +21,7 @@ export class MasterNode {
     try {
       this._gainNode.disconnect();
     } catch (err) {
-      console.warn('[waveform-playlist] MasterNode.dispose: error disconnecting:', String(err));
+      console.warn('[waveform-playlist] MasterNode.dispose: error disconnecting: ' + String(err));
     }
   }
 }

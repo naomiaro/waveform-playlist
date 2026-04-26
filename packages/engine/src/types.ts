@@ -46,6 +46,9 @@ export interface PlayoutAdapter {
   createAudioWorkletNode?(name: string, options?: AudioWorkletNodeOptions): AudioWorkletNode;
   /** Create a MediaStreamSource on this adapter's context. */
   createMediaStreamSource?(stream: MediaStream): MediaStreamAudioSourceNode;
+  /** The master output AudioNode. Connect your own nodes (analyzers, recorders, etc.)
+   *  in parallel or series. The adapter already routes this to audioContext.destination. */
+  readonly masterOutputNode?: AudioNode;
   dispose(): void;
 }
 
