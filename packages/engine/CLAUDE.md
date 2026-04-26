@@ -8,7 +8,7 @@
 
 **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 
-**Key types:** `PlayoutAdapter` (pluggable audio backend interface — requires `readonly audioContext: AudioContext`, optional `readonly ppqn?: number`, optional `addWorkletModule`/`createAudioWorkletNode`/`createMediaStreamSource` for cross-context worklet support), `EngineState` (state snapshot), `EngineEvents` (statechange, play/pause/stop).
+**Key types:** `PlayoutAdapter` (pluggable audio backend interface — requires `readonly audioContext: AudioContext`, `readonly ppqn: number`; optional `addWorkletModule`/`createAudioWorkletNode`/`createMediaStreamSource` for cross-context worklet support, `masterOutputNode` for analyzer/recorder tap), `EngineState` (state snapshot), `EngineEvents` (statechange, play/pause/stop).
 
 **Operations:** `clipOperations.ts` (drag constraints, trim, split), `viewportOperations.ts` (bounds, chunks, scroll threshold), `timelineOperations.ts` (duration, zoom, seek).
 
