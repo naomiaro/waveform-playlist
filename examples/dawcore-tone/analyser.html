@@ -65,13 +65,8 @@
     const adapter = createToneAdapter();
     editor.adapter = adapter;
 
-    // Connect analyser to master output — parallel connection,
+    // Connect analyser to master output in parallel —
     // audio still flows to speakers via the existing Tone.js destination route.
-    //
-    // To route through the analyser instead (serial):
-    //   adapter.masterOutputNode.disconnect();
-    //   adapter.masterOutputNode.connect(analyser);
-    //   analyser.connect(adapter.audioContext.destination);
     const analyser = adapter.audioContext.createAnalyser();
     analyser.fftSize = 256;
     adapter.masterOutputNode.connect(analyser);

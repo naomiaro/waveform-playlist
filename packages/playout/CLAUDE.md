@@ -167,7 +167,7 @@ AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
 
 **`addTrackToPlayout()` helper:** Extracted from `buildPlayout`'s per-track loop. Shared by `buildPlayout`, `adapter.addTrack()`, and `adapter.updateTrack()`. Handles audio clips, MIDI clips, and SoundFont routing.
 
-**`adapter.addTrack(track)`:** Adds a single track to the existing playout. Throws if called before `setTracks()` (no playout exists yet).
+**`adapter.addTrack(track)`:** Adds a single track to the existing playout. Playout is created eagerly, so `addTrack` works before `setTracks()`. Warns and returns if called after `dispose()`.
 
 **`adapter.updateTrack(trackId, track)`:** For audio tracks, uses `ToneTrack.replaceClips()` which diffs clips and only reschedules changed ones. Falls back to remove+re-add for MIDI tracks.
 

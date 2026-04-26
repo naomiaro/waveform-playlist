@@ -330,8 +330,8 @@ export class TonePlayout {
   }
 
   /** The master output tap node. Connect analyzers, recorders, etc. in parallel.
-   *  Chain: masterVolume → tap → destination. The tap's native GainNode is on the
-   *  same standardized-audio-context as adapter.audioContext, so .connect() works. */
+   *  masterVolume connects to both destination AND this tap. The tap's native
+   *  GainNode is on the same standardized-audio-context as adapter.audioContext. */
   get masterOutputNode(): GainNode {
     return this._masterTap.input;
   }

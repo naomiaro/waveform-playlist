@@ -136,8 +136,8 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     }
   }
 
-  // Creates the initial TonePlayout. Called only on the first setTracks().
-  // Subsequent setTracks calls use the incremental path (no dispose/rebuild).
+  // Recreates TonePlayout after dispose. The initial playout is created eagerly
+  // above. setTracks() uses the incremental path when playout exists.
   function buildPlayout(tracks: ClipTrack[]): void {
     if (playout) {
       try {

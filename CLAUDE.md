@@ -275,7 +275,7 @@ interface AudioClip {
 
 **Why:** Consumers choose their audio backend — `NativePlayoutAdapter` (native Web Audio, multi-tempo) or `TonePlayoutAdapter` (Tone.js, effects/MIDI). AudioContext owned by the adapter, not the editor.
 
-**Interface:** `PlayoutAdapter` has required `readonly audioContext: AudioContext` and optional `readonly ppqn?: number`. Engine reads `adapter.ppqn` on construction to align tick resolution.
+**Interface:** `PlayoutAdapter` has required `readonly audioContext: AudioContext` and required `readonly ppqn: number`. Engine reads `adapter.ppqn` on construction to align tick resolution. `setPpqn?(ppqn)` is optional — allows the editor to request a PPQN before reading.
 
 **Breaking changes (dawcore 0.0.x):** `adapter` property required, `transport` getter removed, `audioContext` setter removed, `sample-rate` attribute removed, `@dawcore/transport` is optional peer dep.
 
