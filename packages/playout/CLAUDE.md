@@ -90,6 +90,8 @@ AudioBufferSourceNode (native, one-shot, created per play/loop)
 
 **Gain generic mismatch:** `Volume.input` is `Gain<"decibels">` but plain `Gain` import defaults to `Gain<"gain">`. Accessing native input requires double cast: `(this.volumeNode.input as unknown as Gain).input`.
 
+**`Gain.input` is already `GainNode`** — Unlike `Volume.input`, plain `Gain.input` is typed as `GainNode` directly. No cast needed (e.g., `_masterTap.input` returns `GainNode`).
+
 ## Global AudioContext Pattern
 
 **Implementation:** Recording and playback use a global shared AudioContext (same as Tone.js).
