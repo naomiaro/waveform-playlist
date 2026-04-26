@@ -24,9 +24,19 @@ export interface ToneAdapterOptions {
 }
 
 export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter {
-  let playout: TonePlayout | null = null;
+  // Ensure the global shared context exists BEFORE creating the playout.
+  // Without this, TonePlayout's Volume is created on Tone's default context,
+  // which is replaced by getGlobalContext() later — causing cross-context errors.
+  getGlobalContext();
+
+  let _playoutGeneration = 1;
+  let playout: TonePlayout | null = new TonePlayout({ effects: options?.effects });
+  playout.setOnPlaybackComplete(() => {
+    if (_playoutGeneration === 1) {
+      _isPlaying = false;
+    }
+  });
   let _isPlaying = false;
-  let _playoutGeneration = 0;
   let _loopEnabled = false;
   let _loopStart = 0;
   let _loopEnd = 0;
@@ -266,12 +276,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     },
 
     addTrack(track: ClipTrack): void {
-      if (!playout) {
-        throw new Error(
-          '[waveform-playlist] adapter.addTrack() called but no playout exists. ' +
-            'Call setTracks() first to initialize the playout.'
-        );
-      }
+      if (!playout) return;
       addTrackToPlayout(playout, track);
       playout.applyInitialSoloState();
     },
@@ -397,8 +402,8 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       return getGlobalContext().createMediaStreamSource(stream);
     },
 
-    get masterOutputNode(): AudioNode | undefined {
-      return playout?.masterOutputNode;
+    get masterOutputNode(): AudioNode {
+      return playout!.masterOutputNode;
     },
 
     dispose(): void {

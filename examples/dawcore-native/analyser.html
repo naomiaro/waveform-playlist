@@ -68,6 +68,11 @@
 
     // Connect analyser to master output — parallel connection,
     // audio still flows to speakers via the existing destination route.
+    //
+    // To route through the analyser instead (serial):
+    //   adapter.masterOutputNode.disconnect(audioCtx.destination);
+    //   adapter.masterOutputNode.connect(analyser);
+    //   analyser.connect(audioCtx.destination);
     const analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
     adapter.masterOutputNode.connect(analyser);

@@ -1,30 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // vi.hoisted runs before vi.mock hoisting, making these available in mock factories
-const { mockTransport, mockVolume } = vi.hoisted(() => ({
-  mockTransport: {
-    stop: vi.fn(),
-    off: vi.fn(),
-    clear: vi.fn(),
-    schedule: vi.fn().mockReturnValue(1),
-    cancel: vi.fn(),
-    start: vi.fn(),
-    seconds: 0,
-    state: 'stopped' as string,
-    loop: false,
-    loopStart: 0,
-    loopEnd: 0,
-  },
-  mockVolume: {
-    volume: { value: 0 },
-    toDestination: vi.fn(),
+const { mockTransport, mockVolume, mockGain } = vi.hoisted(() => {
+  const mockGain = {
+    connect: vi.fn(),
     dispose: vi.fn(),
     input: {},
-  },
-}));
+  };
+  return {
+    mockTransport: {
+      stop: vi.fn(),
+      off: vi.fn(),
+      clear: vi.fn(),
+      schedule: vi.fn().mockReturnValue(1),
+      cancel: vi.fn(),
+      start: vi.fn(),
+      seconds: 0,
+      state: 'stopped' as string,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+    },
+    mockVolume: {
+      volume: { value: 0 },
+      toDestination: vi.fn(),
+      connect: vi.fn(),
+      chain: vi.fn(),
+      dispose: vi.fn(),
+      input: {},
+    },
+    mockGain,
+  };
+});
 
 vi.mock('tone', () => ({
   Volume: vi.fn().mockImplementation(() => mockVolume),
+  Gain: vi.fn().mockImplementation(() => mockGain),
   getTransport: vi.fn().mockReturnValue(mockTransport),
   getDestination: vi.fn(),
   getContext: vi.fn().mockReturnValue({ sampleRate: 44100 }),

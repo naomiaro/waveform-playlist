@@ -1,5 +1,6 @@
 import {
   Volume,
+  Gain,
   ToneAudioNode,
   getDestination,
   start,
@@ -29,6 +30,7 @@ export interface TonePlayoutOptions {
 export class TonePlayout {
   private tracks: Map<string, PlayableTrack> = new Map();
   private masterVolume: Volume;
+  private _masterTap: Gain;
   private isInitialized = false;
   private soloedTracks: Set<string> = new Set();
   private manualMuteState: Map<string, boolean> = new Map();
@@ -42,6 +44,9 @@ export class TonePlayout {
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Volume(gainToDb(options.masterGain ?? 1));
+    // Pass-through tap node for consumer connections (analyzers, recorders).
+    // Shares the same standardized-audio-context as masterVolume.
+    this._masterTap = new Gain(1);
 
     // Setup effects chain if provided, otherwise connect directly to destination
     if (options.effects) {
@@ -52,6 +57,10 @@ export class TonePlayout {
     } else {
       this.masterVolume.toDestination();
     }
+
+    // Tap node connected in parallel — always sees post-volume signal,
+    // regardless of effects chain. Consumers connect analyzers etc. here.
+    this.masterVolume.connect(this._masterTap);
 
     if (options.tracks) {
       options.tracks.forEach((track) => {
@@ -320,12 +329,11 @@ export class TonePlayout {
     this.masterVolume.volume.value = gainToDb(gain);
   }
 
-  /** The master output as a native GainNode. Connect analyzers, recorders, etc.
-   *  in parallel — the playout already routes this to Tone.js Destination.
-   *  Uses the native GainNode backing Tone.js Volume's output Gain. */
+  /** The master output tap node. Connect analyzers, recorders, etc. in parallel.
+   *  Chain: masterVolume → tap → destination. The tap's native GainNode is on the
+   *  same standardized-audio-context as adapter.audioContext, so .connect() works. */
   get masterOutputNode(): GainNode {
-    // Volume.output is a Tone.js Gain; Gain.input is the native GainNode
-    return (this.masterVolume.output as any).input as GainNode;
+    return (this._masterTap as any).input as GainNode;
   }
 
   setSolo(trackId: string, soloed: boolean): void {

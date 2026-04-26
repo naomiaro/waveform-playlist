@@ -5,6 +5,7 @@ vi.mock('../audioContext', () => ({
   getGlobalAudioContext: vi.fn().mockReturnValue({
     sampleRate: 48000,
   } as unknown as AudioContext),
+  getGlobalContext: vi.fn(),
 }));
 
 // Mock TonePlayout before importing adapter
@@ -473,15 +474,10 @@ describe('createToneAdapter', () => {
   });
 
   describe('play guards', () => {
-    it('play() before setTracks is a no-op (isPlaying stays false)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('play() before setTracks works (playout created eagerly)', () => {
       const adapter = createToneAdapter();
       adapter.play(0);
-      expect(adapter.isPlaying()).toBe(false);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('adapter.play() called but no playout is available')
-      );
-      warnSpy.mockRestore();
+      expect(adapter.isPlaying()).toBe(true);
     });
   });
 
@@ -542,12 +538,12 @@ describe('createToneAdapter', () => {
       expect(TonePlayout).toHaveBeenCalledTimes(1);
     });
 
-    it('throws if called before setTracks', () => {
+    it('addTrack works before setTracks (playout created eagerly)', () => {
       const adapter = createToneAdapter();
 
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
 
-      expect(() => adapter.addTrack!(makeTrack('t1', [clip]))).toThrow('no playout exists');
+      expect(() => adapter.addTrack!(makeTrack('t1', [clip]))).not.toThrow();
     });
   });
 
