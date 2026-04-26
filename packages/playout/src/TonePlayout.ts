@@ -48,19 +48,18 @@ export class TonePlayout {
     // Shares the same standardized-audio-context as masterVolume.
     this._masterTap = new Gain(1);
 
-    // Setup effects chain if provided, otherwise connect directly to destination
+    // Serial chain: masterVolume → tap → destination.
+    // When effects are present: masterVolume → effects → tap → destination.
+    // Consumers connect analyzers, effects, recorders to the tap node.
     if (options.effects) {
-      const cleanup = options.effects(this.masterVolume, getDestination(), false);
+      const cleanup = options.effects(this.masterVolume, this._masterTap, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
+      this._masterTap.connect(getDestination());
     } else {
-      this.masterVolume.toDestination();
+      this.masterVolume.chain(this._masterTap, getDestination());
     }
-
-    // Tap node connected in parallel — always sees post-volume signal,
-    // regardless of effects chain. Consumers connect analyzers etc. here.
-    this.masterVolume.connect(this._masterTap);
 
     if (options.tracks) {
       options.tracks.forEach((track) => {
@@ -329,9 +328,9 @@ export class TonePlayout {
     this.masterVolume.volume.value = gainToDb(gain);
   }
 
-  /** The master output tap node. Connect analyzers, recorders, etc. in parallel.
-   *  masterVolume connects to both destination AND this tap. The tap's native
-   *  GainNode is on the same standardized-audio-context as adapter.audioContext. */
+  /** The master output tap node. In the signal chain: masterVolume → tap → destination.
+   *  Connect analyzers/effects/recorders here — parallel or serial.
+   *  The tap's native GainNode is on the same standardized-audio-context as adapter.audioContext. */
   get masterOutputNode(): GainNode {
     return this._masterTap.input;
   }
