@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — spectrum analyser</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #analyser-canvas {
+      width: 100%;
+      height: 120px;
+      background: #1a1a2e;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore — spectrum analyser</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/05_Claps.opus" name="Claps"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/06_HiHat.opus" name="HiHat"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <canvas id="analyser-canvas"></canvas>
+
+  <script type="module">
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+
+    const editor = document.getElementById('editor');
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
+
+    // Connect analyser to master output — parallel connection,
+    // audio still flows to speakers via the existing destination route.
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    adapter.masterOutputNode.connect(analyser);
+
+    // Draw frequency bars on canvas
+    const canvas = document.getElementById('analyser-canvas');
+    const ctx = canvas.getContext('2d');
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    function draw() {
+      requestAnimationFrame(draw);
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+
+      analyser.getByteFrequencyData(dataArray);
+
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, width, height);
+
+      const barWidth = width / bufferLength;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 255;
+        const barHeight = v * height;
+
+        // Gradient from green (low) to amber (mid) to red (high)
+        const r = Math.min(255, v * 400);
+        const g = Math.min(255, 150 + (1 - v) * 105);
+        const b = 80 * (1 - v);
+        ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+        ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
+
+        x += barWidth;
+      }
+    }
+
+    draw();
+  </script>
+</body>
+</html>
