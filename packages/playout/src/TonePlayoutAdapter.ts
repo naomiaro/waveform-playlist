@@ -276,7 +276,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     },
 
     addTrack(track: ClipTrack): void {
-      if (!playout) return;
+      if (!playout) {
+        console.warn(
+          '[waveform-playlist] adapter.addTrack() called but playout is not available ' +
+            '(adapter may have been disposed).'
+        );
+        return;
+      }
       addTrackToPlayout(playout, track);
       playout.applyInitialSoloState();
     },
@@ -403,7 +409,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
     },
 
     get masterOutputNode(): AudioNode {
-      return playout!.masterOutputNode;
+      if (!playout) {
+        throw new Error(
+          '[waveform-playlist] adapter.masterOutputNode accessed after dispose. ' +
+            'Disconnect your analyzer before disposing the adapter.'
+        );
+      }
+      return playout.masterOutputNode;
     },
 
     dispose(): void {

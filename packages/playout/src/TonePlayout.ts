@@ -333,7 +333,7 @@ export class TonePlayout {
    *  Chain: masterVolume → tap → destination. The tap's native GainNode is on the
    *  same standardized-audio-context as adapter.audioContext, so .connect() works. */
   get masterOutputNode(): GainNode {
-    return (this._masterTap as any).input as GainNode;
+    return this._masterTap.input;
   }
 
   setSolo(trackId: string, soloed: boolean): void {
@@ -467,9 +467,15 @@ export class TonePlayout {
     }
 
     try {
+      this._masterTap.dispose();
+    } catch (err) {
+      console.warn('[waveform-playlist] Error disposing master tap: ' + String(err));
+    }
+
+    try {
       this.masterVolume.dispose();
     } catch (err) {
-      console.warn('[waveform-playlist] Error disposing master volume:', err);
+      console.warn('[waveform-playlist] Error disposing master volume: ' + String(err));
     }
   }
 
