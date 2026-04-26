@@ -24,7 +24,7 @@
 
 ## Master Output Tap
 
-`TonePlayout` creates a Tone.js `Gain` tap node in parallel from `masterVolume`. Exposed as `masterOutputNode` (native GainNode via `_masterTap.input`). Consumers connect analyzers, recorders, etc. — audio still flows to destination via the existing route.
+`TonePlayout` creates a Tone.js `Gain` tap node in the signal chain: `masterVolume → [effects] → tap → destination`. Exposed as `masterOutputNode` (native GainNode via `_masterTap.input`). Consumers connect analyzers/effects/recorders to the tap — parallel (`.connect()` without disconnecting) or serial (`.disconnect(destination)` then rewire).
 
 **Eager playout creation:** `createToneAdapter()` calls `getGlobalContext()` BEFORE `new TonePlayout()` so the playout's nodes share the same standardized-audio-context as `adapter.audioContext`. Without this, `Volume` is created on Tone's default context (replaced later by `setContext`), causing cross-context connect errors.
 
