@@ -25,11 +25,14 @@ export class DawClipElement extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    // Defer so the parent <daw-track> connectedCallback runs first and the
-    // editor's listeners are registered. The editor's _onClipConnected
-    // handler ignores this event during the parent track's initial load
-    // (daw-track-connected reads all <daw-clip> children synchronously);
-    // late-append clips trigger an incremental load.
+    // Defer dispatch so:
+    //  1. The editor's connectedCallback (which registers the daw-clip-connected
+    //     listener) has time to run when parsed all-at-once.
+    //  2. The parent's deferred daw-track-connected event fires first; the editor
+    //     reads <daw-clip> children synchronously via _readTrackDescriptor, so
+    //     this event is the canonical late-append signal.
+    // _onClipConnected skips this event during the parent track's initial load
+    // (parent not yet in _engineTracks) and runs an incremental load otherwise.
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent('daw-clip-connected', {

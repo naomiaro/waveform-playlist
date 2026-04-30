@@ -155,9 +155,12 @@ describe('editor.removeTrack()', () => {
     editor.remove();
   });
 
-  it('is a no-op for unknown trackId', () => {
+  it('warns and is a no-op for unknown trackId', () => {
     const editor = setupEditor();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => editor.removeTrack('not-a-track')).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no track found'));
+    warnSpy.mockRestore();
     editor.remove();
   });
 });
@@ -386,6 +389,184 @@ describe('Phase 1 regression fixes', () => {
     const stored = editor._peaksData.get(clipId);
     expect(stored.bits).toBe(16);
     expect(stored.data).toBeDefined();
+    editor.remove();
+  });
+});
+
+describe('Phase 2: end-to-end engine state assertions', () => {
+  it('addClip resolves with clipId and engine track gains the clip', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const trackId = trackEl.trackId;
+
+    const clipsBefore = editor._engineTracks.get(trackId)?.clips.length ?? 0;
+    const clipId = await editor.addClip(trackId, { src: '/a.opus', start: 4 });
+
+    expect(typeof clipId).toBe('string');
+    expect(editor._engineTracks.get(trackId).clips.length).toBe(clipsBefore + 1);
+    const newClip = editor._engineTracks.get(trackId).clips.find((c: any) => c.id === clipId);
+    expect(newClip).toBeDefined();
+    // `start: 4` × 48000 = 192000 samples
+    expect(newClip.startSample).toBe(192000);
+    expect(editor._clipBuffers.has(clipId)).toBe(true);
+    expect(editor._peaksData.has(clipId)).toBe(true);
+    editor.remove();
+  });
+
+  it('addClip dispatches daw-clip-ready and the engine receives the updated track', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+
+    const readyEvents: CustomEvent[] = [];
+    editor.addEventListener('daw-clip-ready', (e: CustomEvent) => readyEvents.push(e));
+
+    const updateTrackBefore = editor._engine.updateTrack.mock.calls.length;
+    await editor.addClip(trackEl.trackId, { src: '/a.opus' });
+
+    expect(readyEvents).toHaveLength(1);
+    expect(readyEvents[0].detail.trackId).toBe(trackEl.trackId);
+    expect(editor._engine.updateTrack.mock.calls.length).toBeGreaterThan(updateTrackBefore);
+    editor.remove();
+  });
+
+  it('late-append <daw-clip> via direct appendChild triggers _loadAndAppendClip', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const trackId = trackEl.trackId;
+    const clipsBefore = editor._engineTracks.get(trackId).clips.length;
+
+    // Directly construct + append, no editor.addClip API
+    const clipEl = document.createElement('daw-clip') as any;
+    clipEl.setAttribute('src', '/late.opus');
+    clipEl.setAttribute('start', '5');
+    trackEl.appendChild(clipEl);
+
+    // Wait for daw-clip-connected (deferred via setTimeout(0)) → _loadAndAppendClip
+    await new Promise((r) => setTimeout(r, 60));
+    expect(editor._engineTracks.get(trackId).clips.length).toBe(clipsBefore + 1);
+    const added = editor._engineTracks.get(trackId).clips.find((c: any) => c.id === clipEl.clipId);
+    expect(added).toBeDefined();
+    editor.remove();
+  });
+
+  it('removeClip cleans up engine state, _clipBuffers, _clipOffsets, _peaksData', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const clipEl = trackEl.querySelector('daw-clip') as any;
+    const clipId = clipEl.clipId;
+    const trackId = trackEl.trackId;
+
+    // Sanity — clip exists in engine and caches
+    expect(editor._engineTracks.get(trackId).clips.length).toBe(1);
+    expect(editor._clipBuffers.has(clipId)).toBe(true);
+    expect(editor._peaksData.has(clipId)).toBe(true);
+
+    editor.removeClip(trackId, clipId);
+    // MutationObserver fires asynchronously
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(editor._engineTracks.get(trackId).clips.length).toBe(0);
+    expect(editor._clipBuffers.has(clipId)).toBe(false);
+    expect(editor._clipOffsets.has(clipId)).toBe(false);
+    expect(editor._peaksData.has(clipId)).toBe(false);
+    expect(editor._engine.updateTrack).toHaveBeenCalledWith(trackId, expect.any(Object));
+    editor.remove();
+  });
+
+  it('removing a track with clips cascades cleanup to engine state', async () => {
+    const editor = setupEditor();
+    // Stub _stopPlayhead — happy-dom playhead controller isn't fully realized
+    // and throws when the engine empties at the end of MutationObserver work.
+    editor._stopPlayhead = vi.fn();
+    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
+    await new Promise((r) => setTimeout(r, 80));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const clipIds = [...trackEl.querySelectorAll('daw-clip')].map((c: any) => c.clipId);
+    expect(clipIds.length).toBe(2);
+
+    editor.removeTrack(trackEl.trackId);
+    await new Promise((r) => setTimeout(r, 0));
+
+    for (const id of clipIds) {
+      expect(editor._clipBuffers.has(id)).toBe(false);
+      expect(editor._peaksData.has(id)).toBe(false);
+    }
+    expect(editor._engineTracks.has(trackEl.trackId)).toBe(false);
+    editor.remove();
+  });
+
+  it('updateClip DOM-path triggers _applyClipUpdate which mutates engine startSample', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0 }] });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const clipEl = trackEl.querySelector('daw-clip') as any;
+
+    editor.updateClip(trackEl.trackId, clipEl.clipId, { start: 3 });
+    await clipEl.updateComplete; // Lit fires daw-clip-update post-render
+
+    const engineClip = editor._engineTracks
+      .get(trackEl.trackId)
+      .clips.find((c: any) => c.id === clipEl.clipId);
+    // start: 3 × 48000 = 144000
+    expect(engineClip.startSample).toBe(144000);
+    editor.remove();
+  });
+
+  it('updateClip with changed bounds invokes reextractPeaks', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0, duration: 4 }] });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const clipEl = trackEl.querySelector('daw-clip') as any;
+
+    const reextractCalls = editor._peakPipeline.reextractPeaks.mock.calls.length;
+    editor.updateClip(trackEl.trackId, clipEl.clipId, { duration: 2 });
+    await clipEl.updateComplete;
+
+    expect(editor._peakPipeline.reextractPeaks.mock.calls.length).toBeGreaterThan(reextractCalls);
+    editor.remove();
+  });
+});
+
+describe('Phase 2: silent no-op warns', () => {
+  it('removeTrack warns when trackId is unknown', () => {
+    const editor = setupEditor();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor.removeTrack('not-a-track');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no track found'));
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+
+  it('removeClip warns when track is unknown', () => {
+    const editor = setupEditor();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor.removeClip('not-a-track', 'not-a-clip');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no track found'));
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+
+  it('updateClip warns when DOM-track present but clip not found in engine state', () => {
+    // Skip the DOM short-circuit by setting up a track without the clip,
+    // then calling updateClip with a non-existent clipId.
+    const editor = setupEditor();
+    const trackId = 'engine-only';
+    editor._engineTracks = new Map([[trackId, { id: trackId, clips: [], name: 'T' }]]);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor.updateClip(trackId, 'missing-clip', { start: 1 });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not found'));
+    warnSpy.mockRestore();
     editor.remove();
   });
 });

@@ -362,7 +362,7 @@ export class DawEditorElement extends LitElement {
     if (this.indefinitePlayback) {
       // Fill the visible viewport when natural duration is shorter — lets the
       // ruler render before any audio is loaded. ViewportController exposes
-      // the scroll-area's clientWidth (updated on attach, scroll, and resize).
+      // the scroll-area's clientWidth (updated on attach + ResizeObserver).
       return Math.max(naturalWidth, this._viewport.containerWidth);
     }
     return naturalWidth;
@@ -619,7 +619,22 @@ export class DawEditorElement extends LitElement {
     // Skip during initial track load — daw-track-connected reads all <daw-clip>
     // children synchronously via _readTrackDescriptor. Late-append clips trigger
     // an incremental load below.
-    if (!this._engineTracks.has(trackId)) return;
+    if (!this._engineTracks.has(trackId)) {
+      // _tracks is populated in _onTrackConnected before _loadTrack runs, so
+      // having a descriptor without an engine track means the parent is still
+      // loading. _readTrackDescriptor already saw the clips that were children
+      // at that time — a clip appended after that point will be missed.
+      if (this._tracks.has(trackId)) {
+        console.warn(
+          '[dawcore] daw-clip-connected fired while parent track "' +
+            trackId +
+            '" is still loading — late-appended clip may be missed. ' +
+            'Wait for daw-track-ready before appending more <daw-clip> children, ' +
+            'or use editor.addClip(trackId, config) after the track finishes loading.'
+        );
+      }
+      return;
+    }
     const clipDesc: ClipDescriptor = {
       clipId: clipEl.clipId,
       src: clipEl.src,
@@ -649,6 +664,21 @@ export class DawEditorElement extends LitElement {
         this._removeClipFromTrack(trackId, clipId);
         return;
       }
+    }
+    // No matching engine clip. May be benign (clip was removed before its load
+    // completed), but it can also indicate a DOM/engine id mismatch — purge any
+    // orphan cache entries and warn so the leak is visible.
+    if (
+      this._clipBuffers.has(clipId) ||
+      this._clipOffsets.has(clipId) ||
+      this._peaksData.has(clipId)
+    ) {
+      console.warn(
+        '[dawcore] _onClipRemovedFromDom: orphaned cache entries for clip "' +
+          clipId +
+          '" — purging (DOM/engine id mismatch?)'
+      );
+      this._purgeClipCaches(clipId);
     }
   }
   private async _loadAndAppendClip(trackId: string, clipDesc: ClipDescriptor) {
@@ -704,6 +734,10 @@ export class DawEditorElement extends LitElement {
           sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
         });
         this._peakPipeline.cacheWaveformData(audioBuffer, waveformData);
+        // Mirror _loadTrack: pre-computed peaks set a zoom-floor — without
+        // this, samplesPerPixel can be set finer than what WaveformData can
+        // resample to, producing blank waveforms for the new clip.
+        this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
       } else {
         clip = createClipFromSeconds({
           audioBuffer,
@@ -789,9 +823,21 @@ export class DawEditorElement extends LitElement {
   }
   private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
     const t = this._engineTracks.get(trackId);
-    if (!t) return;
+    if (!t) {
+      console.warn('[dawcore] _applyClipUpdate: no engine track for id "' + trackId + '"');
+      return;
+    }
     const idx = t.clips.findIndex((c) => c.id === clipId);
-    if (idx === -1) return;
+    if (idx === -1) {
+      console.warn(
+        '[dawcore] _applyClipUpdate: clip "' +
+          clipId +
+          '" not found in track "' +
+          trackId +
+          '" (DOM/engine clip-id misalignment?)'
+      );
+      return;
+    }
     const oldClip = t.clips[idx];
     const sr = oldClip.sampleRate ?? this.effectiveSampleRate;
     const newStartSample = Math.round(clipEl.start * sr);
@@ -830,9 +876,17 @@ export class DawEditorElement extends LitElement {
   }
   private _removeClipFromTrack(trackId: string, clipId: string) {
     const t = this._engineTracks.get(trackId);
-    if (!t) return;
+    if (!t) {
+      console.warn('[dawcore] _removeClipFromTrack: no engine track for id "' + trackId + '"');
+      return;
+    }
     const updatedClips = t.clips.filter((c) => c.id !== clipId);
-    if (updatedClips.length === t.clips.length) return;
+    if (updatedClips.length === t.clips.length) {
+      console.warn(
+        '[dawcore] _removeClipFromTrack: clip "' + clipId + '" not found in track "' + trackId + '"'
+      );
+      return;
+    }
     const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
     this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
 
@@ -1300,6 +1354,8 @@ export class DawEditorElement extends LitElement {
     } else if (this._engineTracks.has(trackId)) {
       // File-dropped tracks have no DOM element; clean up engine state directly.
       this._onTrackRemoved(trackId);
+    } else {
+      console.warn('[dawcore] removeTrack: no track found for id "' + trackId + '"');
     }
   }
   /**
@@ -1411,7 +1467,11 @@ export class DawEditorElement extends LitElement {
     }
     if (this._engineTracks.has(trackId)) {
       this._removeClipFromTrack(trackId, clipId);
+      return;
     }
+    console.warn(
+      '[dawcore] removeClip: no track found for id "' + trackId + '" (clipId "' + clipId + '")'
+    );
   }
   /**
    * Update a clip's position (start/duration/offset) or properties (gain/name).
@@ -1446,9 +1506,17 @@ export class DawEditorElement extends LitElement {
     }
     // No DOM element — apply changes directly.
     const t = this._engineTracks.get(trackId);
-    if (!t) return;
+    if (!t) {
+      console.warn('[dawcore] updateClip: no track found for id "' + trackId + '"');
+      return;
+    }
     const idx = t.clips.findIndex((c) => c.id === clipId);
-    if (idx === -1) return;
+    if (idx === -1) {
+      console.warn(
+        '[dawcore] updateClip: clip "' + clipId + '" not found in track "' + trackId + '"'
+      );
+      return;
+    }
     const oldClip = t.clips[idx];
     const sr = oldClip.sampleRate ?? this.effectiveSampleRate;
     const updatedClip = {
