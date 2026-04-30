@@ -1,7 +1,7 @@
 import React, { useContext, useRef, useState, useMemo, type ReactNode, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { getGlobalAudioContext, getGlobalContext } from '@waveform-playlist/playout';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import {
   Playlist,
   Track as TrackComponent,
@@ -35,7 +35,7 @@ import {
   usePlaylistData,
   type ClipPeaks,
 } from '../WaveformPlaylistContext';
-import type { Peaks } from '@waveform-playlist/core';
+import { audibleLatencySamples, type Peaks } from '@waveform-playlist/core';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
@@ -135,7 +135,7 @@ const CustomPlayhead: React.FC<{
     samplesPerPixel,
     sampleRate,
     controlsOffset: 0,
-    getAudioContextTime: () => getGlobalContext().rawContext.currentTime,
+    getAudioContextTime: () => getGlobalAudioContext().currentTime,
     getPlaybackTime,
   }) as React.ReactElement;
 };
@@ -186,7 +186,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying, getLookAhead } = usePlaybackAnimation();
   const {
     selectionStart,
     selectionEnd,
@@ -756,12 +756,18 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                       // this, the playhead — which now uses audible time — would
                       // appear behind the right edge of the recorded waveform.
                       // Mirrors useIntegratedRecording's finalization compensation
-                      // and dawcore's preview-skip-latency-peaks pattern.
+                      // (shared `audibleLatencySamples`) and dawcore's preview-skip
+                      // pattern. `getLookAhead()` reads from the same engine the
+                      // playhead's animation loop uses — keeps the two in lockstep.
                       const audioCtx = getGlobalAudioContext();
-                      const outputLatency = audioCtx.outputLatency ?? 0;
-                      const lookAhead = getGlobalContext().lookAhead ?? 0;
-                      const totalLatency = outputLatency + lookAhead;
-                      const latencyOffsetSamples = Math.floor(totalLatency * sampleRate);
+                      const outputLatency =
+                        'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
+                      const lookAhead = getLookAhead();
+                      const latencyOffsetSamples = audibleLatencySamples(
+                        outputLatency,
+                        lookAhead,
+                        sampleRate
+                      );
                       const latencyPixels = Math.floor(latencyOffsetSamples / samplesPerPixel);
                       const skipPeakElements = latencyPixels * 2; // each pixel is a min/max pair
                       const previewDuration = Math.max(

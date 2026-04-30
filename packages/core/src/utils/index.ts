@@ -5,3 +5,4 @@ export * from './musicalTicks';
 export * from './meterDetection';
 export * from './peaksGenerator';
 export * from './audioBufferUtils';
+export * from './latency';

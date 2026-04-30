@@ -8,7 +8,7 @@ import { useRecording } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
 import type { MicrophoneDevice } from '../types';
-import { type ClipTrack, type AudioClip } from '@waveform-playlist/core';
+import { type ClipTrack, type AudioClip, audibleLatencySamples } from '@waveform-playlist/core';
 import {
   resumeGlobalAudioContext,
   getGlobalAudioContext,
@@ -202,12 +202,17 @@ export function useIntegratedRecording(
       // 2. Output latency — hardware DAC delay before audio reaches speakers
       // The user hears playback delayed by both, so they perform late relative
       // to the timeline. Skip that duration at the start of the recorded audio.
+      // Shared formula with the live preview in PlaylistVisualization — keep both
+      // paths using `audibleLatencySamples` so trim widths match.
       const audioContext = getGlobalAudioContext();
       const outputLatency = audioContext.outputLatency ?? 0;
       const toneContext = getGlobalContext();
       const lookAhead = toneContext.lookAhead ?? 0;
-      const totalLatency = outputLatency + lookAhead;
-      const latencyOffsetSamples = Math.floor(totalLatency * buffer.sampleRate);
+      const latencyOffsetSamples = audibleLatencySamples(
+        outputLatency,
+        lookAhead,
+        buffer.sampleRate
+      );
 
       // Guard: very short recordings (< latency compensation) would produce negative duration
       const effectiveDuration = Math.max(0, buffer.length - latencyOffsetSamples);

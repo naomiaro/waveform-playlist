@@ -1832,7 +1832,8 @@ export class DawEditorElement extends LitElement {
     //   playhead leads audio by ~100ms with the Tone adapter; native is a no-op.
     const audibleTime = (): number => {
       const outputLatency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-      return Math.max(0, engine.getCurrentTime() - outputLatency - engine.lookAhead);
+      const t = engine.getCurrentTime() - outputLatency - engine.lookAhead;
+      return Number.isFinite(t) ? Math.max(0, t) : 0;
     };
     if (this.scaleMode === 'beats') {
       const secondsToTicksFn = (s: number) => this._secondsToTicks(s);
@@ -1850,7 +1851,8 @@ export class DawEditorElement extends LitElement {
     const ctx = this.audioContext;
     const outputLatency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
     const lookAhead = this._engine?.lookAhead ?? 0;
-    const visualTime = Math.max(0, this._currentTime - outputLatency - lookAhead);
+    const t = this._currentTime - outputLatency - lookAhead;
+    const visualTime = Number.isFinite(t) ? Math.max(0, t) : 0;
     if (this.scaleMode === 'beats') {
       playhead.stopBeatsAnimationWithMap(
         visualTime,
