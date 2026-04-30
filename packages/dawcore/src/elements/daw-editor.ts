@@ -1824,17 +1824,15 @@ export class DawEditorElement extends LitElement {
     if (!playhead || !this._engine) return;
     const engine = this._engine;
     const ctx = this.audioContext;
-    const adapter = this._externalAdapter;
     // Audible position = engine time - hardware DAC latency - scheduler lookahead.
     // - outputLatency: present on native AudioContext (~3ms Chrome, ~15ms Safari).
-    // - adapter.lookAhead: present on Tone-backed adapters (default 0.1s). Transport.seconds
-    //   is the scheduling position, which is lookAhead ahead of what the listener hears.
-    //   Without this subtraction, the playhead leads audio by ~100ms with the Tone adapter;
-    //   the native adapter reports lookAhead as 0 (no-op).
+    // - engine.lookAhead: proxies adapter.lookAhead (0.1s on Tone-backed adapters,
+    //   0 on native). Transport.seconds is the scheduling position, which runs
+    //   lookAhead ahead of what the listener hears. Without this subtraction the
+    //   playhead leads audio by ~100ms with the Tone adapter; native is a no-op.
     const audibleTime = (): number => {
       const outputLatency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-      const lookAhead = adapter?.lookAhead ?? 0;
-      return Math.max(0, engine.getCurrentTime() - outputLatency - lookAhead);
+      return Math.max(0, engine.getCurrentTime() - outputLatency - engine.lookAhead);
     };
     if (this.scaleMode === 'beats') {
       const secondsToTicksFn = (s: number) => this._secondsToTicks(s);
