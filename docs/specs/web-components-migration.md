@@ -726,8 +726,10 @@ daw-editor {
   --daw-ruler-background: #0f0f1a;
   --daw-controls-background: #1a1a2e;
   --daw-controls-text: #e0d4c8;
+  --daw-controls-width: 180px;       /* Track-controls column width */
   --daw-clip-header-background: rgba(0,0,0,0.4);
   --daw-clip-header-text: #e0d4c8;
+  --daw-min-height: 200px;            /* Min scroll-area height for empty editor / drop zone */
 }
 ```
 
