@@ -1,4 +1,5 @@
 import type { DawTrackElement } from './elements/daw-track';
+import type { DawClipElement } from './elements/daw-clip';
 
 // ---------------------------------------------------------------------------
 // Event detail types
@@ -69,6 +70,26 @@ export interface DawRecordingErrorDetail {
   error: unknown;
 }
 
+export interface DawClipConnectedDetail {
+  clipId: string;
+  element: DawClipElement;
+}
+
+export interface DawClipIdDetail {
+  trackId: string;
+  clipId: string;
+}
+
+export interface DawClipUpdateDetail {
+  clipId: string;
+}
+
+export interface DawClipErrorDetail {
+  trackId: string;
+  clipId: string;
+  error: unknown;
+}
+
 export interface DawClipMoveDetail {
   readonly trackId: string;
   readonly clipId: string;
@@ -115,6 +136,10 @@ export interface DawEventMap {
   'daw-recording-start': CustomEvent<DawRecordingStartDetail>;
   'daw-recording-complete': CustomEvent<DawRecordingCompleteDetail>;
   'daw-recording-error': CustomEvent<DawRecordingErrorDetail>;
+  'daw-clip-connected': CustomEvent<DawClipConnectedDetail>;
+  'daw-clip-update': CustomEvent<DawClipUpdateDetail>;
+  'daw-clip-ready': CustomEvent<DawClipIdDetail>;
+  'daw-clip-error': CustomEvent<DawClipErrorDetail>;
   'daw-clip-move': CustomEvent<DawClipMoveDetail>;
   'daw-clip-trim': CustomEvent<DawClipTrimDetail>;
   'daw-clip-split': CustomEvent<DawClipSplitDetail>;

@@ -384,8 +384,14 @@ editor.setTrackSolo(trackId: string, soloed: boolean): void
 editor.zoomIn(): void
 editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
-editor.addTrack(config: TrackConfig): DawTrackElement   // Add track, returns element
-editor.removeTrack(trackId: string): void              // Remove track by ID
+// Programmatic track/clip mutation (see "Programmatic Track Mutation" section)
+editor.ready(): Promise<void>                                            // Ensure engine is built
+editor.addTrack(config: TrackConfig): Promise<DawTrackElement>           // Append a <daw-track>
+editor.removeTrack(trackId: string): void                                // Remove track by ID
+editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
+editor.addClip(trackId: string, config: ClipConfig): Promise<string>     // Returns clipId
+editor.removeClip(trackId: string, clipId: string): void
+editor.updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void
 editor.setTimeFormat(format: string): void             // 'hh:mm:ss.sss' | 'hh:mm:ss' | 'seconds'
 editor.setAutomaticScroll(enabled: boolean): void      // Toggle auto-scroll
 editor.setBpm(bpm: number): void                       // Set tempo
@@ -438,6 +444,11 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 'daw-undo-state'        // canUndo/canRedo changed: detail: {canUndo, canRedo}
 // File loading
 'daw-files-load-error'  // Decode/parse failed: detail: {file: File, error: string}
+// Programmatic mutation
+'daw-track-ready'       // Track finished loading: detail: {trackId}
+'daw-track-error'       // Track failed to load: detail: {trackId, error}
+'daw-clip-ready'        // Clip finished loading: detail: {trackId, clipId}
+'daw-clip-error'        // Clip failed to load: detail: {trackId, clipId, error}
 ```
 
 ### `<daw-track>` API
@@ -1333,6 +1344,131 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 - Respects `link-endpoints` — boundary moves cascade to adjacent annotations
 - Boundary constraints: minimum 0.1s duration, end cannot exceed timeline duration
 - Navigation shortcuts always active; boundary editing requires `editable` attribute
+
+---
+
+## Programmatic Track Mutation
+
+Two consumer-facing ways to mutate tracks at runtime exist by design: **declarative DOM mutation** (append/remove/update `<daw-track>` and `<daw-clip>` elements) and **imperative editor methods** (`editor.addTrack`, `editor.removeTrack`, `editor.loadFiles`). The engine API (`editor.engine.setTracks`, `editor.engine.addTrack`, …) is **internal plumbing**, not a consumer surface — calling it directly bypasses the descriptor map that backs `<daw-track-controls>` and the peak/buffer caches that back the waveform.
+
+### Engine Lifecycle
+
+`<daw-editor>` builds its `PlaylistEngine` lazily on the first track load. With no children declared and no programmatic load issued, `editor.engine` is `null`. Consumers that need engine access before the first track must:
+
+- Call `editor.loadFiles([...])` (recommended — populates descriptors, peaks, and engine in one shot), **or**
+- Append a `<daw-track>` element (any path that triggers `_loadTrack` ensures the engine), **or**
+- Use `await editor.ready()` (returns a promise that resolves once the engine is built — used to await engine availability without forcing a track load). When called before any track exists, `ready()` builds an empty engine eagerly.
+
+```javascript
+// Engine is null until something loads
+console.log(editor.engine); // null
+
+await editor.ready();        // builds engine if needed
+console.log(editor.engine); // PlaylistEngine
+```
+
+### Declarative DOM Mutation
+
+Appending a `<daw-track>` element to a connected `<daw-editor>` is fully supported. The track element fires a `daw-track-connected` event on `connectedCallback` (deferred via `setTimeout(0)`); the editor reads the descriptor and runs the standard load pipeline.
+
+```javascript
+const t = document.createElement('daw-track');
+t.setAttribute('src', '/audio/kick.opus');
+t.setAttribute('name', 'Kick');
+editor.appendChild(t);   // → daw-track-ready event fires when loaded
+```
+
+Removal works via `element.remove()` — the editor's MutationObserver detects detached `<daw-track>` nodes and cleans up engine state, peaks, and clip buffers. The engine call is incremental (`adapter.removeTrack`) when the adapter supports it; otherwise it falls back to `setTracks()` and stops playback.
+
+**Updating reflected attributes** (`name`, `volume`, `pan`, `muted`, `soloed`, `src`) on a `<daw-track>` after connection fires `daw-track-update`. The editor diffs the new descriptor against the cached one and forwards changes to the engine. Changing `src` re-runs the full load pipeline.
+
+#### Late `<daw-clip>` mutation
+
+`<daw-clip>` dispatches `daw-clip-connected` (deferred via `setTimeout(0)` after construction) and `daw-clip-update` (when reflected attributes change after the initial render). The editor's MutationObserver detects clip removals on the `<daw-track>` subtree.
+
+- Appending a `<daw-clip>` to an already-connected `<daw-track>` triggers an incremental load and appends the clip to the existing track.
+- Mutating a `<daw-clip>` attribute (`start`, `offset`, `duration`, `gain`, `name`, `fade-in`, `fade-out`, `fade-type`) after track-connect propagates to the engine via `daw-clip-update`. Re-extracts peaks when `offset`/`duration` change.
+- Removing a `<daw-clip>` from the DOM removes it from the engine and cleans up per-clip caches.
+
+Changing `src` on an already-loaded `<daw-clip>` is **not** supported via `daw-clip-update` — remove and re-add the clip instead.
+
+The editor's `daw-track-connected` handler reads all `<daw-clip>` children synchronously via `_readTrackDescriptor` during initial track load; `daw-clip-connected` events fired during that initial pass are skipped (the track loader handles them). Late-append clips (after `_engineTracks` already has the parent track) trigger the incremental path.
+
+### Imperative Editor API
+
+For consumers who can't or won't go through declarative DOM (Vue/Svelte/Angular templates, MIDI sources without a `src` URL, dynamic clip generation):
+
+```typescript
+editor.addTrack(config: TrackConfig): Promise<DawTrackElement>
+editor.removeTrack(trackId: string): void
+editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
+editor.addClip(trackId: string, config: ClipConfig): Promise<string>      // returns clipId
+editor.removeClip(trackId: string, clipId: string): void
+editor.updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void
+
+interface TrackConfig {
+  name?: string;
+  volume?: number;     // 0..1, default 1
+  pan?: number;        // -1..1, default 0
+  muted?: boolean;
+  soloed?: boolean;
+  clips?: ClipConfig[];  // omit for empty track
+}
+
+interface ClipConfig {
+  src?: string;            // URL — fetched + decoded
+  audioBuffer?: AudioBuffer; // decoded buffer (skips fetch)
+  waveformData?: WaveformDataObject;  // pre-computed peaks (peaks-first render)
+  peaksSrc?: string;       // URL for .dat/.json peaks
+  midiNotes?: MidiNoteData[]; // for MIDI/piano-roll tracks
+  start?: number;          // seconds, default 0
+  duration?: number;       // seconds, defaults to source length
+  offset?: number;         // seconds, default 0
+  gain?: number;           // 0..1+, default 1
+  name?: string;
+  fadeIn?: number;
+  fadeOut?: number;
+  fadeType?: FadeType;
+}
+```
+
+Behavior contract — all methods MUST go through the same path as `_loadTrack` so that:
+
+1. `<daw-track-controls>` shows the correct name/volume/pan/mute/solo (the descriptor map `_tracks` is populated).
+2. The waveform renders (peaks generated and cached in `_peaksData`).
+3. Drag/trim/split work (audio buffer cached in `_clipBuffers`).
+4. The engine lifecycle is honoured (engine built lazily on first call; `daw-track-ready` event fires).
+
+`addTrack` returns a real `<daw-track>` element appended to the editor's light DOM so subsequent declarative mutations work uniformly. The element's `src`/`name`/etc. attributes are reflected from the config.
+
+```javascript
+// Plain audio
+const t = await editor.addTrack({
+  name: 'Drums',
+  clips: [{ src: '/audio/drums.opus', start: 0 }],
+});
+// t is a <daw-track> element — t.trackId is its id
+
+// MIDI (no src, parsed notes provided directly)
+await editor.addTrack({
+  name: 'Synth',
+  clips: [{ midiNotes: parsedNotes, start: 0, duration: 16 }],
+});
+```
+
+### Why `editor.engine.setTracks(...)` is not a consumer API
+
+The engine owns the playback graph; the editor owns the descriptor map, the DOM elements, the peak cache, and the clip-buffer cache. Calling `engine.setTracks` directly partially works — the `statechange` listener mirrors engine tracks into `_engineTracks` and `syncPeaksForChangedClips` regenerates peaks from any `clip.audioBuffer` attached to the engine clip — so a waveform will render. What stays broken:
+
+- `_tracks` **descriptor map** is not populated. `<daw-track-controls>` falls back to `name='Untitled'`, `volume=1`, `pan=0`, `muted=false`, `soloed=false` — regardless of what the engine track was constructed with. The track's real name and volume are invisible in the controls column.
+- `_onTrackControl` (volume slider, mute, solo buttons) early-returns when no descriptor exists, so user interactions on the controls column become silent no-ops.
+- `_trackElements` is not populated. `editor.removeTrack(trackId)` falls back to `_onTrackRemoved` directly, but consumers that walk the DOM (`editor.querySelectorAll('daw-track')`) see nothing.
+
+Treat `editor.engine` as **read-only** from consumer code (analyzers, master taps, effect insertions on `engine.masterOutputNode` are fine); mutate tracks via the editor API.
+
+### Backwards-compat surface
+
+`editor.engine` remains exposed for power users who need to wire effects, taps, or analyzers (e.g., `editor.engine.masterOutputNode`). Mutation methods on the engine are out of scope for the documented Web Component API.
 
 ---
 

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — programmatic tracks &amp; clips</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+    }
+    p.intro {
+      color: #aaa;
+      font-size: 0.85rem;
+      max-width: 760px;
+      line-height: 1.5;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      --daw-min-height: 200px;
+      margin-bottom: 12px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+      align-items: center;
+    }
+    .toolbar fieldset {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 6px 8px;
+      margin: 0;
+    }
+    .toolbar legend {
+      color: #888;
+      font-size: 0.7rem;
+      padding: 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    button {
+      cursor: pointer;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid currentColor;
+      padding: 4px 10px;
+      font: inherit;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+    button.good {
+      color: #63C75F;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+    }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px;
+      background: #0a0a14;
+    }
+    #log .err { color: #d08070; }
+    #log .ok { color: #63C75F; }
+    #log .warn { color: #c49a6c; }
+  </style>
+</head>
+<body>
+  <h1>dawcore — programmatic tracks &amp; clips (issue #381)</h1>
+  <p class="intro">
+    Imperative API on <code>&lt;daw-editor&gt;</code> for tracks and clips.
+    <code>editor.ready()</code> bootstraps the engine before any track exists.
+    <code>addTrack</code> / <code>updateTrack</code> / <code>removeTrack</code>
+    operate on whole tracks; <code>addClip</code> / <code>updateClip</code> /
+    <code>removeClip</code> operate on individual clips. The same flow works
+    declaratively — appending or mutating <code>&lt;daw-track&gt;</code> /
+    <code>&lt;daw-clip&gt;</code> in the DOM goes through the exact same pipeline.
+  </p>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <!-- Intentionally empty: no <daw-track> children. -->
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop interactive-clips>
+    <daw-keyboard-shortcuts playback splitting undo></daw-keyboard-shortcuts>
+  </daw-editor>
+
+  <div class="toolbar">
+    <daw-transport for="editor">
+      <daw-play-button></daw-play-button>
+      <daw-pause-button></daw-pause-button>
+      <daw-stop-button></daw-stop-button>
+    </daw-transport>
+  </div>
+
+  <div class="toolbar">
+    <fieldset>
+      <legend>Tracks (imperative)</legend>
+      <button class="good" id="add-track-src">addTrack({ src })</button>
+      <button class="good" id="add-track-multiclip">addTrack({ clips: [..] })</button>
+      <button class="good" id="add-track-empty">addTrack({}) — empty</button>
+      <button id="update-track-vol">updateTrack(volume=0.4)</button>
+      <button id="remove-track-last">removeTrack(last)</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Clips (imperative)</legend>
+      <button class="good" id="add-clip">addClip(last track)</button>
+      <button id="update-clip-shift">updateClip(shift +1s)</button>
+      <button id="remove-clip-first">removeClip(first)</button>
+    </fieldset>
+  </div>
+
+  <div class="toolbar">
+    <fieldset>
+      <legend>Tracks (declarative DOM)</legend>
+      <button id="dom-append-track">append &lt;daw-track src&gt;</button>
+      <button id="dom-mutate-track-vol">mutate volume attr</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Clips (declarative DOM)</legend>
+      <button id="dom-append-clip">append &lt;daw-clip&gt;</button>
+      <button id="dom-mutate-clip-start">mutate start attr</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>State</legend>
+      <button id="dump">dump editor.tracks</button>
+      <button id="clear">clear all</button>
+    </fieldset>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+    const editor = document.getElementById('editor');
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
+
+    const log = document.getElementById('log');
+    function addLog(msg, cls = '') {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+      log.prepend(line);
+      while (log.children.length > 50) log.lastChild.remove();
+    }
+
+    // --- Editor events -----------------------------------------------------
+    editor.addEventListener('daw-track-ready', (e) =>
+      addLog('track-ready: ' + e.detail.trackId.slice(0, 8), 'ok')
+    );
+    editor.addEventListener('daw-track-error', (e) =>
+      addLog('track-error: ' + String(e.detail.error), 'err')
+    );
+    editor.addEventListener('daw-clip-ready', (e) =>
+      addLog('clip-ready: trackId=' + e.detail.trackId.slice(0, 8) + ' clipId=' + e.detail.clipId.slice(0, 8), 'ok')
+    );
+    editor.addEventListener('daw-clip-error', (e) =>
+      addLog('clip-error: ' + String(e.detail.error), 'err')
+    );
+
+    // --- Bootstrap ---------------------------------------------------------
+    (async () => {
+      const engine = await editor.ready();
+      addLog('editor.ready() → engine = ' + (engine ? 'built' : 'null'), 'ok');
+    })();
+
+    // Helper: id of the most recently added track
+    function lastTrackId() {
+      const ids = editor.engine?.getState().tracks.map((t) => t.id) ?? [];
+      return ids[ids.length - 1] ?? null;
+    }
+
+    // --- Tracks (imperative) ----------------------------------------------
+    document.getElementById('add-track-src').addEventListener('click', async () => {
+      try {
+        const t = await editor.addTrack({
+          name: 'Kick (addTrack)',
+          volume: 0.8,
+          clips: [{ src: '/media/audio/AlbertKader_Whiptails/03_Kick.opus' }],
+        });
+        addLog('addTrack({src}) → ' + t.trackId.slice(0, 8), 'ok');
+      } catch (err) {
+        addLog('addTrack rejected: ' + String(err), 'err');
+      }
+    });
+
+    document.getElementById('add-track-multiclip').addEventListener('click', async () => {
+      try {
+        const t = await editor.addTrack({
+          name: 'Snare 2-clip',
+          clips: [
+            { src: '/media/audio/AlbertKader_Whiptails/04_Snare.opus', start: 0, duration: 4, offset: 0 },
+            { src: '/media/audio/AlbertKader_Whiptails/04_Snare.opus', start: 6, duration: 4, offset: 4 },
+          ],
+        });
+        addLog('addTrack(multi-clip) → ' + t.trackId.slice(0, 8), 'ok');
+      } catch (err) {
+        addLog('addTrack rejected: ' + String(err), 'err');
+      }
+    });
+
+    document.getElementById('add-track-empty').addEventListener('click', async () => {
+      try {
+        const t = await editor.addTrack({ name: 'Empty track' });
+        addLog('addTrack({}) → ' + t.trackId.slice(0, 8), 'ok');
+      } catch (err) {
+        addLog('addTrack rejected: ' + String(err), 'err');
+      }
+    });
+
+    document.getElementById('update-track-vol').addEventListener('click', () => {
+      const id = lastTrackId();
+      if (!id) {
+        addLog('no track to update', 'err');
+        return;
+      }
+      editor.updateTrack(id, { volume: 0.4 });
+      addLog('updateTrack(' + id.slice(0, 8) + ', {volume: 0.4})', 'ok');
+    });
+
+    document.getElementById('remove-track-last').addEventListener('click', () => {
+      const id = lastTrackId();
+      if (!id) {
+        addLog('no track to remove', 'err');
+        return;
+      }
+      editor.removeTrack(id);
+      addLog('removeTrack(' + id.slice(0, 8) + ')', 'ok');
+    });
+
+    // --- Clips (imperative) -----------------------------------------------
+    document.getElementById('add-clip').addEventListener('click', async () => {
+      const id = lastTrackId();
+      if (!id) {
+        addLog('no track for addClip — add a track first', 'err');
+        return;
+      }
+      try {
+        const clipId = await editor.addClip(id, {
+          src: '/media/audio/AlbertKader_Whiptails/06_HiHat.opus',
+          start: 8,
+          duration: 4,
+          offset: 0,
+          name: 'HiHat (addClip)',
+        });
+        addLog('addClip → trackId=' + id.slice(0, 8) + ' clipId=' + clipId.slice(0, 8), 'ok');
+      } catch (err) {
+        addLog('addClip rejected: ' + String(err), 'err');
+      }
+    });
+
+    document.getElementById('update-clip-shift').addEventListener('click', () => {
+      const id = lastTrackId();
+      if (!id) return addLog('no track', 'err');
+      const t = editor.engine.getState().tracks.find((tr) => tr.id === id);
+      const clip = t?.clips[t.clips.length - 1];
+      if (!clip) return addLog('no clip', 'err');
+      const sr = clip.sampleRate ?? 48000;
+      const newStart = clip.startSample / sr + 1;
+      editor.updateClip(id, clip.id, { start: newStart });
+      addLog(
+        'updateClip(' + id.slice(0, 8) + ', ' + clip.id.slice(0, 8) + ', {start: ' + newStart.toFixed(2) + '})',
+        'ok'
+      );
+    });
+
+    document.getElementById('remove-clip-first').addEventListener('click', () => {
+      const id = lastTrackId();
+      if (!id) return addLog('no track', 'err');
+      const t = editor.engine.getState().tracks.find((tr) => tr.id === id);
+      const clip = t?.clips[0];
+      if (!clip) return addLog('no clip', 'err');
+      editor.removeClip(id, clip.id);
+      addLog('removeClip(' + id.slice(0, 8) + ', ' + clip.id.slice(0, 8) + ')', 'ok');
+    });
+
+    // --- Tracks (declarative DOM) -----------------------------------------
+    document.getElementById('dom-append-track').addEventListener('click', () => {
+      const t = document.createElement('daw-track');
+      t.setAttribute('src', '/media/audio/AlbertKader_Whiptails/05_Claps.opus');
+      t.setAttribute('name', 'Claps (DOM)');
+      editor.appendChild(t);
+      addLog('appended <daw-track src=...> id=' + t.trackId.slice(0, 8));
+    });
+
+    document.getElementById('dom-mutate-track-vol').addEventListener('click', () => {
+      const trackEl = editor.querySelector('daw-track');
+      if (!trackEl) return addLog('no <daw-track> in DOM', 'err');
+      trackEl.volume = 0.2;
+      addLog('mutated <daw-track>.volume = 0.2 (fires daw-track-update)');
+    });
+
+    // --- Clips (declarative DOM) ------------------------------------------
+    document.getElementById('dom-append-clip').addEventListener('click', () => {
+      const trackEl = editor.querySelector('daw-track');
+      if (!trackEl) return addLog('no <daw-track> in DOM — append a track first', 'err');
+      const c = document.createElement('daw-clip');
+      c.setAttribute('src', '/media/audio/AlbertKader_Whiptails/04_Snare.opus');
+      c.setAttribute('start', '12');
+      c.setAttribute('duration', '4');
+      c.setAttribute('offset', '0');
+      trackEl.appendChild(c);
+      addLog('appended <daw-clip> to first track — clipId=' + c.clipId.slice(0, 8));
+    });
+
+    document.getElementById('dom-mutate-clip-start').addEventListener('click', () => {
+      const clipEl = editor.querySelector('daw-clip');
+      if (!clipEl) return addLog('no <daw-clip> in DOM', 'err');
+      const newStart = (Number(clipEl.start || 0) + 1).toFixed(2);
+      clipEl.setAttribute('start', newStart);
+      addLog('mutated <daw-clip>.start = ' + newStart + ' (fires daw-clip-update)');
+    });
+
+    // --- State helpers -----------------------------------------------------
+    document.getElementById('dump').addEventListener('click', () => {
+      const desc = editor.tracks;
+      const eng = editor.engine?.getState().tracks ?? [];
+      addLog(
+        'descriptors=' + desc.length +
+        ' engineTracks=' + eng.length +
+        ' clips=' + eng.reduce((sum, t) => sum + t.clips.length, 0) +
+        (desc.length !== eng.length ? ' MISMATCH' : ''),
+        desc.length !== eng.length ? 'err' : ''
+      );
+    });
+
+    document.getElementById('clear').addEventListener('click', () => {
+      const ids = editor.engine?.getState().tracks.map((t) => t.id) ?? [];
+      ids.forEach((id) => editor.removeTrack(id));
+      addLog('cleared ' + ids.length + ' track(s)', 'ok');
+    });
+  </script>
+</body>
+</html>

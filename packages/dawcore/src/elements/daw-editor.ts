@@ -8,7 +8,7 @@ import type {
   SnapTo,
   MeterEntry,
 } from '@waveform-playlist/core';
-import type { TrackDescriptor, ClipDescriptor } from '../types';
+import type { TrackDescriptor, ClipDescriptor, TrackConfig, ClipConfig } from '../types';
 import {
   createClip,
   createClipFromSeconds,
@@ -34,6 +34,8 @@ import type {
   DawSelectionDetail,
   DawTrackIdDetail,
   DawTrackErrorDetail,
+  DawClipIdDetail,
+  DawClipErrorDetail,
   DawErrorDetail,
   LoadFilesResult,
 } from '../events';
@@ -387,18 +389,28 @@ export class DawEditorElement extends LitElement {
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
     this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
-    // Detect track removal via MutationObserver (detached elements can't bubble events).
+    this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener);
+    this.addEventListener('daw-clip-update', this._onClipUpdate as EventListener);
+    // Detect track + clip removal via MutationObserver (detached elements can't bubble events).
     this._childObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.removedNodes) {
           if (node instanceof HTMLElement) {
             if (node.tagName === 'DAW-TRACK') {
               this._onTrackRemoved((node as DawTrackElement).trackId);
+            } else if (node.tagName === 'DAW-CLIP') {
+              this._onClipRemovedFromDom(node as DawClipElement);
             }
-            const nested = node.querySelectorAll?.('daw-track');
-            if (nested) {
-              for (const track of nested) {
+            const nestedTracks = node.querySelectorAll?.('daw-track');
+            if (nestedTracks) {
+              for (const track of nestedTracks) {
                 this._onTrackRemoved((track as DawTrackElement).trackId);
+              }
+            }
+            const nestedClips = node.querySelectorAll?.('daw-clip');
+            if (nestedClips) {
+              for (const clip of nestedClips) {
+                this._onClipRemovedFromDom(clip as DawClipElement);
               }
             }
           }
@@ -413,6 +425,8 @@ export class DawEditorElement extends LitElement {
     this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
     this.removeEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
+    this.removeEventListener('daw-clip-connected', this._onClipConnected as EventListener);
+    this.removeEventListener('daw-clip-update', this._onClipUpdate as EventListener);
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -576,6 +590,227 @@ export class DawEditorElement extends LitElement {
       this._onTrackRemoved(trackId); // File-dropped tracks: no DOM element
     }
   };
+  // --- Clip lifecycle ---
+  private _onClipConnected = (e: CustomEvent) => {
+    const detail = e.detail as { clipId: string; element: DawClipElement };
+    const clipEl = detail.element;
+    if (!(clipEl instanceof HTMLElement)) return;
+    const trackEl = clipEl.closest('daw-track') as DawTrackElement | null;
+    if (!trackEl) return;
+    const trackId = trackEl.trackId;
+    // Skip during initial track load — daw-track-connected reads all <daw-clip>
+    // children synchronously via _readTrackDescriptor. Late-append clips trigger
+    // an incremental load below.
+    if (!this._engineTracks.has(trackId)) return;
+    const clipDesc: ClipDescriptor = {
+      clipId: clipEl.clipId,
+      src: clipEl.src,
+      peaksSrc: clipEl.peaksSrc,
+      start: clipEl.start,
+      duration: clipEl.duration,
+      offset: clipEl.offset,
+      gain: clipEl.gain,
+      name: clipEl.name,
+      fadeIn: clipEl.fadeIn,
+      fadeOut: clipEl.fadeOut,
+      fadeType: clipEl.fadeType as FadeType,
+    };
+    this._loadAndAppendClip(trackId, clipDesc);
+  };
+  private _onClipUpdate = (e: CustomEvent) => {
+    const clipEl = e.target as DawClipElement;
+    if (!(clipEl instanceof HTMLElement) || clipEl.tagName !== 'DAW-CLIP') return;
+    const trackEl = clipEl.closest('daw-track') as DawTrackElement | null;
+    if (!trackEl) return;
+    this._applyClipUpdate(trackEl.trackId, clipEl.clipId, clipEl);
+  };
+  private _onClipRemovedFromDom(clipEl: DawClipElement) {
+    const clipId = clipEl.clipId;
+    for (const [trackId, t] of this._engineTracks.entries()) {
+      if (t.clips.some((c) => c.id === clipId)) {
+        this._removeClipFromTrack(trackId, clipId);
+        return;
+      }
+    }
+  }
+  private async _loadAndAppendClip(trackId: string, clipDesc: ClipDescriptor) {
+    if (!clipDesc.src) return; // empty/no-src clips can't be loaded
+    const clipId = clipDesc.clipId;
+    try {
+      const waveformDataPromise = clipDesc.peaksSrc ? this._fetchPeaks(clipDesc.peaksSrc) : null;
+      const audioPromise = this._fetchAndDecode(clipDesc.src);
+
+      let waveformData: import('waveform-data').default | null = null;
+      if (waveformDataPromise) {
+        try {
+          const wd = await waveformDataPromise;
+          if (wd.sample_rate === this.audioContext.sampleRate) waveformData = wd;
+        } catch (err) {
+          console.warn('[dawcore] _loadAndAppendClip: peaks load failed: ' + String(err));
+        }
+      }
+      const audioBuffer = await audioPromise;
+      this._resolvedSampleRate = audioBuffer.sampleRate;
+
+      let clip;
+      if (waveformData) {
+        const wdRate = waveformData.sample_rate;
+        clip = createClip({
+          audioBuffer,
+          waveformData,
+          startSample: Math.round(clipDesc.start * wdRate),
+          durationSamples: Math.round((clipDesc.duration || waveformData.duration) * wdRate),
+          offsetSamples: Math.round(clipDesc.offset * wdRate),
+          gain: clipDesc.gain,
+          name: clipDesc.name,
+          sampleRate: wdRate,
+          sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
+        });
+        this._peakPipeline.cacheWaveformData(audioBuffer, waveformData);
+      } else {
+        clip = createClipFromSeconds({
+          audioBuffer,
+          startTime: clipDesc.start,
+          duration: clipDesc.duration || audioBuffer.duration,
+          offset: clipDesc.offset,
+          gain: clipDesc.gain,
+          name: clipDesc.name,
+          sampleRate: audioBuffer.sampleRate,
+          sourceDuration: audioBuffer.duration,
+        });
+      }
+      if (clipId) clip.id = clipId;
+
+      this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
+      this._clipOffsets.set(clip.id, {
+        offsetSamples: clip.offsetSamples,
+        durationSamples: clip.durationSamples,
+      });
+      const peakData = await this._peakPipeline.generatePeaks(
+        audioBuffer,
+        this._renderSpp,
+        this.mono,
+        clip.offsetSamples,
+        clip.durationSamples
+      );
+      this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
+
+      const t = this._engineTracks.get(trackId);
+      if (!t) {
+        // Track was removed during load — purge clip state
+        const nextBuffers = new Map(this._clipBuffers);
+        nextBuffers.delete(clip.id);
+        this._clipBuffers = nextBuffers;
+        const nextPeaks = new Map(this._peaksData);
+        nextPeaks.delete(clip.id);
+        this._peaksData = nextPeaks;
+        this._clipOffsets.delete(clip.id);
+        return;
+      }
+      const updatedTrack: ClipTrack = { ...t, clips: [...t.clips, clip] };
+      this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
+
+      const desc = this._tracks.get(trackId);
+      if (desc) {
+        this._tracks = new Map(this._tracks).set(trackId, {
+          ...desc,
+          clips: [...desc.clips, clipDesc],
+        });
+      }
+      this._recomputeDuration();
+      if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
+      else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+
+      this.dispatchEvent(
+        new CustomEvent<DawClipIdDetail>('daw-clip-ready', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId, clipId: clip.id },
+        })
+      );
+    } catch (err) {
+      if (!this.isConnected) return;
+      console.warn('[dawcore] _loadAndAppendClip failed: ' + String(err));
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId, clipId: clipId ?? '', error: err },
+        })
+      );
+    }
+  }
+  private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
+    const t = this._engineTracks.get(trackId);
+    if (!t) return;
+    const idx = t.clips.findIndex((c) => c.id === clipId);
+    if (idx === -1) return;
+    const oldClip = t.clips[idx];
+    const sr = oldClip.sampleRate ?? this.effectiveSampleRate;
+    const newStartSample = Math.round(clipEl.start * sr);
+    const newDurationSamples =
+      clipEl.duration > 0 ? Math.round(clipEl.duration * sr) : oldClip.durationSamples;
+    const newOffsetSamples = Math.round(clipEl.offset * sr);
+    const updatedClip = {
+      ...oldClip,
+      startSample: newStartSample,
+      durationSamples: newDurationSamples,
+      offsetSamples: newOffsetSamples,
+      gain: clipEl.gain,
+      name: clipEl.name || oldClip.name,
+    };
+    const updatedClips = [...t.clips];
+    updatedClips[idx] = updatedClip;
+    const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
+    this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
+
+    const boundsChanged =
+      oldClip.offsetSamples !== newOffsetSamples || oldClip.durationSamples !== newDurationSamples;
+    if (boundsChanged) {
+      this._clipOffsets.set(clipId, {
+        offsetSamples: newOffsetSamples,
+        durationSamples: newDurationSamples,
+      });
+      const peaks = this.reextractClipPeaks(clipId, newOffsetSamples, newDurationSamples);
+      if (peaks) {
+        this._peaksData = new Map(this._peaksData).set(clipId, {
+          data: peaks.data,
+          length: peaks.length,
+        } as PeakData);
+      }
+    }
+
+    this._recomputeDuration();
+    if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
+    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+  }
+  private _removeClipFromTrack(trackId: string, clipId: string) {
+    const t = this._engineTracks.get(trackId);
+    if (!t) return;
+    const updatedClips = t.clips.filter((c) => c.id !== clipId);
+    if (updatedClips.length === t.clips.length) return;
+    const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
+    this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
+
+    const nextBuffers = new Map(this._clipBuffers);
+    nextBuffers.delete(clipId);
+    this._clipBuffers = nextBuffers;
+    this._clipOffsets.delete(clipId);
+    const nextPeaks = new Map(this._peaksData);
+    nextPeaks.delete(clipId);
+    this._peaksData = nextPeaks;
+
+    const desc = this._tracks.get(trackId);
+    if (desc) {
+      this._tracks = new Map(this._tracks).set(trackId, {
+        ...desc,
+        clips: desc.clips.filter((c) => c.clipId !== clipId),
+      });
+    }
+    this._recomputeDuration();
+    if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
+    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+  }
   private _readTrackDescriptor(trackEl: DawTrackElement): TrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
     const clips: ClipDescriptor[] = [];
@@ -596,6 +831,7 @@ export class DawEditorElement extends LitElement {
     } else {
       for (const clipEl of clipEls) {
         clips.push({
+          clipId: clipEl.clipId,
           src: clipEl.src,
           peaksSrc: clipEl.peaksSrc,
           start: clipEl.start,
@@ -677,6 +913,10 @@ export class DawEditorElement extends LitElement {
             sampleRate: wdRate,
             sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
           });
+          // Align engine clip.id with the source <daw-clip>.clipId (if any) so
+          // DOM and engine refer to the same clip — required for editor.removeClip
+          // and editor.updateClip lookups.
+          if (clipDesc.clipId) clip.id = clipDesc.clipId;
           const effectiveScale = Math.max(this._renderSpp, waveformData.scale);
           const peakData = extractPeaks(
             waveformData,
@@ -745,6 +985,7 @@ export class DawEditorElement extends LitElement {
           sampleRate: audioBuffer.sampleRate,
           sourceDuration: audioBuffer.duration,
         });
+        if (clipDesc.clipId) clip.id = clipDesc.clipId;
         this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
         this._clipOffsets.set(clip.id, {
           offsetSamples: clip.offsetSamples,
@@ -952,6 +1193,236 @@ export class DawEditorElement extends LitElement {
   };
   async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
     return loadFilesImpl(this, files);
+  }
+  // --- Programmatic Track API ---
+  /**
+   * Build the engine if it hasn't been built yet. Lets consumers obtain a
+   * non-null `editor.engine` before any track has been loaded — useful for
+   * wiring analyzers, effects, or master taps before content arrives.
+   */
+  async ready(): Promise<PlaylistEngine> {
+    return this._ensureEngine();
+  }
+  /**
+   * Append a `<daw-track>` element built from `config` and resolve once the
+   * track finishes loading (or reject on `daw-track-error`). Goes through
+   * the same `_loadTrack` pipeline as declarative tracks, so descriptors,
+   * peaks, and clip buffers are populated correctly.
+   */
+  addTrack(config: TrackConfig = {}): Promise<DawTrackElement> {
+    const trackEl = document.createElement('daw-track') as DawTrackElement;
+    if (config.name !== undefined) trackEl.setAttribute('name', config.name);
+    if (config.volume !== undefined) trackEl.volume = config.volume;
+    if (config.pan !== undefined) trackEl.pan = config.pan;
+    if (config.muted) trackEl.setAttribute('muted', '');
+    if (config.soloed) trackEl.setAttribute('soloed', '');
+
+    for (const clipConfig of config.clips ?? []) {
+      trackEl.appendChild(this._buildClipElement(clipConfig));
+    }
+
+    const targetId = trackEl.trackId;
+    return new Promise<DawTrackElement>((resolve, reject) => {
+      const onReady = (e: Event) => {
+        const detail = (e as CustomEvent<DawTrackIdDetail>).detail;
+        if (detail.trackId !== targetId) return;
+        cleanup();
+        resolve(trackEl);
+      };
+      const onError = (e: Event) => {
+        const detail = (e as CustomEvent<DawTrackErrorDetail>).detail;
+        if (detail.trackId !== targetId) return;
+        cleanup();
+        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+      };
+      const cleanup = () => {
+        this.removeEventListener('daw-track-ready', onReady);
+        this.removeEventListener('daw-track-error', onError);
+      };
+      this.addEventListener('daw-track-ready', onReady);
+      this.addEventListener('daw-track-error', onError);
+      this.appendChild(trackEl);
+    });
+  }
+  /**
+   * Remove a track by id. Equivalent to `trackElement.remove()` —
+   * the editor's MutationObserver handles engine and cache cleanup.
+   * No-op if no matching track exists.
+   */
+  removeTrack(trackId: string): void {
+    const trackEl = this._trackElements.get(trackId);
+    if (trackEl) {
+      trackEl.remove();
+    } else if (this._engineTracks.has(trackId)) {
+      // File-dropped tracks have no DOM element; clean up engine state directly.
+      this._onTrackRemoved(trackId);
+    }
+  }
+  /**
+   * Update reflected attributes on a track. For DOM-element tracks the changes
+   * are written to the `<daw-track>` element (which fires `daw-track-update`);
+   * for tracks without a DOM element (file drops) the descriptor and engine
+   * state are updated in place.
+   */
+  updateTrack(trackId: string, partial: Partial<TrackConfig>): void {
+    const trackEl = this._trackElements.get(trackId);
+    if (trackEl) {
+      // Mutating reflected props triggers daw-track-update which propagates
+      // to engine via _onTrackUpdate.
+      if (partial.name !== undefined) trackEl.setAttribute('name', partial.name);
+      if (partial.volume !== undefined) trackEl.volume = partial.volume;
+      if (partial.pan !== undefined) trackEl.pan = partial.pan;
+      if (partial.muted !== undefined) {
+        if (partial.muted) trackEl.setAttribute('muted', '');
+        else trackEl.removeAttribute('muted');
+      }
+      if (partial.soloed !== undefined) {
+        if (partial.soloed) trackEl.setAttribute('soloed', '');
+        else trackEl.removeAttribute('soloed');
+      }
+      return;
+    }
+    // No DOM element — apply directly to descriptor + engine.
+    const oldDesc = this._tracks.get(trackId);
+    if (!oldDesc) return;
+    const newDesc: TrackDescriptor = {
+      ...oldDesc,
+      ...(partial.name !== undefined && { name: partial.name }),
+      ...(partial.volume !== undefined && { volume: partial.volume }),
+      ...(partial.pan !== undefined && { pan: partial.pan }),
+      ...(partial.muted !== undefined && { muted: partial.muted }),
+      ...(partial.soloed !== undefined && { soloed: partial.soloed }),
+    };
+    this._tracks = new Map(this._tracks).set(trackId, newDesc);
+    if (this._engine) {
+      if (partial.volume !== undefined) this._engine.setTrackVolume(trackId, partial.volume);
+      if (partial.pan !== undefined) this._engine.setTrackPan(trackId, partial.pan);
+      if (partial.muted !== undefined) this._engine.setTrackMute(trackId, partial.muted);
+      if (partial.soloed !== undefined) this._engine.setTrackSolo(trackId, partial.soloed);
+    }
+  }
+  /**
+   * Append a clip to an existing track. Builds a `<daw-clip>` from `config`
+   * and appends it to the track's DOM element when one exists; resolves with
+   * the new clip's id once the audio decode + peak generation finish.
+   */
+  addClip(trackId: string, config: ClipConfig): Promise<string> {
+    const trackEl = this._trackElements.get(trackId);
+    if (!trackEl) {
+      return Promise.reject(
+        new Error(
+          'addClip: no <daw-track> element for trackId "' +
+            trackId +
+            '" — addClip currently requires a DOM-backed track. Use editor.addTrack(config) first.'
+        )
+      );
+    }
+    const clipEl = this._buildClipElement(config);
+    const targetClipId = clipEl.clipId;
+    return new Promise<string>((resolve, reject) => {
+      const onReady = (e: Event) => {
+        const detail = (e as CustomEvent<DawClipIdDetail>).detail;
+        if (detail.clipId !== targetClipId) return;
+        cleanup();
+        resolve(targetClipId);
+      };
+      const onError = (e: Event) => {
+        const detail = (e as CustomEvent<DawClipErrorDetail>).detail;
+        if (detail.clipId !== targetClipId) return;
+        cleanup();
+        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+      };
+      const cleanup = () => {
+        this.removeEventListener('daw-clip-ready', onReady);
+        this.removeEventListener('daw-clip-error', onError);
+      };
+      this.addEventListener('daw-clip-ready', onReady);
+      this.addEventListener('daw-clip-error', onError);
+      trackEl.appendChild(clipEl);
+    });
+  }
+  /**
+   * Remove a clip by id. Removes the matching `<daw-clip>` DOM element when
+   * present (MutationObserver handles cleanup); otherwise updates engine
+   * state directly. No-op if no matching clip exists.
+   */
+  removeClip(trackId: string, clipId: string): void {
+    const trackEl = this._trackElements.get(trackId);
+    if (trackEl) {
+      const clipEl = [...trackEl.querySelectorAll('daw-clip')].find(
+        (c) => (c as DawClipElement).clipId === clipId
+      ) as DawClipElement | undefined;
+      if (clipEl) {
+        clipEl.remove();
+        return;
+      }
+    }
+    if (this._engineTracks.has(trackId)) {
+      this._removeClipFromTrack(trackId, clipId);
+    }
+  }
+  /**
+   * Update a clip's position (start/duration/offset) or properties (gain/name/fades).
+   * For DOM-element clips, writes properties on the `<daw-clip>` element which
+   * fires `daw-clip-update`; otherwise applies directly via `_applyClipUpdate`.
+   * Re-decoding (changing `src`) is not supported via this method — remove and
+   * re-add the clip instead.
+   */
+  updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void {
+    const trackEl = this._trackElements.get(trackId);
+    if (trackEl) {
+      const clipEl = [...trackEl.querySelectorAll('daw-clip')].find(
+        (c) => (c as DawClipElement).clipId === clipId
+      ) as DawClipElement | undefined;
+      if (clipEl) {
+        if (partial.start !== undefined) clipEl.start = partial.start;
+        if (partial.duration !== undefined) clipEl.duration = partial.duration;
+        if (partial.offset !== undefined) clipEl.offset = partial.offset;
+        if (partial.gain !== undefined) clipEl.gain = partial.gain;
+        if (partial.name !== undefined) clipEl.setAttribute('name', partial.name);
+        if (partial.fadeIn !== undefined) clipEl.fadeIn = partial.fadeIn;
+        if (partial.fadeOut !== undefined) clipEl.fadeOut = partial.fadeOut;
+        if (partial.fadeType !== undefined) clipEl.setAttribute('fade-type', partial.fadeType);
+        return;
+      }
+    }
+    // No DOM element — apply changes directly.
+    const t = this._engineTracks.get(trackId);
+    if (!t) return;
+    const idx = t.clips.findIndex((c) => c.id === clipId);
+    if (idx === -1) return;
+    const oldClip = t.clips[idx];
+    const sr = oldClip.sampleRate ?? this.effectiveSampleRate;
+    const updatedClip = {
+      ...oldClip,
+      ...(partial.start !== undefined && { startSample: Math.round(partial.start * sr) }),
+      ...(partial.duration !== undefined &&
+        partial.duration > 0 && { durationSamples: Math.round(partial.duration * sr) }),
+      ...(partial.offset !== undefined && { offsetSamples: Math.round(partial.offset * sr) }),
+      ...(partial.gain !== undefined && { gain: partial.gain }),
+      ...(partial.name !== undefined && { name: partial.name }),
+    };
+    const updatedClips = [...t.clips];
+    updatedClips[idx] = updatedClip;
+    const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
+    this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
+    this._recomputeDuration();
+    if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
+    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+  }
+  private _buildClipElement(config: ClipConfig): DawClipElement {
+    const clipEl = document.createElement('daw-clip') as DawClipElement;
+    if (config.src !== undefined) clipEl.setAttribute('src', config.src);
+    if (config.peaksSrc !== undefined) clipEl.setAttribute('peaks-src', config.peaksSrc);
+    if (config.start !== undefined) clipEl.start = config.start;
+    if (config.duration !== undefined) clipEl.duration = config.duration;
+    if (config.offset !== undefined) clipEl.offset = config.offset;
+    if (config.gain !== undefined) clipEl.gain = config.gain;
+    if (config.name !== undefined) clipEl.setAttribute('name', config.name);
+    if (config.fadeIn !== undefined) clipEl.fadeIn = config.fadeIn;
+    if (config.fadeOut !== undefined) clipEl.fadeOut = config.fadeOut;
+    if (config.fadeType !== undefined) clipEl.setAttribute('fade-type', config.fadeType);
+    return clipEl;
   }
   // --- Playback ---
   async play(startTime?: number) {
