@@ -1386,6 +1386,27 @@ describe('PlaylistEngine', () => {
     });
   });
 
+  describe('lookAhead', () => {
+    it('proxies to adapter.lookAhead when present (Tone-style adapter)', () => {
+      const adapter = createMockAdapter();
+      (adapter as unknown as { lookAhead: number }).lookAhead = 0.1;
+      const engine = new PlaylistEngine({ adapter });
+      expect(engine.lookAhead).toBe(0.1);
+    });
+
+    it('returns 0 when adapter does not implement lookAhead (native-style)', () => {
+      const adapter = createMockAdapter();
+      // No lookAhead property defined — adapter.lookAhead is undefined
+      const engine = new PlaylistEngine({ adapter });
+      expect(engine.lookAhead).toBe(0);
+    });
+
+    it('returns 0 when there is no adapter', () => {
+      const engine = new PlaylistEngine();
+      expect(engine.lookAhead).toBe(0);
+    });
+  });
+
   describe('dispose', () => {
     it('disposes adapter and clears listeners', () => {
       const adapter = createMockAdapter();

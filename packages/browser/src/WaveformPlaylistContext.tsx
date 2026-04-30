@@ -1041,9 +1041,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       currentTimeRef.current = time;
 
       // Compute visual time once — all visual consumers use this same value.
-      // Subtracts outputLatency so DOM positions match speaker output.
+      // Subtracts outputLatency (hardware DAC delay) AND adapter.lookAhead
+      // (Tone.js Transport runs lookAhead ahead of audible — ~100ms by default)
+      // so DOM positions match what the listener actually hears. Native adapter
+      // reports lookAhead as 0, so this is a no-op there.
       const latency = 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
-      const visualTime = Math.max(0, time - latency);
+      const lookAhead = engineRef.current?.lookAhead ?? 0;
+      const visualTime = Math.max(0, time - latency - lookAhead);
 
       // Drive registered per-frame callbacks BEFORE stop checks so the
       // final frame renders at the correct stop position (not one frame behind).

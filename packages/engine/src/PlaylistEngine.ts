@@ -621,6 +621,18 @@ export class PlaylistEngine {
     return this._currentTime;
   }
 
+  /**
+   * Audio scheduling lookahead in seconds — `getCurrentTime()` is this far ahead of
+   * what the listener actually hears. Tone.js Transport reports a position that's
+   * `lookAhead` ahead of audible (default 0.1s); native AudioContext-based adapters
+   * have no lookahead and return 0. Consumers visualizing playback position should
+   * subtract this from `getCurrentTime()` (along with `audioContext.outputLatency`)
+   * to align the playhead with audible output.
+   */
+  get lookAhead(): number {
+    return this._adapter?.lookAhead ?? 0;
+  }
+
   // ---------------------------------------------------------------------------
   // Selection & Loop
   // ---------------------------------------------------------------------------
