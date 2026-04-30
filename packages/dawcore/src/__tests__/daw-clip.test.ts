@@ -41,4 +41,75 @@ describe('DawClipElement', () => {
     expect(el.fadeOut).toBe(1.0);
     expect(el.fadeType).toBe('sCurve');
   });
+
+  describe('lifecycle events', () => {
+    it('dispatches daw-clip-connected with clipId + element after deferred microtask', async () => {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const events: CustomEvent[] = [];
+      host.addEventListener('daw-clip-connected', (e) => events.push(e as CustomEvent));
+
+      const el = document.createElement('daw-clip') as any;
+      host.appendChild(el);
+      // Should NOT fire synchronously — the dispatch is deferred via setTimeout(0)
+      // so the editor's daw-track-connected handler runs first.
+      expect(events).toHaveLength(0);
+
+      await new Promise((r) => setTimeout(r, 0));
+      expect(events).toHaveLength(1);
+      expect(events[0].detail.clipId).toBe(el.clipId);
+      expect(events[0].detail.element).toBe(el);
+      expect(events[0].bubbles).toBe(true);
+      expect(events[0].composed).toBe(true);
+
+      document.body.removeChild(host);
+    });
+
+    it('dispatches daw-clip-update only after first render, not on initial property assignment', async () => {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const events: CustomEvent[] = [];
+      host.addEventListener('daw-clip-update', (e) => events.push(e as CustomEvent));
+
+      const el = document.createElement('daw-clip') as any;
+      el.setAttribute('start', '4');
+      host.appendChild(el);
+
+      // First render — should not fire (initial state isn't a "change")
+      await el.updateComplete;
+      expect(events).toHaveLength(0);
+
+      // Subsequent change — should fire
+      el.start = 8;
+      await el.updateComplete;
+      expect(events).toHaveLength(1);
+      expect(events[0].detail.clipId).toBe(el.clipId);
+
+      document.body.removeChild(host);
+    });
+
+    it('daw-clip-update covers all reflected position/property changes', async () => {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const el = document.createElement('daw-clip') as any;
+      host.appendChild(el);
+      await el.updateComplete; // initial render
+
+      const events: CustomEvent[] = [];
+      host.addEventListener('daw-clip-update', (e) => events.push(e as CustomEvent));
+
+      // Each property change should fire one event
+      el.start = 1;
+      await el.updateComplete;
+      el.duration = 2;
+      await el.updateComplete;
+      el.offset = 3;
+      await el.updateComplete;
+      el.gain = 0.5;
+      await el.updateComplete;
+      expect(events.length).toBe(4);
+
+      document.body.removeChild(host);
+    });
+  });
 });
