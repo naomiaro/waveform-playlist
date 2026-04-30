@@ -10,12 +10,10 @@ export interface TrackDescriptor {
   clips: ClipDescriptor[];
 }
 
-export interface ClipDescriptor {
-  /**
-   * Optional id from the source `<daw-clip>` element. When present, the engine
-   * clip's `id` is set to this value so DOM and engine refer to the same clip.
-   */
-  clipId?: string;
+/**
+ * Common fields shared by all clip descriptors regardless of source.
+ */
+interface BaseClipDescriptor {
   src: string;
   peaksSrc: string;
   start: number;
@@ -27,6 +25,29 @@ export interface ClipDescriptor {
   fadeOut: number;
   fadeType: FadeType;
 }
+
+/**
+ * A clip descriptor sourced from a `<daw-clip>` DOM element. `clipId` is
+ * always set — `<daw-clip>.clipId` is a `crypto.randomUUID()` generated at
+ * construction. Engine `clip.id` is aligned with this id in `_loadTrack`
+ * and `_loadAndAppendClip` so DOM and engine reference the same clip.
+ */
+export interface DomClipDescriptor extends BaseClipDescriptor {
+  source: 'dom';
+  clipId: string;
+}
+
+/**
+ * A clip descriptor synthesized from a non-DOM source — file drops, the
+ * `<daw-track src>` shorthand fallback, or recording-clip insertion. No
+ * `clipId` because there's no DOM element to align with; the engine
+ * generates its own id at clip-creation time.
+ */
+export interface DropClipDescriptor extends BaseClipDescriptor {
+  source: 'drop';
+}
+
+export type ClipDescriptor = DomClipDescriptor | DropClipDescriptor;
 
 /**
  * Public input shape for `editor.addTrack(config)`. All fields optional —

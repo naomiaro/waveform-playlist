@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type {
+  AudioClip,
   ClipTrack,
   FadeType,
   Peaks,
@@ -628,7 +629,7 @@ export class DawEditorElement extends LitElement {
       // wasn't in the pre-load capture is a true late-append that risks being
       // missed; warn for those.
       const desc = this._tracks.get(trackId);
-      if (desc && !desc.clips.some((c) => c.clipId === clipEl.clipId)) {
+      if (desc && !desc.clips.some((c) => c.source === 'dom' && c.clipId === clipEl.clipId)) {
         console.warn(
           '[dawcore] daw-clip-connected fired while parent track "' +
             trackId +
@@ -640,6 +641,7 @@ export class DawEditorElement extends LitElement {
       return;
     }
     const clipDesc: ClipDescriptor = {
+      source: 'dom',
       clipId: clipEl.clipId,
       src: clipEl.src,
       peaksSrc: clipEl.peaksSrc,
@@ -693,89 +695,21 @@ export class DawEditorElement extends LitElement {
   }
   private async _loadAndAppendClip(trackId: string, clipDesc: ClipDescriptor) {
     if (!clipDesc.src) return; // empty/no-src clips can't be loaded
-    const clipId = clipDesc.clipId;
+    const clipId = clipDesc.source === 'dom' ? clipDesc.clipId : undefined;
     // Track which clip id has been inserted into per-clip caches so the catch
     // block can roll back partial state on any error past the cache writes.
     let insertedClipId: string | null = null;
     try {
-      const waveformDataPromise = clipDesc.peaksSrc ? this._fetchPeaks(clipDesc.peaksSrc) : null;
+      // Concurrent fetches: peaks (if provided) + audio decode.
+      const waveformDataPromise = clipDesc.peaksSrc
+        ? this._resolvePeaks(clipDesc.peaksSrc)
+        : Promise.resolve(null);
       const audioPromise = this._fetchAndDecode(clipDesc.src);
-
-      let waveformData: import('waveform-data').default | null = null;
-      if (waveformDataPromise) {
-        try {
-          const wd = await waveformDataPromise;
-          const contextRate = this.audioContext.sampleRate;
-          if (wd.sample_rate === contextRate) {
-            waveformData = wd;
-          } else {
-            // Mirror _loadTrack's behavior: warn loudly when pre-computed peaks
-            // can't be used due to sample-rate mismatch — silent drops would
-            // confuse consumers wondering why their .dat file was ignored.
-            console.warn(
-              '[dawcore] Pre-computed peaks at ' +
-                wd.sample_rate +
-                ' Hz do not match AudioContext at ' +
-                contextRate +
-                ' Hz — ignoring ' +
-                clipDesc.peaksSrc +
-                ', generating from audio'
-            );
-          }
-        } catch (err) {
-          console.warn('[dawcore] _loadAndAppendClip: peaks load failed: ' + String(err));
-        }
-      }
-      const audioBuffer = await audioPromise;
+      const [waveformData, audioBuffer] = await Promise.all([waveformDataPromise, audioPromise]);
       this._resolvedSampleRate = audioBuffer.sampleRate;
 
-      let clip;
-      if (waveformData) {
-        const wdRate = waveformData.sample_rate;
-        clip = createClip({
-          audioBuffer,
-          waveformData,
-          startSample: Math.round(clipDesc.start * wdRate),
-          durationSamples: Math.round((clipDesc.duration || waveformData.duration) * wdRate),
-          offsetSamples: Math.round(clipDesc.offset * wdRate),
-          gain: clipDesc.gain,
-          name: clipDesc.name,
-          sampleRate: wdRate,
-          sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
-        });
-        this._peakPipeline.cacheWaveformData(audioBuffer, waveformData);
-        // Mirror _loadTrack: pre-computed peaks set a zoom-floor — without
-        // this, samplesPerPixel can be set finer than what WaveformData can
-        // resample to, producing blank waveforms for the new clip.
-        this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
-      } else {
-        clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: clipDesc.start,
-          duration: clipDesc.duration || audioBuffer.duration,
-          offset: clipDesc.offset,
-          gain: clipDesc.gain,
-          name: clipDesc.name,
-          sampleRate: audioBuffer.sampleRate,
-          sourceDuration: audioBuffer.duration,
-        });
-      }
-      if (clipId) clip.id = clipId;
+      const clip = await this._finalizeAudioClip(clipDesc, audioBuffer, waveformData);
       insertedClipId = clip.id;
-
-      this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
-      this._clipOffsets.set(clip.id, {
-        offsetSamples: clip.offsetSamples,
-        durationSamples: clip.durationSamples,
-      });
-      const peakData = await this._peakPipeline.generatePeaks(
-        audioBuffer,
-        this._renderSpp,
-        this.mono,
-        clip.offsetSamples,
-        clip.durationSamples
-      );
-      this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
 
       const t = this._engineTracks.get(trackId);
       if (!t) {
@@ -818,6 +752,113 @@ export class DawEditorElement extends LitElement {
         })
       );
     }
+  }
+  /**
+   * Resolve pre-computed peaks for a clip: fetch the .dat/.json, validate the
+   * sample rate matches the AudioContext, return the WaveformData or null.
+   * Warns on fetch failure and on sample-rate mismatch — never silent.
+   *
+   * Shared between `_loadTrack` (peaks-first preview path) and
+   * `_loadAndAppendClip` (incremental late-append).
+   */
+  private async _resolvePeaks(peaksSrc: string): Promise<import('waveform-data').default | null> {
+    try {
+      const wd = await this._fetchPeaks(peaksSrc);
+      const contextRate = this.audioContext.sampleRate;
+      if (wd.sample_rate === contextRate) return wd;
+      console.warn(
+        '[dawcore] Pre-computed peaks at ' +
+          wd.sample_rate +
+          ' Hz do not match AudioContext at ' +
+          contextRate +
+          ' Hz — ignoring ' +
+          peaksSrc +
+          ', generating from audio'
+      );
+      return null;
+    } catch (err) {
+      console.warn(
+        '[dawcore] Failed to load peaks from ' +
+          peaksSrc +
+          ': ' +
+          String(err) +
+          ' — falling back to AudioBuffer generation'
+      );
+      return null;
+    }
+  }
+  /**
+   * Construct an AudioClip from a decoded buffer (and optional WaveformData),
+   * align its id with the source `<daw-clip>.clipId` when present, populate
+   * `_clipBuffers` / `_clipOffsets`, generate peaks via the worker pipeline,
+   * and populate `_peaksData`. Returns the finished AudioClip.
+   *
+   * Shared between `_loadTrack`'s standard path and `_loadAndAppendClip`.
+   * Not used by `_loadTrack`'s peaks-first preview path because that path
+   * uses sync `extractPeaks` and inserts a preview track BEFORE audio decode.
+   */
+  private async _finalizeAudioClip(
+    clipDesc: ClipDescriptor,
+    audioBuffer: AudioBuffer,
+    waveformData: import('waveform-data').default | null
+  ): Promise<AudioClip> {
+    let clip: AudioClip;
+    if (waveformData) {
+      const wdRate = waveformData.sample_rate;
+      clip = createClip({
+        audioBuffer,
+        waveformData,
+        startSample: Math.round(clipDesc.start * wdRate),
+        durationSamples: Math.round((clipDesc.duration || waveformData.duration) * wdRate),
+        offsetSamples: Math.round(clipDesc.offset * wdRate),
+        gain: clipDesc.gain,
+        name: clipDesc.name,
+        sampleRate: wdRate,
+        sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
+      });
+      this._peakPipeline.cacheWaveformData(audioBuffer, waveformData);
+      // Pre-computed peaks set a zoom-floor — without this, samplesPerPixel
+      // can be set finer than what WaveformData can resample to, producing
+      // blank waveforms for the clip.
+      this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
+    } else {
+      clip = createClipFromSeconds({
+        audioBuffer,
+        startTime: clipDesc.start,
+        duration: clipDesc.duration || audioBuffer.duration,
+        offset: clipDesc.offset,
+        gain: clipDesc.gain,
+        name: clipDesc.name,
+        sampleRate: audioBuffer.sampleRate,
+        sourceDuration: audioBuffer.duration,
+      });
+    }
+    if (clipDesc.source === 'dom') clip.id = clipDesc.clipId;
+
+    this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
+    this._clipOffsets.set(clip.id, {
+      offsetSamples: clip.offsetSamples,
+      durationSamples: clip.durationSamples,
+    });
+    // generatePeaks can fail (worker crash, CSP, OOM). Purge the cache entries
+    // we just inserted so the caller's catch path doesn't leak. The caller may
+    // also call _purgeClipCaches in its own error handler — _purgeClipCaches
+    // is idempotent.
+    let peakData: PeakData;
+    try {
+      peakData = await this._peakPipeline.generatePeaks(
+        audioBuffer,
+        this._renderSpp,
+        this.mono,
+        clip.offsetSamples,
+        clip.durationSamples
+      );
+    } catch (err) {
+      this._purgeClipCaches(clip.id);
+      throw err;
+    }
+    this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
+    return clip;
   }
   /** Remove a single clip from all per-clip caches. Used by error rollbacks. */
   private _purgeClipCaches(clipId: string) {
@@ -920,7 +961,9 @@ export class DawEditorElement extends LitElement {
     if (desc) {
       this._tracks = new Map(this._tracks).set(trackId, {
         ...desc,
-        clips: desc.clips.filter((c) => c.clipId !== clipId),
+        // Only DOM-sourced clips have an id to match; drop-sourced clips are
+        // filtered through unchanged (their identity is the descriptor itself).
+        clips: desc.clips.filter((c) => !(c.source === 'dom' && c.clipId === clipId)),
       });
     }
     this._commitTrackChange(trackId, updatedTrack);
@@ -930,7 +973,10 @@ export class DawEditorElement extends LitElement {
     const clips: ClipDescriptor[] = [];
 
     if (clipEls.length === 0 && trackEl.src) {
+      // <daw-track src> shorthand — synthetic descriptor with no <daw-clip>
+      // backing element. No DOM clipId to align with.
       clips.push({
+        source: 'drop',
         src: trackEl.src,
         peaksSrc: '',
         start: 0,
@@ -945,6 +991,7 @@ export class DawEditorElement extends LitElement {
     } else {
       for (const clipEl of clipEls) {
         clips.push({
+          source: 'dom',
           clipId: clipEl.clipId,
           src: clipEl.src,
           peaksSrc: clipEl.peaksSrc,
@@ -977,42 +1024,15 @@ export class DawEditorElement extends LitElement {
         if (!clipDesc.src) continue;
 
         // Start both fetches concurrently — await peaks first to render preview before audio decode
-        const waveformDataPromise = clipDesc.peaksSrc ? this._fetchPeaks(clipDesc.peaksSrc) : null;
+        const waveformDataPromise = clipDesc.peaksSrc
+          ? this._resolvePeaks(clipDesc.peaksSrc)
+          : Promise.resolve(null);
         const audioPromise = this._fetchAndDecode(clipDesc.src);
 
         // --- Peaks-first path: render waveform before audio decode completes ---
-        // Separate try/catch for peaks so audio errors aren't misattributed.
-        // If the .dat sample rate doesn't match the AudioContext rate, skip the
-        // pre-computed peaks entirely — rate conversion creates subtle mismatches
-        // in trim/split/zoom. The worker generates correct peaks from decoded audio.
-        let waveformData: any = null;
-        if (waveformDataPromise) {
-          try {
-            const wd = await waveformDataPromise;
-            const contextRate = this.audioContext.sampleRate;
-            if (wd.sample_rate === contextRate) {
-              waveformData = wd;
-            } else {
-              console.warn(
-                '[dawcore] Pre-computed peaks at ' +
-                  wd.sample_rate +
-                  ' Hz do not match AudioContext at ' +
-                  contextRate +
-                  ' Hz — ignoring ' +
-                  clipDesc.peaksSrc +
-                  ', generating from audio'
-              );
-            }
-          } catch (err) {
-            console.warn(
-              '[dawcore] Failed to load peaks from ' +
-                clipDesc.peaksSrc +
-                ': ' +
-                String(err) +
-                ' — falling back to AudioBuffer generation'
-            );
-          }
-        }
+        // _resolvePeaks returns null on fetch failure or sample-rate mismatch
+        // (warns in either case); the standard path below handles the null case.
+        const waveformData = await waveformDataPromise;
         if (waveformData) {
           // Create clip with integer samples to avoid float round-trip drift
           // (CLAUDE.md pattern #40: prefer createClip when samples known)
@@ -1030,7 +1050,7 @@ export class DawEditorElement extends LitElement {
           // Align engine clip.id with the source <daw-clip>.clipId (if any) so
           // DOM and engine refer to the same clip — required for editor.removeClip
           // and editor.updateClip lookups.
-          if (clipDesc.clipId) clip.id = clipDesc.clipId;
+          if (clipDesc.source === 'dom') clip.id = clipDesc.clipId;
           const effectiveScale = Math.max(this._renderSpp, waveformData.scale);
           const peakData = extractPeaks(
             waveformData,
@@ -1087,32 +1107,12 @@ export class DawEditorElement extends LitElement {
         }
 
         // --- Standard path: decode audio first, then generate peaks ---
+        // Reached only when the peaks-first branch above didn't kick in
+        // (no peaksSrc, fetch failure, or sample-rate mismatch). waveformData
+        // is always null here.
         const audioBuffer = await audioPromise;
         this._resolvedSampleRate = audioBuffer.sampleRate;
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: clipDesc.start,
-          duration: clipDesc.duration || audioBuffer.duration,
-          offset: clipDesc.offset,
-          gain: clipDesc.gain,
-          name: clipDesc.name,
-          sampleRate: audioBuffer.sampleRate,
-          sourceDuration: audioBuffer.duration,
-        });
-        if (clipDesc.clipId) clip.id = clipDesc.clipId;
-        this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
-        this._clipOffsets.set(clip.id, {
-          offsetSamples: clip.offsetSamples,
-          durationSamples: clip.durationSamples,
-        });
-        const peakData = await this._peakPipeline.generatePeaks(
-          audioBuffer,
-          this._renderSpp,
-          this.mono,
-          clip.offsetSamples,
-          clip.durationSamples
-        );
-        this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
+        const clip = await this._finalizeAudioClip(clipDesc, audioBuffer, null);
         clips.push(clip);
       }
       const track = createTrack({
