@@ -205,6 +205,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - Wrap one-shot `evaluate()` for computed styles in `.toPass()` — styles may not be applied on first query
 - Use Play/Pause/Stop buttons (not `keyboard.press('Space')`) for initial playback — AudioContext init is async and `Space` requires playlist focus
 - After clicking Play, wait for time to advance with retrying assertion: `await expect(async () => { expect(await timeDisplay.textContent()).not.toBe('00:00:00.000'); }).toPass({ timeout: 10000 })`
+- Refresh between scenarios when using `browser_evaluate` — the page persists across eval calls in one MCP session; state from prior interactions can silently invalidate assertions (e.g. "first M-click reports muted=false" because a prior eval already toggled it). Call `browser_navigate` to the same URL to reset before each independent reproduction.
 
 **Git Safety:** Always make intermediate commits before running `git stash` or switching branches. A failed `git stash pop` + `git checkout -- .` can destroy all uncommitted work permanently.
 
