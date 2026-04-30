@@ -151,9 +151,9 @@ const rebuildChain = useCallback(() => {
 
 ## Playhead outputLatency Compensation
 
-`getPlaybackTime()` returns **raw engine time** — no latency subtraction. The animation loop computes `visualTime = Math.max(0, time - outputLatency)` once per frame. All registered frame callbacks receive `visualTime` via `FrameData`. Auto-scroll also uses `visualTime`.
+`getPlaybackTime()` returns **raw engine time** — no latency subtraction. **Storage refs (`currentTimeRef`, pause/seek targets) must stay raw** so `play(time)` resumes correctly — subtracting latency from storage compounds on every pause/resume cycle.
 
-**Do NOT compensate `currentTimeRef` or pause position** — state storage must use raw engine time. Subtracting `outputLatency` from stored positions shifts the next `play()` start time and compounds on every pause/resume cycle.
+**Display uses `visualTimeRef` (audible time = raw − `outputLatency` − `engine.lookAhead`).** The animation loop updates it per frame; every site that assigns `currentTimeRef.current = X` also assigns `visualTimeRef.current = toVisualTime(X)`. Static-display consumers (`AnimatedPlayhead` / `ChannelWithProgress` not-playing branches, `PlayheadWithMarker`, `CustomPlayhead` initial position) read `visualTimeRef`. Frame callbacks during playback receive `visualTime` via `FrameData`. Auto-scroll uses `visualTime`. The dual-ref pattern is mandatory: one ref → either storage broken (compounding) or display broken (lag).
 
 ## Engine State Subscription Pattern
 

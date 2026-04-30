@@ -227,3 +227,7 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 ## SegmentedVUMeter Theming
 
 **Decision:** Transparent background, no padding/border-radius — consumers control container styling. `labelColor` prop (not theme) controls scale/channel label color for light/dark mode. Inactive segments use `rgba(128, 128, 128, 0.2)` to work on any background. Use transient `$props` for color, not CSS variables.
+
+## PlayheadProps Evolution
+
+Adding a new field to `PlayheadProps` is a soft-breaking change for custom playheads — they continue compiling but won't pick up the new behavior until updated. When the provider context exposes a new playback-time concept (e.g., `visualTimeRef`), thread it through `PlayheadProps` and update the bundled `PlayheadWithMarker` to use it. External consumers' custom playheads need to opt in. Document the failure mode (e.g., visual lag) so users notice.
