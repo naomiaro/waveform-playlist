@@ -81,6 +81,7 @@ export interface DawClipIdDetail {
 }
 
 export interface DawClipUpdateDetail {
+  trackId: string;
   clipId: string;
 }
 

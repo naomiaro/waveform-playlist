@@ -653,9 +653,15 @@ export class DawEditorElement extends LitElement {
   private _onClipUpdate = (e: CustomEvent) => {
     const clipEl = e.target as DawClipElement;
     if (!(clipEl instanceof HTMLElement) || clipEl.tagName !== 'DAW-CLIP') return;
-    const trackEl = clipEl.closest('daw-track') as DawTrackElement | null;
-    if (!trackEl) return;
-    this._applyClipUpdate(trackEl.trackId, clipEl.clipId, clipEl);
+    const detail = e.detail as { trackId: string; clipId: string };
+    if (!detail.trackId) {
+      // <daw-clip> mounted outside a <daw-track> — developer error.
+      console.warn(
+        '[dawcore] daw-clip-update fired from a <daw-clip> not nested in a <daw-track> — ignored'
+      );
+      return;
+    }
+    this._applyClipUpdate(detail.trackId, detail.clipId, clipEl);
   };
   private _onClipRemovedFromDom(clipEl: DawClipElement) {
     const clipId = clipEl.clipId;
@@ -783,9 +789,7 @@ export class DawEditorElement extends LitElement {
           clips: [...desc.clips, clipDesc],
         });
       }
-      this._recomputeDuration();
-      if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
-      else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+      this._commitTrackChange(trackId, updatedTrack);
 
       this.dispatchEvent(
         new CustomEvent<DawClipIdDetail>('daw-clip-ready', {
@@ -820,6 +824,18 @@ export class DawEditorElement extends LitElement {
     nextPeaks.delete(clipId);
     this._peaksData = nextPeaks;
     this._clipOffsets.delete(clipId);
+  }
+  /**
+   * Recompute duration and forward an updated track to the engine. Single
+   * source of truth for the incremental-vs-full-rebuild policy used by every
+   * clip-level mutation (addClip, updateClip, removeClip, _applyClipUpdate).
+   * Use the engine's incremental updateTrack when available; otherwise fall
+   * back to full setTracks (legacy adapters).
+   */
+  private _commitTrackChange(trackId: string, updatedTrack: ClipTrack) {
+    this._recomputeDuration();
+    if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
+    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
   }
   private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
     const t = this._engineTracks.get(trackId);
@@ -870,9 +886,7 @@ export class DawEditorElement extends LitElement {
       }
     }
 
-    this._recomputeDuration();
-    if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
-    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+    this._commitTrackChange(trackId, updatedTrack);
   }
   private _removeClipFromTrack(trackId: string, clipId: string) {
     const t = this._engineTracks.get(trackId);
@@ -905,9 +919,7 @@ export class DawEditorElement extends LitElement {
         clips: desc.clips.filter((c) => c.clipId !== clipId),
       });
     }
-    this._recomputeDuration();
-    if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
-    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+    this._commitTrackChange(trackId, updatedTrack);
   }
   private _readTrackDescriptor(trackEl: DawTrackElement): TrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
@@ -1302,6 +1314,42 @@ export class DawEditorElement extends LitElement {
     return this._ensureEngine();
   }
   /**
+   * Wait for either `readyEvent` or `errorEvent` to fire on this editor for
+   * the entity matching `matchesId`. Listeners are wired synchronously, then
+   * `setup` is called (typical: appendChild). Resolves with `resolveValue`
+   * on ready; rejects with a normalized Error on error. Used by addTrack and
+   * addClip to share their Promise-with-listener-cleanup machinery.
+   */
+  private _awaitId<T>(
+    readyEvent: string,
+    errorEvent: string,
+    matchesId: (detail: { trackId?: string; clipId?: string }) => boolean,
+    resolveValue: T,
+    setup: () => void
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const onReady = (e: Event) => {
+        if (!matchesId((e as CustomEvent).detail)) return;
+        cleanup();
+        resolve(resolveValue);
+      };
+      const onError = (e: Event) => {
+        const detail = (e as CustomEvent).detail as { error?: unknown };
+        if (!matchesId((e as CustomEvent).detail)) return;
+        cleanup();
+        const err = detail.error;
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+      const cleanup = () => {
+        this.removeEventListener(readyEvent, onReady);
+        this.removeEventListener(errorEvent, onError);
+      };
+      this.addEventListener(readyEvent, onReady);
+      this.addEventListener(errorEvent, onError);
+      setup();
+    });
+  }
+  /**
    * Append a `<daw-track>` element built from `config` and resolve once the
    * track finishes loading (or reject on `daw-track-error`). Goes through
    * the same `_loadTrack` pipeline as declarative tracks, so descriptors,
@@ -1319,28 +1367,13 @@ export class DawEditorElement extends LitElement {
       trackEl.appendChild(this._buildClipElement(clipConfig));
     }
 
-    const targetId = trackEl.trackId;
-    return new Promise<DawTrackElement>((resolve, reject) => {
-      const onReady = (e: Event) => {
-        const detail = (e as CustomEvent<DawTrackIdDetail>).detail;
-        if (detail.trackId !== targetId) return;
-        cleanup();
-        resolve(trackEl);
-      };
-      const onError = (e: Event) => {
-        const detail = (e as CustomEvent<DawTrackErrorDetail>).detail;
-        if (detail.trackId !== targetId) return;
-        cleanup();
-        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
-      };
-      const cleanup = () => {
-        this.removeEventListener('daw-track-ready', onReady);
-        this.removeEventListener('daw-track-error', onError);
-      };
-      this.addEventListener('daw-track-ready', onReady);
-      this.addEventListener('daw-track-error', onError);
-      this.appendChild(trackEl);
-    });
+    return this._awaitId(
+      'daw-track-ready',
+      'daw-track-error',
+      (d) => d.trackId === trackEl.trackId,
+      trackEl,
+      () => this.appendChild(trackEl)
+    );
   }
   /**
    * Remove a track by id. Equivalent to `trackElement.remove()` —
@@ -1426,28 +1459,13 @@ export class DawEditorElement extends LitElement {
       );
     }
     const clipEl = this._buildClipElement(config);
-    const targetClipId = clipEl.clipId;
-    return new Promise<string>((resolve, reject) => {
-      const onReady = (e: Event) => {
-        const detail = (e as CustomEvent<DawClipIdDetail>).detail;
-        if (detail.clipId !== targetClipId) return;
-        cleanup();
-        resolve(targetClipId);
-      };
-      const onError = (e: Event) => {
-        const detail = (e as CustomEvent<DawClipErrorDetail>).detail;
-        if (detail.clipId !== targetClipId) return;
-        cleanup();
-        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
-      };
-      const cleanup = () => {
-        this.removeEventListener('daw-clip-ready', onReady);
-        this.removeEventListener('daw-clip-error', onError);
-      };
-      this.addEventListener('daw-clip-ready', onReady);
-      this.addEventListener('daw-clip-error', onError);
-      trackEl.appendChild(clipEl);
-    });
+    return this._awaitId(
+      'daw-clip-ready',
+      'daw-clip-error',
+      (d) => d.clipId === clipEl.clipId,
+      clipEl.clipId,
+      () => trackEl.appendChild(clipEl)
+    );
   }
   /**
    * Remove a clip by id. Removes the matching `<daw-clip>` DOM element when
@@ -1532,9 +1550,7 @@ export class DawEditorElement extends LitElement {
     updatedClips[idx] = updatedClip;
     const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
     this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
-    this._recomputeDuration();
-    if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
-    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+    this._commitTrackChange(trackId, updatedTrack);
   }
   private _buildClipElement(config: ClipConfig): DawClipElement {
     const clipEl = document.createElement('daw-clip') as DawClipElement;

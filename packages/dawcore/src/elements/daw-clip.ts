@@ -67,11 +67,15 @@ export class DawClipElement extends LitElement {
       'fadeType',
     ];
     if (clipProps.some((p) => changed.has(p as keyof this))) {
+      // Resolve parent <daw-track> at dispatch time so consumers don't need
+      // to walk closest('daw-track') themselves. trackId may be empty if the
+      // clip is mounted outside a track (developer error).
+      const trackEl = this.closest('daw-track') as { trackId?: string } | null;
       this.dispatchEvent(
         new CustomEvent('daw-clip-update', {
           bubbles: true,
           composed: true,
-          detail: { clipId: this.clipId },
+          detail: { trackId: trackEl?.trackId ?? '', clipId: this.clipId },
         })
       );
     }

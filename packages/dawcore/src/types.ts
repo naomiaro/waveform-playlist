@@ -42,11 +42,13 @@ export interface TrackConfig {
 }
 
 /**
- * Public input shape for clips passed via `TrackConfig.clips`. All fields
- * optional — defaults match the declarative `<daw-clip>` defaults.
+ * Public input shape for clips passed via `TrackConfig.clips` or
+ * `editor.addClip(trackId, config)`. `src` is required — every clip needs
+ * an audio source to load. Other fields default to the matching
+ * `<daw-clip>` attribute defaults.
  */
 export interface ClipConfig {
-  src?: string;
+  src: string;
   peaksSrc?: string;
   start?: number;
   duration?: number;
