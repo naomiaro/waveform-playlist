@@ -10,6 +10,7 @@ export class ViewportController implements ReactiveController {
   private _host: ReactiveControllerHost & HTMLElement;
   private _scrollContainer: HTMLElement | null = null;
   private _lastScrollLeft = 0;
+  private _resizeObserver: ResizeObserver | null = null;
 
   // Permissive defaults: render everything until scroll container is attached
   visibleStart = -Infinity;
@@ -45,14 +46,27 @@ export class ViewportController implements ReactiveController {
 
   hostDisconnected() {
     this._scrollContainer?.removeEventListener('scroll', this._onScroll);
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
     this._scrollContainer = null;
   }
 
   private _attachScrollContainer(container: HTMLElement) {
     this._scrollContainer?.removeEventListener('scroll', this._onScroll);
+    this._resizeObserver?.disconnect();
     this._scrollContainer = container;
     container.addEventListener('scroll', this._onScroll, { passive: true });
     this._update(container.scrollLeft, container.clientWidth);
+    if (typeof ResizeObserver !== 'undefined') {
+      this._resizeObserver = new ResizeObserver(() => {
+        if (!this._scrollContainer) return;
+        const next = this._scrollContainer.clientWidth;
+        if (next === this.containerWidth) return;
+        this._update(this._scrollContainer.scrollLeft, next);
+        this._host.requestUpdate();
+      });
+      this._resizeObserver.observe(container);
+    }
     this._host.requestUpdate();
   }
 

@@ -93,6 +93,13 @@ export class DawEditorElement extends LitElement {
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
   @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
   @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
+  /**
+   * When true, the timeline fills the visible viewport even if total clip
+   * duration is less. Lets the ruler render before any audio is loaded —
+   * useful for empty editors and recording UIs. In beats mode the 32-bar
+   * floor already provides this; this attribute controls the temporal mode.
+   */
+  @property({ type: Boolean, attribute: 'indefinite-playback' }) indefinitePlayback = false;
   @property({ type: String, attribute: 'scale-mode' })
   scaleMode: 'temporal' | 'beats' = 'temporal';
   @property({ type: Number, attribute: 'ticks-per-pixel', noAccessor: true })
@@ -347,7 +354,16 @@ export class DawEditorElement extends LitElement {
       const minTicks = 32 * num * this.ppqn;
       return Math.ceil(Math.max(contentTicks, minTicks) / this.ticksPerPixel);
     }
-    return Math.ceil((this._duration * this.effectiveSampleRate) / this.samplesPerPixel);
+    const naturalWidth = Math.ceil(
+      (this._duration * this.effectiveSampleRate) / this.samplesPerPixel
+    );
+    if (this.indefinitePlayback) {
+      // Fill the visible viewport when natural duration is shorter — lets the
+      // ruler render before any audio is loaded. ViewportController exposes
+      // the scroll-area's clientWidth (updated on attach, scroll, and resize).
+      return Math.max(naturalWidth, this._viewport.containerWidth);
+    }
+    return naturalWidth;
   }
   /** Grid height when no tracks exist — matches scroll area's rendered height. */
   private get _emptyGridHeight(): number {
@@ -1725,7 +1741,7 @@ export class DawEditorElement extends LitElement {
     });
 
     return html`
-      ${orderedTracks.length > 0
+      ${orderedTracks.length > 0 || this.indefinitePlayback
         ? html`<div class="controls-column">
             ${this.timescale ? html`<div style="height: 30px;"></div>` : ''}
             ${orderedTracks.map(
@@ -1753,7 +1769,8 @@ export class DawEditorElement extends LitElement {
           @dragleave=${this._onDragLeave}
           @drop=${this._onDrop}
         >
-          ${(orderedTracks.length > 0 || this.scaleMode === 'beats') && this.timescale
+          ${(orderedTracks.length > 0 || this.scaleMode === 'beats' || this.indefinitePlayback) &&
+          this.timescale
             ? html`<daw-ruler
                 .samplesPerPixel=${spp}
                 .sampleRate=${this.effectiveSampleRate}
@@ -1779,7 +1796,7 @@ export class DawEditorElement extends LitElement {
                   : this._emptyGridHeight}
               ></daw-grid>`
             : ''}
-          ${orderedTracks.length > 0 || this.scaleMode === 'beats'
+          ${orderedTracks.length > 0 || this.scaleMode === 'beats' || this.indefinitePlayback
             ? html`<daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
                 <daw-playhead></daw-playhead>`
             : ''}

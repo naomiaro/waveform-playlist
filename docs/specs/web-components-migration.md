@@ -340,7 +340,7 @@ wave-height          Number    128      Track height in px
 timescale            Boolean   false    Show time ruler
 mono                 Boolean   false    Mono waveform rendering
 automatic-scroll     Boolean   false    Follow playhead
-indefinite-playback  Boolean   false    Play past end of audio
+indefinite-playback  Boolean   false    Fill viewport when shorter than visible width — lets the ruler render before any audio is loaded
 bar-width            Number    1        Waveform bar width
 bar-gap              Number    0        Waveform bar gap
 show-clip-headers    Boolean   false    Show clip name headers

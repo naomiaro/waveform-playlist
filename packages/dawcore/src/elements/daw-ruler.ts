@@ -59,12 +59,18 @@ export class DawRulerElement extends LitElement {
         ppqn: this.ppqn,
       });
       this._tickData = null;
-    } else if (this.duration > 0) {
+    } else if (this.duration > 0 || this.totalWidth > 0) {
+      // When natural duration is 0 (empty editor), derive an effective duration
+      // from totalWidth so the ruler can render — used by indefinite-playback.
+      const effectiveDuration =
+        this.duration > 0
+          ? this.duration
+          : (this.totalWidth * this.samplesPerPixel) / this.sampleRate;
       this._musicalTickData = null;
       this._tickData = computeTemporalTicks(
         this.samplesPerPixel,
         this.sampleRate,
-        this.duration,
+        effectiveDuration,
         this.rulerHeight
       );
     } else {
