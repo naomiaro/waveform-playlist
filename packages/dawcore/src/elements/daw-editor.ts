@@ -622,9 +622,13 @@ export class DawEditorElement extends LitElement {
     if (!this._engineTracks.has(trackId)) {
       // _tracks is populated in _onTrackConnected before _loadTrack runs, so
       // having a descriptor without an engine track means the parent is still
-      // loading. _readTrackDescriptor already saw the clips that were children
-      // at that time — a clip appended after that point will be missed.
-      if (this._tracks.has(trackId)) {
+      // loading. _readTrackDescriptor already captured each existing <daw-clip>
+      // child's id into descriptor.clips — those deferred daw-clip-connected
+      // events are redundant and silent skip is correct. Only a clipId that
+      // wasn't in the pre-load capture is a true late-append that risks being
+      // missed; warn for those.
+      const desc = this._tracks.get(trackId);
+      if (desc && !desc.clips.some((c) => c.clipId === clipEl.clipId)) {
         console.warn(
           '[dawcore] daw-clip-connected fired while parent track "' +
             trackId +

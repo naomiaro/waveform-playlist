@@ -537,6 +537,70 @@ describe('Phase 2: end-to-end engine state assertions', () => {
   });
 });
 
+describe("Phase 2: in-flight track load doesn't false-warn for pre-captured clips", () => {
+  it('addTrack({clips:[..]}) does not warn when deferred daw-clip-connected fires for pre-read clips', async () => {
+    const editor = setupEditor();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await editor.addTrack({
+      name: 'T',
+      clips: [
+        { src: '/a.opus', start: 0 },
+        { src: '/b.opus', start: 4 },
+      ],
+    });
+    // None of the warns should mention "still loading" — those clips were
+    // captured by _readTrackDescriptor and the deferred events are redundant.
+    const loadingWarns = warnSpy.mock.calls
+      .map((args) => String(args[0]))
+      .filter((msg) => msg.includes('still loading'));
+    expect(loadingWarns).toEqual([]);
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+
+  it('genuine late-append during in-flight load still warns', async () => {
+    const editor = setupEditor();
+    // Slow the decode so the track is in-flight when we late-append
+    let resolveDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi
+      .fn()
+      .mockImplementation(() => new Promise<AudioBuffer>((r) => (resolveDecode = r)));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const promise = editor.addTrack({
+      name: 'Slow',
+      clips: [{ src: '/a.opus' }],
+    });
+    // Wait for daw-track-connected microtask to run; track now in _tracks but not _engineTracks.
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Append a NEW clip that wasn't in the original config
+    const trackEl = editor.querySelector('daw-track') as any;
+    const lateClip = document.createElement('daw-clip');
+    lateClip.setAttribute('src', '/late.opus');
+    trackEl.appendChild(lateClip);
+    // Wait for the late clip's deferred daw-clip-connected
+    await new Promise((r) => setTimeout(r, 0));
+
+    const loadingWarns = warnSpy.mock.calls
+      .map((args) => String(args[0]))
+      .filter((msg) => msg.includes('still loading'));
+    expect(loadingWarns.length).toBe(1);
+
+    // Let the addTrack promise resolve so the test can clean up
+    resolveDecode({
+      length: 96000,
+      duration: 2,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+      getChannelData: () => new Float32Array(96000),
+    } as unknown as AudioBuffer);
+    await promise;
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+});
+
 describe('Phase 2: silent no-op warns', () => {
   it('removeTrack warns when trackId is unknown', () => {
     const editor = setupEditor();
