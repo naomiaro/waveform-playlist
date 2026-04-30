@@ -5,7 +5,7 @@ vi.mock('../audioContext', () => ({
   getGlobalAudioContext: vi.fn().mockReturnValue({
     sampleRate: 48000,
   } as unknown as AudioContext),
-  getGlobalContext: vi.fn(),
+  getGlobalContext: vi.fn().mockReturnValue({ lookAhead: 0.1 }),
 }));
 
 // Mock TonePlayout before importing adapter
@@ -599,6 +599,13 @@ describe('createToneAdapter', () => {
       const adapter = createToneAdapter();
       expect(adapter.audioContext).toBeDefined();
       expect(adapter.audioContext!.sampleRate).toBe(48000);
+    });
+  });
+
+  describe('lookAhead', () => {
+    it('exposes the Tone Context lookAhead so consumers can align the playhead with audible output', () => {
+      const adapter = createToneAdapter();
+      expect(adapter.lookAhead).toBe(0.1);
     });
   });
 

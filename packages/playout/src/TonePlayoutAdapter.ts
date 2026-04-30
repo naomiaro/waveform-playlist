@@ -361,6 +361,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
       return getGlobalAudioContext();
     },
 
+    get lookAhead(): number {
+      // Tone.js Transport reports a position `lookAhead` ahead of what's audible.
+      // Consumers visualizing playback should subtract this to align the playhead
+      // with the listener's "now". Default is 0.1s on Tone Context wrappers.
+      return getGlobalContext().lookAhead ?? 0;
+    },
+
     get ppqn(): number {
       return _ppqn;
     },

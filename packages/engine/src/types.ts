@@ -49,6 +49,13 @@ export interface PlayoutAdapter {
   /** The master output AudioNode. Connect your own nodes (analyzers, recorders, etc.)
    *  in parallel or series. The adapter already routes this to audioContext.destination. */
   readonly masterOutputNode?: AudioNode;
+  /** Audio scheduling lookahead in seconds — `getCurrentTime()` is this far ahead of
+   *  what the listener actually hears. Tone.js Transport reports a position lookAhead
+   *  ahead of audible (default 0.1s); native AudioContext-based adapters have no
+   *  lookahead. Consumers visualizing playback position should subtract this from
+   *  `getCurrentTime()` (along with `audioContext.outputLatency`) to align the playhead
+   *  with audible output. Returns 0 or undefined when there's no lookahead. */
+  readonly lookAhead?: number;
   dispose(): void;
 }
 

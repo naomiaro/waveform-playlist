@@ -1824,25 +1824,23 @@ export class DawEditorElement extends LitElement {
     if (!playhead || !this._engine) return;
     const engine = this._engine;
     const ctx = this.audioContext;
+    const adapter = this._externalAdapter;
+    // Audible position = engine time - hardware DAC latency - scheduler lookahead.
+    // - outputLatency: present on native AudioContext (~3ms Chrome, ~15ms Safari).
+    // - adapter.lookAhead: present on Tone-backed adapters (default 0.1s). Transport.seconds
+    //   is the scheduling position, which is lookAhead ahead of what the listener hears.
+    //   Without this subtraction, the playhead leads audio by ~100ms with the Tone adapter;
+    //   the native adapter reports lookAhead as 0 (no-op).
+    const audibleTime = (): number => {
+      const outputLatency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+      const lookAhead = adapter?.lookAhead ?? 0;
+      return Math.max(0, engine.getCurrentTime() - outputLatency - lookAhead);
+    };
     if (this.scaleMode === 'beats') {
       const secondsToTicksFn = (s: number) => this._secondsToTicks(s);
-      playhead.startBeatsAnimationWithMap(
-        () => {
-          const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-          return Math.max(0, engine.getCurrentTime() - latency);
-        },
-        secondsToTicksFn,
-        this.ticksPerPixel
-      );
+      playhead.startBeatsAnimationWithMap(audibleTime, secondsToTicksFn, this.ticksPerPixel);
     } else {
-      playhead.startAnimation(
-        () => {
-          const latency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-          return Math.max(0, engine.getCurrentTime() - latency);
-        },
-        this.effectiveSampleRate,
-        this.samplesPerPixel
-      );
+      playhead.startAnimation(audibleTime, this.effectiveSampleRate, this.samplesPerPixel);
     }
   }
   _stopPlayhead() {
