@@ -33,7 +33,7 @@ interface BaseClipDescriptor {
  * and `_loadAndAppendClip` so DOM and engine reference the same clip.
  */
 export interface DomClipDescriptor extends BaseClipDescriptor {
-  source: 'dom';
+  kind: 'dom';
   clipId: string;
 }
 
@@ -44,10 +44,19 @@ export interface DomClipDescriptor extends BaseClipDescriptor {
  * generates its own id at clip-creation time.
  */
 export interface DropClipDescriptor extends BaseClipDescriptor {
-  source: 'drop';
+  kind: 'drop';
 }
 
 export type ClipDescriptor = DomClipDescriptor | DropClipDescriptor;
+
+/**
+ * Type predicate for the `'dom'` discriminator. Use to narrow a
+ * `ClipDescriptor` to `DomClipDescriptor` (which has `clipId`) without
+ * inline `c.kind === 'dom'` repetition.
+ */
+export function isDomClip(desc: ClipDescriptor): desc is DomClipDescriptor {
+  return desc.kind === 'dom';
+}
 
 /**
  * Public input shape for `editor.addTrack(config)`. All fields optional —

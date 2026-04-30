@@ -9,7 +9,14 @@ import type {
   SnapTo,
   MeterEntry,
 } from '@waveform-playlist/core';
-import type { TrackDescriptor, ClipDescriptor, TrackConfig, ClipConfig } from '../types';
+import type {
+  TrackDescriptor,
+  ClipDescriptor,
+  DomClipDescriptor,
+  TrackConfig,
+  ClipConfig,
+} from '../types';
+import { isDomClip } from '../types';
 import {
   createClip,
   createClipFromSeconds,
@@ -629,7 +636,7 @@ export class DawEditorElement extends LitElement {
       // wasn't in the pre-load capture is a true late-append that risks being
       // missed; warn for those.
       const desc = this._tracks.get(trackId);
-      if (desc && !desc.clips.some((c) => c.source === 'dom' && c.clipId === clipEl.clipId)) {
+      if (desc && !desc.clips.some((c) => isDomClip(c) && c.clipId === clipEl.clipId)) {
         console.warn(
           '[dawcore] daw-clip-connected fired while parent track "' +
             trackId +
@@ -641,7 +648,7 @@ export class DawEditorElement extends LitElement {
       return;
     }
     const clipDesc: ClipDescriptor = {
-      source: 'dom',
+      kind: 'dom',
       clipId: clipEl.clipId,
       src: clipEl.src,
       peaksSrc: clipEl.peaksSrc,
@@ -693,9 +700,13 @@ export class DawEditorElement extends LitElement {
       this._purgeClipCaches(clipId);
     }
   }
-  private async _loadAndAppendClip(trackId: string, clipDesc: ClipDescriptor) {
+  private async _loadAndAppendClip(trackId: string, clipDesc: DomClipDescriptor) {
     if (!clipDesc.src) return; // empty/no-src clips can't be loaded
-    const clipId = clipDesc.source === 'dom' ? clipDesc.clipId : undefined;
+    // Late-append always comes via _onClipConnected, which only fires for
+    // <daw-clip> elements — so clipId is always known. We use it for the
+    // error dispatch so the consumer's addClip Promise rejects with a usable
+    // identifier even if _finalizeAudioClip throws before clip.id is set.
+    const clipId = clipDesc.clipId;
     // Track which clip id has been inserted into per-clip caches so the catch
     // block can roll back partial state on any error past the cache writes.
     let insertedClipId: string | null = null;
@@ -748,7 +759,7 @@ export class DawEditorElement extends LitElement {
         new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
           bubbles: true,
           composed: true,
-          detail: { trackId, clipId: insertedClipId ?? clipId ?? '', error: err },
+          detail: { trackId, clipId: insertedClipId ?? clipId, error: err },
         })
       );
     }
@@ -817,10 +828,6 @@ export class DawEditorElement extends LitElement {
         sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
       });
       this._peakPipeline.cacheWaveformData(audioBuffer, waveformData);
-      // Pre-computed peaks set a zoom-floor — without this, samplesPerPixel
-      // can be set finer than what WaveformData can resample to, producing
-      // blank waveforms for the clip.
-      this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
     } else {
       clip = createClipFromSeconds({
         audioBuffer,
@@ -833,7 +840,7 @@ export class DawEditorElement extends LitElement {
         sourceDuration: audioBuffer.duration,
       });
     }
-    if (clipDesc.source === 'dom') clip.id = clipDesc.clipId;
+    if (isDomClip(clipDesc)) clip.id = clipDesc.clipId;
 
     this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
     this._clipOffsets.set(clip.id, {
@@ -858,6 +865,12 @@ export class DawEditorElement extends LitElement {
       throw err;
     }
     this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
+    // Raise the zoom-floor only after generatePeaks succeeds — without this,
+    // a generatePeaks failure would strand _minSamplesPerPixel at a value
+    // backed by no actual peaks (CLAUDE.md `samplesPerPixel` Zoom Floor rule).
+    if (waveformData) {
+      this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
+    }
     return clip;
   }
   /** Remove a single clip from all per-clip caches. Used by error rollbacks. */
@@ -963,7 +976,7 @@ export class DawEditorElement extends LitElement {
         ...desc,
         // Only DOM-sourced clips have an id to match; drop-sourced clips are
         // filtered through unchanged (their identity is the descriptor itself).
-        clips: desc.clips.filter((c) => !(c.source === 'dom' && c.clipId === clipId)),
+        clips: desc.clips.filter((c) => !(isDomClip(c) && c.clipId === clipId)),
       });
     }
     this._commitTrackChange(trackId, updatedTrack);
@@ -976,7 +989,7 @@ export class DawEditorElement extends LitElement {
       // <daw-track src> shorthand — synthetic descriptor with no <daw-clip>
       // backing element. No DOM clipId to align with.
       clips.push({
-        source: 'drop',
+        kind: 'drop',
         src: trackEl.src,
         peaksSrc: '',
         start: 0,
@@ -991,7 +1004,7 @@ export class DawEditorElement extends LitElement {
     } else {
       for (const clipEl of clipEls) {
         clips.push({
-          source: 'dom',
+          kind: 'dom',
           clipId: clipEl.clipId,
           src: clipEl.src,
           peaksSrc: clipEl.peaksSrc,
@@ -1022,98 +1035,123 @@ export class DawEditorElement extends LitElement {
       const clips = [];
       for (const clipDesc of descriptor.clips) {
         if (!clipDesc.src) continue;
+        // Per-clip try/catch: a single bad clip dispatches daw-clip-error and
+        // skips to the next clip rather than aborting the whole track. Without
+        // this, clip N's failure leaks earlier clips' cache writes from this
+        // loop because the outer catch never reaches engine.setTracks().
+        try {
+          // Start both fetches concurrently — await peaks first to render preview before audio decode
+          const waveformDataPromise = clipDesc.peaksSrc
+            ? this._resolvePeaks(clipDesc.peaksSrc)
+            : Promise.resolve(null);
+          const audioPromise = this._fetchAndDecode(clipDesc.src);
 
-        // Start both fetches concurrently — await peaks first to render preview before audio decode
-        const waveformDataPromise = clipDesc.peaksSrc
-          ? this._resolvePeaks(clipDesc.peaksSrc)
-          : Promise.resolve(null);
-        const audioPromise = this._fetchAndDecode(clipDesc.src);
+          // --- Peaks-first path: render waveform before audio decode completes ---
+          // _resolvePeaks returns null on fetch failure or sample-rate mismatch
+          // (warns in either case); the standard path below handles the null case.
+          const waveformData = await waveformDataPromise;
+          if (waveformData) {
+            // Create clip with integer samples to avoid float round-trip drift
+            // (CLAUDE.md pattern #40: prefer createClip when samples known)
+            const wdRate = waveformData.sample_rate;
+            const clip = createClip({
+              waveformData,
+              startSample: Math.round(clipDesc.start * wdRate),
+              durationSamples: Math.round((clipDesc.duration || waveformData.duration) * wdRate),
+              offsetSamples: Math.round(clipDesc.offset * wdRate),
+              gain: clipDesc.gain,
+              name: clipDesc.name,
+              sampleRate: wdRate,
+              sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
+            });
+            // Align engine clip.id with the source <daw-clip>.clipId (if any) so
+            // DOM and engine refer to the same clip — required for editor.removeClip
+            // and editor.updateClip lookups.
+            if (isDomClip(clipDesc)) clip.id = clipDesc.clipId;
+            const effectiveScale = Math.max(this._renderSpp, waveformData.scale);
+            const peakData = extractPeaks(
+              waveformData,
+              effectiveScale,
+              this.mono,
+              clip.offsetSamples,
+              clip.durationSamples
+            );
+            this._clipOffsets.set(clip.id, {
+              offsetSamples: clip.offsetSamples,
+              durationSamples: clip.durationSamples,
+            });
+            this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
+            this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
 
-        // --- Peaks-first path: render waveform before audio decode completes ---
-        // _resolvePeaks returns null on fetch failure or sample-rate mismatch
-        // (warns in either case); the standard path below handles the null case.
-        const waveformData = await waveformDataPromise;
-        if (waveformData) {
-          // Create clip with integer samples to avoid float round-trip drift
-          // (CLAUDE.md pattern #40: prefer createClip when samples known)
-          const wdRate = waveformData.sample_rate;
-          const clip = createClip({
-            waveformData,
-            startSample: Math.round(clipDesc.start * wdRate),
-            durationSamples: Math.round((clipDesc.duration || waveformData.duration) * wdRate),
-            offsetSamples: Math.round(clipDesc.offset * wdRate),
-            gain: clipDesc.gain,
-            name: clipDesc.name,
-            sampleRate: wdRate,
-            sourceDurationSamples: Math.ceil(waveformData.duration * wdRate),
-          });
-          // Align engine clip.id with the source <daw-clip>.clipId (if any) so
-          // DOM and engine refer to the same clip — required for editor.removeClip
-          // and editor.updateClip lookups.
-          if (clipDesc.source === 'dom') clip.id = clipDesc.clipId;
-          const effectiveScale = Math.max(this._renderSpp, waveformData.scale);
-          const peakData = extractPeaks(
-            waveformData,
-            effectiveScale,
-            this.mono,
-            clip.offsetSamples,
-            clip.durationSamples
-          );
-          this._clipOffsets.set(clip.id, {
-            offsetSamples: clip.offsetSamples,
-            durationSamples: clip.durationSamples,
-          });
-          this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
-          this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
-
-          // Render preview track immediately with peaks (render-only until audio
-          // completes and engine.setTracks() runs at end of _loadTrack)
-          const previewTrack = createTrack({
-            name: descriptor.name,
-            clips: [clip],
-            volume: descriptor.volume,
-            pan: descriptor.pan,
-            muted: descriptor.muted,
-            soloed: descriptor.soloed,
-          });
-          previewTrack.id = trackId;
-          this._engineTracks = new Map(this._engineTracks).set(trackId, previewTrack);
-          this._recomputeDuration();
-
-          // Wait for audio decode — clean up preview state if it fails
-          let audioBuffer: AudioBuffer;
-          try {
-            audioBuffer = await audioPromise;
-          } catch (audioErr) {
-            // Remove ghost preview so the user doesn't see a waveform with no audio
-            const nextPeaks = new Map(this._peaksData);
-            nextPeaks.delete(clip.id);
-            this._peaksData = nextPeaks;
-            this._clipOffsets.delete(clip.id);
-            const nextEngine = new Map(this._engineTracks);
-            nextEngine.delete(trackId);
-            this._engineTracks = nextEngine;
-            this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
+            // Render preview track immediately with peaks (render-only until audio
+            // completes and engine.setTracks() runs at end of _loadTrack)
+            const previewTrack = createTrack({
+              name: descriptor.name,
+              clips: [clip],
+              volume: descriptor.volume,
+              pan: descriptor.pan,
+              muted: descriptor.muted,
+              soloed: descriptor.soloed,
+            });
+            previewTrack.id = trackId;
+            this._engineTracks = new Map(this._engineTracks).set(trackId, previewTrack);
             this._recomputeDuration();
-            throw audioErr; // Propagate to outer catch for daw-track-error event
-          }
-          this._resolvedSampleRate = audioBuffer.sampleRate;
-          // Backfill audioBuffer immutably: new clip replaces the preview clip
-          const updatedClip = { ...clip, audioBuffer };
-          this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
-          this._peakPipeline.cacheWaveformData(audioBuffer, waveformData);
-          clips.push(updatedClip);
-          continue;
-        }
 
-        // --- Standard path: decode audio first, then generate peaks ---
-        // Reached only when the peaks-first branch above didn't kick in
-        // (no peaksSrc, fetch failure, or sample-rate mismatch). waveformData
-        // is always null here.
-        const audioBuffer = await audioPromise;
-        this._resolvedSampleRate = audioBuffer.sampleRate;
-        const clip = await this._finalizeAudioClip(clipDesc, audioBuffer, null);
-        clips.push(clip);
+            // Wait for audio decode — clean up preview state if it fails
+            let audioBuffer: AudioBuffer;
+            try {
+              audioBuffer = await audioPromise;
+            } catch (audioErr) {
+              // Remove ghost preview so the user doesn't see a waveform with no audio
+              const nextPeaks = new Map(this._peaksData);
+              nextPeaks.delete(clip.id);
+              this._peaksData = nextPeaks;
+              this._clipOffsets.delete(clip.id);
+              const nextEngine = new Map(this._engineTracks);
+              nextEngine.delete(trackId);
+              this._engineTracks = nextEngine;
+              this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
+              this._recomputeDuration();
+              throw audioErr; // Propagate to outer catch for daw-track-error event
+            }
+            this._resolvedSampleRate = audioBuffer.sampleRate;
+            // Backfill audioBuffer immutably: new clip replaces the preview clip
+            const updatedClip = { ...clip, audioBuffer };
+            this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
+            this._peakPipeline.cacheWaveformData(audioBuffer, waveformData);
+            clips.push(updatedClip);
+            continue;
+          }
+
+          // --- Standard path: decode audio first, then generate peaks ---
+          // Reached only when the peaks-first branch above didn't kick in
+          // (no peaksSrc, fetch failure, or sample-rate mismatch). waveformData
+          // is always null here.
+          const audioBuffer = await audioPromise;
+          this._resolvedSampleRate = audioBuffer.sampleRate;
+          const clip = await this._finalizeAudioClip(clipDesc, audioBuffer, null);
+          clips.push(clip);
+        } catch (clipErr) {
+          // _finalizeAudioClip and the peaks-first audio-decode catch already
+          // purged their own per-clip caches before throwing here. Dispatch
+          // daw-clip-error so consumers can correlate the failure to a clip.
+          console.warn(
+            '[dawcore] _loadTrack: clip "' + clipDesc.src + '" failed: ' + String(clipErr)
+          );
+          if (this.isConnected) {
+            this.dispatchEvent(
+              new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+                bubbles: true,
+                composed: true,
+                detail: {
+                  trackId,
+                  clipId: isDomClip(clipDesc) ? clipDesc.clipId : '',
+                  error: clipErr,
+                },
+              })
+            );
+          }
+        }
       }
       const track = createTrack({
         name: descriptor.name,
@@ -1123,6 +1161,15 @@ export class DawEditorElement extends LitElement {
         muted: descriptor.muted,
         soloed: descriptor.soloed,
       });
+      // If clips were requested but ALL failed to load, surface as a track-level
+      // error so addTrack({clips: [...]}) rejects appropriately. Per-clip
+      // daw-clip-error events have already fired for each individual failure.
+      const requestedClips = descriptor.clips.filter((c) => c.src).length;
+      if (requestedClips > 0 && clips.length === 0) {
+        throw new Error(
+          'all ' + requestedClips + ' clip(s) failed to load — see prior daw-clip-error events'
+        );
+      }
       // Align track.id with the editor's trackId so engine.setTrackSolo/Mute/etc. find it
       track.id = trackId;
       this._engineTracks = new Map(this._engineTracks).set(trackId, track);

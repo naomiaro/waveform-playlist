@@ -118,16 +118,21 @@ describe('editor.addTrack()', () => {
     editor.remove();
   });
 
-  it('rejects when daw-track-error fires for that track', async () => {
+  it('rejects when all requested clips fail to load', async () => {
     const editor = setupEditor();
-    // Make the fetch reject so _loadTrack dispatches daw-track-error naturally.
+    // Per-clip failures dispatch daw-clip-error and skip; if every requested
+    // clip fails, the track surfaces a track-level error so addTrack rejects.
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     editor._fetchAndDecode = vi.fn().mockRejectedValue(new Error('decode failed'));
+    const clipErrors: CustomEvent[] = [];
+    editor.addEventListener('daw-clip-error', (e: CustomEvent) => clipErrors.push(e));
     const promise = editor.addTrack({
       name: 'Bad',
       clips: [{ src: '/missing.opus' }],
     });
-    await expect(promise).rejects.toThrow('decode failed');
+    await expect(promise).rejects.toThrow(/all 1 clip\(s\) failed/);
+    expect(clipErrors).toHaveLength(1);
+    expect(String(clipErrors[0].detail.error)).toContain('decode failed');
     warnSpy.mockRestore();
     editor.remove();
   });
@@ -389,6 +394,141 @@ describe('Phase 1 regression fixes', () => {
     const stored = editor._peaksData.get(clipId);
     expect(stored.bits).toBe(16);
     expect(stored.data).toBeDefined();
+    editor.remove();
+  });
+});
+
+describe('Phase 3 refactor: _resolvePeaks + peaks-first flow', () => {
+  function makeWaveformData(sampleRate: number, scale = 256, durationSec = 2) {
+    return {
+      sample_rate: sampleRate,
+      scale,
+      duration: durationSec,
+      length: 0,
+      bits: 16,
+    } as any;
+  }
+
+  it('peaks-first path uses pre-computed WaveformData when sample-rate matches', async () => {
+    const editor = setupEditor();
+    editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(48000));
+    // Stub extractPeaks via mocking — _peakPipeline.cacheWaveformData is also called
+    editor._peakPipeline.cacheWaveformData = vi.fn();
+    await editor.addTrack({
+      name: 'T',
+      clips: [{ src: '/a.opus', peaksSrc: '/a.dat' }],
+    });
+    expect(editor._fetchPeaks).toHaveBeenCalledWith('/a.dat');
+    expect(editor._peakPipeline.cacheWaveformData).toHaveBeenCalled();
+    editor.remove();
+  });
+
+  it('peaks-first path warns + falls back when peaks sample-rate mismatches AudioContext', async () => {
+    const editor = setupEditor(); // adapter sampleRate is 48000
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // .dat at 44100 — mismatch
+    editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(44100));
+    editor._peakPipeline.cacheWaveformData = vi.fn();
+    await editor.addTrack({
+      name: 'T',
+      clips: [{ src: '/a.opus', peaksSrc: '/a.dat' }],
+    });
+    const mismatchWarns = warnSpy.mock.calls
+      .map((args) => String(args[0]))
+      .filter((m) => m.includes('Pre-computed peaks'));
+    expect(mismatchWarns.length).toBeGreaterThanOrEqual(1);
+    // Fell back to standard path — cacheWaveformData NOT called
+    expect(editor._peakPipeline.cacheWaveformData).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+
+  it('peaks-first path warns + falls back when peaks fetch fails', async () => {
+    const editor = setupEditor();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor._fetchPeaks = vi.fn().mockRejectedValue(new Error('404 not found'));
+    editor._peakPipeline.cacheWaveformData = vi.fn();
+    await editor.addTrack({
+      name: 'T',
+      clips: [{ src: '/a.opus', peaksSrc: '/missing.dat' }],
+    });
+    const fetchWarns = warnSpy.mock.calls
+      .map((args) => String(args[0]))
+      .filter((m) => m.includes('Failed to load peaks'));
+    expect(fetchWarns.length).toBeGreaterThanOrEqual(1);
+    expect(editor._peakPipeline.cacheWaveformData).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+
+  it('_loadAndAppendClip raises _minSamplesPerPixel only after generatePeaks succeeds', async () => {
+    const editor = setupEditor();
+    editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(48000, 512));
+    editor._peakPipeline.cacheWaveformData = vi.fn();
+    // generatePeaks succeeds first, then track loads, then we addClip with peaks
+    await editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const beforeFloor = editor._minSamplesPerPixel;
+    await editor.addClip(trackEl.trackId, { src: '/a.opus', peaksSrc: '/a.dat' });
+    // After successful load, _minSamplesPerPixel was raised to peaks scale (512)
+    expect(editor._minSamplesPerPixel).toBe(Math.max(beforeFloor, 512));
+    editor.remove();
+  });
+
+  it('_loadAndAppendClip does NOT raise _minSamplesPerPixel when generatePeaks fails', async () => {
+    const editor = setupEditor();
+    editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(48000, 512));
+    editor._peakPipeline.cacheWaveformData = vi.fn();
+    await editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const beforeFloor = editor._minSamplesPerPixel;
+
+    // Fail generatePeaks specifically
+    editor._peakPipeline.generatePeaks = vi.fn().mockRejectedValue(new Error('worker crash'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      editor.addClip(trackEl.trackId, { src: '/a.opus', peaksSrc: '/a.dat' })
+    ).rejects.toThrow('worker crash');
+    // Floor is unchanged — no peaks survived, no zoom-floor stranded
+    expect(editor._minSamplesPerPixel).toBe(beforeFloor);
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+});
+
+describe('Phase 3 refactor: _loadTrack per-clip isolation', () => {
+  it('one bad clip does not abort the whole track — successful clips load, bad clip dispatches daw-clip-error', async () => {
+    const editor = setupEditor();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Reject only one src so others succeed
+    editor._fetchAndDecode = vi.fn().mockImplementation((src: string) => {
+      if (src === '/bad.opus') return Promise.reject(new Error('decode failed'));
+      return Promise.resolve({
+        length: 96000,
+        duration: 2,
+        sampleRate: 48000,
+        numberOfChannels: 1,
+        getChannelData: () => new Float32Array(96000),
+      } as unknown as AudioBuffer);
+    });
+    const clipErrors: CustomEvent[] = [];
+    editor.addEventListener('daw-clip-error', (e: CustomEvent) => clipErrors.push(e));
+
+    const t = await editor.addTrack({
+      name: 'Mixed',
+      clips: [{ src: '/good1.opus' }, { src: '/bad.opus' }, { src: '/good2.opus' }],
+    });
+
+    // Track loaded with 2 successful clips
+    const engineTrack = editor._engineTracks.get(t.trackId);
+    expect(engineTrack.clips.length).toBe(2);
+    // Per-clip error dispatched for the failed one
+    expect(clipErrors).toHaveLength(1);
+    expect(String(clipErrors[0].detail.error)).toContain('decode failed');
+    warnSpy.mockRestore();
     editor.remove();
   });
 });

@@ -96,7 +96,7 @@ export async function loadFiles(
         soloed: false,
         clips: [
           {
-            source: 'drop',
+            kind: 'drop',
             src: '',
             peaksSrc: '',
             start: 0,

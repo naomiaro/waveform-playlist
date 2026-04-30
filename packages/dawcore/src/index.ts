@@ -42,7 +42,15 @@ export { AudioResumeController } from './controllers/audio-resume-controller';
 export { RecordingController } from './controllers/recording-controller';
 export type { RecordingOptions, RecordingSession } from './controllers/recording-controller';
 
-export type { TrackDescriptor, ClipDescriptor, TrackConfig, ClipConfig } from './types';
+export type {
+  TrackDescriptor,
+  ClipDescriptor,
+  DomClipDescriptor,
+  DropClipDescriptor,
+  TrackConfig,
+  ClipConfig,
+} from './types';
+export { isDomClip } from './types';
 export type { PointerEngineContract } from './interactions/pointer-handler';
 export { ClipPointerHandler } from './interactions/clip-pointer-handler';
 export type { ClipPointerHost, ClipEngineContract } from './interactions/clip-pointer-handler';
