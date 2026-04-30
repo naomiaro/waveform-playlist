@@ -114,16 +114,22 @@ const CustomPlayhead: React.FC<{
   const {
     isPlaying,
     currentTimeRef,
+    visualTimeRef,
     playbackStartTimeRef,
     audioStartPositionRef,
     getPlaybackTime,
   } = usePlaybackAnimation();
 
+  // Use visualTimeRef so the initial position matches the audible output
+  // (the playhead's rAF loop also reads visualTimeRef for in-sync animation).
+  const visualTime = visualTimeRef.current ?? currentTimeRef.current ?? 0;
+
   return renderPlayhead({
-    position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
+    position: (visualTime * sampleRate) / samplesPerPixel,
     color,
     isPlaying,
     currentTimeRef,
+    visualTimeRef,
     playbackStartTimeRef,
     audioStartPositionRef,
     samplesPerPixel,

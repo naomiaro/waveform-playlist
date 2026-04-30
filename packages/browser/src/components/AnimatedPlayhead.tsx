@@ -28,8 +28,13 @@ interface AnimatedPlayheadProps {
 export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff0000' }) => {
   const playheadRef = useRef<HTMLDivElement>(null);
 
-  const { isPlaying, currentTimeRef, registerFrameCallback, unregisterFrameCallback } =
-    usePlaybackAnimation();
+  const {
+    isPlaying,
+    currentTimeRef,
+    visualTimeRef,
+    registerFrameCallback,
+    unregisterFrameCallback,
+  } = usePlaybackAnimation();
   const { samplesPerPixel, sampleRate, progressBarWidth } = usePlaylistData();
 
   // Register per-frame callback during playback
@@ -46,10 +51,12 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff
     return () => unregisterFrameCallback(id);
   }, [isPlaying, registerFrameCallback, unregisterFrameCallback]);
 
-  // Update position when not playing (seeks, stops, etc.) — no rAF needed
+  // Update position when not playing (seeks, stops, etc.) — no rAF needed.
+  // Reads visualTimeRef so the static playhead lines up with audible output
+  // (the pause/seek paths sync visualTimeRef when they update currentTimeRef).
   useEffect(() => {
     if (!isPlaying && playheadRef.current) {
-      const time = currentTimeRef.current ?? 0;
+      const time = visualTimeRef.current ?? currentTimeRef.current ?? 0;
       const position = (time * sampleRate) / samplesPerPixel;
       playheadRef.current.style.transform = `translate3d(${position}px, 0, 0)`;
     }

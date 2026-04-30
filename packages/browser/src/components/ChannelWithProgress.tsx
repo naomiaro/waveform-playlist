@@ -102,8 +102,13 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   const theme = useTheme() as WaveformPlaylistTheme;
   const { waveHeight } = usePlaylistInfo();
 
-  const { isPlaying, currentTimeRef, registerFrameCallback, unregisterFrameCallback } =
-    usePlaybackAnimation();
+  const {
+    isPlaying,
+    currentTimeRef,
+    visualTimeRef,
+    registerFrameCallback,
+    unregisterFrameCallback,
+  } = usePlaybackAnimation();
   const { samplesPerPixel, sampleRate } = usePlaylistData();
 
   const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
@@ -149,10 +154,11 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     unregisterFrameCallback,
   ]);
 
-  // Also update when not playing (for seeks, stops, etc.)
+  // Also update when not playing (for seeks, stops, etc.). Reads visualTimeRef
+  // so the static progress fill matches the playhead's audible position.
   useEffect(() => {
     if (!isPlaying && progressRef.current) {
-      const currentTime = currentTimeRef.current ?? 0;
+      const currentTime = visualTimeRef.current ?? currentTimeRef.current ?? 0;
       const currentSample = currentTime * sampleRate;
       const clipEndSample = clipStartSample + clipDurationSamples;
 

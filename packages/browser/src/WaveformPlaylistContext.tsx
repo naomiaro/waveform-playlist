@@ -95,10 +95,17 @@ export interface PlaybackAnimationContextValue {
   isPlaying: boolean;
   currentTime: number;
   currentTimeRef: React.RefObject<number>;
+  /**
+   * Visually-aligned playback time (raw engine time minus `outputLatency` and
+   * `engine.lookAhead`). Kept current by the animation loop during playback
+   * and by pause/seek/stop paths when stopped. Read from this for any visual
+   * positioning that should match the audible output.
+   */
+  visualTimeRef: React.RefObject<number>;
   // Refs for direct time calculation in animated components (avoids timing drift)
   playbackStartTimeRef: React.RefObject<number>; // context.currentTime when playback started
   audioStartPositionRef: React.RefObject<number>; // Audio position when playback started
-  /** Returns current playback time from engine (auto-wraps at loop boundaries). */
+  /** Returns raw playback time from engine (auto-wraps at loop boundaries). */
   getPlaybackTime: () => number;
   /** Register a per-frame callback driven by the single animation loop. */
   registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
@@ -365,6 +372,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   isPlayingRef.current = isPlaying;
   const playStartPositionRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
+  // Visually-aligned playback time (raw - outputLatency - lookAhead). The
+  // animation loop updates this per frame. Pause/seek/stop paths sync it
+  // explicitly so the static playhead position lines up with audible output.
+  const visualTimeRef = useRef<number>(0);
   const tracksRef = useRef<ClipTrack[]>(tracks);
   const soundFontCacheRef = useRef(soundFontCache);
   soundFontCacheRef.current = soundFontCache;
@@ -1021,6 +1032,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     return (audioStartPositionRef.current ?? 0) + elapsed;
   }, []);
 
+  // Convert a raw engine time to its visually-aligned counterpart (subtracts
+  // outputLatency and engine.lookAhead). Used by pause/seek/stop paths to
+  // keep visualTimeRef in sync when the animation loop isn't running.
+  const toVisualTime = useCallback((rawTime: number): number => {
+    const audioCtx = getGlobalAudioContext();
+    const latency = 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
+    const lookAhead = engineRef.current?.lookAhead ?? 0;
+    return Math.max(0, rawTime - latency - lookAhead);
+  }, []);
+
   const registerFrameCallback = useCallback((id: string, cb: (data: FrameData) => void) => {
     frameCallbacksRef.current.set(id, cb);
   }, []);
@@ -1048,6 +1069,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       const latency = 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
       const lookAhead = engineRef.current?.lookAhead ?? 0;
       const visualTime = Math.max(0, time - latency - lookAhead);
+      visualTimeRef.current = visualTime;
 
       // Drive registered per-frame callbacks BEFORE stop checks so the
       // final frame renders at the correct stop position (not one frame behind).
@@ -1092,6 +1114,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
               }
               setIsPlaying(false);
               currentTimeRef.current = playStartPositionRef.current;
+              visualTimeRef.current = toVisualTime(playStartPositionRef.current);
               setCurrentTime(playStartPositionRef.current);
               return;
             }
@@ -1124,6 +1147,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         }
         setIsPlaying(false);
         currentTimeRef.current = playbackEndTimeRef.current;
+        visualTimeRef.current = toVisualTime(playbackEndTimeRef.current);
         setCurrentTime(playbackEndTimeRef.current);
         playbackEndTimeRef.current = null; // Clear the end time
         return;
@@ -1140,6 +1164,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         }
         setIsPlaying(false);
         currentTimeRef.current = playStartPositionRef.current;
+        visualTimeRef.current = toVisualTime(playStartPositionRef.current);
         setCurrentTime(playStartPositionRef.current);
         setActiveAnnotationId(null);
         return;
@@ -1147,7 +1172,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       startAnimationFrameLoop(updateTime);
     };
     startAnimationFrameLoop(updateTime);
-  }, [duration, setActiveAnnotationId, startAnimationFrameLoop, getPlaybackTime]);
+  }, [duration, setActiveAnnotationId, startAnimationFrameLoop, getPlaybackTime, toVisualTime]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
 
@@ -1230,6 +1255,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Update currentTimeRef to match the actual start position
       // This ensures the animation loop starts from the correct position
       currentTimeRef.current = actualStartTime;
+      visualTimeRef.current = toVisualTime(actualStartTime);
 
       // Stop existing playback and animation loop before restarting.
       // engine.stop() resets engine._currentTime to _playStartPosition (could be 0)
@@ -1274,7 +1300,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(true);
       startAnimationLoop();
     },
-    [startAnimationLoop, stopAnimationLoop]
+    [startAnimationLoop, stopAnimationLoop, toVisualTime]
   );
 
   const pause = useCallback(() => {
@@ -1289,8 +1315,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     // Update to the calculated pause position
     currentTimeRef.current = pauseTime;
+    visualTimeRef.current = toVisualTime(pauseTime);
     setCurrentTime(pauseTime);
-  }, [stopAnimationLoop, getPlaybackTime]);
+  }, [stopAnimationLoop, getPlaybackTime, toVisualTime]);
 
   const stop = useCallback(() => {
     if (!engineRef.current) return;
@@ -1301,9 +1328,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     // Return cursor to where playback started (Audacity-style)
     currentTimeRef.current = playStartPositionRef.current;
+    visualTimeRef.current = toVisualTime(playStartPositionRef.current);
     setCurrentTime(playStartPositionRef.current);
     setActiveAnnotationId(null);
-  }, [stopAnimationLoop, setActiveAnnotationId]);
+  }, [stopAnimationLoop, setActiveAnnotationId, toVisualTime]);
 
   // Seek to a specific time - works whether playing or stopped
   const seekTo = useCallback(
@@ -1313,6 +1341,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
       // Update the current time state
       currentTimeRef.current = clampedTime;
+      visualTimeRef.current = toVisualTime(clampedTime);
       setCurrentTime(clampedTime);
 
       // If currently playing, restart at the new position.
@@ -1321,7 +1350,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         play(clampedTime);
       }
     },
-    [duration, isPlaying, play]
+    [duration, isPlaying, play, toVisualTime]
   );
 
   // Track controls
@@ -1394,6 +1423,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     (start: number, end: number) => {
       setSelectionEngine(start, end);
       currentTimeRef.current = start;
+      visualTimeRef.current = toVisualTime(start);
       setCurrentTime(start);
 
       if (isPlaying && engineRef.current) {
@@ -1407,7 +1437,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current.play(start);
       }
     },
-    [isPlaying, setSelectionEngine]
+    [isPlaying, setSelectionEngine, toVisualTime]
   );
 
   // Memoize setScrollContainer callback
@@ -1449,6 +1479,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isPlaying,
       currentTime,
       currentTimeRef,
+      visualTimeRef,
       playbackStartTimeRef,
       audioStartPositionRef,
       getPlaybackTime,
@@ -1459,6 +1490,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isPlaying,
       currentTime,
       currentTimeRef,
+      visualTimeRef,
       playbackStartTimeRef,
       audioStartPositionRef,
       getPlaybackTime,
@@ -1507,9 +1539,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const setCurrentTimeControl = useCallback(
     (time: number) => {
       currentTimeRef.current = time;
+      visualTimeRef.current = toVisualTime(time);
       setCurrentTime(time);
     },
-    [currentTimeRef]
+    [currentTimeRef, toVisualTime]
   );
 
   const setAutomaticScrollControl = useCallback((enabled: boolean) => {

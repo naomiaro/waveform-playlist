@@ -28,6 +28,8 @@
 
 **Eager playout creation:** `createToneAdapter()` calls `getGlobalContext()` BEFORE `new TonePlayout()` so the playout's nodes share the same standardized-audio-context as `adapter.audioContext`. Without this, `Volume` is created on Tone's default context (replaced later by `setContext`), causing cross-context connect errors.
 
+**`adapter.lookAhead`** — `TonePlayoutAdapter` exposes the Tone Context's `lookAhead` (~0.1s default). Consumers visualizing playback position must subtract `adapter.lookAhead` from `getCurrentTime()` in addition to `audioContext.outputLatency` — `Transport.seconds` is the scheduling position, which runs `lookAhead` ahead of what the listener hears. Native adapter doesn't implement this getter (returns undefined → 0). The optional property lives on the engine `PlayoutAdapter` interface so consumers don't have to know about Tone Context vs raw AudioContext.
+
 ## Transport.schedule() Architecture
 
 **Approach:** Uses `Transport.schedule()` + native `AudioBufferSourceNode` instead of `Player.sync()`. This eliminates three Tone.js private-internal workarounds that the `Player.sync()` approach required:

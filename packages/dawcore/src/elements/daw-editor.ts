@@ -1844,14 +1844,21 @@ export class DawEditorElement extends LitElement {
   _stopPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead) return;
+    // Resting playhead must use audible time so it lines up with where audio
+    // actually stopped. Storage stays raw (`_currentTime`) so the next play()
+    // resumes correctly — only the visual position is shifted.
+    const ctx = this.audioContext;
+    const outputLatency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
+    const lookAhead = this._engine?.lookAhead ?? 0;
+    const visualTime = Math.max(0, this._currentTime - outputLatency - lookAhead);
     if (this.scaleMode === 'beats') {
       playhead.stopBeatsAnimationWithMap(
-        this._currentTime,
+        visualTime,
         (s: number) => this._secondsToTicks(s),
         this.ticksPerPixel
       );
     } else {
-      playhead.stopAnimation(this._currentTime, this.effectiveSampleRate, this.samplesPerPixel);
+      playhead.stopAnimation(visualTime, this.effectiveSampleRate, this.samplesPerPixel);
     }
   }
   private _getPlayhead(): DawPlayheadElement | null {

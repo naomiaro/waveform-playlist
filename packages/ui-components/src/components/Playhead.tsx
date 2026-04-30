@@ -46,8 +46,20 @@ export interface PlayheadProps {
   controlsOffset?: number;
   /** Function to get current audio context time - required for smooth animation */
   getAudioContextTime?: () => number;
-  /** Returns current playback time (auto-wraps at loop boundaries). Preferred over manual elapsed calculation. */
+  /**
+   * Returns raw playback time from the engine (auto-wraps at loop boundaries).
+   * This is the scheduling position — for playhead display use `visualTimeRef`
+   * which already has `outputLatency` and `lookAhead` subtracted.
+   */
   getPlaybackTime?: () => number;
+  /**
+   * Ref to the visually-aligned playback time (raw time minus `outputLatency`
+   * and `engine.lookAhead`), kept current by the provider's animation loop
+   * during playback and by pause/stop/seek paths when stopped. Use this for
+   * playhead positioning so it lines up with audible output and matches the
+   * progress fill in `ChannelWithProgress`.
+   */
+  visualTimeRef?: React.RefObject<number>;
 }
 
 /**
@@ -106,6 +118,7 @@ export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
   color = '#ff0000',
   isPlaying,
   currentTimeRef,
+  visualTimeRef,
   playbackStartTimeRef,
   audioStartPositionRef,
   samplesPerPixel,
@@ -120,8 +133,15 @@ export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
   useEffect(() => {
     const updatePosition = () => {
       if (containerRef.current) {
+        // Read visualTimeRef so the playhead matches what the listener actually
+        // hears (and stays in sync with the progress fill in ChannelWithProgress).
+        // The provider's animation loop updates visualTimeRef per frame during
+        // playback and the pause/seek/stop paths sync it when stopped.
+        // Fallbacks for legacy custom playheads that don't pass visualTimeRef:
         let time: number;
-        if (isPlaying) {
+        if (visualTimeRef?.current !== undefined && visualTimeRef.current !== null) {
+          time = visualTimeRef.current;
+        } else if (isPlaying) {
           if (getPlaybackTime) {
             time = getPlaybackTime();
           } else if (getAudioContextTime) {
@@ -160,6 +180,7 @@ export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
     samplesPerPixel,
     controlsOffset,
     currentTimeRef,
+    visualTimeRef,
     playbackStartTimeRef,
     audioStartPositionRef,
     getAudioContextTime,
@@ -169,7 +190,7 @@ export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
   // Update position when stopped (for seeks)
   useEffect(() => {
     if (!isPlaying && containerRef.current) {
-      const time = currentTimeRef.current ?? 0;
+      const time = visualTimeRef?.current ?? currentTimeRef.current ?? 0;
       const pos = (time * sampleRate) / samplesPerPixel + controlsOffset;
       containerRef.current.style.transform = `translate3d(${pos}px, 0, 0)`;
     }
