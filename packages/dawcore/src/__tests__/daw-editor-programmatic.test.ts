@@ -281,6 +281,115 @@ describe('editor.addClip() / removeClip() / updateClip()', () => {
   });
 });
 
+describe('Phase 1 regression fixes', () => {
+  it('addClip rejects synchronously when config.src is missing', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    await expect(editor.addClip(trackEl.trackId, {})).rejects.toThrow(/src is required/);
+    await expect(editor.addClip(trackEl.trackId, { src: '' })).rejects.toThrow(/src is required/);
+    editor.remove();
+  });
+
+  it('addClip rejects when daw-clip-error fires (decode failure)', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor._fetchAndDecode = vi.fn().mockRejectedValue(new Error('decode failed'));
+    await expect(editor.addClip(trackEl.trackId, { src: '/missing.opus' })).rejects.toThrow(
+      'decode failed'
+    );
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+
+  it('_loadAndAppendClip rolls back per-clip caches when peak generation fails', async () => {
+    const editor = setupEditor();
+    editor.addTrack({ name: 'T' });
+    await new Promise((r) => setTimeout(r, 60));
+    const trackEl = editor.querySelector('daw-track') as any;
+
+    // Fail peak generation specifically (audio decode succeeds)
+    editor._peakPipeline.generatePeaks = vi.fn().mockRejectedValue(new Error('worker crash'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const buffersBefore = editor._clipBuffers.size;
+    const offsetsBefore = editor._clipOffsets.size;
+    const peaksBefore = editor._peaksData.size;
+
+    await expect(editor.addClip(trackEl.trackId, { src: '/a.opus' })).rejects.toThrow(
+      'worker crash'
+    );
+
+    expect(editor._clipBuffers.size).toBe(buffersBefore);
+    expect(editor._clipOffsets.size).toBe(offsetsBefore);
+    expect(editor._peaksData.size).toBe(peaksBefore);
+    warnSpy.mockRestore();
+    editor.remove();
+  });
+
+  it('reextractClipPeaks returns full PeakData (including bits)', () => {
+    const editor = setupEditor();
+    const fakeBuf = { length: 96000, sampleRate: 48000 } as unknown as AudioBuffer;
+    editor._clipBuffers = new Map([['c1', fakeBuf]]);
+    editor._peakPipeline.reextractPeaks = vi
+      .fn()
+      .mockReturnValue(new Map([['c1', { data: [new Int16Array(0)], length: 0, bits: 16 }]]));
+    const result = editor.reextractClipPeaks('c1', 0, 96000);
+    expect(result).toEqual({ data: [expect.any(Int16Array)], length: 0, bits: 16 });
+    expect(result.bits).toBe(16);
+    editor.remove();
+  });
+
+  it('_applyClipUpdate writes complete PeakData (with bits) into _peaksData', () => {
+    const editor = setupEditor();
+    const fakeBuf = { length: 96000, sampleRate: 48000 } as unknown as AudioBuffer;
+    const clipId = 'c1';
+    const trackId = 't1';
+    editor._clipBuffers = new Map([[clipId, fakeBuf]]);
+    editor._engineTracks = new Map([
+      [
+        trackId,
+        {
+          id: trackId,
+          clips: [
+            {
+              id: clipId,
+              startSample: 0,
+              durationSamples: 96000,
+              offsetSamples: 0,
+              gain: 1,
+              name: 'X',
+              sampleRate: 48000,
+            },
+          ],
+        },
+      ],
+    ]);
+    editor._peakPipeline.reextractPeaks = vi
+      .fn()
+      .mockReturnValue(new Map([[clipId, { data: [new Int16Array(0)], length: 0, bits: 16 }]]));
+
+    // Synthesize a daw-clip element with new offset/duration
+    const clipEl = {
+      start: 0,
+      duration: 1, // changed from 2 → triggers boundsChanged path
+      offset: 0,
+      gain: 1,
+      name: '',
+      tagName: 'DAW-CLIP',
+    } as any;
+    editor._applyClipUpdate(trackId, clipId, clipEl);
+    const stored = editor._peaksData.get(clipId);
+    expect(stored.bits).toBe(16);
+    expect(stored.data).toBeDefined();
+    editor.remove();
+  });
+});
+
 describe('engine clip-id alignment', () => {
   it('engine clip ids match <daw-clip>.clipId after _loadTrack', async () => {
     const editor = setupEditor();

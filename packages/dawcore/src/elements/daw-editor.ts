@@ -226,7 +226,11 @@ export class DawEditorElement extends LitElement {
     return this._renderSpp;
   }
   /** Re-extract peaks for a clip at new offset/duration from cached WaveformData. */
-  reextractClipPeaks(clipId: string, offsetSamples: number, durationSamples: number) {
+  reextractClipPeaks(
+    clipId: string,
+    offsetSamples: number,
+    durationSamples: number
+  ): PeakData | null {
     const buf = this._clipBuffers.get(clipId);
     if (!buf) return null;
     const singleClipBuffers = new Map([[clipId, buf]]);
@@ -237,9 +241,7 @@ export class DawEditorElement extends LitElement {
       this.mono,
       singleClipOffsets
     );
-    const peakData = result.get(clipId);
-    if (!peakData) return null;
-    return { data: peakData.data, length: peakData.length };
+    return result.get(clipId) ?? null;
   }
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
@@ -652,6 +654,9 @@ export class DawEditorElement extends LitElement {
   private async _loadAndAppendClip(trackId: string, clipDesc: ClipDescriptor) {
     if (!clipDesc.src) return; // empty/no-src clips can't be loaded
     const clipId = clipDesc.clipId;
+    // Track which clip id has been inserted into per-clip caches so the catch
+    // block can roll back partial state on any error past the cache writes.
+    let insertedClipId: string | null = null;
     try {
       const waveformDataPromise = clipDesc.peaksSrc ? this._fetchPeaks(clipDesc.peaksSrc) : null;
       const audioPromise = this._fetchAndDecode(clipDesc.src);
@@ -660,7 +665,23 @@ export class DawEditorElement extends LitElement {
       if (waveformDataPromise) {
         try {
           const wd = await waveformDataPromise;
-          if (wd.sample_rate === this.audioContext.sampleRate) waveformData = wd;
+          const contextRate = this.audioContext.sampleRate;
+          if (wd.sample_rate === contextRate) {
+            waveformData = wd;
+          } else {
+            // Mirror _loadTrack's behavior: warn loudly when pre-computed peaks
+            // can't be used due to sample-rate mismatch — silent drops would
+            // confuse consumers wondering why their .dat file was ignored.
+            console.warn(
+              '[dawcore] Pre-computed peaks at ' +
+                wd.sample_rate +
+                ' Hz do not match AudioContext at ' +
+                contextRate +
+                ' Hz — ignoring ' +
+                clipDesc.peaksSrc +
+                ', generating from audio'
+            );
+          }
         } catch (err) {
           console.warn('[dawcore] _loadAndAppendClip: peaks load failed: ' + String(err));
         }
@@ -696,6 +717,7 @@ export class DawEditorElement extends LitElement {
         });
       }
       if (clipId) clip.id = clipId;
+      insertedClipId = clip.id;
 
       this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
       this._clipOffsets.set(clip.id, {
@@ -714,13 +736,7 @@ export class DawEditorElement extends LitElement {
       const t = this._engineTracks.get(trackId);
       if (!t) {
         // Track was removed during load — purge clip state
-        const nextBuffers = new Map(this._clipBuffers);
-        nextBuffers.delete(clip.id);
-        this._clipBuffers = nextBuffers;
-        const nextPeaks = new Map(this._peaksData);
-        nextPeaks.delete(clip.id);
-        this._peaksData = nextPeaks;
-        this._clipOffsets.delete(clip.id);
+        this._purgeClipCaches(clip.id);
         return;
       }
       const updatedTrack: ClipTrack = { ...t, clips: [...t.clips, clip] };
@@ -745,16 +761,31 @@ export class DawEditorElement extends LitElement {
         })
       );
     } catch (err) {
-      if (!this.isConnected) return;
+      // Always warn — even when disconnected — so the failure isn't silent.
       console.warn('[dawcore] _loadAndAppendClip failed: ' + String(err));
+      // Roll back partial cache state so a retry isn't poisoned by stale entries.
+      if (insertedClipId) this._purgeClipCaches(insertedClipId);
+      // Detached elements can't bubble events, but the listener registered on
+      // `this` via addClip will still fire — dispatch directly so the addClip
+      // promise rejects instead of orphaning.
       this.dispatchEvent(
         new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
           bubbles: true,
           composed: true,
-          detail: { trackId, clipId: clipId ?? '', error: err },
+          detail: { trackId, clipId: insertedClipId ?? clipId ?? '', error: err },
         })
       );
     }
+  }
+  /** Remove a single clip from all per-clip caches. Used by error rollbacks. */
+  private _purgeClipCaches(clipId: string) {
+    const nextBuffers = new Map(this._clipBuffers);
+    nextBuffers.delete(clipId);
+    this._clipBuffers = nextBuffers;
+    const nextPeaks = new Map(this._peaksData);
+    nextPeaks.delete(clipId);
+    this._peaksData = nextPeaks;
+    this._clipOffsets.delete(clipId);
   }
   private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
     const t = this._engineTracks.get(trackId);
@@ -789,10 +820,7 @@ export class DawEditorElement extends LitElement {
       });
       const peaks = this.reextractClipPeaks(clipId, newOffsetSamples, newDurationSamples);
       if (peaks) {
-        this._peaksData = new Map(this._peaksData).set(clipId, {
-          data: peaks.data,
-          length: peaks.length,
-        } as PeakData);
+        this._peaksData = new Map(this._peaksData).set(clipId, peaks);
       }
     }
 
@@ -1323,6 +1351,14 @@ export class DawEditorElement extends LitElement {
    * the new clip's id once the audio decode + peak generation finish.
    */
   addClip(trackId: string, config: ClipConfig): Promise<string> {
+    if (!config.src) {
+      return Promise.reject(
+        new Error(
+          'addClip: config.src is required — pass a URL to load. ' +
+            'Empty/recording clips are not yet supported via addClip.'
+        )
+      );
+    }
     const trackEl = this._trackElements.get(trackId);
     if (!trackEl) {
       return Promise.reject(
@@ -1378,11 +1414,17 @@ export class DawEditorElement extends LitElement {
     }
   }
   /**
-   * Update a clip's position (start/duration/offset) or properties (gain/name/fades).
+   * Update a clip's position (start/duration/offset) or properties (gain/name).
    * For DOM-element clips, writes properties on the `<daw-clip>` element which
    * fires `daw-clip-update`; otherwise applies directly via `_applyClipUpdate`.
+   *
    * Re-decoding (changing `src`) is not supported via this method — remove and
    * re-add the clip instead.
+   *
+   * Note: `fadeIn` / `fadeOut` / `fadeType` on the partial are written to the
+   * `<daw-clip>` element (so they round-trip in the descriptor), but engine-side
+   * fade application from `<daw-clip>` properties is not yet implemented — see
+   * the broader fade-engine integration tracked separately.
    */
   updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void {
     const trackEl = this._trackElements.get(trackId);
