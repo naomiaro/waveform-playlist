@@ -60,12 +60,12 @@ export class DawRulerElement extends LitElement {
       });
       this._tickData = null;
     } else if (this.duration > 0 || this.totalWidth > 0) {
-      // When natural duration is 0 (empty editor), derive an effective duration
-      // from totalWidth so the ruler can render — used by indefinite-playback.
-      const effectiveDuration =
-        this.duration > 0
-          ? this.duration
-          : (this.totalWidth * this.samplesPerPixel) / this.sampleRate;
+      // Cover the larger of natural duration and viewport-floored width.
+      // When indefinite-playback is set, totalWidth can exceed the natural
+      // duration's width — use that to keep ruler ticks across the full
+      // visible area instead of only the audible portion.
+      const widthDerivedDuration = (this.totalWidth * this.samplesPerPixel) / this.sampleRate;
+      const effectiveDuration = Math.max(this.duration, widthDerivedDuration);
       this._musicalTickData = null;
       this._tickData = computeTemporalTicks(
         this.samplesPerPixel,
