@@ -1,7 +1,7 @@
 import React, { useContext, useRef, useState, useMemo, type ReactNode, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { getGlobalContext } from '@waveform-playlist/playout';
+import { getGlobalAudioContext, getGlobalContext } from '@waveform-playlist/playout';
 import {
   Playlist,
   Track as TrackComponent,
@@ -747,23 +747,50 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                   })}
                   {recordingState?.isRecording &&
                     recordingState.trackId === track.id &&
-                    recordingState.peaks[0]?.length > 0 && (
-                      <Clip
-                        key={`${track.id}-recording`}
-                        clipId="recording-preview"
-                        trackIndex={trackIndex}
-                        clipIndex={trackClipPeaks.length}
-                        trackName="Recording..."
-                        startSample={recordingState.startSample}
-                        durationSamples={recordingState.durationSamples}
-                        samplesPerPixel={samplesPerPixel}
-                        showHeader={showClipHeaders}
-                        disableHeaderDrag={true}
-                        isSelected={track.id === selectedTrackId}
-                        trackId={track.id}
-                      >
-                        {(mono ? recordingState.peaks.slice(0, 1) : recordingState.peaks).map(
-                          (channelPeaks, chIdx) => (
+                    recordingState.peaks[0]?.length > 0 &&
+                    (() => {
+                      // Strip leading-silence peaks so the visible preview matches
+                      // audible content. Recorder runs at real time, but the user's
+                      // first reaction lands ~outputLatency+lookAhead seconds into
+                      // the buffer (they hadn't heard the backing track yet). Without
+                      // this, the playhead — which now uses audible time — would
+                      // appear behind the right edge of the recorded waveform.
+                      // Mirrors useIntegratedRecording's finalization compensation
+                      // and dawcore's preview-skip-latency-peaks pattern.
+                      const audioCtx = getGlobalAudioContext();
+                      const outputLatency = audioCtx.outputLatency ?? 0;
+                      const lookAhead = getGlobalContext().lookAhead ?? 0;
+                      const totalLatency = outputLatency + lookAhead;
+                      const latencyOffsetSamples = Math.floor(totalLatency * sampleRate);
+                      const latencyPixels = Math.floor(latencyOffsetSamples / samplesPerPixel);
+                      const skipPeakElements = latencyPixels * 2; // each pixel is a min/max pair
+                      const previewDuration = Math.max(
+                        0,
+                        recordingState.durationSamples - latencyOffsetSamples
+                      );
+                      const previewChannels = (
+                        mono ? recordingState.peaks.slice(0, 1) : recordingState.peaks
+                      ).map((channelPeaks) =>
+                        skipPeakElements > 0 && skipPeakElements < channelPeaks.length
+                          ? channelPeaks.subarray(skipPeakElements)
+                          : channelPeaks
+                      );
+                      return (
+                        <Clip
+                          key={`${track.id}-recording`}
+                          clipId="recording-preview"
+                          trackIndex={trackIndex}
+                          clipIndex={trackClipPeaks.length}
+                          trackName="Recording..."
+                          startSample={recordingState.startSample}
+                          durationSamples={previewDuration}
+                          samplesPerPixel={samplesPerPixel}
+                          showHeader={showClipHeaders}
+                          disableHeaderDrag={true}
+                          isSelected={track.id === selectedTrackId}
+                          trackId={track.id}
+                        >
+                          {previewChannels.map((channelPeaks, chIdx) => (
                             <ChannelWithProgress
                               key={`${track.id}-recording-${chIdx}`}
                               index={chIdx}
@@ -772,12 +799,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                               length={Math.floor(channelPeaks.length / 2)}
                               isSelected={track.id === selectedTrackId}
                               clipStartSample={recordingState.startSample}
-                              clipDurationSamples={recordingState.durationSamples}
+                              clipDurationSamples={previewDuration}
                             />
-                          )
-                        )}
-                      </Clip>
-                    )}
+                          ))}
+                        </Clip>
+                      );
+                    })()}
                 </TrackComponent>
               );
             })}
