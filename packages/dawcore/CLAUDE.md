@@ -13,6 +13,7 @@
 - Mocks for async functions (e.g., `resumeGlobalAudioContext`) must return `Promise.resolve()`, not `undefined`. Calling `.catch()` on `undefined` crashes.
 - `canvas.getContext('2d')` returns `null` in happy-dom. Tests must mock it: `vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx as any)` where `mockCtx` has `clearRect`, `resetTransform`, `scale`, `fillStyle`, `fillRect` as `vi.fn()`.
 - `PointerHandlerHost` and `ClipPointerHost` test mocks must include beats-mode fields (`scaleMode`, `ticksPerPixel`, `bpm`, `ppqn`, `_meterEntries`, `snapTo`, `renderSamplesPerPixel`). Default to `scaleMode: 'temporal'`, `snapTo: 'off'` for non-beats tests.
+- `<daw-editor>` test mocks of `_peakPipeline` must include `terminate: vi.fn()` — `disconnectedCallback` calls it on `editor.remove()` and silently fails every test in the file with `TypeError`.
 
 **Dev page:** `pnpm example:dawcore-native` starts Vite at `http://localhost:5173/` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
 
@@ -83,6 +84,13 @@
 - **Do NOT compensate outputLatency in `_stopPlayhead()`** — The resting playhead position must use raw `_currentTime` (no latency subtraction). Subtracting `outputLatency` shifts the stored position, causing the next `play()` to start from the wrong time. Compensation is only safe in the per-frame animation callback.
 - **Web worker peak generation** — `PeakPipeline` (in `workers/peakPipeline.ts`) generates `WaveformData` via inline Blob worker at the current `samplesPerPixel`, caches per `AudioBuffer` (WeakMap), extracts `PeakData` via `resample()`. Resampling only works to coarser (larger) scales — the cached base scale determines the finest renderable zoom. Per-channel peaks when `mono=false`; weighted-average mono merge when `mono=true`.
 
+## Programmatic Track + Clip API
+
+- **Imperative methods on `<daw-editor>`** — `editor.ready()` (build engine without tracks), `addTrack(config)`, `removeTrack(id)`, `updateTrack(id, partial)`, `addClip(trackId, config)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`. All thin wrappers around DOM mutation — they build `<daw-track>` / `<daw-clip>` elements and let the existing event pipeline handle loading. Both declarative DOM mutation and these methods feed the same `_loadTrack` / `_loadAndAppendClip` path.
+- **Treat `editor.engine` as read-only from consumer code** — `engine.setTracks` directly works for rendering (peaks-sync reads `clip.audioBuffer`) but skips `_tracks` descriptor population, so `<daw-track-controls>` shows "Untitled" / default volume. Use the editor methods for mutation; reach into `engine` only for taps (`masterOutputNode`, analyzers).
+- **DOM ↔ engine clip-id alignment** — `clip.id = clipDesc.clipId` in `_loadTrack` aligns engine clip ids with `<daw-clip>.clipId`. Required for `editor.removeClip(trackId, clipId)` lookups. `ClipDescriptor.clipId` is optional (file drops, recording-clip don't set it; engine auto-generates).
+- **`<daw-clip>` lifecycle events** — `daw-clip-connected` (deferred via `setTimeout(0)`) and `daw-clip-update` (fires only after first render, on any reflected property change). Editor's `_onClipConnected` skips during initial track load (`_engineTracks` doesn't have the parent yet); late-append goes through `_loadAndAppendClip`.
+
 ## CSS Theming
 
 Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DOM:
@@ -94,6 +102,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - `--daw-ruler-color` / `--daw-ruler-background`
 - `--daw-controls-background` / `--daw-controls-text`
 - `--daw-selection-color`, `--daw-clip-header-background`, `--daw-clip-header-text`
+- `--daw-controls-width` (default `180px`) — track-controls column width
+- `--daw-min-height` (default `200px`) — scroll-area min height for empty editor / drop zone
 
 ## Reactive Controllers
 
@@ -212,6 +222,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - Hide playhead, selection, and ruler when `orderedTracks.length === 0`
 - Timeline width: `100%` when empty (not hardcoded pixels) for full-width dropzone
 - `.scroll-area` has `min-height: var(--daw-min-height, 200px)` for visible empty dropzone
+- **`indefinite-playback` attribute** — when set, `_totalWidth` floors at `_viewport.containerWidth` so the ruler renders the visible viewport even with no clips. `daw-ruler` covers `max(naturalDuration, totalWidthDerivedDuration)` so it doesn't shrink when a short clip is added. Editor renders an empty controls-column placeholder so the timeline doesn't shift right when the first track loads. `ViewportController` has a `ResizeObserver` for window-resize support.
 
 ## Lit/TypeScript Requirements
 
