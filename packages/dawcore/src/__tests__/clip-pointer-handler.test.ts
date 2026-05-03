@@ -173,7 +173,7 @@ describe('ClipPointerHandler', () => {
       document.body.removeChild(boundary);
     });
 
-    it('returns false for boundary on a MIDI clip — trim is not supported', () => {
+    it('consumes the event (returns true) for boundary on a MIDI clip — prevents fallthrough to timeline seek', () => {
       // Host reports the clip as MIDI
       const midiHost = createMockHost(engine, {
         isMidiClip: vi.fn().mockImplementation((tId: string, cId: string) => {
@@ -185,7 +185,9 @@ describe('ClipPointerHandler', () => {
       const el = makeBoundaryEl('clip-midi', 'track-midi', 'left');
       const e = pointerEvent('pointerdown', { clientX: 100 });
 
-      expect(midiHandler.tryHandle(el, e)).toBe(false);
+      // Event is consumed (true) so it does not fall through to the timeline seek handler.
+      // No trim drag starts.
+      expect(midiHandler.tryHandle(el, e)).toBe(true);
       expect(engine.trimClip).not.toHaveBeenCalled();
     });
 

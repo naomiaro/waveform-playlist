@@ -159,8 +159,9 @@ export class ClipPointerHandler {
       if (!clipId || !trackId || (edge !== 'left' && edge !== 'right')) return false;
 
       // Trim is not supported for MIDI clips — note slicing is a follow-up PR.
-      // Return false so the event is not consumed and no drag starts.
-      if (this._host.isMidiClip(trackId, clipId)) return false;
+      // Consume the event: no trim drag starts, but prevent the click from
+      // falling through to the timeline seek handler.
+      if (this._host.isMidiClip(trackId, clipId)) return true;
 
       this._beginDrag(edge === 'left' ? 'trim-left' : 'trim-right', clipId, trackId, e);
       this._boundaryEl = boundary;

@@ -216,6 +216,84 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
+  it('purges audio caches when a clip transitions from audio to MIDI', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    const adapter = makeMockAdapter();
+    editor.adapter = adapter;
+    document.body.appendChild(editor);
+
+    const trackId = 'track-1';
+    const clipId = 'clip-1';
+    const fakeBuffer = {
+      length: 48000,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+    } as AudioBuffer;
+
+    // Manually populate audio caches as if an audio clip had previously loaded
+    editor._clipBuffers = new Map(editor._clipBuffers).set(clipId, fakeBuffer);
+    editor._clipOffsets.set(clipId, { offsetSamples: 0, durationSamples: 48000 });
+    editor._peaksData = new Map(editor._peaksData).set(clipId, {
+      data: [new Int16Array(0)],
+      length: 0,
+      bits: 16,
+    });
+
+    // Populate _engineTracks with an audio clip so _applyClipUpdate can find it
+    editor._engineTracks = new Map(editor._engineTracks).set(trackId, {
+      id: trackId,
+      name: 'Test',
+      volume: 1,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      clips: [
+        {
+          id: clipId,
+          audioBuffer: fakeBuffer,
+          startSample: 0,
+          durationSamples: 48000,
+          offsetSamples: 0,
+          sourceDurationSamples: 48000,
+          sampleRate: 48000,
+          gain: 1,
+          midiNotes: undefined,
+        },
+      ],
+    });
+    editor._tracks = new Map(editor._tracks).set(trackId, {
+      name: 'Test',
+      src: '',
+      volume: 1,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      renderMode: 'waveform',
+      clips: [],
+    });
+
+    // Simulate a DawClipElement with midiNotes set (audio→MIDI transition)
+    const fakeClipEl = {
+      midiNotes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }],
+      midiChannel: null,
+      midiProgram: null,
+      start: 0,
+      duration: 0.5,
+      offset: 0,
+      gain: 1,
+      name: 'X',
+    };
+
+    editor._applyClipUpdate(trackId, clipId, fakeClipEl);
+
+    // Audio caches should be purged after an audio→MIDI transition
+    expect(editor._clipBuffers.has(clipId)).toBe(false);
+    expect(editor._clipOffsets.has(clipId)).toBe(false);
+    expect(editor._peaksData.has(clipId)).toBe(false);
+
+    document.body.removeChild(editor);
+  });
+
   it('updateTrack({ renderMode: "piano-roll" }) sets render-mode attribute on DOM track', async () => {
     const editor = document.createElement('daw-editor') as any;
     editor.adapter = makeMockAdapter();

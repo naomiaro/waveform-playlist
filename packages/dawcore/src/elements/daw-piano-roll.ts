@@ -113,7 +113,7 @@ export class DawPianoRollElement extends LitElement {
     const color = this._getNoteColor();
 
     for (const canvas of canvases) {
-      // Issue #1 fix: read data-index (matching daw-waveform pattern)
+      // Read data-index (matching daw-waveform pattern)
       const chunkIdx = Number((canvas as HTMLCanvasElement).dataset.index);
       const chunkPixelStart = chunkIdx * MAX_CANVAS_WIDTH;
       const canvasWidth = (canvas as HTMLCanvasElement).width / dpr;
@@ -181,7 +181,7 @@ export class DawPianoRollElement extends LitElement {
       this.visibleEnd,
       this.originX
     );
-    // Issue #3 fix: wrap canvases in a .container div with explicit width/height,
+    // Wrap canvases in a .container div with explicit width/height,
     // matching daw-waveform's container pattern. Background is on .container (not :host)
     // so it has the correct measurable size.
     return html`
@@ -189,7 +189,7 @@ export class DawPianoRollElement extends LitElement {
         ${visibleIndices.map((i) => {
           const chunkLeft = i * MAX_CANVAS_WIDTH;
           const chunkWidth = Math.min(this.length - chunkLeft, MAX_CANVAS_WIDTH);
-          // Issue #1 fix: use data-index (not data-chunk-idx) to match daw-waveform pattern
+          // Use data-index (not data-chunk-idx) to match daw-waveform pattern
           return html`<canvas
             data-index=${i}
             width=${chunkWidth * dpr}

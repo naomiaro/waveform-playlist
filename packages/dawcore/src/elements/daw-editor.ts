@@ -4,6 +4,7 @@ import type {
   AudioClip,
   ClipTrack,
   FadeType,
+  MidiNoteData,
   Peaks,
   PeakData,
   SnapTo,
@@ -717,7 +718,7 @@ export class DawEditorElement extends LitElement {
     }
   }
   private async _loadAndAppendClip(trackId: string, clipDesc: DomClipDescriptor) {
-    if (!clipDesc.src) return; // empty/no-src clips can't be loaded
+    if (!clipDesc.src) return; // Late-append of MIDI clips is not yet supported by _loadAndAppendClip — only _loadTrack handles the no-src MIDI branch on initial load.
     // Late-append always comes via _onClipConnected, which only fires for
     // <daw-clip> elements — so clipId is always known. We use it for the
     // error dispatch so the consumer's addClip Promise rejects with a usable
@@ -890,14 +891,61 @@ export class DawEditorElement extends LitElement {
     return clip;
   }
   /**
+   * Filter MIDI notes to only those with finite, in-range fields. Logs a
+   * warning for each dropped note. Used by _buildMidiClip and the
+   * _applyClipUpdate MIDI branch to prevent NaN propagation through the
+   * timeline.
+   */
+  private _validMidiNotes(notes: MidiNoteData[]): MidiNoteData[] {
+    return notes.filter((n) => {
+      const ok =
+        Number.isFinite(n.time) &&
+        n.time >= 0 &&
+        Number.isFinite(n.duration) &&
+        n.duration > 0 &&
+        Number.isInteger(n.midi) &&
+        n.midi >= 0 &&
+        n.midi <= 127 &&
+        Number.isFinite(n.velocity) &&
+        n.velocity >= 0 &&
+        n.velocity <= 1;
+      if (!ok) {
+        console.warn('[dawcore] dropping malformed MIDI note: ' + JSON.stringify(n));
+      }
+      return ok;
+    });
+  }
+  /**
+   * A clip descriptor is treated as MIDI when it has no audio src.
+   * Includes placeholder MIDI clips (no notes, no duration yet — registered
+   * with a 1s default span; notes upgrade via _applyClipUpdate). Warns when
+   * a clip ambiguously has both src and midiNotes — the audio path runs
+   * and notes would be silently ignored.
+   */
+  private _isMidiDescriptor(clipDesc: ClipDescriptor): boolean {
+    if (clipDesc.src) {
+      if (clipDesc.midiNotes != null) {
+        console.warn(
+          '[dawcore] clip "' +
+            (clipDesc.name || (isDomClip(clipDesc) ? clipDesc.clipId : '?')) +
+            '" has both src and midiNotes — treating as audio (notes will be ignored)'
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+  /**
    * Build an engine clip from a MIDI clip descriptor. Always returns a clip
    * — empty notes / no declared duration get a 1-second placeholder span so
    * the clip is reachable via `engine.updateTrack` once notes arrive.
    */
   private _buildMidiClip(clipDesc: ClipDescriptor): AudioClip {
     const sr = this.effectiveSampleRate;
-    const notes = clipDesc.midiNotes ?? [];
-    const noteSpanSeconds = notes.length ? Math.max(...notes.map((n) => n.time + n.duration)) : 0;
+    const notes = this._validMidiNotes(clipDesc.midiNotes ?? []);
+    const noteSpanSeconds = notes.length
+      ? notes.reduce((max, n) => Math.max(max, n.time + n.duration), 0)
+      : 0;
     const sourceDurationSamples = Math.ceil(Math.max(noteSpanSeconds, clipDesc.duration, 1) * sr);
     const requestedDurationSamples =
       clipDesc.duration > 0 ? Math.round(clipDesc.duration * sr) : sourceDurationSamples;
@@ -963,14 +1011,15 @@ export class DawEditorElement extends LitElement {
     // MIDI by either current or previous state being MIDI. oldClip.midiNotes
     // is an array (possibly empty []) for any clip registered via _buildMidiClip
     // — including placeholders. For audio clips it is undefined.
-    // Use loose != null to treat both null and undefined as "not MIDI" for
-    // clipEl.midiNotes (DawClipElement defaults to null; synthetic test objects
-    // may omit the property entirely, yielding undefined).
+    // Use loose != null consistently: treats both null and undefined as "not MIDI"
+    // for both clipEl.midiNotes (DawClipElement defaults to null) and oldClip.midiNotes.
     const isMidiNow = clipEl.midiNotes != null;
-    const wasMidi = oldClip.midiNotes !== undefined;
+    const wasMidi = oldClip.midiNotes != null;
     if (isMidiNow || wasMidi) {
-      const notes = clipEl.midiNotes ?? [];
-      const noteSpanSeconds = notes.length ? Math.max(...notes.map((n) => n.time + n.duration)) : 0;
+      const notes = this._validMidiNotes(clipEl.midiNotes ?? []);
+      const noteSpanSeconds = notes.length
+        ? notes.reduce((max, n) => Math.max(max, n.time + n.duration), 0)
+        : 0;
       const sourceDurationSamples = Math.ceil(Math.max(noteSpanSeconds, clipEl.duration, 1) * sr);
       const requestedDurationSamples =
         clipEl.duration > 0 ? Math.round(clipEl.duration * sr) : sourceDurationSamples;
@@ -1125,10 +1174,10 @@ export class DawEditorElement extends LitElement {
     try {
       const clips = [];
       for (const clipDesc of descriptor.clips) {
-        if (!clipDesc.src) {
+        if (this._isMidiDescriptor(clipDesc)) {
           // MIDI clip path: no fetch, no peaks, register the clip directly.
           // Always registers (even with no notes / no duration) so late note
-          // arrivals via daw-clip-update — handled in _applyClipUpdate (Task 6)
+          // arrivals via daw-clip-update — handled in _applyClipUpdate
           // — can find the clip in _engineTracks.
           clips.push(this._buildMidiClip(clipDesc));
           continue;
