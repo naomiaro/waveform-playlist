@@ -98,6 +98,31 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
+  it('mounts <daw-piano-roll> when track.renderMode === "piano-roll"', async () => {
+    await import('../elements/daw-piano-roll');
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    document.body.appendChild(editor);
+
+    const track = document.createElement('daw-track') as any;
+    track.setAttribute('render-mode', 'piano-roll');
+    const clip = document.createElement('daw-clip') as any;
+    clip.midiNotes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
+    track.appendChild(clip);
+    editor.appendChild(track);
+
+    await new Promise<void>((resolve) => {
+      editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
+    });
+    await editor.updateComplete;
+
+    const pianoRoll = editor.shadowRoot.querySelector('daw-piano-roll');
+    const waveform = editor.shadowRoot.querySelector('daw-waveform');
+    expect(pianoRoll).toBeTruthy();
+    expect(waveform).toBeFalsy();
+    document.body.removeChild(editor);
+  });
+
   it('registers a placeholder clip (no notes, no duration) so late arrivals can find it', async () => {
     const editor = document.createElement('daw-editor') as any;
     const adapter = makeMockAdapter();

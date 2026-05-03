@@ -1340,8 +1340,14 @@ export class DawEditorElement extends LitElement {
           nextTracks.set(track.id, track);
         }
         this._engineTracks = nextTracks;
-        // Regenerate peaks for new or trimmed clips
-        syncPeaksForChangedClips(this, engineState.tracks);
+        // Regenerate peaks for new or trimmed clips.
+        // Piano-roll tracks have no AudioBuffer — skip them to avoid noisy
+        // "no AudioBuffer" warnings on every tracksVersion bump.
+        const audioTracks = engineState.tracks.filter((t) => {
+          const desc = this._tracks.get(t.id);
+          return desc?.renderMode !== 'piano-roll';
+        });
+        syncPeaksForChangedClips(this, audioTracks);
       }
     });
     engine.on('pause', () => {
@@ -2138,21 +2144,35 @@ export class DawEditorElement extends LitElement {
                           <span>${clip.name || t.descriptor?.name || ''}</span>
                         </div>`
                       : ''}
-                    ${channels.map(
-                      (chPeaks, chIdx) =>
-                        html` <daw-waveform
-                          style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
-                          .peaks=${chPeaks}
+                    ${t.descriptor?.renderMode === 'piano-roll'
+                      ? html`<daw-piano-roll
+                          style="position:absolute;left:0;top:${hdrH}px;"
+                          .midiNotes=${clip.midiNotes ?? []}
                           .length=${peakData?.length ?? width}
-                          .waveHeight=${chH}
-                          .barWidth=${this.barWidth}
-                          .barGap=${this.barGap}
+                          .waveHeight=${chH * channels.length}
+                          .samplesPerPixel=${this._renderSpp}
+                          .sampleRate=${this.effectiveSampleRate}
+                          .clipOffsetSeconds=${(clip.offsetSamples ?? 0) / this.effectiveSampleRate}
                           .visibleStart=${this._viewport.visibleStart}
                           .visibleEnd=${this._viewport.visibleEnd}
                           .originX=${clipLeft}
-                          .segments=${clipSegments}
-                        ></daw-waveform>`
-                    )}
+                          ?selected=${t.trackId === this._selectedTrackId}
+                        ></daw-piano-roll>`
+                      : channels.map(
+                          (chPeaks, chIdx) =>
+                            html` <daw-waveform
+                              style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
+                              .peaks=${chPeaks}
+                              .length=${peakData?.length ?? width}
+                              .waveHeight=${chH}
+                              .barWidth=${this.barWidth}
+                              .barGap=${this.barGap}
+                              .visibleStart=${this._viewport.visibleStart}
+                              .visibleEnd=${this._viewport.visibleEnd}
+                              .originX=${clipLeft}
+                              .segments=${clipSegments}
+                            ></daw-waveform>`
+                        )}
                     ${this.interactiveClips
                       ? html` <div
                             class="clip-boundary"
