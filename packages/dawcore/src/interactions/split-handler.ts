@@ -77,7 +77,13 @@ function canSplitAtTime(host: SplitHost, time: number): boolean {
   if (!track) return false;
 
   const atSample = Math.round(time * host.effectiveSampleRate);
-  return !!findClipAtSample(track.clips, atSample);
+  const clip = findClipAtSample(track.clips, atSample);
+  if (!clip) return false;
+
+  // MIDI clip splitting requires note slicing — not implemented yet.
+  if (clip.midiNotes != null) return false;
+
+  return true;
 }
 
 /** Core split logic — finds clip at position, calls engine, diffs state for new IDs. */

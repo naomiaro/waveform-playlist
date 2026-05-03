@@ -230,3 +230,90 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 });
+
+describe('splitAtPlayhead MIDI guard', () => {
+  function makeMidiTrack(
+    clipId: string,
+    durationSamples: number,
+    midiNotes: import('@waveform-playlist/core').MidiNoteData[]
+  ) {
+    return {
+      id: 't1',
+      name: 'MIDI Track',
+      volume: 1,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      clips: [
+        {
+          id: clipId,
+          startSample: 0,
+          durationSamples,
+          offsetSamples: 0,
+          sourceDurationSamples: durationSamples,
+          sampleRate: 48000,
+          gain: 1,
+          midiNotes,
+        },
+      ],
+    };
+  }
+
+  it('returns false and does not dispatch daw-clip-split for a MIDI clip', async () => {
+    const { splitAtPlayhead } = await import('../interactions/split-handler');
+
+    const splitClipFn = vi.fn();
+    const dispatchEventFn = vi.fn(() => true);
+
+    const host: Parameters<typeof splitAtPlayhead>[0] = {
+      effectiveSampleRate: 48000,
+      currentTime: 1.0,
+      isPlaying: false,
+      engine: {
+        getState: () => ({
+          selectedTrackId: 't1',
+          tracks: [
+            makeMidiTrack('c1', 96000, [
+              { midi: 60, name: 'C4', time: 0, duration: 1, velocity: 0.8 },
+            ]),
+          ],
+        }),
+        splitClip: splitClipFn,
+      },
+      dispatchEvent: dispatchEventFn,
+      stop: vi.fn(),
+      play: vi.fn(),
+    };
+
+    const result = splitAtPlayhead(host);
+
+    expect(result).toBe(false);
+    expect(splitClipFn).not.toHaveBeenCalled();
+    expect(dispatchEventFn).not.toHaveBeenCalled();
+  });
+
+  it('returns false for MIDI clip even when playhead is well inside clip bounds', async () => {
+    const { splitAtPlayhead } = await import('../interactions/split-handler');
+
+    // Playhead at 2.0s, clip is 4s long (192000 samples at 48kHz).
+    // Without the MIDI guard this would be a valid split position.
+    const host: Parameters<typeof splitAtPlayhead>[0] = {
+      effectiveSampleRate: 48000,
+      currentTime: 2.0,
+      isPlaying: false,
+      engine: {
+        getState: () => ({
+          selectedTrackId: 't1',
+          tracks: [makeMidiTrack('c1', 192000, [])],
+        }),
+        splitClip: vi.fn(),
+      },
+      dispatchEvent: vi.fn(() => true),
+      stop: vi.fn(),
+      play: vi.fn(),
+    };
+
+    const result = splitAtPlayhead(host);
+    expect(result).toBe(false);
+  });
+});

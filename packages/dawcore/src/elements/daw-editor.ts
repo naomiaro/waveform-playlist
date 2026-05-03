@@ -251,6 +251,19 @@ export class DawEditorElement extends LitElement {
     );
     return result.get(clipId) ?? null;
   }
+
+  /**
+   * Returns true if the clip is a MIDI clip (has midiNotes).
+   * Used by ClipPointerHandler to make trim handles inert for MIDI clips.
+   * Returns false for unknown track/clip IDs (defensive).
+   */
+  isMidiClip(trackId: string, clipId: string): boolean {
+    const track = this._engineTracks.get(trackId);
+    if (!track) return false;
+    const clip = track.clips.find((c) => c.id === clipId);
+    return clip?.midiNotes != null;
+  }
+
   private _pointer = new PointerHandler(this);
   private _viewport = (() => {
     const v = new ViewportController(this);

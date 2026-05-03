@@ -68,6 +68,11 @@ export interface ClipPointerHost {
     offsetSamples: number,
     durationSamples: number
   ): ClipPeakSlice | null;
+  /**
+   * Returns true if the clip is a MIDI clip (has midiNotes).
+   * Trim handles are inert for MIDI clips — note slicing is not yet implemented.
+   */
+  isMidiClip(trackId: string, clipId: string): boolean;
 }
 
 type DragMode = 'move' | 'trim-left' | 'trim-right';
@@ -152,6 +157,10 @@ export class ClipPointerHandler {
       const trackId = boundary.dataset.trackId;
       const edge = boundary.dataset.boundaryEdge as 'left' | 'right';
       if (!clipId || !trackId || (edge !== 'left' && edge !== 'right')) return false;
+
+      // Trim is not supported for MIDI clips — note slicing is a follow-up PR.
+      // Return false so the event is not consumed and no drag starts.
+      if (this._host.isMidiClip(trackId, clipId)) return false;
 
       this._beginDrag(edge === 'left' ? 'trim-left' : 'trim-right', clipId, trackId, e);
       this._boundaryEl = boundary;

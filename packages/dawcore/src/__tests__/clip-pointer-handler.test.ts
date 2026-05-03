@@ -54,6 +54,7 @@ function createMockHost(
       return true;
     }),
     reextractClipPeaks: vi.fn().mockReturnValue(null),
+    isMidiClip: vi.fn().mockReturnValue(false),
     events,
     ...overrides,
   };
@@ -170,6 +171,48 @@ describe('ClipPointerHandler', () => {
       expect(handler.tryHandle(inner, e)).toBe(true);
 
       document.body.removeChild(boundary);
+    });
+
+    it('returns false for boundary on a MIDI clip — trim is not supported', () => {
+      // Host reports the clip as MIDI
+      const midiHost = createMockHost(engine, {
+        isMidiClip: vi.fn().mockImplementation((tId: string, cId: string) => {
+          return tId === 'track-midi' && cId === 'clip-midi';
+        }),
+      });
+      const midiHandler = new ClipPointerHandler(midiHost);
+
+      const el = makeBoundaryEl('clip-midi', 'track-midi', 'left');
+      const e = pointerEvent('pointerdown', { clientX: 100 });
+
+      expect(midiHandler.tryHandle(el, e)).toBe(false);
+      expect(engine.trimClip).not.toHaveBeenCalled();
+    });
+
+    it('does not start trim drag for MIDI clip — isActive remains false', () => {
+      const midiHost = createMockHost(engine, {
+        isMidiClip: vi.fn().mockReturnValue(true),
+      });
+      const midiHandler = new ClipPointerHandler(midiHost);
+
+      const el = makeBoundaryEl('clip-1', 'track-1', 'right');
+      midiHandler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
+
+      expect(midiHandler.isActive).toBe(false);
+    });
+
+    it('still allows move drag on MIDI clips — only trim is guarded', () => {
+      const midiHost = createMockHost(engine, {
+        isMidiClip: vi.fn().mockReturnValue(true),
+      });
+      const midiHandler = new ClipPointerHandler(midiHost);
+
+      const el = makeClipEl('clip-1', 'track-1');
+      const e = pointerEvent('pointerdown', { clientX: 100 });
+
+      // Move (clip header) should still work for MIDI clips
+      expect(midiHandler.tryHandle(el, e)).toBe(true);
+      expect(midiHandler.isActive).toBe(true);
     });
   });
 
