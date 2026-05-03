@@ -150,24 +150,23 @@ interface TrackDescriptor {
 
 ```
 for each clip in track:
-  if clip.src:                                        → existing audio path (fetch, decode, peaks)
-  else if clip.midiNotes != null:                     → MIDI path with notes
-  else if track.renderMode === 'piano-roll'
-       && clip.duration > 0:                          → MIDI placeholder (empty notes)
-  else:                                               → defer; wait for daw-clip-update
+  if clip.src:                       → existing audio path (fetch, decode, peaks)
+  else:                              → MIDI path (always registers, even empty)
 ```
 
-The placeholder branch covers the common declarative-HTML order: `appendChild(clipEl)` runs before `clipEl.midiNotes = [...]`. Registering the placeholder reserves the timeline span so layout settles immediately; `daw-clip-update` upgrades it once notes arrive.
+A clip with no `src` is treated as MIDI. It always registers in the engine — even with no notes and no declared `duration` — so `_applyClipUpdate` can reliably find it when notes arrive later via property assignment.
 
 ### MIDI path
 
-1. Resolve `notes` and `sourceDurationSamples`:
-   - With notes: `notes = clip.midiNotes`, `sourceDurationSamples = Math.ceil(maxNoteEnd × effectiveSampleRate)` where `maxNoteEnd = max(note.time + note.duration)`. If `notes.length === 0`, fall through to placeholder path.
-   - Placeholder: `notes = []`, `sourceDurationSamples = clip.duration × effectiveSampleRate`.
-2. Build engine clip via `createClip({ startSample, durationSamples, offsetSamples, sampleRate, sourceDurationSamples, midiNotes: notes, midiChannel, midiProgram, gain, fadeIn, fadeOut, name })`. Align `clip.id = clipEl.clipId`.
+1. Resolve inputs:
+   - `notes = clip.midiNotes ?? []`
+   - `noteSpanSeconds = notes.length ? max(note.time + note.duration) : 0`
+   - `sourceDurationSamples = Math.ceil(Math.max(noteSpanSeconds, clip.duration, 1) × effectiveSampleRate)` — at least 1 second so the engine has a non-zero clip span. Late note arrivals upgrade this via `_applyClipUpdate`.
+   - `requestedDurationSamples = clip.duration > 0 ? Math.round(clip.duration × effectiveSampleRate) : sourceDurationSamples`
+2. Build engine clip via `createClip({ startSample, durationSamples: requestedDurationSamples, offsetSamples, sampleRate, sourceDurationSamples, midiNotes: notes, midiChannel, midiProgram, gain, fadeIn, fadeOut, name })`. Align `clip.id = clipEl.clipId`.
 3. Push into `_engineTracks` Map under the track's id; do **not** touch `_clipBuffers`, `_peaksData`, `_clipOffsets`.
 4. Build engine if not yet built (existing lazy path). The engine accepts MIDI clips because `AudioClip.audioBuffer` is optional.
-5. Call `engine.setTracks(...)` (same point existing path calls it). The Tone adapter routes the clip — empty `notes` array produces no scheduled events but reserves the track shell.
+5. Call `engine.setTracks(...)` (same point existing path calls it). The Tone adapter routes the clip — empty `notes` array produces no scheduled events but reserves the track shell so subsequent `engine.updateTrack` calls work.
 
 ### Reactive updates when notes arrive late
 
