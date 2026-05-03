@@ -72,7 +72,19 @@ export interface TrackConfig {
   pan?: number;
   muted?: boolean;
   soloed?: boolean;
+  renderMode?: 'waveform' | 'piano-roll';
   clips?: ClipConfig[];
+  /**
+   * Convenience: creates a single piano-roll `<daw-clip>` child with these
+   * notes and sets `render-mode="piano-roll"` on the track. Equivalent to
+   * passing `{ renderMode: 'piano-roll', clips: [{ midiNotes, midiChannel, midiProgram }] }`.
+   * An explicit `renderMode` takes precedence over the inferred `'piano-roll'`.
+   */
+  midi?: {
+    notes: MidiNoteData[];
+    channel?: number;
+    program?: number;
+  };
 }
 
 /**

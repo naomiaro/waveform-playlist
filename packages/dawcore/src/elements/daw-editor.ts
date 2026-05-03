@@ -1505,7 +1505,19 @@ export class DawEditorElement extends LitElement {
     if (config.muted) trackEl.setAttribute('muted', '');
     if (config.soloed) trackEl.setAttribute('soloed', '');
 
-    for (const clipConfig of config.clips ?? []) {
+    // render-mode: explicit > inferred from midi shorthand > default 'waveform'
+    const renderMode = config.renderMode ?? (config.midi ? 'piano-roll' : undefined);
+    if (renderMode !== undefined) trackEl.setAttribute('render-mode', renderMode);
+
+    const clipConfigs: ClipConfig[] = [...(config.clips ?? [])];
+    if (config.midi) {
+      clipConfigs.push({
+        midiNotes: config.midi.notes,
+        midiChannel: config.midi.channel,
+        midiProgram: config.midi.program,
+      });
+    }
+    for (const clipConfig of clipConfigs) {
       trackEl.appendChild(this._buildClipElement(clipConfig));
     }
 

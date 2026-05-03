@@ -153,6 +153,28 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
+  it('addTrack({ midi }) creates a piano-roll track with one MIDI clip', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    const adapter = makeMockAdapter();
+    editor.adapter = adapter;
+    document.body.appendChild(editor);
+
+    const notes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
+    const track = await editor.addTrack({
+      name: 'Lead',
+      midi: { notes, channel: 0, program: 24 },
+    });
+
+    expect(track.getAttribute('render-mode')).toBe('piano-roll');
+    expect(track.name).toBe('Lead');
+    const clipEls = track.querySelectorAll('daw-clip');
+    expect(clipEls.length).toBe(1);
+    expect(clipEls[0].midiNotes).toEqual(notes);
+    expect(clipEls[0].midiChannel).toBe(0);
+    expect(clipEls[0].midiProgram).toBe(24);
+    document.body.removeChild(editor);
+  });
+
   it('updates engine clip when midiNotes is assigned after track-ready', async () => {
     const editor = document.createElement('daw-editor') as any;
     const adapter = makeMockAdapter();
