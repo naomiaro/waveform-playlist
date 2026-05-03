@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore + Tone.js — MIDI</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      --daw-piano-roll-note-color: #2a7070;
+      --daw-piano-roll-selected-note-color: #3d9e9e;
+      --daw-piano-roll-background: #1a1a2e;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+    }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore + Tone.js — MIDI (programmatic, piano-roll, PolySynth)</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="2048" wave-height="120" timescale>
+    <daw-keyboard-shortcuts playback></daw-keyboard-shortcuts>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { createToneAdapter } from '@waveform-playlist/playout';
+
+    const editor = document.getElementById('editor');
+    editor.adapter = createToneAdapter({ ppqn: 960 });
+
+    const log = document.getElementById('log');
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = msg;
+      log.prepend(line);
+      while (log.children.length > 20) log.lastChild.remove();
+    }
+    editor.addEventListener('daw-track-ready', (e) => addLog('track-ready: ' + e.detail.trackId));
+    editor.addEventListener('daw-error', (e) => addLog('error: ' + e.detail.operation + ' — ' + String(e.detail.error)));
+
+    // C major scale, quarter notes (~120 BPM = 0.5s per beat)
+    const notes = [
+      { midi: 60, name: 'C4', time: 0.0, duration: 0.5, velocity: 0.8 },
+      { midi: 62, name: 'D4', time: 0.5, duration: 0.5, velocity: 0.7 },
+      { midi: 64, name: 'E4', time: 1.0, duration: 0.5, velocity: 0.7 },
+      { midi: 65, name: 'F4', time: 1.5, duration: 0.5, velocity: 0.7 },
+      { midi: 67, name: 'G4', time: 2.0, duration: 0.5, velocity: 0.8 },
+      { midi: 69, name: 'A4', time: 2.5, duration: 0.5, velocity: 0.7 },
+      { midi: 71, name: 'B4', time: 3.0, duration: 0.5, velocity: 0.7 },
+      { midi: 72, name: 'C5', time: 3.5, duration: 0.5, velocity: 0.9 },
+    ];
+
+    await editor.addTrack({
+      name: 'C Major Scale',
+      midi: { notes },
+    });
+  </script>
+</body>
+</html>
