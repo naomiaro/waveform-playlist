@@ -945,6 +945,46 @@ export class DawEditorElement extends LitElement {
     }
     const oldClip = t.clips[idx];
     const sr = oldClip.sampleRate ?? this.effectiveSampleRate;
+
+    // MIDI clips: rebuild the clip when notes/channel/program change. Detect
+    // MIDI by either current or previous state being MIDI. oldClip.midiNotes
+    // is an array (possibly empty []) for any clip registered via _buildMidiClip
+    // — including placeholders. For audio clips it is undefined.
+    // Use loose != null to treat both null and undefined as "not MIDI" for
+    // clipEl.midiNotes (DawClipElement defaults to null; synthetic test objects
+    // may omit the property entirely, yielding undefined).
+    const isMidiNow = clipEl.midiNotes != null;
+    const wasMidi = oldClip.midiNotes !== undefined;
+    if (isMidiNow || wasMidi) {
+      const notes = clipEl.midiNotes ?? [];
+      const noteSpanSeconds = notes.length ? Math.max(...notes.map((n) => n.time + n.duration)) : 0;
+      const sourceDurationSamples = Math.ceil(Math.max(noteSpanSeconds, clipEl.duration, 1) * sr);
+      const requestedDurationSamples =
+        clipEl.duration > 0 ? Math.round(clipEl.duration * sr) : sourceDurationSamples;
+
+      const updatedClip: AudioClip = {
+        ...oldClip,
+        audioBuffer: undefined,
+        startSample: Math.round(clipEl.start * sr),
+        offsetSamples: Math.round(clipEl.offset * sr),
+        durationSamples: requestedDurationSamples,
+        sourceDurationSamples,
+        gain: clipEl.gain,
+        name: clipEl.name || oldClip.name,
+        midiNotes: notes,
+        midiChannel: clipEl.midiChannel ?? undefined,
+        midiProgram: clipEl.midiProgram ?? undefined,
+      };
+      const updatedClips = [...t.clips];
+      updatedClips[idx] = updatedClip;
+      const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
+      this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
+      // Drop any audio caches in case this clip was previously loaded as audio.
+      this._purgeClipCaches(clipId);
+      this._commitTrackChange(trackId, updatedTrack);
+      return;
+    }
+
     const newStartSample = Math.round(clipEl.start * sr);
     const newDurationSamples =
       clipEl.duration > 0 ? Math.round(clipEl.duration * sr) : oldClip.durationSamples;

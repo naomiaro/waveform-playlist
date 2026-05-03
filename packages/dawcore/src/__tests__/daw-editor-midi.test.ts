@@ -33,6 +33,7 @@ function makeMockAdapter() {
     audioContext: ctx as unknown as AudioContext,
     ppqn: 960,
     setTracks: vi.fn(),
+    updateTrack: vi.fn(),
     setTempo: vi.fn(),
     play: vi.fn(),
     pause: vi.fn(),
@@ -149,6 +150,47 @@ describe('<daw-editor> MIDI loading', () => {
     expect(engineClip.sourceDurationSamples).toBe(48000);
     // No audio buffer
     expect(engineClip.audioBuffer).toBeUndefined();
+    document.body.removeChild(editor);
+  });
+
+  it('updates engine clip when midiNotes is assigned after track-ready', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    const adapter = makeMockAdapter();
+    editor.adapter = adapter;
+    document.body.appendChild(editor);
+
+    const track = document.createElement('daw-track') as any;
+    track.setAttribute('render-mode', 'piano-roll');
+    const clip = document.createElement('daw-clip') as any;
+    clip.duration = 4; // placeholder span — notes not yet set
+    track.appendChild(clip);
+    editor.appendChild(track);
+
+    await new Promise<void>((resolve) => {
+      editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
+    });
+    // Engine always takes the incremental path — updateTrack is a required mock field.
+    const updateTrackCallsBefore = adapter.updateTrack.mock.calls.length;
+
+    // Now assign notes
+    const notes = [
+      { midi: 60, name: 'C4', time: 0, duration: 1, velocity: 0.8 },
+      { midi: 64, name: 'E4', time: 1, duration: 1, velocity: 0.6 },
+    ];
+    clip.midiNotes = notes;
+    await clip.updateComplete;
+    // _applyClipUpdate is sync after the event; allow microtasks
+    await new Promise((r) => setTimeout(r, 0));
+
+    const updateTrackCallsAfter = adapter.updateTrack.mock.calls.length;
+    expect(updateTrackCallsAfter).toBeGreaterThan(updateTrackCallsBefore);
+
+    const lastUpdateTrack = adapter.updateTrack.mock.calls.at(-1);
+    expect(lastUpdateTrack).toBeDefined();
+    const updatedClip = lastUpdateTrack![1].clips[0];
+    expect(updatedClip).toBeDefined();
+    expect(updatedClip!.midiNotes).toEqual(notes);
+    expect(updatedClip!.audioBuffer).toBeUndefined();
     document.body.removeChild(editor);
   });
 });
