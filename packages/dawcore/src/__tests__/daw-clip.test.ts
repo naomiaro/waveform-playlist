@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 
 // Register elements
 beforeAll(async () => {
@@ -58,6 +58,40 @@ describe('DawClipElement', () => {
     const el = document.createElement('daw-clip') as any;
     el.setAttribute('midi-program', '24');
     expect(el.midiProgram).toBe(24);
+  });
+
+  it('rejects out-of-range midi-channel and warns', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const el = document.createElement('daw-clip') as any;
+      el.midiChannel = 16; // invalid
+      expect(el.midiChannel).toBeNull(); // unchanged
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('midi-channel 16'));
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('rejects out-of-range midi-program and warns', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const el = document.createElement('daw-clip') as any;
+      el.midiProgram = 200; // invalid
+      expect(el.midiProgram).toBeNull(); // unchanged
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('midi-program 200'));
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('accepts null to clear midiChannel / midiProgram', () => {
+    const el = document.createElement('daw-clip') as any;
+    el.midiChannel = 5;
+    el.midiChannel = null;
+    expect(el.midiChannel).toBeNull();
+    el.midiProgram = 24;
+    el.midiProgram = null;
+    expect(el.midiProgram).toBeNull();
   });
 
   it('dispatches daw-clip-update when midiNotes is set after first render', async () => {

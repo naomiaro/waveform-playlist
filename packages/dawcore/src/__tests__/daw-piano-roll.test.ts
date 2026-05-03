@@ -126,6 +126,24 @@ describe('DawPianoRollElement', () => {
     vi.restoreAllMocks();
   });
 
+  it('rejects zero / negative / NaN samplesPerPixel and sampleRate', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const el = document.createElement('daw-piano-roll') as any;
+      el.samplesPerPixel = 0;
+      el.samplesPerPixel = -100;
+      el.samplesPerPixel = NaN;
+      expect(el.samplesPerPixel).toBe(1024); // default unchanged
+      el.sampleRate = 0;
+      el.sampleRate = -1;
+      el.sampleRate = NaN;
+      expect(el.sampleRate).toBe(48000); // default unchanged
+      expect(warnSpy.mock.calls.length).toBeGreaterThanOrEqual(6);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('schedules a redraw when visibleStart/visibleEnd/originX change', async () => {
     const el = document.createElement('daw-piano-roll') as any;
     el.length = 2500;

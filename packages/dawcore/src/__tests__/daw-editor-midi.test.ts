@@ -307,6 +307,114 @@ describe('<daw-editor> MIDI loading', () => {
     expect(track.getAttribute('render-mode')).toBe('piano-roll');
     document.body.removeChild(editor);
   });
+
+  it('updateTrack({ midi }) is silently ignored — does not create or modify clips', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    document.body.appendChild(editor);
+
+    const track = await editor.addTrack({ name: 'Audio Track' }); // no midi
+    const clipsBefore = track.querySelectorAll('daw-clip').length;
+
+    // updateTrack with midi field — should be silently ignored per JSDoc contract
+    editor.updateTrack(track.trackId, {
+      midi: { notes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }] },
+    });
+    await track.updateComplete;
+
+    const clipsAfter = track.querySelectorAll('daw-clip').length;
+    expect(clipsAfter).toBe(clipsBefore);
+    expect(track.getAttribute('render-mode')).toBeNull(); // not flipped to piano-roll
+    document.body.removeChild(editor);
+  });
+
+  it('does not emit "no AudioBuffer" warning for piano-roll tracks during statechange', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const editor = document.createElement('daw-editor') as any;
+      editor.adapter = makeMockAdapter();
+      document.body.appendChild(editor);
+
+      await editor.addTrack({
+        name: 'MIDI',
+        midi: {
+          notes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }],
+        },
+      });
+
+      // Trigger a tracksVersion bump by calling _applyClipUpdate path via property change
+      // Simplest: re-emit statechange manually if engine exists, or do a no-op update.
+      // Use updateClip on the auto-created MIDI clip:
+      const trackEl = editor.querySelector('daw-track');
+      const clipEl = trackEl?.querySelector('daw-clip');
+      if (clipEl) {
+        clipEl.midiNotes = [{ midi: 62, name: 'D4', time: 0, duration: 0.5, velocity: 0.8 }];
+        await clipEl.updateComplete;
+        await new Promise((r) => setTimeout(r, 0));
+      }
+
+      const warnCalls = warnSpy.mock.calls
+        .map((c) => String(c[0]))
+        .filter((s) => s.includes('no AudioBuffer'));
+      expect(warnCalls).toEqual([]);
+      document.body.removeChild(editor);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  describe('isMidiClip', () => {
+    it('returns false for unknown trackId', () => {
+      const editor = document.createElement('daw-editor') as any;
+      editor.adapter = makeMockAdapter();
+      document.body.appendChild(editor);
+      expect(editor.isMidiClip('missing-track', 'any-clip')).toBe(false);
+      document.body.removeChild(editor);
+    });
+
+    it('returns false for known track but unknown clipId', async () => {
+      const editor = document.createElement('daw-editor') as any;
+      editor.adapter = makeMockAdapter();
+      document.body.appendChild(editor);
+      const track = await editor.addTrack({
+        name: 'M',
+        midi: { notes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }] },
+      });
+      expect(editor.isMidiClip(track.trackId, 'missing-clip')).toBe(false);
+      document.body.removeChild(editor);
+    });
+
+    it('returns true for an empty-array placeholder MIDI clip', async () => {
+      // Critical: empty array != undefined, must still register as MIDI
+      const editor = document.createElement('daw-editor') as any;
+      editor.adapter = makeMockAdapter();
+      document.body.appendChild(editor);
+      const trackEl = document.createElement('daw-track') as any;
+      trackEl.setAttribute('render-mode', 'piano-roll');
+      const clipEl = document.createElement('daw-clip') as any;
+      clipEl.duration = 4; // placeholder span
+      trackEl.appendChild(clipEl);
+      editor.appendChild(trackEl);
+      await new Promise<void>((resolve) => {
+        editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
+      });
+      expect(editor.isMidiClip(trackEl.trackId, clipEl.clipId)).toBe(true);
+      document.body.removeChild(editor);
+    });
+
+    it('returns true for a clip with non-empty midiNotes', async () => {
+      const editor = document.createElement('daw-editor') as any;
+      editor.adapter = makeMockAdapter();
+      document.body.appendChild(editor);
+      const track = await editor.addTrack({
+        name: 'M',
+        midi: { notes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }] },
+      });
+      const clipEl = track.querySelector('daw-clip');
+      expect(editor.isMidiClip(track.trackId, clipEl.clipId)).toBe(true);
+      document.body.removeChild(editor);
+    });
+  });
 });
 
 describe('splitAtPlayhead MIDI guard', () => {

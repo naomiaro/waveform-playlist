@@ -22,8 +22,35 @@ export class DawPianoRollElement extends LitElement {
   @property({ attribute: false }) midiNotes: MidiNoteData[] = [];
   @property({ type: Number, attribute: false }) length = 0;
   @property({ type: Number, attribute: false }) waveHeight = 128;
-  @property({ type: Number, attribute: false }) samplesPerPixel = 1024;
-  @property({ type: Number, attribute: false }) sampleRate = 48000;
+  @property({ type: Number, attribute: 'samples-per-pixel', noAccessor: true })
+  get samplesPerPixel(): number {
+    return this._samplesPerPixel;
+  }
+  set samplesPerPixel(value: number) {
+    if (!Number.isFinite(value) || value <= 0) {
+      console.warn('[dawcore] daw-piano-roll samplesPerPixel ' + value + ' is invalid — ignored');
+      return;
+    }
+    const old = this._samplesPerPixel;
+    this._samplesPerPixel = value;
+    this.requestUpdate('samplesPerPixel', old);
+  }
+  private _samplesPerPixel = 1024;
+
+  @property({ type: Number, attribute: 'sample-rate', noAccessor: true })
+  get sampleRate(): number {
+    return this._sampleRate;
+  }
+  set sampleRate(value: number) {
+    if (!Number.isFinite(value) || value <= 0) {
+      console.warn('[dawcore] daw-piano-roll sampleRate ' + value + ' is invalid — ignored');
+      return;
+    }
+    const old = this._sampleRate;
+    this._sampleRate = value;
+    this.requestUpdate('sampleRate', old);
+  }
+  private _sampleRate = 48000;
   @property({ type: Number, attribute: false }) clipOffsetSeconds = 0;
   /** Visible viewport start in pixels (relative to timeline origin). */
   @property({ type: Number, attribute: false }) visibleStart = -Infinity;
