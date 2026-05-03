@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
-// Register element
+// Register elements
 beforeAll(async () => {
   await import('../elements/daw-clip');
+  await import('../elements/daw-track');
 });
 
 describe('DawClipElement', () => {
@@ -40,6 +41,42 @@ describe('DawClipElement', () => {
     expect(el.fadeIn).toBe(0.5);
     expect(el.fadeOut).toBe(1.0);
     expect(el.fadeType).toBe('sCurve');
+  });
+
+  it('exposes midiNotes JS property defaulting to null', () => {
+    const el = document.createElement('daw-clip') as any;
+    expect(el.midiNotes).toBeNull();
+  });
+
+  it('reflects midi-channel attribute as midiChannel number', () => {
+    const el = document.createElement('daw-clip') as any;
+    el.setAttribute('midi-channel', '9');
+    expect(el.midiChannel).toBe(9);
+  });
+
+  it('reflects midi-program attribute as midiProgram number', () => {
+    const el = document.createElement('daw-clip') as any;
+    el.setAttribute('midi-program', '24');
+    expect(el.midiProgram).toBe(24);
+  });
+
+  it('dispatches daw-clip-update when midiNotes is set after first render', async () => {
+    const trackEl = document.createElement('daw-track') as any;
+    const clipEl = document.createElement('daw-clip') as any;
+    trackEl.appendChild(clipEl);
+    document.body.appendChild(trackEl);
+    await clipEl.updateComplete;
+
+    let detail: any = null;
+    trackEl.addEventListener('daw-clip-update', (e: any) => {
+      detail = e.detail;
+    });
+
+    clipEl.midiNotes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
+    await clipEl.updateComplete;
+
+    expect(detail).toEqual({ trackId: trackEl.trackId, clipId: clipEl.clipId });
+    document.body.removeChild(trackEl);
   });
 
   describe('lifecycle events', () => {

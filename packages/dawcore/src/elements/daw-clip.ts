@@ -1,6 +1,7 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
+import type { MidiNoteData } from '@waveform-playlist/core';
 
 @customElement('daw-clip')
 export class DawClipElement extends LitElement {
@@ -15,6 +16,15 @@ export class DawClipElement extends LitElement {
   @property({ type: Number, attribute: 'fade-in' }) fadeIn = 0;
   @property({ type: Number, attribute: 'fade-out' }) fadeOut = 0;
   @property({ attribute: 'fade-type' }) fadeType = 'linear';
+
+  /** MIDI notes — JS property only, not reflected (note arrays are too large for attributes). */
+  @property({ attribute: false }) midiNotes: MidiNoteData[] | null = null;
+
+  /** MIDI channel (0-indexed). Channel 9 = GM percussion. */
+  @property({ type: Number, attribute: 'midi-channel' }) midiChannel: number | null = null;
+
+  /** MIDI program (GM instrument 0-127). Used by SoundFontToneTrack. */
+  @property({ type: Number, attribute: 'midi-program' }) midiProgram: number | null = null;
 
   readonly clipId = crypto.randomUUID();
 
@@ -65,6 +75,9 @@ export class DawClipElement extends LitElement {
       'fadeIn',
       'fadeOut',
       'fadeType',
+      'midiNotes',
+      'midiChannel',
+      'midiProgram',
     ];
     if (clipProps.some((p) => changed.has(p as keyof this))) {
       // Resolve parent <daw-track> at dispatch time so consumers don't need

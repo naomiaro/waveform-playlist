@@ -94,6 +94,7 @@ export async function loadFiles(
         pan: 0,
         muted: false,
         soloed: false,
+        renderMode: 'waveform',
         clips: [
           {
             kind: 'drop',
@@ -107,6 +108,9 @@ export async function loadFiles(
             fadeIn: 0,
             fadeOut: 0,
             fadeType: 'linear',
+            midiNotes: null,
+            midiChannel: null,
+            midiProgram: null,
           },
         ],
       });

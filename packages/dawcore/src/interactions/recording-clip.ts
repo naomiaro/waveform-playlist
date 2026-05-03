@@ -91,6 +91,9 @@ export function addRecordedClip(
           fadeIn: 0,
           fadeOut: 0,
           fadeType: 'linear',
+          midiNotes: null,
+          midiChannel: null,
+          midiProgram: null,
         };
         host._tracks = new Map(host._tracks).set(trackId, {
           ...desc,

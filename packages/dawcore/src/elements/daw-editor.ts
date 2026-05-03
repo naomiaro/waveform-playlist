@@ -660,6 +660,9 @@ export class DawEditorElement extends LitElement {
       fadeIn: clipEl.fadeIn,
       fadeOut: clipEl.fadeOut,
       fadeType: clipEl.fadeType as FadeType,
+      midiNotes: clipEl.midiNotes,
+      midiChannel: clipEl.midiChannel,
+      midiProgram: clipEl.midiProgram,
     };
     this._loadAndAppendClip(trackId, clipDesc);
   };
@@ -1000,6 +1003,9 @@ export class DawEditorElement extends LitElement {
         fadeIn: 0,
         fadeOut: 0,
         fadeType: 'linear',
+        midiNotes: null,
+        midiChannel: null,
+        midiProgram: null,
       });
     } else {
       for (const clipEl of clipEls) {
@@ -1016,6 +1022,9 @@ export class DawEditorElement extends LitElement {
           fadeIn: clipEl.fadeIn,
           fadeOut: clipEl.fadeOut,
           fadeType: clipEl.fadeType as FadeType,
+          midiNotes: clipEl.midiNotes,
+          midiChannel: clipEl.midiChannel,
+          midiProgram: clipEl.midiProgram,
         });
       }
     }
@@ -1026,6 +1035,7 @@ export class DawEditorElement extends LitElement {
       pan: trackEl.pan,
       muted: trackEl.muted,
       soloed: trackEl.soloed,
+      renderMode: 'waveform', // wired to trackEl.renderMode in Task 2
       clips,
     };
   }
@@ -1615,6 +1625,11 @@ export class DawEditorElement extends LitElement {
     if (config.fadeIn !== undefined) clipEl.fadeIn = config.fadeIn;
     if (config.fadeOut !== undefined) clipEl.fadeOut = config.fadeOut;
     if (config.fadeType !== undefined) clipEl.setAttribute('fade-type', config.fadeType);
+    if (config.midiNotes !== undefined) clipEl.midiNotes = config.midiNotes;
+    if (config.midiChannel !== undefined)
+      clipEl.setAttribute('midi-channel', String(config.midiChannel));
+    if (config.midiProgram !== undefined)
+      clipEl.setAttribute('midi-program', String(config.midiProgram));
     return clipEl;
   }
   // --- Playback ---

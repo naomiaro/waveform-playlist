@@ -1,4 +1,4 @@
-import type { FadeType } from '@waveform-playlist/core';
+import type { FadeType, MidiNoteData } from '@waveform-playlist/core';
 
 export interface TrackDescriptor {
   name: string;
@@ -7,6 +7,7 @@ export interface TrackDescriptor {
   pan: number;
   muted: boolean;
   soloed: boolean;
+  renderMode: 'waveform' | 'piano-roll';
   clips: ClipDescriptor[];
 }
 
@@ -24,6 +25,9 @@ interface BaseClipDescriptor {
   fadeIn: number;
   fadeOut: number;
   fadeType: FadeType;
+  midiNotes: MidiNoteData[] | null;
+  midiChannel: number | null;
+  midiProgram: number | null;
 }
 
 /**
@@ -73,12 +77,12 @@ export interface TrackConfig {
 
 /**
  * Public input shape for clips passed via `TrackConfig.clips` or
- * `editor.addClip(trackId, config)`. `src` is required — every clip needs
- * an audio source to load. Other fields default to the matching
- * `<daw-clip>` attribute defaults.
+ * `editor.addClip(trackId, config)`. `src` is optional to support MIDI clips
+ * with no audio source. Other fields default to the matching `<daw-clip>`
+ * attribute defaults.
  */
 export interface ClipConfig {
-  src: string;
+  src?: string;
   peaksSrc?: string;
   start?: number;
   duration?: number;
@@ -88,4 +92,7 @@ export interface ClipConfig {
   fadeIn?: number;
   fadeOut?: number;
   fadeType?: FadeType;
+  midiNotes?: MidiNoteData[];
+  midiChannel?: number;
+  midiProgram?: number;
 }
