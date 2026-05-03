@@ -49,6 +49,7 @@ export type {
   ClipDescriptor,
   DomClipDescriptor,
   DropClipDescriptor,
+  TrackRenderMode,
   TrackConfig,
   ClipConfig,
 } from './types';

@@ -215,4 +215,18 @@ describe('<daw-editor> MIDI loading', () => {
     expect(updatedClip!.audioBuffer).toBeUndefined();
     document.body.removeChild(editor);
   });
+
+  it('updateTrack({ renderMode: "piano-roll" }) sets render-mode attribute on DOM track', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    document.body.appendChild(editor);
+
+    const track = await editor.addTrack({ name: 'Test' });
+    expect(track.getAttribute('render-mode')).toBeNull();
+
+    editor.updateTrack(track.trackId, { renderMode: 'piano-roll' });
+    await track.updateComplete;
+    expect(track.getAttribute('render-mode')).toBe('piano-roll');
+    document.body.removeChild(editor);
+  });
 });

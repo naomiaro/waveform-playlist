@@ -1567,6 +1567,7 @@ export class DawEditorElement extends LitElement {
         if (partial.soloed) trackEl.setAttribute('soloed', '');
         else trackEl.removeAttribute('soloed');
       }
+      if (partial.renderMode !== undefined) trackEl.setAttribute('render-mode', partial.renderMode);
       return;
     }
     // No DOM element — apply directly to descriptor + engine.
@@ -1579,6 +1580,7 @@ export class DawEditorElement extends LitElement {
       ...(partial.pan !== undefined && { pan: partial.pan }),
       ...(partial.muted !== undefined && { muted: partial.muted }),
       ...(partial.soloed !== undefined && { soloed: partial.soloed }),
+      ...(partial.renderMode !== undefined && { renderMode: partial.renderMode }),
     };
     this._tracks = new Map(this._tracks).set(trackId, newDesc);
     if (this._engine) {

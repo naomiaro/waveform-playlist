@@ -81,6 +81,10 @@ export interface TrackConfig {
    * notes and sets `render-mode="piano-roll"` on the track. Equivalent to
    * passing `{ renderMode: 'piano-roll', clips: [{ midiNotes, midiChannel, midiProgram }] }`.
    * An explicit `renderMode` takes precedence over the inferred `'piano-roll'`.
+   *
+   * Creation-only — ignored by `updateTrack`. To modify notes after the
+   * track is built, use `editor.updateClip(trackId, clipId, { midiNotes })` or
+   * mutate the `<daw-clip>` element's `midiNotes` property directly.
    */
   midi?: {
     notes: MidiNoteData[];
