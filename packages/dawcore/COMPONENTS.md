@@ -87,6 +87,7 @@ Declares a track. Must be a direct child of `<daw-editor>`.
 | `pan` | number | `0` | Stereo pan (-1.0 left, 0 center, 1.0 right) |
 | `muted` | boolean | `false` | Whether track is muted |
 | `soloed` | boolean | `false` | Whether track is soloed |
+| `render-mode` | string | `'waveform'` | `'waveform'` or `'piano-roll'`. Piano-roll mode mounts `<daw-piano-roll>` for each clip in the track instead of `<daw-waveform>`. |
 
 When `src` is set without child `<daw-clip>` elements, a single clip spanning the full audio is created automatically.
 
@@ -108,6 +109,14 @@ Declares a clip within a track. Must be a direct child of `<daw-track>`.
 | `fade-in-duration` | number | — | Fade in duration (seconds) |
 | `fade-out-type` | string | — | Fade out curve type |
 | `fade-out-duration` | number | — | Fade out duration (seconds) |
+| `midi-channel` | number | — | MIDI channel (0-indexed). Channel 9 = GM percussion. |
+| `midi-program` | number | — | GM program (0-127). Used by `SoundFontToneTrack` for instrument lookup. |
+
+**JS-only properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `midiNotes` | `MidiNoteData[] \| null` | MIDI notes for this clip. Not reflected as an attribute (note arrays are too large). Setting this dispatches `daw-clip-update`, which propagates to the engine via `<daw-editor>._applyClipUpdate`. A clip is treated as MIDI iff `midiNotes != null`. |
 
 ---
 
@@ -120,6 +129,14 @@ Visual elements use Shadow DOM with canvas rendering.
 Renders waveform data on canvas. Receives peak data as JS properties (not attributes).
 
 Uses chunked rendering (1000px chunks) with virtual scrolling for performance. Only visible chunks are rendered. Dirty pixel tracking enables incremental updates without full redraws.
+
+### `<daw-piano-roll>`
+
+Renders MIDI notes on canvas — alternative to `<daw-waveform>` for clips on tracks with `render-mode="piano-roll"`. Auto-mounted by `<daw-editor>`; rarely instantiated directly.
+
+Same chunked rendering pattern as `<daw-waveform>` (1000px chunks, virtual scrolling). Auto-fits the pitch range to the actual notes (± 1 note for breathing room), maps velocity to opacity (0.3 → 1.0), and respects `--daw-piano-roll-note-color` / `--daw-piano-roll-selected-note-color` / `--daw-piano-roll-background` CSS custom properties.
+
+Properties (set by `<daw-editor>`): `midiNotes`, `length`, `waveHeight`, `samplesPerPixel`, `sampleRate`, `clipOffsetSeconds`, `visibleStart`, `visibleEnd`, `originX`, `selected`.
 
 ### `<daw-playhead>`
 
@@ -204,7 +221,8 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
   ├── <daw-track>               ← Data element, light DOM
   │     └── <daw-clip>          ← Data element, light DOM
   ├── <daw-track-controls>      ← Visual, Shadow DOM (auto-generated)
-  ├── <daw-waveform>            ← Visual, Shadow DOM (auto-generated)
+  ├── <daw-waveform>            ← Visual, Shadow DOM (auto-generated; render-mode="waveform")
+  ├── <daw-piano-roll>          ← Visual, Shadow DOM (auto-generated; render-mode="piano-roll")
   ├── <daw-playhead>            ← Visual, Shadow DOM (auto-generated)
   ├── <daw-ruler>               ← Visual, Shadow DOM (auto-generated)
   └── <daw-selection>           ← Visual, Shadow DOM (auto-generated)
@@ -218,7 +236,7 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 
 **Data elements** (`<daw-track>`, `<daw-clip>`) use light DOM — the editor reads their attributes and listens for events. They don't render anything visible.
 
-**Visual elements** (`<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>`, `<daw-selection>`, `<daw-track-controls>`) use Shadow DOM and are created internally by the editor. Consumers don't create these directly.
+**Visual elements** (`<daw-waveform>`, `<daw-piano-roll>`, `<daw-playhead>`, `<daw-ruler>`, `<daw-selection>`, `<daw-track-controls>`) use Shadow DOM and are created internally by the editor. Consumers don't create these directly. The editor mounts `<daw-waveform>` or `<daw-piano-roll>` per clip based on the parent `<daw-track>`'s `render-mode` attribute.
 
 **Transport elements** are light DOM. The `<daw-transport>` container resolves the target editor via `document.getElementById(this.getAttribute('for'))`. Button elements walk up to the closest `<daw-transport>` to find their target.
 

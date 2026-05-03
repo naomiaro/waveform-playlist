@@ -13,6 +13,7 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **File drop** — Drag audio files onto the editor to add tracks
 - **Recording** — Live mic recording with waveform preview, pause/resume, cancelable clip creation
 - **Pre-computed peaks** — Instant waveform rendering from `.dat` files before audio decodes
+- **MIDI tracks** — Programmatic MIDI clips render as piano-roll via `<daw-piano-roll>`. Playback via Tone.js adapter (native MIDI synth deferred). See [MIDI Tracks](#midi-tracks).
 - **Track controls** — Volume, pan, mute, solo per track via `<daw-track-controls>`
 - **Transport access** — Tempo, metronome, count-in, meter, effects via `@dawcore/transport`
 - **CSS theming** — Dark mode by default, fully customizable via CSS custom properties
@@ -92,7 +93,7 @@ adapter.transport.setCountIn(true);
 
 ### Tone.js (effects, MIDI synths)
 
-Uses Tone.js for audio processing. Single tempo/meter only.
+Uses Tone.js for audio processing. Single tempo/meter only. **Required for MIDI playback** — the native adapter has no MIDI synth yet, so MIDI clips render as piano-roll but are silent.
 
 ```bash
 npm install @waveform-playlist/playout tone
@@ -124,6 +125,50 @@ For multiple clips per track with independent positioning:
   </daw-track>
 </daw-editor>
 ```
+
+## MIDI Tracks
+
+Programmatic MIDI clips render as piano-roll. Playback requires the Tone.js adapter (the native adapter has no MIDI synth yet). Use the `editor.addTrack({ midi })` sugar for the simplest path:
+
+```javascript
+import { createToneAdapter } from '@waveform-playlist/playout';
+
+const editor = document.querySelector('daw-editor');
+editor.adapter = createToneAdapter({ ppqn: 960 });
+
+await editor.addTrack({
+  name: 'Lead',
+  midi: {
+    notes: [
+      { midi: 60, name: 'C4', time: 0.0, duration: 0.5, velocity: 0.8 },
+      { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
+      { midi: 67, name: 'G4', time: 1.0, duration: 0.5, velocity: 0.8 },
+    ],
+    channel: 0,        // optional — 9 = GM percussion
+    program: 24,       // optional — GM instrument 0-127 (used by SoundFontToneTrack)
+  },
+});
+```
+
+This expands to a `<daw-track render-mode="piano-roll">` containing a `<daw-clip>` whose `midiNotes` JS property is set to the notes array. Equivalent declarative form:
+
+```html
+<daw-track render-mode="piano-roll" name="Lead">
+  <daw-clip midi-channel="0" midi-program="24"></daw-clip>
+</daw-track>
+<script>
+  document.querySelector('daw-clip').midiNotes = [
+    { midi: 60, name: 'C4', time: 0.0, duration: 0.5, velocity: 0.8 },
+    // ...
+  ];
+</script>
+```
+
+A clip is treated as MIDI iff `clip.midiNotes != null`. MIDI clips skip audio fetch + decode + peak generation. Trim handles and split-at-playhead are inert on MIDI clips for now (note slicing is a follow-up). Move drag works.
+
+**Theming:** the piano-roll honors `--daw-piano-roll-note-color` (default `#2a7070`), `--daw-piano-roll-selected-note-color` (default `#3d9e9e`), and `--daw-piano-roll-background` (default `#1a1a2e`).
+
+See `examples/dawcore-tone/midi.html` for a runnable demo (C major scale, PolySynth playback).
 
 ## Pre-Computed Peaks
 
@@ -233,6 +278,9 @@ daw-editor {
   --daw-clip-header-text: #e0d4c8;
   --daw-controls-width: 180px;
   --daw-min-height: 200px;
+  --daw-piano-roll-note-color: #2a7070;
+  --daw-piano-roll-selected-note-color: #3d9e9e;
+  --daw-piano-roll-background: #1a1a2e;
 }
 ```
 
@@ -259,11 +307,15 @@ Methods: `loadFiles(fileList)`, `splitAtPlayhead()`.
 
 ### `<daw-track>`
 
-Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `mono`.
+Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `mono`, `render-mode` (`'waveform' | 'piano-roll'`, default `'waveform'`).
 
 ### `<daw-clip>`
 
-Declarative clip data. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`.
+Declarative clip data. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `midi-channel`, `midi-program`. JS-only property: `midiNotes: MidiNoteData[] | null` (note arrays are too large for attributes).
+
+### `<daw-piano-roll>`
+
+Visual element for MIDI note rendering. Mounted automatically when the parent track has `render-mode="piano-roll"` — you don't usually instantiate it directly. See [MIDI Tracks](#midi-tracks).
 
 ### `<daw-transport for="editor-id">`
 
