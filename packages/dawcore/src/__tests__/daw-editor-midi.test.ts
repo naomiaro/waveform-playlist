@@ -1,0 +1,129 @@
+import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+
+beforeAll(async () => {
+  await import('../elements/daw-editor');
+  await import('../elements/daw-track');
+  await import('../elements/daw-clip');
+});
+
+let fetchSpy: ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  vi.stubGlobal('devicePixelRatio', 1);
+  fetchSpy = vi.fn().mockRejectedValue(new Error('fetch should not have been called'));
+  vi.stubGlobal('fetch', fetchSpy);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+function makeMockAdapter() {
+  // Minimal PlayoutAdapter stub — engine accepts but doesn't actually play.
+  const ctx = {
+    sampleRate: 48000,
+    state: 'suspended' as AudioContextState,
+    destination: {} as AudioDestinationNode,
+    resume: vi.fn().mockResolvedValue(undefined),
+    decodeAudioData: vi.fn(),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+  return {
+    audioContext: ctx as unknown as AudioContext,
+    ppqn: 960,
+    setTracks: vi.fn(),
+    setTempo: vi.fn(),
+    play: vi.fn(),
+    pause: vi.fn(),
+    stop: vi.fn(),
+    seek: vi.fn(),
+    init: vi.fn().mockResolvedValue(undefined),
+    dispose: vi.fn(),
+    isPlaying: vi.fn().mockReturnValue(false),
+  };
+}
+
+describe('<daw-editor> MIDI loading', () => {
+  it('does not fetch when a clip has midiNotes set', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    document.body.appendChild(editor);
+
+    const track = document.createElement('daw-track') as any;
+    track.setAttribute('render-mode', 'piano-roll');
+    track.setAttribute('name', 'Lead');
+
+    const clip = document.createElement('daw-clip') as any;
+    clip.midiNotes = [
+      { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
+      { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
+    ];
+    track.appendChild(clip);
+    editor.appendChild(track);
+
+    await new Promise<void>((resolve) => {
+      editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    document.body.removeChild(editor);
+  });
+
+  it('passes midiNotes through to engine.setTracks', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    const adapter = makeMockAdapter();
+    editor.adapter = adapter;
+    document.body.appendChild(editor);
+
+    const track = document.createElement('daw-track') as any;
+    track.setAttribute('render-mode', 'piano-roll');
+    const clip = document.createElement('daw-clip') as any;
+    const notes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
+    clip.midiNotes = notes;
+    track.appendChild(clip);
+    editor.appendChild(track);
+
+    await new Promise<void>((resolve) => {
+      editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
+    });
+
+    const lastCall = adapter.setTracks.mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    const tracks = lastCall![0];
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].clips).toHaveLength(1);
+    expect(tracks[0].clips[0].midiNotes).toEqual(notes);
+    expect(tracks[0].clips[0].audioBuffer).toBeUndefined();
+    document.body.removeChild(editor);
+  });
+
+  it('registers a placeholder clip (no notes, no duration) so late arrivals can find it', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    const adapter = makeMockAdapter();
+    editor.adapter = adapter;
+    document.body.appendChild(editor);
+
+    const track = document.createElement('daw-track') as any;
+    track.setAttribute('render-mode', 'piano-roll');
+    // Clip with neither midiNotes nor duration — pure placeholder
+    const clip = document.createElement('daw-clip') as any;
+    track.appendChild(clip);
+    editor.appendChild(track);
+
+    await new Promise<void>((resolve) => {
+      editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
+    });
+
+    const lastCall = adapter.setTracks.mock.calls.at(-1);
+    const engineClip = lastCall![0][0].clips[0];
+    // Discriminator: must be != null (and specifically [] in this case)
+    expect(engineClip.midiNotes).toEqual([]);
+    expect(engineClip.midiNotes).not.toBeUndefined();
+    // 1-second placeholder span at 48000 Hz
+    expect(engineClip.sourceDurationSamples).toBe(48000);
+    // No audio buffer
+    expect(engineClip.audioBuffer).toBeUndefined();
+    document.body.removeChild(editor);
+  });
+});

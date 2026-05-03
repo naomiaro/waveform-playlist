@@ -876,6 +876,34 @@ export class DawEditorElement extends LitElement {
     }
     return clip;
   }
+  /**
+   * Build an engine clip from a MIDI clip descriptor. Always returns a clip
+   * — empty notes / no declared duration get a 1-second placeholder span so
+   * the clip is reachable via `engine.updateTrack` once notes arrive.
+   */
+  private _buildMidiClip(clipDesc: ClipDescriptor): AudioClip {
+    const sr = this.effectiveSampleRate;
+    const notes = clipDesc.midiNotes ?? [];
+    const noteSpanSeconds = notes.length ? Math.max(...notes.map((n) => n.time + n.duration)) : 0;
+    const sourceDurationSamples = Math.ceil(Math.max(noteSpanSeconds, clipDesc.duration, 1) * sr);
+    const requestedDurationSamples =
+      clipDesc.duration > 0 ? Math.round(clipDesc.duration * sr) : sourceDurationSamples;
+
+    const clip = createClip({
+      startSample: Math.round(clipDesc.start * sr),
+      durationSamples: requestedDurationSamples,
+      offsetSamples: Math.round(clipDesc.offset * sr),
+      sampleRate: sr,
+      sourceDurationSamples,
+      gain: clipDesc.gain,
+      name: clipDesc.name,
+      midiNotes: notes,
+      midiChannel: clipDesc.midiChannel ?? undefined,
+      midiProgram: clipDesc.midiProgram ?? undefined,
+    });
+    if (isDomClip(clipDesc)) clip.id = clipDesc.clipId;
+    return clip;
+  }
   /** Remove a single clip from all per-clip caches. Used by error rollbacks. */
   private _purgeClipCaches(clipId: string) {
     const nextBuffers = new Map(this._clipBuffers);
@@ -1044,7 +1072,14 @@ export class DawEditorElement extends LitElement {
     try {
       const clips = [];
       for (const clipDesc of descriptor.clips) {
-        if (!clipDesc.src) continue;
+        if (!clipDesc.src) {
+          // MIDI clip path: no fetch, no peaks, register the clip directly.
+          // Always registers (even with no notes / no duration) so late note
+          // arrivals via daw-clip-update — handled in _applyClipUpdate (Task 6)
+          // — can find the clip in _engineTracks.
+          clips.push(this._buildMidiClip(clipDesc));
+          continue;
+        }
         // Per-clip try/catch: a single bad clip dispatches daw-clip-error and
         // skips to the next clip rather than aborting the whole track. Without
         // this, clip N's failure leaks earlier clips' cache writes from this
