@@ -10,6 +10,7 @@ export class DawTrackElement extends LitElement {
   @property({ type: Number }) pan = 0;
   @property({ type: Boolean }) muted = false;
   @property({ type: Boolean }) soloed = false;
+  @property({ attribute: 'render-mode' }) renderMode: 'waveform' | 'piano-roll' = 'waveform';
 
   readonly trackId = crypto.randomUUID();
 
@@ -48,7 +49,7 @@ export class DawTrackElement extends LitElement {
       return;
     }
 
-    const trackProps = ['volume', 'pan', 'muted', 'soloed', 'src', 'name'];
+    const trackProps = ['volume', 'pan', 'muted', 'soloed', 'src', 'name', 'renderMode'];
     const hasTrackChange = trackProps.some((p) => changed.has(p as keyof this));
 
     if (hasTrackChange) {

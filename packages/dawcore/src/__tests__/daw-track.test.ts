@@ -64,4 +64,32 @@ describe('DawTrackElement', () => {
 
     document.body.removeChild(track);
   });
+
+  it('defaults renderMode to "waveform"', () => {
+    const el = document.createElement('daw-track') as any;
+    expect(el.renderMode).toBe('waveform');
+  });
+
+  it('reflects render-mode attribute', () => {
+    const el = document.createElement('daw-track') as any;
+    el.setAttribute('render-mode', 'piano-roll');
+    expect(el.renderMode).toBe('piano-roll');
+  });
+
+  it('dispatches daw-track-update when renderMode changes after first render', async () => {
+    const el = document.createElement('daw-track') as any;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    let detail: any = null;
+    el.addEventListener('daw-track-update', (e: any) => {
+      detail = e.detail;
+    });
+
+    el.renderMode = 'piano-roll';
+    await el.updateComplete;
+
+    expect(detail).toEqual({ trackId: el.trackId });
+    document.body.removeChild(el);
+  });
 });

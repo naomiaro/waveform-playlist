@@ -1035,7 +1035,7 @@ export class DawEditorElement extends LitElement {
       pan: trackEl.pan,
       muted: trackEl.muted,
       soloed: trackEl.soloed,
-      renderMode: 'waveform', // wired to trackEl.renderMode in Task 2
+      renderMode: trackEl.renderMode,
       clips,
     };
   }
