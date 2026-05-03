@@ -1,6 +1,7 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
+import type { TrackRenderMode } from '../types';
 
 @customElement('daw-track')
 export class DawTrackElement extends LitElement {
@@ -10,7 +11,7 @@ export class DawTrackElement extends LitElement {
   @property({ type: Number }) pan = 0;
   @property({ type: Boolean }) muted = false;
   @property({ type: Boolean }) soloed = false;
-  @property({ attribute: 'render-mode' }) renderMode: 'waveform' | 'piano-roll' = 'waveform';
+  @property({ attribute: 'render-mode' }) renderMode: TrackRenderMode = 'waveform';
 
   readonly trackId = crypto.randomUUID();
 

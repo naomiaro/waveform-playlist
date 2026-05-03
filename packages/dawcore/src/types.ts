@@ -1,5 +1,7 @@
 import type { FadeType, MidiNoteData } from '@waveform-playlist/core';
 
+export type TrackRenderMode = 'waveform' | 'piano-roll';
+
 export interface TrackDescriptor {
   name: string;
   src: string;
@@ -7,7 +9,7 @@ export interface TrackDescriptor {
   pan: number;
   muted: boolean;
   soloed: boolean;
-  renderMode: 'waveform' | 'piano-roll';
+  renderMode: TrackRenderMode;
   clips: ClipDescriptor[];
 }
 
@@ -72,7 +74,7 @@ export interface TrackConfig {
   pan?: number;
   muted?: boolean;
   soloed?: boolean;
-  renderMode?: 'waveform' | 'piano-roll';
+  renderMode?: TrackRenderMode;
   clips?: ClipConfig[];
   /**
    * Convenience: creates a single piano-roll `<daw-clip>` child with these
