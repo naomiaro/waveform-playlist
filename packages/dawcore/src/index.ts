@@ -1,6 +1,7 @@
 import './elements/daw-clip';
 import './elements/daw-track';
 import './elements/daw-waveform';
+import './elements/daw-piano-roll';
 import './elements/daw-playhead';
 import './elements/daw-transport';
 import './elements/daw-play-button';
@@ -18,6 +19,7 @@ export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
 export { DawWaveformElement } from './elements/daw-waveform';
 export type { WaveformSegment } from './elements/daw-waveform';
+export { DawPianoRollElement } from './elements/daw-piano-roll';
 export { DawPlayheadElement } from './elements/daw-playhead';
 export { DawTransportElement } from './elements/daw-transport';
 export { DawTransportButton } from './elements/daw-transport-button';
