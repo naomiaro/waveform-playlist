@@ -130,18 +130,26 @@ class RecordingProcessor extends AudioWorkletProcessor {
   }
 
   private flushBuffers(): void {
-    // Send all channel buffers to main thread
+    // Transfer the underlying buffers instead of slice() + structured-clone copy.
+    // Saves one memcpy per channel on the audio thread (no slice) and one on the
+    // receive side (no structured clone). After transfer, this.buffers[i] is
+    // detached, so we allocate replacements before returning.
     const channels: Float32Array[] = [];
+    const transfer: ArrayBuffer[] = [];
     for (let i = 0; i < this.channelCount; i++) {
-      channels.push(this.buffers[i].slice(0, this.samplesCollected));
+      const buf = this.buffers[i];
+      channels.push(buf.subarray(0, this.samplesCollected));
+      transfer.push(buf.buffer);
     }
 
-    this.port.postMessage({
-      channels,
-      channelCount: this.channelCount,
-    } as RecordingProcessorMessage);
+    this.port.postMessage(
+      { channels, channelCount: this.channelCount } as RecordingProcessorMessage,
+      transfer
+    );
 
-    // Reset buffer
+    for (let i = 0; i < this.channelCount; i++) {
+      this.buffers[i] = new Float32Array(this.bufferSize);
+    }
     this.samplesCollected = 0;
   }
 }

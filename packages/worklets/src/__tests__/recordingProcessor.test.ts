@@ -270,4 +270,64 @@ describe('RecordingProcessor', () => {
       expect(messages.length).toBe(0);
     });
   });
+
+  describe('pause / resume', () => {
+    it('flushes partial buffer on pause and stops accumulating', () => {
+      const proc = createProcessor(44100, 1);
+      // Fill 2 frames (256 samples) — less than bufferSize 705
+      proc.process(monoInput(128, 0.3), [], {});
+      proc.process(monoInput(128, 0.3), [], {});
+      expect(messages.length).toBe(0);
+
+      proc.port.onmessage({ data: { command: 'pause' } });
+      expect(messages.length).toBe(1);
+      expect(messages[0].channels[0].length).toBe(256);
+
+      // While paused, process() must not enqueue any more samples
+      for (let i = 0; i < 10; i++) {
+        proc.process(monoInput(128, 0.9), [], {});
+      }
+      expect(messages.length).toBe(1);
+    });
+
+    it('resumes capture into freshly-allocated buffers after pause', () => {
+      const proc = createProcessor(44100, 1);
+      // Pause mid-buffer
+      proc.process(monoInput(128, 0.3), [], {});
+      proc.port.onmessage({ data: { command: 'pause' } });
+      expect(messages.length).toBe(1);
+
+      // Resume and fill a complete buffer with a distinct value
+      proc.port.onmessage({ data: { command: 'resume' } });
+      // bufferSize = 705. 6 frames = 768 samples → flush at 705
+      for (let i = 0; i < 6; i++) {
+        proc.process(monoInput(128, 0.7), [], {});
+      }
+      expect(messages.length).toBe(2);
+      const second = messages[1].channels[0];
+      expect(second.length).toBe(705);
+      // Sample values must come from post-resume input only — not the pre-pause partial
+      expect(second[0]).toBeCloseTo(0.7);
+      expect(second[704]).toBeCloseTo(0.7);
+    });
+
+    it('survives multiple pause/resume cycles without corrupting samples', () => {
+      const proc = createProcessor(48000, 1);
+      // bufferSize = 768
+      for (let cycle = 0; cycle < 3; cycle++) {
+        // Resume / first cycle uses initial isRecording = true
+        if (cycle > 0) proc.port.onmessage({ data: { command: 'resume' } });
+        const value = 0.1 * (cycle + 1);
+        for (let i = 0; i < 6; i++) {
+          proc.process(monoInput(128, value), [], {});
+        }
+        proc.port.onmessage({ data: { command: 'pause' } });
+      }
+      // 3 full-buffer flushes from process(), plus possibly partials on pause (none here)
+      expect(messages.length).toBe(3);
+      expect(messages[0].channels[0][0]).toBeCloseTo(0.1);
+      expect(messages[1].channels[0][0]).toBeCloseTo(0.2);
+      expect(messages[2].channels[0][0]).toBeCloseTo(0.3);
+    });
+  });
 });
