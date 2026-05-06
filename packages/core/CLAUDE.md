@@ -45,3 +45,12 @@ Framework-agnostic types, pure functions, and utilities shared across all packag
 **Keyboard shortcuts:** `handleKeyboardEvent` is a pure function — no React dependency. The `undefined` vs `false` distinction in modifier keys matters: `undefined` = match any state, `false` = must NOT be pressed.
 
 **Musical ticks:** `beatsAndBars.ts` uses Tone.js-compatible PPQN (192). `musicalTicks.ts` uses 960 PPQN for finer resolution in snap-to-grid. Both accept PPQN as a parameter.
+
+## Clip Constructors
+
+- **Prefer `createClip()` Over `createClipFromSeconds()` When Samples Known** — `createClipFromSeconds` round-trips through float seconds: `samples/rate → seconds → Math.round(seconds*rate)`. Safe when the same rate is used for both legs, but drifts silently when rates differ (e.g., `effectiveSampleRate` vs `audioBuffer.sampleRate`). Use `createClip()` with integer samples when available. For tick-based creation (variable-tempo), use `createClipFromTicks()` which sets `startTick` as authoritative and derives `startSample`.
+- **`createClipFromSeconds` Supports Peaks-First Rendering** — `audioBuffer` is optional. Provide `waveformData` (from `waveform-data.js`) + `sampleRate` + `sourceDuration` instead. This enables rendering waveforms before audio decode completes. The `WaveformDataObject` interface defines the required shape.
+
+## WaveformData Constraints
+
+- **`WaveformData.resample({ scale })` only resamples to coarser (larger) scales** than the source. Attempting to resample finer throws. When caching `WaveformData`, validate `cached.scale <= requestedScale` before returning cache hits.

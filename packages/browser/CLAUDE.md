@@ -415,3 +415,25 @@ const setState = useCallback((v) => {
 ## MediaElement currentTime vs currentTimeRef
 
 `currentTime` (React state from `useMediaElementAnimation`) only updates on pause/stop/seek/playback-end — NOT during playback. For smooth real-time display, use `currentTimeRef` with a local `requestAnimationFrame` loop and direct DOM manipulation (e.g., `ref.current.textContent = ...`). Never use `currentTime` for time displays that should update during playback.
+
+## React Hook Patterns (cross-cutting)
+
+- **Derive Render Guards from Props, Not Effect State** — Don't use effect-set state (e.g., `audioBuffers`) in render guards. Effect state lags props by one+ renders, causing content to flash/disappear. Compute values synchronously from props instead.
+- **Copy Refs in useEffect Body** — When accessing a ref in `useEffect` cleanup, copy `.current` to a local variable inside the effect body. ESLint's `react-hooks/exhaustive-deps` rule flags refs that may change between render and cleanup. **Exception:** for `[]` deps effects (mount/unmount only), refs are null at mount — copying captures null forever; read refs directly inside the cleanup function instead.
+- **Refs from Custom Hooks in Dep Arrays** — When a `useRef` is returned from a custom hook, ESLint's `exhaustive-deps` can't trace its stability. Include it in the dep array (harmless, never triggers) rather than `eslint-disable-next-line` which would mask real missing dependencies.
+- **Render-Phase Guards ≠ Effect Dependencies** — Derived booleans computed during render (e.g., `isEngineTracks = tracks === engineTracksRef.current`) that are read inside effect bodies as guards should NOT be in the effect's dep array. They flip between renders, causing spurious re-runs. Read them inside the effect body; depend only on the source data (`tracks`). When the same guard also needs to be visible to the *previous* effect's cleanup, store it in a ref during render.
+- **Gate Provider Behind Async Readiness** — When multiple async resources must load before rendering (e.g., MIDI tracks + SoundFont), gate the `WaveformPlaylistProvider` mount behind all resources being ready. Prevents double engine rebuilds. Check both the loading flag AND `tracks.length > 0` since hooks can briefly report `loading: false` with empty data.
+- **Provider Child Effects and playoutRef Timing** — React runs child effects before parent effects. A child component's `useEffect` accessing `playoutRef.current` will find `null` on first run. Add `duration` (from `useMediaElementData()`) as a dependency — it changes from 0 to the actual value when the playout is ready, retriggering the effect.
+
+## Tone.js Usage Outside the Playout Package
+
+- **Dynamic Import Tone.js** — `import * as Tone from 'tone'` eagerly creates a default context with AudioWorklet nodes, which fails before user gesture. Use `import type` for types and `await import('tone')` inside effects after AudioContext is running. Call `Tone.setContext(new Tone.Context(audioContext))` to share the native AudioContext.
+- **`Tone.js Effect.input` Is Not a Native AudioNode** — `Effect` subclasses (BitCrusher, etc.) set `this.input = new Tone.Gain(...)` (a Tone wrapper). Native `AudioNode.connect(effect.input)` fails with "Overload resolution failed". Use `Tone.Gain` as a bridge: `outputNode.connect(bridge.input)` works because `Tone.Gain.input` IS a native `GainNode`. Then `bridge.chain(effect, destination)` for the Tone chain.
+
+## Stop Before Clear
+
+Always call `stop()` before clearing tracks. Clearing React state without stopping Tone.js Transport leaves orphaned audio playing. Use `ClearAllButton` (re-exported from `@waveform-playlist/browser`) which handles this via `usePlaylistControls().stop()`.
+
+## Shared Clip Pixel Width
+
+Use `clipPixelWidth()` from `@waveform-playlist/core` for any pixel width derived from `startSample`/`durationSamples`/`samplesPerPixel`. Both `Clip.tsx` (container) and `ChannelWithProgress.tsx` (progress overlay) must use this shared function — never `peaksData.length`, which may be shorter than the clip when audio is shorter than configured duration.

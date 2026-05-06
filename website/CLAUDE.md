@@ -1,5 +1,22 @@
 # Website Package (Docusaurus)
 
+## Aesthetic: Berlin Underground
+
+Industrial / electronic-music-culture aesthetic. When adding examples or UI:
+
+- **Dark gradient backgrounds** with high-contrast text
+- **Monospace fonts** (Courier New) for timestamps and technical elements
+- **Grungy details** — `//` prefixes on timestamps, text shadows
+- **Muted palette** with strategic accent colors
+- **Minimal, utilitarian** — form follows function
+
+**Dark-mode palette ("Ampelmännchen Traffic Light"** — DDR pedestrian-signal homage):
+- 🟢 Green `#63C75F` — buttons / links
+- 🟡 Amber `#c49a6c` — waveform bars, body text
+- 🔴 Red `#d08070` — headings, accents
+
+Reference: the Flexible API example showcases full customization (custom playheads, grungy timestamps, monospace clip headers).
+
 ## CSS Pitfalls
 
 ### `backdrop-filter` breaks `position: fixed` children
@@ -52,6 +69,31 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 - **Tone.js in example components must use dynamic import** — `import * as Tone from 'tone'` triggers AudioWorklet errors on page load. Use `import type * as ToneNs from 'tone'` for types, then `const Tone = await import('tone')` inside effects after `AudioContext.state === 'running'`.
 - **Examples must pass `onTracksChange` to `WaveformPlaylistProvider`** — Without it, engine track mutations (from statechange) trigger "UI will revert on next render" warning. On the next React render, old tracks are passed back, causing engine rebuild mid-playback (audio interruption, playhead jitter). The only exception is truly read-only examples with no interactive clips or track mutations.
 - **Use `decodeAudioFiles()` for file drop** — `website/src/utils/decodeAudioFiles.ts` decodes files in parallel and returns `ClipTrack[]`. Accepts `trackDefaults` for per-example options. Do not write sequential `for-await` decode loops — they cause N engine rebuilds for N dropped files.
+
+## Docusaurus Native Examples
+
+**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source: `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source. `annotations`, `recording` → dist/ (have build artifacts like worklets).
+
+**SSR/SSG pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use `createLazyExample` from `BrowserOnlyWrapper`:
+
+```typescript
+import { createLazyExample } from '../../components/BrowserOnlyWrapper';
+
+const LazyExample = createLazyExample(() =>
+  import('../../components/examples/ExampleComponent').then((m) => ({
+    default: m.ExampleComponent,
+  }))
+);
+```
+
+`BrowserOnly` alone is insufficient — it prevents rendering, not importing. Some libraries (Radix UI, Tone.js, AudioWorklets) access `window` at import time. `React.lazy()` defers the import until render time in the browser.
+
+**Theme/styling pattern:**
+- Use `useDocusaurusTheme()` hook for automatic light/dark theme.
+- Export components as functions (no `createRoot()`).
+- Styled components use CSS variables: `var(--ifm-background-surface-color, #fallback)`.
+
+**Rebuild requirement:** When ui-components changes affect recording, rebuild both packages.
 
 ## Guide Documentation Drift
 

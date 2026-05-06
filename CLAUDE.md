@@ -10,24 +10,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 - **Tone.js 15.1.22** - Audio engine for playback, scheduling, and effects
 
-### Website Aesthetic: Berlin Underground
-
-The documentation website follows a **Berlin underground/industrial** aesthetic inspired by electronic music culture:
-
-- **Dark gradient backgrounds** with high-contrast text
-- **Monospace fonts** for timestamps and technical elements (Courier New)
-- **Grungy details** like `//` prefixes on timestamps, text shadows
-- **Muted color palette** with strategic accent colors
-- **Minimal, utilitarian design** - form follows function
-
-**Dark Mode Color Palette - "Ampelmännchen Traffic Light":**
-Inspired by the iconic DDR pedestrian signal with its friendly walking figure and hat.
-
-- 🟢 **Green** (`#63C75F`) - Official Ampelmännchen brand green for buttons/links
-- 🟡 **Amber** (`#c49a6c`) - Warm golden waveform bars and body text
-- 🔴 **Red** (`#d08070`) - Headings and accent elements
-
-When adding new examples or UI elements, maintain this aesthetic. The Flexible API example showcases the full customization potential with custom playheads, grungy timestamps, and monospace clip headers.
+**Website aesthetic** — see `website/CLAUDE.md` for the Berlin-underground design system, dark-mode palette, and example styling guidelines.
 
 ## Project Roadmap
 
@@ -249,14 +232,6 @@ interface AudioClip {
 - Interactions: @dnd-kit (13KB) for drag-and-drop
 - State: React Context + useReducer for undo/redo
 
-### TypeScript Build Integration
-
-**Decision:** Enforce TypeScript type checking in all build scripts.
-
-**Implementation:** `"build:single": "pnpm typecheck && vite build"`
-
-**Why:** Vite doesn't fail builds on TS errors by default. Prevents silent runtime failures.
-
 ### UI Library Strategy
 
 **Decision:** Do NOT add a full UI library (Material-UI, Chakra, etc.) as peer dependency.
@@ -290,123 +265,28 @@ interface AudioClip {
 - `examples/dawcore-native/` — Web components + NativePlayoutAdapter (moved from `packages/dawcore/dev/`)
 - `examples/dawcore-tone/` — Web components + TonePlayoutAdapter (Tone.js backend)
 
-### ESLint Baseline (2026-02-13)
+### ESLint Baseline
 
-**Decision:** Add a root flat ESLint config with TypeScript + React Hooks checks.
-
-**Implementation:**
-
-- Config file: `eslint.config.mjs`
-- Root `package.json` devDependencies include:
-  - `eslint`, `@eslint/js`
-  - `@typescript-eslint/parser`, `@typescript-eslint/eslint-plugin`
-  - `eslint-plugin-react-hooks`, `globals`
-
-**Usage:** Run `pnpm lint` before committing. Catches missing hook dependencies, unused variables, and React Hooks rule violations.
+Root flat ESLint config (`eslint.config.mjs`) with TypeScript + React Hooks checks. Run `pnpm lint` before committing — catches missing hook deps, unused variables, hook-rule violations.
 
 ### Docusaurus Native Examples
 
-**Decision:** Docusaurus-native React components instead of Jekyll + separate bundles.
-
-**Webpack Aliases:** In `website/docusaurus.config.ts`, packages transpiled from source:
-
-- `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source
-- `annotations`, `recording` → dist/ (have build artifacts like worklets)
-
-**SSR/SSG Pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use lazy loading:
-
-```typescript
-// In example page files (website/src/pages/examples/*.tsx)
-import { createLazyExample } from '../../components/BrowserOnlyWrapper';
-
-const LazyExample = createLazyExample(() =>
-  import('../../components/examples/ExampleComponent').then((m) => ({
-    default: m.ExampleComponent,
-  }))
-);
-
-// Use <LazyExample /> in the page
-```
-
-**Why `createLazyExample` instead of just `BrowserOnly`:**
-
-- Some libraries (Radix UI, Tone.js, AudioWorklets) access `window` at import time
-- `BrowserOnly` only prevents rendering, not importing
-- `React.lazy()` defers the import until render time in the browser
-
-**Pattern:**
-
-- Use `useDocusaurusTheme()` hook for automatic light/dark theme
-- Export components as functions (no `createRoot()`)
-- Styled components use CSS variables: `var(--ifm-background-surface-color, #fallback)`
-
-**Rebuild requirement:** When ui-components changes affect recording, rebuild both packages.
-
-**Location:** `website/src/components/examples/`, `website/src/components/BrowserOnlyWrapper.tsx`
+Docusaurus-native React components (no Jekyll). See `website/CLAUDE.md` for the `createLazyExample` SSR/SSG pattern, webpack aliases, and theme integration.
 
 ---
 
-## Important Patterns
+## Important Patterns (cross-package)
 
-1. **Targeted Disconnect** - Always specify destination on shared audio nodes
-2. **Refs in Animation Loops** - Use refs for synchronous checks in `requestAnimationFrame`
-3. **AudioWorklet Debugging** - Use postMessage, not console.log
-4. **Try-Catch Cleanup** - Wrap audio node disconnects for device switching
-5. **Sample-Based Math** - Use integer samples for all timing calculations
-6. **TypeScript Enforcement** - Build scripts run `pnpm typecheck &&` before bundling
-7. **Refs for Dynamic Audio Callbacks** - When useCallback needs fresh state for audio graph rebuilding, store state in a ref and read from ref inside callback (avoids stale closures)
-8. **Playlist Loading Detection** - Use `data-playlist-state` attribute and `waveform-playlist:ready` custom event for reliable loading detection in CSS, E2E tests, and external integrations
-9. **Stable React Keys for Tracks/Clips** - Always use `track.id` / `clip.clipId` as React keys, never array indices. Index-based keys cause DOM reuse on removal, breaking `transferControlToOffscreen()` (can only be called once per canvas) and causing stale OffscreenCanvas references.
-10. **Per-Track Maps Must Use Track ID** - Any `Map` storing per-track overrides (render modes, configs) must be keyed by `track.id` (string), not array index. Index keys break when tracks are added/removed.
-11. **Context Value Memoization** - All context value objects in providers must be wrapped with `useMemo`. Extract inline callbacks into `useCallback` first to avoid dependency churn.
-12. **Error Boundary Available** - `PlaylistErrorBoundary` from `@waveform-playlist/ui-components` catches render errors. Uses plain CSS (no styled-components) so it works without ThemeProvider.
-13. **Audio Disconnect Diagnostics** - Use `console.warn('[waveform-playlist] ...')` in catch blocks for audio node disconnect errors, never silently swallow.
-14. **Fetch Cleanup with AbortController** - `useAudioTracks` uses AbortController to cancel in-flight fetches on cleanup. Follow this pattern for any fetch in useEffect. For per-item abort (e.g., removing one loading track), use `Map<id, AbortController>` instead of `Set<AbortController>`.
-15. **Derive Render Guards from Props, Not Effect State** - Don't use effect-set state (e.g., `audioBuffers`) in render guards. Effect state lags props by one+ renders, causing content to flash/disappear. Compute values synchronously from props instead.
-16. **Copy Refs in useEffect Body** - When accessing a ref in `useEffect` cleanup, copy `.current` to a local variable inside the effect body. ESLint's `react-hooks/exhaustive-deps` rule flags refs that may change between render and cleanup. **Exception:** For `[]` deps effects (mount/unmount only), refs are null at mount — copying them in the effect body captures null forever. Read refs directly inside the cleanup function instead.
-17. **Refs from Custom Hooks in Dep Arrays** - When a `useRef` is returned from a custom hook, ESLint's `exhaustive-deps` can't trace its stability. Include it in the dep array (harmless, never triggers) rather than using `eslint-disable-next-line` which would mask real missing dependencies.
-18. **Engine State Ownership** — Engine owns selection, loop, selectedTrackId, zoom (samplesPerPixel, canZoomIn, canZoomOut), and masterVolume; React subscribes to statechange. Engine setters normalize invariants (start <= end). All engine-owned state uses the `onEngineState()` hook pattern: `useSelectionState`, `useLoopState`, `useSelectedTrack`, `useZoomControls`, `useMasterVolume`. Each hook delegates mutations to engine methods and exposes `onEngineState()` for the provider's statechange handler.
-19. **Render-Phase Guards ≠ Effect Dependencies** — Derived booleans computed during render (e.g., `isEngineTracks = tracks === engineTracksRef.current`) that are read inside effect bodies as guards should NOT be in the effect's dep array. They flip between renders (e.g., true→false after clearing the ref), causing spurious re-runs. Read them inside the effect body; depend only on the source data (`tracks`). When the same guard also needs to be visible to the _previous_ effect's cleanup, store it in a ref during render (as with `skipEngineDisposeRef`).
-20. **Adding a New Rendering Mode** — Requires changes across packages: `RenderMode` type in core, theme colors + `*Channel` component in ui-components, `SmartChannel` branch, `ChannelWithProgress` background, `ClipPeaks` data fields in browser, `PlaylistVisualization` auto-detection. Follow `Channel.tsx` pattern for virtual scrolling.
-21. **will-change Budget** — Only use `will-change` on actively animating elements (playheads, progress overlays). Firefox enforces a 3× document surface area budget; static canvas chunks with `translateZ(0)` don't need it.
-22. **Always Use getGlobalAudioContext() / getGlobalContext()** — Never `new AudioContext()` or `getContext()`/`getDestination()` from Tone.js. Firefox blocks contexts created before user gesture. `getGlobalContext()` from playout calls `setContext()`, replacing Tone's default context — nodes created on the old default are on a dead audio graph. Use `getGlobalContext()` and `context.destination` for any Tone.js node in the playback signal path.
-23. **Gate Provider Behind Async Readiness** — When multiple async resources must load before rendering (e.g., MIDI tracks + SoundFont), gate the `WaveformPlaylistProvider` mount behind all resources being ready. This prevents double engine rebuilds. Check both the loading flag AND `tracks.length > 0` since hooks can briefly report `loading: false` with empty data.
-24. **Shared Clip Pixel Width** — Use `clipPixelWidth()` from `@waveform-playlist/core` for any pixel width derived from `startSample`/`durationSamples`/`samplesPerPixel`. Both `Clip.tsx` (container) and `ChannelWithProgress.tsx` (progress overlay) must use this shared function — never `peaksData.length`, which may be shorter than the clip when audio is shorter than configured duration.
-25. **Grep Comments When Renaming APIs** — When renaming an option or prop across files (e.g., `progressive` → `immediate`), also grep for the old name in comments. Mechanical find-replace on code misses adjacent comments that describe the old behavior.
-26. **Prefer Props Over Mount/Unmount for Optional Providers** — If a provider controls both data (e.g., snap config) and rendering (e.g., timescale mode), add a mode prop instead of conditionally mounting/unmounting. Unmounting tears down the subtree and loses state; a prop switch is cheaper and keeps context consumers stable.
-27. **Stop Before Clear** — Always call `stop()` before clearing tracks. Clearing React state without stopping Tone.js Transport leaves orphaned audio playing. Use `ClearAllButton` (from `@waveform-playlist/browser`) which handles this automatically via `usePlaylistControls().stop()`.
-28. **StereoPanner Stereo Preservation** — Tone.js `Panner` defaults to `channelCount: 1`, downmixing stereo to mono at 1/√2 gain. Use `trackChannelCount(track)` from `@waveform-playlist/core` to derive the correct `channelCount` from source material. Hardcoding `2` upmixes mono; hardcoding `1` downmixes stereo.
-29. **Never Use Tone.js `addAudioWorkletModule`** — Tone.js caches a single `_workletPromise` per context. Only the first URL is loaded; subsequent calls with different URLs are silently skipped. Always use `rawContext.audioWorklet.addModule(url)` directly. `context.createAudioWorkletNode()` is still fine for node creation.
-30. **No Manual `external` in tsup Configs** — tsup auto-externalizes `dependencies` and `peerDependencies` (including deep imports like `react/jsx-runtime`). Never add a manual `external` list — it drifts when dependencies change, causing duplicate instances at runtime (#317). All 13 packages use tsup with no `external` field.
-31. **Dynamic Import Tone.js Outside Playout Package** — `import * as Tone from 'tone'` eagerly creates a default context with AudioWorklet nodes, which fails before user gesture. Outside the playout package (which handles init via `getGlobalContext()`), use `import type` for types and `await import('tone')` inside effects after AudioContext is running. Call `Tone.setContext(new Tone.Context(audioContext))` to share the native AudioContext.
-32. **Tone.js Effect.input Is Not a Native AudioNode** — `Effect` subclasses (BitCrusher, etc.) set `this.input = new Tone.Gain(...)` (a Tone.js wrapper). Native `AudioNode.connect(effect.input)` fails with "Overload resolution failed". Use `Tone.Gain` as a bridge: `outputNode.connect(bridge.input)` works because `Tone.Gain.input` IS a native `GainNode`. Then `bridge.chain(effect, destination)` for the Tone chain.
-33. **Provider Child Effects and playoutRef Timing** — React runs child effects before parent effects. A child component's `useEffect` accessing `playoutRef.current` will find `null` on first run because the provider's effect hasn't created the playout yet. Add `duration` (from `useMediaElementData()`) as a dependency — it changes from 0 to the actual value when the playout is ready, retriggering the effect.
-34. **Global AudioContext for Decode** — Use `getGlobalAudioContext()` from `@waveform-playlist/playout` for `decodeAudioData()`. Works while suspended (pre-gesture). Never create a separate AudioContext — the global one is shared with Tone.js and has the correct sample rate.
-35. **Web Component Packages Need `sideEffects: true`** — Packages that call `customElements.define()` at import time are side-effectful. Setting `"sideEffects": false` in package.json causes bundlers to tree-shake bare imports, silently dropping element registrations.
-36. **Detached Elements Cannot Dispatch Bubbling Events** — In `disconnectedCallback`, the element is already removed from the DOM. Events dispatched with `bubbles: true` will not reach ancestor elements. Use MutationObserver on the parent to detect child removal instead.
-37. **effectiveSampleRate Pattern in dawcore** — `<daw-editor>` `sampleRate` is a derived getter reading from `adapter.audioContext.sampleRate` (or 48000 fallback). Internal calculations use `effectiveSampleRate` getter which returns `_resolvedSampleRate ?? sampleRate`. The resolved rate is set from decoded audio buffers. `PointerHandlerHost` and all pixel/time conversions use `effectiveSampleRate`.
-38. **WaveformData.resample() Only Upsamples** — `WaveformData.resample({ scale })` can only resample to a coarser (larger) scale than the source. Attempting to resample to a finer scale throws. When caching WaveformData, validate `cached.scale <= requestedScale` before returning cache hits.
-39. **Track ID Alignment in dawcore** — `createTrack()` from core generates its own `id` via `generateId()`. The dawcore editor uses a different ID (`<daw-track>.trackId` or `crypto.randomUUID()` for drops) as its map key. Must set `track.id = trackId` after `createTrack()` so engine methods (`setTrackSolo`, `setTrackMute`, etc.) can find the track by ID.
-40. **Prefer `createClip()` Over `createClipFromSeconds()` When Samples Known** — `createClipFromSeconds` round-trips through float seconds: `samples/rate → seconds → Math.round(seconds*rate)`. Safe when the same rate is used for division and multiplication, but drifts silently when rates differ (e.g., `effectiveSampleRate` vs `audioBuffer.sampleRate`). Use `createClip()` with integer samples when available. For tick-based creation (variable-tempo), use `createClipFromTicks()` which sets `startTick` as authoritative and derives `startSample`.
-41. **Clip Interaction Adapter Sync** — During clip move drag, pass `skipAdapter=true` to `engine.moveClip()` to avoid 60fps adapter rebuilds. Call `engine.updateTrack(trackId)` once on `pointerup`. Trim uses cumulative delta (engine called once on drop). Split calls engine normally (single operation).
-42. **`composedPath()[0]` vs `closest()` in Shadow DOM** — `composedPath()[0]` returns the deepest clicked element (may be a child like `<span>`). For hit detection on interaction zones (`.clip-header`, `.clip-boundary`), always use `target.closest('.class-name')` to walk up the DOM tree.
-43. **Peak Regeneration After Clip Mutations** — After `splitClip` (new clip IDs) or `trimClip` (changed offset/duration), peaks must be regenerated via `_syncPeaksForChangedClips`. The statechange handler detects changes by comparing `_clipOffsets` cache with current clip state.
-44. **`undefined` vs `false` in Optional Boolean Modifiers** — In `KeyboardShortcut` and `KeyBinding`, `undefined` means "match any state" while `false` means "must NOT be pressed." Never use falsy checks (`!value`) to test these — use `=== undefined`. The distinction matters for auto-expansion logic (e.g., undo shortcuts generating both Ctrl and Meta variants).
-45. **Lit `noAccessor` for Synchronous Property Validation** — Lit's `@property` setter stores values immediately; `willUpdate` runs asynchronously. If external code reads the property right after setting it, it sees the unvalidated value. Use `@property({ noAccessor: true })` with a custom getter/setter that validates synchronously and calls `this.requestUpdate(name, oldValue)`.
-46. **`createClipFromSeconds` Supports Peaks-First Rendering** — `audioBuffer` is optional. Provide `waveformData` (from `waveform-data.js`) + `sampleRate` + `sourceDuration` instead. This enables rendering waveforms before audio decode completes. The `WaveformDataObject` interface in `@waveform-playlist/core` defines the required shape.
-47. **Opus Always Encodes at 48000 Hz** — Per spec, Opus resamples all input to 48000 Hz. This makes Opus ideal for pre-computed peaks workflows since most browser AudioContexts run at 48000 Hz. WAV/FLAC at 44100 Hz will cause rate mismatches on 48000 Hz hardware.
-48. **Pre-Computed Peaks Require Sample Rate Match** — `.dat` file `sample_rate` must match `AudioContext.sampleRate`. On mismatch, `createClip` warns per-clip (includes clip name) and callers fall back to worker-generated peaks. Dawcore rejects `.dat` and falls to worker. Browser converts offsets for preview (`ratio = wdRate / clipRate` on offsetSamples/durationSamples/samplesPerPixel), worker replaces on next cycle. `configureGlobalContext({ sampleRate })` from playout creates a standard `new Context()` and compares the requested rate against the actual hardware rate — it warns but cannot force the rate (native AudioContext wrapping caused Tone.js issues, reverted).
-49. **`sampleRate` Prop for Pre-Computed Peaks Matching** — `WaveformPlaylistProvider` accepts a `sampleRate` prop; `<daw-editor>` reads sample rate from the adapter's AudioContext (no `sample-rate` attribute). `configureGlobalContext({ sampleRate })` compares against the AudioContext's actual rate and warns on mismatch. Cannot force the rate — Tone.js 15.1.22 doesn't pass `sampleRate` through to `standardized-audio-context`, and passing a `StdAudioContext` directly causes `AudioParam` errors. Peaks fall back to worker on mismatch. Revisit when Tone.js releases the upstream fix.
-50. **Loop Wrap Clock Seek Offset** — When the Scheduler wraps at `loopEnd` inside the lookahead window, seek the clock to `loopStart - (loopEnd - clockTime)`, not `loopStart`. The lookahead means the wrap fires before real time reaches the boundary; `seekTo(loopStart)` makes post-wrap events schedule at "now" instead of at the boundary's audio time. `getCurrentTime()` clamps to `loopStart` during the brief window when the clock is behind.
-51. **`_renderSpp` Pattern in dawcore Beats Mode** — In beats mode, `samplesPerPixel` must be derived from `ticksPerPixel` via `(60 × sampleRate × ticksPerPixel) / (ppqn × bpm)`. Every rendering path (clip positions, peak generation, peak re-extraction after trim/split, trim visual feedback) must use this derived value. Using raw `samplesPerPixel` causes coordinate mismatches. Exposed as `renderSamplesPerPixel` getter for `ClipPointerHost` and `ClipPeakSyncHost` interfaces.
-52. **Snap Absolute Position, Not Delta** — When snapping clip drag/trim to a musical grid, snap the clip's absolute timeline position — not the delta. Delta-snapping preserves off-grid offsets permanently. Applies to both dawcore `ClipPointerHandler._snapDeltaToSamples()` and React `SnapToGridModifier`. Pass the anchor sample (left edge for move/left-trim, right edge for right-trim) to compute the correct absolute target.
-53. **Tick-Space Pixel Positioning in Beats Mode** — In beats mode, clip pixel positions must be derived from tick space, not from `startSample / _renderSpp`. When `clip.startTick` is available, use `clip.startTick / ticksPerPixel` directly. Fall back to `startSample → seconds → ticks → ticks/ticksPerPixel` for clips without `startTick`. Never use `startSample / _renderSpp` — the sample round-trip introduces 1-2px quantization error.
-54. **Engine Tempo Forwarding** — `<daw-editor>` BPM setter must call `engine.setTempo()` to keep the adapter's Transport in sync. `_buildEngine` initializes the adapter with `adapter.setTempo(this._bpm)` BEFORE creating the engine, so `setTracks()` enriches clips with `startTick` at the correct tempo. Without this, clips at non-zero positions get wrong tick values (computed at default 120 BPM).
-55. **`startTick` is Authoritative, `startSample` is Cache** — `AudioClip.startTick` is the authoritative timeline position. `startSample` is a derived cache recomputed via `TempoMap.ticksToSeconds(startTick) * sampleRate` when tempo changes. Engine's `setTracks()` enriches clips missing `startTick` by computing it from `startSample`. In beats mode, rendering must use `clip.startTick / ticksPerPixel` for pixel position — NOT the sample round-trip which drifts when BPM changes.
-56. **Cross-Context Worklet Support (SAC Pattern)** — `new AudioWorkletNode(ctx, ...)` fails when `ctx` is standardized-audio-context (Tone.js), but `ctx.audioWorklet.addModule(url)` works on both. Use callback injection: `addRecordingWorkletModule((url) => ctx.audioWorklet.addModule(url))` from worklets package. For node/source creation only, `PlayoutAdapter` exposes optional `createAudioWorkletNode`/`createMediaStreamSource` methods — adapters implement these using their context type. `<daw-editor>` bridges via `RecordingHost` interface methods, falling back to native APIs.
-57. **`masterOutputNode` Serial Tap** — Both adapters expose `masterOutputNode` (readonly `AudioNode`) in the signal chain before `destination`. Consumers connect analyzers/effects/recorders — parallel (just `.connect()`) or serial (`.disconnect(destination)` then rewire). Native adapter returns `MasterNode.output` (GainNode connected to destination). Tone adapter uses a `Gain` tap node: `masterVolume → [effects] → tap → destination`, on the same standardized-audio-context (created eagerly via `getGlobalContext()` before playout construction).
-58. **Standalone Transport in Demo Pages** — `metronome.html` and `automation.html` create their own `new Transport()` directly (no `<daw-editor>`). These are standalone Transport demos, not editor demos. If a demo uses both `<daw-editor>` and a standalone Transport, tempo set on one doesn't affect the other — use `adapter.transport` for anything that affects clip scheduling.
-59. **Don't Collapse Empty Arrays to `undefined` in Discriminator Fields** — When a field participates in a `!= null` discriminator (e.g. `clip.midiNotes != null` to detect MIDI), never optimize `notes.length ? notes : undefined`. Empty array vs `undefined` is semantically meaningful: `[]` says "this is MIDI, no notes yet"; `undefined` says "this is not MIDI." Collapsing them silently breaks late-arrival upgrades (e.g. `_applyClipUpdate`'s `wasMidi` check) and similar reactive patterns. Pass the array through unchanged.
+Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Documentation" below). The patterns kept here are cross-cutting — they apply across packages or to build/release infrastructure.
+
+1. **Sample-Based Math** — Use integer samples (and `startTick` for tempo-independent positioning) for all timeline calculations. Duration and offset are sample-only; `startTick` is authoritative when present, `startSample` is a derived cache. Helpers: `createClip()` (samples known), `createClipFromTicks()` (tick-based, variable-tempo), `createClipFromSeconds()` (legacy time-based).
+2. **Adding a New Rendering Mode** — Cross-package change: `RenderMode` type in core → theme colors + `*Channel` component in ui-components → `SmartChannel` branch → `ChannelWithProgress` background → `ClipPeaks` data fields in browser → `PlaylistVisualization` auto-detection. Follow `Channel.tsx` virtual-scrolling pattern.
+3. **Grep Comments When Renaming APIs** — When renaming a prop or option, grep for the old name in comments too. Mechanical find-replace on code misses adjacent comments that describe the old behavior.
+4. **Prefer Props Over Mount/Unmount for Optional Providers** — When a provider controls both data and rendering, add a mode prop instead of conditional mount/unmount. Unmounting tears down the subtree and loses state; a prop switch is cheaper and keeps context consumers stable.
+5. **No Manual `external` in tsup Configs** — tsup auto-externalizes `dependencies` and `peerDependencies` (including deep imports like `react/jsx-runtime`). Manual `external` lists drift when deps change, causing duplicate instances at runtime. All packages use tsup with no `external` field.
+6. **Opus Always Encodes at 48000 Hz** — Per spec, Opus resamples all input to 48000 Hz. Ideal for pre-computed peaks workflows since most browser AudioContexts run at 48000 Hz. WAV/FLAC at 44100 Hz will mismatch on 48000 Hz hardware.
+7. **Pre-Computed Peaks Require Sample Rate Match** — `.dat` file `sample_rate` must match `AudioContext.sampleRate`. On mismatch, `createClip` warns per-clip (with clip name) and consumers fall back to worker-generated peaks. Browser converts offsets for preview (`ratio = wdRate / clipRate`); worker replaces on next cycle. `configureGlobalContext({ sampleRate })` from playout compares against the actual hardware rate — warns, cannot force (Tone.js limitation).
+8. **`sampleRate` Prop for Pre-Computed Peaks Matching** — `WaveformPlaylistProvider` accepts a `sampleRate` prop; `<daw-editor>` reads from the adapter's AudioContext. Peaks fall back to worker on mismatch.
 
 ---
 

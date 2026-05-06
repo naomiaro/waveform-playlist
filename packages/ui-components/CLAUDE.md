@@ -231,3 +231,7 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 ## PlayheadProps Evolution
 
 Adding a new field to `PlayheadProps` is a soft-breaking change for custom playheads — they continue compiling but won't pick up the new behavior until updated. When the provider context exposes a new playback-time concept (e.g., `visualTimeRef`), thread it through `PlayheadProps` and update the bundled `PlayheadWithMarker` to use it. External consumers' custom playheads need to opt in. Document the failure mode (e.g., visual lag) so users notice.
+
+## Error Boundary
+
+`PlaylistErrorBoundary` from `@waveform-playlist/ui-components` catches render errors. Uses plain CSS (no styled-components) so it works without `ThemeProvider`.
