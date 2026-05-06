@@ -287,6 +287,7 @@ export function useRecording(
   // Pause recording
   const pauseRecording = useCallback(() => {
     if (isRecording && !isPaused) {
+      workletNodeRef.current?.port.postMessage({ command: 'pause' });
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -299,6 +300,7 @@ export function useRecording(
   // Resume recording
   const resumeRecording = useCallback(() => {
     if (isRecording && isPaused) {
+      workletNodeRef.current?.port.postMessage({ command: 'resume' });
       isPausedRef.current = false;
       setIsPaused(false);
       startTimeRef.current = performance.now() - duration * 1000;
