@@ -1913,8 +1913,8 @@ export class DawEditorElement extends LitElement {
   resumeRecording(): void {
     this._recordingController.resumeRecording();
   }
-  stopRecording(): void {
-    this._recordingController.stopRecording();
+  stopRecording(): Promise<void> {
+    return this._recordingController.stopRecording();
   }
   _addRecordedClip(
     trackId: string,

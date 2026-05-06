@@ -12,6 +12,7 @@ interface ProcessorMessage {
   channels: Float32Array[];
   sampleRate: number;
   channelCount: number;
+  done?: boolean;
 }
 
 interface MockProcessor {
@@ -244,23 +245,28 @@ describe('RecordingProcessor', () => {
       expect(messages.length).toBe(0);
     });
 
-    it('flushes remaining samples on stop', () => {
+    it('flushes remaining samples on stop with done flag', () => {
       const proc = createProcessor(44100, 1);
       // Send 2 frames = 256 samples (less than bufferSize 705)
       proc.process(monoInput(128, 0.3), [], {});
       proc.process(monoInput(128, 0.6), [], {});
       expect(messages.length).toBe(0);
 
-      // Stop should flush partial buffer
+      // Stop should flush partial buffer with the terminal done marker
       proc.port.onmessage({ data: { command: 'stop' } });
       expect(messages.length).toBe(1);
       expect(messages[0].channels[0].length).toBe(256);
+      expect(messages[0].done).toBe(true);
     });
 
-    it('does not flush on stop if buffer is empty', () => {
+    it('sends an empty done acknowledgment on stop with empty buffer', () => {
+      // Always acknowledging stop lets the main thread `await` reliably,
+      // even when there are no buffered samples to flush.
       const proc = createProcessor(44100, 1);
       proc.port.onmessage({ data: { command: 'stop' } });
-      expect(messages.length).toBe(0);
+      expect(messages.length).toBe(1);
+      expect(messages[0].done).toBe(true);
+      expect(messages[0].channels[0]?.length ?? 0).toBe(0);
     });
 
     it('handles no input channels gracefully', () => {

@@ -47,6 +47,8 @@ export function useRecording(
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const onTrackEndedRef = useRef<(() => void) | null>(null);
   const stopRecordingRef = useRef<(() => Promise<AudioBuffer | null>) | null>(null);
+  // Resolved when the worklet posts the final done message after a stop command.
+  const stopAckResolveRef = useRef<(() => void) | null>(null);
 
   // Shared duration update loop — starts a rAF loop that updates duration
   // from performance.now(). Used by both startRecording and resumeRecording.
@@ -143,37 +145,43 @@ export function useRecording(
 
       // Listen for audio data from worklet
       workletNode.port.onmessage = (event: MessageEvent) => {
-        const { channels } = event.data as { channels: Float32Array[] };
+        const { channels, done } = event.data as {
+          channels: Float32Array[];
+          done?: boolean;
+        };
 
-        if (!channels || channels.length === 0) {
-          console.warn('[waveform-playlist] Recording worklet sent empty or missing channels data');
-          return;
-        }
-
-        // Accumulate per-channel samples
-        for (let ch = 0; ch < channels.length; ch++) {
-          if (!recordedChunksRef.current[ch]) {
-            console.warn(
-              `[waveform-playlist] Unexpected channel ${ch} from worklet (expected ${recordedChunksRef.current.length})`
-            );
-            recordedChunksRef.current[ch] = [];
-          }
-          recordedChunksRef.current[ch].push(channels[ch]);
-        }
-        // Capture sample offset before incrementing — used by peak alignment
-        const samplesProcessedBefore = totalSamplesRef.current;
-        totalSamplesRef.current += channels[0].length;
-        setPeaks((prevPeaks) => {
-          // Ensure we have an entry per channel
-          const updated: (Int8Array | Int16Array)[] = [];
+        // Empty messages can arrive from the final stop ack when nothing was buffered.
+        // Handle channels first if present, then resolve the stop barrier.
+        if (channels && channels.length > 0 && channels[0] && channels[0].length > 0) {
           for (let ch = 0; ch < channels.length; ch++) {
-            const prev = prevPeaks[ch] ?? emptyPeaks(bits);
-            updated.push(
-              appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
-            );
+            if (!recordedChunksRef.current[ch]) {
+              console.warn(
+                `[waveform-playlist] Unexpected channel ${ch} from worklet (expected ${recordedChunksRef.current.length})`
+              );
+              recordedChunksRef.current[ch] = [];
+            }
+            recordedChunksRef.current[ch].push(channels[ch]);
           }
-          return updated;
-        });
+          // Capture sample offset before incrementing — used by peak alignment
+          const samplesProcessedBefore = totalSamplesRef.current;
+          totalSamplesRef.current += channels[0].length;
+          setPeaks((prevPeaks) => {
+            // Ensure we have an entry per channel
+            const updated: (Int8Array | Int16Array)[] = [];
+            for (let ch = 0; ch < channels.length; ch++) {
+              const prev = prevPeaks[ch] ?? emptyPeaks(bits);
+              updated.push(
+                appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
+              );
+            }
+            return updated;
+          });
+        }
+
+        if (done) {
+          stopAckResolveRef.current?.();
+          stopAckResolveRef.current = null;
+        }
 
         // Note: VU meter levels come from useMicrophoneLevel (meter-processor worklet)
         // We don't update level/peakLevel here to avoid conflicting state updates
@@ -224,9 +232,20 @@ export function useRecording(
         onTrackEndedRef.current = null;
       }
 
-      // Stop the worklet
+      // Stop the worklet and wait for its final flush message before reading chunks.
+      // Without the await, the partial buffer at the end of recording arrives after
+      // the AudioBuffer is built and is silently dropped.
       if (workletNodeRef.current) {
+        const stopAck = new Promise<void>((resolve) => {
+          stopAckResolveRef.current = resolve;
+        });
+        // Safety timeout in case the worklet fails to acknowledge (worklet crashed,
+        // context already closed, etc.) — proceed with what we have.
+        const timeout = new Promise<void>((resolve) => setTimeout(resolve, 250));
+
         workletNodeRef.current.port.postMessage({ command: 'stop' });
+        await Promise.race([stopAck, timeout]);
+        stopAckResolveRef.current = null;
 
         // Disconnect worklet from source
         if (mediaStreamSourceRef.current) {

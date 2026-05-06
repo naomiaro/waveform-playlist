@@ -78,7 +78,18 @@ describe('RecordingController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockWorkletNode = {
-      port: { postMessage: vi.fn(), onmessage: null },
+      port: {
+        // Auto-acknowledge the stop command — the controller awaits the worklet's
+        // done message before reading chunks, mirroring the real handshake.
+        postMessage: vi.fn((msg: { command?: string }) => {
+          if (msg?.command === 'stop' && mockWorkletNode.port.onmessage) {
+            mockWorkletNode.port.onmessage({
+              data: { channels: [], channelCount: 1, done: true },
+            } as MessageEvent);
+          }
+        }),
+        onmessage: null,
+      },
       disconnect: vi.fn(),
       addEventListener: vi.fn(),
     };
@@ -144,7 +155,7 @@ describe('RecordingController', () => {
     const controller = new RecordingController(host);
 
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    controller.stopRecording();
+    await controller.stopRecording();
     host._selectedTrackId = 'track-2';
     await controller.startRecording(createMockStream(), { trackId: 'track-2' });
 
@@ -174,7 +185,7 @@ describe('RecordingController', () => {
       return true; // not prevented
     });
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     expect(mockSource.disconnect).toHaveBeenCalled();
     expect(mockWorkletNode.disconnect).toHaveBeenCalled();
@@ -197,7 +208,7 @@ describe('RecordingController', () => {
       return false;
     });
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     // Clip creation would involve calling host methods — verify they weren't called
     expect(controller.getSession('track-1')).toBeUndefined();
@@ -215,7 +226,7 @@ describe('RecordingController', () => {
       return origDispatch(e);
     });
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('No audio data'));
     expect(controller.isRecording).toBe(false);
@@ -319,7 +330,7 @@ describe('RecordingController', () => {
     const origDispatch = host.dispatchEvent.bind(host);
     host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     expect(host._addRecordedClip).toHaveBeenCalledWith(
       'track-1',
@@ -340,7 +351,7 @@ describe('RecordingController', () => {
       e.preventDefault();
     });
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     expect(host._addRecordedClip).not.toHaveBeenCalled();
   });
@@ -449,7 +460,7 @@ describe('RecordingController', () => {
 
     // Stop recording (deletes session), then trigger the handler — should not throw
     simulateWorkletData('track-1', 512);
-    controller.stopRecording();
+    await controller.stopRecording();
 
     // Late message arrives after session is gone
     expect(() => {
@@ -482,7 +493,7 @@ describe('RecordingController', () => {
     const origDispatch = host.dispatchEvent.bind(host);
     host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     // offsetSamples = floor(0.01 * 48000) = 480
     // durationSamples = 48000 - 480 = 47520
@@ -518,7 +529,7 @@ describe('RecordingController', () => {
     });
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    controller.stopRecording();
+    await controller.stopRecording();
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('too short'));
     expect(controller.isRecording).toBe(false);
@@ -541,7 +552,7 @@ describe('RecordingController', () => {
       return origDispatch(e);
     });
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     const completeEvent = events.find((e) => e.type === 'daw-recording-complete');
     expect(completeEvent).toBeTruthy();
@@ -561,7 +572,7 @@ describe('RecordingController', () => {
     const origDispatch = host.dispatchEvent.bind(host);
     host.dispatchEvent = vi.fn((e: Event) => origDispatch(e));
 
-    controller.stopRecording();
+    await controller.stopRecording();
 
     expect(host._addRecordedClip).toHaveBeenCalledWith(
       'track-1',

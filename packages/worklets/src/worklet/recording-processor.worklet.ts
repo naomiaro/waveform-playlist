@@ -19,6 +19,10 @@
 interface RecordingProcessorMessage {
   channels: Float32Array[];
   channelCount: number;
+  /** Set on the final message after a `stop` command — main thread awaits this
+   * before reading accumulated chunks, otherwise the partial buffer flushed at
+   * stop time arrives after the AudioBuffer is built and is lost. */
+  done?: boolean;
 }
 
 class RecordingProcessor extends AudioWorkletProcessor {
@@ -69,10 +73,9 @@ class RecordingProcessor extends AudioWorkletProcessor {
       } else if (command === 'stop') {
         this.isRecording = false;
 
-        // Send any remaining buffered samples
-        if (this.samplesCollected > 0) {
-          this.flushBuffers();
-        }
+        // Always send a terminal message with done:true so the main thread
+        // can await the partial-buffer flush before reading accumulated chunks.
+        this.flushBuffers(true);
       }
     };
   }
@@ -129,11 +132,12 @@ class RecordingProcessor extends AudioWorkletProcessor {
     return true; // Keep processor alive
   }
 
-  private flushBuffers(): void {
+  private flushBuffers(final = false): void {
     // Transfer the underlying buffers instead of slice() + structured-clone copy.
     // Saves one memcpy per channel on the audio thread (no slice) and one on the
     // receive side (no structured clone). After transfer, this.buffers[i] is
-    // detached, so we allocate replacements before returning.
+    // detached, so we allocate replacements before returning — except on the
+    // final flush after stop, where there's no further capture.
     const channels: Float32Array[] = [];
     const transfer: ArrayBuffer[] = [];
     for (let i = 0; i < this.channelCount; i++) {
@@ -142,13 +146,18 @@ class RecordingProcessor extends AudioWorkletProcessor {
       transfer.push(buf.buffer);
     }
 
-    this.port.postMessage(
-      { channels, channelCount: this.channelCount } as RecordingProcessorMessage,
-      transfer
-    );
+    const message: RecordingProcessorMessage = {
+      channels,
+      channelCount: this.channelCount,
+    };
+    if (final) message.done = true;
 
-    for (let i = 0; i < this.channelCount; i++) {
-      this.buffers[i] = new Float32Array(this.bufferSize);
+    this.port.postMessage(message, transfer);
+
+    if (!final) {
+      for (let i = 0; i < this.channelCount; i++) {
+        this.buffers[i] = new Float32Array(this.bufferSize);
+      }
     }
     this.samplesCollected = 0;
   }

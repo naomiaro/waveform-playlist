@@ -36,6 +36,8 @@ export interface RecordingSession {
   /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
   readonly _onTrackEnded: (() => void) | null;
   readonly _audioTrack: MediaStreamTrack | null;
+  /** Set during stopRecording, cleared by the done message from the worklet. */
+  stopAckResolve: (() => void) | null;
 }
 
 /** Readonly view of a recording session for external consumers. */
@@ -212,6 +214,7 @@ export class RecordingController implements ReactiveController {
         wasOverdub: options.overdub ?? false,
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
+        stopAckResolve: null,
       };
       this._sessions.set(trackId, session);
 
@@ -271,7 +274,7 @@ export class RecordingController implements ReactiveController {
     session.workletNode.port.postMessage({ command: 'resume' });
   }
 
-  stopRecording(trackId?: string): void {
+  async stopRecording(trackId?: string): Promise<void> {
     const id = trackId ?? [...this._sessions.keys()][0];
     if (!id) return;
 
@@ -283,8 +286,16 @@ export class RecordingController implements ReactiveController {
       this._host.stop();
     }
 
-    // Send stop BEFORE disconnect so worklet can flush remaining buffered samples
+    // Send stop and await the worklet's final flush message before reading chunks.
+    // Without the await, the partial buffer at the end of recording arrives after
+    // the AudioBuffer is built and is silently dropped.
+    const stopAck = new Promise<void>((resolve) => {
+      session.stopAckResolve = resolve;
+    });
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 250));
     session.workletNode.port.postMessage({ command: 'stop' });
+    await Promise.race([stopAck, timeout]);
+    session.stopAckResolve = null;
     session.source.disconnect();
     session.workletNode.disconnect();
 
@@ -371,8 +382,19 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(trackId);
     if (!session) return;
 
-    const { channels } = data as { channels: Float32Array[] };
-    if (!channels || channels.length === 0 || !channels[0]) return;
+    const { channels, done } = data as { channels: Float32Array[]; done?: boolean };
+
+    // Empty messages (terminal stop ack with no buffered samples) skip channel
+    // accumulation but still resolve the stop barrier below.
+    const hasSamples = !!(channels && channels.length > 0 && channels[0] && channels[0].length > 0);
+    if (!hasSamples) {
+      if (done && session.stopAckResolve) {
+        const resolve = session.stopAckResolve;
+        session.stopAckResolve = null;
+        resolve();
+      }
+      return;
+    }
 
     // Capture pre-increment value for appendPeaks
     const samplesProcessedBefore = session.totalSamples;
@@ -422,6 +444,12 @@ export class RecordingController implements ReactiveController {
     );
     if (newPixelWidth > oldPixelWidth) {
       this._host.requestUpdate();
+    }
+
+    if (done && session.stopAckResolve) {
+      const resolve = session.stopAckResolve;
+      session.stopAckResolve = null;
+      resolve();
     }
   }
 
