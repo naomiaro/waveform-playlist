@@ -253,9 +253,7 @@ export function useRecording(
         clearTimeout(timeoutId);
         stopAckResolveRef.current = null;
         if (timedOut) {
-          console.warn(
-            '[waveform-playlist] Recording stop timed out — final ~16ms may be lost'
-          );
+          console.warn('[waveform-playlist] Recording stop timed out — final ~16ms may be lost');
         }
 
         // Null the handler so any late delivery from this worklet doesn't

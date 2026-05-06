@@ -305,9 +305,7 @@ export class RecordingController implements ReactiveController {
     clearTimeout(timeoutId);
     session.stopAckResolve = null;
     if (timedOut) {
-      console.warn(
-        '[dawcore] RecordingController: stop timed out — final ~16ms may be lost'
-      );
+      console.warn('[dawcore] RecordingController: stop timed out — final ~16ms may be lost');
     }
     session.source.disconnect();
     session.workletNode.disconnect();
