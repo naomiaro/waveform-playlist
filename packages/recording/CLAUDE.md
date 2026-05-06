@@ -130,3 +130,9 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 ## Stop Must Await Done Acknowledgment
 
 `stopRecording()` awaits the worklet's `done: true` message before building the AudioBuffer (`stopAckResolveRef` + `Promise.race` against a 250ms safety timeout). Without the await, the partial buffer at stop time arrives after the synchronous chunk read and is silently dropped — last ~16ms of every recording lost.
+
+## Hook Test Setup
+
+- `vitest.config.ts` sets `environment: 'jsdom'`. Tests use `@testing-library/react` `renderHook` + `act`.
+- Mock `getGlobalContext` (Tone playout) via getter form (`getGlobalContext: () => mockContext`) so `beforeEach` can mutate the underlying mock — `vi.mock` factories run at module-load time and capture *bindings*, not values.
+- Mock `concatenateAudioData` with a real concatenation (not `Float32Array(0)`) so `createAudioBuffer.length` reflects pushed chunks. Without this, late-sample assertions can't distinguish "ack fired" from "ack fired AND samples reached the buffer."

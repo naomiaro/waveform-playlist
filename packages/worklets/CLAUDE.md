@@ -36,6 +36,7 @@
 
 - `stop` command **always** sends a terminal `done: true` message (even with empty buffer). Main thread must `await` it before reading accumulated chunks — `port.postMessage` is async, so a synchronous read after sending `stop` misses the final partial buffer (~16ms loss per recording).
 - Pattern: `await Promise.race([stopAck, setTimeout(250)])` so a closed/crashed context can't hang the caller.
+- After the final flush, drop `this.buffers = []` and zero `this.bufferSize = 0`. Without this, a stray `resume` after `stop` would set `isRecording = true` and `process()` would silently no-op writes into detached typed-array memory.
 
 ## Worklet IDE Diagnostics Are Spurious
 
