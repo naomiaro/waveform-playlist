@@ -122,3 +122,11 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 ## Device Hot-Plug Detection
 
 **Pattern:** `useMicrophoneAccess` listens for `navigator.mediaDevices.devicechange` to re-enumerate devices on plug/unplug. `useIntegratedRecording` auto-falls back to the first available device if the selected device disappears from the list.
+
+## Pause/Resume Must Message the Worklet
+
+`useRecording.pauseRecording()` / `resumeRecording()` must `port.postMessage({ command: 'pause' | 'resume' })` to the worklet. Flipping React state and cancelling the duration rAF is not enough — the worklet keeps capturing. Silent bug; only visible in the resulting AudioBuffer length.
+
+## Stop Must Await Done Acknowledgment
+
+`stopRecording()` awaits the worklet's `done: true` message before building the AudioBuffer (`stopAckResolveRef` + `Promise.race` against a 250ms safety timeout). Without the await, the partial buffer at stop time arrives after the synchronous chunk read and is silently dropped — last ~16ms of every recording lost.

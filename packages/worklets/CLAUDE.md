@@ -26,3 +26,17 @@
 
 - **Do NOT send `sampleRate` in the `start` message** — The processor uses the AudioWorklet global `sampleRate` (always correct for the context). Passing it in the message was a source of bugs when callers passed a different rate than the AudioContext's actual rate.
 - **Required fields:** `{ command: 'start', channelCount }` — channelCount configures per-channel buffers.
+
+## Recording Processor Transferable Buffers
+
+- `flushBuffers()` posts `Float32Array.subarray(0, samplesCollected)` views with their underlying `ArrayBuffer`s in the transfer list. After transfer, `this.buffers[i]` is detached → non-final flushes reallocate replacements. Saves slice() + structuredClone memcpy on both threads.
+- `flushBuffers(final = true)` skips reallocation — recording is over.
+
+## Recording Processor Stop Handshake
+
+- `stop` command **always** sends a terminal `done: true` message (even with empty buffer). Main thread must `await` it before reading accumulated chunks — `port.postMessage` is async, so a synchronous read after sending `stop` misses the final partial buffer (~16ms loss per recording).
+- Pattern: `await Promise.race([stopAck, setTimeout(250)])` so a closed/crashed context can't hang the caller.
+
+## Worklet IDE Diagnostics Are Spurious
+
+- IDE may flag `port does not exist`, `Cannot find name 'registerProcessor'`, or `ArrayBufferLike not assignable to ArrayBuffer` in `src/worklet/`. The main `tsconfig.json` excludes these files; IDE falls back to it incorrectly. Trust `tsc --project tsconfig.worklet.json --noEmit` (uses `@types/audioworklet`).
