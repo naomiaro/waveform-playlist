@@ -677,4 +677,29 @@ describe('RecordingController', () => {
     const totalLen = chunkArr.reduce((sum: number, c: Float32Array) => sum + c.length, 0);
     expect(totalLen).toBe(1280);
   });
+
+  it('stopRecording from paused state skips the await (no timeout warn)', async () => {
+    // postMessage that does NOT auto-ack proves we don't wait for the
+    // terminal flush — pause already drained the partial buffer.
+    mockWorkletNode.port.postMessage = vi.fn();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 1024);
+
+    controller.pauseRecording(); // flips controller._isPaused = true
+    expect(controller.isPaused).toBe(true);
+
+    host.dispatchEvent = vi.fn(() => true);
+    const start = Date.now();
+    await controller.stopRecording();
+    const elapsed = Date.now() - start;
+
+    // Should resolve immediately, not wait for the 250ms safety timeout
+    expect(elapsed).toBeLessThan(50);
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('timed out'));
+    expect(host._addRecordedClip).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
 });

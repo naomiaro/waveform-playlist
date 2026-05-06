@@ -306,8 +306,9 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(id);
     if (!session) return;
 
-    // Clear paused flag — once we begin stop, the recording is over regardless
-    // of whether it was paused at the time.
+    // Capture whether we were paused — pause already flushed the partial
+    // buffer, so there's nothing to wait for from the worklet on stop.
+    const wasPaused = this._isPaused;
     this._isPaused = false;
 
     // Stop playback only if this was an overdub session
@@ -315,26 +316,33 @@ export class RecordingController implements ReactiveController {
       this._host.stop();
     }
 
-    // Send stop and await the worklet's final flush message before reading chunks.
-    // Without the await, the partial buffer at the end of recording arrives after
-    // the AudioBuffer is built and is silently dropped.
-    const stopAck = new Promise<void>((resolve) => {
-      session.stopAckResolve = resolve;
-    });
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let timedOut = false;
-    const timeout = new Promise<void>((resolve) => {
-      timeoutId = setTimeout(() => {
-        timedOut = true;
-        resolve();
-      }, 250);
-    });
-    session.workletNode.port.postMessage({ command: 'stop' });
-    await Promise.race([stopAck, timeout]);
-    clearTimeout(timeoutId);
-    session.stopAckResolve = null;
-    if (timedOut) {
-      console.warn('[dawcore] RecordingController: stop timed out — final ~16ms may be lost');
+    // Send stop. If the recording was already paused, pause's flushBuffers()
+    // already drained the partial buffer — no need to await the terminal
+    // message (and the worklet's audio thread may have throttled back while
+    // paused, making the round-trip slow / unreliable).
+    if (wasPaused) {
+      session.workletNode.port.postMessage({ command: 'stop' });
+    } else {
+      // Active recording: await the worklet's terminal flush so the partial
+      // buffer at stop time isn't silently dropped.
+      const stopAck = new Promise<void>((resolve) => {
+        session.stopAckResolve = resolve;
+      });
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let timedOut = false;
+      const timeout = new Promise<void>((resolve) => {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          resolve();
+        }, 250);
+      });
+      session.workletNode.port.postMessage({ command: 'stop' });
+      await Promise.race([stopAck, timeout]);
+      clearTimeout(timeoutId);
+      session.stopAckResolve = null;
+      if (timedOut) {
+        console.warn('[dawcore] RecordingController: stop timed out — final ~16ms may be lost');
+      }
     }
     session.source.disconnect();
     session.workletNode.disconnect();
@@ -424,18 +432,32 @@ export class RecordingController implements ReactiveController {
 
     const { channels, done } = data as { channels: Float32Array[]; done?: boolean };
 
-    // Empty messages (terminal stop ack with no buffered samples) skip channel
-    // accumulation but still resolve the stop barrier below.
-    const hasSamples = !!(channels && channels.length > 0 && channels[0] && channels[0].length > 0);
-    if (!hasSamples) {
+    // Resolve the stop barrier in a finally block so a throw in peak generation
+    // (e.g. samplesPerPixel=0 transient, host shadowRoot churn) doesn't strand
+    // the await in stopRecording for the full 250ms timeout.
+    try {
+      const hasSamples = !!(
+        channels &&
+        channels.length > 0 &&
+        channels[0] &&
+        channels[0].length > 0
+      );
+      if (!hasSamples) return;
+      this._processWorkletSamples(trackId, session, channels);
+    } finally {
       if (done && session.stopAckResolve) {
         const resolve = session.stopAckResolve;
         session.stopAckResolve = null;
         resolve();
       }
-      return;
     }
+  }
 
+  private _processWorkletSamples(
+    trackId: string,
+    session: RecordingSession,
+    channels: Float32Array[]
+  ) {
     // Capture pre-increment value for appendPeaks
     const samplesProcessedBefore = session.totalSamples;
 
@@ -484,12 +506,6 @@ export class RecordingController implements ReactiveController {
     );
     if (newPixelWidth > oldPixelWidth) {
       this._host.requestUpdate();
-    }
-
-    if (done && session.stopAckResolve) {
-      const resolve = session.stopAckResolve;
-      session.stopAckResolve = null;
-      resolve();
     }
   }
 

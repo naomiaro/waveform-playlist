@@ -237,6 +237,12 @@
     editor.addEventListener('daw-recording-error', (e) => {
       addLog('recording-error: ' + e.detail.error);
     });
+    editor.addEventListener('daw-recording-pause', (e) => {
+      addLog('recording-pause: track=' + e.detail.trackId);
+    });
+    editor.addEventListener('daw-recording-resume', (e) => {
+      addLog('recording-resume: track=' + e.detail.trackId);
+    });
 
     // Other editor events
     editor.addEventListener('daw-track-ready', (e) => addLog('track-ready: ' + e.detail.trackId));
