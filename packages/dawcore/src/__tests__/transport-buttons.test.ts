@@ -19,7 +19,7 @@ function createTransport() {
   editor.pause = vi.fn();
   editor.stop = vi.fn();
   editor.startRecording = vi.fn();
-  editor.stopRecording = vi.fn();
+  editor.stopRecording = vi.fn(() => Promise.resolve());
   editor.pauseRecording = vi.fn();
   editor.resumeRecording = vi.fn();
   editor.isRecording = false;
@@ -281,6 +281,8 @@ describe('Stop button', () => {
     editor.isRecording = true;
     stopBtn.shadowRoot?.querySelector('button')?.click();
     expect(editor.stopRecording).toHaveBeenCalled();
+    // stop() is now chained after stopRecording resolves — let the promise settle
+    await new Promise((r) => setTimeout(r, 0));
     expect(editor.stop).toHaveBeenCalled();
 
     cleanup(editor, transport);

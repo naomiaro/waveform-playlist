@@ -241,11 +241,13 @@ export function useRecording(
         });
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
         let timedOut = false;
+        // 1000ms — under load the worklet's flush queue can back up; 250ms
+        // was too aggressive for the round-trip on a busy main thread.
         const timeout = new Promise<void>((resolve) => {
           timeoutId = setTimeout(() => {
             timedOut = true;
             resolve();
-          }, 250);
+          }, 1000);
         });
 
         workletNodeRef.current.port.postMessage({ command: 'stop' });

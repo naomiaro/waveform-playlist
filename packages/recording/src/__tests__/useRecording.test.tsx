@@ -186,7 +186,7 @@ describe('useRecording', () => {
     expect(buffer!.length).toBe(1024);
   });
 
-  it('stopRecording proceeds via 250ms timeout if worklet never acks', async () => {
+  it('stopRecording proceeds via 1000ms timeout if worklet never acks', async () => {
     const stream = createMockStream();
     const { result } = renderHook(() => useRecording(stream));
 
@@ -213,8 +213,8 @@ describe('useRecording', () => {
     });
     const elapsed = Date.now() - start;
 
-    expect(elapsed).toBeGreaterThanOrEqual(200);
-    expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeGreaterThanOrEqual(900);
+    expect(elapsed).toBeLessThan(1500);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timed out'));
     expect(buffer).not.toBeNull();
     expect(buffer!.length).toBe(512); // pre-stop chunk preserved

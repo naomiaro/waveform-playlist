@@ -617,7 +617,7 @@ describe('RecordingController', () => {
 
   it('stopRecording proceeds via timeout if the worklet never acks', async () => {
     // Replace auto-ack with a mock that never sends done — exercises the
-    // 250ms safety timeout. Test takes ~250ms but verifies the bug-catching
+    // 1000ms safety timeout. Test takes ~1s but verifies the bug-catching
     // assertion: stop must not hang forever, and the warn fires.
     mockWorkletNode.port.postMessage = vi.fn();
 
@@ -631,9 +631,9 @@ describe('RecordingController', () => {
     await controller.stopRecording();
     const elapsed = Date.now() - start;
 
-    // Should resolve via timeout (~250ms), not hang
-    expect(elapsed).toBeLessThan(1000);
-    expect(elapsed).toBeGreaterThanOrEqual(200);
+    // Should resolve via the 1000ms safety timeout, not hang
+    expect(elapsed).toBeLessThan(1500);
+    expect(elapsed).toBeGreaterThanOrEqual(900);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timed out'));
     // Pre-stop samples still produce a clip
     expect(host._addRecordedClip).toHaveBeenCalled();
