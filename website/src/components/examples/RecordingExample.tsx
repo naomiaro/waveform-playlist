@@ -301,8 +301,14 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // restarts both the worklet capture and the Transport for overdub.
   const wasPlayingDuringRecordingRef = useRef(false);
 
-  // Pause toggle: handles recording pause/resume during recording, falls
-  // through to plain Transport pause otherwise.
+  // Reset on the recording falling edge so a paused-then-stopped session
+  // doesn't leak its overdub flag into the next pause cycle.
+  useEffect(() => {
+    if (!isRecording) {
+      wasPlayingDuringRecordingRef.current = false;
+    }
+  }, [isRecording]);
+
   const handlePauseToggle = useCallback(() => {
     if (isRecording) {
       if (isPaused) {

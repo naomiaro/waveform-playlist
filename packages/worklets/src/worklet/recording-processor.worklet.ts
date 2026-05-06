@@ -76,6 +76,12 @@ class RecordingProcessor extends AudioWorkletProcessor {
         // Always send a terminal message with done:true so the main thread
         // can await the partial-buffer flush before reading accumulated chunks.
         this.flushBuffers(true);
+
+        // After the final flush the underlying buffers are detached. Drop
+        // them and zero bufferSize so a stray resume can't write into
+        // detached memory (writes would silently no-op in V8).
+        this.buffers = [];
+        this.bufferSize = 0;
       }
     };
   }
@@ -133,11 +139,8 @@ class RecordingProcessor extends AudioWorkletProcessor {
   }
 
   private flushBuffers(final = false): void {
-    // Transfer the underlying buffers instead of slice() + structured-clone copy.
-    // Saves one memcpy per channel on the audio thread (no slice) and one on the
-    // receive side (no structured clone). After transfer, this.buffers[i] is
-    // detached, so we allocate replacements before returning — except on the
-    // final flush after stop, where there's no further capture.
+    // Transfer underlying buffers (no slice / no structured-clone copy).
+    // Detaches this.buffers[i]; non-final flushes reallocate replacements.
     const channels: Float32Array[] = [];
     const transfer: ArrayBuffer[] = [];
     for (let i = 0; i < this.channelCount; i++) {

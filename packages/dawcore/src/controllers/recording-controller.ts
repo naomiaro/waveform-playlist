@@ -292,10 +292,23 @@ export class RecordingController implements ReactiveController {
     const stopAck = new Promise<void>((resolve) => {
       session.stopAckResolve = resolve;
     });
-    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 250));
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const timeout = new Promise<void>((resolve) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, 250);
+    });
     session.workletNode.port.postMessage({ command: 'stop' });
     await Promise.race([stopAck, timeout]);
+    clearTimeout(timeoutId);
     session.stopAckResolve = null;
+    if (timedOut) {
+      console.warn(
+        '[dawcore] RecordingController: stop timed out — final ~16ms may be lost'
+      );
+    }
     session.source.disconnect();
     session.workletNode.disconnect();
 

@@ -582,4 +582,99 @@ describe('RecordingController', () => {
       0 // zero latency
     );
   });
+
+  // --- stop handshake tests ---
+
+  it('stopRecording awaits the done ack — late samples reach the AudioBuffer', async () => {
+    // Defer the done message to a microtask so it arrives strictly AFTER
+    // postMessage returns. If stopRecording forgets to await Promise.race,
+    // session.totalSamples stays 0 and the controller bails with
+    // "No audio data captured" — no _addRecordedClip call.
+    mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
+      if (msg?.command === 'stop' && mockWorkletNode.port.onmessage) {
+        queueMicrotask(() => {
+          mockWorkletNode.port.onmessage({
+            data: {
+              channels: [new Float32Array(1024).fill(0.5)],
+              channelCount: 1,
+              done: true,
+            },
+          } as MessageEvent);
+        });
+      }
+    });
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    // No prior data — only the deferred final message has samples.
+
+    host.dispatchEvent = vi.fn(() => true);
+    await controller.stopRecording();
+
+    // _addRecordedClip is only called when the late chunk made it into session.chunks
+    expect(host._addRecordedClip).toHaveBeenCalled();
+  });
+
+  it('stopRecording proceeds via timeout if the worklet never acks', async () => {
+    // Replace auto-ack with a mock that never sends done — exercises the
+    // 250ms safety timeout. Test takes ~250ms but verifies the bug-catching
+    // assertion: stop must not hang forever, and the warn fires.
+    mockWorkletNode.port.postMessage = vi.fn();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 512);
+
+    host.dispatchEvent = vi.fn(() => true);
+    const start = Date.now();
+    await controller.stopRecording();
+    const elapsed = Date.now() - start;
+
+    // Should resolve via timeout (~250ms), not hang
+    expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeGreaterThanOrEqual(200);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timed out'));
+    // Pre-stop samples still produce a clip
+    expect(host._addRecordedClip).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('handles channels + done in a single terminal message', async () => {
+    // Receiver has separate "hasSamples" and "done" branches; verify a
+    // message carrying both still resolves the barrier (stop completes within
+    // the timeout window) AND appends samples (concatenateAudioData receives
+    // both pre-stop and terminal chunks).
+    const { concatenateAudioData } = await import('@waveform-playlist/core');
+    vi.mocked(concatenateAudioData).mockClear();
+
+    mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
+      if (msg?.command === 'stop' && mockWorkletNode.port.onmessage) {
+        queueMicrotask(() => {
+          mockWorkletNode.port.onmessage({
+            data: {
+              channels: [new Float32Array(256).fill(0.25)],
+              channelCount: 1,
+              done: true,
+            },
+          } as MessageEvent);
+        });
+      }
+    });
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 1024); // pre-stop chunk
+
+    host.dispatchEvent = vi.fn(() => true);
+    const start = Date.now();
+    await controller.stopRecording();
+    expect(Date.now() - start).toBeLessThan(200); // resolved via ack, not timeout
+
+    // concatenateAudioData receives chunkArr per channel — inspect chunk lengths
+    expect(concatenateAudioData).toHaveBeenCalled();
+    const chunkArr = vi.mocked(concatenateAudioData).mock.calls[0][0];
+    const totalLen = chunkArr.reduce((sum: number, c: Float32Array) => sum + c.length, 0);
+    expect(totalLen).toBe(1280);
+  });
 });

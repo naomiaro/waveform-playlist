@@ -239,13 +239,28 @@ export function useRecording(
         const stopAck = new Promise<void>((resolve) => {
           stopAckResolveRef.current = resolve;
         });
-        // Safety timeout in case the worklet fails to acknowledge (worklet crashed,
-        // context already closed, etc.) — proceed with what we have.
-        const timeout = new Promise<void>((resolve) => setTimeout(resolve, 250));
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        let timedOut = false;
+        const timeout = new Promise<void>((resolve) => {
+          timeoutId = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, 250);
+        });
 
         workletNodeRef.current.port.postMessage({ command: 'stop' });
         await Promise.race([stopAck, timeout]);
+        clearTimeout(timeoutId);
         stopAckResolveRef.current = null;
+        if (timedOut) {
+          console.warn(
+            '[waveform-playlist] Recording stop timed out — final ~16ms may be lost'
+          );
+        }
+
+        // Null the handler so any late delivery from this worklet doesn't
+        // contaminate a subsequent recording session's chunks.
+        workletNodeRef.current.port.onmessage = null;
 
         // Disconnect worklet from source
         if (mediaStreamSourceRef.current) {
@@ -275,11 +290,6 @@ export function useRecording(
       // return null instead of creating a 0-length AudioBuffer which throws
       if (totalSamples === 0) {
         console.warn('[waveform-playlist] Recording stopped with 0 samples captured — discarding');
-        isRecordingRef.current = false;
-        isPausedRef.current = false;
-        setIsRecording(false);
-        setIsPaused(false);
-        setLevel(0);
         return null;
       }
 
@@ -287,11 +297,6 @@ export function useRecording(
 
       setAudioBuffer(buffer);
       setDuration(buffer.duration);
-      isRecordingRef.current = false;
-      isPausedRef.current = false;
-      setIsRecording(false);
-      setIsPaused(false);
-      setLevel(0);
       // Keep peakLevel to show the peak reached during recording
 
       return buffer;
@@ -299,6 +304,14 @@ export function useRecording(
       console.warn('[waveform-playlist] Failed to stop recording:', String(err));
       setError(err instanceof Error ? err : new Error('Failed to stop recording'));
       return null;
+    } finally {
+      // Always clear recording flags, even on failure — otherwise the UI gets
+      // stuck in "recording" state if AudioBuffer creation throws.
+      isRecordingRef.current = false;
+      isPausedRef.current = false;
+      setIsRecording(false);
+      setIsPaused(false);
+      setLevel(0);
     }
   }, [channelCount]);
   stopRecordingRef.current = stopRecording;
