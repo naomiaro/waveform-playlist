@@ -329,25 +329,21 @@ export class RecordingController implements ReactiveController {
         session.stopAckResolve = resolve;
       });
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      let timedOut = false;
-      // 1000ms timeout (was 250ms). Under load, the worklet's flush queue
-      // can back up — the terminal `done` message goes to the back of the
-      // queue after periodic flushes, and main-thread processing of those
-      // intermediate messages (peak gen, Lit re-render) can push the
-      // round-trip past 250ms even on a healthy machine.
+      // Safety timeout (1s). Under main-thread load, the worklet's flush
+      // queue can back up — periodic flushes processed before the terminal
+      // `done` push the round-trip past 250ms. The timeout exists to
+      // prevent infinite hang on a real failure (worklet crashed, context
+      // closed); a false positive here just means the partial buffer at
+      // stop time may have been dropped, which is at most ~16ms of audio.
+      // No user-facing warn — chunks accumulated via regular flushes are
+      // already complete.
       const timeout = new Promise<void>((resolve) => {
-        timeoutId = setTimeout(() => {
-          timedOut = true;
-          resolve();
-        }, 1000);
+        timeoutId = setTimeout(resolve, 1000);
       });
       session.workletNode.port.postMessage({ command: 'stop' });
       await Promise.race([stopAck, timeout]);
       clearTimeout(timeoutId);
       session.stopAckResolve = null;
-      if (timedOut) {
-        console.warn('[dawcore] RecordingController: stop timed out — final ~16ms may be lost');
-      }
     }
     session.source.disconnect();
     session.workletNode.disconnect();

@@ -617,11 +617,10 @@ describe('RecordingController', () => {
 
   it('stopRecording proceeds via timeout if the worklet never acks', async () => {
     // Replace auto-ack with a mock that never sends done — exercises the
-    // 1000ms safety timeout. Test takes ~1s but verifies the bug-catching
-    // assertion: stop must not hang forever, and the warn fires.
+    // 1000ms safety timeout. Test takes ~1s but verifies the assertion:
+    // stop must not hang forever, and pre-stop chunks still produce a clip.
     mockWorkletNode.port.postMessage = vi.fn();
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
     simulateWorkletData('track-1', 512);
@@ -634,10 +633,8 @@ describe('RecordingController', () => {
     // Should resolve via the 1000ms safety timeout, not hang
     expect(elapsed).toBeLessThan(1500);
     expect(elapsed).toBeGreaterThanOrEqual(900);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timed out'));
     // Pre-stop samples still produce a clip
     expect(host._addRecordedClip).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
   it('handles channels + done in a single terminal message', async () => {
@@ -678,11 +675,10 @@ describe('RecordingController', () => {
     expect(totalLen).toBe(1280);
   });
 
-  it('stopRecording from paused state skips the await (no timeout warn)', async () => {
+  it('stopRecording from paused state skips the await', async () => {
     // postMessage that does NOT auto-ack proves we don't wait for the
     // terminal flush — pause already drained the partial buffer.
     mockWorkletNode.port.postMessage = vi.fn();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
@@ -696,10 +692,8 @@ describe('RecordingController', () => {
     await controller.stopRecording();
     const elapsed = Date.now() - start;
 
-    // Should resolve immediately, not wait for the 250ms safety timeout
+    // Should resolve immediately, not wait for the safety timeout
     expect(elapsed).toBeLessThan(50);
-    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('timed out'));
     expect(host._addRecordedClip).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 });

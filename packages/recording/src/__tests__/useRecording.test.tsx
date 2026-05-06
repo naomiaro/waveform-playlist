@@ -204,8 +204,6 @@ describe('useRecording', () => {
     // Replace postMessage with a no-op — never acks the stop
     mockWorkletNode.port.postMessage = vi.fn();
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
     const start = Date.now();
     let buffer: AudioBuffer | null = null;
     await act(async () => {
@@ -215,10 +213,8 @@ describe('useRecording', () => {
 
     expect(elapsed).toBeGreaterThanOrEqual(900);
     expect(elapsed).toBeLessThan(1500);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timed out'));
     expect(buffer).not.toBeNull();
     expect(buffer!.length).toBe(512); // pre-stop chunk preserved
-    warnSpy.mockRestore();
   });
 
   it('flips isRecording false even when AudioBuffer creation throws', async () => {

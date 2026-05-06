@@ -240,23 +240,20 @@ export function useRecording(
           stopAckResolveRef.current = resolve;
         });
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
-        let timedOut = false;
-        // 1000ms — under load the worklet's flush queue can back up; 250ms
-        // was too aggressive for the round-trip on a busy main thread.
+        // Safety timeout (1s). Under main-thread load, the worklet's flush
+        // queue can back up — periodic flushes processed before the terminal
+        // `done` push the round-trip past 250ms. The timeout prevents
+        // infinite hang on a real failure; a false positive here drops at
+        // most ~16ms of audio. No user-facing warn — chunks accumulated via
+        // regular flushes are already complete.
         const timeout = new Promise<void>((resolve) => {
-          timeoutId = setTimeout(() => {
-            timedOut = true;
-            resolve();
-          }, 1000);
+          timeoutId = setTimeout(resolve, 1000);
         });
 
         workletNodeRef.current.port.postMessage({ command: 'stop' });
         await Promise.race([stopAck, timeout]);
         clearTimeout(timeoutId);
         stopAckResolveRef.current = null;
-        if (timedOut) {
-          console.warn('[waveform-playlist] Recording stop timed out — final ~16ms may be lost');
-        }
 
         // Null the handler so any late delivery from this worklet doesn't
         // contaminate a subsequent recording session's chunks.
