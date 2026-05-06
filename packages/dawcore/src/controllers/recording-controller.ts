@@ -6,6 +6,8 @@ import type {
   DawRecordingStartDetail,
   DawRecordingCompleteDetail,
   DawRecordingErrorDetail,
+  DawRecordingPauseDetail,
+  DawRecordingResumeDetail,
 } from '../events';
 
 export interface RecordingOptions {
@@ -90,6 +92,9 @@ export class RecordingController implements ReactiveController {
   private _host: RecordingHost & HTMLElement;
   private _sessions = new Map<string, RecordingSession>();
   private _workletLoadedCtx: AudioContext | null = null;
+  /** Tracks worklet pause state explicitly so external consumers (editor,
+   * pause button, spacebar) can share one source of truth. */
+  private _isPaused = false;
 
   constructor(host: RecordingHost & HTMLElement) {
     this._host = host;
@@ -107,6 +112,10 @@ export class RecordingController implements ReactiveController {
 
   get isRecording(): boolean {
     return this._sessions.size > 0;
+  }
+
+  get isPaused(): boolean {
+    return this._isPaused && this._sessions.size > 0;
   }
 
   getSession(trackId: string): ReadonlyRecordingSession | undefined {
@@ -264,6 +273,14 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(id);
     if (!session) return;
     session.workletNode.port.postMessage({ command: 'pause' });
+    this._isPaused = true;
+    this._host.dispatchEvent(
+      new CustomEvent<DawRecordingPauseDetail>('daw-recording-pause', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId: id },
+      })
+    );
   }
 
   resumeRecording(trackId?: string): void {
@@ -272,6 +289,14 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(id);
     if (!session) return;
     session.workletNode.port.postMessage({ command: 'resume' });
+    this._isPaused = false;
+    this._host.dispatchEvent(
+      new CustomEvent<DawRecordingResumeDetail>('daw-recording-resume', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId: id },
+      })
+    );
   }
 
   async stopRecording(trackId?: string): Promise<void> {
@@ -280,6 +305,10 @@ export class RecordingController implements ReactiveController {
 
     const session = this._sessions.get(id);
     if (!session) return;
+
+    // Clear paused flag — once we begin stop, the recording is over regardless
+    // of whether it was paused at the time.
+    this._isPaused = false;
 
     // Stop playback only if this was an overdub session
     if (session.wasOverdub && typeof this._host.stop === 'function') {

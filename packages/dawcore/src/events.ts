@@ -70,6 +70,14 @@ export interface DawRecordingErrorDetail {
   error: unknown;
 }
 
+export interface DawRecordingPauseDetail {
+  trackId: string;
+}
+
+export interface DawRecordingResumeDetail {
+  trackId: string;
+}
+
 export interface DawClipConnectedDetail {
   clipId: string;
   element: DawClipElement;
@@ -137,6 +145,8 @@ export interface DawEventMap {
   'daw-recording-start': CustomEvent<DawRecordingStartDetail>;
   'daw-recording-complete': CustomEvent<DawRecordingCompleteDetail>;
   'daw-recording-error': CustomEvent<DawRecordingErrorDetail>;
+  'daw-recording-pause': CustomEvent<DawRecordingPauseDetail>;
+  'daw-recording-resume': CustomEvent<DawRecordingResumeDetail>;
   'daw-clip-connected': CustomEvent<DawClipConnectedDetail>;
   'daw-clip-update': CustomEvent<DawClipUpdateDetail>;
   'daw-clip-ready': CustomEvent<DawClipIdDetail>;

@@ -135,7 +135,7 @@ Extract framework-agnostic logic, add Web Component wrappers.
 | `<daw-waveform>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
 | `<daw-transport>` | Transport controls container | Groups transport buttons, links to an editor via `for` attribute. |
 | `<daw-play-button>` | play() | Triggers playback. If recording is armed, starts overdub recording simultaneously. |
-| `<daw-pause-button>` | pause() | Pauses playback and recording. |
+| `<daw-pause-button>` | pause() / togglePauseRecording() | Pauses playback. During recording, toggles pause/resume of the worklet capture (Audacity-style). Reflects state via `data-paused` attribute; sync handled by `daw-recording-pause` / `daw-recording-resume` events so the spacebar shortcut and the button stay consistent. |
 | `<daw-stop-button>` | stop() | Stops playback and recording. Finalizes any in-progress recording into a new clip. |
 | `<daw-record-button>` | record() | Arms/starts recording on all armed tracks. When clicked during stop, arms the selected track (or first track). When clicked during play, starts overdub on armed tracks. |
 | `<daw-rewind-button>` | seekTo(0) | Rewinds playhead to the start of the timeline. |
@@ -285,13 +285,18 @@ console.log(editor.armedTrackIds);  // ['track-2', 'track-3']
 console.log(editor.isRecordArmed);  // true
 
 // Listen for recording events
-editor.addEventListener('daw-record', (e) => {
-  console.log('Recording on tracks:', e.detail.trackIds);
+editor.addEventListener('daw-recording-start', (e) => {
+  console.log('Recording started on track:', e.detail.trackId);
 });
 
-editor.addEventListener('daw-record-stop', (e) => {
-  console.log('Recorded clips:', e.detail.clips);
-  // Each clip includes the trackId it was recorded on
+editor.addEventListener('daw-recording-complete', (e) => {
+  console.log('Recorded buffer:', e.detail.audioBuffer);
+  // Cancelable — preventDefault() to skip automatic clip creation
+});
+
+// Pause/resume during recording (Audacity-style: also pauses Transport when overdubbing)
+editor.addEventListener('daw-recording-pause', (e) => {
+  console.log('Paused track:', e.detail.trackId);
 });
 
 // Disarm all
@@ -370,9 +375,16 @@ editor.engine: PlaylistEngine        // Direct engine access
 **Methods:**
 ```typescript
 editor.play(startTime?, duration?): Promise<void>  // Starts overdub if record is armed
-editor.pause(): void                               // Pauses both playback and recording
-editor.stop(): void                                // Stops both, finalizes recording to clip
+editor.pause(): void                               // Pauses playback Transport (does NOT pause active recording — use togglePauseRecording for that)
+editor.stop(): void                                // Stops playback
 editor.record(): Promise<void>                     // Starts recording on all armed tracks
+editor.startRecording(stream): Promise<void>       // Start recording on selected track with provided MediaStream
+editor.stopRecording(): Promise<void>              // Stop and finalize recording (awaits worklet's done ack)
+editor.pauseRecording(): void                      // Pause worklet capture only (no Transport effect)
+editor.resumeRecording(): void                     // Resume worklet capture
+editor.togglePauseRecording(): void                // Audacity-style: pauses worklet AND Transport (if running); on resume restarts Transport only when it was running before
+editor.isRecording: boolean                        // (getter) any track currently recording
+editor.isRecordingPaused: boolean                  // (getter) capture is paused
 editor.armTrack(trackId: string, deviceId?: string): Promise<void>  // Arm a track
 editor.disarmTrack(trackId: string): void           // Disarm a track
 editor.seekTo(time: number): void
@@ -424,9 +436,12 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 'daw-play'          // Playback started
 'daw-pause'         // Playback paused
 'daw-stop'          // Playback stopped
-'daw-record'        // Recording started: detail: {trackIds: string[]}
-'daw-record-stop'   // Recording stopped: detail: {trackIds: string[], clips: ClipInfo[]}
-'daw-record-arm'    // Track armed/disarmed: detail: {trackId, armed, armedTrackIds}
+'daw-recording-start'    // Recording started on a track: detail: {trackId, stream}
+'daw-recording-complete' // Recording finalized: detail: {trackId, audioBuffer, startSample, durationSamples, offsetSamples} — cancelable; preventDefault() skips automatic clip creation
+'daw-recording-error'    // Recording failed: detail: {trackId, error}
+'daw-recording-pause'    // Worklet capture paused: detail: {trackId}
+'daw-recording-resume'   // Worklet capture resumed: detail: {trackId}
+'daw-record-arm'         // Track armed/disarmed: detail: {trackId, armed, armedTrackIds}
 'daw-timeupdate'    // Playback time changed (RAF)
 'daw-selection'     // Selection changed: detail: {start, end}
 'daw-track-select'  // Track selected: detail: {trackId}

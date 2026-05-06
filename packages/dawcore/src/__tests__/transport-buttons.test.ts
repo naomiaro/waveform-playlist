@@ -23,6 +23,20 @@ function createTransport() {
   editor.pauseRecording = vi.fn();
   editor.resumeRecording = vi.fn();
   editor.isRecording = false;
+  editor.isRecordingPaused = false;
+  // Simulate the editor's togglePauseRecording: dispatches the matching
+  // event so daw-pause-button can sync its data-paused visual state.
+  editor.togglePauseRecording = vi.fn(() => {
+    if (editor.isRecordingPaused) {
+      editor.isRecordingPaused = false;
+      editor.resumeRecording();
+      editor.dispatchEvent(new CustomEvent('daw-recording-resume', { bubbles: true }));
+    } else {
+      editor.isRecordingPaused = true;
+      editor.pauseRecording();
+      editor.dispatchEvent(new CustomEvent('daw-recording-pause', { bubbles: true }));
+    }
+  });
   editor.recordingStream = {};
   document.body.appendChild(editor);
 
@@ -177,7 +191,7 @@ describe('Pause button', () => {
     cleanup(editor, transport);
   });
 
-  it('calls pauseRecording + pause on first click during recording', async () => {
+  it('calls pauseRecording on first click during recording', async () => {
     const { editor, transport, pauseBtn } = createTransport();
     await new Promise((r) => setTimeout(r, 20));
 
@@ -185,8 +199,9 @@ describe('Pause button', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     pauseBtn.shadowRoot?.querySelector('button')?.click();
+    // Button delegates to togglePauseRecording; mock fires pauseRecording
+    expect(editor.togglePauseRecording).toHaveBeenCalled();
     expect(editor.pauseRecording).toHaveBeenCalled();
-    expect(editor.pause).toHaveBeenCalled();
 
     cleanup(editor, transport);
   });
@@ -206,7 +221,7 @@ describe('Pause button', () => {
     cleanup(editor, transport);
   });
 
-  it('calls resumeRecording + play on second click during recording', async () => {
+  it('calls resumeRecording on second click during recording', async () => {
     const { editor, transport, pauseBtn } = createTransport();
     await new Promise((r) => setTimeout(r, 20));
 
@@ -215,13 +230,16 @@ describe('Pause button', () => {
 
     // First click: pause
     pauseBtn.shadowRoot?.querySelector('button')?.click();
+    await new Promise((r) => setTimeout(r, 20));
     editor.resumeRecording.mockClear();
     editor.play.mockClear();
 
     // Second click: resume
     pauseBtn.shadowRoot?.querySelector('button')?.click();
     expect(editor.resumeRecording).toHaveBeenCalled();
-    expect(editor.play).toHaveBeenCalled();
+    // play() is no longer called unconditionally — only when Transport was
+    // running before pause (overdub). Non-overdub mock leaves it untouched.
+    expect(editor.play).not.toHaveBeenCalled();
 
     cleanup(editor, transport);
   });

@@ -14,6 +14,12 @@ export class DawPauseButtonElement extends DawTransportButton {
     this._isRecording = false;
     this._isPaused = false;
   };
+  private _onRecPause = () => {
+    this._isPaused = true;
+  };
+  private _onRecResume = () => {
+    this._isPaused = false;
+  };
 
   static override styles = [
     DawTransportButton.styles,
@@ -35,6 +41,8 @@ export class DawPauseButtonElement extends DawTransportButton {
       target.addEventListener('daw-recording-start', this._onRecStart);
       target.addEventListener('daw-recording-complete', this._onRecEnd);
       target.addEventListener('daw-recording-error', this._onRecEnd);
+      target.addEventListener('daw-recording-pause', this._onRecPause);
+      target.addEventListener('daw-recording-resume', this._onRecResume);
     });
   }
 
@@ -44,6 +52,8 @@ export class DawPauseButtonElement extends DawTransportButton {
       this._targetRef.removeEventListener('daw-recording-start', this._onRecStart);
       this._targetRef.removeEventListener('daw-recording-complete', this._onRecEnd);
       this._targetRef.removeEventListener('daw-recording-error', this._onRecEnd);
+      this._targetRef.removeEventListener('daw-recording-pause', this._onRecPause);
+      this._targetRef.removeEventListener('daw-recording-resume', this._onRecResume);
       this._targetRef = null;
     }
   }
@@ -66,16 +76,11 @@ export class DawPauseButtonElement extends DawTransportButton {
     }
 
     if (this._isRecording) {
-      // During recording: toggle pause/resume of both worklet and playback (Audacity-style)
-      if (this._isPaused) {
-        target.resumeRecording();
-        target.play(target.currentTime);
-        this._isPaused = false;
-      } else {
-        target.pauseRecording();
-        target.pause();
-        this._isPaused = true;
-      }
+      // Delegate to the editor — same logic as the spacebar shortcut. The
+      // editor tracks "was Transport playing" so resume only restarts
+      // playback for overdub sessions. Visual _isPaused state stays in
+      // sync via daw-recording-pause / daw-recording-resume events.
+      target.togglePauseRecording();
     } else {
       target.pause();
     }
