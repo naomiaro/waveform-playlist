@@ -165,17 +165,26 @@ export function useRecording(
           // Capture sample offset before incrementing — used by peak alignment
           const samplesProcessedBefore = totalSamplesRef.current;
           totalSamplesRef.current += channels[0].length;
-          setPeaks((prevPeaks) => {
-            // Ensure we have an entry per channel
-            const updated: (Int8Array | Int16Array)[] = [];
-            for (let ch = 0; ch < channels.length; ch++) {
-              const prev = prevPeaks[ch] ?? emptyPeaks(bits);
-              updated.push(
-                appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
-              );
-            }
-            return updated;
-          });
+
+          // Skip live-preview peak updates while stop is in flight. The
+          // queue may have many flushes pending; updating peaks for each
+          // would let the live-preview waveform grow visibly past where
+          // the user stopped, only to be replaced moments later by the
+          // final clip (which is shorter due to latency compensation).
+          // Chunks are already pushed above so no audio is lost.
+          if (stopAckResolveRef.current === null) {
+            setPeaks((prevPeaks) => {
+              // Ensure we have an entry per channel
+              const updated: (Int8Array | Int16Array)[] = [];
+              for (let ch = 0; ch < channels.length; ch++) {
+                const prev = prevPeaks[ch] ?? emptyPeaks(bits);
+                updated.push(
+                  appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
+                );
+              }
+              return updated;
+            });
+          }
         }
 
         if (done) {
@@ -225,6 +234,17 @@ export function useRecording(
     }
 
     try {
+      // Freeze the duration tick immediately so the live-preview width
+      // (durationSamples = duration * sampleRate) doesn't keep growing
+      // during the worklet stop handshake / queue drain. isPausedRef stops
+      // the rAF tick from rescheduling; cancelling animationFrameRef kills
+      // any frame already queued.
+      isPausedRef.current = true;
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+
       // Remove mic-unplug listener
       if (audioTrackRef.current && onTrackEndedRef.current) {
         audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);
@@ -284,11 +304,7 @@ export function useRecording(
         workletNodeRef.current.disconnect();
       }
 
-      // Cancel animation frame
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
+      // (animation frame already cancelled at the top of stopRecording)
 
       // Create final AudioBuffer from accumulated per-channel chunks
       const context = getGlobalContext();

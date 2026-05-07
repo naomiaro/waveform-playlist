@@ -248,13 +248,19 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     }
   }, [selectionStart, selectionEnd, isLoopEnabled, play, currentTimeRef]);
 
-  // Stop both playback and recording
+  // Stop both playback and recording. When recording, use pause() instead
+  // of stop() to keep the playhead where the user clicked stop. Engine.stop()
+  // rewinds to the last play-start position, which during a paused/resumed
+  // recording is the most recent resume point — jumping backwards on stop
+  // is jarring when you've just finished recording.
   const handleStop = useCallback(() => {
     if (isRecording) {
       stopRecording();
+      pause();
+    } else {
+      stop();
     }
-    stop();
-  }, [isRecording, stopRecording, stop]);
+  }, [isRecording, stopRecording, stop, pause]);
 
   const handleRecordClick = (e: React.MouseEvent) => {
     if (isRecording) return;
