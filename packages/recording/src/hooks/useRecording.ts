@@ -240,12 +240,10 @@ export function useRecording(
           stopAckResolveRef.current = resolve;
         });
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
-        // Safety timeout (1s). Under main-thread load, the worklet's flush
-        // queue can back up — periodic flushes processed before the terminal
-        // `done` push the round-trip past 250ms. The timeout prevents
-        // infinite hang on a real failure; a false positive here drops at
-        // most ~16ms of audio. No user-facing warn — chunks accumulated via
-        // regular flushes are already complete.
+        // Safety timeout (1s) — purely a circuit breaker for a truly failed
+        // worklet (crashed, context closed). The drain loop below catches
+        // any straggler flush messages that were queued before the timeout
+        // fired, so chunks are complete even when this fires.
         const timeout = new Promise<void>((resolve) => {
           timeoutId = setTimeout(resolve, 1000);
         });
@@ -254,6 +252,22 @@ export function useRecording(
         await Promise.race([stopAck, timeout]);
         clearTimeout(timeoutId);
         stopAckResolveRef.current = null;
+
+        // Drain the event-loop queue. During recording the worklet posts a
+        // flush every ~16ms; if main was slower than that, messages back up.
+        // Yield repeatedly until totalSamplesRef stabilizes for several
+        // consecutive ticks — at that point the queue is empty.
+        let lastSamples = -1;
+        let stable = 0;
+        for (let i = 0; i < 50; i++) {
+          if (totalSamplesRef.current === lastSamples) {
+            if (++stable >= 3) break;
+          } else {
+            stable = 0;
+            lastSamples = totalSamplesRef.current;
+          }
+          await new Promise<void>((r) => setTimeout(r, 5));
+        }
 
         // Null the handler so any late delivery from this worklet doesn't
         // contaminate a subsequent recording session's chunks.

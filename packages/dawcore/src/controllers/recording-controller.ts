@@ -329,14 +329,10 @@ export class RecordingController implements ReactiveController {
         session.stopAckResolve = resolve;
       });
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      // Safety timeout (1s). Under main-thread load, the worklet's flush
-      // queue can back up — periodic flushes processed before the terminal
-      // `done` push the round-trip past 250ms. The timeout exists to
-      // prevent infinite hang on a real failure (worklet crashed, context
-      // closed); a false positive here just means the partial buffer at
-      // stop time may have been dropped, which is at most ~16ms of audio.
-      // No user-facing warn — chunks accumulated via regular flushes are
-      // already complete.
+      // Safety timeout (1s). Prevents infinite hang on a real failure
+      // (worklet crashed, context closed). The drain loop below catches any
+      // straggler flush messages that were queued before the timeout fired,
+      // so this is purely a circuit breaker — not a data-correctness budget.
       const timeout = new Promise<void>((resolve) => {
         timeoutId = setTimeout(resolve, 1000);
       });
@@ -344,6 +340,23 @@ export class RecordingController implements ReactiveController {
       await Promise.race([stopAck, timeout]);
       clearTimeout(timeoutId);
       session.stopAckResolve = null;
+
+      // Drain the event-loop queue. During recording the worklet posts a
+      // flush every ~16ms; if main was slower than that, messages back up.
+      // Yield repeatedly until session.totalSamples stabilizes (no new
+      // messages processed) for several consecutive ticks — at that point
+      // the queue is empty and chunks are complete.
+      let lastSamples = -1;
+      let stable = 0;
+      for (let i = 0; i < 50; i++) {
+        if (session.totalSamples === lastSamples) {
+          if (++stable >= 3) break;
+        } else {
+          stable = 0;
+          lastSamples = session.totalSamples;
+        }
+        await new Promise<void>((r) => setTimeout(r, 5));
+      }
     }
     session.source.disconnect();
     session.workletNode.disconnect();
