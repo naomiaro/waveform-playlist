@@ -38,6 +38,10 @@
 - Pattern: `await Promise.race([stopAck, setTimeout(250)])` so a closed/crashed context can't hang the caller.
 - After the final flush, drop `this.buffers = []` and zero `this.bufferSize = 0`. Without this, a stray `resume` after `stop` would set `isRecording = true` and `process()` would silently no-op writes into detached typed-array memory.
 
-## Worklet IDE Diagnostics Are Spurious
+## IDE-Friendly Worklet Types via Nested tsconfig
 
-- IDE may flag `port does not exist`, `Cannot find name 'registerProcessor'`, or `ArrayBufferLike not assignable to ArrayBuffer` in `src/worklet/`. The main `tsconfig.json` excludes these files; IDE falls back to it incorrectly. Trust `tsc --project tsconfig.worklet.json --noEmit` (uses `@types/audioworklet`).
+- `src/worklet/tsconfig.json` (extends `../../tsconfig.worklet.json`) gives VS Code the right compiler options for files in this directory. The IDE's TypeScript service uses a closest-tsconfig.json algorithm and doesn't auto-discover `tsconfig.worklet.json` (non-default name) — without the nested file, the IDE falls back to the package's main config (lib: DOM, no `audioworklet` types) and shows spurious "port does not exist" / "Cannot find name registerProcessor" errors. After tsconfig changes, `Cmd+Shift+P → "TypeScript: Restart TS Server"` to clear the IDE's cached project graph.
+
+## Float32Array.buffer Cast for Transfer List
+
+- TS 5.7+ types `Float32Array.buffer` as `ArrayBufferLike` (= `ArrayBuffer | SharedArrayBuffer`), so pushing it into `ArrayBuffer[]` for the postMessage transfer list fails strict checking. AudioWorklet inputs are always ArrayBuffer-backed (SharedArrayBuffer needs cross-origin-isolation that the standard `source.connect()` flow doesn't trigger), so cast at the source: `transfer.push(buf.buffer as ArrayBuffer)`. The cast asserts a real runtime invariant — don't "fix" it with an `instanceof SharedArrayBuffer` branch.
