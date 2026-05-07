@@ -69,7 +69,14 @@
     <span id="mic-status" style="font-size:0.7rem;font-family:'Courier New',monospace;color:#888;"></span>
   </div>
 
-  <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale file-drop>
+  <daw-editor
+    id="editor"
+    samples-per-pixel="1024"
+    wave-height="100"
+    timescale
+    file-drop
+    indefinite-playback
+  >
     <daw-keyboard-shortcuts playback></daw-keyboard-shortcuts>
   </daw-editor>
 
@@ -229,10 +236,14 @@
     });
     editor.addEventListener('daw-recording-complete', (e) => {
       const d = e.detail;
-      addLog('recording-complete: track=' + d.trackId +
-        ' duration=' + (d.durationSamples / d.audioBuffer.sampleRate).toFixed(2) + 's' +
-        ' offset=' + d.offsetSamples + ' samples' +
-        ' channels=' + d.audioBuffer.numberOfChannels);
+      const sr = d.audioBuffer.sampleRate;
+      const offsetMs = ((d.offsetSamples / sr) * 1000).toFixed(1);
+      addLog(
+        'recording-complete: track=' + d.trackId.slice(0, 8) + '…' +
+          ' duration=' + (d.durationSamples / sr).toFixed(2) + 's' +
+          ' latency-skip=' + offsetMs + 'ms' +
+          ' channels=' + d.audioBuffer.numberOfChannels
+      );
     });
     editor.addEventListener('daw-recording-error', (e) => {
       addLog('recording-error: ' + e.detail.error);
