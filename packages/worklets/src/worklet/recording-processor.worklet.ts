@@ -146,7 +146,9 @@ class RecordingProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < this.channelCount; i++) {
       const buf = this.buffers[i];
       channels.push(buf.subarray(0, this.samplesCollected));
-      transfer.push(buf.buffer);
+      // Float32Array.buffer is ArrayBufferLike (ArrayBuffer | SharedArrayBuffer)
+      // in modern lib types. AudioWorklet inputs are always ArrayBuffer-backed.
+      transfer.push(buf.buffer as ArrayBuffer);
     }
 
     const message: RecordingProcessorMessage = {
