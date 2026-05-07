@@ -298,4 +298,41 @@ describe('Stop button', () => {
 
     cleanup(editor, transport);
   });
+
+  it('still calls editor.stop when stopRecording rejects', async () => {
+    const { editor, transport, stopBtn } = createTransport();
+    await new Promise((r) => setTimeout(r, 20));
+
+    editor.isRecording = true;
+    editor.stopRecording = vi.fn(() => Promise.reject(new Error('worklet crashed')));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    stopBtn.shadowRoot?.querySelector('button')?.click();
+    // Let the .catch().then() chain settle
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(editor.stopRecording).toHaveBeenCalled();
+    expect(editor.stop).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('stopRecording failed'));
+    warnSpy.mockRestore();
+
+    cleanup(editor, transport);
+  });
+
+  it('catches sync throws from editor.stop', async () => {
+    const { editor, transport, stopBtn } = createTransport();
+    await new Promise((r) => setTimeout(r, 20));
+
+    editor.stop = vi.fn(() => {
+      throw new Error('engine.stop blew up');
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => stopBtn.shadowRoot?.querySelector('button')?.click()).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('stop failed'));
+    warnSpy.mockRestore();
+
+    cleanup(editor, transport);
+  });
 });

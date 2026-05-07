@@ -49,12 +49,17 @@ export function useRecording(
   const stopRecordingRef = useRef<(() => Promise<AudioBuffer | null>) | null>(null);
   // Resolved when the worklet posts the final done message after a stop command.
   const stopAckResolveRef = useRef<(() => void) | null>(null);
+  // True from the start of stopRecording until it resolves. Distinct from
+  // isPausedRef (user explicitly paused) — both freeze the duration tick,
+  // but conflating them risks pauseRecording becoming a no-op while we're
+  // stopping, or vice versa.
+  const isStoppingRef = useRef<boolean>(false);
 
   // Shared duration update loop — starts a rAF loop that updates duration
   // from performance.now(). Used by both startRecording and resumeRecording.
   const startDurationLoop = useCallback(() => {
     const tick = () => {
-      if (isRecordingRef.current && !isPausedRef.current) {
+      if (isRecordingRef.current && !isPausedRef.current && !isStoppingRef.current) {
         const elapsed = (performance.now() - startTimeRef.current) / 1000;
         setDuration(elapsed);
         animationFrameRef.current = requestAnimationFrame(tick);
@@ -236,10 +241,10 @@ export function useRecording(
     try {
       // Freeze the duration tick immediately so the live-preview width
       // (durationSamples = duration * sampleRate) doesn't keep growing
-      // during the worklet stop handshake / queue drain. isPausedRef stops
-      // the rAF tick from rescheduling; cancelling animationFrameRef kills
-      // any frame already queued.
-      isPausedRef.current = true;
+      // during the worklet stop handshake / queue drain. isStoppingRef
+      // stops the rAF tick from rescheduling; cancelling animationFrameRef
+      // kills any frame already queued.
+      isStoppingRef.current = true;
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -255,7 +260,10 @@ export function useRecording(
       // Stop the worklet and wait for its final flush message before reading chunks.
       // Without the await, the partial buffer at the end of recording arrives after
       // the AudioBuffer is built and is silently dropped.
-      if (workletNodeRef.current) {
+      // Snapshot the worklet node once — the drain loop yields the event loop
+      // for up to 250ms, during which an unmount-cleanup could null the ref.
+      const node = workletNodeRef.current;
+      if (node) {
         const stopAck = new Promise<void>((resolve) => {
           stopAckResolveRef.current = resolve;
         });
@@ -268,7 +276,7 @@ export function useRecording(
           timeoutId = setTimeout(resolve, 1000);
         });
 
-        workletNodeRef.current.port.postMessage({ command: 'stop' });
+        node.port.postMessage({ command: 'stop' });
         await Promise.race([stopAck, timeout]);
         clearTimeout(timeoutId);
         stopAckResolveRef.current = null;
@@ -291,20 +299,18 @@ export function useRecording(
 
         // Null the handler so any late delivery from this worklet doesn't
         // contaminate a subsequent recording session's chunks.
-        workletNodeRef.current.port.onmessage = null;
+        node.port.onmessage = null;
 
         // Disconnect worklet from source
         if (mediaStreamSourceRef.current) {
           try {
-            mediaStreamSourceRef.current.disconnect(workletNodeRef.current);
+            mediaStreamSourceRef.current.disconnect(node);
           } catch (err) {
             console.warn('[waveform-playlist] Source disconnect during stop:', String(err));
           }
         }
-        workletNodeRef.current.disconnect();
+        node.disconnect();
       }
-
-      // (animation frame already cancelled at the top of stopRecording)
 
       // Create final AudioBuffer from accumulated per-channel chunks
       const context = getGlobalContext();
@@ -336,6 +342,7 @@ export function useRecording(
       // stuck in "recording" state if AudioBuffer creation throws.
       isRecordingRef.current = false;
       isPausedRef.current = false;
+      isStoppingRef.current = false;
       setIsRecording(false);
       setIsPaused(false);
       setLevel(0);

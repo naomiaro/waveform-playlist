@@ -265,4 +265,90 @@ describe('useRecording', () => {
 
     expect(mockWorkletNode.port.onmessage).toBeNull();
   });
+
+  it('cancels the duration rAF before posting stop to the worklet', async () => {
+    // The freeze-rAF-at-top fix prevents the live preview from growing
+    // during the stop handshake. Verify the cancel happens BEFORE the
+    // stop message is sent.
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+
+    const cancelSpy = vi.spyOn(globalThis, 'cancelAnimationFrame');
+    const callOrder: string[] = [];
+    cancelSpy.mockImplementation(() => {
+      callOrder.push('cancelAnimationFrame');
+    });
+    const originalPost = mockWorkletNode.port.postMessage;
+    mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
+      if (msg?.command === 'stop') callOrder.push('postMessage:stop');
+      originalPost.call(mockWorkletNode.port, msg);
+    });
+
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+
+    const cancelIdx = callOrder.indexOf('cancelAnimationFrame');
+    const stopIdx = callOrder.indexOf('postMessage:stop');
+    expect(cancelIdx).toBeGreaterThanOrEqual(0);
+    expect(stopIdx).toBeGreaterThanOrEqual(0);
+    expect(cancelIdx).toBeLessThan(stopIdx);
+
+    cancelSpy.mockRestore();
+  });
+
+  it('skips peak updates while stop is in flight', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+
+    // Pre-stop: a flush should advance peaks
+    const peaksBefore = result.current.peaks;
+    act(() => {
+      mockWorkletNode.port.onmessage!({
+        data: { channels: [new Float32Array(512).fill(0.3)], channelCount: 1 },
+      } as MessageEvent);
+    });
+    expect(result.current.peaks).not.toBe(peaksBefore);
+    const peaksAfterPreStop = result.current.peaks;
+
+    // Defer the done message and inject a flush BEFORE done arrives
+    mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
+      if (msg?.command === 'stop' && mockWorkletNode.port.onmessage) {
+        queueMicrotask(() => {
+          // In-flight flush during stop — chunks should push but peaks NOT update
+          mockWorkletNode.port.onmessage!({
+            data: { channels: [new Float32Array(256).fill(0.6)], channelCount: 1 },
+          } as MessageEvent);
+        });
+        queueMicrotask(() => {
+          mockWorkletNode.port.onmessage!({
+            data: { channels: [], channelCount: 1, done: true },
+          } as MessageEvent);
+        });
+      }
+    });
+
+    let buffer: AudioBuffer | null = null;
+    await act(async () => {
+      buffer = await result.current.stopRecording();
+    });
+
+    // The mid-stop flush's chunk made it into the AudioBuffer (512 + 256 = 768)
+    expect(buffer).not.toBeNull();
+    expect(buffer!.length).toBe(768);
+    // But peaks state was NOT updated for that intermediate flush — the
+    // last setPeaks happened at the pre-stop flush. After stopRecording
+    // resolves, finally-block sets isRecording=false but peaks stay.
+    // (We can't trivially compare references because the React re-render
+    // recreates the wrapper, but length-equivalence is the contract.)
+    expect(result.current.peaks).toBe(peaksAfterPreStop);
+  });
 });

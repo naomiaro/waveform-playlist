@@ -1917,6 +1917,10 @@ export class DawEditorElement extends LitElement {
   }
   resumeRecording(): void {
     this._recordingController.resumeRecording();
+    // Programmatic resume bypasses togglePauseRecording — clear the
+    // ref so the next pause cycle doesn't restart Transport based on
+    // stale state from an earlier toggle.
+    this._wasPlayingDuringRecording = false;
   }
   /**
    * Audacity-style pause toggle for active recordings: pauses both the
@@ -1927,9 +1931,12 @@ export class DawEditorElement extends LitElement {
   togglePauseRecording(): void {
     if (!this.isRecording) return;
     if (this.isRecordingPaused) {
+      // Snapshot the flag before resumeRecording — that method clears
+      // the ref defensively (so external callers don't leak it into the
+      // next cycle), so reading after the call is too late.
+      const wasPlaying = this._wasPlayingDuringRecording;
       this.resumeRecording();
-      if (this._wasPlayingDuringRecording) {
-        this._wasPlayingDuringRecording = false;
+      if (wasPlaying) {
         // play() is async on the editor; fire and forget — caller doesn't await.
         void this.play(this.currentTime);
       }

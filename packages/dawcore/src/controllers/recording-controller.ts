@@ -40,6 +40,10 @@ export interface RecordingSession {
   readonly _audioTrack: MediaStreamTrack | null;
   /** Set during stopRecording, cleared by the done message from the worklet. */
   stopAckResolve: (() => void) | null;
+  /** True from the start of stopRecording until the session is deleted.
+   * Guards pauseRecording / resumeRecording so a mid-drain pause toggle
+   * can't dispatch events for a session that's already terminating. */
+  stopping: boolean;
 }
 
 /** Readonly view of a recording session for external consumers. */
@@ -224,6 +228,7 @@ export class RecordingController implements ReactiveController {
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
         stopAckResolve: null,
+        stopping: false,
       };
       this._sessions.set(trackId, session);
 
@@ -271,7 +276,9 @@ export class RecordingController implements ReactiveController {
     const id = trackId ?? [...this._sessions.keys()][0];
     if (!id) return;
     const session = this._sessions.get(id);
-    if (!session) return;
+    // Skip if the session is already on its way out — would otherwise
+    // dispatch a pause event for a session about to be deleted.
+    if (!session || session.stopping) return;
     session.workletNode.port.postMessage({ command: 'pause' });
     this._isPaused = true;
     this._host.dispatchEvent(
@@ -287,7 +294,7 @@ export class RecordingController implements ReactiveController {
     const id = trackId ?? [...this._sessions.keys()][0];
     if (!id) return;
     const session = this._sessions.get(id);
-    if (!session) return;
+    if (!session || session.stopping) return;
     session.workletNode.port.postMessage({ command: 'resume' });
     this._isPaused = false;
     this._host.dispatchEvent(
@@ -310,6 +317,10 @@ export class RecordingController implements ReactiveController {
     // buffer, so there's nothing to wait for from the worklet on stop.
     const wasPaused = this._isPaused;
     this._isPaused = false;
+    // Block any further pause/resume calls on this session — they could
+    // race with the drain loop and dispatch events for a session that's
+    // about to be deleted.
+    session.stopping = true;
 
     // Stop playback only if this was an overdub session
     if (session.wasOverdub && typeof this._host.stop === 'function') {

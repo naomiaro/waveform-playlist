@@ -76,10 +76,8 @@ export class DawPauseButtonElement extends DawTransportButton {
     }
 
     if (this._isRecording) {
-      // Delegate to the editor — same logic as the spacebar shortcut. The
-      // editor tracks "was Transport playing" so resume only restarts
-      // playback for overdub sessions. Visual _isPaused state stays in
-      // sync via daw-recording-pause / daw-recording-resume events.
+      // Delegate to editor — events keep visual state in sync via
+      // daw-recording-pause / daw-recording-resume.
       target.togglePauseRecording();
     } else {
       target.pause();

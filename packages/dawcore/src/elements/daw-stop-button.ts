@@ -23,18 +23,29 @@ export class DawStopButtonElement extends DawTransportButton {
     // When recording: await stopRecording (which awaits the worklet's
     // done ack) BEFORE calling editor.stop(). Calling stop() in parallel
     // disrupts the audio thread mid-handshake — engine.stop() can pause
-    // worklet rendering, which prevents the done message from arriving
-    // and triggers the stop-timeout warning.
+    // worklet rendering, which prevents the done message from arriving.
+    // ALWAYS run stop() afterward (even if stopRecording rejected), so the
+    // engine cleans up; wrap stop() in try/catch since it's synchronous
+    // void and can throw.
     if (target.isRecording) {
-      target.stopRecording().then(
-        () => target.stop(),
-        (err: unknown) => {
+      target
+        .stopRecording()
+        .catch((err: unknown) => {
           console.warn('[dawcore] stopRecording failed: ' + String(err));
-          target.stop();
-        }
-      );
+        })
+        .then(() => {
+          try {
+            target.stop();
+          } catch (err) {
+            console.warn('[dawcore] stop after stopRecording failed: ' + String(err));
+          }
+        });
     } else {
-      target.stop();
+      try {
+        target.stop();
+      } catch (err) {
+        console.warn('[dawcore] stop failed: ' + String(err));
+      }
     }
   }
 }
