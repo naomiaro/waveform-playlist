@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.worklet.json",
+  "include": ["./**/*"]
+}

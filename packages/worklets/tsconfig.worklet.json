@@ -4,7 +4,7 @@
     "module": "ESNext",
     "lib": ["ES2020"],
     "types": ["audioworklet"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,

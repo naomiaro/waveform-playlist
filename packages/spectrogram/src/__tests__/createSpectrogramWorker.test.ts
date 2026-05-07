@@ -218,7 +218,7 @@ describe('createSpectrogramWorker', () => {
       });
 
       // The compute-fft call is the second postMessage (after register-audio-data)
-      const computeCall = mockWorker.worker.postMessage.mock.calls[1];
+      const computeCall = vi.mocked(mockWorker.worker.postMessage).mock.calls[1];
       const transferables = computeCall[1] as ArrayBuffer[];
       expect(transferables).toEqual([]);
     });
@@ -234,7 +234,7 @@ describe('createSpectrogramWorker', () => {
         mono: false,
       });
 
-      const computeCall = mockWorker.worker.postMessage.mock.calls[0];
+      const computeCall = vi.mocked(mockWorker.worker.postMessage).mock.calls[0];
       const transferables = computeCall[1] as ArrayBuffer[];
       expect(transferables.length).toBe(1);
       expect(transferables[0]).toBeInstanceOf(ArrayBuffer);
@@ -255,7 +255,7 @@ describe('createSpectrogramWorker', () => {
       });
 
       // register + unregister + computeFFT = 3 calls
-      const computeCall = mockWorker.worker.postMessage.mock.calls[2];
+      const computeCall = vi.mocked(mockWorker.worker.postMessage).mock.calls[2];
       const transferables = computeCall[1] as ArrayBuffer[];
       expect(transferables.length).toBe(1);
     });
@@ -346,10 +346,11 @@ describe('createSpectrogramWorker', () => {
     it('does not post abortGeneration after terminate', () => {
       api.terminate();
       // Clear the terminate-related calls
-      const callCountAfterTerminate = mockWorker.worker.postMessage.mock.calls.length;
+      const postSpy = vi.mocked(mockWorker.worker.postMessage);
+      const callCountAfterTerminate = postSpy.mock.calls.length;
 
       api.abortGeneration(5);
-      expect(mockWorker.worker.postMessage.mock.calls.length).toBe(callCountAfterTerminate);
+      expect(postSpy.mock.calls.length).toBe(callCountAfterTerminate);
     });
   });
 

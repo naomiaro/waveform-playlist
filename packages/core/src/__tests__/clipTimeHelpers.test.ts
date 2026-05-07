@@ -180,7 +180,7 @@ function makeFakeBuffer(numberOfChannels: number) {
     duration: 1,
     sampleRate: 44100,
     getChannelData: () => new Float32Array(),
-  } as unknown as import('../types').AudioBuffer;
+  } as unknown as AudioBuffer;
 }
 
 describe('trackChannelCount', () => {
