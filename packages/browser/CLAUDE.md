@@ -437,3 +437,7 @@ Always call `stop()` before clearing tracks. Clearing React state without stoppi
 ## Shared Clip Pixel Width
 
 Use `clipPixelWidth()` from `@waveform-playlist/core` for any pixel width derived from `startSample`/`durationSamples`/`samplesPerPixel`. Both `Clip.tsx` (container) and `ChannelWithProgress.tsx` (progress overlay) must use this shared function — never `peaksData.length`, which may be shorter than the clip when audio is shorter than configured duration.
+
+## `handleStop` During Recording: Use `pause()` Not `stop()`
+
+`engine.stop()` rewinds Transport to the last play-start position. During a paused/resumed recording, every resume calls `play(currentTime)` — making the most recent resume the new play-start. So calling `stop()` after `stopRecording()` jumps the playhead back to the last resume position. Use `pause()` instead during recording so the playhead stays where the user clicked stop. Plain `stop()` (when not recording) retains the standard rewind behavior.

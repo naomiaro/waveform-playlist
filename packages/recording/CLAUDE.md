@@ -136,3 +136,11 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 - `vitest.config.ts` sets `environment: 'jsdom'`. Tests use `@testing-library/react` `renderHook` + `act`.
 - Mock `getGlobalContext` (Tone playout) via getter form (`getGlobalContext: () => mockContext`) so `beforeEach` can mutate the underlying mock — `vi.mock` factories run at module-load time and capture *bindings*, not values.
 - Mock `concatenateAudioData` with a real concatenation (not `Float32Array(0)`) so `createAudioBuffer.length` reflects pushed chunks. Without this, late-sample assertions can't distinguish "ack fired" from "ack fired AND samples reached the buffer."
+
+## Drain Event-Loop Queue After Stop Ack
+
+After `await Promise.race([stopAck, timeout])` resolves, drain the event-loop queue before reading chunks. Yield in 5ms ticks until `totalSamples` stops growing for 3 consecutive ticks. Without this, pending flush messages in the queue (built up during recording under main-thread load) get dropped when the session is deleted. The stopAck and the queue drain serve different purposes — neither alone guarantees chunk completeness.
+
+## Freeze Duration rAF at Top of `stopRecording`
+
+The live preview's *width* in the React example is `duration * sampleRate` — driven by a rAF tick separate from the peaks. If the tick keeps running through the stop handshake/drain, the preview container keeps growing while peaks are skipped → empty peaks rendered into an ever-widening container. At the top of `stopRecording`: `isPausedRef.current = true` + `cancelAnimationFrame(animationFrameRef.current)`. The tick checks `isPausedRef` and returns without rescheduling.

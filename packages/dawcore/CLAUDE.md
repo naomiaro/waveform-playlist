@@ -281,3 +281,19 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - **Demo:** `examples/dawcore-tone/midi.html` — programmatic C major scale, no SoundFont, exercises `editor.addTrack({ midi })` end to end.
 - **Read-only classification queries belong on `ClipPointerHost`, not `ClipEngineContract`** — `ClipEngineContract` is a narrow stateless mutation contract (`moveClip`, `trimClip`, etc.). Whether a clip is MIDI is a read-only classification that requires traversing track state. Add such methods (e.g. `isMidiClip(trackId, clipId)`) to the host interface and implement them on `<daw-editor>`. The host is dawcore-internal; only `<daw-editor>` implements it, so requiring the new method (not optional) is safe and prevents silent-pass-through bugs.
 - **MIDI clip late-append is unsupported** — `_loadAndAppendClip` (the late-append path triggered by `daw-clip-connected` after the parent track is loaded) only handles audio clips (early-return on `!src`). Late-appended `<daw-clip>` elements with `midiNotes` set silently do nothing. Workarounds: include the MIDI clip in the initial `<daw-track>` markup, or use `editor.addTrack({ midi })` (which goes through `_loadTrack`'s MIDI branch on initial load).
+
+## Stop Button Must Await `stopRecording` Before `editor.stop()`
+
+`daw-stop-button` chains: `target.stopRecording().then(() => target.stop())`. Calling them in parallel breaks the worklet's terminal `done` round-trip — `engine.stop()` can pause the audio thread mid-handshake, so the worklet's done message never gets delivered through. Symptom: stop-timeout warning that's hard to attribute.
+
+## `<daw-keyboard-shortcuts>` Must Be Inside `<daw-editor>`
+
+Resolves its parent via `closest('daw-editor')`. Placing it as a sibling (e.g. inside `<daw-transport>`) silently fails — runtime warns "Preset shortcuts will be inactive; only customShortcuts will fire." Easy to miss because transport buttons in `<daw-transport>` work via id-based lookup, suggesting both should.
+
+## Pause/Resume Event Bus for Multi-Source State Sync
+
+`RecordingController` dispatches `daw-recording-pause` / `daw-recording-resume` so any UI element can sync its visual state when *anything* triggers a pause toggle (button click, spacebar shortcut, programmatic call). `daw-pause-button` listens to these for its `data-paused` attribute. Add to this pattern when introducing new pause-aware UI.
+
+## `editor.togglePauseRecording()` Is the Unified Pause Toggle
+
+Audacity-style: pauses both worklet capture and (only when running) the playback Transport. Tracks `_wasPlayingDuringRecording` so resume restarts Transport only for overdub sessions. Both `togglePlayPause()` (spacebar) and `daw-pause-button` delegate to this — never duplicate the toggle logic in new UI; route everything through it.
