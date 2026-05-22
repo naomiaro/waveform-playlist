@@ -1,0 +1,52 @@
+{
+  "name": "@dawcore/spectrogram",
+  "version": "0.0.1",
+  "description": "Spectrogram computation, worker, and viewport orchestrator — framework-agnostic",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./worker/spectrogram.worker": {
+      "import": "./dist/worker/spectrogram.worker.mjs"
+    },
+    "./orchestrator": {
+      "types": "./dist/orchestrator/index.d.ts",
+      "import": "./dist/orchestrator/index.mjs"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": ["spectrogram", "fft", "dawcore", "web-audio"],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/dawcore-spectrogram"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": ["dist", "README.md"],
+  "dependencies": {
+    "@waveform-playlist/core": "workspace:*",
+    "fft.js": "^4.0.4"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0",
+    "happy-dom": "^17.0.0"
+  }
+}
