@@ -66,6 +66,12 @@ export class SpectrogramOrchestrator extends EventTarget {
   protected colorLUT = new ColorLUTCache();
   protected disposed = false;
   protected renderInFlight = false;
+  // Tracks which trackIds have already emitted `viewport-ready` for the
+  // current generation. Cleared on every generation bump (setViewport /
+  // setConfig / setColorMap). Without this, every render — including
+  // those triggered by late `registerCanvas` calls during track-by-track
+  // loading — would re-fire the event for every track in the canvas map.
+  protected readyDispatched = new Set<string>();
 
   constructor(opts: SpectrogramOrchestratorOptions) {
     super();
@@ -121,8 +127,10 @@ export class SpectrogramOrchestrator extends EventTarget {
 
   setViewport(state: ViewportState): void {
     if (this.disposed) return;
+    if (this.viewport && viewportsEqual(this.viewport, state)) return;
     const prevGeneration = this.generation;
     this.generation += 1;
+    this.readyDispatched.clear();
     this.pool.abortGeneration(prevGeneration);
     this.viewport = state;
     this.scheduleRender();
@@ -133,6 +141,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     this.config = config;
     const prevGeneration = this.generation;
     this.generation += 1;
+    this.readyDispatched.clear();
     this.pool.abortGeneration(prevGeneration);
     this.colorLUT.clear();
     this.scheduleRender();
@@ -143,6 +152,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     this.colorMap = colorMap;
     const prevGeneration = this.generation;
     this.generation += 1;
+    this.readyDispatched.clear();
     this.pool.abortGeneration(prevGeneration);
     this.scheduleRender();
   }
@@ -158,6 +168,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     this.canvases.clear();
     this.viewport = null;
     this.colorLUT.clear();
+    this.readyDispatched.clear();
     this.pool.terminate();
   }
 
@@ -188,7 +199,10 @@ export class SpectrogramOrchestrator extends EventTarget {
       // Phase 1a: viewport tier — render synchronously (priority)
       await this.renderTier(tiers.viewport, generation, viewport);
       if (this.generation !== generation || this.disposed) return;
-      this.dispatchEvent(new CustomEvent('viewport-ready', { detail: { trackId } }));
+      if (!this.readyDispatched.has(trackId)) {
+        this.readyDispatched.add(trackId);
+        this.dispatchEvent(new CustomEvent('viewport-ready', { detail: { trackId } }));
+      }
       // Phase 1b: buffer tier
       await this.renderTier(tiers.buffer, generation, viewport);
       if (this.generation !== generation || this.disposed) return;
@@ -292,4 +306,14 @@ export class SpectrogramOrchestrator extends EventTarget {
       }
     });
   }
+}
+
+function viewportsEqual(a: ViewportState, b: ViewportState): boolean {
+  return (
+    a.visibleStartPx === b.visibleStartPx &&
+    a.visibleEndPx === b.visibleEndPx &&
+    a.bufferStartPx === b.bufferStartPx &&
+    a.bufferEndPx === b.bufferEndPx &&
+    a.samplesPerPixel === b.samplesPerPixel
+  );
 }

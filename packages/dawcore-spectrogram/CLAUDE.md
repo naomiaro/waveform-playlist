@@ -16,11 +16,13 @@
 
 Class that owns the worker pool, clip+canvas registries, viewport state, and render dispatch. Extends `EventTarget` — dispatches `viewport-ready` (CustomEvent) after the viewport tier completes per track.
 
+**`viewport-ready` semantics:** fires **at most once per `(generation, trackId)` pair**. Generation bumps (setViewport with a real change, setConfig, setColorMap) reset the dispatched-set so the event re-fires on the next render. Late `registerCanvas` calls that trigger a fresh render within the same generation do NOT re-fire. `setViewport` is also short-circuited when called with identical state — no generation bump, no abort, no render. These dedups prevent N-renders-per-track-load patterns where the dispatched event count grows quadratically during initial loading.
+
 **Constructor:** `new SpectrogramOrchestrator({ workerFactory, workerPoolSize?, config, colorMap?, devicePixelRatio? })`. The consumer owns worker URL resolution — pass a factory rather than baking URLs into the orchestrator.
 
 **Lifecycle:** `registerClip` (audio data), `registerCanvas` (OffscreenCanvas + metadata), `setViewport`, `setConfig`, `setColorMap`. Each setter that affects render output bumps a generation counter and calls `pool.abortGeneration(prev)` so stale FFT work drops cleanly. `dispose()` is idempotent.
 
-**Protected fields:** `pool`, `config`, `colorMap`, `devicePixelRatio`, `clips`, `canvases`, `viewport`, `generation`, `colorLUT`, `disposed`. Protected (not private) so `noUnusedLocals` doesn't flag dormant fields between task slices.
+**Protected fields:** `pool`, `config`, `colorMap`, `devicePixelRatio`, `clips`, `canvases`, `viewport`, `generation`, `colorLUT`, `disposed`, `readyDispatched`. Protected (not private) so `noUnusedLocals` doesn't flag dormant fields between task slices.
 
 ## Three-Tier Render
 

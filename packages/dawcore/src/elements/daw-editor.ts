@@ -628,13 +628,31 @@ export class DawEditorElement extends LitElement {
     }
   }
 
+  /**
+   * Cache of the last ViewportState forwarded to the spectrogram controller.
+   * Lit's `updated()` fires on every reactive state change (`_isPlaying`,
+   * `_selectedTrackId`, etc.) — most of which don't affect the spectrogram
+   * viewport. Skip the cross-controller call when nothing changed.
+   *
+   * The orchestrator dedupes too, but this avoids the call entirely.
+   */
+  private _lastSpectrogramViewport: {
+    vs: number;
+    ve: number;
+    spp: number;
+  } | null = null;
+
   protected updated(_changed: Map<string, unknown>): void {
     // Forward viewport + zoom into the spectrogram controller on every update
     // so scroll, resize, and zoom all trigger orchestrator.setViewport.
     if (this._spectrogramController) {
       const vs = this._viewport.visibleStart;
       const ve = this._viewport.visibleEnd;
+      const spp = this._renderSpp;
       if (Number.isFinite(vs) && Number.isFinite(ve)) {
+        const prev = this._lastSpectrogramViewport;
+        if (prev && prev.vs === vs && prev.ve === ve && prev.spp === spp) return;
+        this._lastSpectrogramViewport = { vs, ve, spp };
         const span = ve - vs;
         const bufferPad = span * 0.25;
         this._spectrogramController.setViewport({
@@ -642,7 +660,7 @@ export class DawEditorElement extends LitElement {
           visibleEndPx: ve,
           bufferStartPx: Math.max(0, vs - bufferPad),
           bufferEndPx: ve + bufferPad,
-          samplesPerPixel: this._renderSpp,
+          samplesPerPixel: spp,
         });
       }
     }

@@ -160,6 +160,20 @@ describe('SpectrogramOrchestrator — canvas registration', () => {
     });
     expect(mockPool.abortGeneration).toHaveBeenCalled();
   });
+
+  it('setViewport short-circuits when called with identical state — no abort, no re-render', () => {
+    const state = {
+      visibleStartPx: 0,
+      visibleEndPx: 100,
+      bufferStartPx: 0,
+      bufferEndPx: 100,
+      samplesPerPixel: 1024,
+    };
+    orch.setViewport(state);
+    mockPool.abortGeneration.mockClear();
+    orch.setViewport({ ...state });
+    expect(mockPool.abortGeneration).not.toHaveBeenCalled();
+  });
 });
 
 describe('SpectrogramOrchestrator — tier-aware render', () => {
@@ -254,5 +268,61 @@ describe('SpectrogramOrchestrator — tier-aware render', () => {
     });
     await new Promise((r) => setTimeout(r, 20));
     expect(count).toBe(1);
+  });
+
+  it('does not re-emit viewport-ready for the same track when a later registerCanvas triggers another render', async () => {
+    let count = 0;
+    orch.addEventListener('viewport-ready', () => {
+      count += 1;
+    });
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(count).toBe(1);
+    // Late canvas registration triggers another render with the SAME viewport
+    // and generation. The track was already marked ready — don't re-fire.
+    orch.registerCanvas({
+      canvasId: 'c1-ch0-chunk3',
+      canvas: { width: 1000, height: 100 } as unknown as OffscreenCanvas,
+      clipId: 'c1',
+      trackId: 't1',
+      channelIndex: 0,
+      chunkIndex: 3,
+      globalPixelOffset: 3000,
+      widthPx: 1000,
+      heightPx: 100,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(count).toBe(1);
+  });
+
+  it('re-emits viewport-ready after setViewport bumps the generation', async () => {
+    let count = 0;
+    orch.addEventListener('viewport-ready', () => {
+      count += 1;
+    });
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(count).toBe(1);
+    orch.setViewport({
+      visibleStartPx: 1000,
+      visibleEndPx: 1500,
+      bufferStartPx: 500,
+      bufferEndPx: 2000,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(count).toBe(2);
   });
 });
