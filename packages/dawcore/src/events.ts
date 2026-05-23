@@ -123,6 +123,10 @@ export interface DawClipSplitDetail {
   readonly rightClipId: string;
 }
 
+export interface DawSpectrogramReadyDetail {
+  trackId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Event map — augments HTMLElementEventMap for typed addEventListener
 // ---------------------------------------------------------------------------
@@ -154,6 +158,7 @@ export interface DawEventMap {
   'daw-clip-move': CustomEvent<DawClipMoveDetail>;
   'daw-clip-trim': CustomEvent<DawClipTrimDetail>;
   'daw-clip-split': CustomEvent<DawClipSplitDetail>;
+  'daw-spectrogram-ready': CustomEvent<DawSpectrogramReadyDetail>;
 }
 
 // Helper type for creating typed custom events
