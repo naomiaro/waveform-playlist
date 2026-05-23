@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dawcore — spectrogram render mode (Tone)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #0f0f1a;
+        color: #e0d4c8;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 1.2rem;
+        margin-bottom: 16px;
+      }
+      daw-editor {
+        --daw-wave-color: #c49a6c;
+        --daw-playhead-color: #d08070;
+        --daw-background: #1a1a2e;
+        --daw-track-background: #16213e;
+        --daw-ruler-color: #c49a6c;
+        --daw-ruler-background: #0f0f1a;
+        --daw-spectrogram-background: #000;
+        margin-bottom: 12px;
+      }
+      daw-transport {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 24px;
+        align-items: center;
+        font-size: 0.85rem;
+        margin-bottom: 12px;
+      }
+      select,
+      label {
+        font-family: inherit;
+      }
+      select {
+        background: #1a1a2e;
+        color: #e0d4c8;
+        border: 1px solid #c49a6c;
+        padding: 4px 8px;
+      }
+      #status {
+        font-family: monospace;
+        font-size: 0.75rem;
+        color: #888;
+        max-height: 80px;
+        overflow-y: auto;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>dawcore — spectrogram render-mode (Tone adapter)</h1>
+
+    <script type="module">
+      import '@dawcore/components';
+    </script>
+
+    <div class="controls">
+      <label
+        >Color map:
+        <select id="colormap">
+          <option>viridis</option>
+          <option selected>magma</option>
+          <option>inferno</option>
+          <option>grayscale</option>
+          <option>roseus</option>
+        </select>
+      </label>
+      <label
+        >Frequency scale:
+        <select id="freqscale">
+          <option>linear</option>
+          <option>logarithmic</option>
+          <option selected>mel</option>
+          <option>bark</option>
+          <option>erb</option>
+        </select>
+      </label>
+      <label
+        >FFT size:
+        <select id="fftsize">
+          <option>512</option>
+          <option>1024</option>
+          <option selected>2048</option>
+          <option>4096</option>
+        </select>
+      </label>
+    </div>
+
+    <daw-editor id="editor" samples-per-pixel="1024" wave-height="120" timescale file-drop>
+      <daw-track
+        src="/media/audio/AlbertKader_Whiptails/03_Kick.opus"
+        name="Kick"
+        render-mode="spectrogram"
+      ></daw-track>
+      <daw-track
+        src="/media/audio/AlbertKader_Whiptails/05_Claps.opus"
+        name="Claps"
+        render-mode="spectrogram"
+      ></daw-track>
+      <daw-track
+        src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus"
+        name="Bass"
+        render-mode="waveform"
+      ></daw-track>
+      <daw-track
+        src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus"
+        name="Synth"
+        render-mode="spectrogram"
+      ></daw-track>
+    </daw-editor>
+
+    <daw-transport for="editor">
+      <daw-play-button></daw-play-button>
+      <daw-pause-button></daw-pause-button>
+      <daw-stop-button></daw-stop-button>
+    </daw-transport>
+
+    <div id="status"></div>
+
+    <script type="module">
+      import { createToneAdapter } from '@waveform-playlist/playout';
+
+      const editor = document.getElementById('editor');
+      
+      editor.adapter = createToneAdapter();
+
+      // Initial defaults (overrides the library defaults inside SpectrogramController).
+      editor.spectrogramConfig = { fftSize: 2048, frequencyScale: 'mel' };
+      editor.spectrogramColorMap = 'magma';
+
+      const status = document.getElementById('status');
+      editor.addEventListener('daw-spectrogram-ready', (e) => {
+        const line = document.createElement('div');
+        line.textContent = 'ready: track ' + e.detail.trackId;
+        status.prepend(line);
+        while (status.children.length > 10) status.lastChild.remove();
+      });
+
+      document.getElementById('colormap').addEventListener('change', (e) => {
+        editor.spectrogramColorMap = e.target.value;
+      });
+      document.getElementById('freqscale').addEventListener('change', (e) => {
+        editor.spectrogramConfig = {
+          ...editor.spectrogramConfig,
+          frequencyScale: e.target.value,
+        };
+      });
+      document.getElementById('fftsize').addEventListener('change', (e) => {
+        editor.spectrogramConfig = {
+          ...editor.spectrogramConfig,
+          fftSize: Number(e.target.value),
+        };
+      });
+    </script>
+  </body>
+</html>
