@@ -12,14 +12,25 @@ export default defineConfig([
     sourcemap: true,
     clean: true,
   },
-  // Web Worker — ESM only, no DTS, don't clean (would wipe first build's output).
-  // The orchestrator entry is added in Task 7 when src/orchestrator/index.ts exists.
+  // Web Worker — ESM only, no DTS, don't clean (would wipe first block's output).
   {
     entry: {
       'worker/spectrogram.worker': 'src/worker/spectrogram.worker.ts',
     },
     format: ['esm'],
     dts: false,
+    splitting: false,
+    sourcemap: true,
+    clean: false,
+  },
+  // Orchestrator subpath — emits dist/orchestrator/index.mjs + .d.ts so
+  // consumers can `import { SpectrogramOrchestrator } from '@dawcore/spectrogram/orchestrator'`.
+  {
+    entry: {
+      'orchestrator/index': 'src/orchestrator/index.ts',
+    },
+    format: ['esm'],
+    dts: true,
     splitting: false,
     sourcemap: true,
     clean: false,

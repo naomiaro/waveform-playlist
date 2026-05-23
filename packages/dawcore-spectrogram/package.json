@@ -15,7 +15,7 @@
       "import": "./dist/worker/spectrogram.worker.mjs"
     },
     "./orchestrator": {
-      "types": "./dist/orchestrator/index.d.ts",
+      "types": "./dist/orchestrator/index.d.mts",
       "import": "./dist/orchestrator/index.mjs"
     }
   },

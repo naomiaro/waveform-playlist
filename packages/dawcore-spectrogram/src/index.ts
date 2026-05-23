@@ -15,3 +15,20 @@ export type {
   SpectrogramWorkerFFTParams,
   SpectrogramWorkerRenderChunksParams,
 } from './worker';
+
+// Orchestrator
+export {
+  SpectrogramOrchestrator,
+  ColorLUTCache,
+  classifyViewport,
+  groupContiguousChunks,
+} from './orchestrator';
+export type {
+  SpectrogramOrchestratorOptions,
+  ClipRegistration,
+  ViewportReadyDetail,
+  CanvasMeta,
+  ViewportBounds,
+  ClassifiedTiers,
+  ChunkLike,
+} from './orchestrator';
