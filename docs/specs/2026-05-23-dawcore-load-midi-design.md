@@ -17,7 +17,8 @@ This builds on the programmatic MIDI surface added in PR [#385](https://github.c
 - **`flatten: true` option.** Defers until dawcore grows a "hidden audio-only track" concept. The React `@waveform-playlist/midi` package's flatten behavior (visual-merge + per-channel synths under the hood for natural thickening) is not portable to dawcore without that primitive.
 - **`name` override option.** Ambiguous semantics with multi-track files (5 tracks ≠ 5 copies of the same name). MIDI's own track names are used unconditionally. Can revisit if a concrete need surfaces.
 - **Auto-apply of tempo / time signature.** `loadMidi` returns `bpm` and `timeSignature` from the MIDI header; the caller decides whether to apply them. Mirrors the spec example flow; predictable for multi-file loads; trivially upgradable via an opt-in flag later.
-- **Transaction / cleanup-on-failure.** If N-1 tracks succeed and 1 fails, the N-1 successful tracks remain in the DOM and the returned Promise rejects. Documented as v1 behavior. Cleanup-on-failure is a v2 follow-up.
+
+_Note: cleanup-on-failure was originally deferred to v2; promoted to v1 — see [Error Handling](#error-handling)._
 
 ## Architecture
 
@@ -145,7 +146,7 @@ editor.loadMidi(source, options)
                                             │
                                             ▼ ParsedMidi { tracks, bpm, timeSignature, duration, name }
        │
-       ├── (3) Promise.all(parsed.tracks.map(t => this.addTrack({
+       ├── (3) Promise.allSettled(parsed.tracks.map(t => this.addTrack({
        │           name: t.name,
        │           renderMode: 'piano-roll',
        │           clips: [{
@@ -155,26 +156,38 @@ editor.loadMidi(source, options)
        │               start: options.startTime ?? 0,
        │           }],
        │       })))
-       │       → returns DawTrackElement[]; trackIds = els.map(e => e.trackId)
+       │       → settles either to DawTrackElement (fulfilled) or Error (rejected)
        │
-       └── (4) return { trackIds, bpm, timeSignature, duration, name }
+       ├── (4) Partition: succeeded[] = fulfilled values, firstError = first rejection (if any)
+       │
+       ├── (5) if firstError exists:
+       │         for (const el of succeeded) el.remove();    // cleanup-on-failure
+       │         throw firstError;
+       │
+       └── (6) return { trackIds: succeeded.map(e => e.trackId), bpm, timeSignature, duration, name }
 ```
 
 Implementation lives in `packages/dawcore/src/interactions/midi-loader.ts` exposing `loadMidiImpl(host, source, options)`. `<daw-editor>` keeps the public method one-liner that delegates — matches `loadFiles` → `loadFilesImpl` extraction pattern.
 
 `addTrack` is called explicitly (not the `midi: { notes }` shorthand) because we need to set the clip's `start` to `options.startTime`. The shorthand always sets `start: 0`.
 
-`Promise.all` runs the N track loads concurrently — matches how N declarative `<daw-track>` children load today. Each track goes through `_loadTrack`'s MIDI branch (the existing path that produces a 1-second placeholder span when notes are absent, ensuring late `daw-clip-update` events can find the clip — but in this case notes are present upfront).
+`Promise.allSettled` (not `Promise.all`) runs the N track loads concurrently — matches how N declarative `<daw-track>` children load today — and waits for all to resolve or reject before we decide whether to commit or roll back. Without `allSettled`, a `Promise.all` rejection would abort early but leave the still-in-flight `addTrack` calls to complete in the background and append more `<daw-track>` elements after we'd already "cleaned up" — a race. `allSettled` guarantees every track call has fully resolved (or rejected) before the cleanup loop runs.
+
+`el.remove()` is sufficient for cleanup: `<daw-editor>`'s MutationObserver detects the detachment and calls `_onTrackRemoved`, which tears down engine state, peaks, and per-clip caches (per the dawcore CLAUDE.md "Track removal detected by editor's MutationObserver" pattern).
+
+Each track goes through `_loadTrack`'s MIDI branch (the existing path that produces a 1-second placeholder span when notes are absent, ensuring late `daw-clip-update` events can find the clip — but in this case notes are present upfront).
 
 ## Error Handling
 
 | Failure mode | Behavior |
 |--------------|----------|
-| `@dawcore/midi` not installed | dynamic import rejects → re-throw `Error('@dawcore/midi is required for loadMidi(). Install with: npm install @dawcore/midi')` |
-| Fetch failure / non-OK status | rethrow from `parseMidiUrl` (existing helper already does this) |
-| Parse failure (corrupt file) | rethrow from `parseMidiFile` (existing `new Midi(buf)` throws) |
-| Abort during fetch | `signal.abort()` → AbortError propagates from fetch |
-| One of N tracks fails during addTrack | `Promise.all` rejects; N-1 successful tracks remain in the DOM (documented v1 limitation) |
+| `@dawcore/midi` not installed | dynamic import rejects → re-throw `Error('@dawcore/midi is required for loadMidi(). Install with: npm install @dawcore/midi')`. No tracks created, nothing to clean up. |
+| Fetch failure / non-OK status | rethrow from `parseMidiUrl` (existing helper already does this). No tracks created. |
+| Parse failure (corrupt file) | rethrow from `parseMidiFile` (existing `new Midi(buf)` throws). No tracks created. |
+| Abort during fetch | `signal.abort()` → AbortError propagates from fetch. No tracks created. |
+| One of N tracks fails during addTrack | `Promise.allSettled` waits for all settlements, then `loadMidi` calls `.remove()` on every successfully-created track and throws the first rejection. The editor returns to its pre-call state — no orphaned `<daw-track>` elements, no orphaned engine state (MutationObserver tears down engine state on detachment). |
+
+**Abort during addTrack phase:** `signal.abort()` after `parseMidi*` has resolved does NOT cancel the in-flight track creation — `addTrack` does not currently accept an `AbortSignal`. The N track creations run to completion (success or failure) regardless of subsequent abort. Documented v1 limitation; future work could thread `signal` into `addTrack`.
 
 `loadMidi` itself does NOT dispatch `daw-error`. Consumers may wrap in try/catch and dispatch one themselves — matches the `loadFiles` pattern (the drop handler dispatches `daw-error` on `loadFiles` failure, but `loadFiles` is a clean throw).
 
@@ -219,6 +232,8 @@ Mocks `@dawcore/midi` so no binary MIDI fixture is needed. Cases:
 - Missing `@dawcore/midi` peer dep → rejects with the install-hint message
 - `signal` forwarded to `parseMidiUrl`
 - bpm / timeSignature / duration / name correctly propagated from parsed data to result
+- **Cleanup-on-failure:** mock `addTrack` to fulfill for tracks 0 and 2, reject for track 1. Expect: `loadMidi` rejects with track 1's error, `editor.querySelectorAll('daw-track').length === 0`, engine state is empty (`<daw-editor>._engineTracks.size === 0`).
+- **Cleanup waits for all settlements:** mock track 0 to reject immediately and track 1 to fulfill after a microtask. Expect: track 1's element gets removed (proving cleanup ran AFTER track 1 settled, not before).
 
 ### Manual / example
 
@@ -231,7 +246,7 @@ No new asset needed.
 
 ## Open Questions / Future Work
 
-- **Transaction semantics for partial failure.** Mentioned in non-goals. If a user reports partial-state confusion, add `{ cleanupOnError: true }` opt-in that removes already-created tracks on rejection.
+- **Cancellable addTrack.** `addTrack` does not currently accept an `AbortSignal`, so `signal.abort()` after parsing is a no-op. Threading the signal through `addTrack` (and the underlying `_loadTrack` audio fetch / decode pipeline) would let `loadMidi` cancel mid-creation and still leave a clean state via the existing cleanup loop.
 - **`flatten: true` requires hidden tracks.** When dawcore grows a "hidden audio-only track" concept (likely driven by another use case), revisit and add `flatten` to match React parity.
 - **`name` override.** If a use case appears (e.g., loading the same MIDI file twice with different prefixes), revisit with a name-template option like `{ namePattern: 'Section A: {name}' }` rather than a single `name`.
 - **Auto-apply tempo / time signature.** A future `{ applyTempo: boolean, applyTimeSignature: boolean }` flag (default false to preserve current behavior) is a low-risk addition.
