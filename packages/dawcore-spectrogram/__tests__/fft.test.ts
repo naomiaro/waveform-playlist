@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fft, magnitudeSpectrum, toDecibels, fftMagnitudeDb } from '../computation/fft';
+import { fft, magnitudeSpectrum, toDecibels, fftMagnitudeDb } from '../src/computation/fft';
 
 describe('toDecibels', () => {
   it('converts known magnitudes to correct dB values', () => {

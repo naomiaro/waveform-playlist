@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getFrequencyScale } from '../computation/frequencyScales';
-import type { FrequencyScaleName } from '../computation/frequencyScales';
+import { getFrequencyScale } from '../src/computation/frequencyScales';
+import type { FrequencyScaleName } from '../src/computation/frequencyScales';
 
 describe('getFrequencyScale', () => {
   const scaleNames: FrequencyScaleName[] = ['linear', 'logarithmic', 'mel', 'bark', 'erb'];

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSpectrogramWorker, SpectrogramAbortError } from '../worker/createSpectrogramWorker';
-import type { SpectrogramWorkerApi } from '../worker/createSpectrogramWorker';
+import { createSpectrogramWorker, SpectrogramAbortError } from '../src/worker/createSpectrogramWorker';
+import type { SpectrogramWorkerApi } from '../src/worker/createSpectrogramWorker';
 
 /** Minimal mock Worker that captures postMessage calls and exposes onmessage. */
 function createMockWorker() {

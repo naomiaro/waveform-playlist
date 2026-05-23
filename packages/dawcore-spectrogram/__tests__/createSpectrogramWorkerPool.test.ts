@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createSpectrogramWorkerPool } from '../worker/createSpectrogramWorkerPool';
+import { createSpectrogramWorkerPool } from '../src/worker/createSpectrogramWorkerPool';
 
 function createMockNativeWorker() {
   const worker = {

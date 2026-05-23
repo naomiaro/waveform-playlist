@@ -87,7 +87,7 @@ let idCounter = 0;
  * The caller is responsible for creating the Worker, e.g.:
  * ```ts
  * const worker = new Worker(
- *   new URL('@waveform-playlist/spectrogram/worker/spectrogram.worker', import.meta.url),
+ *   new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url),
  *   { type: 'module' }
  * );
  * const api = createSpectrogramWorker(worker);

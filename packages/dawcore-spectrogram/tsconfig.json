@@ -12,7 +12,6 @@
     "noUnusedParameters": true,
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "resolveJsonModule": true,
     "types": ["node", "vitest/globals"]
   },

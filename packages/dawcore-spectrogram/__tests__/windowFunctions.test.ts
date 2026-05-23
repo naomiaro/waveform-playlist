@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getWindowFunction } from '../computation/windowFunctions';
+import { getWindowFunction } from '../src/computation/windowFunctions';
 
 describe('getWindowFunction', () => {
   describe('correct length', () => {

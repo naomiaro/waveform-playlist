@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getColorMap } from '../computation/colorMaps';
+import { getColorMap } from '../src/computation/colorMaps';
 
 describe('getColorMap', () => {
   describe('named colormaps exist and return valid LUTs', () => {
