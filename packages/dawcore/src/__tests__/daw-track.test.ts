@@ -92,4 +92,23 @@ describe('DawTrackElement', () => {
     expect(detail).toEqual({ trackId: el.trackId });
     document.body.removeChild(el);
   });
+
+  it('accepts render-mode="spectrogram" attribute', () => {
+    const el = document.createElement('daw-track') as any;
+    el.setAttribute('render-mode', 'spectrogram');
+    document.body.appendChild(el);
+    expect(el.renderMode).toBe('spectrogram');
+    el.remove();
+  });
+
+  it('exposes spectrogramConfig JS property defaulting to null', () => {
+    const el = document.createElement('daw-track') as any;
+    expect(el.spectrogramConfig).toBeNull();
+  });
+
+  it('accepts and stores a spectrogramConfig object', () => {
+    const el = document.createElement('daw-track') as any;
+    el.spectrogramConfig = { fftSize: 1024, frequencyScale: 'mel' };
+    expect(el.spectrogramConfig.fftSize).toBe(1024);
+  });
 });

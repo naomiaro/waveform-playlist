@@ -172,6 +172,9 @@ importers:
 
   packages/dawcore:
     dependencies:
+      '@dawcore/spectrogram':
+        specifier: workspace:*
+        version: link:../dawcore-spectrogram
       lit:
         specifier: ^3.0.0
         version: 3.3.2

@@ -1,6 +1,7 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
+import type { SpectrogramConfig } from '@waveform-playlist/core';
 import type { TrackRenderMode } from '../types';
 
 @customElement('daw-track')
@@ -12,6 +13,7 @@ export class DawTrackElement extends LitElement {
   @property({ type: Boolean }) muted = false;
   @property({ type: Boolean }) soloed = false;
   @property({ attribute: 'render-mode' }) renderMode: TrackRenderMode = 'waveform';
+  @property({ attribute: false }) spectrogramConfig: SpectrogramConfig | null = null;
 
   readonly trackId = crypto.randomUUID();
 
@@ -50,7 +52,16 @@ export class DawTrackElement extends LitElement {
       return;
     }
 
-    const trackProps = ['volume', 'pan', 'muted', 'soloed', 'src', 'name', 'renderMode'];
+    const trackProps = [
+      'volume',
+      'pan',
+      'muted',
+      'soloed',
+      'src',
+      'name',
+      'renderMode',
+      'spectrogramConfig',
+    ];
     const hasTrackChange = trackProps.some((p) => changed.has(p as keyof this));
 
     if (hasTrackChange) {

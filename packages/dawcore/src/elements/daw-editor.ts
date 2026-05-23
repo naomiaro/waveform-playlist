@@ -9,6 +9,7 @@ import type {
   PeakData,
   SnapTo,
   MeterEntry,
+  SpectrogramConfig,
 } from '@waveform-playlist/core';
 import type {
   TrackDescriptor,
@@ -109,6 +110,21 @@ export class DawEditorElement extends LitElement {
    * floor already provides this; this attribute controls the temporal mode.
    */
   @property({ type: Boolean, attribute: 'indefinite-playback' }) indefinitePlayback = false;
+  /**
+   * Default spectrogram FFT/render config inherited by tracks with
+   * `render-mode="spectrogram"` that do not set their own. Wired into the
+   * orchestrator by `SpectrogramController` in Task 14.
+   */
+  @property({ attribute: false, noAccessor: true })
+  get spectrogramConfig(): SpectrogramConfig | null {
+    return this._spectrogramConfig;
+  }
+  set spectrogramConfig(value: SpectrogramConfig | null) {
+    const old = this._spectrogramConfig;
+    this._spectrogramConfig = value;
+    this.requestUpdate('spectrogramConfig', old);
+  }
+  private _spectrogramConfig: SpectrogramConfig | null = null;
   @property({ type: String, attribute: 'scale-mode' })
   scaleMode: 'temporal' | 'beats' = 'temporal';
   @property({ type: Number, attribute: 'ticks-per-pixel', noAccessor: true })

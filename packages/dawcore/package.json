@@ -27,7 +27,8 @@
   ],
   "dependencies": {
     "lit": "^3.0.0",
-    "waveform-data": "^4.5.2"
+    "waveform-data": "^4.5.2",
+    "@dawcore/spectrogram": "workspace:*"
   },
   "peerDependencies": {
     "@waveform-playlist/engine": ">=12.0.0",
