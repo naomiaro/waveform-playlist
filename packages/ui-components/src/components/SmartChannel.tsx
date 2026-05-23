@@ -2,7 +2,7 @@ import React, { FunctionComponent } from 'react';
 import { useDevicePixelRatio, usePlaylistInfo, useTheme } from '../contexts';
 import { Channel } from './Channel';
 import { PianoRollChannel } from './PianoRollChannel';
-import { SpectrogramChannel, type SpectrogramWorkerCanvasApi } from './SpectrogramChannel';
+import { SpectrogramChannel, type SpectrogramCanvasRegistration } from './SpectrogramChannel';
 import type { RenderMode, MidiNoteData } from '@waveform-playlist/core';
 
 export interface SmartChannelProps {
@@ -18,12 +18,12 @@ export interface SmartChannelProps {
   renderMode?: RenderMode;
   /** Samples per pixel at current zoom level */
   samplesPerPixel?: number;
-  /** Worker API for OffscreenCanvas transfer */
-  spectrogramWorkerApi?: SpectrogramWorkerCanvasApi;
-  /** Clip ID for worker canvas registration */
+  /** Clip ID for spectrogram canvas registration */
   spectrogramClipId?: string;
-  /** Callback when canvases are registered with the worker */
-  spectrogramOnCanvasesReady?: (canvasIds: string[], canvasWidths: number[]) => void;
+  /** Single-call registration for spectrogram canvases (from SpectrogramIntegration). */
+  spectrogramOnCanvasRegister?: (reg: SpectrogramCanvasRegistration) => void;
+  /** Counterpart for chunk unmount / unmount. */
+  spectrogramOnCanvasUnregister?: (canvasId: string) => void;
   /** MIDI note data for piano-roll rendering */
   midiNotes?: MidiNoteData[];
   /** Sample rate for MIDI note time → pixel conversion */
@@ -37,9 +37,9 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
   transparentBackground,
   renderMode = 'waveform',
   samplesPerPixel: sppProp,
-  spectrogramWorkerApi,
   spectrogramClipId,
-  spectrogramOnCanvasesReady,
+  spectrogramOnCanvasRegister,
+  spectrogramOnCanvasUnregister,
   midiNotes,
   sampleRate: sampleRateProp,
   clipOffsetSeconds,
@@ -65,8 +65,9 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
   // Get draw mode from theme (defaults to 'inverted' for backwards compatibility)
   const drawMode = theme?.waveformDrawMode || 'inverted';
 
-  // Spectrogram requires worker API and clip ID
-  const hasSpectrogram = spectrogramWorkerApi && spectrogramClipId;
+  // Spectrogram requires registration callbacks and a clip ID.
+  const hasSpectrogram =
+    spectrogramClipId && spectrogramOnCanvasRegister && spectrogramOnCanvasUnregister;
 
   if (renderMode === 'spectrogram' && hasSpectrogram) {
     return (
@@ -76,9 +77,9 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
         waveHeight={waveHeight}
         devicePixelRatio={devicePixelRatio}
         samplesPerPixel={samplesPerPixel}
-        workerApi={spectrogramWorkerApi}
         clipId={spectrogramClipId}
-        onCanvasesReady={spectrogramOnCanvasesReady}
+        onCanvasRegister={spectrogramOnCanvasRegister}
+        onCanvasUnregister={spectrogramOnCanvasUnregister}
       />
     );
   }
@@ -96,9 +97,9 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
           waveHeight={halfHeight}
           devicePixelRatio={devicePixelRatio}
           samplesPerPixel={samplesPerPixel}
-          workerApi={spectrogramWorkerApi}
           clipId={spectrogramClipId}
-          onCanvasesReady={spectrogramOnCanvasesReady}
+          onCanvasRegister={spectrogramOnCanvasRegister}
+          onCanvasUnregister={spectrogramOnCanvasUnregister}
         />
         <div
           style={{

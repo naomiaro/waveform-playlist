@@ -7,9 +7,26 @@ import type {
 } from '@waveform-playlist/core';
 import type { TrackMenuItem } from '@waveform-playlist/ui-components';
 
+/**
+ * Single-call canvas registration shape. Consolidates the OffscreenCanvas
+ * transfer and per-canvas metadata that earlier required two separate
+ * registration paths.
+ *
+ * Provider/orchestrator look up trackId from clipId and derive
+ * globalPixelOffset = chunkIndex * MAX_CANVAS_WIDTH.
+ */
+export interface SpectrogramCanvasRegistration {
+  canvasId: string;
+  canvas: OffscreenCanvas;
+  clipId: string;
+  channelIndex: number;
+  chunkIndex: number;
+  widthPx: number;
+  heightPx: number;
+}
+
 export interface SpectrogramIntegration {
   trackSpectrogramOverrides: Map<string, TrackSpectrogramOverrides>;
-  spectrogramWorkerApi: SpectrogramWorkerApi | null;
   spectrogramConfig?: SpectrogramConfig;
   spectrogramColorMap?: ColorMapValue;
   setTrackRenderMode: (trackId: string, mode: RenderMode) => void;
@@ -18,13 +35,9 @@ export interface SpectrogramIntegration {
     config: SpectrogramConfig,
     colorMap?: ColorMapValue
   ) => void;
-  registerSpectrogramCanvases: (
-    clipId: string,
-    channelIndex: number,
-    canvasIds: string[],
-    canvasWidths: number[]
-  ) => void;
-  unregisterSpectrogramCanvases: (clipId: string, channelIndex: number) => void;
+  /** Single-canvas registration. OffscreenCanvas is non-transferable — call once per canvas. */
+  registerSpectrogramCanvas: (reg: SpectrogramCanvasRegistration) => void;
+  unregisterSpectrogramCanvas: (canvasId: string) => void;
   /** Render spectrogram menu items for a track's context menu */
   renderMenuItems?: (props: {
     renderMode: string;
@@ -44,12 +57,6 @@ export interface SpectrogramIntegration {
   getColorMap: (name: ColorMapValue) => Uint8Array;
   /** Get frequency scale function for a scale name */
   getFrequencyScale: (name: string) => (f: number, minF: number, maxF: number) => number;
-}
-
-/** Minimal type for the worker API surface used by browser components */
-export interface SpectrogramWorkerApi {
-  registerCanvas: (canvasId: string, canvas: OffscreenCanvas) => void;
-  unregisterCanvas: (canvasId: string) => void;
 }
 
 export const SpectrogramIntegrationContext = createContext<SpectrogramIntegration | null>(null);

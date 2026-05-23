@@ -19,6 +19,7 @@ import { SpectrogramSettingsModal } from './components';
 import {
   SpectrogramIntegrationProvider,
   type SpectrogramIntegration,
+  type SpectrogramCanvasRegistration,
 } from '@waveform-playlist/browser';
 import { usePlaylistData, usePlaylistControls } from '@waveform-playlist/browser';
 
@@ -66,7 +67,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   const spectrogramWorkerRef = useRef<SpectrogramWorkerApi | null>(null);
   const spectrogramGenerationRef = useRef(0);
   const prevCanvasVersionRef = useRef(0);
-  const [spectrogramWorkerReady, setSpectrogramWorkerReady] = useState(false);
   const renderedClipIdsRef = useRef<Set<string>>(new Set());
   const backgroundRenderAbortRef = useRef<{ aborted: boolean } | null>(null);
   const registeredAudioClipIdsRef = useRef<Set<string>>(new Set());
@@ -94,7 +94,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
           workerPoolSize
         );
         spectrogramWorkerRef.current = workerApi;
-        setSpectrogramWorkerReady(true);
       } catch (err) {
         console.warn(
           `[waveform-playlist] Spectrogram Web Worker unavailable for pre-transfer: ${err instanceof Error ? err.message : String(err)}`
@@ -214,7 +213,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
           workerPoolSize
         );
         spectrogramWorkerRef.current = workerApi;
-        setSpectrogramWorkerReady(true);
       } catch (err) {
         console.error(
           `[waveform-playlist] Spectrogram Web Worker required but unavailable: ${err instanceof Error ? err.message : String(err)}`
@@ -828,29 +826,96 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     []
   );
 
-  const registerSpectrogramCanvases = useCallback(
-    (clipId: string, channelIndex: number, canvasIds: string[], canvasWidths: number[]) => {
-      const registry = spectrogramCanvasRegistryRef.current;
-      if (!registry.has(clipId)) {
-        registry.set(clipId, new Map());
+  // Lazily create the worker pool — keeps the same fallback path as the
+  // pre-transfer / FFT effects.
+  const ensureWorkerPool = useCallback((): SpectrogramWorkerApi | null => {
+    if (spectrogramWorkerRef.current) return spectrogramWorkerRef.current;
+    try {
+      const pool = createSpectrogramWorkerPool(
+        () =>
+          new Worker(new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url), {
+            type: 'module',
+          }),
+        workerPoolSize
+      );
+      spectrogramWorkerRef.current = pool;
+      return pool;
+    } catch (err) {
+      console.warn(
+        `[waveform-playlist] Spectrogram Web Worker unavailable: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return null;
+    }
+  }, [workerPoolSize]);
+
+  const registerSpectrogramCanvas = useCallback(
+    (reg: SpectrogramCanvasRegistration) => {
+      const pool = ensureWorkerPool();
+      if (!pool) return;
+
+      try {
+        pool.registerCanvas(reg.canvasId, reg.canvas);
+      } catch (err) {
+        console.warn(
+          `[waveform-playlist] registerCanvas failed for ${reg.canvasId}: ${err instanceof Error ? err.message : String(err)}`
+        );
+        return;
       }
-      // Replace: SpectrogramChannel passes ALL currently-registered canvas IDs
-      // (not just new ones), so replacing gives the correct full set.
-      registry.get(clipId)!.set(channelIndex, { canvasIds, canvasWidths });
+
+      const registry = spectrogramCanvasRegistryRef.current;
+      if (!registry.has(reg.clipId)) {
+        registry.set(reg.clipId, new Map());
+      }
+      const perClip = registry.get(reg.clipId)!;
+      const entry = perClip.get(reg.channelIndex) ?? { canvasIds: [], canvasWidths: [] };
+      const existingIdx = entry.canvasIds.indexOf(reg.canvasId);
+      if (existingIdx >= 0) {
+        entry.canvasWidths[existingIdx] = reg.widthPx;
+      } else {
+        entry.canvasIds.push(reg.canvasId);
+        entry.canvasWidths.push(reg.widthPx);
+      }
+      perClip.set(reg.channelIndex, entry);
       setSpectrogramCanvasVersion((v) => v + 1);
     },
-    []
+    [ensureWorkerPool]
   );
 
-  const unregisterSpectrogramCanvases = useCallback((clipId: string, channelIndex: number) => {
-    const registry = spectrogramCanvasRegistryRef.current;
-    const clipChannels = registry.get(clipId);
-    if (clipChannels) {
-      clipChannels.delete(channelIndex);
-      if (clipChannels.size === 0) {
-        registry.delete(clipId);
+  const unregisterSpectrogramCanvas = useCallback((canvasId: string) => {
+    const pool = spectrogramWorkerRef.current;
+    if (pool) {
+      try {
+        pool.unregisterCanvas(canvasId);
+      } catch (err) {
+        console.warn(
+          `[waveform-playlist] unregisterCanvas failed for ${canvasId}: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
     }
+
+    // Canvas IDs follow the format `${clipId}-ch${channelIndex}-chunk${n}`.
+    const match = canvasId.match(/^(.+)-ch(\d+)-chunk\d+$/);
+    if (!match) return;
+    const clipId = match[1];
+    const channelIndex = parseInt(match[2], 10);
+
+    const registry = spectrogramCanvasRegistryRef.current;
+    const perClip = registry.get(clipId);
+    if (!perClip) return;
+    const entry = perClip.get(channelIndex);
+    if (!entry) return;
+    const idx = entry.canvasIds.indexOf(canvasId);
+    if (idx >= 0) {
+      entry.canvasIds.splice(idx, 1);
+      entry.canvasWidths.splice(idx, 1);
+    }
+    if (entry.canvasIds.length === 0) {
+      perClip.delete(channelIndex);
+    }
+    if (perClip.size === 0) {
+      registry.delete(clipId);
+    }
+    setSpectrogramCanvasVersion((v) => v + 1);
   }, []);
 
   const renderMenuItems = useCallback(
@@ -873,13 +938,12 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   const value: SpectrogramIntegration = useMemo(
     () => ({
       trackSpectrogramOverrides,
-      spectrogramWorkerApi: spectrogramWorkerReady ? spectrogramWorkerRef.current : null,
       spectrogramConfig,
       spectrogramColorMap,
       setTrackRenderMode,
       setTrackSpectrogramConfig,
-      registerSpectrogramCanvases,
-      unregisterSpectrogramCanvases,
+      registerSpectrogramCanvas,
+      unregisterSpectrogramCanvas,
       renderMenuItems,
       SettingsModal: SpectrogramSettingsModal,
       getColorMap,
@@ -889,13 +953,12 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     }),
     [
       trackSpectrogramOverrides,
-      spectrogramWorkerReady,
       spectrogramConfig,
       spectrogramColorMap,
       setTrackRenderMode,
       setTrackSpectrogramConfig,
-      registerSpectrogramCanvases,
-      unregisterSpectrogramCanvases,
+      registerSpectrogramCanvas,
+      unregisterSpectrogramCanvas,
       renderMenuItems,
     ]
   );

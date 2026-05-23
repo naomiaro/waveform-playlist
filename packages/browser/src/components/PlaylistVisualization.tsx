@@ -276,19 +276,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     return helpers;
   }, [tracks, spectrogram]);
 
-  // Worker canvas API for SpectrogramChannel (stable reference)
-  const workerCanvasApi = useMemo(() => {
-    if (!spectrogram?.spectrogramWorkerApi) return undefined;
-    return {
-      registerCanvas: spectrogram.spectrogramWorkerApi.registerCanvas.bind(
-        spectrogram.spectrogramWorkerApi
-      ),
-      unregisterCanvas: spectrogram.spectrogramWorkerApi.unregisterCanvas.bind(
-        spectrogram.spectrogramWorkerApi
-      ),
-    };
-  }, [spectrogram?.spectrogramWorkerApi]);
-
   // State for spectrogram settings modal
   const [settingsModalTrackId, setSettingsModalTrackId] = useState<string | null>(null);
 
@@ -725,19 +712,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                                   : 0
                               }
                               samplesPerPixel={samplesPerPixel}
-                              spectrogramWorkerApi={workerCanvasApi}
                               spectrogramClipId={clip.clipId}
-                              spectrogramOnCanvasesReady={
-                                spectrogram
-                                  ? (canvasIds, canvasWidths) => {
-                                      spectrogram.registerSpectrogramCanvases(
-                                        clip.clipId,
-                                        channelIndex,
-                                        canvasIds,
-                                        canvasWidths
-                                      );
-                                    }
-                                  : undefined
+                              spectrogramOnCanvasRegister={
+                                spectrogram ? spectrogram.registerSpectrogramCanvas : undefined
+                              }
+                              spectrogramOnCanvasUnregister={
+                                spectrogram ? spectrogram.unregisterSpectrogramCanvas : undefined
                               }
                             />
                           );

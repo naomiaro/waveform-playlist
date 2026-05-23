@@ -144,7 +144,10 @@ export {
   SpectrogramIntegrationProvider,
   useSpectrogramIntegration,
 } from './SpectrogramIntegrationContext';
-export type { SpectrogramIntegration } from './SpectrogramIntegrationContext';
+export type {
+  SpectrogramIntegration,
+  SpectrogramCanvasRegistration,
+} from './SpectrogramIntegrationContext';
 
 // Export ClipInteractionProvider for encapsulated drag/trim/snap/collision setup
 export { ClipInteractionProvider } from './components/ClipInteractionProvider';

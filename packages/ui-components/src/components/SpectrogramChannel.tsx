@@ -43,9 +43,14 @@ const SpectrogramCanvas = styled.canvas.attrs<CanvasProps>((props) => ({
   image-rendering: crisp-edges;
 `;
 
-export interface SpectrogramWorkerCanvasApi {
-  registerCanvas(canvasId: string, canvas: OffscreenCanvas): void;
-  unregisterCanvas(canvasId: string): void;
+export interface SpectrogramCanvasRegistration {
+  canvasId: string;
+  canvas: OffscreenCanvas;
+  clipId: string;
+  channelIndex: number;
+  chunkIndex: number;
+  widthPx: number;
+  heightPx: number;
 }
 
 export interface SpectrogramChannelProps {
@@ -61,12 +66,12 @@ export interface SpectrogramChannelProps {
   devicePixelRatio?: number;
   /** Samples per pixel at current zoom level */
   samplesPerPixel: number;
-  /** Worker API for transferring canvas ownership. Rendering is done in the worker. */
-  workerApi: SpectrogramWorkerCanvasApi;
-  /** Clip ID used to construct unique canvas IDs for worker registration */
+  /** Clip ID used to construct unique canvas IDs */
   clipId: string;
-  /** Callback when canvases are registered with the worker, providing canvas IDs and widths */
-  onCanvasesReady?: (canvasIds: string[], canvasWidths: number[]) => void;
+  /** Single-call canvas registration. Receives the transferred OffscreenCanvas + metadata. */
+  onCanvasRegister: (reg: SpectrogramCanvasRegistration) => void;
+  /** Counterpart for chunk unmount / component unmount. */
+  onCanvasUnregister: (canvasId: string) => void;
 }
 
 export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
@@ -76,39 +81,36 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   waveHeight,
   devicePixelRatio = 1,
   samplesPerPixel: _samplesPerPixel,
-  workerApi,
   clipId,
-  onCanvasesReady,
+  onCanvasRegister,
+  onCanvasUnregister,
 }) => {
   const channelIndex = channelIndexProp ?? index;
   const { canvasRef, canvasMapRef } = useChunkedCanvasRefs();
   const registeredIdsRef = useRef<string[]>([]);
   const transferredCanvasesRef = useRef<WeakSet<HTMLCanvasElement>>(new WeakSet());
-  const workerApiRef = useRef(workerApi);
-  const onCanvasesReadyRef = useRef(onCanvasesReady);
+  const onCanvasRegisterRef = useRef(onCanvasRegister);
+  const onCanvasUnregisterRef = useRef(onCanvasUnregister);
 
   const clipOriginX = useClipViewportOrigin();
   const visibleChunkIndices = useVisibleChunkIndices(length, MAX_CANVAS_WIDTH, clipOriginX);
 
-  // Keep refs in sync with latest props
   useEffect(() => {
-    workerApiRef.current = workerApi;
-  }, [workerApi]);
+    onCanvasRegisterRef.current = onCanvasRegister;
+  }, [onCanvasRegister]);
 
   useEffect(() => {
-    onCanvasesReadyRef.current = onCanvasesReady;
-  }, [onCanvasesReady]);
+    onCanvasUnregisterRef.current = onCanvasUnregister;
+  }, [onCanvasUnregister]);
 
-  // Clean up stale canvases, then transfer new ones to worker.
-  // Cleanup and registration are combined in a single effect so that
-  // `onCanvasesReady` always receives a clean list without stale IDs.
-  // Uses visibleChunkIndices so it only re-runs when chunks mount/unmount.
+  // Clean up stale canvases, then transfer new ones to the spectrogram provider.
   useEffect(() => {
-    const currentWorkerApi = workerApiRef.current;
-    if (!currentWorkerApi || !clipId) return;
+    if (!clipId) return;
 
-    // Step 1: Remove stale registrations for unmounted canvases.
-    const previousCount = registeredIdsRef.current.length;
+    const unregister = onCanvasUnregisterRef.current;
+    const register = onCanvasRegisterRef.current;
+
+    // Step 1: Drop registrations for canvases that have unmounted.
     const remaining: string[] = [];
     for (const id of registeredIdsRef.current) {
       const match = id.match(/chunk(\d+)$/);
@@ -122,17 +124,15 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
         remaining.push(id);
       } else {
         try {
-          currentWorkerApi.unregisterCanvas(id);
+          unregister(id);
         } catch (err) {
-          console.warn(`[spectrogram] unregisterCanvas failed for ${id}:`, err);
+          console.warn(`[spectrogram] unregister failed for ${id}:`, err);
         }
       }
     }
     registeredIdsRef.current = remaining;
 
-    // Step 2: Transfer new canvases to the worker.
-    const newIds: string[] = [];
-
+    // Step 2: Transfer newly mounted canvases.
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
       if (transferredCanvasesRef.current.has(canvas)) continue;
 
@@ -145,50 +145,37 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
         console.warn(`[spectrogram] transferControlToOffscreen failed for ${canvasId}:`, err);
         continue;
       }
-
       // Mark transferred immediately — transferControlToOffscreen is irreversible.
       transferredCanvasesRef.current.add(canvas);
 
+      const widthPx = Math.min(length - canvasIdx * MAX_CANVAS_WIDTH, MAX_CANVAS_WIDTH);
+
       try {
-        currentWorkerApi.registerCanvas(canvasId, offscreen);
-        newIds.push(canvasId);
+        register({
+          canvasId,
+          canvas: offscreen,
+          clipId,
+          channelIndex,
+          chunkIndex: canvasIdx,
+          widthPx,
+          heightPx: waveHeight,
+        });
+        registeredIdsRef.current.push(canvasId);
       } catch (err) {
-        console.warn(`[spectrogram] registerCanvas failed for ${canvasId}:`, err);
-        continue;
+        console.warn(`[spectrogram] register failed for ${canvasId}:`, err);
       }
     }
+  }, [canvasMapRef, clipId, channelIndex, length, waveHeight, visibleChunkIndices]);
 
-    if (newIds.length > 0) {
-      registeredIdsRef.current = [...registeredIdsRef.current, ...newIds];
-    }
-
-    // Step 3: Notify provider when canvas set changed (added or removed).
-    const canvasSetChanged = newIds.length > 0 || remaining.length < previousCount;
-    if (canvasSetChanged) {
-      const allIds = registeredIdsRef.current;
-      const allWidths = allIds.map((id) => {
-        const match = id.match(/chunk(\d+)$/);
-        if (!match) {
-          console.warn(`[spectrogram] Unexpected canvas ID format: ${id}`);
-          return MAX_CANVAS_WIDTH;
-        }
-        const chunkIdx = parseInt(match[1], 10);
-        return Math.min(length - chunkIdx * MAX_CANVAS_WIDTH, MAX_CANVAS_WIDTH);
-      });
-      onCanvasesReadyRef.current?.(allIds, allWidths);
-    }
-  }, [canvasMapRef, clipId, channelIndex, length, visibleChunkIndices]);
-
-  // Unregister all canvases from worker on component unmount
+  // Unregister all canvases on component unmount.
   useEffect(() => {
     return () => {
-      const api = workerApiRef.current;
-      if (!api) return;
+      const unregister = onCanvasUnregisterRef.current;
       for (const id of registeredIdsRef.current) {
         try {
-          api.unregisterCanvas(id);
+          unregister(id);
         } catch (err) {
-          console.warn(`[spectrogram] unregisterCanvas failed for ${id}:`, err);
+          console.warn(`[spectrogram] unregister failed for ${id}:`, err);
         }
       }
       registeredIdsRef.current = [];
