@@ -10,6 +10,7 @@ import type {
   SnapTo,
   MeterEntry,
   SpectrogramConfig,
+  ColorMapValue,
 } from '@waveform-playlist/core';
 import type {
   TrackDescriptor,
@@ -128,6 +129,24 @@ export class DawEditorElement extends LitElement {
   }
   private _spectrogramConfig: SpectrogramConfig | null = null;
 
+  /**
+   * Default color map for spectrogram tracks. Tracks may override via
+   * their own per-track property in a future iteration. Separate from
+   * `spectrogramConfig` because `ColorMapValue` is not part of the
+   * `SpectrogramConfig` shape.
+   */
+  @property({ attribute: false, noAccessor: true })
+  get spectrogramColorMap(): ColorMapValue | null {
+    return this._spectrogramColorMap;
+  }
+  set spectrogramColorMap(value: ColorMapValue | null) {
+    const old = this._spectrogramColorMap;
+    this._spectrogramColorMap = value;
+    this._spectrogramController?.setEditorColorMap(value);
+    this.requestUpdate('spectrogramColorMap', old);
+  }
+  private _spectrogramColorMap: ColorMapValue | null = null;
+
   private _ensureSpectrogramController(): SpectrogramController {
     if (!this._spectrogramController) {
       this._spectrogramController = new SpectrogramController(
@@ -139,6 +158,9 @@ export class DawEditorElement extends LitElement {
       );
       if (this._spectrogramConfig) {
         this._spectrogramController.setEditorConfig(this._spectrogramConfig);
+      }
+      if (this._spectrogramColorMap) {
+        this._spectrogramController.setEditorColorMap(this._spectrogramColorMap);
       }
     }
     return this._spectrogramController;
@@ -172,7 +194,11 @@ export class DawEditorElement extends LitElement {
   private _maybeRegisterSpectrogramClipAudio(trackId: string, clip: AudioClip): void {
     const descriptor = this._tracks.get(trackId);
     if (descriptor?.renderMode !== 'spectrogram') return;
-    const buffer = this._clipBuffers.get(clip.id);
+    // Read the buffer off the clip itself — `_clipBuffers` is mutated in-place
+    // by `cleanupOrphanedClipData` during concurrent track loading and may
+    // briefly miss this clip even though the clip object still holds the
+    // buffer reference.
+    const buffer = clip.audioBuffer ?? this._clipBuffers.get(clip.id);
     if (!buffer) return;
     const channelData: Float32Array[] = [];
     for (let i = 0; i < buffer.numberOfChannels; i++) {

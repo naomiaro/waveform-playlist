@@ -80,6 +80,19 @@ export class DawSpectrogramElement extends LitElement {
   private _canvases: HTMLCanvasElement[] = [];
   private _registeredCanvasIds: string[] = [];
 
+  /**
+   * Walk up to the editor host. `closest('daw-editor')` does NOT cross
+   * shadow boundaries — and this element lives inside the editor's shadow
+   * DOM — so use getRootNode().host to step out.
+   */
+  private _findHostEditor(): SpectrogramHost | null {
+    const root = this.getRootNode();
+    const host = root instanceof ShadowRoot ? root.host : null;
+    if (!host) return null;
+    if (host.tagName === 'DAW-EDITOR') return host as SpectrogramHost;
+    return host.closest('daw-editor') as SpectrogramHost | null;
+  }
+
   willUpdate(changed: PropertyValues): void {
     const layoutChanged =
       changed.has('length') ||
@@ -118,7 +131,7 @@ export class DawSpectrogramElement extends LitElement {
   }
 
   private _registerCanvases(): void {
-    const editor = this.closest('daw-editor') as SpectrogramHost | null;
+    const editor = this._findHostEditor();
     if (!editor || typeof editor._spectrogramRegisterCanvas !== 'function') return;
 
     for (let i = 0; i < this._canvases.length; i++) {
@@ -152,7 +165,7 @@ export class DawSpectrogramElement extends LitElement {
   }
 
   private _unregisterAllCanvases(): void {
-    const editor = this.closest('daw-editor') as SpectrogramHost | null;
+    const editor = this._findHostEditor();
     if (editor && typeof editor._spectrogramUnregisterCanvas === 'function') {
       for (const id of this._registeredCanvasIds) {
         editor._spectrogramUnregisterCanvas(id);
