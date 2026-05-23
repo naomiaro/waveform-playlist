@@ -543,7 +543,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 #### `@waveform-playlist/spectrogram`
 
 - **Type:** Optional package (install separately)
-- **Purpose (v14+):** React Provider + UI for spectrograms. Computation, worker, and the framework-agnostic orchestrator now live in `@dawcore/spectrogram`. This package is React glue.
+- **Purpose (v13+):** React Provider + UI for spectrograms. Computation, worker, and the framework-agnostic orchestrator now live in `@dawcore/spectrogram`. This package is React glue.
 - **Install:** `npm install @waveform-playlist/spectrogram @dawcore/spectrogram`
 - **Structure:**
   ```

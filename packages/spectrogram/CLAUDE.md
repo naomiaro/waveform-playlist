@@ -1,8 +1,8 @@
 # Spectrogram Package (`@waveform-playlist/spectrogram`)
 
-**Purpose (v14+):** React Provider + UI for spectrograms. Computation, worker, and the framework-agnostic orchestrator now live in `@dawcore/spectrogram`. This package supplies `SpectrogramProvider`, menu/settings components, and the `SpectrogramIntegrationContext` value the browser package consumes.
+**Purpose (v13+):** React Provider + UI for spectrograms. Computation, worker, and the framework-agnostic orchestrator now live in `@dawcore/spectrogram`. This package supplies `SpectrogramProvider`, menu/settings components, and the `SpectrogramIntegrationContext` value the browser package consumes.
 
-## v14.0.0 Breaking Changes
+## v13.0.0 Breaking Changes
 
 - Removed package-root re-exports of `computeSpectrogram`, `getColorMap`, `getFrequencyScale`, `createSpectrogramWorker`, `createSpectrogramWorkerPool`, `SpectrogramAbortError`, `SpectrogramWorkerApi`, `FrequencyScaleName`. Import these from `@dawcore/spectrogram` directly.
 - Removed `./worker/spectrogram.worker` subpath export. Use `new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url)`.

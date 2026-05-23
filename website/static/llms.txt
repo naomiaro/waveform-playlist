@@ -30,7 +30,7 @@ waveform-playlist is a React component library for building browser-based audio 
 - `@waveform-playlist/webaudio-peaks` — Peak extraction from AudioBuffer
 - `@waveform-playlist/media-element-playout` — HTMLAudioElement playback with pitch-preserving speed control, optional Web Audio routing for fades and Tone.js effect bridging
 - `@waveform-playlist/midi` — MIDI file loading and parsing: .mid file fetch/parse via @tonejs/midi, `useMidiTracks` hook converts to ClipTrack[] with midiNotes for piano roll visualization and SoundFont/PolySynth playback
-- `@waveform-playlist/spectrogram` — Optional spectrogram package (v14+): React `SpectrogramProvider` + UI (menu items, settings modal) integrating via `SpectrogramIntegrationContext`. Computation/worker/orchestrator are imported from `@dawcore/spectrogram`.
+- `@waveform-playlist/spectrogram` — Optional spectrogram package (v13+): React `SpectrogramProvider` + UI (menu items, settings modal) integrating via `SpectrogramIntegrationContext`. Computation/worker/orchestrator are imported from `@dawcore/spectrogram`.
 - `@dawcore/spectrogram` — Framework-agnostic FFT computation, Web Worker, and `SpectrogramOrchestrator` class (viewport classification, 3-tier render, generation-based abort, contiguous chunk grouping, color LUT cache). Shared between the React Provider and the dawcore Lit element layer.
 
 ## Quick Start
