@@ -14,6 +14,7 @@ import './elements/daw-selection';
 import './elements/daw-track-controls';
 import './elements/daw-record-button';
 import './elements/daw-keyboard-shortcuts';
+import './elements/daw-spectrogram';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
@@ -33,6 +34,7 @@ export { DawSelectionElement } from './elements/daw-selection';
 export { DawTrackControlsElement } from './elements/daw-track-controls';
 export { DawRecordButtonElement } from './elements/daw-record-button';
 export { DawKeyboardShortcutsElement } from './elements/daw-keyboard-shortcuts';
+export { DawSpectrogramElement } from './elements/daw-spectrogram';
 export type {
   KeyBinding,
   PlaybackShortcutMap,
