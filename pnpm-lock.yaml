@@ -386,12 +386,12 @@ importers:
 
   packages/spectrogram:
     dependencies:
+      '@dawcore/spectrogram':
+        specifier: workspace:*
+        version: link:../dawcore-spectrogram
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
-      fft.js:
-        specifier: ^4.0.4
-        version: 4.0.4
       react:
         specifier: ^18.0.0
         version: 18.3.1

@@ -7,12 +7,13 @@ import {
   type RenderMode,
   type TrackSpectrogramOverrides,
 } from '@waveform-playlist/core';
-import { getColorMap, getFrequencyScale } from './computation';
 import {
+  getColorMap,
+  getFrequencyScale,
   createSpectrogramWorkerPool,
   SpectrogramAbortError,
   type SpectrogramWorkerApi,
-} from './worker';
+} from '@dawcore/spectrogram';
 import { SpectrogramMenuItems } from './components';
 import { SpectrogramSettingsModal } from './components';
 import {
@@ -87,10 +88,9 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       try {
         workerApi = createSpectrogramWorkerPool(
           () =>
-            new Worker(
-              new URL('@waveform-playlist/spectrogram/worker/spectrogram.worker', import.meta.url),
-              { type: 'module' }
-            ),
+            new Worker(new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url), {
+              type: 'module',
+            }),
           workerPoolSize
         );
         spectrogramWorkerRef.current = workerApi;
@@ -208,10 +208,9 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       try {
         workerApi = createSpectrogramWorkerPool(
           () =>
-            new Worker(
-              new URL('@waveform-playlist/spectrogram/worker/spectrogram.worker', import.meta.url),
-              { type: 'module' }
-            ),
+            new Worker(new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url), {
+              type: 'module',
+            }),
           workerPoolSize
         );
         spectrogramWorkerRef.current = workerApi;

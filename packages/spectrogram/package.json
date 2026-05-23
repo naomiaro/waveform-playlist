@@ -1,7 +1,7 @@
 {
   "name": "@waveform-playlist/spectrogram",
-  "version": "12.0.0",
-  "description": "Spectrogram computation and UI for waveform-playlist",
+  "version": "13.0.0",
+  "description": "React Provider + UI for spectrograms — wraps @dawcore/spectrogram",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -10,9 +10,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
-    },
-    "./worker/spectrogram.worker": {
-      "import": "./dist/worker/spectrogram.worker.mjs"
     }
   },
   "sideEffects": false,
@@ -20,7 +17,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "keywords": [
     "waveform",
@@ -54,7 +51,7 @@
   },
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
-    "fft.js": "^4.0.4"
+    "@dawcore/spectrogram": "workspace:*"
   },
   "peerDependencies": {
     "@waveform-playlist/browser": "workspace:*",
