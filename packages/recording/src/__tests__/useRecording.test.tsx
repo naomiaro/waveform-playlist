@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 interface MockWorkletNode {
@@ -108,7 +108,14 @@ beforeEach(() => {
   };
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Unmount inside act() so React's concurrent scheduler flushes commit work
+  // (e.g. final renders triggered by useEffect cleanups, pending rAF→setState
+  // ticks) before vitest tears down jsdom. Without this, scheduler tasks fire
+  // post-teardown and throw "window is not defined" — flaky on React 19 CI.
+  await act(async () => {
+    cleanup();
+  });
   vi.clearAllMocks();
 });
 
