@@ -297,3 +297,14 @@ Resolves its parent via `closest('daw-editor')`. Placing it as a sibling (e.g. i
 ## `editor.togglePauseRecording()` Is the Unified Pause Toggle
 
 Audacity-style: pauses both worklet capture and (only when running) the playback Transport. Tracks `_wasPlayingDuringRecording` so resume restarts Transport only for overdub sessions. Both `togglePlayPause()` (spacebar) and `daw-pause-button` delegate to this — never duplicate the toggle logic in new UI; route everything through it.
+
+## Spectrogram
+
+- **`TrackRenderMode = 'waveform' | 'piano-roll' | 'spectrogram'`** — added to the shared alias in `types.ts`. `<daw-track render-mode="spectrogram">` switches that track's rendering branch in `<daw-editor>`'s template to emit one `<daw-spectrogram>` per channel instead of `<daw-waveform>`.
+- **`<daw-spectrogram>`** — Shadow DOM, 1000px chunked canvases. Each canvas is transferred via `transferControlToOffscreen()` and handed up to the editor via `editor._spectrogramRegisterCanvas(...)`. The element lives inside the editor's shadow root, so it uses `getRootNode().host` (NOT `closest('daw-editor')`) to find the editor — `closest()` does not cross shadow boundaries.
+- **`SpectrogramController`** — Lit reactive controller on `<daw-editor>`. Built lazily on first `registerCanvas`; disposed when no spectrogram tracks remain (`_disposeSpectrogramControllerIfEmpty`). Holds editor-level defaults + per-track overrides separately and merges them down to one `(config, colorMap)` pair for the orchestrator (v1 limitation: orchestrator accepts a single config/colorMap at a time; first track override wins).
+- **`editor.spectrogramConfig` + `editor.spectrogramColorMap`** — editor-level defaults. Separate properties because `ColorMapValue` is not a field on `SpectrogramConfig`. Both setters forward to the controller and `requestUpdate()`.
+- **`track.spectrogramConfig`** (on `<daw-track>`) — per-track override. Reflected through `daw-track-update` like the other track props.
+- **`daw-spectrogram-ready` event** — fired (bubbles + composed) when the viewport tier completes for a track. Re-dispatched from the orchestrator's `viewport-ready` by the controller. Typed in `DawEventMap`.
+- **`_maybeRegisterSpectrogramClipAudio(trackId, clip)` reads `clip.audioBuffer`, NOT `_clipBuffers.get(clip.id)`** — `cleanupOrphanedClipData` mutates `_clipBuffers` in-place on every engine statechange, and during concurrent track loading it briefly clears entries before the engine knows about all tracks. The clip object itself holds a stable AudioBuffer reference.
+- **Worker URL** — `new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url)` inside `_ensureSpectrogramController`. Bundler must support package-relative URL resolution (Vite does).

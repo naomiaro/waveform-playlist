@@ -15,6 +15,7 @@ waveform-playlist/
 │   ├── browser/           # Main React package (provider, hooks, components)
 │   ├── core/              # Core types and interfaces
 │   ├── dawcore/           # Web Components (Lit) — framework-agnostic DAW UI
+│   ├── dawcore-spectrogram/  # Framework-agnostic FFT computation, worker, viewport orchestrator
 │   ├── loaders/           # Audio file loaders
 │   ├── media-element-playout/  # Audio playback (HTMLAudioElement, no Tone.js)
 │   ├── engine/            # Framework-agnostic timeline engine
@@ -542,21 +543,17 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 #### `@waveform-playlist/spectrogram`
 
 - **Type:** Optional package (install separately)
-- **Purpose:** FFT-based spectrogram visualization with worker-based rendering
-- **Install:** `npm install @waveform-playlist/spectrogram`
+- **Purpose (v14+):** React Provider + UI for spectrograms. Computation, worker, and the framework-agnostic orchestrator now live in `@dawcore/spectrogram`. This package is React glue.
+- **Install:** `npm install @waveform-playlist/spectrogram @dawcore/spectrogram`
 - **Structure:**
   ```
   src/
   ├── SpectrogramProvider.tsx  # Provider (fills SpectrogramIntegrationContext)
   ├── components/              # UI components (menu items, settings modal)
-  ├── computation/             # FFT computation logic
-  ├── worker/
-  │   ├── createSpectrogramWorker.ts      # Single worker wrapper + SpectrogramAbortError
-  │   ├── createSpectrogramWorkerPool.ts  # Pool of N workers for parallel per-channel FFT
-  │   └── spectrogram.worker.ts           # Worker: FFT, LRU cache, canvas rendering
   ├── styled.d.ts
   └── index.ts
   ```
+- **Companion package:** `@dawcore/spectrogram` (framework-agnostic) ships the FFT computation, Web Worker, `SpectrogramOrchestrator` class, and pure helpers (`classifyViewport`, `groupContiguousChunks`, `ColorLUTCache`). Used by this package's Provider AND by the dawcore Lit element layer.
 - **Integration Pattern:**
   - Browser package defines `SpectrogramIntegrationContext` (nullable)
   - Spectrogram package provides `SpectrogramProvider` that fills this context

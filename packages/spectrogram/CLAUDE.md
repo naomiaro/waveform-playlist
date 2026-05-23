@@ -1,5 +1,13 @@
 # Spectrogram Package (`@waveform-playlist/spectrogram`)
 
+**Purpose (v14+):** React Provider + UI for spectrograms. Computation, worker, and the framework-agnostic orchestrator now live in `@dawcore/spectrogram`. This package supplies `SpectrogramProvider`, menu/settings components, and the `SpectrogramIntegrationContext` value the browser package consumes.
+
+## v14.0.0 Breaking Changes
+
+- Removed package-root re-exports of `computeSpectrogram`, `getColorMap`, `getFrequencyScale`, `createSpectrogramWorker`, `createSpectrogramWorkerPool`, `SpectrogramAbortError`, `SpectrogramWorkerApi`, `FrequencyScaleName`. Import these from `@dawcore/spectrogram` directly.
+- Removed `./worker/spectrogram.worker` subpath export. Use `new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url)`.
+- `SpectrogramIntegration` shape changed: `spectrogramWorkerApi` + `registerSpectrogramCanvases`/`unregisterSpectrogramCanvases` (batch per channel) replaced by `registerSpectrogramCanvas`/`unregisterSpectrogramCanvas` (single-canvas with full metadata in one call). See `@waveform-playlist/browser` for the new shape.
+
 ## Integration Context Pattern
 
 **Pattern:** Browser package defines an interface + context, this package provides implementation via a Provider component. Same pattern as `@waveform-playlist/annotations`.
@@ -20,43 +28,29 @@ const spectrogram = useContext(SpectrogramIntegrationContext);
 
 **Location:** `packages/browser/src/SpectrogramIntegrationContext.tsx`
 
+## Single-Call Canvas Registration
+
+`registerSpectrogramCanvas({ canvasId, canvas, clipId, channelIndex, chunkIndex, widthPx, heightPx })` is invoked by `SpectrogramChannel` immediately after `transferControlToOffscreen()`. The Provider stores the canvas in its internal per-clip-per-channel registry (`spectrogramCanvasRegistryRef`) and forwards the OffscreenCanvas to the worker pool. `unregisterSpectrogramCanvas(canvasId)` is the counterpart on chunk unmount.
+
+Canvas IDs follow `${clipId}-ch${channelIndex}-chunk${n}`. `unregisterSpectrogramCanvas` parses this format to find the right registry slot.
+
 ## SpectrogramChannel Index vs ChannelIndex
 
-**`SpectrogramChannel`** has two index concerns: `index` (CSS positioning via Wrapper `top` offset) and `channelIndex` (canvas ID construction for worker registration, e.g. `clipId-ch{channelIndex}-chunk0`). In "both" mode, `SmartChannel` passes `index={props.index * 2}` for layout interleaving but `channelIndex={props.index}` for correct canvas identity. When `channelIndex` is omitted it defaults to `index`. Never use the visual `index` for canvas IDs — the worker and SpectrogramProvider registry expect sequential audio channel indices (0, 1).
+**`SpectrogramChannel`** has two index concerns: `index` (CSS positioning via Wrapper `top` offset) and `channelIndex` (canvas ID construction, e.g. `clipId-ch{channelIndex}-chunk0`). In "both" mode, `SmartChannel` passes `index={props.index * 2}` for layout interleaving but `channelIndex={props.index}` for correct canvas identity. When `channelIndex` is omitted it defaults to `index`. Never use the visual `index` for canvas IDs — the worker and Provider registry expect sequential audio channel indices (0, 1).
 
-## Worker Pool Architecture
+## Provider Owns the Worker Pool
 
-**Decision:** `createSpectrogramWorkerPool` creates N workers (default 2, one per stereo channel) for parallel per-channel FFT. Configurable via `<SpectrogramProvider workerPoolSize={N}>` for multi-channel audio.
+The Provider still creates and owns the `createSpectrogramWorkerPool` instance internally (via `ensureWorkerPool()` — lazy, bootstrapped on first canvas registration). The `SpectrogramOrchestrator` from `@dawcore/spectrogram` exists for the dawcore Lit element path, not the React Provider — the Provider's existing FFT/render pipeline handles per-track config overrides and is unchanged.
 
-**How it works:** Each worker computes a single channel via `channelFilter` param. Pool routes canvases by channel parsed from canvas ID (`clipId-ch0-chunk5` → worker 0). `renderChunks({channelIndex: N})` remaps to `channelIndex: 0` at the target worker since each worker stores its channel at index 0. Audio data registered in ALL workers (needed for mono mode).
+## Worker Pool Architecture (now in `@dawcore/spectrogram`)
 
-**Mono mode:** Only worker 0 runs (no channelFilter), averages all channels as before.
-
-**Channel cap:** `computeFFT` fan-out is capped to `min(poolSize, channelDataArrays.length)`. If `workerPoolSize` exceeds the channel count (e.g., 3 workers for stereo audio), excess workers sit completely idle (canvas routing also maps by channel, not pool size).
-
-**Location:** `src/worker/createSpectrogramWorkerPool.ts`
-
-## Generation-Based Abort
-
-**Problem:** During scrolling, stale FFT requests (~1.4s each) block the worker queue, delaying visible-range FFT for the new scroll position.
-
-**Fix:** Cooperative abort via `setTimeout(0)` yielding every 2000 FFT frames. Main thread sends `abort-generation` messages; worker checks `latestGeneration` between yields and returns `null` if stale. Provider catches `SpectrogramAbortError` (via `instanceof`, not string matching) silently.
-
-**Key fields:** `generation` on `ComputeFFTRequest`/`RenderChunksRequest`, `AbortGenerationMessage`, `latestGeneration` in worker.
-
-## Lazy Per-Batch FFT (OOM Prevention)
-
-**Decision:** Never compute a full-clip FFT. Compute FFT per rendering batch (visible range, then contiguous background groups).
-
-**Why:** Full-clip FFT on 1hr+ files allocates ~2.5GB (310K frames × 2048 bins × 4 bytes). Per-batch FFT bounds memory to the chunk range being rendered.
-
-**Implementation:** `computeFFTForChunks()` computes sample range from chunk positions, padded by windowSize. Worker LRU cache (16 entries) prevents recomputation on scroll-back.
+For details on `createSpectrogramWorkerPool`, generation-based abort, lazy per-batch FFT, and contiguous chunk grouping, see `packages/dawcore-spectrogram/CLAUDE.md`. The Provider consumes these primitives but does not own their implementation.
 
 ## Overscan Buffer (1.5x Viewport)
 
 **Critical:** `getVisibleChunkRange` in SpectrogramProvider MUST use the same 1.5× viewport-width buffer as `useVisibleChunkIndices` in ScrollViewport.tsx. Without this, canvases mounted in the buffer zone (by the virtualizer) remain black — they're classified as "remaining" and get aborted during scrolling before background batches render them.
 
-## Three-Tier Rendering Pipeline
+## Three-Tier Rendering Pipeline (React Provider)
 
 **Decision:** Classify chunks into viewport/buffer/remaining instead of binary visible/remaining.
 
