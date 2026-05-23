@@ -161,3 +161,98 @@ describe('SpectrogramOrchestrator — canvas registration', () => {
     expect(mockPool.abortGeneration).toHaveBeenCalled();
   });
 });
+
+describe('SpectrogramOrchestrator — tier-aware render', () => {
+  let orch: SpectrogramOrchestrator;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockPool: any;
+
+  beforeEach(() => {
+    mockPool = {
+      registerCanvas: vi.fn(),
+      unregisterCanvas: vi.fn(),
+      registerAudioData: vi.fn(),
+      unregisterAudioData: vi.fn(),
+      computeFFT: vi.fn(() => Promise.resolve({ cacheKey: 'k' })),
+      renderChunks: vi.fn(() => Promise.resolve()),
+      abortGeneration: vi.fn(),
+      terminate: vi.fn(),
+    };
+    orch = new SpectrogramOrchestrator({
+      workerFactory: () => makeMockWorker(),
+      workerPoolSize: 1,
+      config: defaultConfig,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (orch as any).pool = mockPool;
+
+    orch.registerClip({
+      clipId: 'c1',
+      trackId: 't1',
+      channelData: [new Float32Array(48000)],
+      sampleRate: 48000,
+      durationSamples: 48000,
+      offsetSamples: 0,
+    });
+
+    for (let i = 0; i < 3; i++) {
+      orch.registerCanvas({
+        canvasId: 'c1-ch0-chunk' + i,
+        canvas: { width: 1000, height: 100 } as unknown as OffscreenCanvas,
+        clipId: 'c1',
+        trackId: 't1',
+        channelIndex: 0,
+        chunkIndex: i,
+        globalPixelOffset: i * 1000,
+        widthPx: 1000,
+        heightPx: 100,
+      });
+    }
+  });
+
+  it('setViewport renders viewport-tier canvases first', async () => {
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockPool.renderChunks).toHaveBeenCalled();
+    const firstCall = mockPool.renderChunks.mock.calls[0][0];
+    expect(firstCall.canvasIds).toEqual(['c1-ch0-chunk0']);
+  });
+
+  it('emits viewport-ready event with trackId after viewport-tier completes', async () => {
+    const readyEvents: string[] = [];
+    orch.addEventListener('viewport-ready', (e: Event) => {
+      readyEvents.push((e as CustomEvent).detail.trackId);
+    });
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readyEvents).toContain('t1');
+  });
+
+  it('does not emit viewport-ready twice for the same generation', async () => {
+    let count = 0;
+    orch.addEventListener('viewport-ready', () => {
+      count += 1;
+    });
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(count).toBe(1);
+  });
+});
