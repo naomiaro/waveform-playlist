@@ -52,9 +52,12 @@
         font-family: monospace;
         font-size: 0.75rem;
         color: #888;
-        max-height: 80px;
+        max-height: 240px;
         overflow-y: auto;
         margin-top: 12px;
+      }
+      #status div {
+        white-space: pre;
       }
     </style>
   </head>
@@ -140,12 +143,23 @@
       editor.spectrogramColorMap = 'magma';
 
       const status = document.getElementById('status');
-      editor.addEventListener('daw-spectrogram-ready', (e) => {
+      const EVENT_COLOR = {
+        'track-ready': '#63C75F',         // green — audio decoded + peaks rendered
+        'spectrogram-ready': '#d08070',   // red — FFT viewport tier rendered
+      };
+      function logEvent(kind, trackId) {
         const line = document.createElement('div');
-        line.textContent = 'ready: track ' + e.detail.trackId;
+        const tag = document.createElement('span');
+        tag.textContent = kind.padEnd(18);
+        tag.style.color = EVENT_COLOR[kind];
+        line.append(tag, trackId.slice(0, 8));
         status.prepend(line);
-        while (status.children.length > 10) status.lastChild.remove();
-      });
+        while (status.children.length > 16) status.lastChild.remove();
+      }
+      editor.addEventListener('daw-track-ready', (e) => logEvent('track-ready', e.detail.trackId));
+      editor.addEventListener('daw-spectrogram-ready', (e) =>
+        logEvent('spectrogram-ready', e.detail.trackId)
+      );
 
       document.getElementById('colormap').addEventListener('change', (e) => {
         editor.spectrogramColorMap = e.target.value;
