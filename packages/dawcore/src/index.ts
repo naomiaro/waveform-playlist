@@ -35,6 +35,7 @@ export { DawTrackControlsElement } from './elements/daw-track-controls';
 export { DawRecordButtonElement } from './elements/daw-record-button';
 export { DawKeyboardShortcutsElement } from './elements/daw-keyboard-shortcuts';
 export { DawSpectrogramElement } from './elements/daw-spectrogram';
+export { SpectrogramController } from './controllers/spectrogram-controller';
 export type {
   KeyBinding,
   PlaybackShortcutMap,
