@@ -26,6 +26,8 @@ export {
 export type {
   SpectrogramOrchestratorOptions,
   ClipRegistration,
+  CanvasRegistration,
+  ViewportState,
   ViewportReadyDetail,
   CanvasMeta,
   ViewportBounds,

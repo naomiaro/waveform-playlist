@@ -81,3 +81,83 @@ describe('SpectrogramOrchestrator — clip registration', () => {
     expect(() => orch.unregisterClip('nonexistent')).not.toThrow();
   });
 });
+
+describe('SpectrogramOrchestrator — canvas registration', () => {
+  let orch: SpectrogramOrchestrator;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockPool: any;
+
+  function makeMockPool() {
+    return {
+      registerCanvas: vi.fn(),
+      unregisterCanvas: vi.fn(),
+      registerAudioData: vi.fn(),
+      unregisterAudioData: vi.fn(),
+      computeFFT: vi.fn(() => Promise.resolve({ cacheKey: 'key' })),
+      renderChunks: vi.fn(() => Promise.resolve()),
+      abortGeneration: vi.fn(),
+      terminate: vi.fn(),
+    };
+  }
+
+  beforeEach(() => {
+    mockPool = makeMockPool();
+    orch = new SpectrogramOrchestrator({
+      workerFactory: () => makeMockWorker(),
+      workerPoolSize: 2,
+      config: defaultConfig,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (orch as any).pool = mockPool; // test-only seam
+  });
+
+  it('registerCanvas forwards OffscreenCanvas to worker pool', () => {
+    const canvas = { width: 100, height: 100 } as unknown as OffscreenCanvas;
+    orch.registerCanvas({
+      canvasId: 'c1-ch0-chunk0',
+      canvas,
+      clipId: 'c1',
+      trackId: 't1',
+      channelIndex: 0,
+      chunkIndex: 0,
+      globalPixelOffset: 0,
+      widthPx: 1000,
+      heightPx: 100,
+    });
+    expect(mockPool.registerCanvas).toHaveBeenCalledWith('c1-ch0-chunk0', canvas);
+  });
+
+  it('unregisterCanvas forwards to worker pool', () => {
+    orch.registerCanvas({
+      canvasId: 'c1-ch0-chunk0',
+      canvas: {} as OffscreenCanvas,
+      clipId: 'c1',
+      trackId: 't1',
+      channelIndex: 0,
+      chunkIndex: 0,
+      globalPixelOffset: 0,
+      widthPx: 1000,
+      heightPx: 100,
+    });
+    orch.unregisterCanvas('c1-ch0-chunk0');
+    expect(mockPool.unregisterCanvas).toHaveBeenCalledWith('c1-ch0-chunk0');
+  });
+
+  it('setViewport increments generation and aborts previous', () => {
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 100,
+      bufferStartPx: 0,
+      bufferEndPx: 100,
+      samplesPerPixel: 1024,
+    });
+    orch.setViewport({
+      visibleStartPx: 100,
+      visibleEndPx: 200,
+      bufferStartPx: 50,
+      bufferEndPx: 250,
+      samplesPerPixel: 1024,
+    });
+    expect(mockPool.abortGeneration).toHaveBeenCalled();
+  });
+});

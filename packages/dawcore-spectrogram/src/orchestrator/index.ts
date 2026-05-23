@@ -1,5 +1,10 @@
 export { SpectrogramOrchestrator } from './SpectrogramOrchestrator';
-export type { SpectrogramOrchestratorOptions, ClipRegistration } from './SpectrogramOrchestrator';
+export type {
+  SpectrogramOrchestratorOptions,
+  ClipRegistration,
+  CanvasRegistration,
+  ViewportState,
+} from './SpectrogramOrchestrator';
 export type { ViewportReadyDetail } from './events';
 export { classifyViewport } from './viewport-classify';
 export type { CanvasMeta, ViewportBounds, ClassifiedTiers } from './viewport-classify';
