@@ -201,6 +201,7 @@ npm install @waveform-playlist/playout tone  # Tone.js (effects, MIDI synths)
 |---------|-------------|
 | `@dawcore/components` | Lit Web Components for multi-track editing |
 | `@dawcore/transport` | Native Web Audio transport — scheduling, looping, tempo automation, time signatures, metronome |
+| `@dawcore/spectrogram` | Framework-agnostic spectrogram orchestrator, FFT worker pool, and color maps — used by `render-mode="spectrogram"` |
 
 Run the examples locally:
 
@@ -220,6 +221,7 @@ pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
 - [`metronome.html`](examples/dawcore-native/metronome.html) — Metronome with mixed meters, tempo presets, and looping sequences
 - [`automation.html`](examples/dawcore-native/automation.html) — Tempo automation with step, linear, and curve presets
 - [`analyser.html`](examples/dawcore-native/analyser.html) — Spectrum analyser connected to master output
+- [`spectrogram.html`](examples/dawcore-native/spectrogram.html) — Per-track FFT spectrograms via `render-mode="spectrogram"` with color-map and frequency-scale controls
 
 **dawcore-tone** example pages:
 
@@ -229,6 +231,8 @@ pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
 - [`beats-grid.html`](examples/dawcore-tone/beats-grid.html) — Beats & bars grid with Tone.js
 - [`record.html`](examples/dawcore-tone/record.html) — Mic recording with overdub
 - [`analyser.html`](examples/dawcore-tone/analyser.html) — Spectrum analyser connected to master output
+- [`spectrogram.html`](examples/dawcore-tone/spectrogram.html) — Per-track FFT spectrograms with the Tone.js adapter
+- [`midi.html`](examples/dawcore-tone/midi.html) — Programmatic MIDI clips with piano-roll render mode and Tone.js PolySynth
 
 **Spec & roadmap:** [`docs/specs/web-components-migration.md`](docs/specs/web-components-migration.md) — full element catalogue, attribute/property/event tables, programmatic API contracts, theming tokens, and migration phases.
 
