@@ -1,5 +1,5 @@
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
-import { createSpectrogramWorkerPool } from '../worker';
+import { createSpectrogramWorkerPool, SpectrogramAbortError } from '../worker';
 import type { SpectrogramWorkerApi } from '../worker';
 import { ColorLUTCache } from './color-lut-cache';
 import { classifyViewport, type CanvasMeta, type ViewportBounds } from './viewport-classify';
@@ -93,17 +93,40 @@ export class SpectrogramOrchestrator extends EventTarget {
       offsetSamples: reg.offsetSamples,
     });
     this.pool.registerAudioData(reg.clipId, reg.channelData, reg.sampleRate);
+
+    // If any canvases for this clip were registered BEFORE the clip audio
+    // arrived (race during track-by-track loading), they would have been
+    // left black by renderGroup's missing-clip early-return. Trigger a
+    // render now so they paint.
+    if (this.viewport) {
+      for (const canvas of this.canvases.values()) {
+        if (canvas.clipId === reg.clipId) {
+          this.scheduleRender();
+          break;
+        }
+      }
+    }
   }
 
   unregisterClip(clipId: string): void {
     if (this.disposed) return;
-    if (!this.clips.has(clipId)) return;
+    if (!this.clips.has(clipId)) {
+      console.warn('[dawcore-spectrogram] unregisterClip: unknown clip ' + clipId);
+      return;
+    }
     this.clips.delete(clipId);
     this.pool.unregisterAudioData(clipId);
   }
 
   registerCanvas(reg: CanvasRegistration): void {
-    if (this.disposed) return;
+    if (this.disposed) {
+      console.warn(
+        '[dawcore-spectrogram] registerCanvas after dispose — canvas ' +
+          reg.canvasId +
+          ' will not render (OffscreenCanvas is now dead)'
+      );
+      return;
+    }
     this.canvases.set(reg.canvasId, {
       canvasId: reg.canvasId,
       globalPixelOffset: reg.globalPixelOffset,
@@ -120,13 +143,33 @@ export class SpectrogramOrchestrator extends EventTarget {
 
   unregisterCanvas(canvasId: string): void {
     if (this.disposed) return;
-    if (!this.canvases.has(canvasId)) return;
+    if (!this.canvases.has(canvasId)) {
+      console.warn('[dawcore-spectrogram] unregisterCanvas: unknown canvas ' + canvasId);
+      return;
+    }
     this.canvases.delete(canvasId);
     this.pool.unregisterCanvas(canvasId);
   }
 
   setViewport(state: ViewportState): void {
     if (this.disposed) return;
+    if (
+      !Number.isFinite(state.visibleStartPx) ||
+      !Number.isFinite(state.visibleEndPx) ||
+      !Number.isFinite(state.bufferStartPx) ||
+      !Number.isFinite(state.bufferEndPx) ||
+      !Number.isFinite(state.samplesPerPixel) ||
+      state.samplesPerPixel <= 0 ||
+      state.visibleStartPx > state.visibleEndPx ||
+      state.bufferStartPx > state.bufferEndPx
+    ) {
+      console.warn(
+        '[dawcore-spectrogram] setViewport: invalid state — ignored (' +
+          JSON.stringify(state) +
+          ')'
+      );
+      return;
+    }
     if (this.viewport && viewportsEqual(this.viewport, state)) return;
     const prevGeneration = this.generation;
     this.generation += 1;
@@ -158,7 +201,20 @@ export class SpectrogramOrchestrator extends EventTarget {
   }
 
   setDevicePixelRatio(dpr: number): void {
+    if (this.disposed) return;
+    if (!Number.isFinite(dpr) || dpr <= 0) {
+      console.warn(
+        '[dawcore-spectrogram] setDevicePixelRatio: invalid value ' + dpr + ' — ignored'
+      );
+      return;
+    }
+    if (this.devicePixelRatio === dpr) return;
     this.devicePixelRatio = dpr;
+    const prevGeneration = this.generation;
+    this.generation += 1;
+    this.readyDispatched.clear();
+    this.pool.abortGeneration(prevGeneration);
+    this.scheduleRender();
   }
 
   dispose(): void {
@@ -178,7 +234,15 @@ export class SpectrogramOrchestrator extends EventTarget {
     this.renderInFlight = true;
     queueMicrotask(() => {
       this.renderInFlight = false;
-      void this.runRender(this.generation);
+      this.runRender(this.generation).catch((err) => {
+        if (err instanceof SpectrogramAbortError) return;
+        console.warn(
+          '[dawcore-spectrogram] runRender unhandled rejection (generation ' +
+            this.generation +
+            '): ' +
+            (err instanceof Error ? err.message : String(err))
+        );
+      });
     });
   }
 
@@ -195,19 +259,44 @@ export class SpectrogramOrchestrator extends EventTarget {
     }
 
     for (const [trackId, trackCanvases] of canvasesByTrack) {
-      const tiers = classifyViewport(trackCanvases, viewport);
-      // Phase 1a: viewport tier — render synchronously (priority)
-      await this.renderTier(tiers.viewport, generation, viewport);
-      if (this.generation !== generation || this.disposed) return;
-      if (!this.readyDispatched.has(trackId)) {
-        this.readyDispatched.add(trackId);
-        this.dispatchEvent(new CustomEvent('viewport-ready', { detail: { trackId } }));
+      try {
+        const tiers = classifyViewport(trackCanvases, viewport);
+        // Phase 1a: viewport tier — render synchronously (priority)
+        await this.renderTier(tiers.viewport, generation, viewport);
+        if (this.generation !== generation || this.disposed) return;
+        if (!this.readyDispatched.has(trackId)) {
+          this.readyDispatched.add(trackId);
+          this.dispatchEvent(
+            new CustomEvent('viewport-ready', { detail: { trackId, generation } })
+          );
+        }
+        // Phase 1b: buffer tier
+        await this.renderTier(tiers.buffer, generation, viewport);
+        if (this.generation !== generation || this.disposed) return;
+        // Phase 2: remaining — yield via requestIdleCallback
+        await this.renderRemainingViaIdle(tiers.remaining, generation, viewport);
+      } catch (err) {
+        if (this.generation !== generation || this.disposed) return;
+        if (err instanceof SpectrogramAbortError) {
+          // Normal abort — generation bumped mid-render. Not an error.
+          return;
+        }
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.warn(
+          '[dawcore-spectrogram] render failed for track ' +
+            trackId +
+            ' (generation ' +
+            generation +
+            '): ' +
+            error.message
+        );
+        this.dispatchEvent(
+          new CustomEvent('viewport-error', {
+            detail: { trackId, generation, error },
+          })
+        );
+        // Continue to next track — one failure doesn't break siblings.
       }
-      // Phase 1b: buffer tier
-      await this.renderTier(tiers.buffer, generation, viewport);
-      if (this.generation !== generation || this.disposed) return;
-      // Phase 2: remaining — yield via requestIdleCallback
-      await this.renderRemainingViaIdle(tiers.remaining, generation, viewport);
     }
   }
 
@@ -232,7 +321,16 @@ export class SpectrogramOrchestrator extends EventTarget {
     if (group.length === 0) return;
     const first = group[0];
     const clip = this.clips.get(first.clipId);
-    if (!clip) return;
+    if (!clip) {
+      console.warn(
+        '[dawcore-spectrogram] renderGroup: no clip audio for ' +
+          first.clipId +
+          ' (canvas ' +
+          first.canvasId +
+          ') — canvas will stay black until registerClip is called'
+      );
+      return;
+    }
 
     const fftSize = this.config.fftSize ?? 2048;
     const startPx = Math.min(...group.map((c) => c.globalPixelOffset));
@@ -293,7 +391,18 @@ export class SpectrogramOrchestrator extends EventTarget {
       if (this.generation !== generation || this.disposed) return;
       await this.yieldUntilIdle();
       if (this.generation !== generation || this.disposed) return;
-      await this.renderGroup(group, generation, viewport);
+      try {
+        await this.renderGroup(group, generation, viewport);
+      } catch (err) {
+        if (this.generation !== generation || this.disposed) return;
+        if (err instanceof SpectrogramAbortError) return;
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.warn(
+          '[dawcore-spectrogram] remaining-tier render failed for canvas group: ' +
+            error.message
+        );
+        // Continue to next group
+      }
     }
   }
 

@@ -125,6 +125,13 @@ export interface DawClipSplitDetail {
 
 export interface DawSpectrogramReadyDetail {
   trackId: string;
+  generation: number;
+}
+
+export interface DawSpectrogramErrorDetail {
+  trackId: string;
+  generation: number;
+  error: Error;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +166,7 @@ export interface DawEventMap {
   'daw-clip-trim': CustomEvent<DawClipTrimDetail>;
   'daw-clip-split': CustomEvent<DawClipSplitDetail>;
   'daw-spectrogram-ready': CustomEvent<DawSpectrogramReadyDetail>;
+  'daw-spectrogram-error': CustomEvent<DawSpectrogramErrorDetail>;
 }
 
 // Helper type for creating typed custom events
