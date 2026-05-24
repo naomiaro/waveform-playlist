@@ -79,6 +79,7 @@ export class DawSpectrogramElement extends LitElement {
 
   private _canvases: HTMLCanvasElement[] = [];
   private _registeredCanvasIds: string[] = [];
+  private _warnedNoHost = false;
 
   /**
    * Walk up to the editor host. `closest('daw-editor')` does NOT cross
@@ -132,7 +133,18 @@ export class DawSpectrogramElement extends LitElement {
 
   private _registerCanvases(): void {
     const editor = this._findHostEditor();
-    if (!editor || typeof editor._spectrogramRegisterCanvas !== 'function') return;
+    if (!editor || typeof editor._spectrogramRegisterCanvas !== 'function') {
+      if (!this._warnedNoHost) {
+        this._warnedNoHost = true;
+        console.warn(
+          '[dawcore] <daw-spectrogram> (clip ' +
+            this.clipId +
+            ') could not find host <daw-editor>. Canvases will not render. ' +
+            'Ensure the element is mounted inside a <daw-editor>.'
+        );
+      }
+      return;
+    }
 
     for (let i = 0; i < this._canvases.length; i++) {
       const canvas = this._canvases[i];
