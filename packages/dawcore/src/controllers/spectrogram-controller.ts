@@ -124,10 +124,25 @@ export class SpectrogramController implements ReactiveController {
         colorMap: this.mergedColorMap(),
       });
       this.orchestrator.addEventListener('viewport-ready', (e: Event) => {
-        const detail = (e as CustomEvent).detail as { trackId: string };
+        const detail = (e as CustomEvent<{ trackId: string; generation: number }>).detail;
         this.host.dispatchEvent(
           new CustomEvent('daw-spectrogram-ready', {
-            detail,
+            detail: { trackId: detail.trackId, generation: detail.generation },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      });
+      this.orchestrator.addEventListener('viewport-error', (e: Event) => {
+        const detail = (e as CustomEvent<{ trackId: string; generation: number; error: Error }>)
+          .detail;
+        this.host.dispatchEvent(
+          new CustomEvent('daw-spectrogram-error', {
+            detail: {
+              trackId: detail.trackId,
+              generation: detail.generation,
+              error: detail.error,
+            },
             bubbles: true,
             composed: true,
           })
