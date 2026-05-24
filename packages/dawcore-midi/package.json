@@ -1,0 +1,44 @@
+{
+  "name": "@dawcore/midi",
+  "version": "0.0.1",
+  "description": "Framework-agnostic MIDI file loading and parsing for the dawcore family",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": ["midi", "dawcore", "web-audio", "tonejs"],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/dawcore-midi"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": ["dist", "README.md"],
+  "dependencies": {
+    "@waveform-playlist/core": "workspace:*",
+    "@tonejs/midi": "^2.0.28"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
+  }
+}
