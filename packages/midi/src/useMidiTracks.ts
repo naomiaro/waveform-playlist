@@ -5,7 +5,7 @@ import {
   createClipFromSeconds,
   createTrack,
 } from '@waveform-playlist/core';
-import { parseMidiFile } from './parseMidiFile';
+import { parseMidiFile } from '@dawcore/midi';
 
 /**
  * Configuration for a single MIDI track to load.
