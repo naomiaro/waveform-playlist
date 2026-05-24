@@ -1,8 +1,7 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
-import type { SpectrogramConfig } from '@waveform-playlist/core';
-import type { TrackRenderMode } from '../types';
+import type { RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
 
 @customElement('daw-track')
 export class DawTrackElement extends LitElement {
@@ -12,7 +11,27 @@ export class DawTrackElement extends LitElement {
   @property({ type: Number }) pan = 0;
   @property({ type: Boolean }) muted = false;
   @property({ type: Boolean }) soloed = false;
-  @property({ attribute: 'render-mode' }) renderMode: TrackRenderMode = 'waveform';
+
+  // Custom getter/setter so we can warn-and-fallback on 'both' (dawcore
+  // doesn't yet support rendering waveform + spectrogram simultaneously).
+  @property({ attribute: 'render-mode', noAccessor: true })
+  get renderMode(): RenderMode {
+    return this._renderMode;
+  }
+  set renderMode(value: RenderMode) {
+    const old = this._renderMode;
+    let next = value;
+    if (next === 'both') {
+      console.warn(
+        '[dawcore] <daw-track render-mode="both"> is not yet supported; falling back to \'spectrogram\''
+      );
+      next = 'spectrogram';
+    }
+    this._renderMode = next;
+    this.requestUpdate('renderMode', old);
+  }
+  private _renderMode: RenderMode = 'waveform';
+
   @property({ attribute: false }) spectrogramConfig: SpectrogramConfig | null = null;
 
   readonly trackId = crypto.randomUUID();

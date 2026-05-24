@@ -1846,6 +1846,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // No DOM element — apply directly to descriptor + engine.
     const oldDesc = this._tracks.get(trackId);
     if (!oldDesc) return;
+    let normalizedRenderMode = partial.renderMode;
+    if (normalizedRenderMode === 'both') {
+      console.warn(
+        '[dawcore] render-mode="both" is not yet supported; falling back to \'spectrogram\''
+      );
+      normalizedRenderMode = 'spectrogram';
+    }
     const newDesc: TrackDescriptor = {
       ...oldDesc,
       ...(partial.name !== undefined && { name: partial.name }),
@@ -1853,7 +1860,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       ...(partial.pan !== undefined && { pan: partial.pan }),
       ...(partial.muted !== undefined && { muted: partial.muted }),
       ...(partial.soloed !== undefined && { soloed: partial.soloed }),
-      ...(partial.renderMode !== undefined && { renderMode: partial.renderMode }),
+      ...(normalizedRenderMode !== undefined && { renderMode: normalizedRenderMode }),
     };
     this._tracks = new Map(this._tracks).set(trackId, newDesc);
     if (this._engine) {

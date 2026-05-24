@@ -1,6 +1,14 @@
-import type { FadeType, MidiNoteData, SpectrogramConfig } from '@waveform-playlist/core';
+import type {
+  FadeType,
+  MidiNoteData,
+  RenderMode,
+  SpectrogramConfig,
+} from '@waveform-playlist/core';
 
-export type TrackRenderMode = 'waveform' | 'piano-roll' | 'spectrogram';
+// Re-export RenderMode from core as TrackRenderMode for backward compatibility
+// during the migration; consumers should prefer RenderMode directly.
+export type { RenderMode } from '@waveform-playlist/core';
+export type TrackRenderMode = RenderMode;
 
 export interface TrackDescriptor {
   name: string;
