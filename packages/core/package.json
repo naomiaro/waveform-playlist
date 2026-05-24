@@ -25,7 +25,9 @@
     "audio",
     "webaudio",
     "waveform-playlist",
-    "types"
+    "types",
+    "daw",
+    "audio-editor"
   ],
   "author": "Naomi Aro",
   "license": "MIT",

@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["waveform", "audio", "webaudio", "transport", "scheduler"],
+  "keywords": ["waveform", "audio", "webaudio", "transport", "scheduler", "daw", "dawcore"],
   "author": "Naomi Aro",
   "license": "MIT",
   "repository": {

@@ -20,6 +20,15 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "keywords": [
+    "daw",
+    "web-components",
+    "audio",
+    "webaudio",
+    "multitrack",
+    "audio-editor",
+    "lit"
+  ],
   "author": "Naomi Aro",
   "license": "MIT",
   "files": [
