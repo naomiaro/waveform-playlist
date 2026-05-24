@@ -52,7 +52,11 @@ import type {
   LoadFilesResult,
 } from '../events';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
-import { loadMidiImpl, type MidiLoadOptions, type MidiLoadResult } from '../interactions/midi-loader';
+import {
+  loadMidiImpl,
+  type MidiLoadOptions,
+  type MidiLoadResult,
+} from '../interactions/midi-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
