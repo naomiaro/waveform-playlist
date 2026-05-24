@@ -165,14 +165,28 @@ interface MediaElementDataContextValue {
 ### usePlaybackAnimation()
 
 ```typescript
+interface FrameData {
+  readonly time: number;          // Raw engine time (state/logic — NOT visual positioning)
+  readonly visualTime: number;    // time − outputLatency − engine.lookAhead (use for DOM positioning)
+  readonly sampleRate: number;
+  readonly samplesPerPixel: number;
+}
+
 interface PlaybackAnimationContextValue {
   isPlaying: boolean;
   currentTime: number;
   currentTimeRef: RefObject<number>;
+  /** Visually-aligned playback time (raw − outputLatency − engine.lookAhead). */
+  visualTimeRef: RefObject<number>;
   playbackStartTimeRef: RefObject<number>;
   audioStartPositionRef: RefObject<number>;
-  /** Returns current playback time from engine (auto-wraps at loop boundaries). */
+  /** Raw playback time from engine (auto-wraps at loop boundaries). */
   getPlaybackTime: () => number;
+  /** Current adapter scheduler lookahead (Tone ~0.1s, native 0). */
+  getLookAhead: () => number;
+  /** Register/unregister per-frame callbacks driven by the shared rAF loop. */
+  registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
+  unregisterFrameCallback: (id: string) => void;
 }
 ```
 
@@ -309,6 +323,12 @@ interface ClipPeaks {
   durationSamples: number;
   fadeIn?: Fade;
   fadeOut?: Fade;
+  /** MIDI note data — present for clips rendered as piano roll. */
+  midiNotes?: MidiNoteData[];
+  /** Source audio sample rate (waveformData rate when mismatched from context). */
+  sampleRate?: number;
+  /** Offset into the source audio in samples. */
+  offsetSamples?: number;
 }
 
 type TrackClipPeaks = ClipPeaks[];
@@ -326,7 +346,8 @@ function useAudioTracks(
   tracks: ClipTrack[];
   loading: boolean;
   error: string | null;
-  progress: number;
+  loadedCount: number;
+  totalCount: number;
 };
 
 interface AudioTrackConfig {

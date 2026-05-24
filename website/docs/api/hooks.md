@@ -110,51 +110,66 @@ function usePlaylistData(): {
 
 ### usePlaybackAnimation
 
-Access playback state and timing refs for smooth animations.
+Access playback state, timing refs, and the per-frame animation registry. A single `requestAnimationFrame` loop inside the provider drives all visual updates; components register callbacks instead of spinning their own loops.
 
 ```typescript
+interface FrameData {
+  /** Raw engine time (use for state/logic — NOT for visual positioning). */
+  readonly time: number;
+  /** time − outputLatency − engine.lookAhead. Use for any DOM positioning that
+   *  should match the audible output. */
+  readonly visualTime: number;
+  readonly sampleRate: number;
+  readonly samplesPerPixel: number;
+}
+
 function usePlaybackAnimation(): {
   isPlaying: boolean;
   currentTime: number;
 
-  // Refs for 60fps animation loops
+  // Refs for 60fps animation loops (read inside frame callbacks or rAF)
   currentTimeRef: RefObject<number>;
+  /** Visually-aligned playback time (raw − outputLatency − lookAhead). Read this
+   *  for any static playhead positioning that should match the audible output. */
+  visualTimeRef: RefObject<number>;
   playbackStartTimeRef: RefObject<number>;
   audioStartPositionRef: RefObject<number>;
 
-  /** Returns current playback time from engine (auto-wraps at loop boundaries). */
+  /** Raw playback time from engine (auto-wraps at loop boundaries). */
   getPlaybackTime: () => number;
+  /** Current adapter scheduler lookahead (Tone ~0.1s, native 0). Use for any
+   *  audible-latency calculation that must match the playhead. */
+  getLookAhead: () => number;
+
+  /** Register a per-frame callback driven by the shared animation loop. */
+  registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
+  unregisterFrameCallback: (id: string) => void;
 };
 ```
 
 #### Example
 
+Use `registerFrameCallback` rather than your own `requestAnimationFrame` loop — it shares the provider's single rAF, runs only while playing, and hands you a fresh `FrameData` so closure values can't go stale during zoom changes.
+
 ```tsx
 function AnimatedPlayhead() {
-  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
-  const { samplesPerPixel, sampleRate } = usePlaylistData();
+  const { registerFrameCallback, unregisterFrameCallback } = usePlaybackAnimation();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let frameId: number;
-
-    const animate = () => {
-      if (ref.current && isPlaying) {
-        const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
-        const time = (audioStartPositionRef.current ?? 0) + elapsed;
-        const pixels = (time * sampleRate) / samplesPerPixel;
-        ref.current.style.transform = `translateX(${pixels}px)`;
-      }
-      frameId = requestAnimationFrame(animate);
-    };
-
-    if (isPlaying) frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
-  }, [isPlaying]);
+    registerFrameCallback('playhead', ({ visualTime, sampleRate, samplesPerPixel }) => {
+      if (!ref.current) return;
+      const pixels = (visualTime * sampleRate) / samplesPerPixel;
+      ref.current.style.transform = `translateX(${pixels}px)`;
+    });
+    return () => unregisterFrameCallback('playhead');
+  }, [registerFrameCallback, unregisterFrameCallback]);
 
   return <div ref={ref} className="playhead" />;
 }
 ```
+
+For static positioning when playback is stopped (initial render, after pause/seek), read `visualTimeRef.current` instead — the loop keeps it current outside of playback too.
 
 ---
 
@@ -165,11 +180,12 @@ Load and decode audio files into track objects.
 ### Signature
 
 ```typescript
-function useAudioTracks(configs: AudioConfig[]): {
+function useAudioTracks(configs: AudioTrackConfig[]): {
   tracks: ClipTrack[];
   loading: boolean;
   error: string | null;
-  progress: number;
+  loadedCount: number;
+  totalCount: number;
 };
 ```
 
@@ -177,7 +193,7 @@ function useAudioTracks(configs: AudioConfig[]): {
 
 | Name | Type | Description |
 |------|------|-------------|
-| `configs` | `AudioConfig[]` | Array of audio configurations |
+| `configs` | `AudioTrackConfig[]` | Array of audio configurations |
 
 ### AudioTrackConfig
 
@@ -207,17 +223,18 @@ interface AudioTrackConfig {
 | `tracks` | `ClipTrack[]` | Loaded track objects |
 | `loading` | `boolean` | Loading state |
 | `error` | `string \| null` | Error message |
-| `progress` | `number` | Loading progress 0-1 |
+| `loadedCount` | `number` | Number of configs that have finished loading |
+| `totalCount` | `number` | Total number of configs |
 
 ### Example
 
 ```tsx
-const { tracks, loading, error, progress } = useAudioTracks([
+const { tracks, loading, error, loadedCount, totalCount } = useAudioTracks([
   { src: '/audio/track1.mp3', name: 'Track 1' },
   { src: '/audio/track2.mp3', name: 'Track 2', startTime: 5 },
 ]);
 
-if (loading) return <div>Loading... {Math.round(progress * 100)}%</div>;
+if (loading) return <div>Loading {loadedCount} / {totalCount}…</div>;
 if (error) return <div>Error: {error}</div>;
 ```
 
