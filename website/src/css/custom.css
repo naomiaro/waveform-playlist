@@ -553,6 +553,56 @@ div[class*='announcementBar'] code {
   padding: 0.1em 0.4em;
 }
 
+/* ============================================
+   SEARCH MODAL — Berlin Underground theming
+   Overrides exposed by @easyops-cn/docusaurus-search-local
+   ============================================ */
+
+[data-theme='dark'] {
+  /* Modal panel — same pure-black as the navbar input so the field
+     visually extends into the dropdown when opened */
+  --search-local-modal-background: #000;
+  --search-local-modal-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 32px 0 rgba(0, 0, 0, 0.6);
+
+  /* Result rows — subtle elevation over modal bg */
+  --search-local-hit-background: rgba(255, 255, 255, 0.03);
+  --search-local-hit-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --search-local-hit-color: var(--ifm-font-color-base);
+
+  /* Active/keyboard-selected row */
+  --search-local-highlight-color: var(--ifm-color-primary);
+  --search-local-hit-active-color: #0a0a0f;
+
+  /* Tree breadcrumbs, icons, file paths */
+  --search-local-muted-color: var(--ifm-font-color-secondary);
+
+  /* Navbar search input — match page body text (amber on near-black);
+     bg defaults to grey --ifm-color-emphasis-200, override to pure black
+     so the field reads as a depressed slot cut into the navbar */
+  --ifm-navbar-search-input-color: var(--ifm-font-color-base);
+  --ifm-navbar-search-input-placeholder-color: var(--ifm-font-color-secondary);
+  --ifm-navbar-search-input-background-color: #000;
+}
+
+/* Boxy/brutalist corners + body font — form inputs don't inherit
+   font-family by default, so set it explicitly to match page text */
+.navbar__search-input {
+  border-radius: 0;
+  font-family: var(--ifm-font-family-base);
+}
+
+/* Plugin uses CSS-modules with hashed class names; partial-match
+   attribute selectors are stable across builds. !important is needed
+   because the plugin's selectors (.searchBar .dropdownMenu) match our
+   specificity and load order isn't guaranteed. */
+[class*='dropdownMenu_'],
+[class*='suggestion_'],
+[class*='searchHint_'] {
+  border-radius: 0 !important;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .hero__title {
