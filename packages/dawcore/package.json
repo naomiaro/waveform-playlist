@@ -1,6 +1,6 @@
 {
   "name": "@dawcore/components",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "description": "Web Components for multi-track audio editing — framework-agnostic",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
