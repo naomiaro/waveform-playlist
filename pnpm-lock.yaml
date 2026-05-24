@@ -182,6 +182,9 @@ importers:
         specifier: ^4.5.2
         version: 4.5.2
     devDependencies:
+      '@dawcore/midi':
+        specifier: workspace:*
+        version: link:../dawcore-midi
       '@dawcore/transport':
         specifier: workspace:*
         version: link:../transport
