@@ -174,6 +174,23 @@ describe('SpectrogramOrchestrator — canvas registration', () => {
     orch.setViewport({ ...state });
     expect(mockPool.abortGeneration).not.toHaveBeenCalled();
   });
+
+  it('registerClip forwards channelData + sampleRate to pool.registerAudioData', () => {
+    const channelData = [new Float32Array([0.1, 0.2, 0.3])];
+    orch.registerClip({
+      clipId: 'c-test',
+      trackId: 't-test',
+      channelData,
+      sampleRate: 48000,
+      durationSamples: 3,
+      offsetSamples: 0,
+    });
+    expect(mockPool.registerAudioData).toHaveBeenCalledWith(
+      'c-test',
+      expect.any(Array),
+      48000
+    );
+  });
 });
 
 describe('SpectrogramOrchestrator — tier-aware render', () => {
@@ -373,6 +390,58 @@ describe('SpectrogramOrchestrator — tier-aware render', () => {
     orch.setColorMap('magma');
     await new Promise((r) => setTimeout(r, 20));
     expect(readyEvents).toEqual(['t1', 't1']);
+  });
+
+  it('dispose() during in-flight render bails before pool.renderChunks runs on terminated pool', async () => {
+    // Deferred-resolve mock for computeFFT so we can dispose between
+    // computeFFT and the post-await `this.disposed` check in renderGroup.
+    let resolveComputeFFT: ((v: { cacheKey: string }) => void) | undefined;
+    mockPool.computeFFT.mockImplementationOnce(
+      () =>
+        new Promise<{ cacheKey: string }>((res) => {
+          resolveComputeFFT = res;
+        })
+    );
+
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    // Let microtask queue flush so runRender starts and awaits computeFFT
+    await Promise.resolve();
+    await Promise.resolve();
+
+    orch.dispose();
+    resolveComputeFFT!({ cacheKey: 'late' });
+    await new Promise((r) => setTimeout(r, 10));
+
+    // After dispose + late resolve, renderChunks must NOT be called on the
+    // now-terminated pool.
+    expect(mockPool.renderChunks).not.toHaveBeenCalled();
+  });
+
+  it('runs viewport tier then buffer tier (both call renderChunks)', async () => {
+    // beforeEach registered 3 canvases at offsets 0/1000/2000 (width 1000).
+    // viewport [0, 1000] + buffer [0, 2000] places:
+    //   chunk0 (0-1000)    → viewport tier  → 1 renderChunks call
+    //   chunk1 (1000-2000) → buffer tier    → 1 renderChunks call
+    //   chunk2 (2000-3000) → remaining tier → 1 renderChunks call (via idle)
+    mockPool.renderChunks.mockClear();
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 1000,
+      bufferStartPx: 0,
+      bufferEndPx: 2000,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    // Viewport + buffer tiers must each trigger a renderChunks call.
+    // The exact total can include remaining-tier work; assert >= 2.
+    expect(mockPool.renderChunks.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it('viewport-ready fires exactly once per trackId per generation (multi-track)', async () => {
