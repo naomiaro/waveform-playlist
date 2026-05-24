@@ -148,6 +148,21 @@ const config: Config = {
     ],
   ],
 
+  themes: [
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        // Offline/local search — index baked into the static build, no backend.
+        indexBlog: false,
+        indexPages: true,
+        language: ['en'],
+        hashed: true,
+        highlightSearchTermsOnTargetPage: true,
+        explicitSearchResultPath: true,
+      },
+    ],
+  ],
+
   plugins: [
     function (context, options) {
       return {
