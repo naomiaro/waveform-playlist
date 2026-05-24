@@ -1,5 +1,11 @@
 # MIDI Package (`@waveform-playlist/midi`)
 
+## Parser Now Lives in `@dawcore/midi`
+
+As of v13.0.0, `parseMidiFile` / `parseMidiUrl` and the `ParsedMidi*` types are re-exported from `@dawcore/midi`. The local copy was removed during the dawcore framework-split (see `docs/specs/2026-05-23-dawcore-load-midi-design.md`). React-side consumers see no API change. The `parser-parity.test.ts` smoke test guards against accidental re-divergence.
+
+`useMidiTracks` is the only original symbol still defined in this package.
+
 ## Purpose
 
 Provides MIDI file loading, parsing, and React hook integration for waveform-playlist. Separates `@tonejs/midi` (~8-12 KB gzipped) into an opt-in package so users who only need audio don't pay the bundle cost.
