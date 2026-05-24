@@ -1,8 +1,5 @@
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
-import {
-  SPECTROGRAM_DEFAULTS,
-  DEFAULT_SPECTROGRAM_COLOR_MAP,
-} from '@waveform-playlist/core';
+import { SPECTROGRAM_DEFAULTS, DEFAULT_SPECTROGRAM_COLOR_MAP } from '@waveform-playlist/core';
 import { createSpectrogramWorkerPool, SpectrogramAbortError } from '../worker';
 import type { SpectrogramWorkerApi } from '../worker';
 import { ColorLUTCache } from './color-lut-cache';
@@ -173,9 +170,7 @@ export class SpectrogramOrchestrator extends EventTarget {
       state.bufferStartPx > state.bufferEndPx
     ) {
       console.warn(
-        '[dawcore-spectrogram] setViewport: invalid state — ignored (' +
-          JSON.stringify(state) +
-          ')'
+        '[dawcore-spectrogram] setViewport: invalid state — ignored (' + JSON.stringify(state) + ')'
       );
       return;
     }
@@ -407,8 +402,7 @@ export class SpectrogramOrchestrator extends EventTarget {
         if (err instanceof SpectrogramAbortError) return;
         const error = err instanceof Error ? err : new Error(String(err));
         console.warn(
-          '[dawcore-spectrogram] remaining-tier render failed for canvas group: ' +
-            error.message
+          '[dawcore-spectrogram] remaining-tier render failed for canvas group: ' + error.message
         );
         // Continue to next group
       }

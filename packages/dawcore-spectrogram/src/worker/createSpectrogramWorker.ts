@@ -133,9 +133,7 @@ export function createSpectrogramWorker(worker: Worker): SpectrogramWorkerApi {
         (e.message || 'unknown error')
     );
     for (const [id, entry] of pending) {
-      entry.reject(
-        new Error('Worker crashed (id=' + id + '): ' + (e.message || 'unknown error'))
-      );
+      entry.reject(new Error('Worker crashed (id=' + id + '): ' + (e.message || 'unknown error')));
     }
     pending.clear();
   };

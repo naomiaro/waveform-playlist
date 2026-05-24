@@ -12,8 +12,7 @@ function parseChannelFromCanvasId(canvasId: string): number {
   const match = canvasId.match(/-ch(\d+)-/);
   if (!match) {
     console.warn(
-      '[dawcore-spectrogram] canvas ID missing -ch{N}- segment, routing to worker 0: ' +
-        canvasId
+      '[dawcore-spectrogram] canvas ID missing -ch{N}- segment, routing to worker 0: ' + canvasId
     );
     return 0;
   }
@@ -100,9 +99,7 @@ export function createSpectrogramWorkerPool(
       // Use allSettled so one channel's failure doesn't drop surviving channel results.
       // Throw the first failure; log additional ones so they're not silently swallowed.
       const settled = await Promise.allSettled(promises);
-      const failures = settled.filter(
-        (s): s is PromiseRejectedResult => s.status === 'rejected'
-      );
+      const failures = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
       if (failures.length > 0) {
         for (let i = 1; i < failures.length; i++) {
           console.warn(
