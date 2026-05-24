@@ -5,10 +5,10 @@ export interface CanvasMeta {
 }
 
 export interface ViewportBounds {
-  visibleStartPx: number;
-  visibleEndPx: number;
-  bufferStartPx: number;
-  bufferEndPx: number;
+  readonly visibleStartPx: number;
+  readonly visibleEndPx: number;
+  readonly bufferStartPx: number;
+  readonly bufferEndPx: number;
 }
 
 export interface ClassifiedTiers<T extends CanvasMeta> {

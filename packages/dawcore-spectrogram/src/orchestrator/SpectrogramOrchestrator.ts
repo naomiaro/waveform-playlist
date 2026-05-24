@@ -10,36 +10,36 @@ import { classifyViewport, type CanvasMeta, type ViewportBounds } from './viewpo
 import { groupContiguousChunks } from './chunk-grouping';
 
 export interface SpectrogramOrchestratorOptions {
-  workerFactory: () => Worker;
-  workerPoolSize?: number;
-  config: SpectrogramConfig;
-  colorMap?: ColorMapValue;
-  devicePixelRatio?: number;
+  readonly workerFactory: () => Worker;
+  readonly workerPoolSize?: number;
+  readonly config: SpectrogramConfig;
+  readonly colorMap?: ColorMapValue;
+  readonly devicePixelRatio?: number;
 }
 
 export interface ClipRegistration {
-  clipId: string;
-  trackId: string;
-  channelData: Float32Array[];
-  sampleRate: number;
-  durationSamples: number;
-  offsetSamples: number;
+  readonly clipId: string;
+  readonly trackId: string;
+  readonly channelData: ReadonlyArray<Float32Array>;
+  readonly sampleRate: number;
+  readonly durationSamples: number;
+  readonly offsetSamples: number;
 }
 
 export interface CanvasRegistration {
-  canvasId: string;
-  canvas: OffscreenCanvas;
-  clipId: string;
-  trackId: string;
-  channelIndex: number;
-  chunkIndex: number;
-  globalPixelOffset: number;
-  widthPx: number;
-  heightPx: number;
+  readonly canvasId: string;
+  readonly canvas: OffscreenCanvas;
+  readonly clipId: string;
+  readonly trackId: string;
+  readonly channelIndex: number;
+  readonly chunkIndex: number;
+  readonly globalPixelOffset: number;
+  readonly widthPx: number;
+  readonly heightPx: number;
 }
 
 export interface ViewportState extends ViewportBounds {
-  samplesPerPixel: number;
+  readonly samplesPerPixel: number;
 }
 
 interface ClipEntry {
@@ -89,14 +89,17 @@ export class SpectrogramOrchestrator extends EventTarget {
 
   registerClip(reg: ClipRegistration): void {
     if (this.disposed) return;
+    // Defensive copy of the channel-array container — the typed-array buffers
+    // are shared (Web Audio needs that), but the outer array is owned by us.
+    const channelData: Float32Array[] = [...reg.channelData];
     this.clips.set(reg.clipId, {
       trackId: reg.trackId,
-      channelData: reg.channelData,
+      channelData,
       sampleRate: reg.sampleRate,
       durationSamples: reg.durationSamples,
       offsetSamples: reg.offsetSamples,
     });
-    this.pool.registerAudioData(reg.clipId, reg.channelData, reg.sampleRate);
+    this.pool.registerAudioData(reg.clipId, channelData, reg.sampleRate);
 
     // If any canvases for this clip were registered BEFORE the clip audio
     // arrived (race during track-by-track loading), they would have been
