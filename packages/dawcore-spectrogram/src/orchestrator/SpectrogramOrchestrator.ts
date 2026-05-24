@@ -433,3 +433,15 @@ function viewportsEqual(a: ViewportState, b: ViewportState): boolean {
     a.samplesPerPixel === b.samplesPerPixel
   );
 }
+
+// Compile-time guard: any future field added to ViewportState must be added
+// to viewportsEqual or this `satisfies` check will fail.
+const _VIEWPORT_STATE_FIELDS_COVERED_BY_EQUAL = {
+  visibleStartPx: true,
+  visibleEndPx: true,
+  bufferStartPx: true,
+  bufferEndPx: true,
+  samplesPerPixel: true,
+} satisfies Record<keyof ViewportState, true>;
+// Mark as used so noUnusedLocals doesn't complain
+void _VIEWPORT_STATE_FIELDS_COVERED_BY_EQUAL;

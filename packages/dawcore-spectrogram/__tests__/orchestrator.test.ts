@@ -325,4 +325,114 @@ describe('SpectrogramOrchestrator — tier-aware render', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(count).toBe(2);
   });
+
+  it('setConfig clears readyDispatched so the next render re-emits viewport-ready', async () => {
+    const readyEvents: string[] = [];
+    orch.addEventListener('viewport-ready', (e: Event) => {
+      readyEvents.push((e as CustomEvent).detail.trackId);
+    });
+
+    const viewport = {
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    };
+    orch.setViewport(viewport);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readyEvents).toEqual(['t1']);
+
+    // Same viewport — short-circuits, no new ready event
+    orch.setViewport({ ...viewport });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readyEvents).toEqual(['t1']);
+
+    // setConfig bumps generation and clears readyDispatched — should re-fire
+    orch.setConfig({ fftSize: 4096, frequencyScale: 'mel' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readyEvents).toEqual(['t1', 't1']);
+  });
+
+  it('setColorMap clears readyDispatched so the next render re-emits viewport-ready', async () => {
+    const readyEvents: string[] = [];
+    orch.addEventListener('viewport-ready', (e: Event) => {
+      readyEvents.push((e as CustomEvent).detail.trackId);
+    });
+
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readyEvents).toEqual(['t1']);
+
+    orch.setColorMap('magma');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readyEvents).toEqual(['t1', 't1']);
+  });
+
+  it('viewport-ready fires exactly once per trackId per generation (multi-track)', async () => {
+    // The beforeEach registered c1/t1 + 3 canvases for t1. Add c2/t2 here.
+    orch.registerClip({
+      clipId: 'c2',
+      trackId: 't2',
+      channelData: [new Float32Array(48000)],
+      sampleRate: 48000,
+      durationSamples: 48000,
+      offsetSamples: 0,
+    });
+    orch.registerCanvas({
+      canvasId: 'c2-ch0-chunk0',
+      canvas: { width: 1000, height: 100 } as unknown as OffscreenCanvas,
+      clipId: 'c2',
+      trackId: 't2',
+      channelIndex: 0,
+      chunkIndex: 0,
+      globalPixelOffset: 0,
+      widthPx: 1000,
+      heightPx: 100,
+    });
+
+    const readyEvents: Array<{ trackId: string; generation: number }> = [];
+    orch.addEventListener('viewport-ready', (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      readyEvents.push({ trackId: detail.trackId, generation: detail.generation });
+    });
+
+    orch.setViewport({
+      visibleStartPx: 0,
+      visibleEndPx: 500,
+      bufferStartPx: 0,
+      bufferEndPx: 1500,
+      samplesPerPixel: 1024,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Exactly one event per track in this generation
+    expect(readyEvents).toHaveLength(2);
+    expect(new Set(readyEvents.map((e) => e.trackId))).toEqual(new Set(['t1', 't2']));
+    // Both events share the same generation (same setViewport call)
+    const generations = new Set(readyEvents.map((e) => e.generation));
+    expect(generations.size).toBe(1);
+
+    // Late registerCanvas for t1 — triggers another render, but t1 was already
+    // dispatched in this generation. Must NOT re-fire.
+    orch.registerCanvas({
+      canvasId: 'c1-ch0-chunk3',
+      canvas: { width: 1000, height: 100 } as unknown as OffscreenCanvas,
+      clipId: 'c1',
+      trackId: 't1',
+      channelIndex: 0,
+      chunkIndex: 3,
+      globalPixelOffset: 3000,
+      widthPx: 1000,
+      heightPx: 100,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(readyEvents).toHaveLength(2);
+  });
 });
