@@ -1,4 +1,8 @@
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
+import {
+  SPECTROGRAM_DEFAULTS,
+  DEFAULT_SPECTROGRAM_COLOR_MAP,
+} from '@waveform-playlist/core';
 import { createSpectrogramWorkerPool, SpectrogramAbortError } from '../worker';
 import type { SpectrogramWorkerApi } from '../worker';
 import { ColorLUTCache } from './color-lut-cache';
@@ -78,7 +82,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     const poolSize = opts.workerPoolSize ?? 2;
     this.pool = createSpectrogramWorkerPool(opts.workerFactory, poolSize);
     this.config = opts.config;
-    this.colorMap = opts.colorMap ?? 'viridis';
+    this.colorMap = opts.colorMap ?? DEFAULT_SPECTROGRAM_COLOR_MAP;
     this.devicePixelRatio =
       opts.devicePixelRatio ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1);
   }
@@ -332,7 +336,7 @@ export class SpectrogramOrchestrator extends EventTarget {
       return;
     }
 
-    const fftSize = this.config.fftSize ?? 2048;
+    const fftSize = this.config.fftSize ?? SPECTROGRAM_DEFAULTS.fftSize;
     const startPx = Math.min(...group.map((c) => c.globalPixelOffset));
     const endPx = Math.max(...group.map((c) => c.globalPixelOffset + c.widthPx));
     const startSample = clip.offsetSamples + Math.floor(startPx * viewport.samplesPerPixel);
@@ -369,11 +373,11 @@ export class SpectrogramOrchestrator extends EventTarget {
         devicePixelRatio: this.devicePixelRatio,
         samplesPerPixel: viewport.samplesPerPixel,
         colorLUT,
-        frequencyScale: String(this.config.frequencyScale ?? 'mel'),
-        minFrequency: this.config.minFrequency ?? 0,
+        frequencyScale: String(this.config.frequencyScale ?? SPECTROGRAM_DEFAULTS.frequencyScale),
+        minFrequency: this.config.minFrequency ?? SPECTROGRAM_DEFAULTS.minFrequency,
         maxFrequency: this.config.maxFrequency ?? clip.sampleRate / 2,
-        gainDb: this.config.gainDb ?? 20,
-        rangeDb: this.config.rangeDb ?? 80,
+        gainDb: this.config.gainDb ?? SPECTROGRAM_DEFAULTS.gainDb,
+        rangeDb: this.config.rangeDb ?? SPECTROGRAM_DEFAULTS.rangeDb,
         channelIndex: first.channelIndex,
       },
       generation

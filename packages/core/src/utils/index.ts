@@ -6,3 +6,4 @@ export * from './meterDetection';
 export * from './peaksGenerator';
 export * from './audioBufferUtils';
 export * from './latency';
+export * from './spectrogram-defaults';

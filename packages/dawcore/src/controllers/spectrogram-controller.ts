@@ -6,17 +6,10 @@ import {
   type ViewportState,
 } from '@dawcore/spectrogram';
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
-
-const LIBRARY_DEFAULTS: SpectrogramConfig = {
-  fftSize: 2048,
-  windowFunction: 'hann',
-  frequencyScale: 'mel',
-  minFrequency: 0,
-  gainDb: 20,
-  rangeDb: 80,
-};
-
-const LIBRARY_DEFAULT_COLOR_MAP: ColorMapValue = 'viridis';
+import {
+  SPECTROGRAM_DEFAULTS as LIBRARY_DEFAULTS,
+  DEFAULT_SPECTROGRAM_COLOR_MAP as LIBRARY_DEFAULT_COLOR_MAP,
+} from '@waveform-playlist/core';
 
 export interface SpectrogramControllerHost extends ReactiveControllerHost {
   dispatchEvent(event: Event): boolean;
