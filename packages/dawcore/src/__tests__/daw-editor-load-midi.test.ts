@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import type { Mock } from 'vitest';
 import type { DawEditorElement } from '../elements/daw-editor';
+import type { DawClipElement } from '../elements/daw-clip';
 
 // Mock @dawcore/midi so we don't need a real binary fixture.
 vi.mock('@dawcore/midi', () => ({
@@ -135,7 +136,7 @@ describe('<daw-editor>.loadMidi', () => {
     const clips = editor.querySelectorAll('daw-clip');
     expect(clips.length).toBe(2);
     clips.forEach((c) => {
-      expect(Number((c as HTMLElement).getAttribute('start'))).toBe(30);
+      expect((c as unknown as DawClipElement).start).toBe(30);
     });
   });
 
@@ -146,15 +147,14 @@ describe('<daw-editor>.loadMidi', () => {
     expect(tracks.map((t) => t.getAttribute('name'))).toEqual(['Track 1', 'Track 2']);
   });
 
-  it('rejects with install hint when @dawcore/midi is unavailable', async () => {
-    // Force the dynamic import to fail by mocking it to throw.
+  // Note: a true "install hint" test would need vi.doMock to simulate
+  // the @dawcore/midi module being absent — deferred since vi.mock at file
+  // scope is incompatible with per-test module replacement.
+  it('rejects when parseMidiUrl throws', async () => {
     mockParseMidiUrl.mockImplementationOnce(() => {
-      throw new Error('synthetic — module-resolution failure');
+      throw new Error('synthetic — parse failure');
     });
-    // The implementation catches a module-not-found and rejects with an install hint;
-    // but parseMidiUrl throwing AFTER successful import does NOT trigger the install hint.
-    // That branch is exercised by a separate test below using vi.doMock.
-    await expect(editor.loadMidi('/midi/x.mid')).rejects.toBeTruthy();
+    await expect(editor.loadMidi('/midi/x.mid')).rejects.toThrow(/parse failure/);
   });
 
   it('cleans up successfully-created tracks when one fails', async () => {
@@ -177,19 +177,20 @@ describe('<daw-editor>.loadMidi', () => {
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
     const originalAddTrack = editor.addTrack.bind(editor);
     let lateResolveTrack: HTMLElement | null = null;
+    let callCount = 0;
     editor.addTrack = vi.fn(async (config) => {
-      if (((config as any).clips?.[0]?.midiChannel ?? 0) === 0) {
-        // Track 0 rejects immediately
+      callCount += 1;
+      if (callCount === 1) {
+        // First addTrack call rejects synchronously.
         throw new Error('synthetic — track 0 fails fast');
       }
-      // Track 1 resolves after a microtask tick — proving cleanup waits.
+      // Second resolves after a microtask tick — proving cleanup waits.
       const el = await originalAddTrack(config);
       lateResolveTrack = el as unknown as HTMLElement;
       return el;
     });
 
     await expect(editor.loadMidi('/midi/race.mid')).rejects.toThrow(/track 0 fails fast/);
-    // After loadMidi resolves, the late-resolved track has also been cleaned up.
     expect(editor.querySelectorAll('daw-track')).toHaveLength(0);
     expect(lateResolveTrack).not.toBeNull();
     expect((lateResolveTrack as HTMLElement | null)?.isConnected).toBe(false);
