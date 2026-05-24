@@ -1,15 +1,18 @@
 import type { SpectrogramConfig, ColorMapValue } from '../types/spectrogram';
 
 /**
- * Default values for every `SpectrogramConfig` field. Used by both
- * `@dawcore/spectrogram`'s orchestrator and `@dawcore/components`'s
- * controller so defaults can't drift between layers.
+ * Default values for `SpectrogramConfig` fields. Used by both the orchestrator
+ * and the React controller so defaults can't drift between layers.
  *
- * `maxFrequency` is intentionally omitted — it defaults to `sampleRate / 2`
- * at compute time (depends on the clip's audio).
+ * Intentionally omitted:
+ * - `maxFrequency` — defaults to `sampleRate / 2` at compute time (clip-dependent)
+ * - `alpha` — window-specific (only used by the `hamming` window function); its
+ *   canonical default (0.54) lives in `windowFunctions.ts` where the math is
+ * - `labelsColor`, `labelsBackground` — kept as optional `undefined` so consumers
+ *   can opt into label styling without forcing a color value
  */
 export const SPECTROGRAM_DEFAULTS: Required<
-  Omit<SpectrogramConfig, 'maxFrequency' | 'labelsColor' | 'labelsBackground'>
+  Omit<SpectrogramConfig, 'maxFrequency' | 'alpha' | 'labelsColor' | 'labelsBackground'>
 > & {
   labelsColor: string | undefined;
   labelsBackground: string | undefined;
@@ -17,7 +20,6 @@ export const SPECTROGRAM_DEFAULTS: Required<
   fftSize: 2048,
   hopSize: 512,
   windowFunction: 'hann',
-  alpha: 0.5,
   frequencyScale: 'mel',
   minFrequency: 0,
   gainDb: 20,
