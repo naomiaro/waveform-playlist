@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Midi } from '@tonejs/midi';
-import { parseMidiFile } from '../parseMidiFile';
+import { parseMidiFile } from '../src/parseMidiFile';
 
 /**
  * Helper: create a minimal MIDI ArrayBuffer using @tonejs/midi's Midi constructor.
