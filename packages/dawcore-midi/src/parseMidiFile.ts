@@ -19,11 +19,19 @@ export interface ParsedMidiTrack {
 export interface ParsedMidi {
   /** Individual MIDI tracks with their notes */
   tracks: ParsedMidiTrack[];
-  /** Total duration in seconds (max of all track durations) */
+  /** Total duration in seconds (max of all track durations; 0 if no note-bearing tracks) */
   duration: number;
-  /** Song name from MIDI header */
+  /** Song name from MIDI header (empty string when not set) */
   name: string;
-  /** First tempo in BPM (default 120 if none specified) */
+  /**
+   * First tempo in BPM (default 120 if none specified).
+   *
+   * Note: multi-tempo files (e.g., ritardando, tempo automation) have N tempo
+   * events but this field reports only the first. Note timings inside
+   * `tracks[].notes` are already tempo-adjusted by `@tonejs/midi`, so playback
+   * stays correct — but if you set `editor.bpm = parsed.bpm` on a multi-tempo
+   * file the visual grid will not match the audio mid-piece.
+   */
   bpm: number;
   /** Time signature as [numerator, denominator] (default [4, 4]) */
   timeSignature: [number, number];

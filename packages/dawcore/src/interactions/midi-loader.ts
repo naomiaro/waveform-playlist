@@ -11,7 +11,7 @@ import type { MidiLoadOptions, MidiLoadResult } from '@dawcore/midi';
 import type { TrackConfig } from '../types';
 import type { DawTrackElement } from '../elements/daw-track';
 
-export type { MidiLoadOptions, MidiLoadResult } from '@dawcore/midi';
+export type { MidiLoadOptions, MidiLoadResult };
 
 /**
  * Minimal host surface needed by `loadMidiImpl`. `<daw-editor>` satisfies this
@@ -45,6 +45,17 @@ export async function loadMidiImpl(
   source: string | File,
   options: MidiLoadOptions = {}
 ): Promise<MidiLoadResult> {
+  // Reject NaN / Infinity / negative startTime up front. Without this, every
+  // clip silently inherits the bogus value and the timeline corrupts.
+  const startTime = options.startTime ?? 0;
+  if (!Number.isFinite(startTime) || startTime < 0) {
+    throw new RangeError(
+      'loadMidi: startTime must be a non-negative finite number (got ' +
+        String(options.startTime) +
+        ')'
+    );
+  }
+
   // (1) Dynamic-import the optional peer dep. Log the original error so
   // debugging isn't blocked when the failure is something other than
   // "not installed" (broken exports map, 404 chunk, CSP, etc.). Targeting
@@ -87,7 +98,6 @@ export async function loadMidiImpl(
   // (4) Concurrent addTrack with allSettled so we can wait for every settlement
   // before deciding. Promise.all would early-reject while other addTrack calls
   // keep running, leaving orphan tracks after cleanup.
-  const startTime = options.startTime ?? 0;
   const settlements = await Promise.allSettled(
     parsed.tracks.map((t) =>
       host.addTrack({

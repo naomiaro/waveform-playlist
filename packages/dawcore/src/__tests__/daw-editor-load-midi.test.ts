@@ -147,6 +147,44 @@ describe('<daw-editor>.loadMidi', () => {
     expect(tracks.map((t) => t.getAttribute('name'))).toEqual(['Track 1', 'Track 2']);
   });
 
+  it('sets render-mode="piano-roll" on every created track', async () => {
+    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 3 }));
+    await editor.loadMidi('/midi/x.mid');
+    const tracks = Array.from(editor.querySelectorAll('daw-track'));
+    tracks.forEach((t) => {
+      expect(t.getAttribute('render-mode')).toBe('piano-roll');
+    });
+  });
+
+  it('propagates AbortError when the signal aborts during fetch', async () => {
+    const ctrl = new AbortController();
+    // Simulate parseMidiUrl honoring the signal — checks the aborted flag
+    // synchronously (standard fetch pattern) and also listens for the abort
+    // event. Without the synchronous check, an abort called between the
+    // editor.loadMidi() invocation and the mock's promise creation gets lost.
+    mockParseMidiUrl.mockImplementationOnce((_url: string, _opts: unknown, signal: AbortSignal) => {
+      return new Promise((_resolve, reject) => {
+        if (signal.aborted) {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
+          return;
+        }
+        signal.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
+        });
+      });
+    });
+    const p = editor.loadMidi('/midi/long.mid', { signal: ctrl.signal });
+    ctrl.abort();
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('throws RangeError when startTime is NaN or negative', async () => {
+    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 1 }));
+    await expect(editor.loadMidi('/midi/x.mid', { startTime: NaN })).rejects.toThrow(RangeError);
+    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 1 }));
+    await expect(editor.loadMidi('/midi/x.mid', { startTime: -1 })).rejects.toThrow(RangeError);
+  });
+
   // Note: a true "install hint" test would need vi.doMock to simulate
   // the @dawcore/midi module being absent — deferred since vi.mock at file
   // scope is incompatible with per-test module replacement.

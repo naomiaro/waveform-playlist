@@ -19,7 +19,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "keywords": ["midi", "dawcore", "web-audio", "tonejs"],
+  "keywords": [
+    "midi",
+    "dawcore",
+    "web-audio",
+    "tonejs"
+  ],
   "author": "Naomi Aro",
   "license": "MIT",
   "repository": {
@@ -31,7 +36,10 @@
   "bugs": {
     "url": "https://github.com/naomiaro/waveform-playlist/issues"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
     "@tonejs/midi": "^2.0.28"

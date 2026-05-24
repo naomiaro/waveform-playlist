@@ -7,6 +7,12 @@ import type { MidiNoteData } from '@waveform-playlist/core';
 export class DawClipElement extends LitElement {
   @property() src = '';
   @property({ attribute: 'peaks-src' }) peaksSrc = '';
+  /**
+   * Timeline position in seconds. JS property only — NOT reflected to the
+   * `start` attribute (Lit's `reflect` defaults to false). Tests that need
+   * to assert clip position must read this property directly; reading
+   * `el.getAttribute('start')` returns `null` regardless of correctness.
+   */
   @property({ type: Number }) start = 0;
   @property({ type: Number }) duration = 0;
   @property({ type: Number }) offset = 0;
