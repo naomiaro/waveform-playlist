@@ -1,16 +1,16 @@
 # dawcore-spectrogram (`@dawcore/spectrogram`)
 
-**Purpose:** Framework-agnostic spectrogram computation, Web Worker, and viewport-aware rendering orchestrator. Shared between the dawcore Lit element layer and the React Provider in `@waveform-playlist/spectrogram`.
+**Purpose:** Framework-agnostic spectrogram computation, Web Worker, and viewport-aware rendering orchestrator. Used by the dawcore Lit element layer via `<daw-spectrogram>` + `SpectrogramController`. The React Provider in `@waveform-playlist/spectrogram` currently consumes the worker + computation primitives only and keeps its own per-track tier pipeline; the orchestrator is a candidate for a future consolidation PR.
 
 **Build:** tsup, three entry blocks — main (CJS + ESM + DTS), `worker/spectrogram.worker` (ESM-only, no DTS), `orchestrator/index` (ESM + DTS) under `./orchestrator` subpath. `clean: true` only on the first block.
 
-**Testing:** vitest with happy-dom. Tests live at `packages/dawcore-spectrogram/__tests__/` (sibling of `src/`, NOT inside it — `rootDir` is dropped from tsconfig so the sibling layout coexists with build emission).
+**Testing:** vitest with happy-dom. Tests live at `packages/dawcore-spectrogram/__tests__/` (sibling of `src/`, NOT inside it — `rootDir` is intentionally omitted from `tsconfig.json` so the sibling `__tests__/` and `src/` directories are both picked up via `include`).
 
 ## Subpath Exports
 
 - `@dawcore/spectrogram` — re-exports computation + worker + orchestrator class
 - `@dawcore/spectrogram/worker/spectrogram.worker` — Worker URL target; use as `new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url)`
-- `@dawcore/spectrogram/orchestrator` — orchestrator + helpers (already re-exported from root, this subpath exists for tree-shaking)
+- `@dawcore/spectrogram/orchestrator` — orchestrator + helpers via a focused ESM-only subpath. The root entry re-exports the same surface, but importing through `/orchestrator` ships only the orchestrator graph (no computation/worker code at the import-time level, useful for consumers that handle their own FFT pipeline).
 
 ## SpectrogramOrchestrator
 
@@ -58,4 +58,4 @@ The third tsup block (orchestrator subpath) is `format: ['esm']`. tsup emits `di
 
 ## Tests
 
-145 tests across `__tests__/`: 6 computation (colorMaps, fft, frequencyScales, windowFunctions, createSpectrogramWorker, createSpectrogramWorkerPool) + 4 orchestrator (construction, clip-reg, canvas-reg, tier-render) + viewport-classify (6) + chunk-grouping (5) + color-lut-cache (4) = ~165 total at last count. Run with `cd packages/dawcore-spectrogram && npx vitest run`.
+Pure helper tests (chunk-grouping, color-lut-cache, viewport-classify, colorMaps, fft, frequencyScales, windowFunctions) + worker pool tests + orchestrator tests. Run with `cd packages/dawcore-spectrogram && npx vitest run` — vitest reports the current count.

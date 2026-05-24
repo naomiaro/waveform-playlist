@@ -71,10 +71,12 @@ export class SpectrogramOrchestrator extends EventTarget {
   protected disposed = false;
   protected renderInFlight = false;
   // Tracks which trackIds have already emitted `viewport-ready` for the
-  // current generation. Cleared on every generation bump (setViewport /
-  // setConfig / setColorMap). Without this, every render — including
-  // those triggered by late `registerCanvas` calls during track-by-track
-  // loading — would re-fire the event for every track in the canvas map.
+  // current generation. Cleared on every generation bump (setViewport with a
+  // real change, setConfig, setColorMap, setDevicePixelRatio) AND in dispose().
+  // Without this, every render — including those triggered by late
+  // `registerCanvas` calls during track-by-track loading — would re-fire the
+  // event for every track in the canvas map (N×N-ish ascending fan-in:
+  // 3 tracks → 4+3+2+1 = 10 events; the dedup reduces this to 3).
   protected readyDispatched = new Set<string>();
 
   constructor(opts: SpectrogramOrchestratorOptions) {

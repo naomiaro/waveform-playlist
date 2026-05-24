@@ -23,7 +23,7 @@ export default defineConfig([
     sourcemap: true,
     clean: false,
   },
-  // Orchestrator subpath — emits dist/orchestrator/index.mjs + .d.ts so
+  // Orchestrator subpath — emits dist/orchestrator/index.mjs + .d.mts so
   // consumers can `import { SpectrogramOrchestrator } from '@dawcore/spectrogram/orchestrator'`.
   {
     entry: {
