@@ -52,6 +52,7 @@ import type {
   LoadFilesResult,
 } from '../events';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
+import { loadMidiImpl, type MidiLoadOptions, type MidiLoadResult } from '../interactions/midi-loader';
 import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
@@ -1696,6 +1697,15 @@ export class DawEditorElement extends LitElement {
   };
   async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
     return loadFilesImpl(this, files);
+  }
+  /**
+   * Imperatively load a `.mid` file (URL or File) and create N `<daw-track>`
+   * elements — one per note-bearing MIDI track. On any per-track failure,
+   * successfully-created tracks are removed so the editor returns to its
+   * pre-call state. Requires the optional `@dawcore/midi` peer dep.
+   */
+  async loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiLoadResult> {
+    return loadMidiImpl(this, source, options);
   }
   // --- Programmatic Track API ---
   /**
