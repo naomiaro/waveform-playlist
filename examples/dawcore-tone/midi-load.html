@@ -87,6 +87,14 @@
         editor.bpm = result.bpm;
         editor.timeSignature = result.timeSignature;
       } catch (err) {
+        // Cancellation isn't a failure — surface it differently.
+        if (err && err.name === 'AbortError') {
+          addLog('loadMidi cancelled');
+          return;
+        }
+        // Log the full Error (with stack + cause chain) to DevTools — the
+        // on-screen log is plain text and loses structured detail.
+        console.error('[loadMidi]', err);
         addLog('loadMidi failed: ' + String(err));
       }
     }

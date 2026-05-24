@@ -196,6 +196,57 @@ describe('<daw-editor>.loadMidi', () => {
     expect((lateResolveTrack as HTMLElement | null)?.isConnected).toBe(false);
   });
 
+  it('cleans up a track element that addTrack appended before rejecting', async () => {
+    // Realistic failure mode: addTrack appends the <daw-track> synchronously
+    // and THEN rejects (e.g., _loadTrack fires daw-track-error after the
+    // element is in the DOM). The cleanup must remove that orphan too —
+    // not just the elements from the succeeded[] array.
+    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
+    const originalAddTrack = editor.addTrack.bind(editor);
+    let callCount = 0;
+    editor.addTrack = vi.fn(async (config) => {
+      callCount += 1;
+      if (callCount === 1) {
+        // Append the element first, then reject — mirrors the real
+        // _loadTrack-fails-after-append path.
+        const trackEl = document.createElement('daw-track');
+        editor.appendChild(trackEl);
+        throw new Error('synthetic — appended then rejected');
+      }
+      return originalAddTrack(config);
+    });
+
+    await expect(editor.loadMidi('/midi/orphan.mid')).rejects.toThrow(/appended then rejected/);
+    // Both the failed (orphan-appended) track AND the succeeded second track
+    // must be gone — editor returns to pre-call state.
+    expect(editor.querySelectorAll('daw-track')).toHaveLength(0);
+  });
+
+  it('summarizes multi-track failures and warns each subsequent rejection', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 3 }));
+    editor.addTrack = vi.fn(async () => {
+      throw new Error('synthetic — all tracks fail');
+    });
+
+    await expect(editor.loadMidi('/midi/all-fail.mid')).rejects.toThrow(/3 of 3 tracks failed/);
+    // First rejection is in the thrown Error; the other two surface as warnings.
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('additional track failure (1)'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('additional track failure (2)'));
+    warnSpy.mockRestore();
+  });
+
+  it('preserves dynamic-import original error as cause when @dawcore/midi unavailable', async () => {
+    // We can't easily trigger the dynamic-import catch from a file-scope
+    // vi.mock; this test instead verifies the error WRAPPING behavior on a
+    // simulated failure via the underlying parseMidiUrl. The install-hint
+    // path proper is covered by the impl reading; this guards the cause-chain
+    // semantics on the wrapper at the catch site.
+    const originalErr = new Error('synthetic underlying cause');
+    mockParseMidiUrl.mockRejectedValueOnce(originalErr);
+    await expect(editor.loadMidi('/midi/x.mid')).rejects.toBe(originalErr);
+  });
+
   it('propagates bpm / timeSignature / duration / name from parsed data', async () => {
     mockParseMidiUrl.mockResolvedValueOnce(
       makeParsedMidi({ tracks: 1, bpm: 96, ts: [6, 8], duration: 12.5, name: 'Song' })

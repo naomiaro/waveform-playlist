@@ -1507,24 +1507,20 @@ Enable with the `file-drop` attribute on `<daw-editor>`:
 </daw-editor>
 ```
 
-Dropping audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, etc.) creates one new track per file. Dropping a MIDI file (`.mid`, `.midi`) routes through the `loadMidi()` pipeline, creating N tracks with `render-mode="piano-roll"`.
+Dropping audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, etc.) creates one new track per file.
 
-Mixed drops work — dropping 2 audio files and 1 MIDI file in a single drop creates tracks for all of them.
+**MIDI files in `loadFiles()` is planned, not yet implemented.** Today, drop a `.mid` via the file zone and it will fail at `AudioContext.decodeAudioData()`. Use `editor.loadMidi(file)` directly for MIDI input. See [MIDI Loading](#midi-loading).
 
 ### Programmatic File Loading
 
 For custom drop zones, file pickers, or other UIs:
 
 ```typescript
-editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<LoadFilesResult>
-
-interface LoadFilesOptions {
-  midiOptions?: MidiLoadOptions;  // Passed through for .mid files (startTime, signal)
-}
+editor.loadFiles(files: File[] | FileList): Promise<LoadFilesResult>
 
 interface LoadFilesResult {
-  trackIds: string[];             // All created track IDs (audio + MIDI)
-  midi?: MidiLoadResult;          // Present when MIDI files were in the drop (bpm, timeSignature, duration, name, trackIds)
+  loaded: string[];                                 // Successfully-loaded track IDs (audio only today)
+  failed: Array<{ file: File; error: unknown }>;    // Per-file failures
 }
 ```
 
@@ -1533,25 +1529,28 @@ interface LoadFilesResult {
 const input = document.createElement('input');
 input.type = 'file';
 input.multiple = true;
-input.accept = 'audio/*,.mid,.midi';
+input.accept = 'audio/*';
 input.onchange = async () => {
-  const { trackIds } = await editor.loadFiles(input.files);
-  console.log('Created tracks:', trackIds);
+  const { loaded, failed } = await editor.loadFiles(input.files);
+  console.log('Loaded:', loaded, 'Failed:', failed);
 };
 input.click();
 
-// Custom drop zone with MIDI options
-dropZone.addEventListener('drop', async (e) => {
-  e.preventDefault();
-  const { trackIds } = await editor.loadFiles(e.dataTransfer.files, {
-    midiOptions: { flatten: true },
-  });
-});
+// MIDI files require a separate call today
+const midiInput = document.createElement('input');
+midiInput.type = 'file';
+midiInput.accept = '.mid,.midi';
+midiInput.onchange = async () => {
+  const result = await editor.loadMidi(midiInput.files[0]);
+  console.log('Loaded MIDI tracks:', result.trackIds);
+};
 ```
+
+**Planned:** unify the two paths so a single `loadFiles()` call accepts mixed audio + MIDI input and routes by extension. Until that lands, callers branch on extension themselves.
 
 ### File Type Detection
 
-`loadFiles()` detects MIDI files by extension (`.mid`, `.midi`) and routes them through `loadMidi()`. All other files are treated as audio and passed to `AudioContext.decodeAudioData()` — no upfront MIME type filtering. Non-audio files (`.pdf`, `.txt`, etc.) will fail at decode and emit a `daw-files-load-error` event. This is intentional: the browser's decoder is the most reliable detector of valid audio.
+`loadFiles()` does no upfront MIME type filtering — every file is passed to `AudioContext.decodeAudioData()`. Non-audio files (`.pdf`, `.txt`, `.mid`, etc.) will fail at decode and emit a `daw-files-load-error` event. This is intentional for audio: the browser's decoder is the most reliable detector of valid audio. For MIDI files, route through `editor.loadMidi()` instead.
 
 ```typescript
 'daw-files-load-error'  // detail: {file: File, error: string}
