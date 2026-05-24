@@ -126,10 +126,25 @@ export function createSpectrogramWorker(worker: Worker): SpectrogramWorkerApi {
 
   worker.onerror = (e: ErrorEvent) => {
     terminated = true;
-    for (const [, entry] of pending) {
-      entry.reject(e.error ?? new Error(e.message));
+    console.error(
+      '[dawcore-spectrogram] worker crashed with ' +
+        pending.size +
+        ' pending operations: ' +
+        (e.message || 'unknown error')
+    );
+    for (const [id, entry] of pending) {
+      entry.reject(
+        new Error('Worker crashed (id=' + id + '): ' + (e.message || 'unknown error'))
+      );
     }
     pending.clear();
+  };
+
+  worker.onmessageerror = (e: MessageEvent) => {
+    console.warn(
+      '[dawcore-spectrogram] worker postMessage clone failure: ' +
+        (e.data ? JSON.stringify(e.data) : 'no data')
+    );
   };
 
   return {

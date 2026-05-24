@@ -10,7 +10,14 @@ import {
  */
 function parseChannelFromCanvasId(canvasId: string): number {
   const match = canvasId.match(/-ch(\d+)-/);
-  return match ? parseInt(match[1], 10) : 0;
+  if (!match) {
+    console.warn(
+      '[dawcore-spectrogram] canvas ID missing -ch{N}- segment, routing to worker 0: ' +
+        canvasId
+    );
+    return 0;
+  }
+  return parseInt(match[1], 10);
 }
 
 /**
@@ -40,15 +47,32 @@ export function createSpectrogramWorkerPool(
   poolSize = defaultPoolSize()
 ): SpectrogramWorkerApi {
   const workers: SpectrogramWorkerApi[] = [];
+  let failedAt = -1;
   try {
     for (let i = 0; i < poolSize; i++) {
+      failedAt = i;
       workers.push(createSpectrogramWorker(createWorker()));
     }
+    failedAt = -1;
   } catch (err) {
     for (const w of workers) {
-      w.terminate();
+      try {
+        w.terminate();
+      } catch (terminateErr) {
+        console.warn(
+          '[dawcore-spectrogram] pool constructor cleanup: terminate failed for worker — ' +
+            String(terminateErr)
+        );
+      }
     }
-    throw err;
+    throw new Error(
+      'Failed to create spectrogram worker pool (size=' +
+        poolSize +
+        ') at worker ' +
+        failedAt +
+        ': ' +
+        (err instanceof Error ? err.message : String(err))
+    );
   }
 
   function getWorkerForChannel(channelIndex: number): SpectrogramWorkerApi {
@@ -56,7 +80,10 @@ export function createSpectrogramWorkerPool(
   }
 
   return {
-    computeFFT(params: SpectrogramWorkerFFTParams, generation = 0): Promise<{ cacheKey: string }> {
+    async computeFFT(
+      params: SpectrogramWorkerFFTParams,
+      generation = 0
+    ): Promise<{ cacheKey: string }> {
       // Mono: single worker computes the mono mix (needs all channel data)
       if (params.mono) {
         return workers[0].computeFFT(params, generation);
@@ -70,8 +97,26 @@ export function createSpectrogramWorkerPool(
       const promises = activeWorkers.map((w, i) =>
         w.computeFFT({ ...params, channelFilter: i }, generation)
       );
-      // Wait for all workers, return any cacheKey (all are identical)
-      return Promise.all(promises).then((results) => results[0]);
+      // Use allSettled so one channel's failure doesn't drop surviving channel results.
+      // Throw the first failure; log additional ones so they're not silently swallowed.
+      const settled = await Promise.allSettled(promises);
+      const failures = settled.filter(
+        (s): s is PromiseRejectedResult => s.status === 'rejected'
+      );
+      if (failures.length > 0) {
+        for (let i = 1; i < failures.length; i++) {
+          console.warn(
+            '[dawcore-spectrogram] additional channel FFT failure (' +
+              i +
+              '): ' +
+              (failures[i].reason instanceof Error
+                ? failures[i].reason.message
+                : String(failures[i].reason))
+          );
+        }
+        throw failures[0].reason;
+      }
+      return (settled[0] as PromiseFulfilledResult<{ cacheKey: string }>).value;
     },
 
     renderChunks(params: SpectrogramWorkerRenderChunksParams, generation = 0): Promise<void> {
