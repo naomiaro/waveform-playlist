@@ -3,7 +3,10 @@ import '@dawcore/components';
 import { NativePlayoutAdapter } from '@dawcore/transport';
 import styles from './wc-example.module.css';
 
-const ZOOM_LEVELS = [128, 256, 512, 1024, 2048, 4096, 8192];
+// Pre-computed .dat peaks have base scale 256 spp; WaveformData.resample()
+// can only go coarser. Starting at 256 avoids dawcore's "zoom rejected"
+// warning when zooming in past the peaks' resolution limit.
+const ZOOM_LEVELS = [256, 512, 1024, 2048, 4096, 8192];
 
 const TRACKS = [
   {
@@ -76,7 +79,9 @@ export default function WcMulticlipExample() {
     const next = idx + direction;
     if (next < 0 || next >= ZOOM_LEVELS.length) return;
     editor.samplesPerPixel = ZOOM_LEVELS[next];
-    setZoom(ZOOM_LEVELS[next]);
+    // Read back: the editor may reject the value (e.g., finer than the
+    // pre-computed peaks' base scale) and leave samplesPerPixel unchanged.
+    setZoom(editor.samplesPerPixel);
   };
 
   return (
