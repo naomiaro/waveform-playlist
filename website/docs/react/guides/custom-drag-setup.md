@@ -5,7 +5,7 @@ description: "Advanced: manually configure DragDropProvider with custom sensors,
 
 # Custom Drag Setup
 
-For most use cases, [`ClipInteractionProvider`](/docs/guides/beats-and-bars#snap-to-grid) handles all clip drag/move/trim/snap/collision setup automatically. This guide covers the **manual approach** — configuring `DragDropProvider` directly when you need full control over sensors, modifiers, or drag behavior.
+For most use cases, [`ClipInteractionProvider`](/docs/react/guides/beats-and-bars#snap-to-grid) handles all clip drag/move/trim/snap/collision setup automatically. This guide covers the **manual approach** — configuring `DragDropProvider` directly when you need full control over sensors, modifiers, or drag behavior.
 
 ## When to Use Manual Setup
 
@@ -350,6 +350,6 @@ This uses delay-based activation for touch events (distinguishes drag from scrol
 
 ## See Also
 
-- [Beats & Bars](/docs/guides/beats-and-bars) — Musical timescale with `ClipInteractionProvider`
+- [Beats & Bars](/docs/react/guides/beats-and-bars) — Musical timescale with `ClipInteractionProvider`
 - [Annotations Example](/examples/annotations) — Combined clip + annotation dragging
 - [LLM API Reference](/docs/api/llm-reference) — Complete TypeScript interfaces

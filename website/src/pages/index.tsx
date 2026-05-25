@@ -139,7 +139,7 @@ function HomepageHeader() {
           </Link>
           <Link
             className={styles.secondaryButton}
-            to="/docs/getting-started/installation">
+            to="/docs/react/getting-started/installation">
             Get Started
           </Link>
         </div>

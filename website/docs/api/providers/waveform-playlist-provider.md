@@ -104,7 +104,7 @@ Track controls panel configuration.
 **Type:** `Partial<WaveformPlaylistTheme>`
 **Default:** `defaultTheme`
 
-Custom theme object. See [Theming Guide](/docs/guides/theming).
+Custom theme object. See [Theming Guide](/docs/react/guides/theming).
 
 ```tsx
 <WaveformPlaylistProvider

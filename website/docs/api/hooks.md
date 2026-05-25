@@ -522,7 +522,7 @@ Note: For consumer components, use `setMasterVolume()` from `usePlaylistControls
 These hooks follow the **onEngineState pattern**: they delegate mutations to `PlaylistEngine` methods and mirror engine state into React via an `onEngineState()` callback. They are used internally by `WaveformPlaylistProvider` but can be useful for advanced custom providers.
 
 :::tip Using the engine without React?
-For Svelte, Vue, vanilla JS, or headless editing, see [Using the Engine Directly](/docs/guides/engine) — the `PlaylistEngine` class works without any framework.
+For Svelte, Vue, vanilla JS, or headless editing, see [Using the Engine Directly](/docs/react/guides/engine) — the `PlaylistEngine` class works without any framework.
 :::
 
 ### useSelectionState
@@ -1315,5 +1315,5 @@ Hooks must be used within their providers:
 
 - [WaveformPlaylistProvider](/docs/api/providers/waveform-playlist-provider)
 - [Components](/docs/api/components)
-- [Recording Guide](/docs/guides/recording)
-- [Annotations Guide](/docs/guides/annotations)
+- [Recording Guide](/docs/react/guides/recording)
+- [Annotations Guide](/docs/react/guides/annotations)

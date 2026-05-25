@@ -87,4 +87,4 @@ Each starter has multiple example pages — basic, multiclip, recording, spectro
 
 For the complete element catalog, audio-backend comparison, MIDI loading, recording reference, and CSS theming, see the [`@dawcore/components` README](https://github.com/naomiaro/waveform-playlist/blob/main/packages/dawcore/README.md).
 
-Using React instead? → [React Getting Started](/docs/getting-started/installation)
+Using React instead? → [React Getting Started](/docs/react/getting-started/installation)

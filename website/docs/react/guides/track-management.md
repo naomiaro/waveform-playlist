@@ -320,5 +320,5 @@ function TrackManagementExample() {
 
 ## Next Steps
 
-- [Annotations](/docs/guides/annotations) - Add time-synchronized annotations
-- [Audio Effects](/docs/guides/effects) - Apply effects to tracks
+- [Annotations](/docs/react/guides/annotations) - Add time-synchronized annotations
+- [Audio Effects](/docs/react/guides/effects) - Apply effects to tracks

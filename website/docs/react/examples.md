@@ -1,6 +1,5 @@
 ---
-sidebar_position: 5
-sidebar_label: "React: Examples"
+sidebar_position: 3
 description: "Interactive demos of multitrack editing, effects, recording, annotations, and waveform visualization"
 ---
 
@@ -316,6 +315,6 @@ Visit `http://localhost:3000` to see the examples.
 
 ## See Also
 
-- [Getting Started](/docs/getting-started/installation)
+- [Getting Started](/docs/react/getting-started/installation)
 - [API Reference](/docs/api/providers/waveform-playlist-provider)
 - [GitHub Repository](https://github.com/naomiaro/waveform-playlist)

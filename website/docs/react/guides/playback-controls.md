@@ -449,5 +449,5 @@ function FullPlaybackExample() {
 
 ## Next Steps
 
-- [Track Management](/docs/guides/track-management) - Control individual tracks
-- [Audio Effects](/docs/guides/effects) - Add effects to playback
+- [Track Management](/docs/react/guides/track-management) - Control individual tracks
+- [Audio Effects](/docs/react/guides/effects) - Add effects to playback

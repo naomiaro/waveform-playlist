@@ -686,5 +686,5 @@ Recording requires:
 
 ## Next Steps
 
-- [Annotations](/docs/guides/annotations) - Add annotations to recordings
-- [Track Management](/docs/guides/track-management) - Manage recorded tracks
+- [Annotations](/docs/react/guides/annotations) - Add annotations to recordings
+- [Track Management](/docs/react/guides/track-management) - Manage recorded tracks

@@ -32,7 +32,7 @@ return (
 );
 ```
 
-[**→ Get started with React**](/docs/getting-started/installation)
+[**→ Get started with React**](/docs/react/getting-started/installation)
 
 ### Web Components
 

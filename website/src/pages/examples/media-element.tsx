@@ -37,7 +37,7 @@ export default function MediaElementExamplePage(): React.ReactElement {
 
         <p style={{ marginTop: '1.5rem' }}>
           See the{' '}
-          <a href="/waveform-playlist/docs/guides/media-element-playout">
+          <a href="/waveform-playlist/docs/react/guides/media-element-playout">
             Media Element Playout Guide
           </a>{' '}
           for usage details and API reference.

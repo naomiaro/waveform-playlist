@@ -259,5 +259,5 @@ When `channelCount` is 1, the scalar `level` and `peakLevel` return values are i
 
 ## Next Steps
 
-- [Recording](/docs/guides/recording) — Record audio with level monitoring
-- [Audio Effects](/docs/guides/effects) — Apply effects to tracks and master output
+- [Recording](/docs/react/guides/recording) — Record audio with level monitoring
+- [Audio Effects](/docs/react/guides/effects) — Apply effects to tracks and master output

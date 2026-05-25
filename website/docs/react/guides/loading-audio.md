@@ -405,5 +405,5 @@ const { tracks, loading, loadedCount, totalCount } = useAudioTracks(configs, { i
 
 ## Next Steps
 
-- [Playback Controls](/docs/guides/playback-controls) - Control playback
-- [Track Management](/docs/guides/track-management) - Manage loaded tracks
+- [Playback Controls](/docs/react/guides/playback-controls) - Control playback
+- [Track Management](/docs/react/guides/track-management) - Manage loaded tracks

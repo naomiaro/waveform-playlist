@@ -676,5 +676,5 @@ See the [Annotations Example](/examples/annotations) for a full working demo.
 
 ## Next Steps
 
-- [Recording](/docs/guides/recording) - Record audio with annotations
-- [Theming](/docs/guides/theming) - Customize annotation appearance
+- [Recording](/docs/react/guides/recording) - Record audio with annotations
+- [Theming](/docs/react/guides/theming) - Customize annotation appearance

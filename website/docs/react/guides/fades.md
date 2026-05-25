@@ -323,6 +323,6 @@ interface AudioTrackConfig {
 
 ## Next Steps
 
-- [Effects](/docs/guides/effects) - Add audio effects like reverb and delay
-- [Playback Controls](/docs/guides/playback-controls) - Control playback with play, pause, and stop
-- [Track Management](/docs/guides/track-management) - Manage tracks dynamically
+- [Effects](/docs/react/guides/effects) - Add audio effects like reverb and delay
+- [Playback Controls](/docs/react/guides/playback-controls) - Control playback with play, pause, and stop
+- [Track Management](/docs/react/guides/track-management) - Manage tracks dynamically

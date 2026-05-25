@@ -569,4 +569,4 @@ const StyledPlayButton = styled(PlayButton)`
 
 - [WaveformPlaylistProvider](/docs/api/providers/waveform-playlist-provider)
 - [Hooks](/docs/api/hooks)
-- [Theming Guide](/docs/guides/theming)
+- [Theming Guide](/docs/react/guides/theming)

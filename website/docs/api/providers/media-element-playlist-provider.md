@@ -17,7 +17,7 @@ A simplified playlist provider for single-track playback using `HTMLAudioElement
 | Waveform data | Pre-computed (`WaveformDataObject`) | Decoded from AudioBuffer |
 | Playback rate | Pitch-preserving (0.5x - 2.0x) | Not built-in |
 | Editing | View only | Drag, trim, split |
-| Effects | Via Tone.js bridge (see [guide](/docs/guides/media-element-playout#tonejs-effects)) | 20 built-in Tone.js effects |
+| Effects | Via Tone.js bridge (see [guide](/docs/react/guides/media-element-playout#tonejs-effects)) | 20 built-in Tone.js effects |
 
 ## Import
 
@@ -144,7 +144,7 @@ Auto-scroll to keep the playhead centered during playback.
 **Type:** `Partial<WaveformPlaylistTheme>`
 **Default:** `defaultTheme`
 
-Custom theme object. See [Theming Guide](/docs/guides/theming).
+Custom theme object. See [Theming Guide](/docs/react/guides/theming).
 
 ### Annotations
 
@@ -261,7 +261,7 @@ interface MediaElementDataContextValue {
 }
 ```
 
-`playoutRef.current.outputNode` returns the native `GainNode` output — use it to bridge into Tone.js effect chains (see [guide](/docs/guides/media-element-playout#tonejs-effects)).
+`playoutRef.current.outputNode` returns the native `GainNode` output — use it to bridge into Tone.js effect chains (see [guide](/docs/react/guides/media-element-playout#tonejs-effects)).
 
 ## TypeScript
 
