@@ -70,9 +70,14 @@ Web Components Integration        ← all WC code lives here
   ├─ Getting started (WC)
   ├─ Editor element (<daw-editor>)
   ├─ Track & clip elements
-  ├─ Visual elements (waveform, playhead, ruler)
+  ├─ Visual elements (waveform, playhead, ruler, grid, piano-roll)
   ├─ Transport elements
+  ├─ Track controls (<daw-track-controls>)
+  ├─ Selection (<daw-selection>)
   ├─ Loading audio
+  ├─ Recording (<daw-record-button>, RecordingController)
+  ├─ Clip interactions (drag, trim, split via ClipPointerHandler)
+  ├─ Keyboard shortcuts (<daw-keyboard-shortcuts>)
   ├─ MIDI
   ├─ Spectrogram
   ├─ Theming (CSS custom properties)
@@ -141,22 +146,27 @@ All React code; all examples copy-pasteable. Fifteen pages:
 
 ### Web Components Integration/
 
-All WC code. Ten pages:
+All WC code. Fifteen pages — near-parity with React:
 
 | Page | Covers |
 |---|---|
 | `getting-started.md` | Install via npm or CDN, minimal `<daw-editor>` page, common pitfalls (PlayoutAdapter requirement, AudioContext init) |
-| `editor-element.md` | `<daw-editor>` attributes, properties, events, lifecycle, `shortcuts` property |
+| `editor-element.md` | `<daw-editor>` attributes, properties, events, lifecycle |
 | `track-and-clip.md` | `<daw-track>`, `<daw-clip>` data elements (light DOM), MutationObserver lifecycle |
-| `visual-elements.md` | `<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>` — shadow DOM, chunked canvas |
-| `transport-elements.md` | Play/pause/stop buttons, AudioPosition displays, transport binding via `for` attribute |
+| `visual-elements.md` | `<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>`, `<daw-grid>`, `<daw-piano-roll>` — shadow DOM, chunked canvas, beats/bars grid |
+| `transport-elements.md` | `<daw-transport>`, play/pause/stop buttons, `<daw-transport-button>`, transport binding via `for` attribute |
+| `track-controls.md` | `<daw-track-controls>` — per-track volume/mute/solo/pan UI |
+| `selection.md` | `<daw-selection>` element, selection model |
 | `loading-audio.md` | File drops, programmatic `editor.addTrack`, peaks pre-computation |
+| `recording.md` | `<daw-record-button>`, `RecordingController`, `daw-recording-*` events (start/complete/error/pause/resume) |
+| `clip-interactions.md` | `ClipPointerHandler`, `splitAtPlayhead`, drag/trim/split semantics, pointer engine contract |
+| `keyboard-shortcuts.md` | `<daw-keyboard-shortcuts>` element, configurable `shortcuts` property (per PR #343) |
 | `midi.md` | `editor.loadMidi(source, options?)`, optional `@dawcore/midi` peer dep |
-| `spectrogram.md` | `<daw-spectrogram>` element, controller |
+| `spectrogram.md` | `<daw-spectrogram>`, `SpectrogramController` |
 | `theming.md` | CSS custom properties, dark-mode handling |
 | `tone-bridge.md` | Using `TonePlayoutAdapter` for Tone.js effects with the WC stack |
 
-Pages **deliberately not present** in WC integration: Effects, Recording, Annotations, Drag interactions, Keyboard shortcuts (in the React-component sense), Media Element variant, Beats & Bars (as a provider). These are either React-specific abstractions or features the WC surface doesn't currently expose. The Concepts pages still cover the underlying ideas, and integration pages can be added later if/when the WC surface gains them.
+Pages **deliberately not present** in WC integration: **Effects**, **Annotations**, **Media Element variant**. The Concepts pages still cover the underlying ideas (effects routing, annotations data model), and integration pages can be added later if/when the WC surface gains them.
 
 ### Framework-Agnostic/
 
@@ -182,7 +192,7 @@ One page for now. Will grow into a section if Vue/Svelte wrappers materialize.
 | Section | Contents | Ports needed |
 |---|---|---|
 | **React** | 19 existing example pages | None |
-| **Web Components** | Minimal `<daw-editor>`, Recording (ported from `examples/dawcore-native`), MIDI, Tone.js bridge (ported from `examples/dawcore-tone`) | 3–4 new pages |
+| **Web Components** | Ported from `examples/dawcore-native` (10 pages: basic, multiclip, programmatic, record, spectrogram, beats-grid, beat-map-grid, metronome, automation, analyser) and `examples/dawcore-tone` (Tone.js variants: basic, multiclip, record, spectrogram, beats-grid, programmatic, midi, midi-load, analyser). De-duplicate where pairs cover the same feature with both native + Tone.js adapters — show one page per feature with an adapter toggle. **Open question (see below):** which subset to port in the first wave. | ~8–12 new pages |
 | **Engine** | Placeholder (one paragraph: "Direct engine usage examples — coming when there's demand. See the Engine guide for the API.") | None |
 
 Each example card gets a small framework badge (React / WC / Engine). The `/examples` landing page (`website/src/pages/examples/index.tsx`) is a custom React page (not a Docusaurus doc sidebar) — the three sections render as headed groups within the grid, with an in-page filter rail at the top for quick framework filtering.
@@ -195,17 +205,19 @@ These are placements I made without dedicated user input — flagging for confir
 
 1. **Theming is in both integration sections** — same conceptual idea, very different implementation (`styled-components` themes vs CSS custom properties). Felt cleaner than one Concepts page + dual implementation pages.
 
-2. **Drag interactions is React-only** — `ClipInteractionProvider` is a React API. WC users get clip drag through `<daw-editor>` interactions documented in `editor-element.md`. No separate WC drag page.
+2. **Clip interactions has parallel pages in both sections** — React has `drag-interactions.md` (`ClipInteractionProvider`, modifiers); WC has `clip-interactions.md` (`ClipPointerHandler`, `splitAtPlayhead`). Same conceptual surface, very different APIs.
 
-3. **Keyboard shortcuts is React-only** — the `KeyboardShortcuts` component is React. WC has its own `shortcuts` property on `<daw-editor>`, covered in `editor-element.md`.
+3. **Keyboard shortcuts has parallel pages in both sections** — React: `KeyboardShortcuts` component + `useKeyboardShortcuts`. WC: `<daw-keyboard-shortcuts>` element + `shortcuts` property (per PR #343). The shared keyboard model lives in `Concepts` (or could fold into existing concepts — flag for review).
 
 4. **Media Element variant is React-only** — `MediaElementPlaylistProvider` is a React-specific provider for single-track HTMLAudioElement playback. No WC equivalent exists; if one ever does, it gets its own page in WC integration.
 
 5. **VU meters fold into the Recording integration pages** — the agent flagged VU as a missing example, not a missing guide. `Concepts/recording.md` covers the VU concept; integration pages show wiring.
 
-6. **"Custom drag setup" folds into `drag-interactions.md`** — same content; doesn't need a separate page in the new IA.
+6. **"Custom drag setup" folds into the React `drag-interactions.md`** — same content; doesn't need a separate page in the new IA.
 
-7. **Beats & Bars is React-only at the integration layer** — `BeatsAndBarsProvider` is a React provider. The conceptual model (PPQN, tempo map) belongs in `Concepts/playback-timing.md`. WC has tempo support on `<daw-editor>` covered in `editor-element.md`.
+7. **Beats & Bars** — React has `BeatsAndBarsProvider` (a Provider); WC has `<daw-grid>` element. The conceptual model (PPQN, tempo map, snap) belongs in `Concepts/playback-timing.md`. The React-side beats-and-bars page covers the Provider usage; WC's `<daw-grid>` is covered in `visual-elements.md`. Open question whether `<daw-grid>` deserves its own page — currently folded.
+
+8. **Effects is React-only at the integration layer** — there's no `daw-effects-*` surface in dawcore today. `Concepts/effects-routing.md` covers the design; `React Integration/effects.md` covers `useDynamicEffects`. WC integration page can be added later if/when WC gains an effects surface.
 
 ## Migration Considerations (high-level only)
 
@@ -228,7 +240,9 @@ Detailed phasing belongs to a separate work plan. The plan must honor these cons
 
 ## Open Questions for Review
 
-1. **Concepts page list (8 pages) + React Integration page list (15 pages)** — does this feel right, anything missing or over-split?
-2. **Landing features grid (6: Multitrack mixing, Effects, Recording, MIDI, Spectrogram, Annotations)** — right ones to lead with? Anything to swap out?
+1. **Concepts (8) + React Integration (15) + WC Integration (15) page counts** — does this feel right? Anything missing or over-split?
+2. **Landing features grid (6: Multitrack mixing, Effects, Recording, MIDI, Spectrogram, Annotations)** — right ones to lead with?
 3. **Migration constraint priority** — "redirects, not 404s" is treated as priority over a clean cutover. Confirm?
-4. **WC examples ported in** — happy with starting at 4 (Minimal, Recording, MIDI, Tone bridge), or want a different starter set?
+4. **WC examples — first wave port subset.** There are ~10 example HTML pages in `examples/dawcore-native` and ~9 in `examples/dawcore-tone`. Suggested starter set: basic, multiclip, record, spectrogram, midi, beats-grid (6 pages, both native + Tone variants merged via adapter toggle). Or wider/narrower?
+5. **`<daw-grid>` placement** — currently folded into `Web Components Integration/visual-elements.md`. Worth its own page given React's `beats-and-bars.md` is dedicated?
+6. **Shared keyboard model in Concepts?** Both React and WC layer keyboard shortcuts on top of `handleKeyboardEvent` from `@waveform-playlist/core` (per PR #343). Worth a `Concepts/keyboard-shortcuts.md` page covering the shared model, with both integration pages referencing it? Or keep concepts implicit?
