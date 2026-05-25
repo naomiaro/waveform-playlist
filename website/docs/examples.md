@@ -1,5 +1,6 @@
 ---
 sidebar_position: 5
+sidebar_label: "React: Examples"
 description: "Interactive demos of multitrack editing, effects, recording, annotations, and waveform visualization"
 ---
 
