@@ -1,0 +1,8 @@
+{
+  "label": "Web Components",
+  "position": 3,
+  "link": {
+    "type": "doc",
+    "id": "web-components/getting-started"
+  }
+}

@@ -1,100 +1,55 @@
 ---
 sidebar_position: 1
 slug: /
-description: "Getting started with Waveform Playlist — a React multitrack audio editor with Web Audio API and Tone.js"
+description: "Multitrack Web Audio editor — choose React components or framework-agnostic Web Components."
 ---
 
-# Introduction
+# Waveform Playlist
 
-Waveform Playlist is a multitrack Web Audio editor and player with canvas waveform visualization. Built with React and [Tone.js](https://tonejs.github.io/), it provides a complete solution for audio editing in the browser.
+A multitrack Web Audio editor and player with canvas waveform visualization. One headless engine, two integration paths: React components or framework-agnostic Web Components.
 
-## Features
+## What it does
 
-- **Multi-track editing** - Load, arrange, and mix multiple audio tracks
-- **Waveform visualization** - High-performance canvas rendering with zoom support
-- **Playback controls** - Play, pause, stop, seek, and loop
-- **Track controls** - Mute, solo, volume, and pan per track
-- **Audio effects** - Comprehensive effect library powered by Tone.js
-- **Annotations** - Time-synchronized text annotations with drag-to-edit
-- **Recording** - Record directly from microphone with level monitoring
-- **Theming** - Light and dark themes with full customization
-- **BBC Peaks support** - Pre-computed waveform data for large files
+- **Multitrack mixing** — Load, arrange, and mix multiple audio tracks
+- **Effects** — 20 Tone.js effects with real-time parameter control (React)
+- **Recording** — Mic capture with live waveform preview, multi-channel support
+- **MIDI** — Load `.mid` files; piano-roll rendering; SoundFont playback
+- **Spectrogram** — FFT visualization with multiple color maps
+- **Annotations** — Time-synced text with drag-to-edit
 
-## Packages
+## Choose your integration
 
-The library is organized into focused packages:
+### React
 
-| Package | Description |
-|---------|-------------|
-| `@waveform-playlist/browser` | Main React components, hooks, and context |
-| `@waveform-playlist/core` | Types, utilities, and clip/track creation |
-| `@waveform-playlist/engine` | Framework-agnostic timeline engine with pure operations |
-| `@waveform-playlist/ui-components` | Styled UI components (buttons, sliders, etc.) |
-| `@waveform-playlist/playout` | Tone.js audio engine |
-| `@waveform-playlist/webaudio-peaks` | Peak extraction from AudioBuffer or sample arrays |
-| `@waveform-playlist/loaders` | Audio loaders |
-
-**Optional packages:**
-
-| Package | Description |
-|---------|-------------|
-| `@waveform-playlist/midi` | React `useMidiTracks` hook for MIDI file loading; piano roll visualization + SoundFont/PolySynth playback. Re-exports the parser from `@dawcore/midi`. |
-| `@dawcore/midi` | Framework-agnostic MIDI parser (`parseMidiFile`, `parseMidiUrl`). Used by `@dawcore/components` via `editor.loadMidi()` and re-exported by `@waveform-playlist/midi`. |
-| `@waveform-playlist/annotations` | Time-synced text annotations with drag editing |
-| `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview |
-| `@waveform-playlist/worklets` | AudioWorklet processors for recording and VU metering (auto-installed with recording) |
-| `@waveform-playlist/spectrogram` | React `SpectrogramProvider` + UI (menu items, settings modal). Computation/worker/orchestrator are imported from `@dawcore/spectrogram`. |
-| `@dawcore/spectrogram` | Framework-agnostic FFT computation, Web Worker, and `SpectrogramOrchestrator`. Used by `@dawcore/components` for `render-mode="spectrogram"` and by the React Provider. |
-| `@waveform-playlist/media-element-playout` | HTMLMediaElement-based playout with pitch-preserving playback rate |
-
-## Quick Example
+For React 18+ / 19+ projects. Hooks + components.
 
 ```tsx
-import {
-  WaveformPlaylistProvider,
-  Waveform,
-  PlayButton,
-  PauseButton,
-  StopButton,
-  useAudioTracks,
-} from '@waveform-playlist/browser';
-
-function MyPlaylist() {
-  const { tracks, loading, error } = useAudioTracks([
-    { src: '/audio/vocals.mp3', name: 'Vocals' },
-    { src: '/audio/guitar.mp3', name: 'Guitar' },
-  ]);
-
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
-  return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={128}
-      timescale
-    >
-      <div>
-        <PlayButton />
-        <PauseButton />
-        <StopButton />
-      </div>
-      <Waveform />
-    </WaveformPlaylistProvider>
-  );
-}
+const { tracks, loading } = useAudioTracks([{ src: '/drums.mp3' }]);
+return (
+  <WaveformPlaylistProvider tracks={tracks}>
+    <Waveform />
+  </WaveformPlaylistProvider>
+);
 ```
 
-## Browser Support
+[**→ Get started with React**](/docs/getting-started/installation)
 
-Waveform Playlist works in all modern browsers that support:
-- Web Audio API
-- Canvas API
-- ES2020+
+### Web Components
 
-## Next Steps
+For any framework or vanilla HTML. Custom elements; no React required.
 
-- [Installation](/docs/getting-started/installation) - Install the packages
-- [Basic Usage](/docs/getting-started/basic-usage) - Build your first playlist
-- [Examples](/examples) - See live demos
+```html
+<daw-editor>
+  <daw-track src="/drums.opus" name="Drums"></daw-track>
+  <daw-track src="/bass.opus" name="Bass"></daw-track>
+</daw-editor>
+```
+
+[**→ Get started with Web Components**](/docs/web-components/getting-started)
+
+## Architecture at a glance
+
+Both integration paths share the same headless engine (`@waveform-playlist/engine`) and a pluggable `PlayoutAdapter` for audio backends. React wraps the engine in providers + hooks; Web Components wrap it in Lit-based custom elements (`@dawcore/components`).
+
+- [Type reference](/docs/api/llm-reference) — full TypeScript surface
+- [Examples](/examples) — runnable demos
