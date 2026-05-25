@@ -43,6 +43,12 @@
 - `<daw-play-button>`, `<daw-pause-button>`, `<daw-stop-button>` — Walk up to closest `<daw-transport>` for target resolution. Warn when target is null.
 - `<daw-record-button>` — Transport button. Toggles `startRecording()`/`stopRecording()` on target editor. Listens for `daw-recording-start`/`daw-recording-complete` events to update visual state.
 
+## Embedding Gotchas
+
+- **`:host { display: flex }`** on `<daw-editor>` is load-bearing — it puts the controls-column on the left and scroll-area (waveforms) on the right. Setting `display: block` externally collapses to a vertical stack.
+- **`theme.ts` `:host` rules block ancestor inheritance** for `--daw-*` custom properties. Consumers must set overrides directly on the host element (`<daw-editor>` / `<daw-transport>`), not on a wrapper above. Documented in `theme.ts` comments but the constraint is subtle — flag in any future Lit migration.
+- **`daw-track-controls` has unthemed hardcoded values** that break on light page backgrounds: `rgba(255,255,255,0.06-0.12)` for M/S buttons + slider tracks (not exposed as CSS vars) and `opacity: 0.6` × `opacity: 0.5` nested on `.slider-label-name` (effective contrast 1.97:1, fails WCAG AA). See the open project memory for the var list a future PR should expose.
+
 ## Cross-Context Worklet Support
 
 - **`RecordingHost` bridge methods** — `addWorkletModule`, `createAudioWorkletNode`, `createMediaStreamSource` on the host interface. `<daw-editor>` implements these by delegating to the adapter when it has matching methods, falling back to native `AudioContext` APIs.
