@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react';
 import '@dawcore/components';
 import { NativePlayoutAdapter } from '@dawcore/transport';
+import styles from './wc-example.module.css';
 
 declare global {
   namespace JSX {
     interface IntrinsicElements {
       'daw-editor': any;
       'daw-track': any;
+      'daw-clip': any;
+      'daw-keyboard-shortcuts': any;
       'daw-transport': any;
       'daw-play-button': any;
       'daw-pause-button': any;
@@ -37,23 +40,20 @@ export default function WcBasicExample() {
   }, []);
 
   return (
-    <div>
+    <div className={styles.wrapper}>
       <daw-editor
         ref={editorRef}
         id="wc-basic-editor"
         samples-per-pixel="1024"
-        wave-height="100"
+        wave-height="80"
         timescale
-        style={{ display: 'block', marginBottom: '0.75rem' }}
+        class={styles.editor}
       >
         {TRACKS.map((t) => (
           <daw-track key={t.src} src={t.src} name={t.name} />
         ))}
       </daw-editor>
-      <daw-transport
-        for="wc-basic-editor"
-        style={{ display: 'flex', gap: '0.5rem' }}
-      >
+      <daw-transport for="wc-basic-editor" class={styles.transport}>
         <daw-play-button />
         <daw-pause-button />
         <daw-stop-button />

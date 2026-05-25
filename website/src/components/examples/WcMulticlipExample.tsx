@@ -1,21 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import '@dawcore/components';
 import { NativePlayoutAdapter } from '@dawcore/transport';
-
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'daw-editor': any;
-      'daw-track': any;
-      'daw-clip': any;
-      'daw-keyboard-shortcuts': any;
-      'daw-transport': any;
-      'daw-play-button': any;
-      'daw-pause-button': any;
-      'daw-stop-button': any;
-    }
-  }
-}
+import styles from './wc-example.module.css';
 
 const ZOOM_LEVELS = [128, 256, 512, 1024, 2048, 4096, 8192];
 
@@ -94,7 +80,7 @@ export default function WcMulticlipExample() {
   };
 
   return (
-    <div>
+    <div className={styles.wrapper}>
       <daw-editor
         ref={editorRef}
         id="wc-multiclip-editor"
@@ -103,7 +89,7 @@ export default function WcMulticlipExample() {
         timescale
         clip-headers
         interactive-clips
-        style={{ display: 'block', marginBottom: '0.75rem' }}
+        class={styles.editor}
       >
         <daw-keyboard-shortcuts playback splitting undo />
         {TRACKS.map((track) => (
@@ -121,19 +107,16 @@ export default function WcMulticlipExample() {
           </daw-track>
         ))}
       </daw-editor>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <daw-transport for="wc-multiclip-editor" style={{ display: 'contents' }}>
-          <daw-play-button />
-          <daw-pause-button />
-          <daw-stop-button />
-        </daw-transport>
-        <span style={{ width: '1px', alignSelf: 'stretch', background: 'var(--ifm-color-emphasis-300)' }} />
-        <button onClick={() => handleZoom(-1)}>+</button>
-        <button onClick={() => handleZoom(1)}>−</button>
-        <code style={{ fontSize: '0.85rem', color: 'var(--ifm-color-emphasis-600)' }}>
-          {zoom} spp
-        </code>
-      </div>
+      <daw-transport for="wc-multiclip-editor" class={styles.transport}>
+        <daw-play-button />
+        <daw-pause-button />
+        <daw-stop-button />
+        <span className={styles.zoomGroup}>
+          <button onClick={() => handleZoom(-1)}>+</button>
+          <button onClick={() => handleZoom(1)}>−</button>
+          <code>{zoom} spp</code>
+        </span>
+      </daw-transport>
     </div>
   );
 }
