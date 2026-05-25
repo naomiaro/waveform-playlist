@@ -352,4 +352,4 @@ This uses delay-based activation for touch events (distinguishes drag from scrol
 
 - [Beats & Bars](/docs/react/guides/beats-and-bars) — Musical timescale with `ClipInteractionProvider`
 - [Annotations Example](/examples/annotations) — Combined clip + annotation dragging
-- [LLM API Reference](/docs/api/llm-reference) — Complete TypeScript interfaces
+- [LLM API Reference](/docs/framework-agnostic/llm-reference) — Complete TypeScript interfaces

@@ -627,6 +627,6 @@ interface EngineEvents {
 
 ## See Also
 
-- [Hooks Reference](/docs/api/hooks) — React hooks that wrap the engine
+- [Hooks Reference](/docs/react/api/hooks) — React hooks that wrap the engine
 - [Loading Audio](/docs/react/guides/loading-audio) — Creating tracks with `useAudioTracks`
 - [Track Management](/docs/react/guides/track-management) — Adding and removing tracks

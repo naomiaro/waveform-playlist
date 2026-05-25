@@ -309,4 +309,4 @@ interface MediaElementPlaylistProviderProps {
 
 ## See Also
 
-- [WaveformPlaylistProvider](/docs/api/providers/waveform-playlist-provider) - Multi-track provider with full editing support
+- [WaveformPlaylistProvider](/docs/react/api/providers/waveform-playlist-provider) - Multi-track provider with full editing support

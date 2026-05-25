@@ -80,7 +80,7 @@ import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 <MediaElementWaveform renderPlayhead={PlayheadWithMarker} />
 ```
 
-`PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` (see [API reference](/docs/api/llm-reference)). In the MediaElement context, use `currentTimeRef` for animation; `playbackStartTimeRef` and `audioStartPositionRef` are not applicable.
+`PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` (see [API reference](/docs/framework-agnostic/llm-reference)). In the MediaElement context, use `currentTimeRef` for animation; `playbackStartTimeRef` and `audioStartPositionRef` are not applicable.
 
 ## Web Audio Routing
 

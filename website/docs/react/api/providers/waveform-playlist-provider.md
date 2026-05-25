@@ -8,7 +8,7 @@ description: "WaveformPlaylistProvider API — the root React context provider f
 The `WaveformPlaylistProvider` is the core component that manages all playlist state and provides context to child components. It uses the Web Audio API (via Tone.js) for multi-track playback, mixing, and effects processing.
 
 :::caution Single Instance Per Page
-Only one `WaveformPlaylistProvider` should be mounted at a time. It uses a shared Tone.js Transport singleton for scheduling — multiple instances will conflict with each other's playback, timing, and effects. For multiple independent players on the same page, use [`MediaElementPlaylistProvider`](/docs/api/providers/media-element-playlist-provider) which creates independent `HTMLAudioElement` instances.
+Only one `WaveformPlaylistProvider` should be mounted at a time. It uses a shared Tone.js Transport singleton for scheduling — multiple instances will conflict with each other's playback, timing, and effects. For multiple independent players on the same page, use [`MediaElementPlaylistProvider`](/docs/react/api/providers/media-element-playlist-provider) which creates independent `HTMLAudioElement` instances.
 :::
 
 ## Import
@@ -409,6 +409,6 @@ interface WaveformPlaylistProviderProps {
 
 ## See Also
 
-- [Waveform Component](/docs/api/components#waveform)
-- [usePlaylistState Hook](/docs/api/hooks#useplayliststate)
-- [usePlaylistControls Hook](/docs/api/hooks#useplaylistcontrols)
+- [Waveform Component](/docs/react/api/components#waveform)
+- [usePlaylistState Hook](/docs/react/api/hooks#useplayliststate)
+- [usePlaylistControls Hook](/docs/react/api/hooks#useplaylistcontrols)

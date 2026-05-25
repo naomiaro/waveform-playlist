@@ -216,7 +216,8 @@ const config: Config = {
                 '@waveform-playlist/spectrogram': path.resolve(__dirname, '../packages/spectrogram/src'),
                 '@waveform-playlist/midi': path.resolve(__dirname, '../packages/midi/src'),
                 '@waveform-playlist/recording': path.resolve(__dirname, '../packages/recording/src'),
-                // worklets, loaders, and webaudio-peaks use their built dist versions via node_modules
+                // worklets, loaders, webaudio-peaks, and the @dawcore/* family use their built dist versions via node_modules
+                // (@dawcore/components uses Lit decorators which babel-loader doesn't parse without extra config)
 
                 // Force single instance of styled-components to avoid "several instances" warning
                 // and ensure styles work correctly across all packages

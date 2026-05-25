@@ -579,6 +579,18 @@ importers:
 
   website:
     dependencies:
+      '@dawcore/components':
+        specifier: workspace:*
+        version: link:../packages/dawcore
+      '@dawcore/midi':
+        specifier: workspace:*
+        version: link:../packages/dawcore-midi
+      '@dawcore/spectrogram':
+        specifier: workspace:*
+        version: link:../packages/dawcore-spectrogram
+      '@dawcore/transport':
+        specifier: workspace:*
+        version: link:../packages/transport
       '@dnd-kit/abstract':
         specifier: ^0.3.0
         version: 0.3.2
@@ -618,6 +630,9 @@ importers:
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@waveform-playlist/engine':
+        specifier: workspace:*
+        version: link:../packages/engine
       '@waveform-playlist/playout':
         specifier: workspace:*
         version: link:../packages/playout
@@ -627,6 +642,9 @@ importers:
       '@waveform-playlist/ui-components':
         specifier: workspace:*
         version: link:../packages/ui-components
+      '@waveform-playlist/worklets':
+        specifier: workspace:*
+        version: link:../packages/worklets
       clsx:
         specifier: ^2.0.0
         version: 2.1.1

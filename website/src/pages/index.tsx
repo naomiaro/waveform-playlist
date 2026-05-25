@@ -297,7 +297,7 @@ function CodeExample() {
             </p>
             <Link
               className={styles.primaryButton}
-              to="/docs/api/providers/waveform-playlist-provider">
+              to="/docs/react/api/providers/waveform-playlist-provider">
               View API Docs
             </Link>
           </div>

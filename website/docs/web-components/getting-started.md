@@ -69,19 +69,24 @@ The editor loads audio, generates waveforms, and handles playback.
 
 This is intentional — it lets consumers choose their audio backend (native Web Audio or Tone.js) and keeps `AudioContext` lifecycle in your hands.
 
-## Try it locally
+## Try it on this site
 
-Two runnable starter apps live in the repo:
+Runnable examples — rendered with `@dawcore/components` directly, no React in the audio path:
+
+- [**Basic**](pathname:///waveform-playlist/examples/wc-basic) — Minimal `<daw-editor>` with the native Web Audio adapter
+- [**Multiclip**](pathname:///waveform-playlist/examples/wc-multiclip) — Multiple `<daw-clip>` per track, drag/trim/split, pre-computed peaks via `<daw-keyboard-shortcuts>`
+
+## Run it locally
+
+For the full set (programmatic, record, spectrogram, beats-grid, metronome, automation, analyser, plus Tone.js variants including MIDI), clone the repo:
 
 ```bash
 git clone https://github.com/naomiaro/waveform-playlist.git
 cd waveform-playlist
 pnpm install
 pnpm example:dawcore-native    # Native Web Audio backend
-pnpm example:dawcore-tone      # Tone.js backend
+pnpm example:dawcore-tone      # Tone.js backend (includes MIDI)
 ```
-
-Each starter has multiple example pages — basic, multiclip, recording, spectrogram, MIDI, beats grid, metronome — you can use as a starting point.
 
 ## Next steps
 

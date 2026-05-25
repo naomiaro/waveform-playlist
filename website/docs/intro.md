@@ -51,5 +51,5 @@ For any framework or vanilla HTML. Custom elements; no React required.
 
 Both integration paths share the same headless engine (`@waveform-playlist/engine`) and a pluggable `PlayoutAdapter` for audio backends. React wraps the engine in providers + hooks; Web Components wrap it in Lit-based custom elements (`@dawcore/components`).
 
-- [Type reference](/docs/api/llm-reference) — full TypeScript surface
+- [Type reference](/docs/framework-agnostic/llm-reference) — full TypeScript surface
 - [Examples](/examples) — runnable demos
