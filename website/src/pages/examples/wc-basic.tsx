@@ -19,17 +19,7 @@ export default function WcBasicPage(): React.ReactElement {
           are pure custom elements from <code>@dawcore/components</code> — React is only
           the page shell.
         </p>
-        <div
-          style={{
-            marginTop: '2rem',
-            padding: '2rem',
-            background: 'var(--ifm-background-surface-color)',
-            borderRadius: '8px',
-            border: '1px solid var(--ifm-color-emphasis-300)',
-          }}
-        >
-          <LazyWcBasic />
-        </div>
+        <LazyWcBasic />
         <div style={{ marginTop: '2rem' }}>
           <h2>What's in it</h2>
           <ul>

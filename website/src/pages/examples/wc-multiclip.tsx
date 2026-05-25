@@ -20,17 +20,7 @@ export default function WcMulticlipPage(): React.ReactElement {
           press <kbd>S</kbd> at the playhead to split. Each clip loads its own
           pre-computed peaks (<code>.dat</code> file) for instant rendering.
         </p>
-        <div
-          style={{
-            marginTop: '2rem',
-            padding: '2rem',
-            background: 'var(--ifm-background-surface-color)',
-            borderRadius: '8px',
-            border: '1px solid var(--ifm-color-emphasis-300)',
-          }}
-        >
-          <LazyWcMulticlip />
-        </div>
+        <LazyWcMulticlip />
         <div style={{ marginTop: '2rem' }}>
           <h2>Keyboard shortcuts</h2>
           <ul>

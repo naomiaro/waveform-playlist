@@ -80,7 +80,7 @@ export default function WcMulticlipExample() {
   };
 
   return (
-    <div className={styles.wrapper}>
+    <>
       <daw-editor
         ref={editorRef}
         id="wc-multiclip-editor"
@@ -117,6 +117,6 @@ export default function WcMulticlipExample() {
           <code>{zoom} spp</code>
         </span>
       </daw-transport>
-    </div>
+    </>
   );
 }

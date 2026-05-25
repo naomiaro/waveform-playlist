@@ -1,16 +1,14 @@
 /* Berlin Underground theming for embedded dawcore Web Components.
    IMPORTANT: dawcore's theme.ts sets default --daw-* values via :host
    on every element. Those :host declarations stop inheritance from
-   ancestors, so we must set our overrides directly on the host
-   elements (.editor and .transport), not on a wrapper above them. */
+   ancestors, so we set our overrides directly on the host elements
+   (.editor and .transport) — not on a wrapper above them.
 
-.wrapper {
-  /* purely a flex/grid container; no theming here */
-}
+   Do NOT set `display` on .editor: its :host uses `display: flex` to
+   put the track-controls column on the left and scroll-area
+   (waveforms) on the right. An external `display: block` collapses
+   that into a vertical stack. */
 
-/* Do NOT set `display` on the editor — its :host uses `display: flex` to put
-   the track-controls column on the left and scroll-area (waveforms) on the
-   right. An external `display: block` collapses that into a vertical stack. */
 .editor,
 .transport {
   --daw-background: var(--ifm-background-color);

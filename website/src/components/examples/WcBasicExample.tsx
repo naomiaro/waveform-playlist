@@ -40,7 +40,7 @@ export default function WcBasicExample() {
   }, []);
 
   return (
-    <div className={styles.wrapper}>
+    <>
       <daw-editor
         ref={editorRef}
         id="wc-basic-editor"
@@ -58,6 +58,6 @@ export default function WcBasicExample() {
         <daw-pause-button />
         <daw-stop-button />
       </daw-transport>
-    </div>
+    </>
   );
 }
