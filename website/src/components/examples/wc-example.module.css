@@ -1,31 +1,53 @@
-/* Berlin Underground theming for embedded dawcore Web Components.
-   IMPORTANT: dawcore's theme.ts sets default --daw-* values via :host
-   on every element. Those :host declarations stop inheritance from
-   ancestors, so we set our overrides directly on the host elements
-   (.editor and .transport) — not on a wrapper above them.
+/* Theming for embedded dawcore Web Components.
 
-   Do NOT set `display` on .editor: its :host uses `display: flex` to
-   put the track-controls column on the left and scroll-area
-   (waveforms) on the right. An external `display: block` collapses
-   that into a vertical stack. */
+   DESIGN DECISION: The editor uses a fixed dark palette in BOTH light
+   and dark site themes. Two reasons:
+
+   1. Convention. DAWs (Pro Tools, Ableton, Logic, Audacity) have been
+      dark surfaces for 30+ years regardless of OS theme — easier on
+      the eyes during long sessions and waveforms read with more
+      contrast on dark. Embedding a dark editor in a light page
+      matches what users expect from audio software.
+
+   2. Technical: dawcore's <daw-track-controls> Shadow DOM hardcodes
+      `rgba(255, 255, 255, 0.06–0.12)` for the M/S button + slider
+      backgrounds. Those aren't exposed as CSS custom properties, so
+      they can't be themed from outside. On a white page background
+      they become invisible. Keeping the editor dark sidesteps the
+      problem until dawcore exposes those internals (proposed for a
+      future packages/dawcore PR).
+
+   Palette: Berlin Underground warm amber + muted red on near-black
+   (matches the Prism night-vision theme in custom.css for code
+   blocks). Hardcoded hex values intentionally — these don't follow
+   the site's --ifm-* tokens since they're not supposed to flip with
+   the site theme.
+
+   GOTCHAS for the next person:
+   - dawcore's theme.ts sets default --daw-* via :host on every element.
+     Those :host declarations stop inheritance from ancestors, so set
+     overrides directly on the host (.editor and .transport), not on a
+     wrapper above them.
+   - Do NOT set `display` on .editor — its :host uses `display: flex`
+     to put the controls column on the left and scroll-area on the
+     right. An external `display: block` collapses it into a stack. */
 
 .editor,
 .transport {
-  --daw-background: var(--ifm-background-color);
-  --daw-track-background: var(--ifm-background-surface-color);
+  --daw-background: #0a0a0f;
+  --daw-track-background: #12121a;
   --daw-wave-color: #c49a6c;
   --daw-playhead-color: #d08070;
-  --daw-ruler-background: var(--ifm-background-color);
+  --daw-ruler-background: #0a0a0f;
   --daw-ruler-color: #c49a6c;
-  --daw-controls-background: var(--ifm-background-color);
-  --daw-controls-text: var(--ifm-font-color-base);
+  --daw-controls-background: #0a0a0f;
+  --daw-controls-text: #d8c0a8;
   --daw-selection-color: rgba(99, 199, 95, 0.25);
   --daw-min-height: 280px;
 }
 
 .editor {
   margin-bottom: 1rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
 }
 
 .transport {
