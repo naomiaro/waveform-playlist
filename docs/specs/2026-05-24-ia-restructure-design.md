@@ -44,6 +44,7 @@ Concepts                          ← framework-agnostic; no code samples
   ├─ Audio playlist model (clips, tracks, timeline, sample-based math)
   ├─ Playback timing (engine, transport, latency, lookahead)
   ├─ Effects routing (graph design, why Tone.js)
+  ├─ Keyboard shortcuts (handleKeyboardEvent, shared shortcut model)
   ├─ MIDI rendering (ParsedMidi, piano-roll model, SoundFont)
   ├─ Spectrogram rendering (FFT, tier model, color maps)
   ├─ Recording (AudioWorklet, multi-channel, overdub)
@@ -70,7 +71,7 @@ Web Components Integration        ← all WC code lives here
   ├─ Getting started (WC)
   ├─ Editor element (<daw-editor>)
   ├─ Track & clip elements
-  ├─ Visual elements (waveform, playhead, ruler, grid, piano-roll)
+  ├─ Visual elements (waveform, playhead, ruler, piano-roll)
   ├─ Transport elements
   ├─ Track controls (<daw-track-controls>)
   ├─ Selection (<daw-selection>)
@@ -78,6 +79,7 @@ Web Components Integration        ← all WC code lives here
   ├─ Recording (<daw-record-button>, RecordingController)
   ├─ Clip interactions (drag, trim, split via ClipPointerHandler)
   ├─ Keyboard shortcuts (<daw-keyboard-shortcuts>)
+  ├─ Grid / beats & bars (<daw-grid>)
   ├─ MIDI
   ├─ Spectrogram
   ├─ Audio graph taps (masterOutputNode → analyser/recorder/Tone chains)
@@ -110,7 +112,7 @@ Single landing page. Top-down structure:
 
 ### Concepts/
 
-Framework-agnostic; **no code samples**. Eight pages:
+Framework-agnostic; **no code samples**. Nine pages:
 
 | Page | Covers |
 |---|---|
@@ -118,6 +120,7 @@ Framework-agnostic; **no code samples**. Eight pages:
 | `audio-playlist-model.md` | `ClipTrack`, `AudioClip`, timeline, sample-based math, `startTick` vs `startSample` |
 | `playback-timing.md` | Engine ownership of time, Transport, `outputLatency`, lookahead, the `visualTime` vs raw time distinction |
 | `effects-routing.md` | Tone.js graph design, per-track vs master chains, why we use Tone.js, offline render |
+| `keyboard-shortcuts.md` | The shared `handleKeyboardEvent` model and `KeyboardShortcut` type from `@waveform-playlist/core` (per PR #343). Both integration pages reference this for the underlying contract; integration pages then cover their framework-specific wiring (`KeyboardShortcuts` component for React, `<daw-keyboard-shortcuts>` element for WC). |
 | `midi-rendering.md` | `ParsedMidi` type, `MidiNoteData`, piano-roll model, SoundFont loading concepts |
 | `spectrogram-rendering.md` | FFT pipeline, color maps, 3-tier render strategy, viewport orchestrator |
 | `recording.md` | AudioWorklet capture pipeline, multi-channel handling, overdub semantics, latency compensation |
@@ -141,27 +144,28 @@ All React code; all examples copy-pasteable. Fifteen pages:
 | `annotations.md` | `useAnnotationControls`, edit modes, keyboard navigation |
 | `theming.md` | `styled-components` theme tokens, custom Channel components |
 | `drag-interactions.md` | `ClipInteractionProvider`, modifiers (collision, snap-to-grid), custom drag setup |
-| `keyboard-shortcuts.md` | `KeyboardShortcuts` component, `useKeyboardShortcuts` for custom bindings |
-| `beats-and-bars.md` | `BeatsAndBarsProvider`, musical time, snap modes |
+| `keyboard-shortcuts.md` | `KeyboardShortcuts` component, `useKeyboardShortcuts` for custom bindings. Builds on the shared model documented in `Concepts/keyboard-shortcuts.md`. |
+| `beats-and-bars.md` | `BeatsAndBarsProvider`, musical time, snap modes. Parallel to WC's `grid.md`. |
 | `media-element-variant.md` | `MediaElementPlaylistProvider` for single-track HTMLAudioElement playback (language learning, podcasts) |
 
 ### Web Components Integration/
 
-All WC code. Sixteen pages — near-parity with React:
+All WC code. Seventeen pages — near-parity with React:
 
 | Page | Covers |
 |---|---|
 | `getting-started.md` | Install via npm or CDN, minimal `<daw-editor>` page, common pitfalls (PlayoutAdapter requirement, AudioContext init) |
 | `editor-element.md` | `<daw-editor>` attributes, properties, events, lifecycle |
 | `track-and-clip.md` | `<daw-track>`, `<daw-clip>` data elements (light DOM), MutationObserver lifecycle |
-| `visual-elements.md` | `<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>`, `<daw-grid>`, `<daw-piano-roll>` — shadow DOM, chunked canvas, beats/bars grid |
+| `visual-elements.md` | `<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>`, `<daw-piano-roll>` — shadow DOM, chunked canvas (`<daw-grid>` has its own page below given React's `beats-and-bars.md` is dedicated) |
 | `transport-elements.md` | `<daw-transport>`, play/pause/stop buttons, `<daw-transport-button>`, transport binding via `for` attribute |
 | `track-controls.md` | `<daw-track-controls>` — per-track volume/mute/solo/pan UI |
 | `selection.md` | `<daw-selection>` element, selection model |
 | `loading-audio.md` | File drops, programmatic `editor.addTrack`, peaks pre-computation |
 | `recording.md` | `<daw-record-button>`, `RecordingController`, `daw-recording-*` events (start/complete/error/pause/resume) |
 | `clip-interactions.md` | `ClipPointerHandler`, `splitAtPlayhead`, drag/trim/split semantics, pointer engine contract |
-| `keyboard-shortcuts.md` | `<daw-keyboard-shortcuts>` element, configurable `shortcuts` property (per PR #343) |
+| `keyboard-shortcuts.md` | `<daw-keyboard-shortcuts>` element, configurable `shortcuts` property (per PR #343). Builds on the shared model documented in `Concepts/keyboard-shortcuts.md`. |
+| `grid.md` | `<daw-grid>` element — beats/bars rendering, BPM + time signature inputs, snap modes. Parallel to React's `beats-and-bars.md`. |
 | `midi.md` | `editor.loadMidi(source, options?)`, optional `@dawcore/midi` peer dep |
 | `spectrogram.md` | `<daw-spectrogram>`, `SpectrogramController` |
 | `audio-graph-taps.md` | The `adapter.masterOutputNode` tap pattern — exposed by both `NativePlayoutAdapter` and `TonePlayoutAdapter` as the documented escape hatch for connecting arbitrary AudioNodes (analysers, recorders, custom worklets, Tone effect chains). Covers connection, cleanup, and worked examples from `examples/dawcore-{native,tone}/analyser.html`. **Forward-looking:** when per-track taps land, this page extends to cover them — no rename needed. |
@@ -205,6 +209,8 @@ Each example card gets a small framework badge (React / WC / Engine). The `/exam
 
 WC examples are built as Docusaurus-native React pages (matching the existing pattern) that render the WC elements directly. This requires source-aliasing `@dawcore/components`, `@dawcore/transport`, and `@dawcore/midi` in `website/docusaurus.config.ts` alongside the existing `@waveform-playlist/*` aliases.
 
+**Standalone Vite apps stay.** `examples/dawcore-native/` and `examples/dawcore-tone/` continue to exist as runnable quick-start scaffolds — clone the repo, run `pnpm example:dawcore-native` or `pnpm example:dawcore-tone`, see it work locally. The website ports listed above are additions, not replacements: the Vite apps give developers a complete copy-pasteable starting point; the website pages give visitors an in-browser showcase. Each website example page should link to its corresponding standalone app for users who want the local-dev experience.
+
 ## Judgment Calls (call out for review)
 
 These are placements I made without dedicated user input — flagging for confirmation:
@@ -221,7 +227,7 @@ These are placements I made without dedicated user input — flagging for confir
 
 6. **"Custom drag setup" folds into the React `drag-interactions.md`** — same content; doesn't need a separate page in the new IA.
 
-7. **Beats & Bars** — React has `BeatsAndBarsProvider` (a Provider); WC has `<daw-grid>` element. The conceptual model (PPQN, tempo map, snap) belongs in `Concepts/playback-timing.md`. The React-side beats-and-bars page covers the Provider usage; WC's `<daw-grid>` is covered in `visual-elements.md`. Open question whether `<daw-grid>` deserves its own page — currently folded.
+7. **Beats & Bars has parallel pages in both sections** — React has `BeatsAndBarsProvider` (a Provider), WC has `<daw-grid>` (an element). Both pages cover the same conceptual surface (BPM, time signature, snap modes); the conceptual model (PPQN, tempo map) lives in `Concepts/playback-timing.md`.
 
 8. **Effects has no dedicated WC integration page — workaround is split into two pages** — there's no `daw-effects-*` surface in dawcore today, so React's `effects.md` (covering `useDynamicEffects`) has no direct WC counterpart. The working manual path is split across two pages: `audio-graph-taps.md` covers the underlying `adapter.masterOutputNode` mechanic (also used by analysers, recorders, custom worklets); `tone-bridge.md` covers the Tone-specific recipe (lazy import, context bridging, effect chain construction). `Concepts/effects-routing.md` covers the design rationale shared by both React and WC.
 
@@ -246,9 +252,7 @@ Detailed phasing belongs to a separate work plan. The plan must honor these cons
 
 ## Open Questions for Review
 
-1. **Concepts (8) + React Integration (15) + WC Integration (15) page counts** — does this feel right? Anything missing or over-split?
+1. **Concepts (9) + React Integration (15) + WC Integration (17) page counts** — does this feel right? Anything missing or over-split?
 2. **Landing features grid (6: Multitrack mixing, Effects, Recording, MIDI, Spectrogram, Annotations)** — right ones to lead with?
 3. **Migration constraint priority** — "redirects, not 404s" is treated as priority over a clean cutover. Confirm?
 4. **WC examples — first wave port subset.** There are ~10 example HTML pages in `examples/dawcore-native` and ~9 in `examples/dawcore-tone`. Suggested starter set: basic, multiclip, record, spectrogram, midi, beats-grid (6 pages, both native + Tone variants merged via adapter toggle). Or wider/narrower?
-5. **`<daw-grid>` placement** — currently folded into `Web Components Integration/visual-elements.md`. Worth its own page given React's `beats-and-bars.md` is dedicated?
-6. **Shared keyboard model in Concepts?** Both React and WC layer keyboard shortcuts on top of `handleKeyboardEvent` from `@waveform-playlist/core` (per PR #343). Worth a `Concepts/keyboard-shortcuts.md` page covering the shared model, with both integration pages referencing it? Or keep concepts implicit?
