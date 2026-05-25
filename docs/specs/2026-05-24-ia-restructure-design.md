@@ -80,6 +80,7 @@ Web Components Integration        ← all WC code lives here
   ├─ Keyboard shortcuts (<daw-keyboard-shortcuts>)
   ├─ MIDI
   ├─ Spectrogram
+  ├─ Audio graph taps (masterOutputNode → analyser/recorder/Tone chains)
   ├─ Theming (CSS custom properties)
   └─ Tone.js bridge
 
@@ -146,7 +147,7 @@ All React code; all examples copy-pasteable. Fifteen pages:
 
 ### Web Components Integration/
 
-All WC code. Fifteen pages — near-parity with React:
+All WC code. Sixteen pages — near-parity with React:
 
 | Page | Covers |
 |---|---|
@@ -163,12 +164,13 @@ All WC code. Fifteen pages — near-parity with React:
 | `keyboard-shortcuts.md` | `<daw-keyboard-shortcuts>` element, configurable `shortcuts` property (per PR #343) |
 | `midi.md` | `editor.loadMidi(source, options?)`, optional `@dawcore/midi` peer dep |
 | `spectrogram.md` | `<daw-spectrogram>`, `SpectrogramController` |
+| `audio-graph-taps.md` | The `adapter.masterOutputNode` tap pattern — exposed by both `NativePlayoutAdapter` and `TonePlayoutAdapter` as the documented escape hatch for connecting arbitrary AudioNodes (analysers, recorders, custom worklets, Tone effect chains). Covers connection, cleanup, and worked examples from `examples/dawcore-{native,tone}/analyser.html`. **Forward-looking:** when per-track taps land, this page extends to cover them — no rename needed. |
 | `theming.md` | CSS custom properties, dark-mode handling |
-| `tone-bridge.md` | Using `TonePlayoutAdapter` for Tone.js effects with the WC stack. Covers the **master-output tap pattern** (`adapter.masterOutputNode`) — currently the documented path for applying Tone effect chains to the entire playlist manually, until a dedicated WC effects API ships. Both `examples/dawcore-{native,tone}/analyser.html` demonstrate the hookup. |
+| `tone-bridge.md` | Using `TonePlayoutAdapter` for Tone.js effects with the WC stack. For the master-output tap mechanic itself, see `audio-graph-taps.md`; this page covers Tone-specific concerns: lazy import, context bridging via `setContext`, the `getGlobalContext` gotcha, and end-to-end recipes for applying Tone effect chains to the entire playlist. |
 
 Pages **deliberately not present** in WC integration:
 
-- **Effects** — no dedicated WC effects API yet, but `adapter.masterOutputNode` exposes a tap point that consumers can chain Tone effects to manually. Documented in `tone-bridge.md` as the current path until a dedicated WC effects surface ships.
+- **Effects** — no dedicated WC effects API yet. The current path is to chain Tone effects manually via the master-output tap (`audio-graph-taps.md` covers the mechanic; `tone-bridge.md` covers the Tone-specific recipe). A dedicated `effects.md` would land if/when WC gains an effects abstraction.
 - **Annotations** — no WC element/controller exists today; concept lives in `Concepts/annotations.md`.
 - **Media Element variant** — `MediaElementPlaylistProvider` has no WC equivalent; if one ever ships, it gets its own page.
 
@@ -221,7 +223,7 @@ These are placements I made without dedicated user input — flagging for confir
 
 7. **Beats & Bars** — React has `BeatsAndBarsProvider` (a Provider); WC has `<daw-grid>` element. The conceptual model (PPQN, tempo map, snap) belongs in `Concepts/playback-timing.md`. The React-side beats-and-bars page covers the Provider usage; WC's `<daw-grid>` is covered in `visual-elements.md`. Open question whether `<daw-grid>` deserves its own page — currently folded.
 
-8. **Effects has no dedicated WC integration page — workaround is documented** — there's no `daw-effects-*` surface in dawcore today, so React's `effects.md` (covering `useDynamicEffects`) has no direct WC counterpart. However, WC users have a working manual path: chain Tone effects to `adapter.masterOutputNode` (the same tap point the analyser examples use). This is documented in WC's `tone-bridge.md` rather than getting its own `effects.md` page, since the API surface is "wire Tone nodes to the master output" rather than a dedicated effects abstraction. `Concepts/effects-routing.md` covers the design rationale shared by both.
+8. **Effects has no dedicated WC integration page — workaround is split into two pages** — there's no `daw-effects-*` surface in dawcore today, so React's `effects.md` (covering `useDynamicEffects`) has no direct WC counterpart. The working manual path is split across two pages: `audio-graph-taps.md` covers the underlying `adapter.masterOutputNode` mechanic (also used by analysers, recorders, custom worklets); `tone-bridge.md` covers the Tone-specific recipe (lazy import, context bridging, effect chain construction). `Concepts/effects-routing.md` covers the design rationale shared by both React and WC.
 
 ## Migration Considerations (high-level only)
 
@@ -250,4 +252,3 @@ Detailed phasing belongs to a separate work plan. The plan must honor these cons
 4. **WC examples — first wave port subset.** There are ~10 example HTML pages in `examples/dawcore-native` and ~9 in `examples/dawcore-tone`. Suggested starter set: basic, multiclip, record, spectrogram, midi, beats-grid (6 pages, both native + Tone variants merged via adapter toggle). Or wider/narrower?
 5. **`<daw-grid>` placement** — currently folded into `Web Components Integration/visual-elements.md`. Worth its own page given React's `beats-and-bars.md` is dedicated?
 6. **Shared keyboard model in Concepts?** Both React and WC layer keyboard shortcuts on top of `handleKeyboardEvent` from `@waveform-playlist/core` (per PR #343). Worth a `Concepts/keyboard-shortcuts.md` page covering the shared model, with both integration pages referencing it? Or keep concepts implicit?
-7. **Dedicated "Master output tap" page in WC Integration?** The `adapter.masterOutputNode` pattern is cross-cutting — used by the analyser examples, the manual Tone effects workaround, and anyone wanting to wire a recorder or custom AudioNode. Currently folded into `tone-bridge.md` since Tone is the most common use case. Promote to its own page if it deserves discoverability beyond the Tone story?
