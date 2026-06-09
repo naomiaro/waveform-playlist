@@ -31,6 +31,16 @@ import type { DawTrackElement } from './daw-track';
 import type { DawClipElement } from './daw-clip';
 import type { DawPlayheadElement } from './daw-playhead';
 import type { WaveformSegment } from './daw-waveform';
+// Register the visual child elements this editor's template always renders.
+// The shadow template emits <daw-playhead>/<daw-waveform>/<daw-ruler> directly,
+// so the editor must guarantee they're defined. Without these side-effect
+// imports, importing daw-editor alone (not the package barrel) leaves the
+// elements un-upgraded — querySelector returns generic HTMLElements, and calls
+// like playhead.stopAnimation() throw "is not a function". (Module caching +
+// @customElement make this safe to import here and from the index barrel.)
+import './daw-playhead';
+import './daw-waveform';
+import './daw-ruler';
 import type { PlaylistEngine, PlayoutAdapter } from '@waveform-playlist/engine';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
