@@ -46,12 +46,12 @@
     "README.md"
   ],
   "devDependencies": {
-    "@types/node": "^20.10.6",
-    "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3",
-    "vitest": "^3.0.0"
+    "@types/node": "^20.19.42",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   },
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
@@ -61,7 +61,7 @@
     "@waveform-playlist/playout": "workspace:*",
     "@waveform-playlist/ui-components": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*",
-    "uuid": "^13.0.0",
+    "uuid": "^13.0.2",
     "waveform-data": "^4.5.2"
   },
   "peerDependencies": {

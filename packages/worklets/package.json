@@ -44,8 +44,8 @@
   ],
   "devDependencies": {
     "@types/audioworklet": "^0.0.96",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3",
-    "vitest": "^3.0.0"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   }
 }

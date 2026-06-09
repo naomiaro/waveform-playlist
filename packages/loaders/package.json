@@ -42,12 +42,12 @@
     "README.md"
   ],
   "devDependencies": {
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3",
-    "vitest": "^3.0.0"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   },
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
-    "eventemitter3": "^5.0.1"
+    "eventemitter3": "^5.0.4"
   }
 }

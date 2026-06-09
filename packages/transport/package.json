@@ -20,7 +20,15 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["waveform", "audio", "webaudio", "transport", "scheduler", "daw", "dawcore"],
+  "keywords": [
+    "waveform",
+    "audio",
+    "webaudio",
+    "transport",
+    "scheduler",
+    "daw",
+    "dawcore"
+  ],
   "author": "Naomi Aro",
   "license": "MIT",
   "repository": {
@@ -28,13 +36,15 @@
     "url": "https://github.com/naomiaro/waveform-playlist.git",
     "directory": "packages/transport"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/engine": "workspace:*",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3",
-    "vitest": "^3.0.0"
-  },
-  "dependencies": {}
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
+  }
 }

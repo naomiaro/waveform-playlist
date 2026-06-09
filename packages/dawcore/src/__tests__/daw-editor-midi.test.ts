@@ -4,6 +4,11 @@ beforeAll(async () => {
   await import('../elements/daw-editor');
   await import('../elements/daw-track');
   await import('../elements/daw-clip');
+  // Register daw-piano-roll up front: happy-dom 20's CustomElementReactionStack
+  // upgrades cloned elements only if the class is defined before template cloning.
+  // Late registration (inside a test) leaves the editor's cloned <daw-piano-roll>
+  // un-upgraded, so Lit's connectedCallback runs without createRenderRoot.
+  await import('../elements/daw-piano-roll');
 });
 
 let fetchSpy: ReturnType<typeof vi.fn>;
@@ -100,7 +105,6 @@ describe('<daw-editor> MIDI loading', () => {
   });
 
   it('mounts <daw-piano-roll> when track.renderMode === "piano-roll"', async () => {
-    await import('../elements/daw-piano-roll');
     const editor = document.createElement('daw-editor') as any;
     editor.adapter = makeMockAdapter();
     document.body.appendChild(editor);

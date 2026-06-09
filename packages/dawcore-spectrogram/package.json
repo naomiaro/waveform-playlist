@@ -26,7 +26,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "keywords": ["spectrogram", "fft", "dawcore", "daw", "audio-editor", "web-audio"],
+  "keywords": [
+    "spectrogram",
+    "fft",
+    "dawcore",
+    "daw",
+    "audio-editor",
+    "web-audio"
+  ],
   "author": "Naomi Aro",
   "license": "MIT",
   "repository": {
@@ -38,15 +45,18 @@
   "bugs": {
     "url": "https://github.com/naomiaro/waveform-playlist/issues"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
     "fft.js": "^4.0.4"
   },
   "devDependencies": {
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3",
-    "vitest": "^3.0.0",
-    "happy-dom": "^17.0.0"
+    "happy-dom": "^20.10.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   }
 }

@@ -35,16 +35,16 @@
     "dist"
   ],
   "dependencies": {
-    "lit": "^3.0.0",
-    "waveform-data": "^4.5.2",
-    "@dawcore/spectrogram": "workspace:*"
+    "@dawcore/spectrogram": "workspace:*",
+    "lit": "^3.3.3",
+    "waveform-data": "^4.5.2"
   },
   "peerDependencies": {
-    "@waveform-playlist/engine": ">=12.0.0",
-    "@waveform-playlist/core": ">=12.0.0",
+    "@dawcore/midi": ">=0.0.1",
     "@dawcore/transport": ">=0.0.7",
-    "@waveform-playlist/worklets": ">=12.0.0",
-    "@dawcore/midi": ">=0.0.1"
+    "@waveform-playlist/core": ">=12.0.0",
+    "@waveform-playlist/engine": ">=12.0.0",
+    "@waveform-playlist/worklets": ">=12.0.0"
   },
   "peerDependenciesMeta": {
     "@waveform-playlist/worklets": {
@@ -58,15 +58,15 @@
     }
   },
   "devDependencies": {
-    "@waveform-playlist/engine": "workspace:*",
-    "@waveform-playlist/core": "workspace:*",
-    "@dawcore/transport": "workspace:*",
     "@dawcore/midi": "workspace:*",
+    "@dawcore/transport": "workspace:*",
+    "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/engine": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*",
-    "happy-dom": "^17.0.0",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3",
-    "vite": "^6.0.0",
-    "vitest": "^3.0.0"
+    "happy-dom": "^20.10.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.6"
   }
 }
