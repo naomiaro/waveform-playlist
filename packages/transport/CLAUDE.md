@@ -197,11 +197,11 @@ Tests that drive the Timer via `requestAnimationFrame` stubs must snapshot the c
 
 Set `editor.audioContext = new AudioContext({ sampleRate: 48000 })` before tracks load. The editor uses `NativePlayoutAdapter` internally — no Tone.js dependency.
 
-### dawcore dev pages
+### dawcore example pages (`examples/dawcore-native/`)
 
-All dev pages use the native transport. `multiclip.html` passes a custom AudioContext; `index.html` and `record.html` use the editor's default.
+All example pages use the native transport. `multiclip.html` passes a custom AudioContext; `index.html` and `record.html` use the editor's default.
 
-**Gotcha:** Dev pages call `Transport` methods directly (not via the adapter). When Transport APIs change (e.g., `setLoop` switching from seconds to ticks), dev pages break silently. Always grep `packages/dawcore/dev/` for changed method names.
+**Gotcha:** Example pages call `Transport` methods directly (not via the adapter). When Transport APIs change behavior OR signature (e.g., `setLoop` switching to ticks, the #407 defaulted-`setTempo` guard), they break silently. Always grep `examples/dawcore-native/` for the changed method names — `metronome.html`'s tempo slider needed an explicit tick-0 arg when the guard landed.
 
 ### React (WaveformPlaylistContext)
 

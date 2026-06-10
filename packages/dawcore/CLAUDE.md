@@ -22,6 +22,8 @@
 - happy-dom has no layout engine: `scrollLeft`/`scrollTop` assignments are NOT clamped, and `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight` default to 0. Tests emulating scrollable or scroll-at-limit containers must stub these via `Object.defineProperty` (no-op setters emulate a clamped container).
 - Container queries are not evaluated in happy-dom — assert structure (classes) and `static styles` cssText instead; verify actual compact/responsive behavior in a real browser.
 - `editor.addTrack({ name, midi: { notes } })` is the lightweight way to get fully loaded tracks in editor template tests — no fetch/decode. See `daw-editor-layout.test.ts` `makeEditor()`.
+- Test cleanup (spy `mockRestore`, removing appended `daw-editor`s) belongs in `afterEach`, never as the last line of a test body — a failed assertion skips trailing cleanup and silently poisons subsequent tests in the file.
+- After refactoring test cleanup, run `pnpm typecheck` too — vitest passing doesn't catch newly-unused destructured bindings (`TS6133` under `noUnusedLocals`).
 
 **Dev page:** `pnpm example:dawcore-native` starts Vite at `http://localhost:5173/` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
 
