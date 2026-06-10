@@ -17,7 +17,7 @@ import {
   type TrackEffectsFunction,
   type SoundFontCache,
 } from '@waveform-playlist/playout';
-import { PlaylistEngine, type EngineState } from '@waveform-playlist/engine';
+import { PlaylistEngine, type EngineState, type PlayoutAdapter } from '@waveform-playlist/engine';
 import {
   type ClipTrack,
   type Fade,
@@ -31,6 +31,7 @@ import {
 } from '@waveform-playlist/ui-components';
 import { getContext } from 'tone';
 import { extractPeaksFromWaveformDataFull } from './waveformDataLoader';
+import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
@@ -373,6 +374,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // React subscribes to engine statechange and mirrors into useState/refs.
   // Playback timing (currentTime, isPlaying) remains in React for animation loop.
   const engineRef = useRef<PlaylistEngine | null>(null);
+  const adapterRef = useRef<PlayoutAdapter | null>(null);
   const audioInitializedRef = useRef<boolean>(false);
   const isPlayingRef = useRef<boolean>(false);
   isPlayingRef.current = isPlaying;
@@ -783,6 +785,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // Reset init flag — new adapter needs Tone.start() on first play
         audioInitializedRef.current = false;
         const adapter = createToneAdapter({ effects, soundFontCache: soundFontCacheRef.current });
+        adapterRef.current = adapter;
         const engine = new PlaylistEngine({
           adapter,
           samplesPerPixel: samplesPerPixelRef.current,
@@ -911,6 +914,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     soundFontCache,
     deferEngineRebuild,
   ]);
+
+  // Forward late-arriving / swapped SoundFontCache to the live adapter so
+  // MIDI tracks upgrade from PolySynth without an engine rebuild. The
+  // adapter no-ops when routing is unchanged, so the mount-time call with
+  // the creation-time cache is harmless.
+  useEffect(() => {
+    syncSoundFontCacheToAdapter(adapterRef.current, soundFontCache);
+  }, [soundFontCache]);
 
   // Regenerate peaks when zoom, mono, or waveformDataCache changes (without reloading audio)
   // Peak sources in priority order:
