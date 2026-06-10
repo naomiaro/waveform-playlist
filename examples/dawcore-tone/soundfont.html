@@ -87,15 +87,16 @@
       //    lives here, not on <daw-editor>.
       editor.adapter = createToneAdapter({ ppqn: 960, soundFontCache });
 
-      // 3. Load a multi-track .mid file. Each track's GM program number is
-      //    extracted from the file and selects the soundfont instrument;
-      //    channel 9 routes to percussion samples.
+      // 3. Load a multi-track .mid file. Each track's GM program number drives
+      //    instrument selection; routing is per-note, so any note on MIDI
+      //    channel 9 plays from the percussion bank even in mixed-channel clips.
       try {
         const result = await editor.loadMidi('/media/midi/RedHotChiliPeppers-Otherside.mid');
         addLog('loaded ' + result.trackIds.length + ' track(s); bpm=' + result.bpm.toFixed(1) + ' ts=' + result.timeSignature.join('/'));
         editor.bpm = result.bpm;
         editor.timeSignature = result.timeSignature;
       } catch (err) {
+        if (err && err.name === 'AbortError') return; // navigation away mid-load
         console.error('[loadMidi]', err);
         addLog('loadMidi failed: ' + String(err));
       }
