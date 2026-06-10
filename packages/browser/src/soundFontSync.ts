@@ -1,6 +1,5 @@
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import { isToneAdapter } from '@waveform-playlist/playout';
-import type { SoundFontCache } from '@waveform-playlist/playout';
+import { isToneAdapter, type SoundFontCache } from '@waveform-playlist/playout';
 
 /**
  * Forward a (possibly late-loaded or swapped) SoundFontCache to the live
