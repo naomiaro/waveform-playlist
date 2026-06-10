@@ -625,12 +625,42 @@ export class PlaylistEngine {
    * Audio scheduling lookahead in seconds — `getCurrentTime()` is this far ahead of
    * what the listener actually hears. Tone.js Transport reports a position that's
    * `lookAhead` ahead of audible (default 0.1s); native AudioContext-based adapters
-   * have no lookahead and return 0. Consumers visualizing playback position should
-   * subtract this from `getCurrentTime()` (along with `audioContext.outputLatency`)
-   * to align the playhead with audible output.
+   * have no lookahead and return 0. Visual consumers should use `getAudibleTime()`,
+   * which applies this compensation only while playing.
    */
   get lookAhead(): number {
     return this._adapter?.lookAhead ?? 0;
+  }
+
+  /**
+   * Playback position aligned with what the listener actually hears, for
+   * visual consumers (playhead, progress overlays, auto-scroll).
+   *
+   * While playing: `getCurrentTime() − outputLatency − lookAhead`, held at
+   * the play-start position during the pre-roll window (audio at the start
+   * position isn't audible until ~outputLatency + lookAhead after `play()`,
+   * so the cursor waits there instead of jumping backward).
+   *
+   * While not playing: the raw resting position. A stationary cursor has no
+   * audible counterpart — seek/stop/pause positions display exactly.
+   *
+   * Storage stays raw: never feed this value back into `play()`/`seek()`,
+   * which compounds the subtraction on every cycle. Use `getCurrentTime()`
+   * for storage and resume positions.
+   */
+  getAudibleTime(): number {
+    if (!this._isPlaying) {
+      return this._currentTime;
+    }
+    const ctx = this._adapter?.audioContext;
+    const outputLatency =
+      ctx && 'outputLatency' in ctx ? ((ctx as AudioContext).outputLatency ?? 0) : 0;
+    const raw = this.getCurrentTime();
+    let t = raw - outputLatency - this.lookAhead;
+    if (raw >= this._playStartPosition && t < this._playStartPosition) {
+      t = this._playStartPosition;
+    }
+    return Number.isFinite(t) ? Math.max(0, t) : 0;
   }
 
   // ---------------------------------------------------------------------------
