@@ -14,6 +14,8 @@ vi.mock('../TonePlayout', () => {
     TonePlayout: vi.fn().mockImplementation(() => ({
       init: vi.fn().mockResolvedValue(undefined),
       addTrack: vi.fn(),
+      addMidiTrack: vi.fn(),
+      addSoundFontTrack: vi.fn(),
       applyInitialSoloState: vi.fn(),
       play: vi.fn(),
       pause: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock('tone', () => ({
 import { createToneAdapter } from '../TonePlayoutAdapter';
 import { TonePlayout } from '../TonePlayout';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { SoundFontCache } from '../SoundFontCache';
 
 function makeClip(
   overrides: Partial<AudioClip> & {
@@ -67,6 +70,28 @@ function makeClip(
 function makeTrack(id: string, clips: AudioClip[]): ClipTrack {
   return { id, name: `Track ${id}`, clips, muted: false, soloed: false, volume: 1, pan: 0 };
 }
+
+function makeMidiClip(
+  overrides: Partial<AudioClip> & {
+    id: string;
+    startSample: number;
+    durationSamples: number;
+  }
+): AudioClip {
+  return {
+    offsetSamples: 0,
+    sampleRate: 44100,
+    sourceDurationSamples: 441000,
+    gain: 1,
+    midiNotes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }],
+    midiChannel: 0,
+    midiProgram: 5,
+    ...overrides,
+  };
+}
+
+const loadedCache = { isLoaded: true } as unknown as SoundFontCache;
+const unloadedCache = { isLoaded: false } as unknown as SoundFontCache;
 
 describe('createToneAdapter', () => {
   beforeEach(() => {
@@ -618,6 +643,76 @@ describe('createToneAdapter', () => {
     it('uses custom ppqn from options', () => {
       const adapter = createToneAdapter({ ppqn: 960 });
       expect(adapter.ppqn).toBe(960);
+    });
+  });
+
+  describe('soundfont routing', () => {
+    it('routes MIDI tracks to addSoundFontTrack when cache is loaded at creation', () => {
+      const adapter = createToneAdapter({ soundFontCache: loadedCache });
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+      expect(instance.addMidiTrack).not.toHaveBeenCalled();
+
+      const arg = instance.addSoundFontTrack.mock.calls[0][0];
+      expect(arg.track.id).toBe('t1');
+      expect(arg.programNumber).toBe(5);
+      expect(arg.isPercussion).toBe(false);
+      expect(arg.soundFontCache).toBe(loadedCache);
+    });
+
+    it('sets isPercussion for MIDI channel 9', () => {
+      const adapter = createToneAdapter({ soundFontCache: loadedCache });
+      adapter.setTracks([
+        makeTrack('t1', [
+          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100, midiChannel: 9 }),
+        ]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addSoundFontTrack.mock.calls[0][0].isPercussion).toBe(true);
+    });
+
+    it('falls back to addMidiTrack when no cache is provided', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+      expect(instance.addSoundFontTrack).not.toHaveBeenCalled();
+    });
+
+    it('falls back to addMidiTrack (with warning) when cache is not loaded', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = createToneAdapter({ soundFontCache: unloadedCache });
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+      expect(instance.addSoundFontTrack).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('SoundFont not loaded'));
+      warnSpy.mockRestore();
+    });
+
+    it('uses :midi suffixed id for tracks with both audio and MIDI clips', () => {
+      const adapter = createToneAdapter({ soundFontCache: loadedCache });
+      adapter.setTracks([
+        makeTrack('t1', [
+          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+        ]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addTrack.mock.calls[0][0].track.id).toBe('t1');
+      expect(instance.addSoundFontTrack.mock.calls[0][0].track.id).toBe('t1:midi');
     });
   });
 });
