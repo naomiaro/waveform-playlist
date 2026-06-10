@@ -85,13 +85,13 @@ describe('<daw-editor> bpm tempo forwarding (#407)', () => {
   });
 
   it('skips the initial engine-build setTempo forward when callbacks are set', async () => {
-    const { editor, adapter } = await makeEditor({ callbacks: true });
+    const { adapter } = await makeEditor({ callbacks: true });
 
     expect(adapter.setTempo).not.toHaveBeenCalled();
   });
 
   it('forwards the initial bpm at engine build without callbacks', async () => {
-    const { editor, adapter } = await makeEditor();
+    const { adapter } = await makeEditor();
 
     expect(adapter.setTempo).toHaveBeenCalledWith(120);
   });
