@@ -671,6 +671,194 @@ describe('createToneAdapter', () => {
     });
   });
 
+  describe('setSoundFontCache', () => {
+    it('upgrades existing MIDI tracks from PolySynth to soundfont', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1');
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+      expect(instance.addSoundFontTrack.mock.calls[0][0].soundFontCache).toBe(loadedCache);
+      expect(instance.applyInitialSoloState).toHaveBeenCalled();
+    });
+
+    it('leaves audio tracks untouched when swapping', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('audio', [makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 })]),
+        makeTrack('midi', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addTrack).toHaveBeenCalledTimes(1);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      // Audio track was not removed or re-added
+      expect(instance.addTrack).toHaveBeenCalledTimes(1);
+      expect(instance.removeTrack).not.toHaveBeenCalledWith('audio');
+      expect(instance.removeTrack).toHaveBeenCalledWith('midi');
+    });
+
+    it('reverts to PolySynth when called with undefined', () => {
+      const adapter = createToneAdapter({ soundFontCache: loadedCache });
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+
+      adapter.setSoundFontCache(undefined);
+
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1');
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+    });
+
+    it('is a no-op when effective routing is unchanged (same loaded cache)', () => {
+      const adapter = createToneAdapter({ soundFontCache: loadedCache });
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.removeTrack.mockClear();
+      instance.addSoundFontTrack.mockClear();
+      instance.applyInitialSoloState.mockClear();
+
+      adapter.setSoundFontCache(loadedCache);
+
+      expect(instance.removeTrack).not.toHaveBeenCalled();
+      expect(instance.addSoundFontTrack).not.toHaveBeenCalled();
+      expect(instance.applyInitialSoloState).not.toHaveBeenCalled();
+    });
+
+    it('rebuilds when the SAME cache object finishes loading late', () => {
+      // The late-load race: cache passed at creation, tracks added before load completes
+      const lateCache = { isLoaded: false } as unknown as SoundFontCache;
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = createToneAdapter({ soundFontCache: lateCache });
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      warnSpy.mockRestore();
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+
+      // load() completes — same object, isLoaded flips
+      (lateCache as unknown as { isLoaded: boolean }).isLoaded = true;
+      adapter.setSoundFontCache(lateCache);
+
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1');
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+    });
+
+    it('resumes mid-playback when swapping during playback', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      adapter.play(0);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.resumeTrackMidPlayback).toHaveBeenCalledWith('t1');
+    });
+
+    it('rebuilt track reflects volume/mute changes made before the swap', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      adapter.setTrackVolume('t1', 0.5);
+      adapter.setTrackMute('t1', true);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const arg = instance.addSoundFontTrack.mock.calls[0][0];
+      expect(arg.track.gain).toBe(0.5);
+      expect(arg.track.muted).toBe(true);
+    });
+
+    it('uses :midi suffixed id for mixed audio+MIDI tracks', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [
+          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+        ]),
+      ]);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
+      expect(instance.addSoundFontTrack.mock.calls[0][0].track.id).toBe('t1:midi');
+    });
+
+    it('does not rebuild tracks removed via removeTrack', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      adapter.removeTrack!('t1');
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.removeTrack.mockClear();
+
+      adapter.setSoundFontCache(loadedCache);
+
+      expect(instance.removeTrack).not.toHaveBeenCalled();
+      expect(instance.addSoundFontTrack).not.toHaveBeenCalled();
+    });
+
+    it('is safe to call before setTracks and applies on later adds', () => {
+      const adapter = createToneAdapter();
+      expect(() => adapter.setSoundFontCache(loadedCache)).not.toThrow();
+
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+      expect(instance.addMidiTrack).not.toHaveBeenCalled();
+    });
+
+    it('is safe to call after dispose (stores only)', () => {
+      const adapter = createToneAdapter();
+      adapter.dispose();
+      expect(() => adapter.setSoundFontCache(loadedCache)).not.toThrow();
+    });
+
+    it('defaults programNumber to 0 when the clip has no midiProgram', () => {
+      const adapter = createToneAdapter({ soundFontCache: loadedCache });
+      adapter.setTracks([
+        makeTrack('t1', [
+          makeMidiClip({
+            id: 'm1',
+            startSample: 0,
+            durationSamples: 44100,
+            midiProgram: undefined,
+          }),
+        ]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addSoundFontTrack.mock.calls[0][0].programNumber).toBe(0);
+    });
+  });
+
   describe('soundfont routing', () => {
     it('routes MIDI tracks to addSoundFontTrack when cache is loaded at creation', () => {
       const adapter = createToneAdapter({ soundFontCache: loadedCache });
