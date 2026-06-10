@@ -11,6 +11,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  document.body.querySelectorAll('daw-editor').forEach((e) => e.remove());
 });
 
 function makeMockAdapter() {
@@ -61,7 +62,6 @@ describe('<daw-editor> bpm tempo forwarding (#407)', () => {
     editor.bpm = 140;
 
     expect(adapter.setTempo).toHaveBeenCalledWith(140, undefined);
-    document.body.removeChild(editor);
   });
 
   it('is display-only when both tick callbacks are set', async () => {
@@ -72,7 +72,6 @@ describe('<daw-editor> bpm tempo forwarding (#407)', () => {
 
     expect(adapter.setTempo).not.toHaveBeenCalled();
     expect(editor.bpm).toBe(140); // readout still updates
-    document.body.removeChild(editor);
   });
 
   it('still forwards when only one callback is set (both required)', async () => {
@@ -83,20 +82,17 @@ describe('<daw-editor> bpm tempo forwarding (#407)', () => {
     editor.bpm = 140;
 
     expect(adapter.setTempo).toHaveBeenCalledWith(140, undefined);
-    document.body.removeChild(editor);
   });
 
   it('skips the initial engine-build setTempo forward when callbacks are set', async () => {
     const { editor, adapter } = await makeEditor({ callbacks: true });
 
     expect(adapter.setTempo).not.toHaveBeenCalled();
-    document.body.removeChild(editor);
   });
 
   it('forwards the initial bpm at engine build without callbacks', async () => {
     const { editor, adapter } = await makeEditor();
 
     expect(adapter.setTempo).toHaveBeenCalledWith(120);
-    document.body.removeChild(editor);
   });
 });
