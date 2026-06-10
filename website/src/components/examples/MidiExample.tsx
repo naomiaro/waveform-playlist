@@ -213,13 +213,11 @@ function useSoundFontCache(url?: string): {
         return;
       }
 
-      // No AudioContext argument — SoundFontCache uses OfflineAudioContext
-      // internally, which doesn't require user gesture and avoids Firefox's
-      // "AudioContext was prevented from starting automatically" warning.
-      const sfCache = new SoundFontCache();
-
       try {
-        await sfCache.load(url);
+        // No context option — SoundFontCache uses OfflineAudioContext
+        // internally, which doesn't require user gesture and avoids Firefox's
+        // "AudioContext was prevented from starting automatically" warning.
+        const sfCache = await SoundFontCache.fromUrl(url);
         if (!cancelled) {
           cacheRef.current = sfCache;
           setCache(sfCache);
