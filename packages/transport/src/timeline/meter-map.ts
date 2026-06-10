@@ -218,5 +218,18 @@ export class MeterMap {
         '[waveform-playlist] MeterMap: denominator must be a power of 2 (1-32), got ' + denominator
       );
     }
+    // ticksPerBeat = ppqn * 4 / denominator must be an integer, or bar
+    // boundaries land on fractional ticks and barToTick/tickToBar corrupt
+    // silently. Only reachable with ppqn < 8 given denominator <= 32, but
+    // cheap to reject here.
+    if (!Number.isInteger((this._ppqn * 4) / denominator)) {
+      throw new Error(
+        '[waveform-playlist] MeterMap: ppqn (' +
+          this._ppqn +
+          ') * 4 is not divisible by denominator (' +
+          denominator +
+          ') — bar boundaries would fall on fractional ticks'
+      );
+    }
   }
 }

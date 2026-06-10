@@ -147,6 +147,19 @@ export class TempoMap {
     this._entries = [{ tick: 0 as Tick, bpm: first.bpm, interpolation: 'step', secondsAtTick: 0 }];
   }
 
+  /** Remove the tempo entry at exactly `atTick`, if one exists. The tick-0
+   *  entry is permanent (a map must always have a tempo) — removing it is a
+   *  no-op, matching removeMeter's treatment of the initial meter. The
+   *  seconds cache is recomputed from the removal point, the same partial
+   *  update setTempo uses. */
+  removeTempo(atTick: Tick): void {
+    if (atTick === 0) return;
+    const i = this._entries.findIndex((e) => e.tick === atTick);
+    if (i === -1) return;
+    this._entries = [...this._entries.slice(0, i), ...this._entries.slice(i + 1)];
+    this._recomputeCache(i);
+  }
+
   /** Get the interpolated BPM at a tick position */
   private _getTempoAt(atTick: Tick): number {
     const entryIndex = this._entryIndexAt(atTick);

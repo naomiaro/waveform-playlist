@@ -365,3 +365,29 @@ describe('TempoMap BPM validation', () => {
     expect(map.ticksToSeconds(960 as Tick)).toBeCloseTo(0.5, 12);
   });
 });
+
+describe('TempoMap.removeTempo', () => {
+  it('removes an entry and recomputes the seconds cache for later entries', () => {
+    const map = new TempoMap(960, 120);
+    map.setTempo(60, 960 as Tick); // beat 2 onward at 60 BPM
+    map.setTempo(240, 1920 as Tick); // beat 3 onward at 240 BPM
+    // With the 60 BPM entry: t(1920) = 0.5 + 1.0 = 1.5s
+    expect(map.ticksToSeconds(1920 as Tick)).toBeCloseTo(1.5, 12);
+
+    map.removeTempo(960 as Tick);
+    // Now 120 BPM holds until tick 1920: t(1920) = 1.0s, and the 240 BPM
+    // entry's cached secondsAtTick must have been recomputed.
+    expect(map.ticksToSeconds(1920 as Tick)).toBeCloseTo(1.0, 12);
+    expect(map.ticksToSeconds(2880 as Tick)).toBeCloseTo(1.25, 12); // +1 beat at 240
+    expect(map.getTempo(960 as Tick)).toBe(120);
+  });
+
+  it('treats tick 0 as permanent and unknown ticks as no-ops', () => {
+    const map = new TempoMap(960, 120);
+    map.setTempo(60, 960 as Tick);
+    map.removeTempo(0 as Tick); // permanent
+    map.removeTempo(480 as Tick); // no entry there
+    expect(map.getTempo(0 as Tick)).toBe(120);
+    expect(map.getTempo(960 as Tick)).toBe(60);
+  });
+});

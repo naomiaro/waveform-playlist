@@ -267,3 +267,19 @@ describe('MeterMap constructor validation', () => {
     expect(new MeterMap(960, 7, 8).getMeter()).toEqual({ numerator: 7, denominator: 8 });
   });
 });
+
+describe('MeterMap ppqn divisibility validation', () => {
+  it('rejects meters whose ticksPerBeat would be fractional', () => {
+    // ppqn 6, denominator 16: ticksPerBeat = 6*4/16 = 1.5 — bar boundaries
+    // would land on fractional ticks and corrupt barToTick/tickToBar.
+    expect(() => new MeterMap(6, 4, 16)).toThrow(/not divisible/);
+    const map = new MeterMap(6, 4, 4); // 6*4/4 = 6, fine
+    expect(() => map.setMeter(3, 16)).toThrow(/not divisible/);
+  });
+
+  it('accepts all denominators up to 32 at the default ppqn', () => {
+    for (const d of [1, 2, 4, 8, 16, 32]) {
+      expect(() => new MeterMap(960, 4, d)).not.toThrow();
+    }
+  });
+});

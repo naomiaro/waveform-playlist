@@ -509,6 +509,18 @@ export class Transport {
     this._emit('tempochange', { bpm: this._tempoMap.getTempo(), atTick: 0 as Tick });
   }
 
+  /** Remove the tempo entry at exactly `atTick` (tick 0 is permanent — a
+   *  no-op, like removeMeter's initial entry). Mirrors setTempo's loop-cache
+   *  invalidation and event; the emitted bpm is the tempo now in force at
+   *  the removed position. */
+  removeTempo(atTick: Tick): void {
+    this._tempoMap.removeTempo(atTick);
+    if (this._loopEnabled) {
+      this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
+    }
+    this._emit('tempochange', { bpm: this._tempoMap.getTempo(atTick), atTick });
+  }
+
   barToTick(bar: number): Tick {
     return this._meterMap.barToTick(bar);
   }

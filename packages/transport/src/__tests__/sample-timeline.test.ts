@@ -63,3 +63,20 @@ describe('SampleTimeline tick conversions', () => {
     expect(() => st.ticksToSamples(960 as Tick)).toThrow();
   });
 });
+
+describe('samplesToTicks integer contract', () => {
+  it('returns integer ticks at a non-commensurate sample rate', () => {
+    // 44100 Hz at 120 BPM/960 PPQN: 1 tick = 22.96875 samples — every
+    // conversion involves rounding. The integer contract must hold at this
+    // boundary, not by accident of TempoMap internals.
+    const tempoMap = new TempoMap(960, 120);
+    const timeline = new SampleTimeline(44100);
+    timeline.setTempoMap(tempoMap);
+    for (const ticks of [1, 7, 240, 961, 12345]) {
+      const samples = timeline.ticksToSamples(ticks as Tick);
+      const back = timeline.samplesToTicks(samples);
+      expect(Number.isInteger(back as number)).toBe(true);
+      expect(Math.abs((back as number) - ticks)).toBeLessThanOrEqual(0); // exact round-trip here
+    }
+  });
+});

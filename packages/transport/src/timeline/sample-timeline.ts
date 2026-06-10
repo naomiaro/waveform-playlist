@@ -40,6 +40,10 @@ export class SampleTimeline {
         '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first'
       );
     }
-    return this._tempoMap.secondsToTicks(samples / this._sampleRate);
+    // Round explicitly rather than relying on secondsToTicks' internal
+    // rounding — the integer Tick contract belongs to THIS boundary, and
+    // a TempoMap refactor returning float ticks must not silently break
+    // the Sample → Tick path. Mirrors the rounding in ticksToSamples.
+    return Math.round(this._tempoMap.secondsToTicks(samples / this._sampleRate)) as Tick;
   }
 }
