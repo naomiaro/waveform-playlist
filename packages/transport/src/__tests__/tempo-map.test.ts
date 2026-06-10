@@ -392,7 +392,7 @@ describe('TempoMap.removeTempo', () => {
   });
 });
 
-describe('entryCount', () => {
+describe('TempoMap.entryCount', () => {
   it('returns 1 for a new map', () => {
     const map = new TempoMap();
     expect(map.entryCount).toBe(1);

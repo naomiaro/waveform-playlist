@@ -289,20 +289,23 @@ describe('Transport', () => {
   });
 
   describe('setTempo multi-entry guard (#407)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('refuses a defaulted setTempo when the tempo map has multiple entries', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const ctx = mockAudioContext();
       const transport = new Transport(ctx);
-      warnSpy.mockClear(); // clear the constructor warn about click sounds
+      warnSpy.mockClear(); // clear constructor warn and setup calls
       transport.setTempo(100, 0 as Tick);
       transport.setTempo(140, 960 as Tick);
-      warnSpy.mockClear(); // clear any prior warns
+      warnSpy.mockClear();
 
       transport.setTempo(120); // defaulted atTick — "display BPM" style call
 
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Pass an explicit atTick'));
       expect(transport.getTempo(0 as Tick)).toBe(100);
-      warnSpy.mockRestore();
     });
 
     it('does not emit tempochange when the guard refuses', () => {
@@ -316,14 +319,13 @@ describe('Transport', () => {
       transport.setTempo(120);
 
       expect(listener).not.toHaveBeenCalled();
-      vi.restoreAllMocks();
     });
 
     it('applies an explicit atTick 0 write on a multi-entry map', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const ctx = mockAudioContext();
       const transport = new Transport(ctx);
-      warnSpy.mockClear();
+      warnSpy.mockClear(); // clear constructor warn and setup calls
       transport.setTempo(100, 0 as Tick);
       transport.setTempo(140, 960 as Tick);
       warnSpy.mockClear();
@@ -332,7 +334,6 @@ describe('Transport', () => {
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(transport.getTempo(0 as Tick)).toBe(120);
-      warnSpy.mockRestore();
     });
 
     it('applies a defaulted setTempo on a single-entry map', () => {
@@ -345,7 +346,6 @@ describe('Transport', () => {
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(transport.getTempo()).toBe(120);
-      warnSpy.mockRestore();
     });
   });
 
