@@ -1,5 +1,8 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
+// Line scrolling uses 16px per line (standard line height).
+const LINE_HEIGHT_PX = 16;
+
 /**
  * Frozen-panes scroll sync. The editor's `.scroll-area` owns both scroll
  * axes; this controller keeps the ruler band (x) and controls column (y)
@@ -10,7 +13,8 @@ import type { ReactiveController, ReactiveControllerHost } from 'lit';
  * Also forwards wheel deltaY over the controls viewport to the scroll
  * container so the mouse wheel scrolls tracks while hovering the controls.
  * preventDefault fires only when the container is actually vertically
- * scrollable, so page scrolling is unaffected for unconstrained editors.
+ * scrollable AND the scroll actually moved, so page scrolling is unaffected
+ * for unconstrained editors and boundary scrolling chains properly.
  */
 export class ScrollSyncController implements ReactiveController {
   private _host: ReactiveControllerHost & HTMLElement;
@@ -37,6 +41,13 @@ export class ScrollSyncController implements ReactiveController {
     requestAnimationFrame(() => {
       if (!this._host.isConnected) return;
       this._attach();
+      if (!this._scrollContainer && this.scrollSelector) {
+        console.warn(
+          '[dawcore] ScrollSyncController: scroll container not found for "' +
+            this.scrollSelector +
+            '"'
+        );
+      }
     });
   }
 
@@ -86,8 +97,15 @@ export class ScrollSyncController implements ReactiveController {
     const sc = this._scrollContainer;
     if (!sc) return;
     if (sc.scrollHeight <= sc.clientHeight) return;
-    sc.scrollTop += e.deltaY;
-    e.preventDefault();
+    const before = sc.scrollTop;
+    const scale =
+      e.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? LINE_HEIGHT_PX
+        : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? sc.clientHeight
+          : 1;
+    sc.scrollTop += e.deltaY * scale;
+    if (sc.scrollTop !== before) e.preventDefault();
   };
 
   private _apply() {

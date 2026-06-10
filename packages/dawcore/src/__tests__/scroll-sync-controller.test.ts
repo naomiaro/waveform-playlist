@@ -139,4 +139,93 @@ describe('ScrollSyncController', () => {
     // String(-0) === '0', so a zero scrollTop renders as plain 0px.
     expect(q(host, '.controls-column').style.transform).toBe('translate3d(0, 0px, 0)');
   });
+
+  it('stops forwarding wheel events after hostDisconnected', async () => {
+    const controller = makeController(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    sa.scrollTop = 0;
+
+    controller.hostDisconnected();
+
+    const wheel = new WheelEvent('wheel', { deltaY: 50, cancelable: true });
+    q(host, '.controls-viewport').dispatchEvent(wheel);
+
+    expect(sa.scrollTop).toBe(0);
+    expect(wheel.defaultPrevented).toBe(false);
+  });
+
+  it('attaches to a replaced scroll container via sync()', async () => {
+    const controller = makeController(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    // Remove the existing scroll-area and create a new one
+    q(host, '.scroll-area').remove();
+    const newSa = document.createElement('div');
+    newSa.className = 'scroll-area';
+    q(host, '.body').appendChild(newSa);
+
+    // Add the timeline child to the new container
+    const timeline = document.createElement('div');
+    timeline.className = 'timeline';
+    newSa.appendChild(timeline);
+
+    // Call sync to re-attach to the new container
+    controller.sync();
+
+    Object.defineProperty(newSa, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(newSa, 'clientHeight', { value: 200, configurable: true });
+    newSa.scrollLeft = 75;
+    newSa.dispatchEvent(new Event('scroll'));
+
+    expect(q(host, '.ruler-content').style.transform).toBe('translate3d(-75px, 0, 0)');
+  });
+
+  it('handles deltaMode line scrolling', async () => {
+    const controller = makeController(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    sa.scrollTop = 0;
+
+    const wheel = new WheelEvent('wheel', { deltaY: 3, cancelable: true });
+    // happy-dom may not support deltaMode in constructor, set it via defineProperty
+    Object.defineProperty(wheel, 'deltaMode', {
+      value: WheelEvent.DOM_DELTA_LINE,
+      configurable: true,
+    });
+    q(host, '.controls-viewport').dispatchEvent(wheel);
+
+    // 3 lines * 16px per line = 48px
+    expect(sa.scrollTop).toBe(48);
+    expect(wheel.defaultPrevented).toBe(true);
+  });
+
+  it('does not prevent default when scroll does not move (boundary chaining)', async () => {
+    const controller = makeController(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollHeight', { value: 100, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    // Already at the top, can't scroll further
+    sa.scrollTop = 0;
+
+    const wheel = new WheelEvent('wheel', { deltaY: -50, cancelable: true });
+    q(host, '.controls-viewport').dispatchEvent(wheel);
+
+    // scrollTop should stay at 0 (can't go negative)
+    expect(sa.scrollTop).toBe(0);
+    // Should not prevent default so page can continue scrolling
+    expect(wheel.defaultPrevented).toBe(false);
+  });
 });
