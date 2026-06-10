@@ -125,6 +125,28 @@ await cache.load('/soundfonts/piano.sf2');
 
 Without a `soundFontCache`, MIDI tracks fall back to Tone.js PolySynth synthesis. SoundFont playback uses the `midiProgram` field on each clip to select the correct instrument samples.
 
+#### Loading the SoundFont late
+
+The SoundFont decision is made per-track when tracks are set up. If the `.sf2`
+file finishes downloading *after* the playlist mounted, just pass the cache to
+the provider when it's ready — the provider forwards it to the live adapter,
+which upgrades MIDI tracks from PolySynth to samples in place:
+
+```tsx
+const [cache, setCache] = useState<SoundFontCache | undefined>(undefined);
+
+useEffect(() => {
+  const sf = new SoundFontCache();
+  sf.load('/media/soundfont/A320U.sf2').then(() => setCache(sf));
+}, []);
+
+<WaveformPlaylistProvider soundFontCache={cache} tracks={tracks} />
+```
+
+For non-React consumers (e.g. `<daw-editor>` web components), the same
+capability is `adapter.setSoundFontCache(cache)` on the adapter returned by
+`createToneAdapter()`.
+
 ### Mixing MIDI and Audio Tracks
 
 MIDI and audio tracks can be played together. Both `useMidiTracks` and `useAudioTracks` return `ClipTrack[]`, so merge them into a single array:

@@ -168,7 +168,7 @@ A clip is treated as MIDI iff `clip.midiNotes != null`. MIDI clips skip audio fe
 
 **Theming:** the piano-roll honors `--daw-piano-roll-note-color` (default `#2a7070`), `--daw-piano-roll-selected-note-color` (default `#3d9e9e`), and `--daw-piano-roll-background` (default `#1a1a2e`).
 
-See `examples/dawcore-tone/midi.html` for a runnable demo (C major scale, PolySynth playback).
+See `examples/dawcore-tone/midi.html` for a runnable demo (C major scale, PolySynth playback). For SoundFont sample playback, pass `createToneAdapter({ soundFontCache })` and see `examples/dawcore-tone/soundfont.html`.
 
 ## Pre-Computed Peaks
 

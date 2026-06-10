@@ -132,6 +132,8 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
 **Architecture:** Opt-in replacement for `MidiToneTrack`. When `soundFontCache` is provided to `TonePlayoutAdapter`, MIDI clips route to `SoundFontToneTrack` instead of `MidiToneTrack`. Falls back to PolySynth when no SoundFont loaded.
 
+**Late load / swap (`ToneAdapter.setSoundFontCache`):** `createToneAdapter` returns `ToneAdapter` (extends engine `PlayoutAdapter`) with `setSoundFontCache(cache | undefined)`. The adapter snapshots its tracks (`_currentTracks`, kept fresh by the volume/mute/solo/pan setters via immutable copies) and records what each MIDI playout track was built with (`_midiTrackBuild: Map<midiTrackId, SoundFontCache | null>`). A swap rebuilds only MIDI tracks whose *effective* routing (`cache?.isLoaded ? cache : null`) differs from their build record — NOT a reference-equality guard, because the same cache object flips `isLoaded` after a late `load()`. Audio tracks are untouched; `resumeTrackMidPlayback` handles swap-during-playback.
+
 **Audio graph per note:**
 ```
 AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
