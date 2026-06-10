@@ -19,6 +19,9 @@
 - Mock `PlayoutAdapter` for `<daw-editor>` tests must also include `init: vi.fn().mockResolvedValue(undefined)` and `isPlaying: vi.fn().mockReturnValue(false)` (in addition to `updateTrack` above). Minimal mock shapes crash on lifecycle paths the editor exercises during element setup. When writing a new editor test, copy `daw-editor-midi.test.ts:makeMockAdapter` rather than hand-rolling a thinner mock.
 - `<daw-clip>.start` is `@property({ type: Number })` WITHOUT `reflect: true` — setting the JS property does NOT update the attribute. Tests asserting on `c.getAttribute('start')` will read `null` regardless of impl correctness. Use `(c as DawClipElement).start` (property access) instead.
 - TDD failure-mode tests that intercept `editor.addTrack` to fail the Nth call should discriminate by `callCount` — NOT by introspecting `config.clips[0].midiChannel` or similar. The impl might use `addTrack({ midi: { ... } })` shorthand instead of `addTrack({ clips: [...] })`; a config-shape discriminator breaks silently. See `daw-editor-load-midi.test.ts` tests 8 and 9 for the pattern.
+- happy-dom has no layout engine: `scrollLeft`/`scrollTop` assignments are NOT clamped, and `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight` default to 0. Tests emulating scrollable or scroll-at-limit containers must stub these via `Object.defineProperty` (no-op setters emulate a clamped container).
+- Container queries are not evaluated in happy-dom — assert structure (classes) and `static styles` cssText instead; verify actual compact/responsive behavior in a real browser.
+- `editor.addTrack({ name, midi: { notes } })` is the lightweight way to get fully loaded tracks in editor template tests — no fetch/decode. See `daw-editor-layout.test.ts` `makeEditor()`.
 
 **Dev page:** `pnpm example:dawcore-native` starts Vite at `http://localhost:5173/` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
 
