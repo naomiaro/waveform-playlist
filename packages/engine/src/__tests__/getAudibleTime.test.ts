@@ -16,11 +16,9 @@ function makeAdapter(
   // destructuring default would silently replace it with 0.01.
   const outputLatency = 'outputLatency' in opts ? opts.outputLatency : 0.01;
   let position = 0;
-  const audioContext = (
-    outputLatency === undefined
-      ? { sampleRate: 48000, state: 'running' }
-      : { sampleRate: 48000, state: 'running', outputLatency }
-  ) as unknown as AudioContext;
+  const audioContext = (outputLatency === undefined
+    ? { sampleRate: 48000, state: 'running' }
+    : { sampleRate: 48000, state: 'running', outputLatency }) as unknown as AudioContext;
   const adapter: PlayoutAdapter = {
     audioContext,
     ppqn: 960,
