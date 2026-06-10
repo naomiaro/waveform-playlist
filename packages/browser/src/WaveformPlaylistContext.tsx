@@ -706,6 +706,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       if (engineRef.current) {
         engineRef.current.dispose();
         engineRef.current = null;
+        adapterRef.current = null;
       }
       prevTracksRef.current = tracks;
       return;
@@ -883,6 +884,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       stopAnimationFrameLoop();
       if (engineRef.current) {
         engineRef.current.dispose();
+        adapterRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -894,6 +896,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // isPlaying is intentionally excluded — read from isPlayingRef inside the
     // effect body. Including it causes a full engine+playout rebuild on every
     // play/pause/stop, destroying and recreating all audio Players.
+    // soundFontCache is deliberately excluded — late cache changes are forwarded
+    // to the live adapter by the sync effect below; only adapter creation reads it
+    // (via soundFontCacheRef).
     onReady,
     effects,
     stopAnimationFrameLoop,
@@ -911,14 +916,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     loopEndRef,
     isLoopEnabledRef,
     stableZoomLevels,
-    soundFontCache,
     deferEngineRebuild,
   ]);
 
   // Forward late-arriving / swapped SoundFontCache to the live adapter so
-  // MIDI tracks upgrade from PolySynth without an engine rebuild. The
-  // adapter no-ops when routing is unchanged, so the mount-time call with
-  // the creation-time cache is harmless.
+  // MIDI tracks upgrade from PolySynth without an engine rebuild. On mount
+  // adapterRef is still null (loadAudio runs in its own effect) and the
+  // helper no-ops; on later prop changes the adapter rebuilds only the MIDI
+  // tracks whose routing actually changed.
   useEffect(() => {
     syncSoundFontCacheToAdapter(adapterRef.current, soundFontCache);
   }, [soundFontCache]);
