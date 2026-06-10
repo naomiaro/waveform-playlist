@@ -86,7 +86,8 @@ export interface TrackState {
 export interface FrameData {
   /** Raw engine time (for state/logic — NOT for visual positioning). */
   readonly time: number;
-  /** time - outputLatency (for DOM positioning — matches speaker output). */
+  /** Visually-aligned time for DOM positioning: engine.getAudibleTime() while
+   *  playing (matches speaker output), raw time when resting. */
   readonly visualTime: number;
   readonly sampleRate: number;
   readonly samplesPerPixel: number;
@@ -97,8 +98,8 @@ export interface PlaybackAnimationContextValue {
   currentTime: number;
   currentTimeRef: React.RefObject<number>;
   /**
-   * Visually-aligned playback time (raw engine time minus `outputLatency` and
-   * `engine.lookAhead`). Kept current by the animation loop during playback
+   * Visually-aligned playback time (engine.getAudibleTime() while playing;
+   * raw resting time otherwise). Kept current by the animation loop during playback
    * and by pause/seek/stop paths when stopped. Read from this for any visual
    * positioning that should match the audible output.
    */
@@ -380,9 +381,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   isPlayingRef.current = isPlaying;
   const playStartPositionRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
-  // Visually-aligned playback time (raw - outputLatency - lookAhead). The
+  // Visually-aligned playback time (see toVisualTime / getAudibleTime). The
   // animation loop updates this per frame. Pause/seek/stop paths sync it
-  // explicitly so the static playhead position lines up with audible output.
+  // explicitly so the static playhead reflects the commanded resting position.
   const visualTimeRef = useRef<number>(0);
   const tracksRef = useRef<ClipTrack[]>(tracks);
   const soundFontCacheRef = useRef(soundFontCache);
@@ -1055,19 +1056,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     return (audioStartPositionRef.current ?? 0) + elapsed;
   }, []);
 
-  // Convert a raw engine time to its visually-aligned counterpart (subtracts
-  // outputLatency and engine.lookAhead). Used by pause/seek/stop paths to
-  // keep visualTimeRef in sync when the animation loop isn't running.
+  // Resting (non-playing) cursor positions display the raw time unchanged.
+  // Latency compensation (outputLatency + lookAhead) models the gap between
+  // the Transport's scheduling position and audible output — a property of
+  // *playing*, not of position. A seeked/paused/stopped cursor has no audible
+  // counterpart; the commanded position is the truth. During playback the
+  // animation loop uses engine.getAudibleTime() instead.
   const toVisualTime = useCallback((rawTime: number): number => {
-    const audioCtx = getGlobalAudioContext();
-    const latency = 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
-    const lookAhead = engineRef.current?.lookAhead ?? 0;
-    const visual = rawTime - latency - lookAhead;
-    return Number.isFinite(visual) ? Math.max(0, visual) : 0;
+    return Number.isFinite(rawTime) ? Math.max(0, rawTime) : 0;
   }, []);
 
   // Pair-write helper for the dual-ref pattern. Storage stays raw on
-  // `currentTimeRef`; display gets the audible-time version on `visualTimeRef`.
+  // `currentTimeRef`; display gets the guard-clamped raw version on `visualTimeRef`
+  // (compensation happens in the animation loop via engine.getAudibleTime() while playing).
   // Use this at every pause/seek/stop/loop site — never assign one ref alone
   // (browser/CLAUDE.md: "Display uses visualTimeRef").
   const setCurrentTimeRefs = useCallback(
@@ -1095,23 +1096,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Animation loop
   const startAnimationLoop = useCallback(() => {
-    // Cache AudioContext at loop start — stable for the lifetime of this playback session.
-    // outputLatency is read per-frame since it's a dynamic property.
-    const audioCtx = getGlobalAudioContext();
-
     const updateTime = () => {
       // Get current time from engine (auto-wraps at loop boundaries via Transport.seconds)
       const time = getPlaybackTime();
       currentTimeRef.current = time;
 
       // Compute visual time once — all visual consumers use this same value.
-      // Subtracts outputLatency (hardware DAC delay) AND adapter.lookAhead
-      // (Tone.js Transport runs lookAhead ahead of audible — ~100ms by default)
-      // so DOM positions match what the listener actually hears. Native adapter
-      // reports lookAhead as 0, so this is a no-op there.
-      const latency = 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
-      const lookAhead = engineRef.current?.lookAhead ?? 0;
-      const visualRaw = time - latency - lookAhead;
+      // engine.getAudibleTime() subtracts outputLatency (hardware DAC delay)
+      // and adapter.lookAhead (Tone.js Transport runs ~100ms ahead of audible),
+      // holding at the play-start position during the pre-roll window. Native
+      // adapters report lookAhead 0, so this is a near no-op there.
+      const visualRaw = engineRef.current ? engineRef.current.getAudibleTime() : time;
       const visualTime = Number.isFinite(visualRaw) ? Math.max(0, visualRaw) : 0;
       visualTimeRef.current = visualTime;
 
