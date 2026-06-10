@@ -340,6 +340,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
       if (!playout) return;
       playout.removeTrack(trackId);
+      playout.removeTrack(trackId + ':midi');
       playout.applyInitialSoloState();
     },
 

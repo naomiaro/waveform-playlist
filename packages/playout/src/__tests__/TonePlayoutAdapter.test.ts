@@ -572,6 +572,23 @@ describe('createToneAdapter', () => {
     });
   });
 
+  describe('removeTrack', () => {
+    it('removeTrack also removes the companion :midi playout track', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [
+          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+        ]),
+      ]);
+      adapter.removeTrack!('t1');
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1');
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
+    });
+  });
+
   describe('updateTrack (companion MIDI)', () => {
     it('re-adds only the MIDI half after replaceTrackClips updates audio in place', () => {
       const adapter = createToneAdapter();
@@ -856,6 +873,43 @@ describe('createToneAdapter', () => {
 
       const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
       expect(instance.addSoundFontTrack.mock.calls[0][0].programNumber).toBe(0);
+    });
+
+    it('upgrades tracks added via addTrack (incremental path)', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      adapter.addTrack!(
+        makeTrack('t2', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })])
+      );
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      expect(instance.removeTrack).toHaveBeenCalledWith('t2');
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+    });
+
+    it('rebuilds from the updated clips after updateTrack then swap', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const updated = makeTrack('t1', [
+        makeMidiClip({ id: 'm1', startSample: 88200, durationSamples: 44100 }),
+      ]);
+      adapter.updateTrack!('t1', updated);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const arg = instance.addSoundFontTrack.mock.calls[0][0];
+      // 88200 samples @44100Hz = 2s — proves the post-update snapshot was used
+      expect(arg.track.startTime).toBe(2);
     });
   });
 
