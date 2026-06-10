@@ -10,16 +10,21 @@ const LINE_HEIGHT_PX = 16;
  * event. (ViewportController's 100px threshold exists for chunk
  * virtualization and is too coarse for visual sync.)
  *
- * Also forwards wheel deltaY over the controls viewport to the scroll
- * container so the mouse wheel scrolls tracks while hovering the controls.
- * preventDefault fires only when the container is actually vertically
- * scrollable AND the scroll actually moved, so page scrolling is unaffected
- * for unconstrained editors and boundary scrolling chains properly.
+ * Also forwards wheel events from ALL elements matched by `wheelForwardSelector`
+ * to the scroll container for both axes:
+ *   - Horizontal scrub (deltaX) — ruler band stays in sync when the user
+ *     scrolls the timeline left/right while hovering the ruler.
+ *   - Vertical scroll (deltaY) — controls column lets the user scroll track
+ *     rows while hovering the track controls.
+ *
+ * preventDefault fires only when at least one axis actually moved, so page
+ * scrolling is unaffected for unconstrained editors and boundary scrolling
+ * chains properly.
  */
 export class ScrollSyncController implements ReactiveController {
   private _host: ReactiveControllerHost & HTMLElement;
   private _scrollContainer: HTMLElement | null = null;
-  private _wheelTarget: HTMLElement | null = null;
+  private _wheelTargets: Set<HTMLElement> = new Set();
 
   /** Selector (in host shadow DOM) for the scroll container. */
   scrollSelector = '';
@@ -27,7 +32,10 @@ export class ScrollSyncController implements ReactiveController {
   xTargetSelector = '';
   /** Selector for the element receiving translate3d(0, -scrollTop, 0). */
   yTargetSelector = '';
-  /** Selector for the element whose wheel events forward to the container. */
+  /**
+   * Selector (or comma-separated selectors) for elements whose wheel events
+   * forward to the scroll container. All matching elements receive listeners.
+   */
   wheelForwardSelector = '';
 
   constructor(host: ReactiveControllerHost & HTMLElement) {
@@ -53,9 +61,11 @@ export class ScrollSyncController implements ReactiveController {
 
   hostDisconnected() {
     this._scrollContainer?.removeEventListener('scroll', this._onScroll);
-    this._wheelTarget?.removeEventListener('wheel', this._onWheel);
     this._scrollContainer = null;
-    this._wheelTarget = null;
+    for (const target of this._wheelTargets) {
+      target.removeEventListener('wheel', this._onWheel);
+    }
+    this._wheelTargets.clear();
   }
 
   /**
@@ -72,6 +82,11 @@ export class ScrollSyncController implements ReactiveController {
     return selector ? (this._host.shadowRoot?.querySelector(selector) as HTMLElement | null) : null;
   }
 
+  private _queryAll(selector: string): HTMLElement[] {
+    if (!selector) return [];
+    return Array.from(this._host.shadowRoot?.querySelectorAll(selector) ?? []) as HTMLElement[];
+  }
+
   private _attach() {
     const container = this._query(this.scrollSelector);
     if (!container) return;
@@ -80,12 +95,22 @@ export class ScrollSyncController implements ReactiveController {
       this._scrollContainer = container;
       container.addEventListener('scroll', this._onScroll, { passive: true });
     }
-    const wheelTarget = this._query(this.wheelForwardSelector);
-    if (wheelTarget !== this._wheelTarget) {
-      this._wheelTarget?.removeEventListener('wheel', this._onWheel);
-      this._wheelTarget = wheelTarget;
-      wheelTarget?.addEventListener('wheel', this._onWheel, { passive: false });
+
+    // Diff the current set of matched wheel targets.
+    const nextTargets = new Set(this._queryAll(this.wheelForwardSelector));
+    for (const old of this._wheelTargets) {
+      if (!nextTargets.has(old)) {
+        old.removeEventListener('wheel', this._onWheel);
+        this._wheelTargets.delete(old);
+      }
     }
+    for (const next of nextTargets) {
+      if (!this._wheelTargets.has(next)) {
+        next.addEventListener('wheel', this._onWheel, { passive: false });
+        this._wheelTargets.add(next);
+      }
+    }
+
     this._apply();
   }
 
@@ -96,16 +121,25 @@ export class ScrollSyncController implements ReactiveController {
   private _onWheel = (e: WheelEvent) => {
     const sc = this._scrollContainer;
     if (!sc) return;
-    if (sc.scrollHeight <= sc.clientHeight) return;
-    const before = sc.scrollTop;
+
     const scale =
       e.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? LINE_HEIGHT_PX
         : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
-          ? sc.clientHeight
+          ? sc.clientHeight // used for Y; X uses clientWidth below
           : 1;
+
+    const scaleX = e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? sc.clientWidth : scale;
+
+    const beforeLeft = sc.scrollLeft;
+    const beforeTop = sc.scrollTop;
+
+    sc.scrollLeft += e.deltaX * scaleX;
     sc.scrollTop += e.deltaY * scale;
-    if (sc.scrollTop !== before) e.preventDefault();
+
+    if (sc.scrollLeft !== beforeLeft || sc.scrollTop !== beforeTop) {
+      e.preventDefault();
+    }
   };
 
   private _apply() {

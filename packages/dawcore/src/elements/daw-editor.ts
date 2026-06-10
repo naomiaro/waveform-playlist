@@ -402,7 +402,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     s.scrollSelector = '.scroll-area';
     s.xTargetSelector = '.ruler-content';
     s.yTargetSelector = '.controls-column';
-    s.wheelForwardSelector = '.controls-viewport';
+    s.wheelForwardSelector = '.controls-viewport, .ruler-viewport';
     return s;
   })();
 

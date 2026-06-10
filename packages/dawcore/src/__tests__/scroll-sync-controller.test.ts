@@ -32,6 +32,15 @@ function makeController(host: ReturnType<typeof makeHost>) {
   return c;
 }
 
+function makeControllerMulti(host: ReturnType<typeof makeHost>) {
+  const c = new ScrollSyncController(host as any);
+  c.scrollSelector = '.scroll-area';
+  c.xTargetSelector = '.ruler-content';
+  c.yTargetSelector = '.controls-column';
+  c.wheelForwardSelector = '.controls-viewport, .ruler-viewport';
+  return c;
+}
+
 function q(host: HTMLElement, sel: string): HTMLElement {
   return host.shadowRoot!.querySelector(sel) as HTMLElement;
 }
@@ -87,6 +96,8 @@ describe('ScrollSyncController', () => {
     const sa = q(host, '.scroll-area');
     Object.defineProperty(sa, 'scrollHeight', { value: 500, configurable: true });
     Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    Object.defineProperty(sa, 'scrollWidth', { value: 200, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 200, configurable: true });
     sa.scrollTop = 0;
 
     const wheel = new WheelEvent('wheel', { deltaY: 50, cancelable: true });
@@ -96,20 +107,34 @@ describe('ScrollSyncController', () => {
     expect(wheel.defaultPrevented).toBe(true);
   });
 
-  it('does not forward wheel when not vertically scrollable', async () => {
+  it('does not forward wheel when neither axis can move (no scrollable room)', async () => {
     const controller = makeController(host);
     controller.hostConnected();
     await nextFrame();
 
     const sa = q(host, '.scroll-area');
+    // Emulate a container with no scrollable room on either axis by stubbing
+    // scrollLeft/scrollTop as non-writable so assignment doesn't change the value.
+    // happy-dom has no layout engine, so we must stub manually.
     Object.defineProperty(sa, 'scrollHeight', { value: 200, configurable: true });
     Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
-    sa.scrollTop = 0;
+    Object.defineProperty(sa, 'scrollWidth', { value: 200, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 200, configurable: true });
+    // Stub scrollTop/scrollLeft as clamped (assignment is a no-op, value stays 0).
+    Object.defineProperty(sa, 'scrollTop', {
+      get: () => 0,
+      set: () => {},
+      configurable: true,
+    });
+    Object.defineProperty(sa, 'scrollLeft', {
+      get: () => 0,
+      set: () => {},
+      configurable: true,
+    });
 
     const wheel = new WheelEvent('wheel', { deltaY: 50, cancelable: true });
     q(host, '.controls-viewport').dispatchEvent(wheel);
 
-    expect(sa.scrollTop).toBe(0);
     expect(wheel.defaultPrevented).toBe(false);
   });
 
@@ -194,6 +219,8 @@ describe('ScrollSyncController', () => {
     const sa = q(host, '.scroll-area');
     Object.defineProperty(sa, 'scrollHeight', { value: 500, configurable: true });
     Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    Object.defineProperty(sa, 'scrollWidth', { value: 200, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 200, configurable: true });
     sa.scrollTop = 0;
 
     const wheel = new WheelEvent('wheel', { deltaY: 3, cancelable: true });
@@ -217,15 +244,112 @@ describe('ScrollSyncController', () => {
     const sa = q(host, '.scroll-area');
     Object.defineProperty(sa, 'scrollHeight', { value: 100, configurable: true });
     Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
-    // Already at the top, can't scroll further
-    sa.scrollTop = 0;
+    Object.defineProperty(sa, 'scrollWidth', { value: 200, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 200, configurable: true });
+    // Already at the top, can't scroll further.
+    // Stub scrollTop as clamped so the assignment is a no-op (no layout in happy-dom).
+    Object.defineProperty(sa, 'scrollTop', {
+      get: () => 0,
+      set: () => {},
+      configurable: true,
+    });
 
     const wheel = new WheelEvent('wheel', { deltaY: -50, cancelable: true });
     q(host, '.controls-viewport').dispatchEvent(wheel);
 
-    // scrollTop should stay at 0 (can't go negative)
-    expect(sa.scrollTop).toBe(0);
     // Should not prevent default so page can continue scrolling
+    expect(wheel.defaultPrevented).toBe(false);
+  });
+
+  // ── Multi-target + both-axes tests ──────────────────────────────────────
+
+  it('forwards wheel deltaX over .ruler-viewport to scrollLeft (horizontal scrub)', async () => {
+    const controller = makeControllerMulti(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollWidth', { value: 900, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'scrollHeight', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 300, configurable: true });
+    sa.scrollLeft = 0;
+
+    const wheel = new WheelEvent('wheel', { deltaX: 80, deltaY: 0, cancelable: true });
+    q(host, '.ruler-viewport').dispatchEvent(wheel);
+
+    // happy-dom does not clamp scrollLeft; assert directly
+    expect(sa.scrollLeft).toBe(80);
+    expect(wheel.defaultPrevented).toBe(true);
+  });
+
+  it('forwards both deltaX and deltaY in a single wheel event over a matched target', async () => {
+    const controller = makeControllerMulti(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollWidth', { value: 900, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    sa.scrollLeft = 0;
+    sa.scrollTop = 0;
+
+    const wheel = new WheelEvent('wheel', { deltaX: 40, deltaY: 20, cancelable: true });
+    q(host, '.controls-viewport').dispatchEvent(wheel);
+
+    expect(sa.scrollLeft).toBe(40);
+    expect(sa.scrollTop).toBe(20);
+    expect(wheel.defaultPrevented).toBe(true);
+  });
+
+  it('does not prevent default over ruler-viewport when neither axis can move', async () => {
+    const controller = makeControllerMulti(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollWidth', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'scrollHeight', { value: 200, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    // Stub both axes as clamped (no layout engine in happy-dom).
+    Object.defineProperty(sa, 'scrollLeft', {
+      get: () => 0,
+      set: () => {},
+      configurable: true,
+    });
+    Object.defineProperty(sa, 'scrollTop', {
+      get: () => 0,
+      set: () => {},
+      configurable: true,
+    });
+
+    const wheel = new WheelEvent('wheel', { deltaX: 50, deltaY: 50, cancelable: true });
+    q(host, '.ruler-viewport').dispatchEvent(wheel);
+
+    expect(wheel.defaultPrevented).toBe(false);
+  });
+
+  it('stops forwarding wheel from all targets after hostDisconnected', async () => {
+    const controller = makeControllerMulti(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollWidth', { value: 900, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 200, configurable: true });
+    sa.scrollLeft = 0;
+
+    controller.hostDisconnected();
+
+    const wheel = new WheelEvent('wheel', { deltaX: 80, cancelable: true });
+    q(host, '.ruler-viewport').dispatchEvent(wheel);
+
+    expect(sa.scrollLeft).toBe(0);
     expect(wheel.defaultPrevented).toBe(false);
   });
 });
