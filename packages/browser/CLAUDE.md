@@ -185,6 +185,10 @@ const rebuildChain = useCallback(() => {
 
 **Guard handler with ref comparisons:** Each hook's `onEngineState()` compares `state.field !== ref.current` before calling `setState` to skip unnecessary React updates. Ref assignments are synchronous; `setState` calls are batched by React.
 
+## SoundFont Late-Load Wiring
+
+The `soundFontCache` prop is deliberately EXCLUDED from the `loadAudio` effect deps — late cache changes are forwarded to the live adapter by a dedicated effect (`syncSoundFontCacheToAdapter(adapterRef.current, soundFontCache)`), which rebuilds only MIDI tracks. Re-adding the dep restores full engine rebuilds on every cache arrival. `adapterRef` is nulled wherever the engine is disposed without immediate recreation.
+
 ## Trim/Move Asymmetry in useClipDragHandlers
 
 **Move:** `onDragEnd` delegates to `engine.moveClip()` in one shot. The collision modifier constrains the visual position per-frame using the engine's pure `constrainClipDrag` function.

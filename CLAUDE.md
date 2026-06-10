@@ -157,6 +157,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 - **Build packages**: `pnpm build` - Build all packages
 - **TypeScript check**: `pnpm typecheck` (enforced in build scripts). `tsconfig`'s `noUnusedLocals` rejects unused private methods with `TS6133` — when extracting a helper, wire it into all call sites in the same change. Staged "add helper now, use it later" commits will fail typecheck.
+  - **Known failure:** `pnpm typecheck` currently fails on `main` in `packages/dawcore-midi/__tests__/parseMidiFile.test.ts` (`ArrayBufferLike` vs `ArrayBuffer`, TS version drift) — pre-existing, not caused by your branch. Verify touched packages individually with `pnpm --filter <pkg> typecheck`.
 - **Lint**: `pnpm lint` - Prettier check + ESLint across all packages. **Always run before committing.** This is a root-only script; run from repo root or use `pnpm -w lint`. Fix formatting issues with `pnpm format`.
 - **New packages**: After adding a new `packages/*/package.json`, run `pnpm install` and commit `pnpm-lock.yaml`. CI uses `--frozen-lockfile` and will fail if the lockfile is stale.
 - **Dev server**: `pnpm --filter website start` - Docusaurus dev server
