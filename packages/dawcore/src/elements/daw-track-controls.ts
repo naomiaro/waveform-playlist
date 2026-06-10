@@ -144,10 +144,13 @@ export class DawTrackControlsElement extends LitElement {
       border: none;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
-    /* Compact modes: drop sliders when the editor gives this row less height
-       than the full stack needs (~76px with both sliders, ~60px with one).
-       NOTE: container-type: size requires an explicit height on the host —
-       the editor always provides one; standalone consumers must too. */
+    /* Compact modes: drop sliders when the row is too short for the full
+       stack. Thresholds are CONTENT-BOX heights — the host is border-box
+       with 12px vertical padding + 1px border, so an editor-given height H
+       enters compact mode at H <= 89px (Pan hidden) and H <= 73px (Vol also
+       hidden). NOTE: container-type: size requires an explicit height on
+       the host — the editor always provides one; standalone consumers must
+       too (see the firstUpdated guard). */
     @container (max-height: 76px) {
       .pan-row {
         display: none;
@@ -159,6 +162,21 @@ export class DawTrackControlsElement extends LitElement {
       }
     }
   `;
+
+  protected firstUpdated(): void {
+    requestAnimationFrame(() => {
+      if (!this.isConnected) return;
+      const rect = this.getBoundingClientRect();
+      // width > 0 proves a real layout engine ran (happy-dom reports 0×0,
+      // so unit tests stay quiet); height 0 then means size containment
+      // collapsed the element because no explicit height was provided.
+      if (rect.width > 0 && rect.height === 0) {
+        console.warn(
+          '[dawcore] <daw-track-controls> has zero height: container-type: size requires an explicit height on the element (the editor sets one automatically; standalone usage must too). The controls are currently invisible.'
+        );
+      }
+    });
+  }
 
   private _onVolumeInput = (e: Event) => {
     const value = Number((e.target as HTMLInputElement).value);

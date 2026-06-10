@@ -160,7 +160,11 @@ describe('ScrollSyncController', () => {
 
     const sa = q(host, '.scroll-area');
     sa.scrollLeft = 50;
+    const warnSpy = vi.spyOn(console, 'warn');
     expect(() => sa.dispatchEvent(new Event('scroll'))).not.toThrow();
+    // Fix 1: warns once when scrolled and x target is missing
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('.ruler-content');
     // String(-0) === '0', so a zero scrollTop renders as plain 0px.
     expect(q(host, '.controls-column').style.transform).toBe('translate3d(0, 0px, 0)');
   });
@@ -348,6 +352,64 @@ describe('ScrollSyncController', () => {
 
     const wheel = new WheelEvent('wheel', { deltaX: 80, cancelable: true });
     q(host, '.ruler-viewport').dispatchEvent(wheel);
+
+    expect(sa.scrollLeft).toBe(0);
+    expect(wheel.defaultPrevented).toBe(false);
+  });
+
+  it('attaches wheel forwarding to targets that appear after sync()', async () => {
+    // Remove .ruler-viewport before hostConnected so the controller doesn't
+    // attach to it initially.
+    const rulerViewport = host.shadowRoot!.querySelector('.ruler-viewport')!;
+    rulerViewport.remove();
+
+    const controller = makeControllerMulti(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollWidth', { value: 900, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'scrollHeight', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 300, configurable: true });
+    sa.scrollLeft = 0;
+
+    // Re-append .ruler-viewport and call sync() to pick it up
+    const headerRow = host.shadowRoot!.querySelector('.header-row')!;
+    const newRulerViewport = document.createElement('div');
+    newRulerViewport.className = 'ruler-viewport';
+    headerRow.appendChild(newRulerViewport);
+
+    controller.sync();
+
+    const wheel = new WheelEvent('wheel', { deltaX: 40, cancelable: true });
+    newRulerViewport.dispatchEvent(wheel);
+
+    expect(sa.scrollLeft).toBe(40);
+  });
+
+  it('detaches wheel forwarding from targets removed from the DOM', async () => {
+    const controller = makeControllerMulti(host);
+    controller.hostConnected();
+    await nextFrame();
+
+    const sa = q(host, '.scroll-area');
+    Object.defineProperty(sa, 'scrollWidth', { value: 900, configurable: true });
+    Object.defineProperty(sa, 'clientWidth', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'scrollHeight', { value: 300, configurable: true });
+    Object.defineProperty(sa, 'clientHeight', { value: 300, configurable: true });
+    sa.scrollLeft = 0;
+
+    // Remove .ruler-viewport from DOM and call sync() so the controller diffs it out
+    const rulerViewport = host.shadowRoot!.querySelector('.ruler-viewport') as HTMLElement;
+    rulerViewport.remove();
+    controller.sync();
+
+    // Re-append WITHOUT calling sync — listener should have been removed
+    host.shadowRoot!.querySelector('.header-row')!.appendChild(rulerViewport);
+
+    const wheel = new WheelEvent('wheel', { deltaX: 40, cancelable: true });
+    rulerViewport.dispatchEvent(wheel);
 
     expect(sa.scrollLeft).toBe(0);
     expect(wheel.defaultPrevented).toBe(false);

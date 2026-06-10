@@ -14,7 +14,7 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.stubGlobal('devicePixelRatio', 1);
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no fetch in layout tests')));
-  // happy-dom canvas getContext returns null — ruler/grid drawing needs a mock.
+  // happy-dom canvas getContext returns null — ruler/grid/piano-roll drawing needs a mock.
   const mockCtx = {
     clearRect: vi.fn(),
     resetTransform: vi.fn(),
@@ -24,12 +24,15 @@ beforeEach(() => {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     stroke: vi.fn(),
+    fill: vi.fn(),
     fillText: vi.fn(),
+    roundRect: vi.fn(),
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 1,
     font: '',
     textBaseline: '',
+    globalAlpha: 1,
   };
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as any);
 });
@@ -77,6 +80,8 @@ async function makeEditor(trackCount: number, attrs: Record<string, string> = {}
   await editor.updateComplete;
   return editor;
 }
+
+const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
 describe('<daw-editor> frozen-panes layout', () => {
   it('renders the ruler in the header band, not inside the timeline', async () => {
@@ -159,6 +164,75 @@ describe('<daw-editor> frozen-panes layout', () => {
     expect(cssText).toMatch(/\.track-row\s*\{[^}]*box-sizing:\s*border-box/);
     expect(cssText).toMatch(/\.scroll-area\s*\{[^}]*overflow:\s*auto/);
     expect(cssText).toMatch(/\.scroll-area\s*\{[^}]*overflow-anchor:\s*none/);
+    editor.remove();
+  });
+
+  it('syncs ruler and controls transforms when the scroll-area scrolls', async () => {
+    const editor = await makeEditor(2, { timescale: '' });
+    // Wait for the ScrollSyncController's rAF-deferred _attach to run
+    await nextFrame();
+    const sr = editor.shadowRoot!;
+    const sa = sr.querySelector('.scroll-area') as HTMLElement;
+    sa.scrollLeft = 120;
+    sa.scrollTop = 45;
+    sa.dispatchEvent(new Event('scroll'));
+    expect((sr.querySelector('.ruler-content') as HTMLElement).style.transform).toBe(
+      'translate3d(-120px, 0, 0)'
+    );
+    expect((sr.querySelector('.controls-column') as HTMLElement).style.transform).toBe(
+      'translate3d(0, -45px, 0)'
+    );
+    editor.remove();
+  });
+
+  it('forwards wheel over the controls viewport to the scroll area', async () => {
+    const editor = await makeEditor(2, { timescale: '' });
+    await nextFrame();
+    const sr = editor.shadowRoot!;
+    const sa = sr.querySelector('.scroll-area') as HTMLElement;
+    const wheel = new WheelEvent('wheel', { deltaY: 50, cancelable: true });
+    sr.querySelector('.controls-viewport')!.dispatchEvent(wheel);
+    expect(sa.scrollTop).toBe(50);
+    expect(wheel.defaultPrevented).toBe(true);
+    editor.remove();
+  });
+
+  it('dispatches daw-seek from a pointerdown on the ruler viewport', async () => {
+    const editor = await makeEditor(1, { timescale: '' });
+    await nextFrame();
+    const sr = editor.shadowRoot!;
+    const timeline = sr.querySelector('.timeline') as HTMLElement;
+    vi.spyOn(timeline, 'getBoundingClientRect').mockReturnValue({
+      top: 30,
+      bottom: 130,
+      left: 0,
+      right: 500,
+      width: 500,
+      height: 100,
+      x: 0,
+      y: 30,
+      toJSON: () => ({}),
+    } as DOMRect);
+    (timeline as any).setPointerCapture = vi.fn();
+    (timeline as any).releasePointerCapture = vi.fn();
+
+    let seekTime: number | null = null;
+    editor.addEventListener('daw-seek', (e: any) => {
+      seekTime = e.detail.time;
+    });
+
+    const rv = sr.querySelector('.ruler-viewport') as HTMLElement;
+    rv.dispatchEvent(
+      new PointerEvent('pointerdown', { clientX: 100, clientY: 15, bubbles: true, composed: true })
+    );
+    // A non-drag pointerdown emits seek on pointerup
+    timeline.dispatchEvent(
+      new PointerEvent('pointerup', { clientX: 100, clientY: 15, bubbles: true })
+    );
+
+    expect(seekTime).not.toBeNull();
+    // px=100, spp=editor.samplesPerPixel, sr=48000 → time = (100 * spp) / 48000
+    expect(seekTime!).toBeCloseTo((100 * editor.samplesPerPixel) / 48000, 5);
     editor.remove();
   });
 });

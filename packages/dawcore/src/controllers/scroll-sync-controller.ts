@@ -25,6 +25,8 @@ export class ScrollSyncController implements ReactiveController {
   private _host: ReactiveControllerHost & HTMLElement;
   private _scrollContainer: HTMLElement | null = null;
   private _wheelTargets: Set<HTMLElement> = new Set();
+  private _warnedX = false;
+  private _warnedY = false;
 
   /** Selector (in host shadow DOM) for the scroll container. */
   scrollSelector = '';
@@ -89,7 +91,20 @@ export class ScrollSyncController implements ReactiveController {
 
   private _attach() {
     const container = this._query(this.scrollSelector);
-    if (!container) return;
+    if (!container) {
+      if (this._scrollContainer && !this._scrollContainer.isConnected) {
+        console.warn(
+          '[dawcore] ScrollSyncController: scroll container "' +
+            this.scrollSelector +
+            '" was removed from the DOM — detaching listeners until it reappears.'
+        );
+        this._scrollContainer.removeEventListener('scroll', this._onScroll);
+        this._scrollContainer = null;
+        for (const t of this._wheelTargets) t.removeEventListener('wheel', this._onWheel);
+        this._wheelTargets.clear();
+      }
+      return;
+    }
     if (container !== this._scrollContainer) {
       this._scrollContainer?.removeEventListener('scroll', this._onScroll);
       this._scrollContainer = container;
@@ -149,8 +164,28 @@ export class ScrollSyncController implements ReactiveController {
     // these elements between renders (e.g. the header row appears with the
     // first loaded track).
     const xTarget = this._query(this.xTargetSelector);
-    if (xTarget) xTarget.style.transform = `translate3d(${-sc.scrollLeft}px, 0, 0)`;
+    if (xTarget) {
+      xTarget.style.transform = `translate3d(${-sc.scrollLeft}px, 0, 0)`;
+      this._warnedX = false;
+    } else if (this.xTargetSelector && sc.scrollLeft !== 0 && !this._warnedX) {
+      this._warnedX = true;
+      console.warn(
+        '[dawcore] ScrollSyncController: x target "' +
+          this.xTargetSelector +
+          '" not found while scrolled — the synced pane will appear frozen. Check the selector, or clear it if the target is intentionally not rendered.'
+      );
+    }
     const yTarget = this._query(this.yTargetSelector);
-    if (yTarget) yTarget.style.transform = `translate3d(0, ${-sc.scrollTop}px, 0)`;
+    if (yTarget) {
+      yTarget.style.transform = `translate3d(0, ${-sc.scrollTop}px, 0)`;
+      this._warnedY = false;
+    } else if (this.yTargetSelector && sc.scrollTop !== 0 && !this._warnedY) {
+      this._warnedY = true;
+      console.warn(
+        '[dawcore] ScrollSyncController: y target "' +
+          this.yTargetSelector +
+          '" not found while scrolled — the synced pane will appear frozen. Check the selector, or clear it if the target is intentionally not rendered.'
+      );
+    }
   }
 }

@@ -97,7 +97,11 @@ export class PointerHandler {
         // Clip handler took over — wire move/up to it
         this._timeline = this._host.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
         if (this._timeline) {
-          this._timeline.setPointerCapture(e.pointerId);
+          try {
+            this._timeline.setPointerCapture(e.pointerId);
+          } catch (err) {
+            console.warn('[dawcore] setPointerCapture failed: ' + String(err));
+          }
           const onMove = (me: Event) => clipHandler.onPointerMove(me as PointerEvent);
           const onUp = (ue: Event) => {
             clipHandler.onPointerUp(ue as PointerEvent);
@@ -120,13 +124,22 @@ export class PointerHandler {
     }
 
     this._timeline = this._host.shadowRoot?.querySelector('.timeline') as HTMLElement | null;
-    if (!this._timeline) return;
+    if (!this._timeline) {
+      console.warn(
+        '[dawcore] PointerHandler: .timeline not found in shadow root — seek/selection ignored'
+      );
+      return;
+    }
 
     this._timelineRect = this._timeline.getBoundingClientRect();
     this._dragStartPx = this._pxFromPointer(e);
     this._isDragging = false;
 
-    this._timeline.setPointerCapture(e.pointerId);
+    try {
+      this._timeline.setPointerCapture(e.pointerId);
+    } catch (err) {
+      console.warn('[dawcore] setPointerCapture failed: ' + String(err));
+    }
     this._timeline.addEventListener('pointermove', this._onPointerMove);
     this._timeline.addEventListener('pointerup', this._onPointerUp);
   };

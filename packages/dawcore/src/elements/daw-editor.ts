@@ -400,9 +400,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _scrollSync = (() => {
     const s = new ScrollSyncController(this);
     s.scrollSelector = '.scroll-area';
-    s.xTargetSelector = '.ruler-content';
-    s.yTargetSelector = '.controls-column';
-    s.wheelForwardSelector = '.controls-viewport, .ruler-viewport';
+    // xTargetSelector, yTargetSelector, and wheelForwardSelector are kept
+    // truthful by updated() — they start empty and are set before any scroll
+    // is possible (updated() runs before paint on every reactive update).
     return s;
   })();
 
@@ -703,6 +703,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   } | null = null;
 
   protected updated(_changed: Map<string, unknown>): void {
+    // Keep selectors truthful so the controller can distinguish "intentionally
+    // not rendered" from "selector broken" (it warns on the latter when scrolled).
+    this._scrollSync.xTargetSelector = this._showRuler ? '.ruler-content' : '';
+    this._scrollSync.yTargetSelector = this._showControls ? '.controls-column' : '';
+    this._scrollSync.wheelForwardSelector = [
+      this._showControls ? '.controls-viewport' : '',
+      this._showRuler ? '.ruler-viewport' : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    // Re-applies transforms clobbered by the .ruler-content style binding —
+    // Lit rewrites the style attribute (width) on _totalWidth changes, wiping
+    // the imperatively-set transform. Must run before paint on every update.
     this._scrollSync.sync();
     // Forward viewport + zoom into the spectrogram controller on every update
     // so scroll, resize, and zoom all trigger orchestrator.setViewport.
@@ -2350,6 +2363,22 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _getPlayhead(): DawPlayheadElement | null {
     return this.shadowRoot?.querySelector('daw-playhead') as DawPlayheadElement | null;
   }
+
+  /** True when the controls column should be rendered (and its selector is valid). */
+  private get _showControls(): boolean {
+    return this._getOrderedTracks().length > 0 || this.indefinitePlayback;
+  }
+
+  /** True when the ruler header band should be rendered (and its selector is valid). */
+  private get _showRuler(): boolean {
+    return (
+      (this._getOrderedTracks().length > 0 ||
+        this.scaleMode === 'beats' ||
+        this.indefinitePlayback) &&
+      this.timescale
+    );
+  }
+
   private _getOrderedTracks(): Array<[string, ClipTrack]> {
     const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
       (el) => (el as DawTrackElement).trackId
@@ -2406,10 +2435,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       };
     });
 
-    const showControls = orderedTracks.length > 0 || this.indefinitePlayback;
-    const showRuler =
-      (orderedTracks.length > 0 || this.scaleMode === 'beats' || this.indefinitePlayback) &&
-      this.timescale;
+    const showControls = this._showControls;
+    const showRuler = this._showRuler;
 
     return html`
       ${showRuler
