@@ -2320,18 +2320,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const playhead = this._getPlayhead();
     if (!playhead || !this._engine) return;
     const engine = this._engine;
-    const ctx = this.audioContext;
-    // Audible position = engine time - hardware DAC latency - scheduler lookahead.
-    // - outputLatency: present on native AudioContext (~3ms Chrome, ~15ms Safari).
-    // - engine.lookAhead: proxies adapter.lookAhead (0.1s on Tone-backed adapters,
-    //   0 on native). Transport.seconds is the scheduling position, which runs
-    //   lookAhead ahead of what the listener hears. Without this subtraction the
-    //   playhead leads audio by ~100ms with the Tone adapter; native is a no-op.
-    const audibleTime = (): number => {
-      const outputLatency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-      const t = engine.getCurrentTime() - outputLatency - engine.lookAhead;
-      return Number.isFinite(t) ? Math.max(0, t) : 0;
-    };
+    // engine.getAudibleTime(): while playing, engine time minus hardware DAC
+    // latency (outputLatency) and scheduler lookahead (0.1s on Tone-backed
+    // adapters, 0 native), held at the play-start position during the
+    // pre-roll window. Without the subtraction the playhead leads audio by
+    // ~100ms with the Tone adapter.
+    const audibleTime = (): number => engine.getAudibleTime();
     if (this.scaleMode === 'beats') {
       const secondsToTicksFn = (s: number) => this._secondsToTicks(s);
       playhead.startBeatsAnimationWithMap(audibleTime, secondsToTicksFn, this.ticksPerPixel);
@@ -2342,13 +2336,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _stopPlayhead() {
     const playhead = this._getPlayhead();
     if (!playhead) return;
-    // Resting playhead must use audible time so it lines up with where audio
-    // actually stopped. Storage stays raw (`_currentTime`) so the next play()
-    // resumes correctly — only the visual position is shifted.
-    const ctx = this.audioContext;
-    const outputLatency = 'outputLatency' in ctx ? (ctx as AudioContext).outputLatency : 0;
-    const lookAhead = this._engine?.lookAhead ?? 0;
-    const t = this._currentTime - outputLatency - lookAhead;
+    // Resting playhead displays the raw position — latency compensation is a
+    // playback-time concept (Transport scheduling vs audible output). A
+    // seeked/stopped/paused cursor shows exactly the commanded position.
+    // Storage (`_currentTime`) is already raw, so play() resumes correctly.
+    const t = this._currentTime;
     const visualTime = Number.isFinite(t) ? Math.max(0, t) : 0;
     if (this.scaleMode === 'beats') {
       playhead.stopBeatsAnimationWithMap(
