@@ -52,6 +52,12 @@ export class TempoMap {
     return this._getTempoAt(atTick);
   }
 
+  /** Number of tempo entries in the map. Always >= 1 — the tick-0 entry is
+   *  permanent. Used by Transport.setTempo to detect multi-entry maps. */
+  get entryCount(): number {
+    return this._entries.length;
+  }
+
   setTempo(bpm: number, atTick: Tick = 0 as Tick, options?: SetTempoOptions): void {
     TempoMap._validateBpm(bpm);
     const interpolation = options?.interpolation ?? 'step';

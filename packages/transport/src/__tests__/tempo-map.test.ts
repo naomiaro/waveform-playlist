@@ -391,3 +391,22 @@ describe('TempoMap.removeTempo', () => {
     expect(map.getTempo(960 as Tick)).toBe(60);
   });
 });
+
+describe('entryCount', () => {
+  it('returns 1 for a new map', () => {
+    const map = new TempoMap();
+    expect(map.entryCount).toBe(1);
+  });
+
+  it('increments when an entry is added at a later tick', () => {
+    const map = new TempoMap();
+    map.setTempo(140, 960 as Tick);
+    expect(map.entryCount).toBe(2);
+  });
+
+  it('stays 1 when the tick-0 entry is overwritten', () => {
+    const map = new TempoMap();
+    map.setTempo(90);
+    expect(map.entryCount).toBe(1);
+  });
+});
