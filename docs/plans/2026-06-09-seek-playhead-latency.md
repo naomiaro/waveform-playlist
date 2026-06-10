@@ -37,7 +37,11 @@ interface AdapterHarness {
 function makeAdapter(
   opts: { lookAhead?: number; outputLatency?: number | undefined } = {}
 ): AdapterHarness {
-  const { lookAhead = 0.1, outputLatency = 0.01 } = opts;
+  const lookAhead = opts.lookAhead ?? 0.1;
+  // 'in' check, not a destructuring default — an explicit `outputLatency: undefined`
+  // must produce a context WITHOUT the property (native-adapter case), and a
+  // destructuring default would silently replace it with 0.01.
+  const outputLatency = 'outputLatency' in opts ? opts.outputLatency : 0.01;
   let position = 0;
   const audioContext = (
     outputLatency === undefined
