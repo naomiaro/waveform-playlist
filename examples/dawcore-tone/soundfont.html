@@ -74,8 +74,7 @@
       //    (recoverable later via adapter.setSoundFontCache(cache)).
       let soundFontCache;
       try {
-        soundFontCache = new SoundFontCache();
-        await soundFontCache.load('/media/soundfont/A320U.sf2');
+        soundFontCache = await SoundFontCache.fromUrl('/media/soundfont/A320U.sf2');
         addLog('soundfont loaded: A320U.sf2');
       } catch (err) {
         console.error('[soundfont]', err);

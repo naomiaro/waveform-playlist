@@ -110,9 +110,9 @@ For realistic instrument sounds, load a SoundFont file and pass the cache to the
 ```tsx
 import { SoundFontCache } from '@waveform-playlist/playout';
 
-// Load the SoundFont (do this once, e.g., in a hook or effect)
-const cache = new SoundFontCache();
-await cache.load('/soundfonts/piano.sf2');
+// Load the SoundFont (do this once, e.g., in a hook or effect).
+// fromUrl resolves only after the file is fetched and parsed.
+const cache = await SoundFontCache.fromUrl('/soundfonts/piano.sf2');
 
 // Pass to provider — MIDI tracks automatically use the SoundFont samples
 <WaveformPlaylistProvider
@@ -136,9 +136,8 @@ which upgrades MIDI tracks from PolySynth to samples in place:
 const [cache, setCache] = useState<SoundFontCache | undefined>(undefined);
 
 useEffect(() => {
-  const sf = new SoundFontCache();
-  sf.load('/media/soundfont/A320U.sf2')
-    .then(() => setCache(sf))
+  SoundFontCache.fromUrl('/media/soundfont/A320U.sf2')
+    .then(setCache)
     .catch((err) => {
       console.error('SoundFont failed to load — MIDI stays on PolySynth:', err);
     });
@@ -147,7 +146,7 @@ useEffect(() => {
 <WaveformPlaylistProvider soundFontCache={cache} tracks={tracks} />
 ```
 
-Set the state *after* `load()` resolves, as above. The provider reacts to the
+With `fromUrl` an unloaded cache never reaches your state. The provider reacts to the
 prop's reference changing — passing the cache eagerly and calling `load()` on
 the same object later won't re-trigger the upgrade (you'd see a
 `"SoundFont not loaded"` console warning instead).
