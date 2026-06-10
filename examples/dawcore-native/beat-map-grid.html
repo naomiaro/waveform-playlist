@@ -163,7 +163,7 @@
 
     // Build engine eagerly so adapter.transport is available before tracks load.
     // This gives us a single transport for metronome, tempo, and clip scheduling.
-    await editor._ensureEngine();
+    await editor.ready();
     const transport = adapter.transport;
     transport.setMetronomeEnabled(true);
 
@@ -243,10 +243,21 @@
 
     // --- Parse beats ---
     function parseBeats(text) {
-      return text.trim().split('\n').map(line => {
+      const parsed = text.trim().split('\n').map(line => {
         const parts = line.trim().split(/\s+/);
         return { time: parseFloat(parts[0]), beat: parseInt(parts[1]) };
       }).filter(b => !isNaN(b.time) && !isNaN(b.beat));
+      parsed.sort((a, b) => a.time - b.time);
+      // Drop near-duplicate detections: a zero interval means an infinite
+      // per-beat BPM, which TempoMap rejects. 50ms = 1200 BPM ceiling.
+      const MIN_BEAT_INTERVAL = 0.05;
+      const beats = [];
+      for (const b of parsed) {
+        if (beats.length === 0 || b.time - beats[beats.length - 1].time >= MIN_BEAT_INTERVAL) {
+          beats.push(b);
+        }
+      }
+      return beats;
     }
 
     // --- Build tempo curve ---
@@ -293,8 +304,11 @@
       let currentTick = firstBeatTick;
       for (let i = 0; i < beats.length - 1; i++) {
         const interval = beats[i + 1].time - beats[i].time;
-        const bpm = 60 / interval;
-        tempoEvents.push({ tick: currentTick, bpm });
+        // Defensive: parseBeats dedupes, but a non-positive interval would
+        // make TempoMap.setTempo throw. Carry the previous tempo instead.
+        if (interval > 0) {
+          tempoEvents.push({ tick: currentTick, bpm: 60 / interval });
+        }
         currentTick += ticksPerBeat;
       }
 
@@ -313,6 +327,12 @@
     function applyTempoCurve(curve) {
       lastCurve = curve;
       transport.stop();
+      // Set the display BPM BEFORE installing the tempo curve. The editor.bpm
+      // setter forwards to engine.setTempo, which writes the adapter's tempo
+      // map at tick 0 — assigning it after the curve would overwrite the
+      // tick-0 beatBpm entry with the median and shift every audio beat off
+      // the grid by a constant offset (97ms on Otherside, 51ms on Scar Tissue).
+      editor.bpm = Math.round(curve.medianBpm);
       transport.clearTempos();
       transport.clearMeters();
       transport.setMeter(4, 4);
@@ -324,26 +344,52 @@
       }
       editor.secondsToTicks = (s) => transport.timeToTick(s);
       editor.ticksToSeconds = (t) => transport.tickToTime(t);
-      editor.bpm = Math.round(curve.medianBpm);
       editor.meterEntries = curve.meterChanges;
     }
 
     // --- Handle loading independently or together ---
     let beatsApplied = false;
 
+    // Reposition every loaded clip so beat 1 in the audio lands on the
+    // curve's bar boundary. Needed in BOTH drop orders: beats-then-audio
+    // (after loadFiles) and audio-then-beats (clip sits at tick 0 until
+    // the curve arrives).
+    function repositionClips(curve) {
+      if (!editor.engine) return false;
+      const state = editor.engine.getState();
+      if (state.tracks.length === 0) return false;
+      const sr = editor.effectiveSampleRate;
+      const clipStartSec = transport.tickToTime(curve.clipStartTick);
+      const clipStartSample = Math.round(clipStartSec * sr);
+      const tracks = state.tracks.map(t => ({
+        ...t,
+        clips: t.clips.map(c => ({
+          ...c,
+          startTick: curve.clipStartTick,
+          startSample: clipStartSample,
+        })),
+      }));
+      editor.engine.setTracks(tracks);
+      return true;
+    }
+
     async function tryLoad() {
-      // Beats only: apply tempo curve for visual preview.
+      // Beats only (no pending audio): apply the tempo curve. If a track is
+      // already loaded (audio was dropped first), realign its clips too.
       if (pendingBeatsText && !pendingAudioFile) {
         addLog('applying beat map...');
         const beats = parseBeats(pendingBeatsText);
         const curve = buildTempoCurve(beats);
         applyTempoCurve(curve);
         beatsApplied = true;
+        pendingBeatsText = null;
 
         statsEl.textContent = beats.length + ' beats · median ~' +
           Math.round(curve.medianBpm) + ' BPM';
         statusSection.classList.remove('hidden');
-        addLog('ready: ' + curve.tempoEvents.length + ' tempo events (drop audio to add track)');
+        const repositioned = repositionClips(curve);
+        addLog('ready: ' + curve.tempoEvents.length + ' tempo events' +
+          (repositioned ? ' (clips realigned)' : ' (drop audio to add track)'));
         return;
       }
 
@@ -367,22 +413,7 @@
         if (result.loaded.length > 0) addLog('track: ' + result.loaded[0]);
 
         if (beatsApplied && lastCurve) {
-          // Reposition clip so first beat aligns with bar boundary.
-          if (lastCurve.clipStartTick > 0 && editor.engine) {
-            const sr = editor.effectiveSampleRate;
-            const clipStartSec = transport.tickToTime(lastCurve.clipStartTick);
-            const clipStartSample = Math.round(clipStartSec * sr);
-            const tracks = editor.engine.getState().tracks.map(t => ({
-              ...t,
-              clips: t.clips.map(c => ({
-                ...c,
-                startTick: lastCurve.clipStartTick,
-                startSample: clipStartSample,
-              })),
-            }));
-            editor.engine.setTracks(tracks);
-          }
-
+          repositionClips(lastCurve);
           addLog('meters: ' + lastCurve.meterChanges.map(m => m.numerator + '/' + m.denominator + ' @tick ' + m.tick).join(', '));
         } else {
           addLog('audio loaded — single BPM (drop .beats to add variable tempo)');
@@ -414,46 +445,28 @@
     });
 
     // Metronome volume
-    document.getElementById('metro-vol').addEventListener('input', (e) => {
-      const vol = e.target.value / 100;
+    const metroVolEl = document.getElementById('metro-vol');
+    function applyMetroVolume(vol) {
       const accent = createClickBuffer(1200, 0.05, 0.8 * vol);
       const normal = createClickBuffer(800, 0.04, 0.5 * vol);
       transport.setMetronomeClickSounds(accent, normal);
-    });
-
-    // --- Sync playhead with transport ---
-    function startTransportPlayhead() {
-      const playhead = editor.shadowRoot?.querySelector('daw-playhead');
-      if (playhead && beatsApplied) {
-        playhead.startBeatsAnimationWithMap(
-          () => transport.getCurrentTime(),
-          (s) => transport.timeToTick(s),
-          editor.ticksPerPixel
-        );
-      }
     }
-    function stopTransportPlayhead() {
-      const playhead = editor.shadowRoot?.querySelector('daw-playhead');
-      if (playhead && beatsApplied) {
-        playhead.stopBeatsAnimationWithMap(
-          transport.getCurrentTime(),
-          (s) => transport.timeToTick(s),
-          editor.ticksPerPixel
-        );
-      }
-    }
+    metroVolEl.addEventListener('input', (e) => applyMetroVolume(e.target.value / 100));
+    applyMetroVolume(metroVolEl.value / 100);
 
+    // --- Track playback state for the tempo/position display ---
+    // No custom playhead wiring: daw-editor animates the playhead itself
+    // through the secondsToTicks/ticksToSeconds callbacks set above, with
+    // output-latency compensation (engine.getAudibleTime). Re-driving it
+    // from raw transport.getCurrentTime() would undo that compensation.
     editor.addEventListener('daw-play', () => {
       isPlaying = true;
-      startTransportPlayhead();
     });
     editor.addEventListener('daw-pause', () => {
       isPlaying = false;
-      stopTransportPlayhead();
     });
     editor.addEventListener('daw-stop', () => {
       isPlaying = false;
-      stopTransportPlayhead();
     });
 
     // --- Editor events ---
