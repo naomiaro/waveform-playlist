@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, type ReactNod
 import {
   MAX_CANVAS_WIDTH,
   type SpectrogramConfig,
-  type SpectrogramComputeConfig,
   type ColorMapValue,
   type RenderMode,
   type TrackSpectrogramOverrides,
@@ -14,6 +13,19 @@ import {
   SpectrogramAbortError,
   type SpectrogramWorkerApi,
 } from '@dawcore/spectrogram';
+import {
+  extractChunkNumber,
+  parseCanvasId,
+  groupContiguousIndices,
+  classifyChunkTiers,
+  computeChunkSampleRange,
+  resolveRenderMode,
+  toComputeConfig,
+  buildConfigKey,
+  buildFFTKey,
+  mapsDiffer,
+  type ChunkTiers,
+} from './spectrogram-helpers';
 import { SpectrogramMenuItems } from './components';
 import { SpectrogramSettingsModal } from './components';
 import {
@@ -22,16 +34,6 @@ import {
   type SpectrogramCanvasRegistration,
 } from '@waveform-playlist/browser';
 import { usePlaylistData, usePlaylistControls } from '@waveform-playlist/browser';
-
-/** Extract the chunk number from a canvas ID like "clipId-ch0-chunk5" → 5 */
-function extractChunkNumber(canvasId: string): number {
-  const match = canvasId.match(/chunk(\d+)$/);
-  if (!match) {
-    console.warn(`[spectrogram] Unexpected canvas ID format: ${canvasId}`);
-    return 0;
-  }
-  return parseInt(match[1], 10);
-}
 
 export interface SpectrogramProviderProps {
   config?: SpectrogramConfig;
@@ -136,50 +138,23 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     const currentKeys = new Map<string, string>();
     const currentFFTKeys = new Map<string, string>();
     tracks.forEach((track) => {
-      const mode =
-        trackSpectrogramOverrides.get(track.id)?.renderMode ?? track.renderMode ?? 'waveform';
+      const override = trackSpectrogramOverrides.get(track.id);
+      const mode = resolveRenderMode(override, track.renderMode);
       if (mode === 'waveform') return;
-      const cfg =
-        trackSpectrogramOverrides.get(track.id)?.config ??
-        track.spectrogramConfig ??
-        spectrogramConfig;
-      const cm =
-        trackSpectrogramOverrides.get(track.id)?.colorMap ??
-        track.spectrogramColorMap ??
-        spectrogramColorMap;
-      currentKeys.set(track.id, JSON.stringify({ mode, cfg, cm, mono }));
-      const computeConfig: SpectrogramComputeConfig = {
-        fftSize: cfg?.fftSize,
-        hopSize: cfg?.hopSize,
-        windowFunction: cfg?.windowFunction,
-        alpha: cfg?.alpha,
-        zeroPaddingFactor: cfg?.zeroPaddingFactor,
-      };
-      currentFFTKeys.set(track.id, JSON.stringify({ mode, mono, ...computeConfig }));
+      const cfg = override?.config ?? track.spectrogramConfig ?? spectrogramConfig;
+      const cm = override?.colorMap ?? track.spectrogramColorMap ?? spectrogramColorMap;
+      currentKeys.set(track.id, buildConfigKey({ mode, cfg, cm, mono }));
+      currentFFTKeys.set(
+        track.id,
+        buildFFTKey({ mode, mono, computeConfig: toComputeConfig(cfg) })
+      );
     });
 
     const prevKeys = prevSpectrogramConfigRef.current;
     const prevFFTKeys = prevSpectrogramFFTKeyRef.current;
 
-    let configChanged = currentKeys.size !== prevKeys.size;
-    if (!configChanged) {
-      for (const [idx, key] of currentKeys) {
-        if (prevKeys.get(idx) !== key) {
-          configChanged = true;
-          break;
-        }
-      }
-    }
-
-    let fftKeyChanged = currentFFTKeys.size !== prevFFTKeys.size;
-    if (!fftKeyChanged) {
-      for (const [idx, key] of currentFFTKeys) {
-        if (prevFFTKeys.get(idx) !== key) {
-          fftKeyChanged = true;
-          break;
-        }
-      }
-    }
+    const configChanged = mapsDiffer(prevKeys, currentKeys);
+    const fftKeyChanged = mapsDiffer(prevFFTKeys, currentFFTKeys);
 
     const canvasVersionChanged = spectrogramCanvasVersion !== prevCanvasVersionRef.current;
     prevCanvasVersionRef.current = spectrogramCanvasVersion;
@@ -248,8 +223,8 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     }> = [];
 
     tracks.forEach((track, i) => {
-      const mode =
-        trackSpectrogramOverrides.get(track.id)?.renderMode ?? track.renderMode ?? 'waveform';
+      const override = trackSpectrogramOverrides.get(track.id);
+      const mode = resolveRenderMode(override, track.renderMode);
       if (mode === 'waveform') return;
 
       const trackConfigChanged =
@@ -261,16 +236,9 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
         track.clips.some((clip) => spectrogramCanvasRegistryRef.current.has(clip.id));
       if (!trackConfigChanged && !hasRegisteredCanvases) return;
 
-      const cfg =
-        trackSpectrogramOverrides.get(track.id)?.config ??
-        track.spectrogramConfig ??
-        spectrogramConfig ??
-        {};
+      const cfg = override?.config ?? track.spectrogramConfig ?? spectrogramConfig ?? {};
       const cm =
-        trackSpectrogramOverrides.get(track.id)?.colorMap ??
-        track.spectrogramColorMap ??
-        spectrogramColorMap ??
-        'viridis';
+        override?.colorMap ?? track.spectrogramColorMap ?? spectrogramColorMap ?? 'viridis';
 
       for (const clip of track.clips) {
         if (!clip.audioBuffer) continue;
@@ -327,42 +295,15 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     const getVisibleChunkRange = (
       channelInfo: { canvasIds: string[]; canvasWidths: number[] },
       clipPixelOffset = 0
-    ): { viewportIndices: number[]; bufferIndices: number[]; remainingIndices: number[] } => {
+    ): ChunkTiers => {
       const container = scrollContainerRef.current;
-      if (!container) {
-        return {
-          viewportIndices: channelInfo.canvasWidths.map((_, i) => i),
-          bufferIndices: [],
-          remainingIndices: [],
-        };
-      }
-
-      const scrollLeft = container.scrollLeft;
-      const viewportWidth = container.clientWidth;
-      // Match the 1.5× overscan buffer used by useVisibleChunkIndices
-      // (ScrollViewport.tsx) so spectrogram FFT covers all mounted canvases.
-      const buffer = viewportWidth * 1.5;
-      const bufferStart = Math.max(0, scrollLeft - buffer);
-      const bufferEnd = scrollLeft + viewportWidth + buffer;
-
-      const viewportIndices: number[] = [];
-      const bufferIndices: number[] = [];
-      const remainingIndices: number[] = [];
-
-      for (let i = 0; i < channelInfo.canvasWidths.length; i++) {
-        const chunkNumber = extractChunkNumber(channelInfo.canvasIds[i]);
-        const chunkLeft = chunkNumber * MAX_CANVAS_WIDTH + clipPixelOffset;
-        const chunkRight = chunkLeft + channelInfo.canvasWidths[i];
-        if (chunkRight > scrollLeft && chunkLeft < scrollLeft + viewportWidth) {
-          viewportIndices.push(i);
-        } else if (chunkRight > bufferStart && chunkLeft < bufferEnd) {
-          bufferIndices.push(i);
-        } else {
-          remainingIndices.push(i);
-        }
-      }
-
-      return { viewportIndices, bufferIndices, remainingIndices };
+      return classifyChunkTiers(
+        channelInfo,
+        clipPixelOffset,
+        container
+          ? { scrollLeft: container.scrollLeft, viewportWidth: container.clientWidth }
+          : null
+      );
     };
 
     const renderChunkSubset = async (
@@ -430,29 +371,15 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       },
       gen: number
     ): Promise<string> => {
-      // Determine the sample range these chunks cover
-      const chunkNumbers = indices.map((i) => extractChunkNumber(channelInfo.canvasIds[i]));
-      const minChunk = Math.min(...chunkNumbers);
-      const maxChunk = Math.max(...chunkNumbers);
-      const maxChunkIdx = indices[chunkNumbers.indexOf(maxChunk)];
-      const lastChunkWidth = channelInfo.canvasWidths[maxChunkIdx];
-
-      const startPx = minChunk * MAX_CANVAS_WIDTH;
-      const endPx = maxChunk * MAX_CANVAS_WIDTH + lastChunkWidth;
-
-      const windowSize = item.config.fftSize ?? 2048;
-      const rangeStartSample = item.offsetSamples + Math.floor(startPx * samplesPerPixel);
-      const rangeEndSample = Math.min(
-        item.offsetSamples + item.durationSamples,
-        item.offsetSamples + Math.ceil(endPx * samplesPerPixel)
-      );
-
-      // Pad by windowSize to avoid edge artifacts
-      const paddedStart = Math.max(item.offsetSamples, rangeStartSample - windowSize);
-      const paddedEnd = Math.min(
-        item.offsetSamples + item.durationSamples,
-        rangeEndSample + windowSize
-      );
+      // Determine the (window-padded) sample range these chunks cover.
+      const { paddedStart, paddedEnd } = computeChunkSampleRange({
+        channelInfo,
+        indices,
+        fftSize: item.config.fftSize ?? 2048,
+        offsetSamples: item.offsetSamples,
+        durationSamples: item.durationSamples,
+        samplesPerPixel,
+      });
 
       const { cacheKey } = await api.computeFFT(
         {
@@ -469,31 +396,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       );
 
       return cacheKey;
-    };
-
-    // Split indices into contiguous groups based on chunk numbers.
-    // E.g., remaining=[0,1,4,5] → [[0,1],[4,5]] — prevents computing
-    // an FFT range spanning the gap between 1 and 4.
-    const groupContiguousIndices = (
-      channelInfo: { canvasIds: string[] },
-      indices: number[]
-    ): number[][] => {
-      if (indices.length === 0) return [];
-      const groups: number[][] = [];
-      let currentGroup = [indices[0]];
-      let prevChunk = extractChunkNumber(channelInfo.canvasIds[indices[0]]);
-      for (let i = 1; i < indices.length; i++) {
-        const chunk = extractChunkNumber(channelInfo.canvasIds[indices[i]]);
-        if (chunk === prevChunk + 1) {
-          currentGroup.push(indices[i]);
-        } else {
-          groups.push(currentGroup);
-          currentGroup = [indices[i]];
-        }
-        prevChunk = chunk;
-      }
-      groups.push(currentGroup);
-      return groups;
     };
 
     const computeAsync = async () => {
@@ -894,10 +796,9 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     }
 
     // Canvas IDs follow the format `${clipId}-ch${channelIndex}-chunk${n}`.
-    const match = canvasId.match(/^(.+)-ch(\d+)-chunk\d+$/);
-    if (!match) return;
-    const clipId = match[1];
-    const channelIndex = parseInt(match[2], 10);
+    const parsed = parseCanvasId(canvasId);
+    if (!parsed) return;
+    const { clipId, channelIndex } = parsed;
 
     const registry = spectrogramCanvasRegistryRef.current;
     const perClip = registry.get(clipId);

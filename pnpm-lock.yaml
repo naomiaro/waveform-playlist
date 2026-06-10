@@ -425,13 +425,10 @@ importers:
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
-      react:
-        specifier: ^18.0.0
-        version: 18.3.1
-      styled-components:
-        specifier: ^6.0.0
-        version: 6.4.2(react-dom@18.3.1)(react@18.3.1)
     devDependencies:
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@18.3.1)(react@18.3.1)
       '@types/react':
         specifier: ^18.3.31
         version: 18.3.31
@@ -441,6 +438,18 @@ importers:
       '@waveform-playlist/browser':
         specifier: workspace:*
         version: link:../browser
+      jsdom:
+        specifier: ^28.1.0
+        version: 28.1.0
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      styled-components:
+        specifier: ^6.4.2
+        version: 6.4.2(react-dom@18.3.1)(react@18.3.1)
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(@swc/core@1.15.41)(postcss@8.5.15)(typescript@5.9.3)
@@ -5666,17 +5675,6 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@mdx-js/react@3.1.1(@types/react@18.3.31)(react@18.3.1):
-    resolution: {integrity: sha512-f++rKLQgUVYDAtECQ6fn/is15GkEH9+nZPM3MS0RcxVqoTfawHvDlSCH7JbMhAM6uJ32v3eXLvLmLvjGu7PTQw==}
-    peerDependencies:
-      '@types/react': '>=16'
-      react: '>=16'
-    dependencies:
-      '@types/mdx': 2.0.14
-      '@types/react': 18.3.31
-      react: 18.3.1
-    dev: true
-
   /@mdx-js/react@3.1.1(@types/react@18.3.31)(react@19.2.7):
     resolution: {integrity: sha512-f++rKLQgUVYDAtECQ6fn/is15GkEH9+nZPM3MS0RcxVqoTfawHvDlSCH7JbMhAM6uJ32v3eXLvLmLvjGu7PTQw==}
     peerDependencies:
@@ -8108,13 +8106,13 @@ packages:
       '@types/react':
         optional: true
     dependencies:
-      '@mdx-js/react': 3.1.1(@types/react@18.3.31)(react@18.3.1)
+      '@mdx-js/react': 3.1.1(@types/react@18.3.31)(react@19.2.7)
       '@storybook/csf-plugin': 10.4.3(esbuild@0.27.7)(storybook@10.4.3)(vite@8.0.16)(webpack@5.104.1)
-      '@storybook/icons': 2.0.2(react-dom@18.3.1)(react@18.3.1)
-      '@storybook/react-dom-shim': 10.4.3(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@18.3.1)(react@18.3.1)(storybook@10.4.3)
+      '@storybook/icons': 2.0.2(react-dom@19.2.7)(react@19.2.7)
+      '@storybook/react-dom-shim': 10.4.3(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@19.2.7)(react@19.2.7)(storybook@10.4.3)
       '@types/react': 18.3.31
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
       storybook: 10.4.3(@testing-library/dom@10.4.1)(@types/react@18.3.31)(prettier@3.6.2)(react-dom@18.3.1)(react@18.3.1)
       ts-dedent: 2.2.0
     transitivePeerDependencies:
@@ -8230,6 +8228,16 @@ packages:
       react-dom: 18.3.1(react@18.3.1)
     dev: true
 
+  /@storybook/icons@2.0.2(react-dom@19.2.7)(react@19.2.7):
+    resolution: {integrity: sha512-KZBCpXsshAIjczYNXR/rlxEtCUX/eAbpFNwKi8bcOomrLA4t/SyPz5RF+lVPO2oZBUE4sAkt43mfJUevQDSEEw==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    dependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+    dev: true
+
   /@storybook/preset-react-webpack@10.4.3(@swc/core@1.15.41)(esbuild@0.27.7)(postcss@8.5.15)(react-dom@18.3.1)(react@18.3.1)(storybook@10.4.3)(typescript@5.9.3):
     resolution: {integrity: sha512-814EDY4yMTVECLoIFeCdbpoRuaFxtvN/U5TcB6czb6SDabaagEHsXWWVIDhx1xZlBGK6KUrxD9CMACPcB2fcKA==}
     peerDependencies:
@@ -8308,6 +8316,27 @@ packages:
       '@types/react-dom': 18.3.7(@types/react@18.3.31)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
+      storybook: 10.4.3(@testing-library/dom@10.4.1)(@types/react@18.3.31)(prettier@3.6.2)(react-dom@18.3.1)(react@18.3.1)
+    dev: true
+
+  /@storybook/react-dom-shim@10.4.3(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@19.2.7)(react@19.2.7)(storybook@10.4.3):
+    resolution: {integrity: sha512-aPZ+Afd+zdoSygISOVCJIYdiqWJM6uRZFw0zhsONwNcn3kU1TNce6iAoBCY8cpEhDAu61M1QjeIHM3LPy/ieog==}
+    peerDependencies:
+      '@types/react': ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      '@types/react-dom': ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      storybook: ^10.4.3
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+    dependencies:
+      '@types/react': 18.3.31
+      '@types/react-dom': 18.3.7(@types/react@18.3.31)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
       storybook: 10.4.3(@testing-library/dom@10.4.1)(@types/react@18.3.31)(prettier@3.6.2)(react-dom@18.3.1)(react@18.3.1)
     dev: true
 
