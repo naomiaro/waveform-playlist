@@ -46,6 +46,32 @@ test.describe('Multi-Clip Example', () => {
       // (exact value depends on zoom level and click position)
       expect(timeText).not.toBe('00:00:00.000');
     });
+
+    test('playhead lands exactly where clicked (no latency offset)', async ({ page }) => {
+      const clipContainer = page.locator('[data-clip-container]').first();
+      await expect(clipContainer).toBeVisible();
+
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await clipContainer.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+
+      const clickX = box!.x + box!.width / 2;
+      const clickY = box!.y + box!.height / 2;
+      await page.mouse.click(clickX, clickY);
+
+      // The playhead must land at the click x. Before the fix the Tone
+      // adapter's lookAhead (0.1s) + outputLatency pulled it ~4.3-4.7px
+      // (at this example's 1024 spp) behind the click.
+      const playhead = page.locator('[data-playhead]');
+      await expect(playhead).toBeVisible();
+      await expect(async () => {
+        const phBox = await playhead.boundingBox();
+        expect(phBox).toBeTruthy();
+        expect(Math.abs(phBox!.x + phBox!.width / 2 - clickX)).toBeLessThanOrEqual(2);
+      }).toPass({ timeout: 5000 });
+    });
   });
 
   test.describe('Clip Boundaries', () => {
