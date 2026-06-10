@@ -858,6 +858,93 @@ describe('createToneAdapter', () => {
       expect(() => adapter.setSoundFontCache(loadedCache)).not.toThrow();
     });
 
+    it('rebuilt track reflects pan/solo changes made before the swap', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      adapter.setTrackPan('t1', -0.5);
+      adapter.setTrackSolo('t1', true);
+
+      adapter.setSoundFontCache(loadedCache);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const arg = instance.addSoundFontTrack.mock.calls[0][0];
+      expect(arg.track.stereoPan).toBe(-0.5);
+      expect(arg.track.soloed).toBe(true);
+    });
+
+    it('upgrades every MIDI track in one swap, with a single solo-state reapply', () => {
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('m1', [makeMidiClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
+        makeTrack('audio', [makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 })]),
+        makeTrack('m2', [makeMidiClip({ id: 'c2', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.applyInitialSoloState.mockClear();
+
+      adapter.setSoundFontCache(loadedCache);
+
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(2);
+      const swappedIds = instance.addSoundFontTrack.mock.calls.map(
+        (call: [{ track: { id: string } }]) => call[0].track.id
+      );
+      expect(swappedIds).toEqual(['m1', 'm2']);
+      expect(instance.addTrack).toHaveBeenCalledTimes(1);
+      expect(instance.removeTrack).not.toHaveBeenCalledWith('audio');
+      expect(instance.applyInitialSoloState).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns and does not rebuild when the cache is not loaded (effective routing unchanged)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.removeTrack.mockClear();
+      instance.addMidiTrack.mockClear();
+      instance.applyInitialSoloState.mockClear();
+
+      adapter.setSoundFontCache(unloadedCache);
+
+      expect(instance.removeTrack).not.toHaveBeenCalled();
+      expect(instance.addMidiTrack).not.toHaveBeenCalled();
+      expect(instance.addSoundFontTrack).not.toHaveBeenCalled();
+      expect(instance.applyInitialSoloState).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Await cache.load()'));
+      warnSpy.mockRestore();
+    });
+
+    it('isolates a per-track failure: remaining tracks still swap and solo state reapplies', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = createToneAdapter();
+      adapter.setTracks([
+        makeTrack('m1', [makeMidiClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
+        makeTrack('m2', [makeMidiClip({ id: 'c2', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.removeTrack.mockImplementationOnce(() => {
+        throw new Error('cross-context connect failure');
+      });
+
+      expect(() => adapter.setSoundFontCache(loadedCache)).not.toThrow();
+
+      // m1 failed (caught + warned); m2 still upgraded; solo state reapplied
+      expect(instance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+      expect(instance.addSoundFontTrack.mock.calls[0][0].track.id).toBe('m2');
+      expect(instance.applyInitialSoloState).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('SoundFont swap failed for track')
+      );
+      warnSpy.mockRestore();
+    });
+
     it('defaults programNumber to 0 when the clip has no midiProgram', () => {
       const adapter = createToneAdapter({ soundFontCache: loadedCache });
       adapter.setTracks([

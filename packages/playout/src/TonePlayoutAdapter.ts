@@ -59,8 +59,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
   // setSoundFontCache to rebuild MIDI tracks without an engine round-trip.
   const _currentTracks = new Map<string, ClipTrack>();
   // What each MIDI playout track was built with (null = PolySynth). The
-  // rebuild guard compares against this, NOT cache reference equality —
-  // the same cache object can flip isLoaded after a late load().
+  // rebuild guard compares effective routing against this build record —
+  // not against the previous setSoundFontCache argument — because the same
+  // cache object can flip isLoaded after a late load().
   const _midiTrackBuild = new Map<string, SoundFontCache | null>();
 
   // A track with both audio and MIDI clips becomes TWO playout tracks:
@@ -311,6 +312,11 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       // Fallback: full track remove+re-add (MIDI-only or no audio clips)
       playout.removeTrack(trackId);
       playout.removeTrack(trackId + ':midi');
+      // Drop both build-record keys — a shape change (mixed ↔ MIDI-only)
+      // flips the MIDI playout id between trackId and trackId + ':midi',
+      // and the re-add below only records the current one.
+      _midiTrackBuild.delete(trackId);
+      _midiTrackBuild.delete(trackId + ':midi');
       addTrackToPlayout(playout, track);
       playout.applyInitialSoloState();
       if (_isPlaying) {
@@ -486,6 +492,12 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
     setSoundFontCache(cache: SoundFontCache | undefined): void {
       _soundFontCache = cache;
+      if (cache && !cache.isLoaded) {
+        console.warn(
+          '[waveform-playlist] setSoundFontCache called with a SoundFontCache that is not ' +
+            'loaded — MIDI tracks remain on PolySynth. Await cache.load() and call again.'
+        );
+      }
       if (!playout) return;
 
       const effective = cache?.isLoaded ? cache : null;
@@ -498,12 +510,22 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
         const midiTrackId = midiPlayoutTrackId(track);
         if (_midiTrackBuild.get(midiTrackId) === effective) continue;
 
-        playout.removeTrack(midiTrackId);
-        addMidiTrackToPlayout(playout, track);
-        if (_isPlaying) {
-          playout.resumeTrackMidPlayback(midiTrackId);
+        // Isolate per-track failures — a Tone.js graph error on one track
+        // must not leave the remaining tracks stuck on their old routing
+        // or escape into the caller (in React that unmounts the playlist
+        // via the error boundary).
+        try {
+          playout.removeTrack(midiTrackId);
+          addMidiTrackToPlayout(playout, track);
+          if (_isPlaying) {
+            playout.resumeTrackMidPlayback(midiTrackId);
+          }
+          changed = true;
+        } catch (err) {
+          console.warn(
+            `[waveform-playlist] SoundFont swap failed for track "${track.name}": ` + String(err)
+          );
         }
-        changed = true;
       }
 
       if (changed) {
