@@ -8,17 +8,18 @@ export interface ClipEvent extends SchedulerEvent {
   trackId: string;
   clipId: string;
   audioBuffer: AudioBuffer;
-  /** Clip position on timeline (integer samples) */
+  /** Clip position on timeline (integer samples, at the TIMELINE sample rate) */
   startSample: Sample;
-  /** Offset into audioBuffer (integer samples) */
+  /** Offset into audioBuffer (integer samples, at the BUFFER's own sample
+   *  rate — they index the buffer, not the timeline) */
   offsetSamples: Sample;
-  /** Duration to play (integer samples) */
+  /** Duration to play (integer samples, at the BUFFER's own sample rate) */
   durationSamples: Sample;
   /** Clip gain multiplier */
   gain: number;
-  /** Fade in duration (integer samples) */
+  /** Fade in duration (integer samples, at the TIMELINE sample rate) */
   fadeInDurationSamples: Sample;
-  /** Fade out duration (integer samples) */
+  /** Fade out duration (integer samples, at the TIMELINE sample rate) */
   fadeOutDurationSamples: Sample;
 }
 
@@ -98,14 +99,35 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
         if (clipTick < (fromTick as number)) continue;
         if (clipTick >= (toTick as number)) continue;
 
-        const fadeInDurationSamples = clip.fadeIn ? (clip.fadeIn.duration ?? 0) : 0;
-        const fadeOutDurationSamples = clip.fadeOut ? (clip.fadeOut.duration ?? 0) : 0;
+        // Two sample-count domains are in play and must not be mixed:
+        // timeline samples (clip.startSample, the loop boundary) and
+        // buffer samples (clip.offsetSamples / durationSamples index the
+        // audio file, which may have a different rate than the timeline).
+        const timelineRate = this._sampleTimeline.sampleRate;
+        const bufferRate = clip.audioBuffer.sampleRate;
+
+        // Fade.duration is SECONDS (the convention shared with the Tone
+        // adapter); pack as timeline samples so consume() recovers the
+        // seconds with one division.
+        const fadeInDurationSamples = clip.fadeIn
+          ? Math.round((clip.fadeIn.duration ?? 0) * timelineRate)
+          : 0;
+        const fadeOutDurationSamples = clip.fadeOut
+          ? Math.round((clip.fadeOut.duration ?? 0) * timelineRate)
+          : 0;
 
         // Clamp duration at loopEnd so the source stops exactly at the
-        // loop boundary. onPositionJump handles the mid-clip restart.
+        // loop boundary. The clamp lives in timeline samples; the event's
+        // duration stays in buffer samples.
         let durationSamples = clip.durationSamples;
-        if (this._loopEnabled && clip.startSample + durationSamples > this._loopEndSamples) {
-          durationSamples = this._loopEndSamples - clip.startSample;
+        if (this._loopEnabled) {
+          const durationTimelineSamples = Math.round(
+            (clip.durationSamples / bufferRate) * timelineRate
+          );
+          const allowedTimelineSamples = this._loopEndSamples - clip.startSample;
+          if (durationTimelineSamples > allowedTimelineSamples) {
+            durationSamples = Math.round((allowedTimelineSamples / timelineRate) * bufferRate);
+          }
         }
 
         events.push({
@@ -139,9 +161,12 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
       return;
     }
 
-    const sampleRate = this._sampleTimeline.sampleRate;
-    const offsetSeconds = event.offsetSamples / sampleRate;
-    const durationSeconds = event.durationSamples / sampleRate;
+    // offsetSamples/durationSamples index the BUFFER, so the buffer's own
+    // rate converts them to seconds; a 48 kHz file on a 44.1 kHz timeline
+    // would otherwise start ~8.8% too deep and play the wrong duration.
+    const bufferRate = event.audioBuffer.sampleRate;
+    const offsetSeconds = event.offsetSamples / bufferRate;
+    const durationSeconds = event.durationSamples / bufferRate;
 
     // Guard against invalid offset
     if (offsetSeconds >= event.audioBuffer.duration) {
@@ -168,10 +193,12 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     const gainNode = this._audioContext.createGain();
     gainNode.gain.value = event.gain;
 
-    // Apply fades (AudioParam scheduling uses AudioContext time)
+    // Apply fades (AudioParam scheduling uses AudioContext time). Fade
+    // durations are packed as TIMELINE samples (see generate()).
     // Clamp fades so they don't overlap (split duration evenly if they would)
-    let fadeIn = event.fadeInDurationSamples / sampleRate;
-    let fadeOut = event.fadeOutDurationSamples / sampleRate;
+    const timelineRate = this._sampleTimeline.sampleRate;
+    let fadeIn = event.fadeInDurationSamples / timelineRate;
+    let fadeOut = event.fadeOutDurationSamples / timelineRate;
     if (fadeIn + fadeOut > durationSeconds) {
       const ratio = durationSeconds / (fadeIn + fadeOut);
       fadeIn *= ratio;
@@ -228,21 +255,36 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
 
         if (clipTick >= (newTick as number)) continue; // hasn't started yet
 
-        // End comparison in samples (duration is audio-file-relative)
-        const clipEndSample = clip.startSample + clip.durationSamples;
+        const timelineRate = this._sampleTimeline.sampleRate;
+        const bufferRate = clip.audioBuffer.sampleRate;
+        const bufToTimeline = (n: number) => Math.round((n / bufferRate) * timelineRate);
+        const timelineToBuf = (n: number) => Math.round((n / timelineRate) * bufferRate);
+
+        // End comparison on the TIMELINE axis: the clip occupies its
+        // buffer-domain duration scaled to timeline samples.
+        const clipEndSample = clip.startSample + bufToTimeline(clip.durationSamples);
         if (clipEndSample <= (newSample as number)) continue; // already finished
 
+        // How far into the clip we are, on the timeline — converted to
+        // buffer samples before indexing the buffer.
         const offsetIntoClipSamples = (newSample as number) - clip.startSample;
-        const offsetSamples = clip.offsetSamples + offsetIntoClipSamples;
-        let durationSamples = clipEndSample - (newSample as number);
+        const offsetSamples = clip.offsetSamples + timelineToBuf(offsetIntoClipSamples);
+        let remainingTimelineSamples = clipEndSample - (newSample as number);
 
-        // Clamp at loop boundary (same as generate)
-        if (this._loopEnabled && (newSample as number) + durationSamples > this._loopEndSamples) {
-          durationSamples = this._loopEndSamples - (newSample as number);
+        // Clamp at loop boundary (same as generate), in timeline samples
+        if (
+          this._loopEnabled &&
+          (newSample as number) + remainingTimelineSamples > this._loopEndSamples
+        ) {
+          remainingTimelineSamples = this._loopEndSamples - (newSample as number);
         }
-        if (durationSamples <= 0) continue;
+        if (remainingTimelineSamples <= 0) continue;
+        const durationSamples = timelineToBuf(remainingTimelineSamples);
 
-        const fadeOutDurationSamples = clip.fadeOut ? (clip.fadeOut.duration ?? 0) : 0;
+        // Fade.duration is seconds; pack as timeline samples (see generate())
+        const fadeOutDurationSamples = clip.fadeOut
+          ? Math.round((clip.fadeOut.duration ?? 0) * timelineRate)
+          : 0;
 
         this.consume({
           trackId,

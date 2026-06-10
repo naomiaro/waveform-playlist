@@ -32,8 +32,20 @@ export class TempoMap {
   private _entries: MutableTempoEntry[];
 
   constructor(ppqn: number = 960, initialBpm: number = 120) {
+    TempoMap._validateBpm(initialBpm);
     this._ppqn = ppqn;
     this._entries = [{ tick: 0 as Tick, bpm: initialBpm, interpolation: 'step', secondsAtTick: 0 }];
+  }
+
+  /** A non-finite or non-positive BPM silently corrupts the secondsAtTick
+   *  cache (Infinity, or non-monotonic values that break the binary search
+   *  in secondsToTicks) — reject it at the boundary instead. */
+  private static _validateBpm(bpm: number): void {
+    if (!Number.isFinite(bpm) || bpm <= 0) {
+      throw new Error(
+        '[waveform-playlist] TempoMap: bpm must be a finite positive number, got ' + bpm
+      );
+    }
   }
 
   getTempo(atTick: Tick = 0 as Tick): number {
@@ -41,6 +53,7 @@ export class TempoMap {
   }
 
   setTempo(bpm: number, atTick: Tick = 0 as Tick, options?: SetTempoOptions): void {
+    TempoMap._validateBpm(bpm);
     const interpolation = options?.interpolation ?? 'step';
 
     if (typeof interpolation === 'object' && interpolation.type === 'curve') {

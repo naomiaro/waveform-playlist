@@ -251,3 +251,19 @@ describe('MeterMap', () => {
     expect(mm.isBarBoundary(7200 as Tick)).toBe(true);
   });
 });
+
+describe('MeterMap constructor validation', () => {
+  it('applies the same meter validation as setMeter', () => {
+    // Previously the constructor bypassed _validateMeter, so an invalid
+    // initial meter silently corrupted every bar computation.
+    expect(() => new MeterMap(960, 0, 4)).toThrow(/numerator/);
+    expect(() => new MeterMap(960, 33, 4)).toThrow(/numerator/);
+    expect(() => new MeterMap(960, 4, 3)).toThrow(/power of 2/);
+    expect(() => new MeterMap(960, 4, 64)).toThrow(/power of 2/);
+  });
+
+  it('accepts valid initial meters', () => {
+    expect(() => new MeterMap(960, 7, 8)).not.toThrow();
+    expect(new MeterMap(960, 7, 8).getMeter()).toEqual({ numerator: 7, denominator: 8 });
+  });
+});

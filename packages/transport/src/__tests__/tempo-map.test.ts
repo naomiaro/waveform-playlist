@@ -339,3 +339,29 @@ describe('TempoMap curve interpolation', () => {
     expect(curveSec).toBeLessThan(slowSec);
   });
 });
+
+describe('TempoMap BPM validation', () => {
+  it('rejects zero, negative, and non-finite BPM in setTempo', () => {
+    const map = new TempoMap(960, 120);
+    // bpm <= 0 poisons the secondsAtTick cache (Infinity / non-monotonic
+    // values that break the secondsToTicks binary search) — reject at the
+    // boundary like curve-slope validation already does.
+    expect(() => map.setTempo(0)).toThrow(/finite positive/);
+    expect(() => map.setTempo(-120, 960 as Tick)).toThrow(/finite positive/);
+    expect(() => map.setTempo(NaN)).toThrow(/finite positive/);
+    expect(() => map.setTempo(Infinity)).toThrow(/finite positive/);
+  });
+
+  it('rejects an invalid initial BPM in the constructor', () => {
+    expect(() => new TempoMap(960, 0)).toThrow(/finite positive/);
+    expect(() => new TempoMap(960, -1)).toThrow(/finite positive/);
+  });
+
+  it('a rejected setTempo leaves the map unchanged', () => {
+    const map = new TempoMap(960, 120);
+    map.setTempo(140, 960 as Tick);
+    expect(() => map.setTempo(0, 1920 as Tick)).toThrow();
+    expect(map.getTempo(1920 as Tick)).toBe(140); // still the prior tempo
+    expect(map.ticksToSeconds(960 as Tick)).toBeCloseTo(0.5, 12);
+  });
+});

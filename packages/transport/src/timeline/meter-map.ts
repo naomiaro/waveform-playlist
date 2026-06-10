@@ -18,6 +18,10 @@ export class MeterMap {
 
   constructor(ppqn: number, numerator: number = 4, denominator: number = 4) {
     this._ppqn = ppqn;
+    // Same gate setMeter() applies — without it, an invalid initial meter
+    // (numerator 0, non-power-of-2 denominator) silently corrupts every
+    // bar computation that follows.
+    this._validateMeter(numerator, denominator);
     this._entries = [{ tick: 0 as Tick, numerator, denominator, barAtTick: 0 }];
   }
 

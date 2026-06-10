@@ -365,3 +365,108 @@ describe('ClipPlayer', () => {
     expect(duration).toBeCloseTo(1.5);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Sample-rate unit regression tests: offsetSamples/durationSamples index the
+// BUFFER (its own rate); startSample and the loop boundary live on the
+// TIMELINE (the SampleTimeline rate); Fade.duration is SECONDS. These were
+// conflated when buffer rate == timeline rate — the default decodeAudioData
+// path — and silently wrong otherwise (e.g. a 48 kHz Opus on a 44.1 kHz
+// timeline started trimmed clips ~8.8% too deep).
+// ---------------------------------------------------------------------------
+describe('ClipPlayer sample-rate domains', () => {
+  function make441Setup() {
+    const ctx = createMockAudioContext(44100);
+    const tempoMap = new TempoMap(960, 120);
+    const sampleTimeline = new SampleTimeline(44100);
+    sampleTimeline.setTempoMap(tempoMap);
+    return { ctx, tempoMap, sampleTimeline };
+  }
+
+  function make48kBufferClip(overrides: Partial<AudioClip> = {}): AudioClip {
+    return makeClip({
+      sampleRate: 48000,
+      audioBuffer: {
+        duration: 2,
+        length: 96000,
+        sampleRate: 48000,
+        numberOfChannels: 2,
+        getChannelData: vi.fn(),
+        copyFromChannel: vi.fn(),
+        copyToChannel: vi.fn(),
+      } as unknown as AudioBuffer,
+      ...overrides,
+    });
+  }
+
+  it('consume divides offset/duration by the BUFFER rate, not the timeline rate', () => {
+    const { ctx, tempoMap, sampleTimeline } = make441Setup();
+    // 1s trim offset and 1s duration, expressed in 48 kHz buffer samples,
+    // played on a 44.1 kHz timeline.
+    const clip = make48kBufferClip({
+      startSample: 0,
+      offsetSamples: 48000,
+      durationSamples: 48000,
+    });
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([makeTrack([clip])], new Map([['track-1', createMockTrackNode('track-1')]]));
+
+    const events = player.generate(0 as Tick, 960 as Tick);
+    expect(events.length).toBe(1);
+    player.consume(events[0]);
+
+    const source = (ctx.createBufferSource as any).mock.results[0].value;
+    const [, offset, duration] = source.start.mock.calls[0];
+    // 48000 buffer samples at 48 kHz = exactly 1 second. Dividing by the
+    // timeline rate would give 48000/44100 = 1.0884s — too deep / too long.
+    expect(offset).toBeCloseTo(1.0, 9);
+    expect(duration).toBeCloseTo(1.0, 9);
+  });
+
+  it('onPositionJump converts the timeline offset into buffer samples', () => {
+    const { ctx, tempoMap, sampleTimeline } = make441Setup();
+    // Clip at timeline 0, 2s of 48 kHz audio (96000 buffer samples).
+    const clip = make48kBufferClip({
+      startSample: 0,
+      offsetSamples: 0,
+      durationSamples: 96000,
+    });
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([makeTrack([clip])], new Map([['track-1', createMockTrackNode('track-1')]]));
+
+    // Jump to 1.0s = 1920 ticks at 120 BPM.
+    player.onPositionJump(1920 as Tick);
+
+    const source = (ctx.createBufferSource as any).mock.results[0].value;
+    const [, offset, duration] = source.start.mock.calls[0];
+    // 1s into the clip = 48000 BUFFER samples of offset (not 44100), and
+    // 1s remains of the 2s clip.
+    expect(offset).toBeCloseTo(1.0, 4);
+    expect(duration).toBeCloseTo(1.0, 4);
+  });
+
+  it('treats Fade.duration as seconds, matching the Tone adapter convention', () => {
+    const ctx = createMockAudioContext();
+    const tempoMap = new TempoMap(960, 120);
+    const sampleTimeline = new SampleTimeline(48000);
+    sampleTimeline.setTempoMap(tempoMap);
+    const clip = makeClip({
+      startSample: 0,
+      durationSamples: 48000,
+      fadeIn: { duration: 0.25 },
+      fadeOut: { duration: 0.25 },
+    });
+    const player = new ClipPlayer(ctx, sampleTimeline, tempoMap, (t) => t);
+    player.setTracks([makeTrack([clip])], new Map([['track-1', createMockTrackNode('track-1')]]));
+
+    const events = player.generate(0 as Tick, 960 as Tick);
+    player.consume(events[0]);
+
+    const gainNode = (ctx.createGain as any).mock.results[0].value;
+    // Fade-in ramps from 0 at `when` to gain at `when + 0.25` SECONDS.
+    // The old code read 0.25 as samples: 0.25/48000 ≈ 5.2 microseconds.
+    const rampCalls = gainNode.gain.linearRampToValueAtTime.mock.calls;
+    expect(rampCalls.length).toBeGreaterThan(0);
+    expect(rampCalls[0][1]).toBeCloseTo(0.25, 9);
+  });
+});
