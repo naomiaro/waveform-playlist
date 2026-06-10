@@ -45,7 +45,7 @@ vi.mock('tone', () => ({
   now: vi.fn().mockReturnValue(0.1),
 }));
 
-import { createToneAdapter } from '../TonePlayoutAdapter';
+import { createToneAdapter, isToneAdapter } from '../TonePlayoutAdapter';
 import { TonePlayout } from '../TonePlayout';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { SoundFontCache } from '../SoundFontCache';
@@ -1067,6 +1067,25 @@ describe('createToneAdapter', () => {
       const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
       expect(instance.addTrack.mock.calls[0][0].track.id).toBe('t1');
       expect(instance.addSoundFontTrack.mock.calls[0][0].track.id).toBe('t1:midi');
+    });
+  });
+
+  describe('isToneAdapter', () => {
+    it('narrows createToneAdapter output', () => {
+      const adapter = createToneAdapter();
+      expect(isToneAdapter(adapter)).toBe(true);
+    });
+
+    it('rejects null and undefined', () => {
+      expect(isToneAdapter(null)).toBe(false);
+      expect(isToneAdapter(undefined)).toBe(false);
+    });
+
+    it('rejects adapters without the soundfont capability', () => {
+      const bare = { play: vi.fn(), pause: vi.fn() } as unknown as Parameters<
+        typeof isToneAdapter
+      >[0];
+      expect(isToneAdapter(bare)).toBe(false);
     });
   });
 });

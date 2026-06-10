@@ -32,6 +32,17 @@ export interface ToneAdapter extends PlayoutAdapter {
   setSoundFontCache(cache: SoundFontCache | undefined): void;
 }
 
+/**
+ * Capability check for Tone-specific adapter features. Structural, not
+ * instanceof — any adapter implementing setSoundFontCache passes. Narrows a
+ * generic PlayoutAdapter so soundfont calls typecheck without casts.
+ */
+export function isToneAdapter(adapter: PlayoutAdapter | null | undefined): adapter is ToneAdapter {
+  return (
+    typeof (adapter as Partial<ToneAdapter> | null | undefined)?.setSoundFontCache === 'function'
+  );
+}
+
 export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
   // Ensure the global shared context exists BEFORE creating the playout.
   // Without this, TonePlayout's Volume is created on Tone's default context,
