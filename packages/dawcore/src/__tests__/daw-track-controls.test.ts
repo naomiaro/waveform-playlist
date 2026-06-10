@@ -205,4 +205,25 @@ describe('DawTrackControlsElement', () => {
     expect(composed).toBe(true);
     document.body.removeChild(el);
   });
+
+  describe('compact modes', () => {
+    it('marks the slider rows with vol-row / pan-row classes', async () => {
+      const el = document.createElement('daw-track-controls') as any;
+      document.body.appendChild(el);
+      await el.updateComplete;
+      expect(el.shadowRoot!.querySelector('.slider-row.vol-row')).not.toBeNull();
+      expect(el.shadowRoot!.querySelector('.slider-row.pan-row')).not.toBeNull();
+      el.remove();
+    });
+
+    it('declares size containment and container-query compact rules', () => {
+      const ctor = customElements.get('daw-track-controls') as any;
+      const cssText = Array.isArray(ctor.styles)
+        ? ctor.styles.map((s: any) => s.cssText ?? String(s)).join('\n')
+        : (ctor.styles.cssText ?? String(ctor.styles));
+      expect(cssText).toMatch(/:host\s*\{[^}]*container-type:\s*size/);
+      expect(cssText).toContain('@container (max-height: 76px)');
+      expect(cssText).toContain('@container (max-height: 60px)');
+    });
+  });
 });

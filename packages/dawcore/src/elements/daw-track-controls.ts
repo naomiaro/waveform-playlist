@@ -24,6 +24,7 @@ export class DawTrackControlsElement extends LitElement {
       font-family: system-ui, sans-serif;
       font-size: 11px;
       overflow: hidden;
+      container-type: size;
     }
     .header {
       display: flex;
@@ -143,6 +144,20 @@ export class DawTrackControlsElement extends LitElement {
       border: none;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
+    /* Compact modes: drop sliders when the editor gives this row less height
+       than the full stack needs (~76px with both sliders, ~60px with one).
+       NOTE: container-type: size requires an explicit height on the host —
+       the editor always provides one; standalone consumers must too. */
+    @container (max-height: 76px) {
+      .pan-row {
+        display: none;
+      }
+    }
+    @container (max-height: 60px) {
+      .vol-row {
+        display: none;
+      }
+    }
   `;
 
   private _onVolumeInput = (e: Event) => {
@@ -209,7 +224,7 @@ export class DawTrackControlsElement extends LitElement {
           S
         </button>
       </div>
-      <div class="slider-row">
+      <div class="slider-row vol-row">
         <span class="slider-label">
           <span class="slider-label-name">Vol</span>
           <span class="slider-label-value">${volPercent}%</span>
@@ -223,7 +238,7 @@ export class DawTrackControlsElement extends LitElement {
           @input=${this._onVolumeInput}
         />
       </div>
-      <div class="slider-row">
+      <div class="slider-row pan-row">
         <span class="slider-label">
           <span class="slider-label-name">Pan</span>
           <span class="slider-label-value">${panDisplay}</span>
