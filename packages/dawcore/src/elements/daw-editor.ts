@@ -255,8 +255,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const old = this._bpm;
     if (!Number.isFinite(value) || value <= 0) return;
     this._bpm = value;
-    // Forward to engine (which forwards to adapter's Transport)
-    if (this._engine) {
+    // Forward to engine (which forwards to adapter's Transport) — unless the
+    // consumer provided tick callbacks, in which case the external tempo map
+    // is authoritative and bpm is display/grid-only (#407).
+    if (this._engine && !this._hasTickCallbacks) {
       this._engine.setTempo(value);
     }
     this.requestUpdate('bpm', old);
@@ -284,12 +286,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _ppqn = 960;
   @property({ type: String, attribute: 'snap-to' })
   snapTo: SnapTo = 'off';
-  /** Optional tempo-aware conversion: seconds → PPQN ticks. When provided, enables variable tempo. */
+  /** Optional tempo-aware conversion: seconds → PPQN ticks. When provided
+   *  together with ticksToSeconds, enables variable tempo AND makes `bpm`
+   *  display/grid-only (no engine/adapter tempo forwarding — #407). */
   @property({ attribute: false })
   secondsToTicks?: (seconds: number) => number;
   /** Optional tempo-aware conversion: PPQN ticks → seconds. Required alongside secondsToTicks. */
   @property({ attribute: false })
   ticksToSeconds?: (ticks: number) => number;
+  /** True when the consumer provided BOTH tick conversion callbacks — the
+   *  external tempo map is authoritative and `bpm` is display/grid-only (#407). */
+  get _hasTickCallbacks(): boolean {
+    return !!(this.secondsToTicks && this.ticksToSeconds);
+  }
   /** Sample rate — reads from adapter's AudioContext when available, otherwise falls back to 48000. */
   get sampleRate(): number {
     return this._resolvedSampleRate ?? this._externalAdapter?.audioContext.sampleRate ?? 48000;
@@ -1666,16 +1675,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const { PlaylistEngine } = await import('@waveform-playlist/engine');
     const adapter = this._externalAdapter;
 
-    // Forward initial tempo if adapter supports it
-    if (adapter.setTempo) {
-      adapter.setTempo(this._bpm);
-    } else if (this._bpm !== 120) {
-      console.warn(
-        '[dawcore] Adapter does not implement setTempo. ' +
-          'Initial BPM ' +
-          this._bpm +
-          ' will not be applied — clips may use wrong tempo.'
-      );
+    // Forward initial tempo if adapter supports it — skipped when tick
+    // callbacks are present (external tempo map is authoritative, #407)
+    if (!this._hasTickCallbacks) {
+      if (adapter.setTempo) {
+        adapter.setTempo(this._bpm);
+      } else if (this._bpm !== 120) {
+        console.warn(
+          '[dawcore] Adapter does not implement setTempo. ' +
+            'Initial BPM ' +
+            this._bpm +
+            ' will not be applied — clips may use wrong tempo.'
+        );
+      }
     }
 
     // Try to set the editor's desired PPQN on the adapter, then sync back.
