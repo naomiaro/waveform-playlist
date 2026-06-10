@@ -1,5 +1,6 @@
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import type { SoundFontCache, ToneAdapter } from '@waveform-playlist/playout';
+import { isToneAdapter } from '@waveform-playlist/playout';
+import type { SoundFontCache } from '@waveform-playlist/playout';
 
 /**
  * Forward a (possibly late-loaded or swapped) SoundFontCache to the live
@@ -11,7 +12,6 @@ export function syncSoundFontCacheToAdapter(
   adapter: PlayoutAdapter | null,
   cache: SoundFontCache | undefined
 ): void {
-  const toneAdapter = adapter as Partial<ToneAdapter> | null;
-  if (typeof toneAdapter?.setSoundFontCache !== 'function') return;
-  toneAdapter.setSoundFontCache(cache);
+  if (!isToneAdapter(adapter)) return;
+  adapter.setSoundFontCache(cache);
 }

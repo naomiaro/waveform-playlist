@@ -38,9 +38,7 @@ export interface ToneAdapter extends PlayoutAdapter {
  * generic PlayoutAdapter so soundfont calls typecheck without casts.
  */
 export function isToneAdapter(adapter: PlayoutAdapter | null | undefined): adapter is ToneAdapter {
-  return (
-    typeof (adapter as Partial<ToneAdapter> | null | undefined)?.setSoundFontCache === 'function'
-  );
+  return typeof (adapter as Partial<ToneAdapter>)?.setSoundFontCache === 'function';
 }
 
 export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {

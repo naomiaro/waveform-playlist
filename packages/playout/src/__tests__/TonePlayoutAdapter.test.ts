@@ -48,6 +48,7 @@ vi.mock('tone', () => ({
 import { createToneAdapter, isToneAdapter } from '../TonePlayoutAdapter';
 import { TonePlayout } from '../TonePlayout';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import type { SoundFontCache } from '../SoundFontCache';
 
 function makeClip(
@@ -1082,9 +1083,7 @@ describe('createToneAdapter', () => {
     });
 
     it('rejects adapters without the soundfont capability', () => {
-      const bare = { play: vi.fn(), pause: vi.fn() } as unknown as Parameters<
-        typeof isToneAdapter
-      >[0];
+      const bare = { play: vi.fn(), pause: vi.fn() } as unknown as PlayoutAdapter;
       expect(isToneAdapter(bare)).toBe(false);
     });
   });
