@@ -116,8 +116,8 @@ Access playback state, timing refs, and the per-frame animation registry. A sing
 interface FrameData {
   /** Raw engine time (use for state/logic — NOT for visual positioning). */
   readonly time: number;
-  /** time − outputLatency − engine.lookAhead. Use for any DOM positioning that
-   *  should match the audible output. */
+  /** engine.getAudibleTime() while playing, raw time when resting. Use for any DOM
+   *  positioning that should match the audible output. */
   readonly visualTime: number;
   readonly sampleRate: number;
   readonly samplesPerPixel: number;
@@ -129,8 +129,9 @@ function usePlaybackAnimation(): {
 
   // Refs for 60fps animation loops (read inside frame callbacks or rAF)
   currentTimeRef: RefObject<number>;
-  /** Visually-aligned playback time (raw − outputLatency − lookAhead). Read this
-   *  for any static playhead positioning that should match the audible output. */
+  /** Visually-aligned playback time: engine.getAudibleTime() (raw − outputLatency −
+   *  lookAhead) while playing, raw time when resting. Read this for any static
+   *  playhead positioning that should match the audible output. */
   visualTimeRef: RefObject<number>;
   playbackStartTimeRef: RefObject<number>;
   audioStartPositionRef: RefObject<number>;

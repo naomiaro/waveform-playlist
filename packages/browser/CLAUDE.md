@@ -155,7 +155,7 @@ const rebuildChain = useCallback(() => {
 
 `getPlaybackTime()` returns **raw engine time** — no latency subtraction. **Storage refs (`currentTimeRef`, pause/seek targets) must stay raw** so `play(time)` resumes correctly — subtracting latency from storage compounds on every pause/resume cycle.
 
-**Display uses `visualTimeRef` (audible time = raw − `outputLatency` − `engine.lookAhead`).** The animation loop updates it per frame; every site that assigns `currentTimeRef.current = X` also assigns `visualTimeRef.current = toVisualTime(X)`. Static-display consumers (`AnimatedPlayhead` / `ChannelWithProgress` not-playing branches, `PlayheadWithMarker`, `CustomPlayhead` initial position) read `visualTimeRef`. Frame callbacks during playback receive `visualTime` via `FrameData`. Auto-scroll uses `visualTime`. The dual-ref pattern is mandatory: one ref → either storage broken (compounding) or display broken (lag).
+**Display uses `visualTimeRef`.** While playing, the animation loop sets it from `engine.getAudibleTime()` (raw − `outputLatency` − `engine.lookAhead`, held at play-start during the pre-roll window). When resting (seek/pause/stop/selection-end), `toVisualTime` is the identity — the cursor displays the raw commanded position exactly; compensation is a property of playing, not of position. Every site that assigns `currentTimeRef.current = X` also assigns `visualTimeRef.current = toVisualTime(X)` via `setCurrentTimeRefs`. Static-display consumers read `visualTimeRef`; frame callbacks receive `visualTime` via `FrameData`; auto-scroll uses `visualTime`. The dual-ref pattern is mandatory: one ref → either storage broken (compounding) or display broken (lag).
 
 ## Engine State Subscription Pattern
 

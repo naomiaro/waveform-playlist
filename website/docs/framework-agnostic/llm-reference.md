@@ -167,7 +167,7 @@ interface MediaElementDataContextValue {
 ```typescript
 interface FrameData {
   readonly time: number;          // Raw engine time (state/logic — NOT visual positioning)
-  readonly visualTime: number;    // time − outputLatency − engine.lookAhead (use for DOM positioning)
+  readonly visualTime: number;    // engine.getAudibleTime() while playing, raw time when resting (use for DOM positioning)
   readonly sampleRate: number;
   readonly samplesPerPixel: number;
 }
@@ -176,7 +176,7 @@ interface PlaybackAnimationContextValue {
   isPlaying: boolean;
   currentTime: number;
   currentTimeRef: RefObject<number>;
-  /** Visually-aligned playback time (raw − outputLatency − engine.lookAhead). */
+  /** Visually-aligned playback time: engine.getAudibleTime() (raw − outputLatency − engine.lookAhead) while playing, raw time when resting. */
   visualTimeRef: RefObject<number>;
   playbackStartTimeRef: RefObject<number>;
   audioStartPositionRef: RefObject<number>;
