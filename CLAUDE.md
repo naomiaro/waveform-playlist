@@ -69,7 +69,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 2. Update PROJECT_STRUCTURE.md only if structure/architecture changed
 3. Never add progress/changelog to PROJECT_STRUCTURE.md
 
-**Design docs and implementation plans:** Design docs go in `docs/specs/YYYY-MM-DD-<topic>-design.md`; matching implementation plans go in `docs/plans/YYYY-MM-DD-<topic>.md`. Commit both — they form the durable record of *why* a feature was built that way.
+**Design docs and implementation plans:** Design docs go in `docs/specs/YYYY-MM-DD-<topic>-design.md`; matching implementation plans go in `docs/plans/YYYY-MM-DD-<topic>.md`. Commit both during development — they drive the spec-review and task-execution workflow. **When implementation is finished, `git rm` both from the branch before the PR merges** — they're working documents, not durable records. The PR description carries the lasting summary of what was built and why.
 
 ### Documentation Maintenance
 
