@@ -921,9 +921,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Forward late-arriving / swapped SoundFontCache to the live adapter so
   // MIDI tracks upgrade from PolySynth without an engine rebuild. On mount
-  // adapterRef is still null (loadAudio runs in its own effect) and the
-  // helper no-ops; on later prop changes the adapter rebuilds only the MIDI
-  // tracks whose routing actually changed.
+  // this may run against a just-created adapter (the loadAudio effect is
+  // declared earlier, runs first, and assigns adapterRef synchronously) or
+  // against null (empty tracks). Both are safe: the helper no-ops on null,
+  // and the adapter skips MIDI tracks whose routing is unchanged.
   useEffect(() => {
     syncSoundFontCacheToAdapter(adapterRef.current, soundFontCache);
   }, [soundFontCache]);

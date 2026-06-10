@@ -102,7 +102,10 @@
       }
     }
 
-    start();
+    start().catch((err) => {
+      console.error('[soundfont example]', err);
+      addLog('startup failed: ' + String(err));
+    });
   </script>
 </body>
 </html>

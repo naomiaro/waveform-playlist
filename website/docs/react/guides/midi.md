@@ -137,11 +137,20 @@ const [cache, setCache] = useState<SoundFontCache | undefined>(undefined);
 
 useEffect(() => {
   const sf = new SoundFontCache();
-  sf.load('/media/soundfont/A320U.sf2').then(() => setCache(sf));
+  sf.load('/media/soundfont/A320U.sf2')
+    .then(() => setCache(sf))
+    .catch((err) => {
+      console.error('SoundFont failed to load — MIDI stays on PolySynth:', err);
+    });
 }, []);
 
 <WaveformPlaylistProvider soundFontCache={cache} tracks={tracks} />
 ```
+
+Set the state *after* `load()` resolves, as above. The provider reacts to the
+prop's reference changing — passing the cache eagerly and calling `load()` on
+the same object later won't re-trigger the upgrade (you'd see a
+`"SoundFont not loaded"` console warning instead).
 
 For non-React consumers (e.g. `<daw-editor>` web components), the same
 capability is `adapter.setSoundFontCache(cache)` on the adapter returned by
