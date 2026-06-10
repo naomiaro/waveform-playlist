@@ -288,6 +288,67 @@ describe('Transport', () => {
     expect(transport.getTempo(3840 as Tick)).toBe(140);
   });
 
+  describe('setTempo multi-entry guard (#407)', () => {
+    it('refuses a defaulted setTempo when the tempo map has multiple entries', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      warnSpy.mockClear(); // clear the constructor warn about click sounds
+      transport.setTempo(100, 0 as Tick);
+      transport.setTempo(140, 960 as Tick);
+      warnSpy.mockClear(); // clear any prior warns
+
+      transport.setTempo(120); // defaulted atTick — "display BPM" style call
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Pass an explicit atTick'));
+      expect(transport.getTempo(0 as Tick)).toBe(100);
+      warnSpy.mockRestore();
+    });
+
+    it('does not emit tempochange when the guard refuses', () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTempo(140, 960 as Tick);
+      const listener = vi.fn();
+      transport.on('tempochange', listener);
+
+      transport.setTempo(120);
+
+      expect(listener).not.toHaveBeenCalled();
+      vi.restoreAllMocks();
+    });
+
+    it('applies an explicit atTick 0 write on a multi-entry map', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      warnSpy.mockClear();
+      transport.setTempo(100, 0 as Tick);
+      transport.setTempo(140, 960 as Tick);
+      warnSpy.mockClear();
+
+      transport.setTempo(120, 0 as Tick); // explicit — escape hatch
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(transport.getTempo(0 as Tick)).toBe(120);
+      warnSpy.mockRestore();
+    });
+
+    it('applies a defaulted setTempo on a single-entry map', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      warnSpy.mockClear();
+
+      transport.setTempo(120);
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(transport.getTempo()).toBe(120);
+      warnSpy.mockRestore();
+    });
+  });
+
   it('setMeter changes time signature', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

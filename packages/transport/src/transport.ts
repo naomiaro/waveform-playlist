@@ -458,6 +458,14 @@ export class Transport {
   // --- Tempo ---
 
   setTempo(bpm: number, atTick?: Tick, options?: SetTempoOptions): void {
+    if (atTick === undefined && this._tempoMap.entryCount > 1) {
+      console.warn(
+        '[waveform-playlist] Transport.setTempo: refusing defaulted tick-0 write — the tempo map has ' +
+          this._tempoMap.entryCount +
+          ' entries. Pass an explicit atTick to modify a multi-entry tempo map.'
+      );
+      return;
+    }
     this._tempoMap.setTempo(bpm, atTick, options);
     // Recompute cached loop start — tempo change invalidates tick→seconds mapping
     if (this._loopEnabled) {
