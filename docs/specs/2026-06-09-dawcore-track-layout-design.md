@@ -43,17 +43,30 @@ and `multiclip.html`):
 ```
 :host (display: flex; flex-direction: column)
 ├── .header-row (flex-shrink: 0; display: flex)           ← only when ruler shown
-│   ├── .ruler-gap (width: --daw-controls-width)
+│   ├── .ruler-gap (width: --daw-controls-width)          ← only when controls shown
 │   └── .ruler-viewport (flex: 1; overflow: hidden)
-│       └── daw-ruler (width: totalWidth; transform: translate3d(-scrollLeft, 0, 0))
-└── .v-scroll (flex: 1; min-height: 0; display: flex; overflow-y: auto)
-    ├── .controls-column (flex-shrink: 0; width: --daw-controls-width)
-    │   └── daw-track-controls × N    ← height: trackHeight[i], border-box
-    └── .scroll-area (flex: 1; overflow-x: auto; overflow-y: hidden)
+│       └── .ruler-content (width: totalWidth; transform: translate3d(-scrollLeft, 0, 0))
+│           └── daw-ruler
+└── .body (flex: 1; min-height: 0; display: flex)
+    ├── .controls-viewport (flex-shrink: 0; width: --daw-controls-width; overflow: hidden)
+    │   └── .controls-column (transform: translate3d(0, -scrollTop, 0))
+    │       └── daw-track-controls × N    ← height: trackHeight[i], border-box
+    └── .scroll-area (flex: 1; overflow: auto)            ← single scroller, BOTH axes
         └── .timeline (width: totalWidth; position: relative)
             ├── daw-grid / daw-selection / daw-playhead   ← overlays, top: 0
             └── .track-row × N        ← height: trackHeight[i], border-box
 ```
+
+**Frozen-panes refinement (planning-stage change from the originally approved
+`.v-scroll` wrapper):** wrapping both columns in an `overflow-y: auto`
+container would place `.scroll-area`'s horizontal scrollbar at the bottom of
+the *content* (e.g. 900px down), invisible until the user scrolls to the
+bottom. Instead, `.scroll-area` owns both scroll axes — both scrollbars sit at
+the visible viewport edges — and the controls column is synced vertically via
+`transform: translate3d(0, -scrollTop, 0)`, the same mechanism the ruler uses
+horizontally. A `wheel` listener on `.controls-viewport` forwards `deltaY` to
+`.scroll-area.scrollTop` (only when vertically scrollable, so page scroll is
+unaffected otherwise) so the mouse wheel works over the controls column.
 
 ### Ruler band
 
@@ -71,12 +84,19 @@ and `multiclip.html`):
 
 ### Vertical scroll
 
-- Both columns are children of one `.v-scroll` container (`overflow-y: auto`),
-  so they cannot desync. Unconstrained editors grow as today (no scrollbar);
-  height-constrained editors scroll vertically with the ruler band pinned
-  above.
-- The drop-zone `min-height: var(--daw-min-height, 200px)` moves from
-  `.scroll-area` to `.v-scroll`.
+- `.scroll-area` scrolls both axes; the controls column mirrors `scrollTop`
+  via transform, so the columns cannot desync. Unconstrained editors grow as
+  today (no scrollbar); height-constrained editors scroll vertically with the
+  ruler band pinned above.
+- A single `scroll` listener (new `ScrollSyncController`) updates both the
+  ruler's x-transform and the controls column's y-transform on every scroll
+  event. The existing `ViewportController` keeps its own thresholded listener
+  for chunk virtualization — its 100px threshold is too coarse for visual
+  sync, which must be per-event.
+- The drop-zone `min-height: var(--daw-min-height, 200px)` stays on
+  `.scroll-area`.
+- `overflow-anchor: none` on `.scroll-area`, matching the React package's fix
+  for browser scroll anchoring on content-size changes.
 
 ## Row geometry — one computation, identical box model
 
