@@ -319,7 +319,9 @@
 
     // --- Tempo ---
     function setTempo(bpm) {
-      transport.setTempo(bpm);
+      // Explicit tick 0: a defaulted call is refused once a sequence (e.g.
+      // Accelerando) installs a multi-entry tempo map (#407 guard).
+      transport.setTempo(bpm, 0);
       tempoSlider.value = bpm;
       updateTempoDisplay(bpm);
       presetsEl.querySelectorAll('button').forEach(btn => {
