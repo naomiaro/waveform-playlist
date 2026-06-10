@@ -73,6 +73,10 @@ import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
 import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
 import { extractPeaks } from '../workers/waveformDataUtils';
+import { ScrollSyncController } from '../controllers/scroll-sync-controller';
+
+/** Height of the ruler band — single source for the ruler element and the header row. */
+const RULER_HEIGHT = 30;
 
 const NO_ADAPTER_ERROR =
   'No PlayoutAdapter set on <daw-editor>. ' +
@@ -393,24 +397,59 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     v.scrollSelector = '.scroll-area';
     return v;
   })();
+  private _scrollSync = (() => {
+    const s = new ScrollSyncController(this);
+    s.scrollSelector = '.scroll-area';
+    s.xTargetSelector = '.ruler-content';
+    s.yTargetSelector = '.controls-column';
+    s.wheelForwardSelector = '.controls-viewport';
+    return s;
+  })();
 
   static styles = [
     hostStyles,
     css`
       :host {
         display: flex;
+        flex-direction: column;
         position: relative;
         background: var(--daw-background, #1a1a2e);
         overflow: hidden;
       }
-      .controls-column {
+      .header-row {
+        display: flex;
+        flex-shrink: 0;
+      }
+      .ruler-gap {
         flex-shrink: 0;
         width: var(--daw-controls-width, 180px);
       }
+      .ruler-viewport {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        cursor: text;
+      }
+      .ruler-content {
+        will-change: transform;
+      }
+      .body {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+      }
+      .controls-viewport {
+        flex-shrink: 0;
+        width: var(--daw-controls-width, 180px);
+        overflow: hidden;
+      }
+      .controls-column {
+        will-change: transform;
+      }
       .scroll-area {
         flex: 1;
-        overflow-x: auto;
-        overflow-y: hidden;
+        overflow: auto;
+        overflow-anchor: none;
         min-height: var(--daw-min-height, 200px);
       }
       .timeline {
@@ -420,6 +459,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }
       .track-row {
         position: relative;
+        box-sizing: border-box;
         background: var(--daw-track-background, #16213e);
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
@@ -663,6 +703,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   } | null = null;
 
   protected updated(_changed: Map<string, unknown>): void {
+    this._scrollSync.sync();
     // Forward viewport + zoom into the spectrogram controller on every update
     // so scroll, resize, and zoom all trigger orchestrator.setViewport.
     if (this._spectrogramController) {
@@ -2365,242 +2406,264 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       };
     });
 
+    const showControls = orderedTracks.length > 0 || this.indefinitePlayback;
+    const showRuler =
+      (orderedTracks.length > 0 || this.scaleMode === 'beats' || this.indefinitePlayback) &&
+      this.timescale;
+
     return html`
-      ${orderedTracks.length > 0 || this.indefinitePlayback
-        ? html`<div class="controls-column">
-            ${this.timescale ? html`<div style="height: 30px;"></div>` : ''}
-            ${orderedTracks.map(
-              (t) => html`
-                <daw-track-controls
-                  style="height: ${t.trackHeight}px;"
-                  .trackId=${t.trackId}
-                  .trackName=${t.descriptor?.name ?? 'Untitled'}
-                  .volume=${t.descriptor?.volume ?? 1}
-                  .pan=${t.descriptor?.pan ?? 0}
-                  .muted=${t.descriptor?.muted ?? false}
-                  .soloed=${t.descriptor?.soloed ?? false}
-                ></daw-track-controls>
-              `
-            )}
+      ${showRuler
+        ? html`<div class="header-row" style="height: ${RULER_HEIGHT}px;">
+            ${showControls ? html`<div class="ruler-gap"></div>` : ''}
+            <div class="ruler-viewport" @pointerdown=${this._pointer.onPointerDown}>
+              <div
+                class="ruler-content"
+                style="width: ${this._totalWidth > 0 ? this._totalWidth + 'px' : '100%'};"
+              >
+                <daw-ruler
+                  .samplesPerPixel=${spp}
+                  .sampleRate=${this.effectiveSampleRate}
+                  .duration=${this._duration}
+                  .scaleMode=${this.scaleMode}
+                  .ticksPerPixel=${this.ticksPerPixel}
+                  .meterEntries=${this._meterEntries}
+                  .ppqn=${this.ppqn}
+                  .totalWidth=${this._totalWidth}
+                  .rulerHeight=${RULER_HEIGHT}
+                ></daw-ruler>
+              </div>
+            </div>
           </div>`
         : ''}
-      <div class="scroll-area">
-        <div
-          class="timeline ${this._dragOver ? 'drag-over' : ''}"
-          style="width: ${this._totalWidth > 0 ? this._totalWidth + 'px' : '100%'};"
-          data-playing=${this._isPlaying}
-          @pointerdown=${this._pointer.onPointerDown}
-          @dragover=${this._onDragOver}
-          @dragleave=${this._onDragLeave}
-          @drop=${this._onDrop}
-        >
-          ${(orderedTracks.length > 0 || this.scaleMode === 'beats' || this.indefinitePlayback) &&
-          this.timescale
-            ? html`<daw-ruler
-                .samplesPerPixel=${spp}
-                .sampleRate=${this.effectiveSampleRate}
-                .duration=${this._duration}
-                .scaleMode=${this.scaleMode}
-                .ticksPerPixel=${this.ticksPerPixel}
-                .meterEntries=${this._meterEntries}
-                .ppqn=${this.ppqn}
-                .totalWidth=${this._totalWidth}
-              ></daw-ruler>`
-            : ''}
-          ${this.scaleMode === 'beats'
-            ? html`<daw-grid
-                style="top: ${this.timescale ? 30 : 0}px;"
-                .ticksPerPixel=${this.ticksPerPixel}
-                .meterEntries=${this._meterEntries}
-                .ppqn=${this.ppqn}
-                .visibleStart=${this._viewport.visibleStart}
-                .visibleEnd=${this._viewport.visibleEnd}
-                .length=${this._totalWidth}
-                .height=${orderedTracks.length > 0
-                  ? orderedTracks.reduce((sum, t) => sum + t.trackHeight + 1, 0)
-                  : this._emptyGridHeight}
-              ></daw-grid>`
-            : ''}
-          ${orderedTracks.length > 0 || this.scaleMode === 'beats' || this.indefinitePlayback
-            ? html`<daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
-                <daw-playhead></daw-playhead>`
-            : ''}
-          ${orderedTracks.map((t) => {
-            const channelHeight = this.waveHeight;
-            return html`
-              <div
-                class="track-row ${t.trackId === this._selectedTrackId ? 'selected' : ''}"
-                style="height: ${t.trackHeight}px;"
-                data-track-id=${t.trackId}
-              >
-                ${t.track.clips.map((clip) => {
-                  const peakData = this._peaksData.get(clip.id);
-                  // In beats mode, derive pixel positions from tick space to
-                  // match grid lines exactly. The sample→spp path introduces
-                  // 1-2px quantization error from integer sample rounding.
-                  let clipLeft: number;
-                  let width: number;
-                  if (this.scaleMode === 'beats') {
-                    // Use startTick directly when available — stable across BPM changes.
-                    // Fall back to sample→seconds→ticks for clips without startTick.
-                    const startTick =
-                      clip.startTick !== undefined
-                        ? clip.startTick
-                        : this._secondsToTicks(clip.startSample / sr);
-                    const durSec = clip.durationSamples / sr;
-                    const startSec =
-                      clip.startTick !== undefined
-                        ? this._ticksToSeconds(clip.startTick)
-                        : clip.startSample / sr;
-                    const endTick = this._secondsToTicks(startSec + durSec);
-                    clipLeft = Math.round(startTick / this.ticksPerPixel);
-                    width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
-                  } else {
-                    clipLeft = Math.floor(clip.startSample / spp);
-                    width = clipPixelWidth(clip.startSample, clip.durationSamples, spp);
-                  }
-                  // Per-segment waveform rendering for variable tempo.
-                  // Uses base-scale (128) peaks directly — segments handle stretching,
-                  // so no BPM-dependent intermediate resampling needed.
-                  let clipSegments: WaveformSegment[] | undefined;
-                  let segmentChannels: Peaks[] | undefined;
-                  if (this.scaleMode === 'beats' && this.secondsToTicks) {
-                    const audioBuffer = this._clipBuffers.get(clip.id);
-                    const basePeaks = audioBuffer
-                      ? this._peakPipeline.getBaseScalePeaks(
-                          audioBuffer,
-                          this.mono,
-                          clip.offsetSamples,
-                          clip.durationSamples
-                        )
-                      : null;
-                    if (basePeaks) {
-                      const baseScale = basePeaks.scale;
-                      segmentChannels = basePeaks.peaks.data;
-                      const MIN_RENDER_STEP = 80;
-                      const stepTicks = Math.max(MIN_RENDER_STEP, Math.ceil(this.ticksPerPixel));
+      <div class="body">
+        ${showControls
+          ? html`<div class="controls-viewport">
+              <div class="controls-column">
+                ${orderedTracks.map(
+                  (t) => html`
+                    <daw-track-controls
+                      style="height: ${t.trackHeight}px;"
+                      .trackId=${t.trackId}
+                      .trackName=${t.descriptor?.name ?? 'Untitled'}
+                      .volume=${t.descriptor?.volume ?? 1}
+                      .pan=${t.descriptor?.pan ?? 0}
+                      .muted=${t.descriptor?.muted ?? false}
+                      .soloed=${t.descriptor?.soloed ?? false}
+                    ></daw-track-controls>
+                  `
+                )}
+              </div>
+            </div>`
+          : ''}
+        <div class="scroll-area">
+          <div
+            class="timeline ${this._dragOver ? 'drag-over' : ''}"
+            style="width: ${this._totalWidth > 0 ? this._totalWidth + 'px' : '100%'};"
+            data-playing=${this._isPlaying}
+            @pointerdown=${this._pointer.onPointerDown}
+            @dragover=${this._onDragOver}
+            @dragleave=${this._onDragLeave}
+            @drop=${this._onDrop}
+          >
+            ${this.scaleMode === 'beats'
+              ? html`<daw-grid
+                  style="top: 0px;"
+                  .ticksPerPixel=${this.ticksPerPixel}
+                  .meterEntries=${this._meterEntries}
+                  .ppqn=${this.ppqn}
+                  .visibleStart=${this._viewport.visibleStart}
+                  .visibleEnd=${this._viewport.visibleEnd}
+                  .length=${this._totalWidth}
+                  .height=${orderedTracks.length > 0
+                    ? orderedTracks.reduce((sum, t) => sum + t.trackHeight, 0)
+                    : this._emptyGridHeight}
+                ></daw-grid>`
+              : ''}
+            ${orderedTracks.length > 0 || this.scaleMode === 'beats' || this.indefinitePlayback
+              ? html`<daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
+                  <daw-playhead></daw-playhead>`
+              : ''}
+            ${orderedTracks.map((t) => {
+              const channelHeight = this.waveHeight;
+              return html`
+                <div
+                  class="track-row ${t.trackId === this._selectedTrackId ? 'selected' : ''}"
+                  style="height: ${t.trackHeight}px;"
+                  data-track-id=${t.trackId}
+                >
+                  ${t.track.clips.map((clip) => {
+                    const peakData = this._peaksData.get(clip.id);
+                    // In beats mode, derive pixel positions from tick space to
+                    // match grid lines exactly. The sample→spp path introduces
+                    // 1-2px quantization error from integer sample rounding.
+                    let clipLeft: number;
+                    let width: number;
+                    if (this.scaleMode === 'beats') {
+                      // Use startTick directly when available — stable across BPM changes.
+                      // Fall back to sample→seconds→ticks for clips without startTick.
+                      const startTick =
+                        clip.startTick !== undefined
+                          ? clip.startTick
+                          : this._secondsToTicks(clip.startSample / sr);
+                      const durSec = clip.durationSamples / sr;
                       const startSec =
                         clip.startTick !== undefined
                           ? this._ticksToSeconds(clip.startTick)
                           : clip.startSample / sr;
-                      const clipOffsetSec = clip.offsetSamples / sr;
-                      const segStartTick =
-                        clip.startTick !== undefined
-                          ? clip.startTick
-                          : this._secondsToTicks(startSec);
-                      const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
-                      clipSegments = [];
-                      for (let tick = segStartTick; tick < endTick; tick += stepTicks) {
-                        const segEndTick = Math.min(tick + stepTicks, endTick);
-                        const segStartAudioSec =
-                          this._ticksToSeconds(tick) - startSec + clipOffsetSec;
-                        const segEndAudioSec =
-                          this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
-                        // Peak indices at base scale (128) — clamped to valid range.
-                        const segStartSample = Math.round(segStartAudioSec * sr);
-                        const segEndSample = Math.round(segEndAudioSec * sr);
-                        const totalPeaks = clip.durationSamples / baseScale;
-                        clipSegments.push({
-                          peakStart: Math.max(0, (segStartSample - clip.offsetSamples) / baseScale),
-                          peakEnd: Math.min(
-                            totalPeaks,
-                            (segEndSample - clip.offsetSamples) / baseScale
-                          ),
-                          pixelStart: (tick - segStartTick) / this.ticksPerPixel,
-                          pixelEnd: (segEndTick - segStartTick) / this.ticksPerPixel,
-                        });
+                      const endTick = this._secondsToTicks(startSec + durSec);
+                      clipLeft = Math.round(startTick / this.ticksPerPixel);
+                      width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
+                    } else {
+                      clipLeft = Math.floor(clip.startSample / spp);
+                      width = clipPixelWidth(clip.startSample, clip.durationSamples, spp);
+                    }
+                    // Per-segment waveform rendering for variable tempo.
+                    // Uses base-scale (128) peaks directly — segments handle stretching,
+                    // so no BPM-dependent intermediate resampling needed.
+                    let clipSegments: WaveformSegment[] | undefined;
+                    let segmentChannels: Peaks[] | undefined;
+                    if (this.scaleMode === 'beats' && this.secondsToTicks) {
+                      const audioBuffer = this._clipBuffers.get(clip.id);
+                      const basePeaks = audioBuffer
+                        ? this._peakPipeline.getBaseScalePeaks(
+                            audioBuffer,
+                            this.mono,
+                            clip.offsetSamples,
+                            clip.durationSamples
+                          )
+                        : null;
+                      if (basePeaks) {
+                        const baseScale = basePeaks.scale;
+                        segmentChannels = basePeaks.peaks.data;
+                        const MIN_RENDER_STEP = 80;
+                        const stepTicks = Math.max(MIN_RENDER_STEP, Math.ceil(this.ticksPerPixel));
+                        const startSec =
+                          clip.startTick !== undefined
+                            ? this._ticksToSeconds(clip.startTick)
+                            : clip.startSample / sr;
+                        const clipOffsetSec = clip.offsetSamples / sr;
+                        const segStartTick =
+                          clip.startTick !== undefined
+                            ? clip.startTick
+                            : this._secondsToTicks(startSec);
+                        const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
+                        clipSegments = [];
+                        for (let tick = segStartTick; tick < endTick; tick += stepTicks) {
+                          const segEndTick = Math.min(tick + stepTicks, endTick);
+                          const segStartAudioSec =
+                            this._ticksToSeconds(tick) - startSec + clipOffsetSec;
+                          const segEndAudioSec =
+                            this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
+                          // Peak indices at base scale (128) — clamped to valid range.
+                          const segStartSample = Math.round(segStartAudioSec * sr);
+                          const segEndSample = Math.round(segEndAudioSec * sr);
+                          const totalPeaks = clip.durationSamples / baseScale;
+                          clipSegments.push({
+                            peakStart: Math.max(
+                              0,
+                              (segStartSample - clip.offsetSamples) / baseScale
+                            ),
+                            peakEnd: Math.min(
+                              totalPeaks,
+                              (segEndSample - clip.offsetSamples) / baseScale
+                            ),
+                            pixelStart: (tick - segStartTick) / this.ticksPerPixel,
+                            pixelEnd: (segEndTick - segStartTick) / this.ticksPerPixel,
+                          });
+                        }
                       }
                     }
-                  }
-                  const channels: Peaks[] = segmentChannels ??
-                    peakData?.data ?? [new Int16Array(0)];
-                  const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
-                  const chH = this.waveHeight;
-                  return html` <div
-                    class="clip-container"
-                    style="left:${clipLeft}px;top:0;width:${width}px;height:${t.trackHeight}px;"
-                    data-clip-id=${clip.id}
-                  >
-                    ${hdrH > 0
-                      ? html`<div
-                          class="clip-header"
-                          data-clip-id=${clip.id}
-                          data-track-id=${t.trackId}
-                          ?data-interactive=${this.interactiveClips}
-                        >
-                          <span>${clip.name || t.descriptor?.name || ''}</span>
-                        </div>`
-                      : ''}
-                    ${t.descriptor?.renderMode === 'piano-roll'
-                      ? html`<daw-piano-roll
-                          style="position:absolute;left:0;top:${hdrH}px;"
-                          .midiNotes=${clip.midiNotes ?? []}
-                          .length=${peakData?.length ?? width}
-                          .waveHeight=${chH * channels.length}
-                          .samplesPerPixel=${this._renderSpp}
-                          .sampleRate=${this.effectiveSampleRate}
-                          .clipOffsetSeconds=${(clip.offsetSamples ?? 0) / this.effectiveSampleRate}
-                          .visibleStart=${this._viewport.visibleStart}
-                          .visibleEnd=${this._viewport.visibleEnd}
-                          .originX=${clipLeft}
-                          ?selected=${t.trackId === this._selectedTrackId}
-                        ></daw-piano-roll>`
-                      : t.descriptor?.renderMode === 'spectrogram'
-                        ? channels.map(
-                            (_chPeaks, chIdx) =>
-                              html`<daw-spectrogram
-                                style="position:absolute;left:0;top:${hdrH +
-                                chIdx * chH}px;height:${chH}px;width:${peakData?.length ??
-                                width}px;"
-                                .clipId=${clip.id}
-                                .trackId=${t.trackId}
-                                .channelIndex=${chIdx}
-                                .length=${peakData?.length ?? width}
-                                .waveHeight=${chH}
-                                .samplesPerPixel=${this._renderSpp}
-                                .sampleRate=${this.effectiveSampleRate}
-                                .clipOffsetSeconds=${(clip.offsetSamples ?? 0) /
-                                this.effectiveSampleRate}
-                                .visibleStart=${this._viewport.visibleStart}
-                                .visibleEnd=${this._viewport.visibleEnd}
-                                .originX=${clipLeft}
-                              ></daw-spectrogram>`
-                          )
-                        : channels.map(
-                            (chPeaks, chIdx) =>
-                              html` <daw-waveform
-                                style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
-                                .peaks=${chPeaks}
-                                .length=${peakData?.length ?? width}
-                                .waveHeight=${chH}
-                                .barWidth=${this.barWidth}
-                                .barGap=${this.barGap}
-                                .visibleStart=${this._viewport.visibleStart}
-                                .visibleEnd=${this._viewport.visibleEnd}
-                                .originX=${clipLeft}
-                                .segments=${clipSegments}
-                              ></daw-waveform>`
-                          )}
-                    ${this.interactiveClips
-                      ? html` <div
-                            class="clip-boundary"
-                            data-boundary-edge="left"
+                    const channels: Peaks[] = segmentChannels ??
+                      peakData?.data ?? [new Int16Array(0)];
+                    const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
+                    const chH = this.waveHeight;
+                    return html` <div
+                      class="clip-container"
+                      style="left:${clipLeft}px;top:0;width:${width}px;height:${t.trackHeight}px;"
+                      data-clip-id=${clip.id}
+                    >
+                      ${hdrH > 0
+                        ? html`<div
+                            class="clip-header"
                             data-clip-id=${clip.id}
                             data-track-id=${t.trackId}
-                          ></div>
-                          <div
-                            class="clip-boundary"
-                            data-boundary-edge="right"
-                            data-clip-id=${clip.id}
-                            data-track-id=${t.trackId}
-                          ></div>`
-                      : ''}
-                  </div>`;
-                })}
-                ${this._renderRecordingPreview(t.trackId, channelHeight)}
-              </div>
-            `;
-          })}
+                            ?data-interactive=${this.interactiveClips}
+                          >
+                            <span>${clip.name || t.descriptor?.name || ''}</span>
+                          </div>`
+                        : ''}
+                      ${t.descriptor?.renderMode === 'piano-roll'
+                        ? html`<daw-piano-roll
+                            style="position:absolute;left:0;top:${hdrH}px;"
+                            .midiNotes=${clip.midiNotes ?? []}
+                            .length=${peakData?.length ?? width}
+                            .waveHeight=${chH * channels.length}
+                            .samplesPerPixel=${this._renderSpp}
+                            .sampleRate=${this.effectiveSampleRate}
+                            .clipOffsetSeconds=${(clip.offsetSamples ?? 0) /
+                            this.effectiveSampleRate}
+                            .visibleStart=${this._viewport.visibleStart}
+                            .visibleEnd=${this._viewport.visibleEnd}
+                            .originX=${clipLeft}
+                            ?selected=${t.trackId === this._selectedTrackId}
+                          ></daw-piano-roll>`
+                        : t.descriptor?.renderMode === 'spectrogram'
+                          ? channels.map(
+                              (_chPeaks, chIdx) =>
+                                html`<daw-spectrogram
+                                  style="position:absolute;left:0;top:${hdrH +
+                                  chIdx * chH}px;height:${chH}px;width:${peakData?.length ??
+                                  width}px;"
+                                  .clipId=${clip.id}
+                                  .trackId=${t.trackId}
+                                  .channelIndex=${chIdx}
+                                  .length=${peakData?.length ?? width}
+                                  .waveHeight=${chH}
+                                  .samplesPerPixel=${this._renderSpp}
+                                  .sampleRate=${this.effectiveSampleRate}
+                                  .clipOffsetSeconds=${(clip.offsetSamples ?? 0) /
+                                  this.effectiveSampleRate}
+                                  .visibleStart=${this._viewport.visibleStart}
+                                  .visibleEnd=${this._viewport.visibleEnd}
+                                  .originX=${clipLeft}
+                                ></daw-spectrogram>`
+                            )
+                          : channels.map(
+                              (chPeaks, chIdx) =>
+                                html` <daw-waveform
+                                  style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
+                                  .peaks=${chPeaks}
+                                  .length=${peakData?.length ?? width}
+                                  .waveHeight=${chH}
+                                  .barWidth=${this.barWidth}
+                                  .barGap=${this.barGap}
+                                  .visibleStart=${this._viewport.visibleStart}
+                                  .visibleEnd=${this._viewport.visibleEnd}
+                                  .originX=${clipLeft}
+                                  .segments=${clipSegments}
+                                ></daw-waveform>`
+                            )}
+                      ${this.interactiveClips
+                        ? html` <div
+                              class="clip-boundary"
+                              data-boundary-edge="left"
+                              data-clip-id=${clip.id}
+                              data-track-id=${t.trackId}
+                            ></div>
+                            <div
+                              class="clip-boundary"
+                              data-boundary-edge="right"
+                              data-clip-id=${clip.id}
+                              data-track-id=${t.trackId}
+                            ></div>`
+                        : ''}
+                    </div>`;
+                  })}
+                  ${this._renderRecordingPreview(t.trackId, channelHeight)}
+                </div>
+              `;
+            })}
+          </div>
         </div>
       </div>
       <slot></slot>
