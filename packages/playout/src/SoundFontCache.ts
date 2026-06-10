@@ -213,6 +213,21 @@ export class SoundFontCache {
   }
 
   /**
+   * Fetch and parse an SF2 file, resolving only once it's ready to play.
+   * Prefer this over `new SoundFontCache()` + `load()` — the returned cache
+   * is always loaded, so it can't hit the "unloaded cache → PolySynth
+   * fallback" path in createToneAdapter / setSoundFontCache.
+   */
+  static async fromUrl(
+    url: string,
+    options?: { context?: BaseAudioContext; signal?: AbortSignal }
+  ): Promise<SoundFontCache> {
+    const cache = new SoundFontCache(options?.context);
+    await cache.load(url, options?.signal);
+    return cache;
+  }
+
+  /**
    * Load and parse an SF2 file from a URL.
    */
   async load(url: string, signal?: AbortSignal): Promise<void> {
