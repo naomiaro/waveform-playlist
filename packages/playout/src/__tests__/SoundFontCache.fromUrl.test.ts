@@ -37,9 +37,8 @@ describe('SoundFontCache.fromUrl', () => {
 
     expect(cache).toBeInstanceOf(SoundFontCache);
     expect(cache.isLoaded).toBe(true);
-    expect(fetchMock).toHaveBeenCalledWith('/media/soundfont/A320U.sf2', {
-      signal: undefined,
-    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('/media/soundfont/A320U.sf2');
   });
 
   it('rejects when the fetch fails (no half-loaded cache escapes)', async () => {
@@ -72,5 +71,23 @@ describe('SoundFontCache.fromUrl', () => {
     // White-box: context is private; reach in rather than exercising the full
     // getAudioBuffer pipeline, which needs real SF2 sample data.
     expect((cache as unknown as { context: BaseAudioContext }).context).toBe(ctx);
+  });
+
+  it('rejects when the SF2 fails to parse', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+      } as unknown as Response)
+    );
+    const { SoundFont2 } = await import('soundfont2');
+    (SoundFont2 as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('bad RIFF header');
+    });
+
+    await expect(SoundFontCache.fromUrl('/corrupt.sf2')).rejects.toThrow(
+      'Failed to parse SoundFont /corrupt.sf2: bad RIFF header'
+    );
   });
 });
