@@ -260,7 +260,10 @@ export function createToneAdapter(options?: ToneAdapterOptions): PlayoutAdapter 
 
         const audioUpdated = playout.replaceTrackClips(trackId, clipInfos, startTime);
 
-        // Also update companion MIDI track if present
+        // Also update companion MIDI track if present. Re-add only the MIDI
+        // half — the audio track was updated in-place by replaceTrackClips
+        // above, and TonePlayout.addTrack has no idempotency guard (a second
+        // add leaks the old ToneTrack and duplicates its Transport events).
         const midiClips = track.clips.filter((c) => c.midiNotes && c.midiNotes.length > 0);
         if (midiClips.length > 0) {
           const midiTrackId = trackId + ':midi';

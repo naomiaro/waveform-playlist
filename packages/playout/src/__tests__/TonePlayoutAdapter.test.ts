@@ -572,6 +572,31 @@ describe('createToneAdapter', () => {
     });
   });
 
+  describe('updateTrack (companion MIDI)', () => {
+    it('re-adds only the MIDI half after replaceTrackClips updates audio in place', () => {
+      const adapter = createToneAdapter();
+      const mixedTrack = makeTrack('t1', [
+        makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+        makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+      ]);
+      adapter.setTracks([mixedTrack]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addTrack).toHaveBeenCalledTimes(1);
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+      instance.replaceTrackClips.mockReturnValue(true);
+
+      adapter.updateTrack!('t1', mixedTrack);
+
+      // Audio updated in place — NOT re-added (a second addTrack would leak
+      // the old ToneTrack; TonePlayout.addTrack has no idempotency guard)
+      expect(instance.addTrack).toHaveBeenCalledTimes(1);
+      // MIDI half removed and re-added
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('tempo and meter', () => {
     it('setTempo sets the BPM', () => {
       const adapter = createToneAdapter();
