@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore + Tone.js — SoundFont MIDI</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 { font-size: 1.2rem; margin-bottom: 16px; }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      --daw-piano-roll-note-color: #2a7070;
+      --daw-piano-roll-selected-note-color: #3d9e9e;
+      --daw-piano-roll-background: #1a1a2e;
+      margin-bottom: 12px;
+    }
+    daw-transport { display: flex; gap: 8px; }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore + Tone.js — MIDI through SoundFont samples</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="2048" wave-height="120" timescale>
+    <daw-keyboard-shortcuts playback></daw-keyboard-shortcuts>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { createToneAdapter, SoundFontCache } from '@waveform-playlist/playout';
+
+    const editor = document.getElementById('editor');
+    const log = document.getElementById('log');
+
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = msg;
+      log.prepend(line);
+      while (log.children.length > 30) log.lastChild.remove();
+    }
+
+    editor.addEventListener('daw-track-ready', (e) => addLog('track-ready: ' + e.detail.trackId));
+    editor.addEventListener('daw-error', (e) => addLog('error: ' + e.detail.operation + ' — ' + String(e.detail.error)));
+
+    async function start() {
+      // 1. Load the SoundFont BEFORE creating the adapter — MIDI tracks added
+      //    while the cache is still loading would fall back to PolySynth
+      //    (recoverable later via adapter.setSoundFontCache(cache)).
+      let soundFontCache;
+      try {
+        soundFontCache = new SoundFontCache();
+        await soundFontCache.load('/media/soundfont/A320U.sf2');
+        addLog('soundfont loaded: A320U.sf2');
+      } catch (err) {
+        console.error('[soundfont]', err);
+        addLog('soundfont failed to load — falling back to PolySynth: ' + String(err));
+        soundFontCache = undefined;
+      }
+
+      // 2. The consumer owns the adapter (issue #378) — soundfont config
+      //    lives here, not on <daw-editor>.
+      editor.adapter = createToneAdapter({ ppqn: 960, soundFontCache });
+
+      // 3. Load a multi-track .mid file. Each track's GM program number is
+      //    extracted from the file and selects the soundfont instrument;
+      //    channel 9 routes to percussion samples.
+      try {
+        const result = await editor.loadMidi('/media/midi/RedHotChiliPeppers-Otherside.mid');
+        addLog('loaded ' + result.trackIds.length + ' track(s); bpm=' + result.bpm.toFixed(1) + ' ts=' + result.timeSignature.join('/'));
+        editor.bpm = result.bpm;
+        editor.timeSignature = result.timeSignature;
+      } catch (err) {
+        console.error('[loadMidi]', err);
+        addLog('loadMidi failed: ' + String(err));
+      }
+    }
+
+    start();
+  </script>
+</body>
+</html>
