@@ -48,15 +48,16 @@ export interface PlayheadProps {
   getAudioContextTime?: () => number;
   /**
    * Returns raw playback time from the engine (auto-wraps at loop boundaries).
-   * This is the scheduling position — for playhead display use `visualTimeRef`
-   * which already has `outputLatency` and `lookAhead` subtracted.
+   * This is the scheduling position — for playhead display use `visualTimeRef`,
+   * which is latency-compensated while playing.
    */
   getPlaybackTime?: () => number;
   /**
-   * Ref to the visually-aligned playback time (raw time minus `outputLatency`
-   * and `engine.lookAhead`), kept current by the provider's animation loop
-   * during playback and by pause/stop/seek paths when stopped. Use this for
-   * playhead positioning so it lines up with audible output and matches the
+   * Ref to the visually-aligned playback time: engine-compensated audible time
+   * (raw minus `outputLatency` and `engine.lookAhead`) while playing, the raw
+   * commanded position when resting (seek/pause/stop). Kept current by the
+   * provider's animation loop during playback and by pause/stop/seek paths
+   * when stopped. Use this for playhead positioning so it matches the
    * progress fill in `ChannelWithProgress`.
    */
   visualTimeRef?: React.RefObject<number>;
