@@ -1,0 +1,36 @@
+import type { DawTransportElement } from '../elements/daw-transport';
+
+/**
+ * Transport target resolution + duck-typed capability detection.
+ *
+ * Transport controls never instanceof-check their target — they probe for the
+ * methods they need (`typeof target[m] === 'function'`). This is what lets the
+ * same controls drive <daw-editor>, the future <daw-player> (#454), or any
+ * conforming element, and lets editor-only controls render disabled against a
+ * player (#474, spec "Transport Compatibility").
+ */
+
+/** Resolve the target of the closest <daw-transport for="..."> ancestor. */
+export function resolveTransportTarget(el: Element): HTMLElement | null {
+  const transport = el.closest('daw-transport') as DawTransportElement | null;
+  return transport?.target ?? null;
+}
+
+/** True when target exists and every named method is a function on it. */
+export function targetSupports(target: unknown, methods: readonly string[]): boolean {
+  if (!target) return false;
+  return methods.every((m) => typeof (target as Record<string, unknown>)[m] === 'function');
+}
+
+const warned = new WeakSet<Element>();
+
+/** One-time console warning explaining why a control is disabled. */
+export function warnUnsupportedOnce(element: Element, methods: readonly string[]): void {
+  if (warned.has(element)) return;
+  warned.add(element);
+  console.warn(
+    `[dawcore] <${element.tagName.toLowerCase()}> is disabled: its transport target ` +
+      `does not implement ${methods.join(', ')}. See the transport compatibility ` +
+      'table in the docs for which controls work with which targets.'
+  );
+}
