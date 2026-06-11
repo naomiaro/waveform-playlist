@@ -41,7 +41,8 @@ export interface FetchWamLibraryOptions {
   baseUrl?: string;
 }
 
-const defaultFetch: WamManifestFetch = (url) => fetch(url);
+/** Internal default for injectable fetchFn options — shared with descriptor.ts, not part of the public API. */
+export const defaultFetch: WamManifestFetch = (url) => fetch(url);
 
 /** Path segments that name a build artifact directory, not the plugin itself. */
 const GENERIC_URL_SEGMENTS = new Set([

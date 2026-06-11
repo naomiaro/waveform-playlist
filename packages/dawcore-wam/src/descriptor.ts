@@ -1,4 +1,7 @@
-import type { WamManifestFetch } from './library';
+// WamManifestFetch is the package's shared structural fetch boundary
+// ((url) => Promise of an ok/status/json view) — same injectable shape as
+// fetchWamLibrary, deliberately reused rather than redefined.
+import { defaultFetch, type WamManifestFetch } from './library';
 
 /** Capability flags from a plugin's static `descriptor.json`. Fields present only when the file provides them as booleans. */
 export interface WamDescriptorInfo {
@@ -12,8 +15,6 @@ export interface WamDescriptorInfo {
 export interface FetchWamDescriptorOptions {
   fetchFn?: WamManifestFetch;
 }
-
-const defaultFetch: WamManifestFetch = (url) => fetch(url);
 
 /**
  * Best-effort probe of the static `descriptor.json` that WAM SDK builds ship
