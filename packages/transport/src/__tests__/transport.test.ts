@@ -264,6 +264,18 @@ describe('Transport', () => {
     expect(onPlay).not.toHaveBeenCalled();
   });
 
+  it('seek emits a seek event with the target position', () => {
+    const ctx = mockAudioContext();
+    const transport = new Transport(ctx);
+    const onSeek = vi.fn();
+    transport.on('seek', onSeek);
+
+    transport.seek(3.5);
+
+    expect(onSeek).toHaveBeenCalledTimes(1);
+    expect(onSeek).toHaveBeenCalledWith({ seconds: 3.5 });
+  });
+
   it('dispose cleans up', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

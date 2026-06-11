@@ -2,12 +2,17 @@ import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vite
 import type { DawEditorElement } from '../elements/daw-editor';
 import type { DawTrackElement } from '../elements/daw-track';
 
-const { ensureWamHost, createWamInstance } = vi.hoisted(() => ({
+const { ensureWamHost, createWamInstance, createWamTransportBridge } = vi.hoisted(() => ({
   ensureWamHost: vi.fn(),
   createWamInstance: vi.fn(),
+  createWamTransportBridge: vi.fn(() => ({
+    notifyNodeAdded: vi.fn(),
+    broadcastNow: vi.fn(),
+    dispose: vi.fn(),
+  })),
 }));
 
-vi.mock('@dawcore/wam', () => ({ ensureWamHost, createWamInstance }));
+vi.mock('@dawcore/wam', () => ({ ensureWamHost, createWamInstance, createWamTransportBridge }));
 
 beforeAll(async () => {
   await import('../elements/daw-editor');

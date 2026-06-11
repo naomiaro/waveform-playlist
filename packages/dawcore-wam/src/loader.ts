@@ -24,6 +24,7 @@ export interface WamPluginAudioNode extends AudioNode {
   setParameterValues?(
     values: Record<string, { id: string; value: number; normalized: boolean }>
   ): Promise<void>;
+  scheduleEvents?(...events: Array<{ type: string; time: number; data?: unknown }>): void;
 }
 
 interface WamModuleLike {

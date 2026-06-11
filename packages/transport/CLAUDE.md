@@ -135,6 +135,8 @@ When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute
 
 `connectTrackOutput(trackId, node)` accepts any AudioNode chain (Tone.js effects, WAM plugins, native nodes). The transport has zero knowledge of Tone.js.
 
+`seek(time)` emits a `seek` event (`{ seconds }`) — added for the wam-transport bridge (#425); generic, no plugin types.
+
 `connectMasterOutput(node)` / `disconnectMasterOutput()` are the master-bus equivalents — the chain is inserted between the master gain and `audioContext.destination` via `MasterNode.connectEffects`. Master insertion uses a **targeted** `disconnect(destination)` (not blanket `disconnect()`) so parallel taps on `masterOutputNode` (analyzers, recorders) survive chain connect/disconnect. The caller routes the chain's output to `audioContext.destination`.
 
 ## NativePlayoutAdapter
