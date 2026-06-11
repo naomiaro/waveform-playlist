@@ -388,6 +388,34 @@ describe('fetchWamLibrary — optional fields', () => {
 
     expect(entries[0].category).toEqual(['Effect', 'Reverb']);
   });
+
+  it('omits category when no array items are strings', async () => {
+    const fetchFn = makeFetchFn([
+      {
+        name: 'Reverb',
+        url: 'https://plugins.example.com/reverb/index.js',
+        category: [7, null],
+      },
+    ]);
+
+    const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
+
+    expect(entries[0].category).toBeUndefined();
+  });
+
+  it('omits a bare empty-string category', async () => {
+    const fetchFn = makeFetchFn([
+      {
+        name: 'Reverb',
+        url: 'https://plugins.example.com/reverb/index.js',
+        category: '  ',
+      },
+    ]);
+
+    const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
+
+    expect(entries[0].category).toBeUndefined();
+  });
 });
 
 describe('fetchWamLibrary — invalid entries', () => {
