@@ -243,4 +243,24 @@ describe('<daw-track> effects API', () => {
 
     expect(adapter.transport.disconnectMasterOutput).toHaveBeenCalled();
   });
+
+  it('replacing the adapter disposes chains from the OLD adapter graph', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const track = await appendTrack();
+    editor.addEffect('native-gain');
+    track.addEffect('native-gain');
+
+    const next = makeMockAdapter();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any).adapter = next;
+
+    // Chains were wired into the OLD adapter's transport — they must be
+    // severed there, not on the new adapter (which never saw them).
+    expect(adapter.transport.disconnectMasterOutput).toHaveBeenCalled();
+    expect(adapter.transport.disconnectTrackOutput).toHaveBeenCalledWith(track.trackId);
+    expect(next.transport.disconnectMasterOutput).not.toHaveBeenCalled();
+    expect(editor.effects).toHaveLength(0);
+    expect(track.effects).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('effect'));
+  });
 });

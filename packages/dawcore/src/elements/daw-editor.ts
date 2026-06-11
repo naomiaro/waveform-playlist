@@ -332,6 +332,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           'The engine will continue using the previous adapter.'
       );
     }
+    if (this._effectsManager) {
+      // Chains are wired into the previous adapter's transport/graph and
+      // cannot be migrated. Sever them there BEFORE the swap so the old
+      // graph is left clean; consumers re-add effects on the new adapter.
+      console.warn(
+        '[dawcore] adapter replaced — existing effect chains were disposed. ' +
+          'Re-add effects on the new adapter.'
+      );
+      this._effectsManager.disposeAll();
+      this._effectsManager = null;
+    }
     this._externalAdapter = value;
   }
   get adapter(): PlayoutAdapter | null {
