@@ -88,3 +88,16 @@ export type {
   DawClipSplitDetail,
   LoadFilesResult,
 } from './events';
+
+// Effects (chain core — element APIs land in #418)
+export {
+  registerEffect,
+  getEffectDefinitions,
+  createEffectInstance,
+} from './effects/effect-registry';
+export type {
+  EffectDefinition,
+  EffectParamDef,
+  EffectInstance,
+  EffectState,
+} from './effects/types';
