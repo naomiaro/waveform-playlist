@@ -1,0 +1,250 @@
+{
+    "name": "ZitaReverb",
+    "filename": "reverb",
+    "version": "2.84.3",
+    "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2",
+    "library_list": [
+        "/usr/share/faust/stdfaust.lib",
+        "/usr/share/faust/demos.lib",
+        "/usr/share/faust/reverbs.lib",
+        "/usr/share/faust/delays.lib",
+        "/usr/share/faust/maths.lib",
+        "/usr/share/faust/platform.lib",
+        "/usr/share/faust/signals.lib",
+        "/usr/share/faust/filters.lib",
+        "/usr/share/faust/basics.lib",
+        "/usr/share/faust/routes.lib"
+    ],
+    "include_pathnames": [
+        "/faust/user/inc0",
+        "/share/faust",
+        "/usr/local/share/faust",
+        "/usr/share/faust",
+        "."
+    ],
+    "size": 959336,
+    "code": "aFN4AVQ8Hw==",
+    "inputs": 2,
+    "outputs": 2,
+    "meta": [
+        {
+            "basics.lib/name": "Faust Basic Element Library"
+        },
+        {
+            "basics.lib/version": "1.22.0"
+        },
+        {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+        },
+        {
+            "delays.lib/name": "Faust Delay Library"
+        },
+        {
+            "delays.lib/version": "1.2.0"
+        },
+        {
+            "demos.lib/name": "Faust Demos Library"
+        },
+        {
+            "demos.lib/version": "1.4.0"
+        },
+        {
+            "demos.lib/zita_light:author": "Julius O. Smith III"
+        },
+        {
+            "demos.lib/zita_light:licence": "MIT"
+        },
+        {
+            "description": "Light version of the Zita feedback-delay-network reverb (stereo)"
+        },
+        {
+            "filename": "reverb"
+        },
+        {
+            "filters.lib/allpass_comb:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/allpass_comb:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/allpass_comb:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/fir:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/fir:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/fir:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/iir:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/iir:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/iir:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/lowpass0_highpass1": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/lowpass0_highpass1:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/lowpass:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/lowpass:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/lowpass:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/name": "Faust Filters Library"
+        },
+        {
+            "filters.lib/peak_eq_rm:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/peak_eq_rm:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/peak_eq_rm:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/tf1:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/tf1:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/tf1:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/tf1s:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/tf1s:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/tf1s:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/tf2:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/tf2:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/tf2:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/version": "1.7.1"
+        },
+        {
+            "maths.lib/author": "GRAME"
+        },
+        {
+            "maths.lib/copyright": "GRAME"
+        },
+        {
+            "maths.lib/license": "LGPL with exception"
+        },
+        {
+            "maths.lib/name": "Faust Math Library"
+        },
+        {
+            "maths.lib/version": "2.9.0"
+        },
+        {
+            "name": "ZitaReverb"
+        },
+        {
+            "platform.lib/name": "Generic Platform Library"
+        },
+        {
+            "platform.lib/version": "1.3.0"
+        },
+        {
+            "reverbs.lib/name": "Faust Reverb Library"
+        },
+        {
+            "reverbs.lib/version": "1.5.1"
+        },
+        {
+            "routes.lib/hadamard:author": "Remy Muller, revised by Romain Michon"
+        },
+        {
+            "routes.lib/name": "Faust Signal Routing Library"
+        },
+        {
+            "routes.lib/version": "1.2.0"
+        },
+        {
+            "signals.lib/name": "Faust Signal Routing Library"
+        },
+        {
+            "signals.lib/version": "1.6.0"
+        }
+    ],
+    "ui": [
+        {
+            "type": "hgroup",
+            "label": "Zita Light",
+            "items": [
+                {
+                    "type": "vslider",
+                    "label": "Wet/Dry Mix",
+                    "varname": "fVslider1",
+                    "shortname": "Wet_Dry_Mix",
+                    "address": "/Zita_Light/Wet_Dry_Mix",
+                    "index": 65568,
+                    "meta": [
+                        {
+                            "1": ""
+                        },
+                        {
+                            "style": "knob"
+                        },
+                        {
+                            "tooltip": "Ratio of dry and wet signal. -1 = fully wet, +1 = fully dry"
+                        }
+                    ],
+                    "init": 0,
+                    "min": -1,
+                    "max": 1,
+                    "step": 0.01
+                },
+                {
+                    "type": "vslider",
+                    "label": "Level",
+                    "varname": "fVslider0",
+                    "shortname": "Level",
+                    "address": "/Zita_Light/Level",
+                    "index": 12,
+                    "meta": [
+                        {
+                            "2": ""
+                        },
+                        {
+                            "style": "knob"
+                        },
+                        {
+                            "tooltip": "Output scale         factor"
+                        },
+                        {
+                            "unit": "dB"
+                        }
+                    ],
+                    "init": -6,
+                    "min": -70,
+                    "max": 40,
+                    "step": 0.1
+                }
+            ]
+        }
+    ]
+}

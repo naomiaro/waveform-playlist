@@ -1,0 +1,360 @@
+{
+    "name": "Flanger",
+    "filename": "flanger",
+    "version": "2.84.3",
+    "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2",
+    "library_list": [
+        "/usr/share/faust/stdfaust.lib",
+        "/usr/share/faust/demos.lib",
+        "/usr/share/faust/basics.lib",
+        "/usr/share/faust/routes.lib",
+        "/usr/share/faust/oscillators.lib",
+        "/usr/share/faust/filters.lib",
+        "/usr/share/faust/maths.lib",
+        "/usr/share/faust/platform.lib",
+        "/usr/share/faust/phaflangers.lib",
+        "/usr/share/faust/delays.lib"
+    ],
+    "include_pathnames": [
+        "/faust/user/inc0",
+        "/share/faust",
+        "/usr/local/share/faust",
+        "/usr/share/faust",
+        "."
+    ],
+    "size": 32860,
+    "code": "wJ0HAVQ8Hw==",
+    "inputs": 2,
+    "outputs": 2,
+    "meta": [
+        {
+            "basics.lib/bypass2:author": "Julius Smith"
+        },
+        {
+            "basics.lib/name": "Faust Basic Element Library"
+        },
+        {
+            "basics.lib/version": "1.22.0"
+        },
+        {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+        },
+        {
+            "delays.lib/name": "Faust Delay Library"
+        },
+        {
+            "delays.lib/version": "1.2.0"
+        },
+        {
+            "demos.lib/flanger_demo:author": "Julius O. Smith III"
+        },
+        {
+            "demos.lib/flanger_demo:licence": "MIT"
+        },
+        {
+            "demos.lib/name": "Faust Demos Library"
+        },
+        {
+            "demos.lib/version": "1.4.0"
+        },
+        {
+            "description": "Stereo flanger with depth, feedback, and LFO controls"
+        },
+        {
+            "filename": "flanger"
+        },
+        {
+            "filters.lib/lowpass0_highpass1": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/name": "Faust Filters Library"
+        },
+        {
+            "filters.lib/nlf2:author": "Julius O. Smith III"
+        },
+        {
+            "filters.lib/nlf2:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+        },
+        {
+            "filters.lib/nlf2:license": "MIT-style STK-4.3 license"
+        },
+        {
+            "filters.lib/version": "1.7.1"
+        },
+        {
+            "maths.lib/author": "GRAME"
+        },
+        {
+            "maths.lib/copyright": "GRAME"
+        },
+        {
+            "maths.lib/license": "LGPL with exception"
+        },
+        {
+            "maths.lib/name": "Faust Math Library"
+        },
+        {
+            "maths.lib/version": "2.9.0"
+        },
+        {
+            "name": "Flanger"
+        },
+        {
+            "oscillators.lib/name": "Faust Oscillator Library"
+        },
+        {
+            "oscillators.lib/version": "1.7.0"
+        },
+        {
+            "phaflangers.lib/name": "Faust Phaser and Flanger Library"
+        },
+        {
+            "phaflangers.lib/version": "1.1.0"
+        },
+        {
+            "platform.lib/name": "Generic Platform Library"
+        },
+        {
+            "platform.lib/version": "1.3.0"
+        },
+        {
+            "routes.lib/name": "Faust Signal Routing Library"
+        },
+        {
+            "routes.lib/version": "1.2.0"
+        }
+    ],
+    "ui": [
+        {
+            "type": "vgroup",
+            "label": "FLANGER",
+            "meta": [
+                {
+                    "tooltip": "Reference: https://ccrma.stanford.edu/~jos/pasp/Flanging.html"
+                }
+            ],
+            "items": [
+                {
+                    "type": "hgroup",
+                    "label": "0x00",
+                    "meta": [
+                        {
+                            "0": ""
+                        }
+                    ],
+                    "items": [
+                        {
+                            "type": "checkbox",
+                            "label": "Bypass",
+                            "varname": "fCheckbox0",
+                            "shortname": "Bypass",
+                            "address": "/FLANGER/0x00/Bypass",
+                            "index": 0,
+                            "meta": [
+                                {
+                                    "0": ""
+                                },
+                                {
+                                    "tooltip": "When this is checked, the flanger         has no effect"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "checkbox",
+                            "label": "Invert Flange Sum",
+                            "varname": "fCheckbox1",
+                            "shortname": "Invert_Flange_Sum",
+                            "address": "/FLANGER/0x00/Invert_Flange_Sum",
+                            "index": 16460,
+                            "meta": [
+                                {
+                                    "1": ""
+                                }
+                            ]
+                        },
+                        {
+                            "type": "hbargraph",
+                            "label": "Flange LFO",
+                            "varname": "fHbargraph0",
+                            "shortname": "Flange_LFO",
+                            "address": "/FLANGER/0x00/Flange_LFO",
+                            "index": 48,
+                            "meta": [
+                                {
+                                    "2": ""
+                                },
+                                {
+                                    "style": "led"
+                                },
+                                {
+                                    "tooltip": "Display sum of flange delays"
+                                }
+                            ],
+                            "min": -1.5,
+                            "max": 1.5
+                        }
+                    ]
+                },
+                {
+                    "type": "hgroup",
+                    "label": "0x00",
+                    "meta": [
+                        {
+                            "1": ""
+                        }
+                    ],
+                    "items": [
+                        {
+                            "type": "hslider",
+                            "label": "Speed",
+                            "varname": "fHslider1",
+                            "shortname": "Speed",
+                            "address": "/FLANGER/0x00/Speed",
+                            "index": 20,
+                            "meta": [
+                                {
+                                    "1": ""
+                                },
+                                {
+                                    "style": "knob"
+                                },
+                                {
+                                    "unit": "Hz"
+                                }
+                            ],
+                            "init": 0.5,
+                            "min": 0,
+                            "max": 10,
+                            "step": 0.01
+                        },
+                        {
+                            "type": "hslider",
+                            "label": "Depth",
+                            "varname": "fHslider5",
+                            "shortname": "Depth",
+                            "address": "/FLANGER/0x00/Depth",
+                            "index": 16464,
+                            "meta": [
+                                {
+                                    "2": ""
+                                },
+                                {
+                                    "style": "knob"
+                                }
+                            ],
+                            "init": 1,
+                            "min": 0,
+                            "max": 1,
+                            "step": 0.001
+                        },
+                        {
+                            "type": "hslider",
+                            "label": "Feedback",
+                            "varname": "fHslider2",
+                            "shortname": "Feedback",
+                            "address": "/FLANGER/0x00/Feedback",
+                            "index": 52,
+                            "meta": [
+                                {
+                                    "3": ""
+                                },
+                                {
+                                    "style": "knob"
+                                }
+                            ],
+                            "init": 0,
+                            "min": -0.999,
+                            "max": 0.999,
+                            "step": 0.001
+                        }
+                    ]
+                },
+                {
+                    "type": "hgroup",
+                    "label": "Delay Controls",
+                    "meta": [
+                        {
+                            "2": ""
+                        }
+                    ],
+                    "items": [
+                        {
+                            "type": "hslider",
+                            "label": "Flange Delay",
+                            "varname": "fHslider4",
+                            "shortname": "Flange_Delay",
+                            "address": "/FLANGER/Delay_Controls/Flange_Delay",
+                            "index": 16448,
+                            "meta": [
+                                {
+                                    "1": ""
+                                },
+                                {
+                                    "style": "knob"
+                                },
+                                {
+                                    "unit": "ms"
+                                }
+                            ],
+                            "init": 10,
+                            "min": 0,
+                            "max": 20,
+                            "step": 0.001
+                        },
+                        {
+                            "type": "hslider",
+                            "label": "Delay Offset",
+                            "varname": "fHslider3",
+                            "shortname": "Delay_Offset",
+                            "address": "/FLANGER/Delay_Controls/Delay_Offset",
+                            "index": 16444,
+                            "meta": [
+                                {
+                                    "2": ""
+                                },
+                                {
+                                    "style": "knob"
+                                },
+                                {
+                                    "unit": "ms"
+                                }
+                            ],
+                            "init": 1,
+                            "min": 0,
+                            "max": 20,
+                            "step": 0.001
+                        }
+                    ]
+                },
+                {
+                    "type": "hgroup",
+                    "label": "0x00",
+                    "meta": [
+                        {
+                            "3": ""
+                        }
+                    ],
+                    "items": [
+                        {
+                            "type": "hslider",
+                            "label": "Flanger Output Level",
+                            "varname": "fHslider0",
+                            "shortname": "Flanger_Output_Level",
+                            "address": "/FLANGER/0x00/Flanger_Output_Level",
+                            "index": 4,
+                            "meta": [
+                                {
+                                    "unit": "dB"
+                                }
+                            ],
+                            "init": 0,
+                            "min": -60,
+                            "max": 10,
+                            "step": 0.1
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

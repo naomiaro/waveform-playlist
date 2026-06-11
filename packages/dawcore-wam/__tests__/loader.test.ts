@@ -160,6 +160,38 @@ describe('createWamInstance', () => {
     expect(audioNode.destroy).toHaveBeenCalled();
   });
 
+  it('accepts a faust2wam-shaped descriptor with no special handling (#429)', async () => {
+    // Mirrors what faust2wam generates: apiVersion 2.0.0, audio in/out,
+    // hasMidiInput always true (even for pure effects), plus a vendor
+    // extension field (faustMeta). None of it should need host-side support.
+    const { WamClass } = makeWamClass({
+      identifier: 'fr.grame.faust.lowpass',
+      name: 'Lowpass',
+      vendor: 'Faust User',
+      isInstrument: false,
+      hasMidiInput: true,
+      hasMidiOutput: false,
+      faustMeta: { poly: false, fft: false, effect: null },
+    });
+    const importFn = makeImportFn({ default: WamClass });
+
+    const plugin = await createWamInstance(URL_A, ctx, 'group-1', { importFn });
+
+    expect(plugin.descriptor.name).toBe('Lowpass');
+  });
+
+  it('applies a flat Faust parameter-map state as initialState (#429)', async () => {
+    // Faust WAM getState() returns a flat { "/Name/param": value } map, not
+    // a { params: ... } envelope — the host must treat it as opaque.
+    const { WamClass, audioNode } = makeWamClass();
+    const importFn = makeImportFn({ default: WamClass });
+    const faustState = { '/Lowpass/cutoff': 250 };
+
+    await createWamInstance(URL_A, ctx, 'group-1', { importFn, initialState: faustState });
+
+    expect(audioNode.setState).toHaveBeenCalledWith(faustState);
+  });
+
   it('applies initialState via the audio node', async () => {
     const { WamClass, audioNode } = makeWamClass();
     const importFn = makeImportFn({ default: WamClass });

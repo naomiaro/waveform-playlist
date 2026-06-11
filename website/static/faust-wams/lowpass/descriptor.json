@@ -1,0 +1,20 @@
+{
+    "identifier": "fr.grame.faust.lowpass",
+    "name": "Lowpass",
+    "vendor": "Faust User",
+    "description": "Second-order stereo lowpass filter with adjustable cutoff",
+    "version": "1.0.0",
+    "apiVersion": "2.0.0",
+    "keywords": [],
+    "isInstrument": false,
+    "website": "",
+    "hasAudioInput": true,
+    "hasAudioOutput": true,
+    "hasMidiInput": true,
+    "hasMidiOutput": false,
+    "faustMeta": {
+        "poly": false,
+        "fft": false,
+        "effect": null
+    }
+}

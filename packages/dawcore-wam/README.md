@@ -51,6 +51,48 @@ See [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree
 
 **CORS note:** plugins load cross-origin via dynamic `import()`, so they must be served with permissive CORS headers. The [webaudiomodules.com community registry](https://www.webaudiomodules.com/community/plugins.json) plugins (the burns-audio / Sequencer Party pack and the Wimmics WAM 2.x plugins) work; self-hosted plugins need `Access-Control-Allow-Origin` on the plugin files. Note the registry also lists WAM 1.0 and instrument-only plugins — those are rejected at load time with a clear error (this host supports WAM 2.x effects with audio input and output).
 
+## Custom effects with Faust
+
+You don't have to wait for someone to publish the effect you need — [Faust](https://faust.grame.fr/) is a DSP language that compiles to a standard WAM 2.0 bundle via [faust2wam](https://github.com/webaudiomodules/faust2wam). The generated plugins load through `addWamPlugin(url)` with **zero special handling**: descriptor validation, chain insertion, bypass, the auto-generated GUI, `getState()`/`setState()` persistence, and offline export all work out of the box.
+
+The complete workflow, starting from a one-line lowpass filter:
+
+**1. Write the DSP** (`lowpass.dsp`) — every `hslider`/`vslider`/`checkbox` declaration becomes a WAM parameter _and_ a control in the auto-generated GUI:
+
+```text
+import("stdfaust.lib");
+process = fi.lowpass(2, hslider("cutoff", 1000, 20, 20000, 1));
+```
+
+(That's a mono filter. Track chains are stereo, so in practice duplicate it across both channels: `cutoff = hslider("cutoff", 1000, 20, 20000, 1); process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);` — or reach for the stereo demos in the standard library like `dm.zita_light` or `dm.flanger_demo`.)
+
+**2. Compile it** with the faust2wam CLI (Node 16+, no Faust toolchain needed — the compiler ships as WebAssembly):
+
+```bash
+git clone https://github.com/webaudiomodules/faust2wam
+cd faust2wam && npm install
+node faust2wam.js lowpass.dsp out/lowpass
+```
+
+**3. Host the bundle** — `out/lowpass/` is a self-contained static directory (`index.js`, `descriptor.json`, `dsp-module.wasm`, dsp metadata, and vendored `sdk/`, `sdk-parammgr/`, `faustwasm/`, `faust-ui/` runtimes). Serve it from any static host; cross-origin hosting needs `Access-Control-Allow-Origin` headers (see the CORS note above). The `fftw/` and `host/` directories and the `.map`/`.d.ts` files are only needed for `-fft` plugins and standalone testing — safe to omit when hosting plain effects.
+
+**4. Load it**:
+
+```javascript
+await track.addWamPlugin('https://your-host/out/lowpass/index.js');
+```
+
+Three pre-compiled Faust effects (the stereo lowpass, a `dm.zita_light` reverb, a `dm.flanger_demo` flanger) are bundled with the repo's example under [`website/static/faust-wams/`](https://github.com/naomiaro/waveform-playlist/tree/main/website/static/faust-wams) — each directory includes its `.dsp` source. Run `pnpm example:dawcore-wam` and click the buttons in the "Faust effects" section.
+
+Faust-generated plugins are well-behaved WAM citizens; quirks observed (none need host-side handling):
+
+- `getState()` returns a **flat parameter map** keyed by Faust paths (`{ "/Lowpass/cutoff": 250 }`) rather than the `{ params: ... }` envelope some plugins use. State is treated as an opaque snapshot, so persistence and offline cloning work unchanged.
+- The descriptor always reports `hasMidiInput: true`, even for pure audio effects — harmless (effect validation only requires audio input + output).
+- The GUI element sizes itself from faust-ui's computed `minWidth`/`minHeight` (inline styles, scrollable container) — it lays out fine in a normal document flow without a fixed-size plugin window.
+- Parameter names/addresses derive from the DSP source (`declare name` + control labels), and the descriptor identifier becomes `fr.grame.faust.<name>` with vendor `Faust User`.
+
+Dynamic in-browser compilation (paste Faust code, get a live plugin — faust2wam also ships as a browser library) is tracked separately in [#430](https://github.com/naomiaro/waveform-playlist/issues/430).
+
 ## Standalone Usage
 
 ### Host initialization
@@ -66,7 +108,7 @@ const { hostGroupId } = await ensureWamHost(audioContext);
 ```
 
 - Realtime contexts must be **running** (resume after a user gesture first) — host init loads an AudioWorklet module.
-- `OfflineAudioContext` is accepted while `'suspended'`: offline rendering initializes the host *before* `startRendering()`.
+- `OfflineAudioContext` is accepted while `'suspended'`: offline rendering initializes the host _before_ `startRendering()`.
 
 ### Plugin discovery
 

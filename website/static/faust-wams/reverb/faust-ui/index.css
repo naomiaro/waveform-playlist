@@ -1,0 +1,442 @@
+/*!*******************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Base.scss ***!
+  \*******************************************************************************************************************/
+.faust-ui-component {
+  display: flex;
+  position: absolute;
+  flex-direction: column;
+  overflow: hidden;
+}
+.faust-ui-component:focus {
+  outline: none;
+}
+.faust-ui-component > .faust-ui-component-label {
+  position: relative;
+  margin-top: 4px;
+  width: 100%;
+  user-select: none;
+}
+.faust-ui-component > .faust-ui-component-label > canvas {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+.faust-ui-component input {
+  box-shadow: none;
+}
+/*!**********************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/VSlider.scss ***!
+  \**********************************************************************************************************************/
+.faust-ui-component.faust-ui-component-vslider {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-vslider > .faust-ui-component-label {
+  flex: 0 0 auto;
+}
+.faust-ui-component.faust-ui-component-vslider > .faust-ui-component-vslider-flexdiv {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+}
+.faust-ui-component.faust-ui-component-vslider > .faust-ui-component-vslider-flexdiv > .faust-ui-component-vslider-canvasdiv {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+}
+.faust-ui-component.faust-ui-component-vslider > .faust-ui-component-vslider-flexdiv > .faust-ui-component-vslider-canvasdiv > canvas {
+  position: absolute;
+  display: block;
+  height: 100%;
+  width: 100%;
+  touch-action: none;
+}
+.faust-ui-component.faust-ui-component-vslider > .faust-ui-component-vslider-flexdiv input {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.25);
+  margin: 5px auto auto auto;
+  border-width: 0px;
+  border-radius: 4px;
+  height: 5%;
+  max-width: calc(100% - 8px);
+  padding: 2px 4px;
+  -moz-appearance: textfield;
+}
+.faust-ui-component.faust-ui-component-vslider > .faust-ui-component-vslider-flexdiv input::-webkit-inner-spin-button, .faust-ui-component.faust-ui-component-vslider > .faust-ui-component-vslider-flexdiv input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/*!**********************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/HSlider.scss ***!
+  \**********************************************************************************************************************/
+.faust-ui-component.faust-ui-component-hslider > .faust-ui-component-label {
+  flex: 0 0 auto;
+}
+.faust-ui-component.faust-ui-component-hslider > .faust-ui-component-hslider-flexdiv {
+  position: relative;
+  display: flex;
+  flex-direction: row-reverse;
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+}
+.faust-ui-component.faust-ui-component-hslider > .faust-ui-component-hslider-flexdiv > .faust-ui-component-hslider-canvasdiv {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  height: 100%;
+  margin: auto;
+}
+.faust-ui-component.faust-ui-component-hslider > .faust-ui-component-hslider-flexdiv > .faust-ui-component-hslider-canvasdiv > canvas {
+  position: absolute;
+  display: block;
+  height: 100%;
+  width: 100%;
+  touch-action: none;
+}
+.faust-ui-component.faust-ui-component-hslider > .faust-ui-component-hslider-flexdiv > input {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.25);
+  margin: auto 5px auto auto;
+  border-width: 0px;
+  border-radius: 4px;
+  width: calc(20% - 13px);
+  padding: 2px 4px;
+  -moz-appearance: textfield;
+}
+.faust-ui-component.faust-ui-component-hslider > .faust-ui-component-hslider-flexdiv > input::-webkit-inner-spin-button, .faust-ui-component.faust-ui-component-hslider > .faust-ui-component-hslider-flexdiv > input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/*!*********************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Nentry.scss ***!
+  \*********************************************************************************************************************/
+.faust-ui-component.faust-ui-component-nentry {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-nentry input {
+  margin: 0px;
+  text-align: center;
+  border-width: 1px;
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: calc(100% - 8px);
+}
+.faust-ui-component.faust-ui-component-nentry input::-webkit-inner-spin-button, .faust-ui-component.faust-ui-component-nentry input::-webkit-outer-spin-button {
+  opacity: 1;
+}
+/*!************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Soundfile.scss ***!
+  \************************************************************************************************************************/
+.faust-ui-component.faust-ui-component-soundfile > div {
+  display: flex;
+  position: relative;
+  cursor: pointer;
+  border-width: 1px;
+  text-align: center;
+  border-radius: 4px;
+  flex: 1 0 auto;
+  border-style: solid;
+}
+.faust-ui-component.faust-ui-component-soundfile > div > span {
+  user-select: none;
+  margin: auto;
+}
+/*!*********************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Button.scss ***!
+  \*********************************************************************************************************************/
+.faust-ui-component.faust-ui-component-button > div {
+  display: flex;
+  position: relative;
+  cursor: pointer;
+  border-width: 1px;
+  text-align: center;
+  border-radius: 4px;
+  flex: 1 0 auto;
+  border-style: solid;
+  touch-action: none;
+}
+.faust-ui-component.faust-ui-component-button > div > span {
+  user-select: none;
+  margin: auto;
+}
+/*!***********************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Checkbox.scss ***!
+  \***********************************************************************************************************************/
+.faust-ui-component.faust-ui-component-checkbox > div {
+  display: flex;
+  position: relative;
+  cursor: pointer;
+  border-width: 1px;
+  text-align: center;
+  border-radius: 1px;
+  flex: 1 0 auto;
+  border-style: solid;
+  touch-action: none;
+}
+.faust-ui-component.faust-ui-component-checkbox > div > span {
+  margin: auto;
+  user-select: none;
+}
+/*!*******************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Knob.scss ***!
+  \*******************************************************************************************************************/
+.faust-ui-component.faust-ui-component-knob {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-knob > canvas {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-height: 50%;
+  width: 100%;
+  touch-action: none;
+}
+.faust-ui-component.faust-ui-component-knob > input {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.25);
+  margin: 0px;
+  border-width: 0px;
+  border-radius: 4px;
+  max-width: calc(100% - 8px);
+  padding: 2px 4px;
+  -moz-appearance: textfield;
+}
+.faust-ui-component.faust-ui-component-knob > input::-webkit-inner-spin-button, .faust-ui-component.faust-ui-component-knob > input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/*!*******************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Menu.scss ***!
+  \*******************************************************************************************************************/
+.faust-ui-component.faust-ui-component-menu {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-menu > select {
+  margin: 0px;
+  text-align: center;
+  border-width: 1px;
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: calc(100% - 8px);
+}
+/*!********************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Radio.scss ***!
+  \********************************************************************************************************************/
+.faust-ui-component.faust-ui-component-radio {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-radio > .faust-ui-component-label {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+.faust-ui-component.faust-ui-component-radio > .faust-ui-component-radio-group {
+  flex: 0 1 auto;
+  margin-bottom: auto;
+  border-width: 1px;
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: calc(100% - 8px);
+  overflow: auto;
+}
+.faust-ui-component.faust-ui-component-radio > .faust-ui-component-radio-group > div {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+/*!******************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Led.scss ***!
+  \******************************************************************************************************************/
+.faust-ui-component.faust-ui-component-led {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-led > .faust-ui-component-label {
+  flex: 0 0 auto;
+}
+.faust-ui-component.faust-ui-component-led > .faust-ui-component-led-canvasdiv {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+}
+.faust-ui-component.faust-ui-component-led > .faust-ui-component-led-canvasdiv > canvas {
+  position: absolute;
+  display: block;
+  height: 100%;
+  width: 100%;
+  touch-action: none;
+}
+/*!************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Numerical.scss ***!
+  \************************************************************************************************************************/
+.faust-ui-component.faust-ui-component-numerical {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-numerical > input {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.25);
+  margin: auto;
+  border-width: 0px;
+  border-radius: 4px;
+  width: calc(100% - 8px);
+  padding: 2px 4px;
+}
+/*!************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/VBargraph.scss ***!
+  \************************************************************************************************************************/
+.faust-ui-component.faust-ui-component-vbargraph {
+  align-items: center;
+}
+.faust-ui-component.faust-ui-component-vbargraph > .faust-ui-component-label {
+  flex: 0 0 auto;
+}
+.faust-ui-component.faust-ui-component-vbargraph > .faust-ui-component-vbargraph-flexdiv {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  height: inherit;
+}
+.faust-ui-component.faust-ui-component-vbargraph > .faust-ui-component-vbargraph-flexdiv > .faust-ui-component-vbargraph-canvasdiv {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+}
+.faust-ui-component.faust-ui-component-vbargraph > .faust-ui-component-vbargraph-flexdiv > .faust-ui-component-vbargraph-canvasdiv > canvas {
+  position: absolute;
+  display: block;
+  height: 100%;
+  width: 100%;
+  touch-action: none;
+}
+.faust-ui-component.faust-ui-component-vbargraph > .faust-ui-component-vbargraph-flexdiv > input {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.25);
+  margin: 5px auto auto auto;
+  border-width: 0px;
+  border-radius: 4px;
+  height: 5%;
+  width: calc(100% - 8px);
+  padding: 2px 4px;
+}
+/*!************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/HBargraph.scss ***!
+  \************************************************************************************************************************/
+.faust-ui-component.faust-ui-component-hbargraph > .faust-ui-component-label {
+  flex: 0 0 auto;
+}
+.faust-ui-component.faust-ui-component-hbargraph > .faust-ui-component-hbargraph-flexdiv {
+  position: relative;
+  display: flex;
+  flex-direction: row-reverse;
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+}
+.faust-ui-component.faust-ui-component-hbargraph > .faust-ui-component-hbargraph-flexdiv > .faust-ui-component-hbargraph-canvasdiv {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  height: 100%;
+  margin: auto;
+}
+.faust-ui-component.faust-ui-component-hbargraph > .faust-ui-component-hbargraph-flexdiv > .faust-ui-component-hbargraph-canvasdiv > canvas {
+  position: absolute;
+  display: block;
+  height: 100%;
+  width: 100%;
+  touch-action: none;
+}
+.faust-ui-component.faust-ui-component-hbargraph > .faust-ui-component-hbargraph-flexdiv > input {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.25);
+  margin: auto 5px auto auto;
+  border-width: 0px;
+  border-radius: 4px;
+  width: calc(20% - 13px);
+  padding: 2px 4px;
+}
+/*!********************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/components/Group.scss ***!
+  \********************************************************************************************************************/
+.faust-ui-group {
+  position: absolute;
+  display: block;
+  background-color: rgba(80, 80, 80, 0.75);
+  border-radius: 4px;
+  border: 1px rgba(255, 255, 255, 0.25) solid;
+}
+.faust-ui-group > .faust-ui-group-label {
+  position: relative;
+  margin: 4px;
+  width: calc(100% - 8px);
+  user-select: none;
+}
+.faust-ui-group > .faust-ui-group-label > canvas {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+.faust-ui-group .faust-ui-tgroup-tabs {
+  position: absolute;
+  display: inline-block;
+  white-space: nowrap;
+  left: 0px;
+}
+.faust-ui-group .faust-ui-tgroup-tabs .faust-ui-tgroup-tab {
+  position: relative;
+  display: inline-block;
+  border-radius: 5px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+  margin: 10px;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+.faust-ui-group .faust-ui-tgroup-tabs .faust-ui-tgroup-tab:hover {
+  background-color: rgb(255, 255, 255);
+}
+.faust-ui-group .faust-ui-tgroup-tabs .faust-ui-tgroup-tab.active {
+  background-color: rgb(40, 40, 40);
+  color: white;
+}
+/*!*********************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/dist/cjs.js!./src/index.scss ***!
+  \*********************************************************************************************************/
+.faust-ui-root {
+  margin: 0px auto;
+  flex: 1 0 auto;
+  position: relative !important;
+  background-color: transparent !important;
+  border: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/*# sourceMappingURL=index.css.map*/

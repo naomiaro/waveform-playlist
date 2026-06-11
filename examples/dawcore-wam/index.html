@@ -210,6 +210,15 @@
   </div>
 
   <div class="section">
+    <h2>Faust effects (compiled with faust2wam, served from this repo)</h2>
+    <div class="controls">
+      <button class="faust-add" data-url="/faust-wams/lowpass/index.js">Lowpass</button>
+      <button class="faust-add" data-url="/faust-wams/reverb/index.js">Zita Reverb</button>
+      <button class="faust-add" data-url="/faust-wams/flanger/index.js">Flanger</button>
+    </div>
+  </div>
+
+  <div class="section">
     <h2>Synth track plugins</h2>
     <div class="rack" id="synth-rack"></div>
   </div>
@@ -373,6 +382,14 @@
       const url = urlInput.value.trim() || urlInput.placeholder;
       addWam(document.getElementById('target').value, url);
     });
+
+    // --- Bundled Faust effects (pre-compiled with faust2wam) ---
+    // Standard WAM 2.0 bundles — they go through the exact same addWamPlugin
+    // path as community plugins, zero special handling.
+    for (const btn of document.querySelectorAll('.faust-add')) {
+      btn.addEventListener('click', () =>
+        addWam(document.getElementById('target').value, new URL(btn.dataset.url, location.href).href));
+    }
 
     // --- Community library picker ---
     const libraryEl = document.getElementById('library');

@@ -1,0 +1,20 @@
+{
+    "identifier": "fr.grame.faust.zitareverb",
+    "name": "ZitaReverb",
+    "vendor": "Faust User",
+    "description": "Light version of the Zita feedback-delay-network reverb (stereo)",
+    "version": "1.0.0",
+    "apiVersion": "2.0.0",
+    "keywords": [],
+    "isInstrument": false,
+    "website": "",
+    "hasAudioInput": true,
+    "hasAudioOutput": true,
+    "hasMidiInput": true,
+    "hasMidiOutput": false,
+    "faustMeta": {
+        "poly": false,
+        "fft": false,
+        "effect": null
+    }
+}
