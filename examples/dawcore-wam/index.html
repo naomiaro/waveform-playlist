@@ -104,6 +104,18 @@
       font-size: 0.75rem;
       color: #888;
     }
+    .library-entry.inert {
+      cursor: default;
+      opacity: 0.45;
+    }
+    .library-entry.inert:hover { border-left-color: #333; }
+    .library-section {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-top: 8px;
+    }
     .rack {
       display: flex;
       flex-direction: column;
@@ -489,9 +501,23 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
         });
         if (warnings.length > 0) addLog('library: ' + warnings.length + ' entries skipped');
         libraryEl.textContent = '';
-        for (const entry of entries) {
+
+        // The community registry categorizes every entry (Effect, Modulation,
+        // Instrument, MIDI, Video). Instrument/MIDI/Video plugins have no
+        // audio input, so createWamInstance would reject them — render them
+        // dimmed and inert instead of letting every click fail. Entries with
+        // no category data (other registries) are assumed insertable; the
+        // URL input above loads anything directly as the escape hatch, and
+        // descriptor validation at load time remains the real gate.
+        const isInsertable = (entry) =>
+          !entry.category ||
+          entry.category.length === 0 ||
+          entry.category.includes('Effect') ||
+          entry.category.includes('Modulation');
+
+        const renderEntry = (entry, insertable) => {
           const row = document.createElement('div');
-          row.className = 'library-entry';
+          row.className = insertable ? 'library-entry' : 'library-entry inert';
           row.title = entry.description || entry.url;
 
           const name = document.createElement('span');
@@ -506,11 +532,23 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
             row.appendChild(vendor);
           }
 
-          // Instrument-only plugins are rejected at load time with a clear
-          // error (effect chains need audio in AND out) — shown in the log.
-          row.addEventListener('click', () =>
-            addWam(document.getElementById('target').value, entry.url));
+          if (insertable) {
+            row.addEventListener('click', () =>
+              addWam(document.getElementById('target').value, entry.url));
+          }
           libraryEl.appendChild(row);
+        };
+
+        const insertable = entries.filter(isInsertable);
+        const inert = entries.filter((entry) => !isInsertable(entry));
+        for (const entry of insertable) renderEntry(entry, true);
+        if (inert.length > 0) {
+          const header = document.createElement('div');
+          header.className = 'library-section';
+          header.textContent =
+            "instruments / midi / video — can't be inserted into an effects chain";
+          libraryEl.appendChild(header);
+          for (const entry of inert) renderEntry(entry, false);
         }
       } catch (err) {
         libraryEl.textContent = '';
