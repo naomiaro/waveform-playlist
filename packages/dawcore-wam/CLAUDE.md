@@ -17,6 +17,13 @@
 
 `ensureWamHost(audioContext)` — idempotent per context (WeakMap of in-flight promises; concurrent callers share one init), failure-evicting (retry re-inits). State guards: `closed` rejects; realtime contexts must be `running` (worklet load needs a post-gesture resume); **`OfflineAudioContext` is accepted while `'suspended'`** (detected via `'startRendering' in ctx`) — offline rendering inits the host *before* `startRendering()`, and a naive running-check would make offline WAM export (#426) impossible.
 
+## Plugin Loader (`src/loader.ts`)
+
+- `loadWamFactory(url, importFn?)` — dynamic `import(url)` → default export. Cached per URL (in-flight promise shared, failures evicted for retry). `importFn` is injectable for tests — never `vi.mock` dynamic URL imports.
+- `createWamInstance(url, ctx, hostGroupId, { initialState?, importFn? })` — load → `factory.createInstance(hostGroupId, ctx)` → **validate descriptor AFTER instantiation** (many plugins only expose it on the instance) → optional `setState(initialState)`. Validation or state failure destroys the instance before throwing.
+- **Effect-only validation**: `apiVersion` must be `2.x`; `hasAudioInput` AND `hasAudioOutput` required — instrument-only plugins are rejected with an explanatory error (MIDI/instrument hosting is out of epic scope).
+- Wrapper `WamPluginInstance` is headless (no GUI handling — that's the GUI issue) with idempotent `destroy()`. Types are structural (`WamFactory`, `WamPluginAudioNode`) rather than the SDK's alpha typings — keeps the public surface stable across SDK bumps.
+
 ## Reference Implementation
 
 wam-studio (local checkout at `~/Code/wam-studio`) — `public/src/Models/Plugin.ts` shows the full plugin lifecycle: `createInstance(hostGroupId, ctx)`, GUI/audio lifecycle split (`createGui`/`destroyGui` independent of `audioNode.destroy()`), and `cloneInto(offlineCtx, groupId)` for offline rendering via getState/setState transfer.
