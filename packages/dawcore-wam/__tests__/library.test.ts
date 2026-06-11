@@ -403,6 +403,46 @@ describe('fetchWamLibrary — optional fields', () => {
     expect(entries[0].category).toBeUndefined();
   });
 
+  it('trims category strings in both bare-string and array forms', async () => {
+    const fetchFn = makeFetchFn([
+      {
+        name: 'Reverb',
+        url: 'https://plugins.example.com/reverb/index.js',
+        category: '  Effect  ',
+      },
+      {
+        name: 'Delay',
+        url: 'https://plugins.example.com/delay/index.js',
+        category: ['  Effect ', 'Delay'],
+      },
+    ]);
+
+    const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
+
+    expect(entries[0].category).toEqual(['Effect']);
+    expect(entries[1].category).toEqual(['Effect', 'Delay']);
+  });
+
+  it('drops empty and whitespace-only strings from category arrays', async () => {
+    const fetchFn = makeFetchFn([
+      {
+        name: 'Reverb',
+        url: 'https://plugins.example.com/reverb/index.js',
+        category: ['', '  ', 'Effect'],
+      },
+      {
+        name: 'Delay',
+        url: 'https://plugins.example.com/delay/index.js',
+        category: ['', '  '],
+      },
+    ]);
+
+    const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
+
+    expect(entries[0].category).toEqual(['Effect']);
+    expect(entries[1].category).toBeUndefined();
+  });
+
   it('omits a bare empty-string category', async () => {
     const fetchFn = makeFetchFn([
       {

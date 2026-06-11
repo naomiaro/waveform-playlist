@@ -21,7 +21,11 @@ export interface WamLibraryEntry {
   /** Absolute URL of a screenshot/thumbnail (resolved against the manifest URL). */
   thumbnail?: string;
   keywords?: string[];
-  /** Registry categories (e.g. "Effect", "Instrument", "MIDI"). Normalized to an array. */
+  /**
+   * Registry categories (e.g. "Effect", "Instrument", "MIDI"). When present,
+   * guaranteed a non-empty array of trimmed, non-empty strings — consumers
+   * don't need empty-array or whitespace defenses.
+   */
   category?: string[];
 }
 
@@ -239,12 +243,15 @@ function parseObjectEntry(
     entry.keywords = raw.keywords.filter((k): k is string => typeof k === 'string');
   }
   if (Array.isArray(raw.category)) {
-    const category = raw.category.filter((c): c is string => typeof c === 'string');
+    const category = raw.category
+      .filter((c): c is string => typeof c === 'string')
+      .map((c) => c.trim())
+      .filter((c) => c !== '');
     if (category.length > 0) {
       entry.category = category;
     }
   } else if (typeof raw.category === 'string' && raw.category.trim() !== '') {
-    entry.category = [raw.category];
+    entry.category = [raw.category.trim()];
   }
   return { entry };
 }

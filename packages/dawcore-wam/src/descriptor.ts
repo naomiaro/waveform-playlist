@@ -1,15 +1,21 @@
 // WamManifestFetch is the package's shared structural fetch boundary
-// ((url) => Promise of an ok/status/json view) — same injectable shape as
-// fetchWamLibrary, deliberately reused rather than redefined.
+// (a (url) => Promise of a structural Response view) — same injectable shape
+// as fetchWamLibrary, deliberately reused rather than redefined.
 import { defaultFetch, type WamManifestFetch } from './library';
 
-/** Capability flags from a plugin's static `descriptor.json`. Fields present only when the file provides them as booleans. */
+/**
+ * Capability flags from a plugin's static `descriptor.json`. Fields present
+ * only when the file provides them as booleans. An absent flag means the
+ * file omitted it, NOT that the capability is missing — the WAM SDK defaults
+ * `hasAudioInput`/`hasAudioOutput` to `true` at runtime, so gate on explicit
+ * denial (`!== false`), never on presence (`=== true`).
+ */
 export interface WamDescriptorInfo {
-  hasAudioInput?: boolean;
-  hasAudioOutput?: boolean;
-  hasMidiInput?: boolean;
-  hasMidiOutput?: boolean;
-  isInstrument?: boolean;
+  readonly hasAudioInput?: boolean;
+  readonly hasAudioOutput?: boolean;
+  readonly hasMidiInput?: boolean;
+  readonly hasMidiOutput?: boolean;
+  readonly isInstrument?: boolean;
 }
 
 export interface FetchWamDescriptorOptions {
@@ -22,10 +28,12 @@ export interface FetchWamDescriptorOptions {
  *
  * Returns the descriptor's capability flags, or `null` when the plugin ships
  * no readable descriptor (unreachable, non-OK response, invalid JSON,
- * non-object payload, or an unresolvable plugin URL). Absence is an expected,
- * non-error state for many registries — callers fall back to other signals
- * (e.g. manifest `category`). Authoritative validation still happens at load
- * time in `createWamInstance`.
+ * non-object payload — including arrays — or an unresolvable plugin URL).
+ * Absence is an expected, non-error state for many registries — callers fall
+ * back to other signals (e.g. manifest `category`). A descriptor that
+ * declares no boolean flags resolves to `{}`, distinct from `null`: the
+ * descriptor exists but defers entirely to the SDK's runtime defaults.
+ * Authoritative validation still happens at load time in `createWamInstance`.
  */
 export async function fetchWamDescriptor(
   pluginUrl: string,
@@ -67,24 +75,13 @@ export async function fetchWamDescriptor(
   }
 
   // Extract boolean flags from the payload; only include fields whose value is strictly boolean
-  const result: WamDescriptorInfo = {};
   const record = payload as Record<string, unknown>;
 
-  if (typeof record.hasAudioInput === 'boolean') {
-    result.hasAudioInput = record.hasAudioInput;
-  }
-  if (typeof record.hasAudioOutput === 'boolean') {
-    result.hasAudioOutput = record.hasAudioOutput;
-  }
-  if (typeof record.hasMidiInput === 'boolean') {
-    result.hasMidiInput = record.hasMidiInput;
-  }
-  if (typeof record.hasMidiOutput === 'boolean') {
-    result.hasMidiOutput = record.hasMidiOutput;
-  }
-  if (typeof record.isInstrument === 'boolean') {
-    result.isInstrument = record.isInstrument;
-  }
-
-  return result;
+  return {
+    ...(typeof record.hasAudioInput === 'boolean' && { hasAudioInput: record.hasAudioInput }),
+    ...(typeof record.hasAudioOutput === 'boolean' && { hasAudioOutput: record.hasAudioOutput }),
+    ...(typeof record.hasMidiInput === 'boolean' && { hasMidiInput: record.hasMidiInput }),
+    ...(typeof record.hasMidiOutput === 'boolean' && { hasMidiOutput: record.hasMidiOutput }),
+    ...(typeof record.isInstrument === 'boolean' && { isInstrument: record.isInstrument }),
+  };
 }

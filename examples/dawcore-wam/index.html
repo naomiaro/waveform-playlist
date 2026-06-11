@@ -505,21 +505,28 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
         // to their module with the real audio-I/O flags. The registry's
         // category metadata misclassifies some entries (e.g. "Audio Input"
         // is tagged Effect but has no audio input), so probe descriptors in
-        // parallel and partition on hasAudioInput && hasAudioOutput. A null
-        // descriptor is expected for registries without the SDK convention —
-        // those entries fall back to the category heuristic. The URL input
+        // parallel and mark a plugin uninsertable only when a flag is
+        // EXPLICITLY false — the SDK defaults absent flags to true at
+        // runtime, so this mirrors what createWamInstance will decide. A
+        // null descriptor is expected for registries without the SDK
+        // convention — those entries fall back to the category heuristic
+        // (category, when present, is a non-empty array). The URL input
         // above loads anything directly as the escape hatch, and
         // createWamInstance's validation remains the real gate.
         const descriptors = await Promise.all(
           entries.map((entry) => fetchWamDescriptor(entry.url)));
         libraryEl.textContent = '';
 
+        const probeMisses = descriptors.filter((descriptor) => descriptor === null).length;
+        if (probeMisses > 0)
+          addLog('library: no descriptor for ' + probeMisses + ' of ' + entries.length +
+            ' entries (category fallback)');
+
         const isInsertable = (entry, descriptor) => {
           if (descriptor) {
-            return descriptor.hasAudioInput === true && descriptor.hasAudioOutput === true;
+            return descriptor.hasAudioInput !== false && descriptor.hasAudioOutput !== false;
           }
           return !entry.category ||
-            entry.category.length === 0 ||
             entry.category.includes('Effect') ||
             entry.category.includes('Modulation');
         };

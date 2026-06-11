@@ -65,6 +65,27 @@ describe('fetchWamDescriptor — URL resolution', () => {
     expect(result).toBeNull();
     expect(fetchFn).not.toHaveBeenCalled();
   });
+
+  it('resolves inside a directory-style plugin URL with a trailing slash', async () => {
+    const fetchFn = makeFetchFn({});
+
+    await fetchWamDescriptor('https://plugins.example.com/coll/reverb/', { fetchFn });
+
+    expect(fetchFn).toHaveBeenCalledWith('https://plugins.example.com/coll/reverb/descriptor.json');
+  });
+
+  // Documented URL-spec behavior, not a feature: without a trailing slash the
+  // last segment is treated as a file, so the probe hits the PARENT directory
+  // and may find a different plugin's descriptor. Registries list module
+  // files (".../index.js"), where resolution is correct — this test pins the
+  // contract for directory-style URLs so a change in behavior is deliberate.
+  it('resolves against the parent directory when a bare URL has no trailing slash', async () => {
+    const fetchFn = makeFetchFn({});
+
+    await fetchWamDescriptor('https://plugins.example.com/coll/reverb', { fetchFn });
+
+    expect(fetchFn).toHaveBeenCalledWith('https://plugins.example.com/coll/descriptor.json');
+  });
 });
 
 describe('fetchWamDescriptor — boolean flags', () => {
