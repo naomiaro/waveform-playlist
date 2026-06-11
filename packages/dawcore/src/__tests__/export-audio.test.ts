@@ -272,6 +272,36 @@ describe('exportAudioImpl', () => {
     expect(destroy).toHaveBeenCalledTimes(1);
   });
 
+  it('destroys already-created plugins when a later chain entry fails to build', async () => {
+    const destroyA = vi.fn();
+    const destroyB = vi.fn();
+    createWamInstance
+      .mockResolvedValueOnce({
+        url: 'https://x/a.js',
+        descriptor: { name: 'A' },
+        audioNode: mockNode(),
+        destroy: destroyA,
+      })
+      .mockResolvedValueOnce({
+        url: 'https://x/b.js',
+        descriptor: { name: 'B' },
+        audioNode: mockNode(),
+        destroy: destroyB,
+      })
+      .mockRejectedValueOnce(new Error('third plugin unreachable'));
+    const master: SerializedEffectEntry[] = [
+      { kind: 'wam', url: 'https://x/a.js', bypassed: false },
+      { kind: 'wam', url: 'https://x/b.js', bypassed: false },
+      { kind: 'wam', url: 'https://x/c.js', bypassed: false },
+    ];
+    const host = makeHost({ getMasterEffectsState: vi.fn(async () => master) });
+
+    await expect(exportAudioImpl(host)).rejects.toThrow('third plugin unreachable');
+
+    expect(destroyA).toHaveBeenCalledTimes(1);
+    expect(destroyB).toHaveBeenCalledTimes(1);
+  });
+
   it('skips bypassed WAM entries without instantiating them', async () => {
     const host = makeHost({
       getMasterEffectsState: vi.fn(

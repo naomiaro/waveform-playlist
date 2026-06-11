@@ -177,48 +177,61 @@ async function buildOfflineChain(
   const input = ctx.createGain();
   const output = ctx.createGain();
   const cleanups: Array<() => void> = [];
+  const dispose = (): void => {
+    for (const cleanup of cleanups) {
+      try {
+        cleanup();
+      } catch (err) {
+        console.warn(PREFIX + 'exportAudio: chain cleanup error: ' + String(err));
+      }
+    }
+  };
   let previous: AudioNode = input;
 
-  for (const entry of entries) {
-    if (entry.kind === 'native') {
-      const created = createEffectInstance(entry.type, ctx, entry.params);
-      if (entry.bypassed) {
-        if (!created.wetParam) {
-          created.instance.dispose?.();
-          continue; // disconnect-style bypass: out of the series
-        }
-        created.instance.applyParams({ [created.wetParam]: 0 });
-      }
-      if (created.instance.dispose) {
-        cleanups.push(created.instance.dispose);
-      }
-      previous.connect(created.instance.input);
-      previous = created.instance.output;
-      continue;
-    }
-
-    // kind 'wam'
-    if (entry.bypassed) {
-      continue; // disconnection bypass — also covers restore placeholders
-    }
-    const wamModule = await import('@dawcore/wam');
-    const { hostGroupId } = await wamModule.ensureWamHost(ctx);
-    const plugin = await wamModule.createWamInstance(entry.url, ctx, hostGroupId, {
-      initialState: entry.state,
-    });
-    cleanups.push(() => plugin.destroy());
-    previous.connect(plugin.audioNode);
-    previous = plugin.audioNode;
+  try {
+    await wireEntries();
+  } catch (err) {
+    // A failure partway through must not leak the plugin worklets already
+    // created for this chain — the caller never gets a dispose handle for a
+    // chain that threw.
+    dispose();
+    throw err;
   }
 
   previous.connect(output);
-  return {
-    input,
-    output,
-    dispose: () => {
-      for (const cleanup of cleanups) {
-        cleanup();
+  return { input, output, dispose };
+
+  async function wireEntries(): Promise<void> {
+    for (const entry of entries) {
+      if (entry.kind === 'native') {
+        const created = createEffectInstance(entry.type, ctx, entry.params);
+        if (entry.bypassed) {
+          if (!created.wetParam) {
+            created.instance.dispose?.();
+            continue; // disconnect-style bypass: out of the series
+          }
+          created.instance.applyParams({ [created.wetParam]: 0 });
+        }
+        if (created.instance.dispose) {
+          cleanups.push(created.instance.dispose);
+        }
+        previous.connect(created.instance.input);
+        previous = created.instance.output;
+        continue;
       }
-    },
-  };
+
+      // kind 'wam'
+      if (entry.bypassed) {
+        continue; // disconnection bypass — also covers restore placeholders
+      }
+      const wamModule = await import('@dawcore/wam');
+      const { hostGroupId } = await wamModule.ensureWamHost(ctx);
+      const plugin = await wamModule.createWamInstance(entry.url, ctx, hostGroupId, {
+        initialState: entry.state,
+      });
+      cleanups.push(() => plugin.destroy());
+      previous.connect(plugin.audioNode);
+      previous = plugin.audioNode;
+    }
+  }
 }
