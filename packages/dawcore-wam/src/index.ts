@@ -25,3 +25,10 @@ export type {
   WamManifestResponse,
   FetchWamLibraryOptions,
 } from './library';
+export { createWamTransportBridge } from './transport-bridge';
+export type {
+  WamTransportData,
+  WamTransportNode,
+  WamTransportBridge,
+  TransportQueryLike,
+} from './transport-bridge';

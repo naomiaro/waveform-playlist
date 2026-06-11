@@ -28,6 +28,7 @@ export interface TransportEvents {
   pause: () => void;
   stop: () => void;
   loop: () => void;
+  seek: (event: { seconds: number }) => void;
   tempochange: (event: TempoChangeEventData) => void;
   meterchange: (event: MeterChangeEventData) => void;
   countIn: (event: CountInEventData) => void;
@@ -241,6 +242,7 @@ export class Transport {
       this._clipPlayer.onPositionJump(seekTick);
       this._timer.start();
     }
+    this._emit('seek', { seconds: time });
   }
 
   getCurrentTime(): number {

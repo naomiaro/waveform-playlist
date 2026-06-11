@@ -53,6 +53,9 @@ export class EffectsManager {
   private _guis = new Map<string, GuiRecord>();
   /** In-flight GUI creation by effectId — concurrent opens share one build. */
   private _guiPending = new Map<string, Promise<GuiRecord>>();
+  /** Live WAM plugin nodes across all chains, fed to the wam-transport bridge. */
+  private _wamNodes = new Set<import('@dawcore/wam').WamTransportNode>();
+  private _transportBridge: { notifyNodeAdded(node: unknown): void; dispose(): void } | null = null;
 
   constructor(getAdapter: () => AdapterLike | null, masterEventTarget: EventTarget) {
     this._getAdapter = getAdapter;
@@ -199,6 +202,9 @@ export class EffectsManager {
   }
 
   disposeAll(): void {
+    this._transportBridge?.dispose();
+    this._transportBridge = null;
+    this._wamNodes.clear();
     for (const trackId of [...this._trackChains.keys()]) {
       this.disposeTrackChain(trackId);
     }
@@ -507,7 +513,10 @@ export class EffectsManager {
               console.warn(PREFIX + 'WAM setParameterValues failed: ' + String(err));
             });
           },
-          dispose: () => plugin.destroy(),
+          dispose: () => {
+            this._wamNodes.delete(node);
+            plugin.destroy();
+          },
           getState: () => plugin.getState(),
           getParameterInfo: () => plugin.getParameterInfo(),
           ...(plugin.createGui ? { createGui: () => plugin.createGui!() } : {}),
@@ -529,6 +538,8 @@ export class EffectsManager {
       }
       throw err;
     }
+    this._wamNodes.add(node);
+    this._ensureTransportBridge(wamModule)?.notifyNodeAdded(node);
     const index = chain.entries.findIndex((e) => e.id === effectId);
     this._dispatch(target, 'daw-effect-add', {
       effectId,
@@ -539,6 +550,34 @@ export class EffectsManager {
       index,
     });
     return effectId;
+  }
+
+  /**
+   * Lazily create the wam-transport bridge so tempo-synced plugins lock to
+   * the timeline. Skipped (not an error) when the adapter's transport lacks
+   * the query/event surface — the bridge is an enhancement, not a
+   * requirement for audio processing.
+   */
+  private _ensureTransportBridge(
+    wamModule: typeof import('@dawcore/wam')
+  ): { notifyNodeAdded(node: unknown): void; dispose(): void } | null {
+    if (this._transportBridge) return this._transportBridge;
+    if (typeof wamModule.createWamTransportBridge !== 'function') return null;
+    const transport = this._getAdapter()?.transport as
+      | (EffectsTransportLike & import('@dawcore/wam').TransportQueryLike)
+      | undefined;
+    if (
+      !transport ||
+      typeof transport.on !== 'function' ||
+      typeof transport.getTempo !== 'function' ||
+      typeof transport.tickToBar !== 'function'
+    ) {
+      return null;
+    }
+    this._transportBridge = wamModule.createWamTransportBridge(transport, () => [
+      ...this._wamNodes,
+    ]);
+    return this._transportBridge;
   }
 
   /**
