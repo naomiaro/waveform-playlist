@@ -91,7 +91,7 @@ Faust-generated plugins are well-behaved WAM citizens; quirks observed (none nee
 - The GUI element sizes itself from faust-ui's computed `minWidth`/`minHeight` (inline styles, scrollable container) — it lays out fine in a normal document flow without a fixed-size plugin window.
 - Parameter names/addresses derive from the DSP source (`declare name` + control labels), and the descriptor identifier becomes `fr.grame.faust.<name>` with vendor `Faust User`.
 
-Dynamic in-browser compilation (paste Faust code, get a live plugin — faust2wam also ships as a browser library) is tracked separately in [#430](https://github.com/naomiaro/waveform-playlist/issues/430).
+**No build step at all?** [`@dawcore/faust`](../dawcore-faust) compiles Faust DSP source **in the browser** — paste code, get a live plugin. `<daw-track>.addFaustEffect(dspCode)` uses it (optional peer dep, ~2.5 MB gzipped compiler loaded on first use only) and instantiates the result through this package's `createWamInstanceFromFactory`.
 
 ## Standalone Usage
 
@@ -140,6 +140,19 @@ const { entries, warnings } = await fetchWamLibrary(
 ```
 
 An entry's `url` feeds straight into `createWamInstance(url, ...)`. Descriptor validation still happens at load time — manifests can lie.
+
+**Factories without URLs** — when you already hold a WebAudioModule class (e.g. one generated in-browser by [`@dawcore/faust`](../dawcore-faust)), instantiate it through the same validate/wrap pipeline with `createWamInstanceFromFactory`:
+
+```typescript
+import { createWamInstanceFromFactory } from '@dawcore/wam';
+
+const plugin = await createWamInstanceFromFactory(WamClass, audioContext, hostGroupId, {
+  initialState: savedState, // optional
+  label: 'My Lowpass', // names the plugin in validation errors
+});
+```
+
+The resulting instance has no `url`, so it cannot be cloned via `cloneInstanceInto` — re-create it from its original source (for Faust entries, recompile the DSP) on the target context instead.
 
 #### Supported manifest schema
 

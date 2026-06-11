@@ -281,7 +281,7 @@ When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, com
 **Structure:**
 - `examples/dawcore-native/` — Web components + NativePlayoutAdapter (moved from `packages/dawcore/dev/`)
 - `examples/dawcore-tone/` — Web components + TonePlayoutAdapter (Tone.js backend)
-- `examples/dawcore-wam/` — WAM 2.0 plugins end-to-end: community-library picker, GUIs, localStorage persistence, WAV export. `@dawcore/wam` is source-aliased (pure TS, no Lit decorators), which also resolves dawcore's dynamic `import('@dawcore/wam')`
+- `examples/dawcore-wam/` — WAM 2.0 plugins end-to-end: community-library picker, GUIs, localStorage persistence, WAV export, plus in-browser Faust compilation (textarea → `addFaustEffect`). `@dawcore/wam` and `@dawcore/faust` are source-aliased (pure TS, no Lit decorators), which also resolves dawcore's dynamic imports of both
 
 ### ESLint Baseline
 
@@ -349,6 +349,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 - `packages/dawcore/CLAUDE.md` — Lit Web Components, native AudioContext (no Tone.js), element types, CSS theming
 - `packages/transport/CLAUDE.md` — Native Web Audio transport, scheduler, clock, MeterMap, PlayoutAdapter bridge
 - `packages/dawcore-wam/CLAUDE.md` — WAM 2.0 plugin hosting, host init, SDK pinning, wam-studio reference
+- `packages/dawcore-faust/CLAUDE.md` — In-browser Faust DSP → WAM compilation, faust2wam API facts, lazy compiler loading
 - `website/CLAUDE.md` — Docusaurus site, CSS pitfalls, custom pages
 
 ---

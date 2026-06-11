@@ -201,7 +201,7 @@ localStorage.setItem('master-fx', JSON.stringify(saved));
 await editor.setEffectsState(JSON.parse(localStorage.getItem('master-fx')));
 ```
 
-WAM entries carry the plugin's own `getState()` snapshot, reapplied on restore. If a saved plugin URL is unreachable, the restore **continues**: the entry becomes a bypassed passthrough placeholder at its saved position (a `daw-effect-error` event fires with `{effectId, url, message}`), and its saved state is retained so re-serializing round-trips it for a later retry.
+WAM entries carry the plugin's own `getState()` snapshot, reapplied on restore. Faust entries (added with `addFaustEffect`) persist their DSP source instead of a URL — `{ kind: 'wam', faustDsp, faustName, bypassed, state }` — and are recompiled in the browser on restore. If a saved plugin URL is unreachable (or a saved Faust source no longer compiles), the restore **continues**: the entry becomes a bypassed passthrough placeholder at its saved position (a `daw-effect-error` event fires with `{effectId, url?, source?, message}`), and its saved state is retained so re-serializing round-trips it for a later retry.
 
 ## Transport Access
 
@@ -260,6 +260,23 @@ const wamId = await track.addWamPlugin('https://www.webaudiomodules.com/communit
 
 See `examples/dawcore-native/effects.html` for a native-effects demo and `examples/dawcore-wam/` (`pnpm example:dawcore-wam`) for the end-to-end WAM demo: URL paste, community-library picker (`fetchWamLibrary`), GUIs, persistence with reload, and WAV export.
 
+### Faust Effects (compiled in the browser)
+
+Write custom DSP in [Faust](https://faust.grame.fr/) and hear it instantly — `addFaustEffect(dspCode, options?)` compiles the source **in the browser** via the optional `@dawcore/faust` peer (`npm install @dawcore/faust @dawcore/wam`) and adds the result to the chain as an ordinary WAM entry:
+
+```javascript
+// Track chains are stereo — duplicate mono filters across both channels.
+const effectId = await track.addFaustEffect(
+  `import("stdfaust.lib");
+   cutoff = hslider("cutoff", 1000, 20, 20000, 1);
+   process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);`,
+  { name: 'My Lowpass' }
+);
+// Every hslider/vslider/checkbox becomes a WAM parameter + a GUI control.
+```
+
+The Faust compiler (~2.5 MB gzipped WASM) loads lazily on the first call — consumers who never compile Faust load zero compiler bytes. Compile errors keep Faust's line/column diagnostics and leave the chain untouched. Faust entries persist as their DSP source (`{ kind: 'wam', faustDsp, faustName, state }` — no URL) and are **recompiled** on `setEffectsState` restore and offline export. See the "Faust (compile in browser)" section of `examples/dawcore-wam/`.
+
 ### Effect GUIs
 
 `openEffectGui(effectId, container)` / `closeEffectGui(effectId)` on both elements mount an effect's GUI into a container **you** provide (your own panel, drawer, floating window — dawcore ships no plugin-window UI):
@@ -284,7 +301,7 @@ const buffer = await editor.exportAudio();
 const intro = await editor.exportAudio({ startTime: 0, duration: 8, channels: 2 });
 ```
 
-Chains rebuild from their persisted form: `native-*` effects via the registry, WAM plugins re-instantiated on the offline context with their saved state (worklets are bound to one context). Bypass behavior matches live playback; all offline plugin instances are destroyed after rendering.
+Chains rebuild from their persisted form: `native-*` effects via the registry, WAM plugins re-instantiated on the offline context with their saved state (worklets are bound to one context), and Faust entries recompiled from their persisted DSP source. Bypass behavior matches live playback; all offline plugin instances are destroyed after rendering.
 
 ## Programmatic File Loading
 

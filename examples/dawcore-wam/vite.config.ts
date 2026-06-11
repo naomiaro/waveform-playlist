@@ -33,10 +33,16 @@ export default defineConfig({
         repoRoot,
         'packages/dawcore-wam/src/index.ts',
       ),
+      '@dawcore/faust': path.resolve(
+        repoRoot,
+        'packages/dawcore-faust/src/index.ts',
+      ),
     },
   },
   optimizeDeps: {
-    exclude: ['tone'],
+    // @shren/faust2wam is a single ~8MB ESM bundle (libfaust WASM inlined) —
+    // it is dynamically imported on first compile and needs no prebundling.
+    exclude: ['tone', '@shren/faust2wam'],
   },
   server: {
     port: 5175,

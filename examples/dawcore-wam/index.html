@@ -168,6 +168,48 @@
       max-height: 160px;
       overflow-y: auto;
     }
+    details summary {
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #c49a6c;
+      margin-bottom: 10px;
+    }
+    #faust-dsp {
+      display: block;
+      width: 100%;
+      max-width: 720px;
+      min-height: 96px;
+      box-sizing: border-box;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid #555;
+      padding: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+      resize: vertical;
+    }
+    input[type="text"] {
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid #555;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    #faust-error {
+      display: none;
+      max-width: 720px;
+      background: #1a1a2e;
+      border-left: 3px solid #d08070;
+      color: #d08070;
+      padding: 8px 12px;
+      margin-top: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      white-space: pre-wrap;
+    }
+    #faust-error.visible { display: block; }
   </style>
 </head>
 <body>
@@ -216,6 +258,22 @@
       <button class="faust-add" data-url="/faust-wams/reverb/index.js">Zita Reverb</button>
       <button class="faust-add" data-url="/faust-wams/flanger/index.js">Flanger</button>
     </div>
+  </div>
+
+  <div class="section">
+    <h2>Faust (compile in browser)</h2>
+    <details>
+      <summary>Write Faust DSP, compile it in the browser, add it to the selected target</summary>
+      <textarea id="faust-dsp" spellcheck="false">import("stdfaust.lib");
+cutoff = hslider("cutoff", 1000, 20, 20000, 1);
+process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
+      <div class="controls">
+        <label for="faust-name">name</label>
+        <input id="faust-name" type="text" value="My Lowpass" />
+        <button id="faust-compile">Compile &amp; Add</button>
+      </div>
+      <div id="faust-error"></div>
+    </details>
   </div>
 
   <div class="section">
@@ -390,6 +448,36 @@
       btn.addEventListener('click', () =>
         addWam(document.getElementById('target').value, new URL(btn.dataset.url, location.href).href));
     }
+
+    // --- Faust compiled in the browser (dynamic mode) ---
+    // addFaustEffect dynamically imports @dawcore/faust (which loads the
+    // Faust compiler WASM) on first use — nothing Faust-related is in the
+    // page's initial bundle. Compile errors carry Faust's line/column
+    // diagnostics and leave the chain untouched.
+    const faustCompileBtn = document.getElementById('faust-compile');
+    const faustErrorEl = document.getElementById('faust-error');
+    faustCompileBtn.addEventListener('click', async () => {
+      const dsp = document.getElementById('faust-dsp').value;
+      const name = document.getElementById('faust-name').value.trim() || undefined;
+      const { target } = chains[document.getElementById('target').value];
+      faustErrorEl.classList.remove('visible');
+      faustErrorEl.textContent = '';
+      faustCompileBtn.disabled = true;
+      faustCompileBtn.textContent = 'Compiling…';
+      try {
+        // WAM host init needs a running context — this click is the gesture.
+        await audioCtx.resume();
+        await target.addFaustEffect(dsp, { name });
+        addLog('faust compiled: ' + (name || 'FaustDSP'));
+      } catch (err) {
+        faustErrorEl.textContent = err && err.message ? err.message : String(err);
+        faustErrorEl.classList.add('visible');
+        addLog('faust compile failed');
+      } finally {
+        faustCompileBtn.disabled = false;
+        faustCompileBtn.textContent = 'Compile & Add';
+      }
+    });
 
     // --- Community library picker ---
     const libraryEl = document.getElementById('library');
