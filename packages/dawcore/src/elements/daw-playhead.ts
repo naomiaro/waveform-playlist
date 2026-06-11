@@ -34,6 +34,15 @@ export class DawPlayheadElement extends LitElement {
     this._line = this.shadowRoot!.querySelector('div');
   }
 
+  /** Position the playhead line at an absolute pixel offset on the timeline.
+   *  The editor's PlaybackAnimationController drives this each frame — the
+   *  playhead owns no animation loop or time math of its own. */
+  setPosition(px: number) {
+    if (this._line) {
+      this._line.style.transform = `translate3d(${px}px, 0, 0)`;
+    }
+  }
+
   startAnimation(getTime: () => number, sampleRate: number, samplesPerPixel: number) {
     this._animation.start(() => {
       const time = getTime();
