@@ -114,7 +114,18 @@ export async function createWamInstance(
       await wam.audioNode.setState(options.initialState);
     }
   } catch (err) {
-    wam.audioNode.destroy();
+    try {
+      wam.audioNode.destroy();
+    } catch (destroyErr) {
+      // Never let teardown failure mask the original validation/state error.
+      console.warn(
+        PREFIX +
+          'createWamInstance: cleanup after failure also failed for "' +
+          url +
+          '": ' +
+          String(destroyErr)
+      );
+    }
     throw err;
   }
 

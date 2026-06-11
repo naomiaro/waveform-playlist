@@ -75,6 +75,34 @@ describe('loadWamFactory', () => {
     expect(second).toBe(first);
   });
 
+  it('concurrent loads share one in-flight import', async () => {
+    const { WamClass } = makeWamClass();
+    const importFn = makeImportFn({ default: WamClass });
+
+    const [a, b] = await Promise.all([
+      loadWamFactory(URL_A, importFn),
+      loadWamFactory(URL_A, importFn),
+    ]);
+
+    expect(importFn).toHaveBeenCalledTimes(1);
+    expect(b).toBe(a);
+  });
+
+  it('a failing destroy during cleanup does not mask the validation error', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { WamClass, audioNode } = makeWamClass({ hasAudioInput: false });
+    audioNode.destroy.mockImplementation(() => {
+      throw new Error('teardown exploded');
+    });
+    const importFn = makeImportFn({ default: WamClass });
+
+    await expect(createWamInstance(URL_A, ctx, 'group-1', { importFn })).rejects.toThrow(
+      /audio input/i
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('teardown exploded'));
+    warn.mockRestore();
+  });
+
   it('evicts a failed load so a retry re-imports', async () => {
     const { WamClass } = makeWamClass();
     const importFn = vi
