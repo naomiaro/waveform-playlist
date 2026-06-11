@@ -409,4 +409,11 @@ describe('TempoMap.entryCount', () => {
     map.setTempo(90);
     expect(map.entryCount).toBe(1);
   });
+
+  it('decrements when an entry is removed', () => {
+    const map = new TempoMap();
+    map.setTempo(140, 960 as Tick);
+    map.removeTempo(960 as Tick);
+    expect(map.entryCount).toBe(1);
+  });
 });

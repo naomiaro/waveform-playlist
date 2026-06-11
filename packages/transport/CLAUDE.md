@@ -42,7 +42,7 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 `TempoInterpolation` type: `'step'` (instant, default), `'linear'` (exact logarithmic integral, exponential inverse), `{ type: 'curve', slope }` (Möbius-Ease, slope 0-1 exclusive, subdivided trapezoidal + binary search inverse). `setTempo(bpm, atTick, { interpolation })` third param is optional for backwards compat. First entry is always `'step'` (no previous to ramp from). `_recomputeCache` accounts for interpolation type per segment.
 
-**Multi-entry guard (#407):** `Transport.setTempo(bpm)` with a defaulted `atTick` warns and refuses when the TempoMap has more than one entry — a defaulted call is the single-BPM convenience path and must not clobber a consumer-installed tempo curve's tick-0 entry. Pass an explicit `atTick: 0 as Tick` to genuinely modify a multi-entry map. `TempoMap.entryCount` (always >= 1) backs the check.
+**Multi-entry guard (#407):** `Transport.setTempo(bpm)` with a defaulted `atTick` warns and refuses when the TempoMap has more than one entry — a defaulted call is the single-BPM convenience path and must not clobber a consumer-installed tempo curve's tick-0 entry. Pass an explicit `atTick: 0 as Tick` to genuinely modify a multi-entry map. `TempoMap.entryCount` (always >= 1) backs the check. `setTempo` returns `boolean` (applied/refused); `NativePlayoutAdapter.setTempo` propagates it so `PlaylistEngine` only commits `_bpm` on acceptance — never widen these back to `void`.
 
 ## Timeline Layer
 

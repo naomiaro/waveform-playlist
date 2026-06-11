@@ -608,8 +608,12 @@ export class PlaylistEngine {
       return;
     }
     if (bpm === this._bpm && atTick === undefined) return;
+    // Commit only when the adapter accepts (an explicit `false` means refused,
+    // e.g. the transport's multi-entry tempo-map guard — #407). Void-returning
+    // and absent adapters count as accepted.
+    const accepted = this._adapter?.setTempo?.(bpm, atTick);
+    if (accepted === false) return;
     this._bpm = bpm;
-    this._adapter?.setTempo?.(bpm, atTick);
     this._recomputeStartSamples();
     this._emitStateChange();
   }

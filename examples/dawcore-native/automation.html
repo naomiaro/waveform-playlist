@@ -215,7 +215,9 @@
       transport.stop();
       transport.clearTempos();
 
-      // First point sets the base tempo (always step — first entry)
+      // First point sets the base tempo (always step — first entry). This
+      // defaulted call only works because clearTempos() above reset the map
+      // to one entry — on a multi-entry map it would be refused (#407 guard).
       transport.setTempo(pattern.points[0].bpm);
 
       // Subsequent points set tempo with interpolation

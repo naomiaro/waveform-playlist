@@ -74,6 +74,21 @@ describe('<daw-editor> bpm tempo forwarding (#407)', () => {
     expect(editor.bpm).toBe(140); // readout still updates
   });
 
+  it('is display-only when both callbacks are assigned after the engine is built', async () => {
+    // Realistic variable-tempo order: build editor → analyze audio → install
+    // callbacks → set bpm readout. _hasTickCallbacks must be a live check,
+    // not a build-time snapshot.
+    const { editor, adapter } = await makeEditor();
+    editor.secondsToTicks = (s: number) => Math.round((s * 120 * 960) / 60);
+    editor.ticksToSeconds = (t: number) => (t * 60) / (120 * 960);
+    adapter.setTempo.mockClear();
+
+    editor.bpm = 140;
+
+    expect(adapter.setTempo).not.toHaveBeenCalled();
+    expect(editor.bpm).toBe(140);
+  });
+
   it('still forwards when only one callback is set (both required)', async () => {
     const { editor, adapter } = await makeEditor();
     editor.secondsToTicks = (s: number) => Math.round((s * 120 * 960) / 60);

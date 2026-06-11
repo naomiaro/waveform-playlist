@@ -153,8 +153,8 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
     return this._transport.isCountingIn();
   }
 
-  setTempo(bpm: number, atTick?: number): void {
-    this._transport.setTempo(bpm, atTick !== undefined ? (atTick as Tick) : undefined);
+  setTempo(bpm: number, atTick?: number): boolean {
+    return this._transport.setTempo(bpm, atTick !== undefined ? (atTick as Tick) : undefined);
   }
 
   setMeter(numerator: number, denominator: number, atTick?: number): void {

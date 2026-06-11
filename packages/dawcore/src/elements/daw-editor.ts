@@ -291,7 +291,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    *  display/grid-only (no engine/adapter tempo forwarding — #407). */
   @property({ attribute: false })
   secondsToTicks?: (seconds: number) => number;
-  /** Optional tempo-aware conversion: PPQN ticks → seconds. Required alongside secondsToTicks. */
+  /** Optional tempo-aware conversion: PPQN ticks → seconds. Required alongside
+   *  secondsToTicks — see that property for the variable-tempo and bpm
+   *  display-only semantics enabled when both are set (#407). */
   @property({ attribute: false })
   ticksToSeconds?: (ticks: number) => number;
   /** True when the consumer provided BOTH tick conversion callbacks — the

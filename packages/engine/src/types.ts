@@ -30,8 +30,12 @@ export interface PlayoutAdapter {
   setTrackSolo(trackId: string, soloed: boolean): void;
   setTrackPan(trackId: string, pan: number): void;
   setLoop(enabled: boolean, start: number, end: number): void;
-  /** Set tempo at a tick position. First call (or atTick=0) sets the base tempo. */
-  setTempo?(bpm: number, atTick?: number): void;
+  /** Set tempo at a tick position. A defaulted (no atTick) call sets the base
+   *  tempo on a single-entry map; adapters MAY refuse it when their tempo map
+   *  has multiple entries (return `false`) so a "display BPM" write can't
+   *  clobber a consumer-installed tempo curve (#407). Pass an explicit atTick
+   *  to modify a multi-entry map. A `void` return counts as accepted. */
+  setTempo?(bpm: number, atTick?: number): boolean | void;
   /** Set time signature at a tick position. */
   setMeter?(numerator: number, denominator: number, atTick?: number): void;
   /** Convert ticks to seconds using the adapter's tempo map. */

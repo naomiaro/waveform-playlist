@@ -327,10 +327,12 @@
     function applyTempoCurve(curve) {
       lastCurve = curve;
       transport.stop();
-      // Display BPM for the readout. Once secondsToTicks/ticksToSeconds are
-      // assigned (below), editor.bpm is display-only and never touches the
-      // tempo map; the transport additionally refuses defaulted tick-0 writes
-      // on multi-entry maps (#407). Ordering no longer matters for safety.
+      // Display BPM for the readout. First run: the callbacks aren't assigned
+      // yet, so this forwards and writes tick 0 — harmless, the clearTempos()
+      // + explicit tick-0 event below overwrite it. Repeat runs: the callbacks
+      // (assigned below) make editor.bpm display-only, and the transport's
+      // #407 guard refuses defaulted tick-0 writes on multi-entry maps anyway.
+      // No ordering of these statements can corrupt the final tick-0 entry.
       editor.bpm = Math.round(curve.medianBpm);
       transport.clearTempos();
       transport.clearMeters();

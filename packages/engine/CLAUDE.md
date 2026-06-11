@@ -16,7 +16,7 @@
 
 ## Tempo Management
 
-- **`setTempo(bpm, atTick?)`** — Updates `_bpm`, forwards to `adapter?.setTempo?.()`, calls `_recomputeStartSamples()`, emits statechange.
+- **`setTempo(bpm, atTick?)` commits on adapter acceptance** — Forwards to `adapter?.setTempo?.()` FIRST; an explicit `false` return (e.g. the transport's multi-entry tempo-map guard, #407) means refused — `_bpm` keeps its prior value, no recompute, no statechange. `void`-returning and absent adapters count as accepted: then `_bpm` updates, `_recomputeStartSamples()` runs, statechange emits. `PlayoutAdapter.setTempo` is typed `boolean | void`.
 - **`getCurrentTime()` always reads from adapter** — No `_isPlaying` gate. When adapter exists, adapter is the time authority. `_currentTime` is only a fallback for headless/no-adapter mode.
 - **`_ticksToSeconds` / `_secondsToTicks`** — Delegates to `adapter.ticksToSeconds()` / `adapter.secondsToTicks()` when available (multi-tempo via Transport's TempoMap). Falls back to simple single-tempo math.
 - **`_recomputeStartSamples()`** — Immutably maps all tracks/clips, recomputes `startSample` from `startTick` for clips that have `startTick` defined. Increments `tracksVersion`.

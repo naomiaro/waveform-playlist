@@ -1331,6 +1331,38 @@ describe('PlaylistEngine', () => {
       engine.setTempo(140);
       expect(listener).toHaveBeenCalledTimes(1);
     });
+
+    it('setTempo keeps prior bpm and emits nothing when the adapter refuses', () => {
+      const adapter = createMockAdapter();
+      adapter.setTempo = vi.fn().mockReturnValue(false); // transport multi-entry guard (#407)
+      const engine = new PlaylistEngine({ adapter });
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+
+      engine.setTempo(140);
+
+      expect(engine.getState().bpm).toBe(120);
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('setTempo with the same bpm forwards again after an earlier refusal', () => {
+      const adapter = createMockAdapter();
+      adapter.setTempo = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
+      const engine = new PlaylistEngine({ adapter });
+
+      engine.setTempo(140); // refused — _bpm must NOT stick at 140
+      engine.setTempo(140); // consumer fixed the map (e.g. clearTempos) and retried
+
+      expect(adapter.setTempo).toHaveBeenCalledTimes(2);
+      expect(engine.getState().bpm).toBe(140);
+    });
+
+    it('setTempo treats a void-returning adapter as accepted', () => {
+      const adapter = createMockAdapter(); // setTempo: vi.fn() → returns undefined
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTempo(140);
+      expect(engine.getState().bpm).toBe(140);
+    });
   });
 
   describe('startTick enrichment', () => {

@@ -457,14 +457,19 @@ export class Transport {
 
   // --- Tempo ---
 
-  setTempo(bpm: number, atTick?: Tick, options?: SetTempoOptions): void {
+  /** Returns true when the tempo was applied, false when a defaulted (no
+   *  atTick) write was refused because the tempo map has multiple entries —
+   *  pass an explicit atTick to modify a multi-entry map (#407). */
+  setTempo(bpm: number, atTick?: Tick, options?: SetTempoOptions): boolean {
     if (atTick === undefined && this._tempoMap.entryCount > 1) {
       console.warn(
-        '[waveform-playlist] Transport.setTempo: refusing defaulted tick-0 write — the tempo map has ' +
+        '[waveform-playlist] Transport.setTempo: refusing defaulted tick-0 write of ' +
+          bpm +
+          ' BPM — the tempo map has ' +
           this._tempoMap.entryCount +
           ' entries. Pass an explicit atTick to modify a multi-entry tempo map.'
       );
-      return;
+      return false;
     }
     this._tempoMap.setTempo(bpm, atTick, options);
     // Recompute cached loop start — tempo change invalidates tick→seconds mapping
@@ -472,6 +477,7 @@ export class Transport {
       this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
     }
     this._emit('tempochange', { bpm, atTick: atTick ?? (0 as Tick) });
+    return true;
   }
 
   getTempo(atTick?: Tick): number {

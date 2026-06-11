@@ -297,15 +297,31 @@ describe('Transport', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const ctx = mockAudioContext();
       const transport = new Transport(ctx);
-      warnSpy.mockClear(); // clear constructor warn and setup calls
       transport.setTempo(100, 0 as Tick);
       transport.setTempo(140, 960 as Tick);
-      warnSpy.mockClear();
+      warnSpy.mockClear(); // isolate the assertion from any warns emitted during setup
 
-      transport.setTempo(120); // defaulted atTick — "display BPM" style call
+      const applied = transport.setTempo(120); // defaulted atTick — "display BPM" style call
 
+      expect(applied).toBe(false);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Pass an explicit atTick'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('120'));
       expect(transport.getTempo(0 as Tick)).toBe(100);
+    });
+
+    it('accepts a defaulted setTempo again after clearTempos returns the map to one entry', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTempo(140, 960 as Tick); // multi-entry: guard active
+      transport.clearTempos();
+      warnSpy.mockClear(); // isolate the assertion from any warns emitted during setup
+
+      const applied = transport.setTempo(100);
+
+      expect(applied).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(transport.getTempo()).toBe(100);
     });
 
     it('does not emit tempochange when the guard refuses', () => {
@@ -325,13 +341,13 @@ describe('Transport', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const ctx = mockAudioContext();
       const transport = new Transport(ctx);
-      warnSpy.mockClear(); // clear constructor warn and setup calls
       transport.setTempo(100, 0 as Tick);
       transport.setTempo(140, 960 as Tick);
-      warnSpy.mockClear();
+      warnSpy.mockClear(); // isolate the assertion from any warns emitted during setup
 
-      transport.setTempo(120, 0 as Tick); // explicit — escape hatch
+      const applied = transport.setTempo(120, 0 as Tick); // explicit — escape hatch
 
+      expect(applied).toBe(true);
       expect(warnSpy).not.toHaveBeenCalled();
       expect(transport.getTempo(0 as Tick)).toBe(120);
     });
@@ -340,10 +356,11 @@ describe('Transport', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const ctx = mockAudioContext();
       const transport = new Transport(ctx);
-      warnSpy.mockClear();
+      warnSpy.mockClear(); // isolate the assertion from any warns emitted during setup
 
-      transport.setTempo(120);
+      const applied = transport.setTempo(120);
 
+      expect(applied).toBe(true);
       expect(warnSpy).not.toHaveBeenCalled();
       expect(transport.getTempo()).toBe(120);
     });
