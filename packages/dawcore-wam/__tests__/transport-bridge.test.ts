@@ -156,6 +156,22 @@ describe('createWamTransportBridge', () => {
     expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
   });
 
+  it('a bridge created while ALREADY playing starts watching immediately', () => {
+    const transport = makeMockTransport();
+    transport._playing = true; // play fired before the bridge existed
+    const node = makeMockNode();
+    createWamTransportBridge(transport, () => [node]);
+
+    // Creation broadcasts the current state (plugins sync without a new play)...
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(1);
+
+    // ...and the boundary watcher is live.
+    transport._tempo = 75;
+    pumpFrame();
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
+    expect(lastEvent(node).data.tempo).toBe(75);
+  });
+
   it('stops the watcher on stop and unsubscribes everything on dispose', () => {
     const transport = makeMockTransport();
     const node = makeMockNode();

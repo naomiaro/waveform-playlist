@@ -152,6 +152,12 @@ export function createWamTransportBridge(
   transport.on('tempochange', onChange);
   transport.on('meterchange', onChange);
 
+  // The bridge is created lazily (first plugin added) — if playback already
+  // started, the play event that would have armed the watcher has passed.
+  if (transport.isPlaying()) {
+    onPlay();
+  }
+
   return {
     notifyNodeAdded(node: WamTransportNode): void {
       if (disposed) return;
