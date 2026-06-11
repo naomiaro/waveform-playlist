@@ -206,6 +206,12 @@ const config: Config = {
               symlinks: true,
               extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
               alias: {
+                // The website never uses Faust compilation, and
+                // @shren/faust2wam's single dist bundle references Node
+                // builtins (fs, url) that webpack 5 won't polyfill. Keep the
+                // whole ~8MB chain out of the bundle; dawcore reaches it only
+                // through a guarded dynamic import (addFaustEffect).
+                '@dawcore/faust': false,
                 // These packages we transpile from source
                 '@waveform-playlist/browser': path.resolve(__dirname, '../packages/browser/src'),
                 '@waveform-playlist/core': path.resolve(__dirname, '../packages/core/src'),
