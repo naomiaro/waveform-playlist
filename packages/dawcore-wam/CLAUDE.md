@@ -12,6 +12,8 @@
 - **No DOM/Lit/React** — anything UI-flavored ships as plain-DOM factories so the future React layer reuses it.
 - Test-only helpers (e.g. `_resetWamHostCacheForTests`) are exported from their module but **not** from `src/index.ts` — tests deep-import from `../src/<module>`.
 - Mock the SDK boundary in tests with `vi.hoisted` + `vi.mock('@webaudiomodules/sdk', ...)` — a plain `const fn = vi.fn()` referenced in a mock factory hits the TDZ because the factory executes during import resolution.
+- **No package-level vitest config (node env).** DOM-needing test files opt in per-file with a `// @vitest-environment happy-dom` docblock (see `__tests__/gui.test.ts`); `happy-dom` is a devDep.
+- **happy-dom strips `var()` from known color properties** (`color`, `background`) on inline styles but passes it through for `accent-color`. Don't assert panel color/background vars in tests — assert class hooks + slider `accentColor` instead; the var() fallbacks are browser-verified.
 
 ## Host Initialization (`src/host.ts`)
 
@@ -22,7 +24,14 @@
 - `loadWamFactory(url, importFn?)` — dynamic `import(url)` → default export. Cached per URL (in-flight promise shared, failures evicted for retry). `importFn` is injectable for tests — never `vi.mock` dynamic URL imports.
 - `createWamInstance(url, ctx, hostGroupId, { initialState?, importFn? })` — load → `factory.createInstance(hostGroupId, ctx)` → **validate descriptor AFTER instantiation** (many plugins only expose it on the instance) → optional `setState(initialState)`. Validation or state failure destroys the instance before throwing.
 - **Effect-only validation**: `apiVersion` must be `2.x`; `hasAudioInput` AND `hasAudioOutput` required — instrument-only plugins are rejected with an explanatory error (MIDI/instrument hosting is out of epic scope).
-- Wrapper `WamPluginInstance` is headless (no GUI handling — that's the GUI issue) with idempotent `destroy()`. Types are structural (`WamFactory`, `WamPluginAudioNode`) rather than the SDK's alpha typings — keeps the public surface stable across SDK bumps.
+- Wrapper `WamPluginInstance` has idempotent `destroy()` (audio only) plus **optional `createGui`/`destroyGui` passthroughs** — present only when the underlying WebAudioModule exposes them (GUI lifecycle lives on the module, NOT the audioNode; absence = headless plugin = consumer falls back to the generic panel). `destroy()` never touches GUIs — the GUI/audio lifecycles are deliberately split (wam-studio `Models/Plugin.ts` pattern). Types are structural (`WamFactory`, `WamPluginAudioNode`) rather than the SDK's alpha typings — keeps the public surface stable across SDK bumps.
+
+## GUI Helpers (`src/gui.ts`)
+
+- **Plain-DOM factories, no Lit/React** — so the future React layer can reuse them. `createParameterPanel(params, onChange)` is the sync generic builder (one labeled `<input type="range">` per `ParameterPanelParam`); `createWamParameterPanel(node, { onParamChange? })` awaits `node.getParameterInfo()`, maps `WamParameterInfoLike` ({id, label, minValue, maxValue, defaultValue, discreteStep, units}) onto panel params, and wires edits to `node.setParameterValues` unless `onParamChange` overrides the routing (dawcore overrides it to route through its setParams op so `daw-effect-change` fires).
+- **Spec-aligned defaults**: absent `minValue`/`maxValue` → 0..1 (WAM spec default range); absent `discreteStep` → `step="any"`; initial value = `defaultValue` clamped, else `min`.
+- **Boundary validation, never fail the panel**: malformed entries (no id, invalid range, non-object info) skip with `[waveform-playlist]` warnings; zero usable params renders a "No adjustable parameters." empty state; a non-object `getParameterInfo()` result throws.
+- **Themable via `--daw-*` vars** with fallbacks (`--daw-controls-text`, `--daw-controls-background`, `--daw-wave-color` for slider accent) + stable class names (`daw-param-panel`, `daw-param-row`, `daw-param-name`, `daw-param-value`, `daw-param-slider`).
 
 ## Library Discovery (`src/library.ts`)
 

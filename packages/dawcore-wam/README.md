@@ -74,6 +74,38 @@ Relative plugin and thumbnail URLs are resolved against the manifest URL — or 
 
 Invalid entries (missing name, missing/unresolvable URL) are skipped with a per-entry message collected into `warnings` — one bad entry never fails the manifest. An unreachable manifest, invalid JSON, an unrecognized shape, or zero valid entries rejects with a `[waveform-playlist]`-prefixed error.
 
+### Plugin GUIs
+
+WAM plugins ship their own GUIs. `createWamInstance` exposes them as optional passthroughs — `plugin.createGui()` returns an `HTMLElement` you mount anywhere; `plugin.destroyGui(el)` releases it. Both are `undefined` for headless plugins. The GUI lifecycle is independent of the audio lifecycle: hiding or destroying a GUI never stops audio processing.
+
+```typescript
+if (plugin.createGui) {
+  const gui = await plugin.createGui();
+  myPanel.appendChild(gui);
+  // later: plugin.destroyGui?.(gui);
+}
+```
+
+### Generic parameter panel
+
+For plugins without a GUI (or when `createGui` throws), build a plain-DOM panel of labeled range sliders from the plugin's parameter metadata:
+
+```typescript
+import { createWamParameterPanel, createParameterPanel } from '@dawcore/wam';
+
+// From a WamNode: await getParameterInfo(), sliders wired to setParameterValues
+const panel = await createWamParameterPanel(plugin.audioNode);
+myPanel.appendChild(panel);
+
+// Or from your own metadata (one code path for any "no custom GUI" effect)
+const generic = createParameterPanel(
+  [{ id: 'frequency', min: 20, max: 20000, step: 1, value: 1000, unit: 'Hz' }],
+  (paramId, value) => console.log(paramId, value)
+);
+```
+
+The panel is unstyled-but-themable: it reads the dawcore CSS custom properties (`--daw-controls-text`, `--daw-controls-background`, `--daw-wave-color`) with sensible fallbacks, and exposes stable class names (`daw-param-panel`, `daw-param-row`, `daw-param-name`, `daw-param-value`, `daw-param-slider`) for external styling.
+
 ## Status
 
 Part of the [WAM 2.0 plugin support epic](https://github.com/naomiaro/waveform-playlist/issues/413). Plugin loading, chain integration, GUI embedding, persistence, and transport sync land in subsequent releases.

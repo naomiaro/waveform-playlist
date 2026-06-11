@@ -29,6 +29,9 @@ export interface WamPluginAudioNode extends AudioNode {
 interface WamModuleLike {
   descriptor: WamPluginDescriptor;
   audioNode: WamPluginAudioNode;
+  // GUI lifecycle lives on the WebAudioModule itself, NOT the audioNode.
+  createGui?(): Promise<HTMLElement>;
+  destroyGui?(gui: HTMLElement): void;
 }
 
 /** The module's default export: a WebAudioModule class (or object) with a createInstance factory. */
@@ -44,6 +47,15 @@ export interface WamPluginInstance {
   getState(): Promise<unknown>;
   setState(state: unknown): Promise<void>;
   getParameterInfo(...parameterIds: string[]): Promise<unknown>;
+  /**
+   * Present when the underlying WebAudioModule ships a GUI. Returns a fresh
+   * GUI element the host mounts anywhere; release it with `destroyGui`. The
+   * GUI lifecycle is independent of the audio lifecycle — destroying a GUI
+   * never stops audio processing.
+   */
+  createGui?: () => Promise<HTMLElement>;
+  /** Present when the underlying WebAudioModule exposes destroyGui. */
+  destroyGui?: (gui: HTMLElement) => void;
   /** Tears down the plugin's AudioWorklet. Safe to call more than once. */
   destroy(): void;
 }
@@ -141,6 +153,10 @@ export async function createWamInstance(
     setState: (state: unknown) => wam.audioNode.setState(state),
     getParameterInfo: (...parameterIds: string[]) =>
       wam.audioNode.getParameterInfo(...parameterIds),
+    ...(typeof wam.createGui === 'function' ? { createGui: () => wam.createGui!() } : {}),
+    ...(typeof wam.destroyGui === 'function'
+      ? { destroyGui: (gui: HTMLElement) => wam.destroyGui!(gui) }
+      : {}),
     destroy: () => {
       if (destroyed) return;
       destroyed = true;

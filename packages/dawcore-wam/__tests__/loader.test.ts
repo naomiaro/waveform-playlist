@@ -192,4 +192,33 @@ describe('createWamInstance', () => {
     expect(audioNode.setState).toHaveBeenCalledWith({ preset: 'room' });
     expect(audioNode.getParameterInfo).toHaveBeenCalled();
   });
+
+  it('exposes createGui/destroyGui passthroughs when the module ships a GUI', async () => {
+    const { WamClass, instance } = makeWamClass();
+    const guiElement = { nodeType: 1 } as unknown as HTMLElement;
+    const moduleWithGui = Object.assign(instance, {
+      createGui: vi.fn(async () => guiElement),
+      destroyGui: vi.fn(),
+    });
+    const importFn = makeImportFn({ default: WamClass });
+
+    const plugin = await createWamInstance(URL_A, ctx, 'group-1', { importFn });
+
+    expect(typeof plugin.createGui).toBe('function');
+    expect(typeof plugin.destroyGui).toBe('function');
+    await expect(plugin.createGui!()).resolves.toBe(guiElement);
+    expect(moduleWithGui.createGui).toHaveBeenCalledTimes(1);
+    plugin.destroyGui!(guiElement);
+    expect(moduleWithGui.destroyGui).toHaveBeenCalledWith(guiElement);
+  });
+
+  it('leaves createGui/destroyGui undefined for headless modules', async () => {
+    const { WamClass } = makeWamClass();
+    const importFn = makeImportFn({ default: WamClass });
+
+    const plugin = await createWamInstance(URL_A, ctx, 'group-1', { importFn });
+
+    expect(plugin.createGui).toBeUndefined();
+    expect(plugin.destroyGui).toBeUndefined();
+  });
 });

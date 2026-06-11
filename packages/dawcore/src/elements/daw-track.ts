@@ -27,6 +27,13 @@ interface TrackEffectsDelegate {
     url: string,
     initialState?: unknown
   ): Promise<string>;
+  _trackOpenEffectGui(
+    trackId: string,
+    target: EventTarget,
+    effectId: string,
+    container: HTMLElement
+  ): Promise<HTMLElement>;
+  _trackCloseEffectGui(trackId: string, effectId: string): void;
   _trackGetEffectsState(trackId: string): Promise<SerializedEffectEntry[]>;
   _trackSetEffectsState(
     trackId: string,
@@ -93,6 +100,20 @@ export class DawTrackElement extends LitElement {
   /** Replace this track's chain with a persisted snapshot. */
   setEffectsState(entries: SerializedEffectEntry[]): Promise<void> {
     return this._effectsEditor()._trackSetEffectsState(this.trackId, this, entries);
+  }
+
+  /**
+   * Open (lazily creating) the GUI for one of this track's effects into a
+   * consumer-provided container. Closing hides without interrupting audio;
+   * the element is cached for reopen. See <daw-editor>.openEffectGui.
+   */
+  openEffectGui(effectId: string, container: HTMLElement): Promise<HTMLElement> {
+    return this._effectsEditor()._trackOpenEffectGui(this.trackId, this, effectId, container);
+  }
+
+  /** Hide an effect's GUI (cached for reopen — never destroys). */
+  closeEffectGui(effectId: string): void {
+    this._effectsEditor()._trackCloseEffectGui(this.trackId, effectId);
   }
 
   removeEffect(effectId: string): void {

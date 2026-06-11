@@ -99,6 +99,12 @@ export class EffectsChainController {
     return this._disposed;
   }
 
+  /** Internal (manager-facing): the live entry — including its instance —
+   *  for GUI wiring. Returns undefined (no warning) when the id is unknown. */
+  getEntry(effectId: string): (EffectChainItem & { id: string; bypassed: boolean }) | undefined {
+    return this._entries.find((e) => e.id === effectId);
+  }
+
   add(item: EffectChainItem, index?: number): string {
     if (this._disposed) {
       throw new Error(

@@ -391,6 +391,22 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._effects.addMasterWamPlugin(url, initialState);
   }
 
+  /**
+   * Open (lazily creating) the GUI for a master-chain effect into a
+   * consumer-provided container. WAM plugins mount their own GUI; plugins
+   * without one — and native effects — get the generic parameter panel from
+   * @dawcore/wam. The element is cached: closeEffectGui hides it without
+   * interrupting audio, reopening remounts the same element.
+   */
+  openEffectGui(effectId: string, container: HTMLElement): Promise<HTMLElement> {
+    return this._effects.openMasterEffectGui(effectId, container);
+  }
+
+  /** Hide a master-chain effect's GUI (cached for reopen — never destroys). */
+  closeEffectGui(effectId: string): void {
+    this._effects.closeEffectGui(effectId);
+  }
+
   /** Snapshot the master chain in its persisted form (see dawcore README). */
   getEffectsState(): Promise<SerializedEffectEntry[]> {
     return this._effectsManager?.getMasterEffectsState() ?? Promise.resolve([]);
@@ -433,6 +449,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     initialState?: unknown
   ): Promise<string> {
     return this._effects.addTrackWamPlugin(trackId, target, url, initialState);
+  }
+
+  _trackOpenEffectGui(
+    trackId: string,
+    target: EventTarget,
+    effectId: string,
+    container: HTMLElement
+  ): Promise<HTMLElement> {
+    return this._effects.openTrackEffectGui(trackId, target, effectId, container);
+  }
+
+  _trackCloseEffectGui(_trackId: string, effectId: string): void {
+    this._effects.closeEffectGui(effectId);
   }
 
   _trackGetEffectsState(trackId: string): Promise<SerializedEffectEntry[]> {

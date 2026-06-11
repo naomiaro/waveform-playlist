@@ -271,6 +271,9 @@ importers:
         specifier: 0.0.12
         version: 0.0.12
     devDependencies:
+      happy-dom:
+        specifier: ^20.10.2
+        version: 20.10.2
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(@swc/core@1.15.41)(postcss@8.5.15)(typescript@5.9.3)
@@ -279,7 +282,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.2.6
-        version: 3.2.6(@types/node@20.19.42)
+        version: 3.2.6(@types/node@20.19.42)(happy-dom@20.10.2)
 
   packages/engine:
     devDependencies:
