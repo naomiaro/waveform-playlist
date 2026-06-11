@@ -570,7 +570,8 @@ export class EffectsManager {
       !transport ||
       typeof transport.on !== 'function' ||
       typeof transport.getTempo !== 'function' ||
-      typeof transport.tickToBar !== 'function'
+      typeof transport.tickToBar !== 'function' ||
+      typeof transport.timeToTick !== 'function'
     ) {
       return null;
     }

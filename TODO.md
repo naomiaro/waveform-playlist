@@ -113,27 +113,27 @@ WAM 2.0 is an open plugin standard for the Web Audio API — the browser equival
   - Use WAM event routing (`connectEvents`) between adjacent plugins so automation and MIDI flow through the chain.
   - Example: a guitar track with a tuner → compressor → amp sim → reverb chain, where the user can reorder or bypass individual plugins.
 
-- [ ] **Plugin discovery and loading** — Provide a mechanism for users to discover and load WAM plugins from URLs or a curated registry. Plugins are ES modules loaded via dynamic `import()`.
+- [x] **Plugin discovery and loading** — Done (#427 + #421, `@dawcore/wam`): `createWamInstance(url, ...)` for direct URL loading with post-instantiation descriptor validation (apiVersion 2.x, audio in/out required) and per-URL factory caching; `fetchWamLibrary(manifestUrl, { baseUrl? })` parses `library.json` manifests (webaudiomodules.com community registry + pedalboard2/wam-studio shapes) into `{ entries, warnings }`. Runnable picker UI in `examples/dawcore-wam/`. Original notes: Provide a mechanism for users to discover and load WAM plugins from URLs or a curated registry. Plugins are ES modules loaded via dynamic `import()`.
   - Accept plugin URLs directly (paste a URL to a WAM `index.js`).
   - Support WAM library manifests (`library.json`) — a JSON file listing available plugins with metadata (name, description, thumbnail, URL). Parse and display as a browsable list.
   - Validate `WamDescriptor` after loading — check `apiVersion` compatibility, `hasAudioInput`/`hasAudioOutput` flags, and reject incompatible plugins with a clear error message.
   - Cache loaded plugin factories in a `Map<url, PluginFactory>` so re-instantiating the same plugin on another track doesn't re-fetch.
   - Example: a user pastes a URL to a community-built WAM compressor; the host fetches it, validates the descriptor, and makes it available in the plugin selector.
 
-- [ ] **Plugin GUI embedding** — Mount WAM plugin GUIs in a panel or floating window. WAM plugins create their own DOM elements via `createGui()`, which can be appended to any container.
+- [x] **Plugin GUI embedding** — Done (#423): `openEffectGui(effectId, container)` / `closeEffectGui(effectId)` on `<daw-editor>` and `<daw-track>` mount a plugin's own `createGui()` element into a consumer-provided container; close hides without interrupting audio (element cached for reopen), destroy only on effect removal. GUI-less plugins and `native-*` effects get the generic parameter panel from `@dawcore/wam` (`createWamParameterPanel`). Original notes: Mount WAM plugin GUIs in a panel or floating window. WAM plugins create their own DOM elements via `createGui()`, which can be appended to any container.
   - Call `await plugin.createGui()` to get an `HTMLElement`. Mount it in a designated panel (e.g., a drawer below the track, or a floating window).
   - GUIs use ShadowDOM for style isolation — no CSS conflicts with the playlist UI.
   - Show/hide GUI without destroying the plugin instance (toggling visibility, not mount/unmount).
   - Provide a fallback for plugins without a GUI — render a generic parameter list using `getParameterInfo()` with sliders for each parameter.
   - Example: a user clicks the plugin name on a track to open its GUI in a floating panel; closing the panel hides the GUI but the effect keeps processing audio.
 
-- [ ] **Plugin state persistence** — Save and restore plugin state so projects can be reopened with the same plugin configurations. WAM plugins support `getState()` and `setState()` for serializable snapshots.
+- [x] **Plugin state persistence** — Done (#424): `getEffectsState()` / `setEffectsState(entries)` on both elements serialize chains (WAM entries carry the plugin's `getState()` snapshot, reapplied on restore). An unreachable saved URL becomes a bypassed passthrough placeholder at its position (`daw-effect-error` fires, restore continues, saved state round-trips for retry). localStorage reload demo in `examples/dawcore-wam/`. Original notes: Save and restore plugin state so projects can be reopened with the same plugin configurations. WAM plugins support `getState()` and `setState()` for serializable snapshots.
   - On project save: iterate all tracks, call `await plugin.getState()` for each loaded plugin, and include the state alongside the plugin URL in the project data.
   - On project load: after instantiating each plugin, call `await plugin.setState(savedState)` to restore parameters, presets, and internal state.
   - Handle missing plugins gracefully — if a saved plugin URL is unreachable, show a placeholder with the plugin name and skip it rather than failing the entire project load.
   - Example: a user saves a project with a reverb and delay on two tracks; reopening the project restores both plugins with their exact parameter settings.
 
-- [ ] **WAM transport events** — Broadcast transport state (playhead position, tempo, time signature, playing/stopped) to all loaded WAM plugins via `wam-transport` events. This lets tempo-synced effects (delays, LFOs, arpeggiators) lock to the playlist's timeline.
+- [x] **WAM transport events** — Done (#425, `createWamTransportBridge` in `@dawcore/wam`): broadcasts `wam-transport` events ({playing, tempo, timeSig, currentBar, currentBarStarted}) to all live plugin nodes on play/pause/stop/seek/tempochange/meterchange, plus a rAF watcher for variable-tempo boundary crossings. dawcore's `EffectsManager` wires it automatically on first `addWamPlugin`. Original notes: Broadcast transport state (playhead position, tempo, time signature, playing/stopped) to all loaded WAM plugins via `wam-transport` events. This lets tempo-synced effects (delays, LFOs, arpeggiators) lock to the playlist's timeline.
   - On play/stop/seek: dispatch `wam-transport` events to all active plugin nodes with current `tempo`, `timeSigNumerator`, `timeSigDenominator`, `currentBar`, and `playing` state.
   - On tempo or time signature change: re-broadcast updated transport data.
   - Example: a tempo-synced delay plugin automatically adjusts its delay time when the user changes the project BPM from 120 to 140.

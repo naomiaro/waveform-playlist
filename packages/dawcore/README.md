@@ -258,7 +258,7 @@ const wamId = await track.addWamPlugin('https://www.webaudiomodules.com/communit
 // WAM entries are ordinary chain entries — bypass/move/remove/events all work
 ```
 
-See `examples/dawcore-native/effects.html` for a runnable demo.
+See `examples/dawcore-native/effects.html` for a native-effects demo and `examples/dawcore-wam/` (`pnpm example:dawcore-wam`) for the end-to-end WAM demo: URL paste, community-library picker (`fetchWamLibrary`), GUIs, persistence with reload, and WAV export.
 
 ### Effect GUIs
 
@@ -273,6 +273,18 @@ await track.openEffectGui(wamId, panel); // instant reopen, same element
 ```
 
 The GUI is created lazily on first open and only destroyed (`destroyGui`) when the effect — or its track — is removed from the chain. Plugins without a GUI, and `native-*` effects, get a generic parameter panel (labeled sliders from the plugin's `getParameterInfo()` or the registry's params metadata) rendered by `@dawcore/wam`; slider edits apply live and dispatch `daw-effect-change` like any other parameter edit.
+
+### Offline Export
+
+`editor.exportAudio(options?)` renders the whole session — clips, volume/pan, mute/solo, per-track and master effect chains — on an `OfflineAudioContext` and resolves to an `AudioBuffer` (encode it to WAV/FLAC however you like):
+
+```javascript
+const buffer = await editor.exportAudio();
+// options: { sampleRate?, startTime?, duration?, channels? }
+const intro = await editor.exportAudio({ startTime: 0, duration: 8, channels: 2 });
+```
+
+Chains rebuild from their persisted form: `native-*` effects via the registry, WAM plugins re-instantiated on the offline context with their saved state (worklets are bound to one context). Bypass behavior matches live playback; all offline plugin instances are destroyed after rendering.
 
 ## Programmatic File Loading
 

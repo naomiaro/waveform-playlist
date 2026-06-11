@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — WAM 2.0 plugins demo</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 0.95rem;
+      color: #888;
+      margin: 0 0 10px 0;
+      font-weight: normal;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button {
+      cursor: pointer;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid currentColor;
+      padding: 6px 14px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    button:hover { opacity: 0.8; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    select, input[type="url"] {
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid #555;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    input[type="url"] { flex: 1; min-width: 280px; }
+    #restore-banner {
+      display: none;
+      background: #1a1a2e;
+      border-left: 3px solid #c49a6c;
+      padding: 8px 12px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+    }
+    #restore-banner.visible { display: block; }
+    .library {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 560px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .library-entry {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      background: #1a1a2e;
+      padding: 6px 10px;
+      cursor: pointer;
+      border-left: 3px solid #333;
+    }
+    .library-entry:hover { border-left-color: #63C75F; }
+    .library-entry .name {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #c49a6c;
+    }
+    .library-entry .vendor {
+      font-size: 0.75rem;
+      color: #888;
+    }
+    .rack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 720px;
+    }
+    .rack:empty::after {
+      content: 'no plugins — dry signal';
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      color: #555;
+    }
+    .effect {
+      background: #1a1a2e;
+      border-left: 3px solid #63C75F;
+      padding: 8px 12px;
+    }
+    .effect.bypassed {
+      border-left-color: #555;
+      opacity: 0.6;
+    }
+    .effect.errored {
+      border-left-color: #d08070;
+    }
+    .effect-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .effect-header .name {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #c49a6c;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .effect-header button {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+    }
+    .effect-header button.active {
+      background: #63C75F;
+      color: #0f0f1a;
+      border-color: #63C75F;
+    }
+    .effect .error {
+      font-size: 0.75rem;
+      color: #d08070;
+      margin-top: 6px;
+    }
+    .gui-host {
+      margin-top: 8px;
+    }
+    .gui-host:empty { display: none; }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore — WAM 2.0 plugins demo</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
+    <daw-track id="synth-track" src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+    <button id="export">Export WAV</button>
+  </daw-transport>
+
+  <div id="restore-banner">
+    Saved plugin chains found — click anywhere to restore them
+    (loading WAM worklets needs a resumed AudioContext, i.e. a user gesture).
+  </div>
+
+  <div class="section">
+    <h2>Add a WAM plugin</h2>
+    <div class="controls">
+      <label for="target">to</label>
+      <select id="target">
+        <option value="synth">Synth track</option>
+        <option value="master">Master</option>
+      </select>
+      <input id="plugin-url" type="url"
+             placeholder="https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js" />
+      <button id="add-url" disabled>Add from URL</button>
+      <button id="load-library">Browse community library</button>
+    </div>
+    <div class="library" id="library"></div>
+  </div>
+
+  <div class="section">
+    <h2>Synth track plugins</h2>
+    <div class="rack" id="synth-rack"></div>
+  </div>
+
+  <div class="section">
+    <h2>Master plugins</h2>
+    <div class="rack" id="master-rack"></div>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { fetchWamLibrary } from '@dawcore/wam';
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+
+    const MANIFEST_URL = 'https://www.webaudiomodules.com/community/plugins.json';
+    // The community registry keeps entry paths relative to community/plugins/,
+    // not to the manifest itself — hence the explicit baseUrl.
+    const MANIFEST_BASE_URL = 'https://www.webaudiomodules.com/community/plugins/';
+    const STORAGE_KEY = 'dawcore-wam-demo-chains';
+
+    const editor = document.getElementById('editor');
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
+
+    const synthTrack = document.getElementById('synth-track');
+    // `target` is anything with the effects API: <daw-track> (per-track chain)
+    // or <daw-editor> (master chain).
+    const chains = {
+      synth: { target: synthTrack, rack: document.getElementById('synth-rack') },
+      master: { target: editor, rack: document.getElementById('master-rack') },
+    };
+
+    const log = document.getElementById('log');
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = msg;
+      log.prepend(line);
+      while (log.children.length > 30) log.lastChild.remove();
+    }
+
+    // --- Rack rendering ---
+    // Effect ids whose GUI panel is open; survives rack re-renders because
+    // openEffectGui caches the GUI element (reopen remounts the same node).
+    const openGuis = new Set();
+
+    function renderRack(key) {
+      const { target, rack } = chains[key];
+      rack.textContent = '';
+      const effects = target.effects;
+      effects.forEach((effect, i) => {
+        const row = document.createElement('div');
+        row.className = 'effect'
+          + (effect.bypassed ? ' bypassed' : '')
+          + (effect.error ? ' errored' : '');
+
+        const header = document.createElement('div');
+        header.className = 'effect-header';
+
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = effect.label || effect.type;
+        header.appendChild(name);
+
+        const guiHost = document.createElement('div');
+        guiHost.className = 'gui-host';
+
+        const guiBtn = document.createElement('button');
+        guiBtn.textContent = 'GUI';
+        guiBtn.disabled = Boolean(effect.error); // placeholders refuse to open
+        guiBtn.classList.toggle('active', openGuis.has(effect.id));
+        guiBtn.addEventListener('click', () => {
+          if (openGuis.has(effect.id)) {
+            openGuis.delete(effect.id);
+            target.closeEffectGui(effect.id);
+            guiBtn.classList.remove('active');
+          } else {
+            openGuis.add(effect.id);
+            guiBtn.classList.add('active');
+            target.openEffectGui(effect.id, guiHost).catch((err) => {
+              openGuis.delete(effect.id);
+              guiBtn.classList.remove('active');
+              addLog('gui failed: ' + (err && err.message ? err.message : err));
+            });
+          }
+        });
+        header.appendChild(guiBtn);
+
+        const bypassBtn = document.createElement('button');
+        bypassBtn.textContent = 'Bypass';
+        bypassBtn.classList.toggle('active', effect.bypassed);
+        bypassBtn.addEventListener('click', () => {
+          target.setEffectBypassed(effect.id, !effect.bypassed);
+        });
+        header.appendChild(bypassBtn);
+
+        const upBtn = document.createElement('button');
+        upBtn.textContent = '↑';
+        upBtn.disabled = i === 0;
+        upBtn.addEventListener('click', () => target.moveEffect(effect.id, i - 1));
+        header.appendChild(upBtn);
+
+        const downBtn = document.createElement('button');
+        downBtn.textContent = '↓';
+        downBtn.disabled = i === effects.length - 1;
+        downBtn.addEventListener('click', () => target.moveEffect(effect.id, i + 1));
+        header.appendChild(downBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          openGuis.delete(effect.id);
+          target.removeEffect(effect.id);
+        });
+        header.appendChild(removeBtn);
+
+        row.appendChild(header);
+
+        if (effect.error) {
+          const error = document.createElement('div');
+          error.className = 'error';
+          error.textContent = 'failed to load: ' + effect.error;
+          row.appendChild(error);
+        }
+
+        row.appendChild(guiHost);
+        rack.appendChild(row);
+
+        // Remount cached GUIs after a re-render.
+        if (openGuis.has(effect.id)) {
+          target.openEffectGui(effect.id, guiHost).catch((err) => {
+            openGuis.delete(effect.id);
+            addLog('gui remount failed: ' + (err && err.message ? err.message : err));
+          });
+        }
+      });
+    }
+
+    function renderAll() {
+      renderRack('synth');
+      renderRack('master');
+    }
+
+    // --- Adding plugins ---
+    async function addWam(key, url) {
+      const { target } = chains[key];
+      try {
+        // Loading WAM worklets requires a running context — the calling
+        // click/pointer event is the user gesture that allows resume().
+        await audioCtx.resume();
+        await target.addWamPlugin(url);
+      } catch (err) {
+        addLog('add failed: ' + (err && err.message ? err.message : err));
+      }
+    }
+
+    const urlInput = document.getElementById('plugin-url');
+    const addUrlBtn = document.getElementById('add-url');
+    addUrlBtn.addEventListener('click', () => {
+      const url = urlInput.value.trim() || urlInput.placeholder;
+      addWam(document.getElementById('target').value, url);
+    });
+
+    // --- Community library picker ---
+    const libraryEl = document.getElementById('library');
+    document.getElementById('load-library').addEventListener('click', async () => {
+      libraryEl.textContent = 'loading…';
+      try {
+        const { entries, warnings } = await fetchWamLibrary(MANIFEST_URL, {
+          baseUrl: MANIFEST_BASE_URL,
+        });
+        if (warnings.length > 0) addLog('library: ' + warnings.length + ' entries skipped');
+        libraryEl.textContent = '';
+        for (const entry of entries) {
+          const row = document.createElement('div');
+          row.className = 'library-entry';
+          row.title = entry.description || entry.url;
+
+          const name = document.createElement('span');
+          name.className = 'name';
+          name.textContent = entry.name;
+          row.appendChild(name);
+
+          if (entry.vendor) {
+            const vendor = document.createElement('span');
+            vendor.className = 'vendor';
+            vendor.textContent = entry.vendor;
+            row.appendChild(vendor);
+          }
+
+          // Instrument-only plugins are rejected at load time with a clear
+          // error (effect chains need audio in AND out) — shown in the log.
+          row.addEventListener('click', () =>
+            addWam(document.getElementById('target').value, entry.url));
+          libraryEl.appendChild(row);
+        }
+      } catch (err) {
+        libraryEl.textContent = '';
+        addLog('library failed: ' + (err && err.message ? err.message : err));
+      }
+    });
+
+    // --- Persistence: save both chains to localStorage on every change ---
+    let restoring = false;
+    let saveTimer = 0;
+    function scheduleSave() {
+      if (restoring) return;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        const state = {
+          synth: await synthTrack.getEffectsState(),
+          master: await editor.getEffectsState(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }, 150);
+    }
+
+    // --- Restore on reload: needs the synth track loaded AND a user gesture
+    // (WAM host init loads an AudioWorklet, which needs a running context).
+    const banner = document.getElementById('restore-banner');
+    let pendingRestore = null;
+    try {
+      pendingRestore = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    if (pendingRestore && (pendingRestore.synth?.length || pendingRestore.master?.length)) {
+      banner.classList.add('visible');
+    } else {
+      pendingRestore = null;
+    }
+
+    let synthReady = false;
+    let gestureSeen = false;
+
+    async function maybeRestore() {
+      if (!pendingRestore || !synthReady || !gestureSeen) return;
+      const saved = pendingRestore;
+      pendingRestore = null;
+      banner.classList.remove('visible');
+      restoring = true;
+      try {
+        await audioCtx.resume();
+        // Restore is sequential and resilient: a plugin URL that fails to
+        // load becomes a bypassed placeholder (daw-effect-error fires) and
+        // the rest of the chain still restores.
+        if (saved.synth?.length) await synthTrack.setEffectsState(saved.synth);
+        if (saved.master?.length) await editor.setEffectsState(saved.master);
+        addLog('restored chains from localStorage');
+      } catch (err) {
+        addLog('restore failed: ' + (err && err.message ? err.message : err));
+      } finally {
+        restoring = false;
+      }
+      renderAll();
+      scheduleSave();
+    }
+
+    document.addEventListener('pointerdown', async () => {
+      gestureSeen = true;
+      maybeRestore();
+    }, { once: true, capture: true });
+
+    // Per-track chains wire into the transport's track nodes — enable adding
+    // once the synth track's audio is loaded.
+    editor.addEventListener('daw-track-ready', (e) => {
+      addLog('track-ready: ' + e.detail.trackId);
+      if (e.detail.trackId === synthTrack.trackId) {
+        synthReady = true;
+        addUrlBtn.disabled = false;
+        maybeRestore();
+      }
+    });
+
+    // --- daw-effect-* events (track events bubble up to the editor) ---
+    // Any chain change re-renders the racks and persists the new state.
+    // daw-effect-change (parameter edits) only persists — re-rendering would
+    // tear down the GUI panel mid-drag.
+    for (const type of ['daw-effect-add', 'daw-effect-remove', 'daw-effect-bypass', 'daw-effect-reorder', 'daw-effect-error']) {
+      editor.addEventListener(type, (e) => {
+        addLog(type.replace('daw-effect-', 'effect-') + ': '
+          + (e.detail.url || e.detail.effectId)
+          + (e.detail.message ? ' — ' + e.detail.message : ''));
+        renderAll();
+        scheduleSave();
+      });
+    }
+    editor.addEventListener('daw-effect-change', () => scheduleSave());
+
+    // --- Offline export: render through all chains, download as WAV ---
+    const exportBtn = document.getElementById('export');
+    exportBtn.addEventListener('click', async () => {
+      exportBtn.disabled = true;
+      exportBtn.textContent = 'Rendering…';
+      try {
+        // exportAudio re-instantiates WAM plugins on an OfflineAudioContext
+        // with their saved state (worklets are bound to one context).
+        const buffer = await editor.exportAudio();
+        const blob = new Blob([encodeWav(buffer)], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'dawcore-wam-export.wav';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        addLog('exported ' + buffer.duration.toFixed(2) + 's @ ' + buffer.sampleRate + ' Hz');
+      } catch (err) {
+        addLog('export failed: ' + (err && err.message ? err.message : err));
+      } finally {
+        exportBtn.disabled = false;
+        exportBtn.textContent = 'Export WAV';
+      }
+    });
+
+    // Minimal 16-bit PCM WAV encoder (interleaved, little-endian).
+    function encodeWav(buffer) {
+      const numChannels = buffer.numberOfChannels;
+      const dataLength = buffer.length * numChannels * 2;
+      const arrayBuffer = new ArrayBuffer(44 + dataLength);
+      const view = new DataView(arrayBuffer);
+      const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + dataLength, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);                                  // fmt chunk size
+      view.setUint16(20, 1, true);                                   // PCM
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, buffer.sampleRate, true);
+      view.setUint32(28, buffer.sampleRate * numChannels * 2, true); // byte rate
+      view.setUint16(32, numChannels * 2, true);                     // block align
+      view.setUint16(34, 16, true);                                  // bits per sample
+      writeString(36, 'data');
+      view.setUint32(40, dataLength, true);
+      const channels = [];
+      for (let c = 0; c < numChannels; c++) channels.push(buffer.getChannelData(c));
+      let offset = 44;
+      for (let i = 0; i < buffer.length; i++) {
+        for (let c = 0; c < numChannels; c++) {
+          const s = Math.max(-1, Math.min(1, channels[c][i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+          offset += 2;
+        }
+      }
+      return arrayBuffer;
+    }
+  </script>
+</body>
+</html>

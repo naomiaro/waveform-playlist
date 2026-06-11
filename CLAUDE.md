@@ -164,6 +164,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Dev server**: `pnpm --filter website start` - Docusaurus dev server
 - **Example: dawcore-native**: `pnpm example:dawcore-native` — Vite dev server at localhost:5173 (Vite falls back to next free port when 5173 is taken; check the server's startup log for the actual URL)
 - **Example: dawcore-tone**: `pnpm example:dawcore-tone` — Vite dev server at localhost:5174 (same fallback behavior — log shows the actual port)
+- **Example: dawcore-wam**: `pnpm example:dawcore-wam` — Vite dev server at localhost:5175. WAM plugins load from webaudiomodules.com (network required)
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
 - **Vitest cleanup:** `npx vitest run` in pnpm monorepos can leave orphaned Node processes at ~100% CPU. After running tests across multiple packages, verify with `pgrep -f vitest` and kill strays with `pkill -f vitest` if needed.
@@ -280,6 +281,7 @@ When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, com
 **Structure:**
 - `examples/dawcore-native/` — Web components + NativePlayoutAdapter (moved from `packages/dawcore/dev/`)
 - `examples/dawcore-tone/` — Web components + TonePlayoutAdapter (Tone.js backend)
+- `examples/dawcore-wam/` — WAM 2.0 plugins end-to-end: community-library picker, GUIs, localStorage persistence, WAV export. `@dawcore/wam` is source-aliased (pure TS, no Lit decorators), which also resolves dawcore's dynamic `import('@dawcore/wam')`
 
 ### ESLint Baseline
 

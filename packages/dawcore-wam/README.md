@@ -10,7 +10,48 @@ This package is framework-agnostic (no Lit, no React). `@dawcore/components` con
 npm install @dawcore/wam
 ```
 
-## Usage
+## Using with `@dawcore/components`
+
+The typical path: install this package next to `@dawcore/components` and use the WAM methods on `<daw-editor>` (master chain) and `<daw-track>` (per-track chain). Host initialization is implicit — the first `addWamPlugin()` call sets up the WAM host on the editor's AudioContext.
+
+```javascript
+const editor = document.querySelector('daw-editor');
+const track = document.querySelector('daw-track');
+
+// Load a plugin into a chain (the AudioContext must be running — call this
+// from a user gesture). WAM entries are ordinary chain entries: bypass,
+// move, remove, and the daw-effect-* events all work.
+const wamId = await track.addWamPlugin(
+  'https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js'
+);
+const masterId = await editor.addWamPlugin(url); // master chain
+
+// Plugin GUIs mount into a container YOU provide. Close hides without
+// interrupting audio; the element is cached for instant reopen.
+await track.openEffectGui(wamId, myPanelElement);
+track.closeEffectGui(wamId);
+
+// Persistence: serialize chains (WAM entries carry the plugin's getState()
+// snapshot), restore later. An unreachable URL becomes a bypassed
+// passthrough placeholder (daw-effect-error fires, the rest restores).
+const saved = await track.getEffectsState();
+await track.setEffectsState(saved);
+
+// Transport sync is automatic: dawcore broadcasts wam-transport events
+// (tempo, time signature, bar position, playing state) to every loaded
+// plugin on play/pause/stop/seek and tempo/meter changes.
+
+// Offline export renders through all chains — WAM plugins are
+// re-instantiated on the OfflineAudioContext with their saved state
+// (worklets are bound to one context).
+const audioBuffer = await editor.exportAudio();
+```
+
+See [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-wam) for a runnable end-to-end demo (`pnpm example:dawcore-wam`): URL paste, community-library picker, GUIs, bypass/reorder, localStorage persistence with reload, and WAV export.
+
+**CORS note:** plugins load cross-origin via dynamic `import()`, so they must be served with permissive CORS headers. The [webaudiomodules.com community registry](https://www.webaudiomodules.com/community/plugins.json) plugins (the burns-audio / Sequencer Party pack and the Wimmics WAM 2.x plugins) work; self-hosted plugins need `Access-Control-Allow-Origin` on the plugin files. Note the registry also lists WAM 1.0 and instrument-only plugins — those are rejected at load time with a clear error (this host supports WAM 2.x effects with audio input and output).
+
+## Standalone Usage
 
 ### Host initialization
 
@@ -106,6 +147,31 @@ const generic = createParameterPanel(
 
 The panel is unstyled-but-themable: it reads the dawcore CSS custom properties (`--daw-controls-text`, `--daw-controls-background`, `--daw-wave-color`) with sensible fallbacks, and exposes stable class names (`daw-param-panel`, `daw-param-row`, `daw-param-name`, `daw-param-value`, `daw-param-slider`) for external styling.
 
-## Status
+### Transport sync
 
-Part of the [WAM 2.0 plugin support epic](https://github.com/naomiaro/waveform-playlist/issues/413). Plugin loading, chain integration, GUI embedding, persistence, and transport sync land in subsequent releases.
+`createWamTransportBridge(transport, getPluginNodes)` broadcasts `wam-transport` events (`{ playing, tempo, timeSigNumerator, timeSigDenominator, currentBar, currentBarStarted }`) to all live plugin nodes so tempo-synced effects (delays, LFOs, arpeggiators) lock to the timeline. It rebroadcasts on play/pause/stop/seek and tempo/meter changes, plus a rAF watcher (active only while playing) that catches variable-tempo map boundary crossings, which emit no transport event.
+
+```typescript
+import { createWamTransportBridge } from '@dawcore/wam';
+
+const bridge = createWamTransportBridge(adapter.transport, () => liveNodes);
+bridge.notifyNodeAdded(node); // push current state to a plugin added mid-playback
+bridge.dispose();
+```
+
+The `transport` argument is structural (`TransportQueryLike`) — `@dawcore/transport`'s `Transport` satisfies it. `@dawcore/components` creates the bridge automatically on the first `addWamPlugin()`.
+
+### Offline rendering
+
+WAM plugin nodes are AudioWorklets bound to one AudioContext — they cannot be moved to an `OfflineAudioContext`. `cloneInstanceInto(instance, offlineCtx, hostGroupId)` re-instantiates a plugin from its URL-cached factory on the offline context and transfers its `getState()` snapshot:
+
+```typescript
+import { ensureWamHost, cloneInstanceInto } from '@dawcore/wam';
+
+const { hostGroupId } = await ensureWamHost(offlineCtx); // OK while 'suspended'
+const offlinePlugin = await cloneInstanceInto(plugin, offlineCtx, hostGroupId);
+// ...render...
+offlinePlugin.destroy();
+```
+
+This is how `<daw-editor>.exportAudio()` renders WAM chains offline: each persisted entry is re-instantiated on the `OfflineAudioContext` with its saved state, and all offline instances are destroyed after rendering.

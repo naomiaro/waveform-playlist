@@ -22,8 +22,8 @@ export interface TransportQueryLike {
   getCurrentTime(): number;
   getTempo(atTick?: number): number;
   getMeter(atTick?: number): { numerator: number; denominator: number };
-  secondsToTicks(seconds: number): number;
-  ticksToSeconds(tick: number): number;
+  timeToTick(seconds: number): number;
+  tickToTime(tick: number): number;
   tickToBar(tick: number): number;
   barToTick(bar: number): number;
   on(event: string, cb: () => void): void;
@@ -65,11 +65,11 @@ export function createWamTransportBridge(
 
   const computeData = (): WamTransportData => {
     const seconds = transport.getCurrentTime();
-    const tick = transport.secondsToTicks(seconds);
+    const tick = transport.timeToTick(seconds);
     const tempo = transport.getTempo(tick);
     const meter = transport.getMeter(tick);
     const currentBar = transport.tickToBar(tick);
-    const barStartSeconds = transport.ticksToSeconds(transport.barToTick(currentBar));
+    const barStartSeconds = transport.tickToTime(transport.barToTick(currentBar));
     return {
       playing: transport.isPlaying(),
       tempo,
@@ -107,7 +107,7 @@ export function createWamTransportBridge(
   const watch = (): void => {
     rafId = null;
     if (disposed || !transport.isPlaying()) return;
-    const tick = transport.secondsToTicks(transport.getCurrentTime());
+    const tick = transport.timeToTick(transport.getCurrentTime());
     const tempo = transport.getTempo(tick);
     const meter = transport.getMeter(tick);
     if (

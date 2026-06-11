@@ -17,8 +17,8 @@ function makeMockTransport() {
     getCurrentTime: vi.fn(() => transport._seconds),
     getTempo: vi.fn(() => transport._tempo),
     getMeter: vi.fn(() => transport._meter),
-    secondsToTicks: vi.fn((s: number) => Math.round(s * 960 * 2)), // 120bpm: 2 beats/s
-    ticksToSeconds: vi.fn((t: number) => t / (960 * 2)),
+    timeToTick: vi.fn((s: number) => Math.round(s * 960 * 2)), // 120bpm: 2 beats/s
+    tickToTime: vi.fn((t: number) => t / (960 * 2)),
     tickToBar: vi.fn(() => 6), // pretend we're in bar 6
     barToTick: vi.fn(() => 8 * 960 * 2), // bar 6 began at 8s worth of ticks
     on: vi.fn((event: string, cb: Listener) => {
