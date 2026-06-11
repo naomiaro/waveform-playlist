@@ -42,7 +42,7 @@
   "peerDependencies": {
     "@dawcore/faust": ">=0.0.1",
     "@dawcore/midi": ">=0.0.1",
-    "@dawcore/transport": ">=0.0.7",
+    "@dawcore/transport": ">=0.0.13",
     "@dawcore/wam": ">=0.0.1",
     "@waveform-playlist/core": ">=12.0.0",
     "@waveform-playlist/engine": ">=13.3.0",
