@@ -50,7 +50,16 @@ export class EffectsChainController {
     }));
   }
 
+  get disposed(): boolean {
+    return this._disposed;
+  }
+
   add(item: EffectChainItem, index?: number): string {
+    if (this._disposed) {
+      throw new Error(
+        '[waveform-playlist] EffectsChainController.add: chain is disposed — entries cannot be added'
+      );
+    }
     const id = 'effect-' + ++idCounter;
     const entry: ChainEntry = { ...item, params: { ...item.params }, id, bypassed: false };
     const at =

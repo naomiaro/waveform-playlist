@@ -236,21 +236,50 @@ export class EffectsManager {
     });
     const node = plugin.audioNode;
 
-    const effectId = chain.add({
-      kind: 'wam',
-      type: 'wam',
-      url,
-      label: plugin.descriptor.name,
-      instance: {
-        input: node,
-        output: node,
-        applyParams: (params) => {
-          void node.setParameterValues?.(toWamParameterMap(params));
+    // The chain may have been torn down while the plugin was loading (track
+    // removed, editor disconnected, adapter swapped). A late add would wire
+    // the plugin into a severed graph and leak its worklet.
+    if (chain.disposed) {
+      plugin.destroy();
+      throw new Error(
+        PREFIX +
+          'addWamPlugin: the effects chain was disposed while "' +
+          url +
+          '" was loading; the plugin was discarded.'
+      );
+    }
+
+    let effectId: string;
+    try {
+      effectId = chain.add({
+        kind: 'wam',
+        type: 'wam',
+        url,
+        label: plugin.descriptor.name,
+        instance: {
+          input: node,
+          output: node,
+          applyParams: (params) => {
+            node.setParameterValues?.(toWamParameterMap(params))?.catch((err: unknown) => {
+              console.warn(PREFIX + 'WAM setParameterValues failed: ' + String(err));
+            });
+          },
+          dispose: () => plugin.destroy(),
         },
-        dispose: () => plugin.destroy(),
-      },
-      params: {},
-    });
+        params: {},
+      });
+    } catch (err) {
+      // Insertion failed — the chain never took ownership, so the live
+      // worklet must be torn down here or it leaks.
+      try {
+        plugin.destroy();
+      } catch (destroyErr) {
+        console.warn(
+          PREFIX + 'addWamPlugin: cleanup after failed insertion also failed: ' + String(destroyErr)
+        );
+      }
+      throw err;
+    }
     const index = chain.entries.findIndex((e) => e.id === effectId);
     this._dispatch(target, 'daw-effect-add', {
       effectId,

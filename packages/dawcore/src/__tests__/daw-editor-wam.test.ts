@@ -203,6 +203,53 @@ describe('addWamPlugin', () => {
     expect(track.effects[0].bypassed).toBe(false);
   });
 
+  it('destroys the plugin when the chain is disposed while the plugin is loading', async () => {
+    const track = await appendTrack();
+    let resolveInstance!: (p: ReturnType<typeof makeMockPlugin>) => void;
+    createWamInstance.mockReset().mockReturnValue(
+      new Promise((resolve) => {
+        resolveInstance = resolve;
+      })
+    );
+
+    const pending = track.addWamPlugin(PLUGIN_URL);
+    // Track removed (chain disposed) while createWamInstance is in flight.
+    track.remove();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resolveInstance(plugin);
+
+    await expect(pending).rejects.toThrow(/disposed/i);
+    expect(plugin.destroy).toHaveBeenCalledTimes(1);
+    expect(track.effects).toHaveLength(0);
+  });
+
+  it('destroys the plugin if chain insertion throws after instantiation', async () => {
+    const track = await appendTrack();
+    const { EffectsChainController } = await import('../effects/effects-chain-controller');
+    const addSpy = vi.spyOn(EffectsChainController.prototype, 'add').mockImplementation(() => {
+      throw new Error('connect exploded');
+    });
+
+    try {
+      await expect(track.addWamPlugin(PLUGIN_URL)).rejects.toThrow('connect exploded');
+      expect(plugin.destroy).toHaveBeenCalledTimes(1);
+    } finally {
+      addSpy.mockRestore();
+    }
+  });
+
+  it('a rejected setParameterValues is warned, not an unhandled rejection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const track = await appendTrack();
+    const id = await track.addWamPlugin(PLUGIN_URL);
+    plugin.audioNode.setParameterValues.mockRejectedValueOnce(new Error('param refused'));
+
+    track.setEffectParams(id, { cutoff: 1000 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('param refused'));
+  });
+
   it('mixed native + WAM chains preserve order across moves', async () => {
     const track = await appendTrack();
     const native = track.addEffect('native-gain');
