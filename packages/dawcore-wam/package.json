@@ -1,0 +1,55 @@
+{
+  "name": "@dawcore/wam",
+  "version": "0.0.1",
+  "description": "Web Audio Modules (WAM 2.0) plugin hosting for the dawcore family",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "wam",
+    "web-audio-modules",
+    "plugins",
+    "dawcore",
+    "daw",
+    "audio-editor",
+    "web-audio"
+  ],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/dawcore-wam"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@webaudiomodules/api": "2.0.0-alpha.6",
+    "@webaudiomodules/sdk": "0.0.12"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
+  }
+}
