@@ -24,6 +24,14 @@
 - **Effect-only validation**: `apiVersion` must be `2.x`; `hasAudioInput` AND `hasAudioOutput` required — instrument-only plugins are rejected with an explanatory error (MIDI/instrument hosting is out of epic scope).
 - Wrapper `WamPluginInstance` is headless (no GUI handling — that's the GUI issue) with idempotent `destroy()`. Types are structural (`WamFactory`, `WamPluginAudioNode`) rather than the SDK's alpha typings — keeps the public surface stable across SDK bumps.
 
+## Library Discovery (`src/library.ts`)
+
+- `fetchWamLibrary(manifestUrl, { fetchFn?, baseUrl? })` → `{ entries, warnings }` — fetch + schema-validate `library.json` manifests at the boundary. `fetchFn` is injectable for tests (structural `WamManifestResponse`, no full `Response` needed); no caching by design.
+- **Common-denominator schema** (surveyed from webaudiomodules.com community `plugins.json` and pedalboard2/wam-studio libraries): top-level array OR `{ plugins: [...] }`; entries are objects (`name` + `url`/`path` required; optional description/vendor/thumbnail/keywords passed through when well-formed) or bare URL strings (name derived from URL, skipping generic segments like `index.js`/`dist`/`src`).
+- Relative plugin/thumbnail URLs resolve against the manifest URL; **`baseUrl` option exists because webaudiomodules.com keeps `path` relative to `community/plugins/`, not the manifest** — manifest-relative resolution alone 404s there.
+- Invalid entries skip with `[waveform-playlist]`-prefixed messages collected into `warnings` (never fail the manifest); unreachable/invalid-JSON/unrecognized-shape/zero-valid-entries reject. Entry `url` feeds straight into `createWamInstance` — descriptor validation stays at load time.
+- Real-world fixture manifests live as constants in `__tests__/library.test.ts` with source URLs in comments.
+
 ## Reference Implementation
 
 wam-studio (local checkout at `~/Code/wam-studio`) — `public/src/Models/Plugin.ts` shows the full plugin lifecycle: `createInstance(hostGroupId, ctx)`, GUI/audio lifecycle split (`createGui`/`destroyGui` independent of `audioNode.destroy()`), and `cloneInto(offlineCtx, groupId)` for offline rendering via getState/setState transfer.

@@ -9,3 +9,11 @@ export type {
   WamPluginInstance,
   CreateWamInstanceOptions,
 } from './loader';
+export { fetchWamLibrary } from './library';
+export type {
+  WamLibraryEntry,
+  WamLibraryResult,
+  WamManifestFetch,
+  WamManifestResponse,
+  FetchWamLibraryOptions,
+} from './library';
