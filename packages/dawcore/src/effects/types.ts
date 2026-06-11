@@ -44,6 +44,10 @@ export interface EffectChainItem {
   instance: EffectInstance;
   params: Record<string, number>;
   wetParam?: string;
+  /** Plugin source URL (kind 'wam'). */
+  url?: string;
+  /** Human-readable name (e.g. a WAM descriptor's name). */
+  label?: string;
 }
 
 /** Public, serializable view of one chain entry. */
@@ -53,6 +57,8 @@ export interface EffectState {
   type: string;
   params: Record<string, number>;
   bypassed: boolean;
+  url?: string;
+  label?: string;
 }
 
 /** Result of creating an effect via the registry. */

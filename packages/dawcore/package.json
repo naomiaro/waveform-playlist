@@ -1,7 +1,7 @@
 {
   "name": "@dawcore/components",
   "version": "0.0.23",
-  "description": "Web Components for multi-track audio editing — framework-agnostic",
+  "description": "Web Components for multi-track audio editing \u2014 framework-agnostic",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -42,24 +42,29 @@
   "peerDependencies": {
     "@dawcore/midi": ">=0.0.1",
     "@dawcore/transport": ">=0.0.7",
+    "@dawcore/wam": ">=0.0.1",
     "@waveform-playlist/core": ">=12.0.0",
     "@waveform-playlist/engine": ">=13.3.0",
     "@waveform-playlist/worklets": ">=12.0.0"
   },
   "peerDependenciesMeta": {
-    "@waveform-playlist/worklets": {
+    "@dawcore/midi": {
       "optional": true
     },
     "@dawcore/transport": {
       "optional": true
     },
-    "@dawcore/midi": {
+    "@dawcore/wam": {
+      "optional": true
+    },
+    "@waveform-playlist/worklets": {
       "optional": true
     }
   },
   "devDependencies": {
     "@dawcore/midi": "workspace:*",
     "@dawcore/transport": "workspace:*",
+    "@dawcore/wam": "workspace:*",
     "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/engine": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*",

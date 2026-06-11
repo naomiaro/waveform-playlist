@@ -45,6 +45,8 @@ export class EffectsChainController {
       type: entry.type,
       params: { ...entry.params },
       bypassed: entry.bypassed,
+      ...(entry.url !== undefined ? { url: entry.url } : {}),
+      ...(entry.label !== undefined ? { label: entry.label } : {}),
     }));
   }
 

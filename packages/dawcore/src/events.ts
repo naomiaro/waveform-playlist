@@ -140,6 +140,8 @@ export interface DawEffectAddDetail {
   type: string;
   params: Record<string, number>;
   index: number;
+  /** Plugin source URL (kind 'wam'). */
+  url?: string;
 }
 
 export interface DawEffectRemoveDetail {

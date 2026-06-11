@@ -94,20 +94,20 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 WAM 2.0 is an open plugin standard for the Web Audio API — the browser equivalent of VST/AU. Plugins are loaded at runtime, expose AudioNodes for graph insertion, and provide their own UIs. Supporting WAM opens the door to a growing ecosystem of third-party effects, instruments, and DSP tools without bundling them.
 
-- [ ] **WAM host initialization** — Initialize the WAM host environment on the shared AudioContext so plugins can be instantiated. This is a one-time setup that creates a plugin group for event routing between plugins on the same context.
+- [x] **WAM host initialization** — Done (#433, `@dawcore/wam` `ensureWamHost`). Original notes: Initialize the WAM host environment on the shared AudioContext so plugins can be instantiated. This is a one-time setup that creates a plugin group for event routing between plugins on the same context.
   - Call `initializeWamHost(audioContext)` once during playlist initialization (or lazily on first plugin load). Store the returned `hostGroupId` for plugin instantiation.
   - Expose via a `useWamHost()` hook that returns `{ hostGroupId, isReady }`. The hook should be idempotent — multiple consumers calling it shouldn't re-initialize.
   - Guard against AudioContext state — host init requires a running context, so defer until after first user gesture (same timing as `resumeGlobalAudioContext()`).
   - Example: a user opens the effects panel for the first time; the host initializes in the background before any plugin loads.
 
-- [ ] **Per-track WAM plugin slot** — Allow each track to load a single WAM plugin inserted into its audio chain. The plugin's `audioNode` sits between the track's source and its gain/pan stage, processing audio in real time.
+- [x] **Per-track WAM plugin slot** — Done (#436 + #422): landed as unified-chain entries via `track.addWamPlugin(url)` rather than a separate slot. Original notes: Allow each track to load a single WAM plugin inserted into its audio chain. The plugin's `audioNode` sits between the track's source and its gain/pan stage, processing audio in real time.
   - Add a `plugin` field to track state: `{ url: string; state?: any } | null`.
   - On load: dynamically import the plugin's `index.js`, call `PluginFactory.createInstance(hostGroupId, audioContext, savedState)`, and wire `source → plugin.audioNode → gainNode`.
   - On removal: call `plugin.audioNode.destroy()`, disconnect, and restore direct routing.
   - Handle hot-swap — replacing one plugin with another should cleanly tear down the old instance before connecting the new one, with no audio glitches (brief mute during swap is acceptable).
   - Example: a user applies a WAM reverb plugin to a vocal track, then swaps it for a delay — the old reverb is destroyed and the delay takes its place in the chain.
 
-- [ ] **Plugin chain (multi-plugin per track)** — Extend the single-slot model to support an ordered chain of WAM plugins per track, similar to an effects rack. Audio flows through each plugin in sequence.
+- [x] **Plugin chain (multi-plugin per track)** — Done (#422): WAM plugins are ordered entries in the unified effects chain (move/remove/bypass shared with native effects). Event routing between plugins still future. Original notes: Extend the single-slot model to support an ordered chain of WAM plugins per track, similar to an effects rack. Audio flows through each plugin in sequence.
   - Track state becomes `plugins: Array<{ url: string; state?: any }>`.
   - Chain management: insert at position, remove, reorder (drag-and-drop in UI). Reconnect the audio graph on every topology change.
   - Use WAM event routing (`connectEvents`) between adjacent plugins so automation and MIDI flow through the chain.

@@ -21,6 +21,9 @@ export interface WamPluginAudioNode extends AudioNode {
   getState(): Promise<unknown>;
   setState(state: unknown): Promise<void>;
   getParameterInfo(...parameterIds: string[]): Promise<unknown>;
+  setParameterValues?(
+    values: Record<string, { id: string; value: number; normalized: boolean }>
+  ): Promise<void>;
 }
 
 interface WamModuleLike {

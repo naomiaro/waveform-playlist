@@ -193,6 +193,9 @@ importers:
       '@dawcore/transport':
         specifier: workspace:*
         version: link:../transport
+      '@dawcore/wam':
+        specifier: workspace:*
+        version: link:../dawcore-wam
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core

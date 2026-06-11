@@ -386,6 +386,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._effectsManager?.masterEffects() ?? [];
   }
 
+  /** Load a WAM plugin (via the optional @dawcore/wam peer) into the master chain. */
+  addWamPlugin(url: string, initialState?: unknown): Promise<string> {
+    return this._effects.addMasterWamPlugin(url, initialState);
+  }
+
   /** Internal — <daw-track> effects API delegates here (dawcore-internal contract). */
   _trackAddEffect(
     trackId: string,
@@ -409,6 +414,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
   _trackEffects(trackId: string): EffectState[] {
     return this._effectsManager?.trackEffects(trackId) ?? [];
+  }
+
+  _trackAddWamPlugin(
+    trackId: string,
+    target: EventTarget,
+    url: string,
+    initialState?: unknown
+  ): Promise<string> {
+    return this._effects.addTrackWamPlugin(trackId, target, url, initialState);
   }
 
   get audioContext(): AudioContext {

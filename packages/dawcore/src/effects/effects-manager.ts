@@ -55,6 +55,11 @@ export class EffectsManager {
     this._runOp(this._masterChain, this._masterTarget, op, effectId, arg);
   }
 
+  addMasterWamPlugin(url: string, initialState?: unknown): Promise<string> {
+    const chain = this._ensureMasterChain();
+    return this._addWamToChain(chain, this._masterTarget, url, initialState);
+  }
+
   // --- Track chains ---
 
   addTrackEffect(
@@ -65,6 +70,16 @@ export class EffectsManager {
   ): string {
     const chain = this._ensureTrackChain(trackId);
     return this._addToChain(chain, target, type, params);
+  }
+
+  addTrackWamPlugin(
+    trackId: string,
+    target: EventTarget,
+    url: string,
+    initialState?: unknown
+  ): Promise<string> {
+    const chain = this._ensureTrackChain(trackId);
+    return this._addWamToChain(chain, target, url, initialState);
   }
 
   trackEffects(trackId: string): EffectState[] {
@@ -187,6 +202,67 @@ export class EffectsManager {
     return effectId;
   }
 
+  /**
+   * Load a WAM plugin (via the optional @dawcore/wam peer dep) and add it to
+   * a chain as a kind:'wam' entry. WAM entries participate in every chain
+   * operation with no special-casing: remove destroys the plugin (via the
+   * entry's dispose), bypass uses disconnection semantics (no wet param),
+   * and setParams maps onto the plugin's setParameterValues.
+   */
+  private async _addWamToChain(
+    chain: EffectsChainController,
+    target: EventTarget,
+    url: string,
+    initialState?: unknown
+  ): Promise<string> {
+    const { audioContext } = this._requireWiring();
+
+    let wamModule: typeof import('@dawcore/wam');
+    try {
+      wamModule = await import('@dawcore/wam');
+    } catch (originalErr) {
+      // Log the original error so debugging isn't blocked when the failure
+      // is something other than "not installed" (broken exports map, CSP, …).
+      console.warn(PREFIX + '@dawcore/wam dynamic import failed: ' + String(originalErr));
+      throw new Error(
+        PREFIX +
+          '@dawcore/wam is required for addWamPlugin(). Install with: npm install @dawcore/wam'
+      );
+    }
+
+    const { hostGroupId } = await wamModule.ensureWamHost(audioContext);
+    const plugin = await wamModule.createWamInstance(url, audioContext, hostGroupId, {
+      initialState,
+    });
+    const node = plugin.audioNode;
+
+    const effectId = chain.add({
+      kind: 'wam',
+      type: 'wam',
+      url,
+      label: plugin.descriptor.name,
+      instance: {
+        input: node,
+        output: node,
+        applyParams: (params) => {
+          void node.setParameterValues?.(toWamParameterMap(params));
+        },
+        dispose: () => plugin.destroy(),
+      },
+      params: {},
+    });
+    const index = chain.entries.findIndex((e) => e.id === effectId);
+    this._dispatch(target, 'daw-effect-add', {
+      effectId,
+      kind: 'wam',
+      type: 'wam',
+      url,
+      params: {},
+      index,
+    });
+    return effectId;
+  }
+
   private _runOp(
     chain: EffectsChainController | null,
     target: EventTarget,
@@ -224,4 +300,15 @@ export class EffectsManager {
   private _dispatch(target: EventTarget, name: string, detail: Record<string, unknown>): void {
     target.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail }));
   }
+}
+
+/** WAM setParameterValues takes a map of {id, value, normalized} records. */
+function toWamParameterMap(
+  params: Record<string, number>
+): Record<string, { id: string; value: number; normalized: boolean }> {
+  const map: Record<string, { id: string; value: number; normalized: boolean }> = {};
+  for (const [id, value] of Object.entries(params)) {
+    map[id] = { id, value, normalized: false };
+  }
+  return map;
 }

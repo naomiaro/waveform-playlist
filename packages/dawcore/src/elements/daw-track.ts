@@ -21,6 +21,12 @@ interface TrackEffectsDelegate {
     arg?: unknown
   ): void;
   _trackEffects(trackId: string): TrackEffectState[];
+  _trackAddWamPlugin(
+    trackId: string,
+    target: EventTarget,
+    url: string,
+    initialState?: unknown
+  ): Promise<string>;
 }
 
 @customElement('daw-track')
@@ -65,6 +71,11 @@ export class DawTrackElement extends LitElement {
 
   addEffect(type: string, params?: Record<string, number>): string {
     return this._effectsEditor()._trackAddEffect(this.trackId, this, type, params);
+  }
+
+  /** Load a WAM plugin (via the optional @dawcore/wam peer) into this track's chain. */
+  addWamPlugin(url: string, initialState?: unknown): Promise<string> {
+    return this._effectsEditor()._trackAddWamPlugin(this.trackId, this, url, initialState);
   }
 
   removeEffect(effectId: string): void {
