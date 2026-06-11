@@ -210,6 +210,7 @@ Run the examples locally:
 ```bash
 pnpm example:dawcore-native  # Native Web Audio — localhost:5173
 pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
+pnpm example:dawcore-wam     # WAM 2.0 plugins + Faust — localhost:5175
 ```
 
 **dawcore-native** example pages:
@@ -224,6 +225,7 @@ pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
 - [`automation.html`](examples/dawcore-native/automation.html) — Tempo automation with step, linear, and curve presets
 - [`analyser.html`](examples/dawcore-native/analyser.html) — Spectrum analyser connected to master output
 - [`spectrogram.html`](examples/dawcore-native/spectrogram.html) — Per-track FFT spectrograms via `render-mode="spectrogram"` with color-map and frequency-scale controls
+- [`effects.html`](examples/dawcore-native/effects.html) — Per-track and master insert effects (`native-*` registry) with live parameter sliders, bypass, and `daw-effect-*` event log
 
 **dawcore-tone** example pages:
 
@@ -237,6 +239,10 @@ pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
 - [`midi.html`](examples/dawcore-tone/midi.html) — Programmatic MIDI clips with piano-roll render mode and Tone.js PolySynth
 - [`midi-load.html`](examples/dawcore-tone/midi-load.html) — Load `.mid` files (URL or file picker) via `editor.loadMidi()` and play them through Tone.js PolySynth
 - [`soundfont.html`](examples/dawcore-tone/soundfont.html) — MIDI through SoundFont samples: `SoundFontCache.fromUrl()` + `createToneAdapter({ soundFontCache })`, with PolySynth fallback when the `.sf2` fails to load
+
+**dawcore-wam** example pages:
+
+- [`index.html`](examples/dawcore-wam/index.html) — WAM 2.0 plugin hosting end to end: load community plugins by URL or from the [webaudiomodules.com](https://www.webaudiomodules.com/) library, open plugin GUIs, reorder/bypass chains, save and restore chains (including state) via localStorage, export the mix to WAV through `exportAudio()`, and compile Faust DSP to a live effect in the browser (`@dawcore/faust`) — plus pre-compiled Faust effects served from this repo
 
 **Spec & roadmap:** [`docs/specs/web-components-migration.md`](docs/specs/web-components-migration.md) — full element catalogue, attribute/property/event tables, programmatic API contracts, theming tokens, and migration phases.
 

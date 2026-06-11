@@ -88,6 +88,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **Moving/Renaming Doc Pages:** Run `pnpm --filter website build` after moving docs — Docusaurus broken link checker will find all internal links that need updating.
 
+**Root README.md lists every demo:** Whenever an example page or a new `examples/*` app is added, update the root README.md's examples section (run commands + per-page lists) in the same PR. The README is the front door — a demo that isn't listed there doesn't exist for most visitors.
+
 **Avoid Duplicating Code in Example Pages:** Example pages (`website/src/pages/examples/`) should link to guide docs for code walkthroughs, not inline full code blocks. Duplication creates maintenance burden when APIs change.
 
 **LLM-Readable Docs:**
