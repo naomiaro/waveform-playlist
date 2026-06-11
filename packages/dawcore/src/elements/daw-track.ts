@@ -2,6 +2,26 @@ import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
 import type { RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
+import type { EffectState as TrackEffectState } from '../effects/types';
+
+/** Structural view of the editor's dawcore-internal track-effects contract —
+ *  avoids a value-import cycle between daw-track and daw-editor. */
+interface TrackEffectsDelegate {
+  _trackAddEffect(
+    trackId: string,
+    target: EventTarget,
+    type: string,
+    params?: Record<string, number>
+  ): string;
+  _trackEffectOp(
+    trackId: string,
+    target: EventTarget,
+    op: 'remove' | 'setParams' | 'setBypassed' | 'move',
+    effectId: string,
+    arg?: unknown
+  ): void;
+  _trackEffects(trackId: string): TrackEffectState[];
+}
 
 @customElement('daw-track')
 export class DawTrackElement extends LitElement {
@@ -39,6 +59,43 @@ export class DawTrackElement extends LitElement {
   // Light DOM so <daw-clip> children are queryable.
   createRenderRoot() {
     return this;
+  }
+
+  // --- Effects API (delegates to the owning <daw-editor>) ---
+
+  addEffect(type: string, params?: Record<string, number>): string {
+    return this._effectsEditor()._trackAddEffect(this.trackId, this, type, params);
+  }
+
+  removeEffect(effectId: string): void {
+    this._effectsEditor()._trackEffectOp(this.trackId, this, 'remove', effectId);
+  }
+
+  setEffectParams(effectId: string, params: Record<string, number>): void {
+    this._effectsEditor()._trackEffectOp(this.trackId, this, 'setParams', effectId, params);
+  }
+
+  setEffectBypassed(effectId: string, bypassed: boolean): void {
+    this._effectsEditor()._trackEffectOp(this.trackId, this, 'setBypassed', effectId, bypassed);
+  }
+
+  moveEffect(effectId: string, newIndex: number): void {
+    this._effectsEditor()._trackEffectOp(this.trackId, this, 'move', effectId, newIndex);
+  }
+
+  get effects(): TrackEffectState[] {
+    const editor = this.closest('daw-editor') as TrackEffectsDelegate | null;
+    return editor?._trackEffects(this.trackId) ?? [];
+  }
+
+  private _effectsEditor(): TrackEffectsDelegate {
+    const editor = this.closest('daw-editor') as TrackEffectsDelegate | null;
+    if (!editor) {
+      throw new Error(
+        '[waveform-playlist] <daw-track> effects API requires the track to be inside a <daw-editor>'
+      );
+    }
+    return editor;
   }
 
   connectedCallback() {

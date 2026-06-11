@@ -86,6 +86,11 @@ export type {
   DawClipMoveDetail,
   DawClipTrimDetail,
   DawClipSplitDetail,
+  DawEffectAddDetail,
+  DawEffectRemoveDetail,
+  DawEffectChangeDetail,
+  DawEffectBypassDetail,
+  DawEffectReorderDetail,
   LoadFilesResult,
 } from './events';
 

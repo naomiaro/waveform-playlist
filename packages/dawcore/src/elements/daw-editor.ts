@@ -71,6 +71,8 @@ import {
 import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
+import { EffectsManager } from '../effects/effects-manager';
+import type { EffectState } from '../effects/types';
 import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
 import { extractPeaks } from '../workers/waveformDataUtils';
 import { ScrollSyncController } from '../controllers/scroll-sync-controller';
@@ -336,6 +338,67 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._externalAdapter;
   }
   private _externalAdapter: PlayoutAdapter | null = null;
+
+  // --- Effects (master chain; per-track chains delegated from <daw-track>) ---
+
+  private _effectsManager: EffectsManager | null = null;
+
+  private get _effects(): EffectsManager {
+    if (!this._effectsManager) {
+      this._effectsManager = new EffectsManager(() => this._externalAdapter, this);
+    }
+    return this._effectsManager;
+  }
+
+  /** Master effects chain — inserted between the master bus and the destination. */
+  addEffect(type: string, params?: Record<string, number>): string {
+    return this._effects.addMasterEffect(type, params);
+  }
+
+  removeEffect(effectId: string): void {
+    this._effects.masterOp('remove', effectId);
+  }
+
+  setEffectParams(effectId: string, params: Record<string, number>): void {
+    this._effects.masterOp('setParams', effectId, params);
+  }
+
+  setEffectBypassed(effectId: string, bypassed: boolean): void {
+    this._effects.masterOp('setBypassed', effectId, bypassed);
+  }
+
+  moveEffect(effectId: string, newIndex: number): void {
+    this._effects.masterOp('move', effectId, newIndex);
+  }
+
+  get effects(): EffectState[] {
+    return this._effectsManager?.masterEffects() ?? [];
+  }
+
+  /** Internal — <daw-track> effects API delegates here (dawcore-internal contract). */
+  _trackAddEffect(
+    trackId: string,
+    target: EventTarget,
+    type: string,
+    params?: Record<string, number>
+  ): string {
+    return this._effects.addTrackEffect(trackId, target, type, params);
+  }
+
+  _trackEffectOp(
+    trackId: string,
+    target: EventTarget,
+    op: 'remove' | 'setParams' | 'setBypassed' | 'move',
+    effectId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    arg?: any
+  ): void {
+    this._effects.trackOp(trackId, target, op, effectId, arg);
+  }
+
+  _trackEffects(trackId: string): EffectState[] {
+    return this._effectsManager?.trackEffects(trackId) ?? [];
+  }
 
   get audioContext(): AudioContext {
     if (!this._externalAdapter) {
@@ -634,6 +697,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   disconnectedCallback() {
     super.disconnectedCallback();
+    this._effectsManager?.disposeAll();
+    this._effectsManager = null;
     this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
@@ -766,6 +831,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   };
   private _onTrackRemoved(trackId: string) {
     this._trackElements.delete(trackId);
+    this._effectsManager?.disposeTrackChain(trackId);
     // Clean up per-clip data before removing the track (need clip IDs from engine tracks)
     const removedTrack = this._engineTracks.get(trackId);
     if (removedTrack) {
@@ -1719,6 +1785,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           nextTracks.set(track.id, track);
         }
         this._engineTracks = nextTracks;
+        // Transport setTracks rebuilds TrackNodes, severing effects hookups.
+        this._effectsManager?.rewireTrackChains();
         // Regenerate peaks for new or trimmed clips.
         // Piano-roll tracks have no AudioBuffer — skip them to avoid noisy
         // "no AudioBuffer" warnings on every tracksVersion bump.

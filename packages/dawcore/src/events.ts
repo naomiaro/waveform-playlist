@@ -134,6 +134,34 @@ export interface DawSpectrogramErrorDetail {
   error: Error;
 }
 
+export interface DawEffectAddDetail {
+  effectId: string;
+  kind: string;
+  type: string;
+  params: Record<string, number>;
+  index: number;
+}
+
+export interface DawEffectRemoveDetail {
+  effectId: string;
+}
+
+export interface DawEffectChangeDetail {
+  effectId: string;
+  params: Record<string, number>;
+}
+
+export interface DawEffectBypassDetail {
+  effectId: string;
+  bypassed: boolean;
+}
+
+export interface DawEffectReorderDetail {
+  effectId: string;
+  fromIndex: number;
+  toIndex: number;
+}
+
 // ---------------------------------------------------------------------------
 // Event map — augments HTMLElementEventMap for typed addEventListener
 // ---------------------------------------------------------------------------
@@ -167,6 +195,11 @@ export interface DawEventMap {
   'daw-clip-split': CustomEvent<DawClipSplitDetail>;
   'daw-spectrogram-ready': CustomEvent<DawSpectrogramReadyDetail>;
   'daw-spectrogram-error': CustomEvent<DawSpectrogramErrorDetail>;
+  'daw-effect-add': CustomEvent<DawEffectAddDetail>;
+  'daw-effect-remove': CustomEvent<DawEffectRemoveDetail>;
+  'daw-effect-change': CustomEvent<DawEffectChangeDetail>;
+  'daw-effect-bypass': CustomEvent<DawEffectBypassDetail>;
+  'daw-effect-reorder': CustomEvent<DawEffectReorderDetail>;
 }
 
 // Helper type for creating typed custom events
