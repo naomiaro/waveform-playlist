@@ -262,19 +262,30 @@
 
     // --- Build tempo curve ---
     // Single-clock: tick 0 = audio time 0 (start of file).
-    // First downbeat (beat === 1) lands at bar 2 beat 1 (tick 3840 in 4/4).
-    // Pickup beats fill the end of bar 1. A "gap BPM" covers tick 0 to
-    // the first beat so ticksToSeconds maps to the correct audio times.
+    // First downbeat (beat === 1) lands on the first bar boundary with room
+    // for the intro audio and any pickup beats before it (e.g. bar 2 beat 1
+    // for a 4/4 song with a short intro). Empty lead-in bars run at the
+    // first segment's tempo so ticksToSeconds maps to correct audio times.
     function buildTempoCurve(beats) {
       const ppqn = 960;
       const ticksPerBeat = ppqn;
-      const beatsPerBar = 4; // 4/4 time
-      const ticksPerBar = beatsPerBar * ticksPerBeat;
 
       const firstDownbeatIdx = beats.findIndex(b => b.beat === 1);
       if (firstDownbeatIdx < 0) throw new Error('No downbeat (beat 1) found in beat map');
 
       const pickupBeats = firstDownbeatIdx;
+
+      // Lead-in bar length follows the FIRST declared bar's meter (the
+      // distance between the first two downbeats), falling back to 4/4 —
+      // the warp-markers gridPlanFromBeats convention. Hardcoding 4/4 here
+      // while the grid uses the detected meter pushed a 2/4 song's first
+      // downbeat to bar 3 (two 2/4 bars fit in one 4/4 lead-in bar).
+      const secondDownbeatIdx = beats.findIndex(
+        (b, i) => i > firstDownbeatIdx && b.beat === 1
+      );
+      const leadMeter =
+        secondDownbeatIdx > firstDownbeatIdx ? secondDownbeatIdx - firstDownbeatIdx : 4;
+      const ticksPerBar = leadMeter * ticksPerBeat;
 
       // BPM from first full beat interval (at the downbeat)
       let beatBpm = 120;
