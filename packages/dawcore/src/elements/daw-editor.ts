@@ -394,6 +394,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
 
   /**
+   * Compile Faust DSP source in the browser (via the optional @dawcore/faust
+   * peer) and add the resulting WAM to the master chain. Compile errors keep
+   * their Faust line/column diagnostics and leave the chain untouched.
+   */
+  addFaustEffect(dspCode: string, options?: { name?: string }): Promise<string> {
+    return this._effects.addMasterFaustEffect(dspCode, options);
+  }
+
+  /**
    * Open (lazily creating) the GUI for a master-chain effect into a
    * consumer-provided container. WAM plugins mount their own GUI; plugins
    * without one — and native effects — get the generic parameter panel from
@@ -469,6 +478,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     initialState?: unknown
   ): Promise<string> {
     return this._effects.addTrackWamPlugin(trackId, target, url, initialState);
+  }
+
+  _trackAddFaustEffect(
+    trackId: string,
+    target: EventTarget,
+    dspCode: string,
+    options?: { name?: string }
+  ): Promise<string> {
+    return this._effects.addTrackFaustEffect(trackId, target, dspCode, options);
   }
 
   _trackOpenEffectGui(

@@ -1,0 +1,57 @@
+{
+  "name": "@dawcore/faust",
+  "version": "0.0.1",
+  "description": "In-browser Faust DSP compilation to WAM 2.0 plugins for the dawcore family",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "faust",
+    "dsp",
+    "wam",
+    "web-audio-modules",
+    "webassembly",
+    "dawcore",
+    "daw",
+    "audio-editor",
+    "web-audio"
+  ],
+  "author": "Naomi Aro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomiaro/waveform-playlist.git",
+    "directory": "packages/dawcore-faust"
+  },
+  "homepage": "https://naomiaro.github.io/waveform-playlist",
+  "bugs": {
+    "url": "https://github.com/naomiaro/waveform-playlist/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@shren/faust2wam": "0.0.16"
+  },
+  "devDependencies": {
+    "@webaudiomodules/api": "2.0.0-alpha.6",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
+  }
+}

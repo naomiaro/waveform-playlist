@@ -27,6 +27,12 @@ interface TrackEffectsDelegate {
     url: string,
     initialState?: unknown
   ): Promise<string>;
+  _trackAddFaustEffect(
+    trackId: string,
+    target: EventTarget,
+    dspCode: string,
+    options?: { name?: string }
+  ): Promise<string>;
   _trackOpenEffectGui(
     trackId: string,
     target: EventTarget,
@@ -89,6 +95,15 @@ export class DawTrackElement extends LitElement {
   /** Load a WAM plugin (via the optional @dawcore/wam peer) into this track's chain. */
   addWamPlugin(url: string, initialState?: unknown): Promise<string> {
     return this._effectsEditor()._trackAddWamPlugin(this.trackId, this, url, initialState);
+  }
+
+  /**
+   * Compile Faust DSP source in the browser (via the optional @dawcore/faust
+   * peer) and add the resulting WAM to this track's chain. Compile errors
+   * keep their Faust line/column diagnostics and leave the chain untouched.
+   */
+  addFaustEffect(dspCode: string, options?: { name?: string }): Promise<string> {
+    return this._effectsEditor()._trackAddFaustEffect(this.trackId, this, dspCode, options);
   }
 
   /** Snapshot this track's chain in its persisted form (see dawcore README). */

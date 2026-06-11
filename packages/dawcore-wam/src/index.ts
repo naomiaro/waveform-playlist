@@ -1,6 +1,11 @@
 export { ensureWamHost } from './host';
 export type { WamHostInfo } from './host';
-export { loadWamFactory, createWamInstance, cloneInstanceInto } from './loader';
+export {
+  loadWamFactory,
+  createWamInstance,
+  createWamInstanceFromFactory,
+  cloneInstanceInto,
+} from './loader';
 export type {
   WamFactory,
   WamModuleImport,
@@ -8,6 +13,7 @@ export type {
   WamPluginDescriptor,
   WamPluginInstance,
   CreateWamInstanceOptions,
+  CreateWamInstanceFromFactoryOptions,
 } from './loader';
 export { createParameterPanel, createWamParameterPanel } from './gui';
 export type {

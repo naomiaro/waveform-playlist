@@ -2,12 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { exportAudioImpl, type ExportAudioHost } from '../interactions/export-audio';
 import type { SerializedEffectEntry } from '../effects/types';
 
-const { ensureWamHost, createWamInstance } = vi.hoisted(() => ({
+const { ensureWamHost, createWamInstance, createWamInstanceFromFactory } = vi.hoisted(() => ({
   ensureWamHost: vi.fn(),
   createWamInstance: vi.fn(),
+  createWamInstanceFromFactory: vi.fn(),
 }));
 
-vi.mock('@dawcore/wam', () => ({ ensureWamHost, createWamInstance }));
+const { compileFaustToWam } = vi.hoisted(() => ({
+  compileFaustToWam: vi.fn(),
+}));
+
+vi.mock('@dawcore/wam', () => ({
+  ensureWamHost,
+  createWamInstance,
+  createWamInstanceFromFactory,
+}));
+
+vi.mock('@dawcore/faust', () => ({ compileFaustToWam }));
 
 function mockParam(value = 0) {
   return { value };
@@ -110,6 +121,8 @@ beforeEach(() => {
   offlineInstances.length = 0;
   ensureWamHost.mockReset().mockResolvedValue({ hostGroupId: 'off-group', hostGroupKey: 'k' });
   createWamInstance.mockReset();
+  createWamInstanceFromFactory.mockReset();
+  compileFaustToWam.mockReset();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.stubGlobal('OfflineAudioContext', MockOfflineContext as any);
 });
@@ -313,5 +326,60 @@ describe('exportAudioImpl', () => {
     await exportAudioImpl(host);
 
     expect(createWamInstance).not.toHaveBeenCalled();
+  });
+
+  it('recompiles Faust entries on the offline context and destroys them after render', async () => {
+    const destroy = vi.fn();
+    const factory = { createInstance: vi.fn() };
+    compileFaustToWam.mockResolvedValue({
+      factory,
+      name: 'My LP',
+      dspCode: 'process = _;',
+    });
+    createWamInstanceFromFactory.mockResolvedValue({
+      descriptor: { name: 'My LP' },
+      audioNode: mockNode(),
+      destroy,
+    });
+    const master: SerializedEffectEntry[] = [
+      {
+        kind: 'wam',
+        faustDsp: 'process = _;',
+        faustName: 'My LP',
+        bypassed: false,
+        state: { '/My LP/cutoff': 500 },
+      },
+    ];
+    const host = makeHost({ getMasterEffectsState: vi.fn(async () => master) });
+
+    await exportAudioImpl(host);
+
+    const ctx = offlineInstances[0];
+    expect(compileFaustToWam).toHaveBeenCalledWith(
+      'process = _;',
+      expect.objectContaining({ name: 'My LP' })
+    );
+    expect(createWamInstanceFromFactory).toHaveBeenCalledWith(
+      factory,
+      ctx,
+      'off-group',
+      expect.objectContaining({ initialState: { '/My LP/cutoff': 500 } })
+    );
+    expect(createWamInstance).not.toHaveBeenCalled();
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips bypassed Faust entries without compiling them', async () => {
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(
+        async () =>
+          [{ kind: 'wam', faustDsp: 'process = _;', bypassed: true }] as SerializedEffectEntry[]
+      ),
+    });
+
+    await exportAudioImpl(host);
+
+    expect(compileFaustToWam).not.toHaveBeenCalled();
+    expect(createWamInstanceFromFactory).not.toHaveBeenCalled();
   });
 });

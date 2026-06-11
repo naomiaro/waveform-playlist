@@ -226,9 +226,26 @@ async function buildOfflineChain(
       }
       const wamModule = await import('@dawcore/wam');
       const { hostGroupId } = await wamModule.ensureWamHost(ctx);
-      const plugin = await wamModule.createWamInstance(entry.url, ctx, hostGroupId, {
-        initialState: entry.state,
-      });
+      let plugin: import('@dawcore/wam').WamPluginInstance;
+      if (entry.faustDsp !== undefined) {
+        // Faust entries have no URL — recompile the persisted DSP source on
+        // demand (worklets are context-bound, so the realtime instance can't
+        // be reused; the compiled factory path mirrors setEffectsState).
+        const faustModule = await import('@dawcore/faust');
+        const compiled = await faustModule.compileFaustToWam(entry.faustDsp, {
+          name: entry.faustName,
+        });
+        plugin = await wamModule.createWamInstanceFromFactory(
+          compiled.factory as import('@dawcore/wam').WamFactory,
+          ctx,
+          hostGroupId,
+          { initialState: entry.state, label: compiled.name }
+        );
+      } else {
+        plugin = await wamModule.createWamInstance(entry.url ?? '', ctx, hostGroupId, {
+          initialState: entry.state,
+        });
+      }
       cleanups.push(() => plugin.destroy());
       previous.connect(plugin.audioNode);
       previous = plugin.audioNode;

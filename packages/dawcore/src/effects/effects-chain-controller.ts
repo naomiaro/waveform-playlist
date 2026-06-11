@@ -46,6 +46,7 @@ export class EffectsChainController {
       params: { ...entry.params },
       bypassed: entry.bypassed,
       ...(entry.url !== undefined ? { url: entry.url } : {}),
+      ...(entry.source !== undefined ? { source: { ...entry.source } } : {}),
       ...(entry.label !== undefined ? { label: entry.label } : {}),
       ...(entry.error !== undefined ? { error: entry.error } : {}),
     }));
@@ -57,10 +58,19 @@ export class EffectsChainController {
     return Promise.all(
       this._entries.map(async (entry): Promise<SerializedEffectEntry> => {
         if (entry.kind === 'wam') {
+          // Faust entries persist their DSP source (recompiled on restore);
+          // url-loaded entries persist their URL.
+          const sourceFields =
+            entry.source?.faust !== undefined
+              ? {
+                  faustDsp: entry.source.faust,
+                  ...(entry.label !== undefined ? { faustName: entry.label } : {}),
+                }
+              : { url: entry.url ?? '' };
           if (entry.placeholder) {
             return {
               kind: 'wam',
-              url: entry.url ?? '',
+              ...sourceFields,
               bypassed: entry.placeholder.bypassed,
               ...(entry.placeholder.state !== undefined ? { state: entry.placeholder.state } : {}),
             };
@@ -73,14 +83,14 @@ export class EffectsChainController {
             // emit the entry without state and let the consumer persist the rest.
             console.warn(
               '[waveform-playlist] serialize: plugin "' +
-                (entry.url ?? entry.type) +
+                (entry.url ?? entry.label ?? entry.type) +
                 '" getState failed: ' +
                 String(err)
             );
           }
           return {
             kind: 'wam',
-            url: entry.url ?? '',
+            ...sourceFields,
             bypassed: entry.bypassed,
             ...(state !== undefined ? { state } : {}),
           };

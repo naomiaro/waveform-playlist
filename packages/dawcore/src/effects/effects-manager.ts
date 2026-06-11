@@ -87,6 +87,11 @@ export class EffectsManager {
     return this._addWamToChain(chain, this._masterTarget, url, initialState);
   }
 
+  addMasterFaustEffect(dspCode: string, options?: { name?: string }): Promise<string> {
+    const chain = this._ensureMasterChain();
+    return this._addFaustToChain(chain, this._masterTarget, dspCode, { name: options?.name });
+  }
+
   getMasterEffectsState(): Promise<SerializedEffectEntry[]> {
     return this._masterChain?.serialize() ?? Promise.resolve([]);
   }
@@ -116,6 +121,16 @@ export class EffectsManager {
   ): Promise<string> {
     const chain = this._ensureTrackChain(trackId);
     return this._addWamToChain(chain, target, url, initialState);
+  }
+
+  addTrackFaustEffect(
+    trackId: string,
+    target: EventTarget,
+    dspCode: string,
+    options?: { name?: string }
+  ): Promise<string> {
+    const chain = this._ensureTrackChain(trackId);
+    return this._addFaustToChain(chain, target, dspCode, { name: options?.name });
   }
 
   trackEffects(trackId: string): EffectState[] {
@@ -254,6 +269,23 @@ export class EffectsManager {
           '@dawcore/wam is required for ' +
           feature +
           '. Install with: npm install @dawcore/wam'
+      );
+    }
+  }
+
+  /** Dynamic-import the optional @dawcore/faust peer with an install hint. */
+  private async _loadFaustModule(feature: string): Promise<typeof import('@dawcore/faust')> {
+    try {
+      return await import('@dawcore/faust');
+    } catch (originalErr) {
+      // Log the original error so debugging isn't blocked when the failure
+      // is something other than "not installed" (broken exports map, CSP, …).
+      console.warn(PREFIX + '@dawcore/faust dynamic import failed: ' + String(originalErr));
+      throw new Error(
+        PREFIX +
+          '@dawcore/faust is required for ' +
+          feature +
+          '. Install with: npm install @dawcore/faust'
       );
     }
   }
@@ -483,17 +515,72 @@ export class EffectsManager {
     const plugin = await wamModule.createWamInstance(url, audioContext, hostGroupId, {
       initialState,
     });
-    const node = plugin.audioNode;
+    return this._insertWamPlugin(chain, target, wamModule, plugin, { url });
+  }
 
-    // The chain may have been torn down while the plugin was loading (track
-    // removed, editor disconnected, adapter swapped). A late add would wire
-    // the plugin into a severed graph and leak its worklet.
+  /**
+   * Compile Faust DSP source in the browser (via the optional @dawcore/faust
+   * peer) and add the resulting WAM to a chain. Compilation happens BEFORE
+   * any chain work, so a Faust error (with its line/column diagnostics intact)
+   * leaves the chain untouched. The entry lands as kind:'wam' with a
+   * `source: { faust }` marker so persistence recompiles instead of fetching.
+   */
+  private async _addFaustToChain(
+    chain: EffectsChainController,
+    target: EventTarget,
+    dspCode: string,
+    opts: { name?: string; initialState?: unknown }
+  ): Promise<string> {
+    if (typeof dspCode !== 'string' || dspCode.trim().length === 0) {
+      throw new Error(PREFIX + 'addFaustEffect: dspCode must be a non-empty string');
+    }
+    this._requireWiring();
+    const faustModule = await this._loadFaustModule('addFaustEffect()');
+    // Faust compile errors propagate unchanged — the diagnostics are
+    // user-facing (the user wrote the DSP).
+    const compiled = await faustModule.compileFaustToWam(dspCode, { name: opts.name });
+
+    const { audioContext } = this._requireWiring();
+    const wamModule = await this._loadWamModule('addFaustEffect()');
+    const { hostGroupId } = await wamModule.ensureWamHost(audioContext);
+    const plugin = await wamModule.createWamInstanceFromFactory(
+      compiled.factory as import('@dawcore/wam').WamFactory,
+      audioContext,
+      hostGroupId,
+      { initialState: opts.initialState, label: compiled.name }
+    );
+    return this._insertWamPlugin(chain, target, wamModule, plugin, {
+      source: { faust: compiled.dspCode },
+    });
+  }
+
+  /**
+   * Wire a live WAM plugin instance into a chain as a kind:'wam' entry —
+   * shared by the url path (addWamPlugin) and the Faust path (addFaustEffect).
+   * WAM entries participate in every chain operation with no special-casing:
+   * remove destroys the plugin (via the entry's dispose), bypass uses
+   * disconnection semantics (no wet param), and setParams maps onto the
+   * plugin's setParameterValues.
+   */
+  private _insertWamPlugin(
+    chain: EffectsChainController,
+    target: EventTarget,
+    wamModule: typeof import('@dawcore/wam'),
+    plugin: import('@dawcore/wam').WamPluginInstance,
+    meta: { url?: string; source?: { faust: string } }
+  ): string {
+    const node = plugin.audioNode;
+    const label = plugin.descriptor.name;
+
+    // The chain may have been torn down while the plugin was loading/compiling
+    // (track removed, editor disconnected, adapter swapped). A late add would
+    // wire the plugin into a severed graph and leak its worklet.
     if (chain.disposed) {
       plugin.destroy();
       throw new Error(
         PREFIX +
           'addWamPlugin: the effects chain was disposed while "' +
-          url +
+          (meta.url ?? label) +
           '" was loading; the plugin was discarded.'
       );
     }
@@ -503,8 +590,9 @@ export class EffectsManager {
       effectId = chain.add({
         kind: 'wam',
         type: 'wam',
-        url,
-        label: plugin.descriptor.name,
+        ...(meta.url !== undefined ? { url: meta.url } : {}),
+        ...(meta.source !== undefined ? { source: meta.source } : {}),
+        label,
         instance: {
           input: node,
           output: node,
@@ -545,7 +633,8 @@ export class EffectsManager {
       effectId,
       kind: 'wam',
       type: 'wam',
-      url,
+      ...(meta.url !== undefined ? { url: meta.url } : {}),
+      ...(meta.source !== undefined ? { source: meta.source } : {}),
       params: {},
       index,
     });
@@ -612,7 +701,15 @@ export class EffectsManager {
         continue;
       }
       try {
-        const id = await this._addWamToChain(chain, target, entry.url, entry.state);
+        // Faust entries recompile from their persisted DSP source; url
+        // entries load from their URL.
+        const id =
+          entry.faustDsp !== undefined
+            ? await this._addFaustToChain(chain, target, entry.faustDsp, {
+                name: entry.faustName,
+                initialState: entry.state,
+              })
+            : await this._addWamToChain(chain, target, entry.url ?? '', entry.state);
         if (superseded()) {
           // A newer restore cleared the chain while this plugin loaded —
           // remove (and thereby destroy) the late arrival.
@@ -625,11 +722,17 @@ export class EffectsManager {
       } catch (err) {
         if (superseded()) return;
         const message = err instanceof Error ? err.message : String(err);
+        const sourceLabel = entry.url ?? entry.faustName ?? 'Faust effect';
         console.warn(
-          PREFIX + 'setEffectsState: plugin "' + entry.url + '" failed to restore: ' + message
+          PREFIX + 'setEffectsState: plugin "' + sourceLabel + '" failed to restore: ' + message
         );
         const effectId = this._addWamPlaceholder(chain, entry, message);
-        this._dispatch(target, 'daw-effect-error', { effectId, url: entry.url, message });
+        this._dispatch(target, 'daw-effect-error', {
+          effectId,
+          ...(entry.url !== undefined ? { url: entry.url } : {}),
+          ...(entry.faustDsp !== undefined ? { source: { faust: entry.faustDsp } } : {}),
+          message,
+        });
       }
     }
   }
@@ -637,7 +740,13 @@ export class EffectsManager {
   /** A silent passthrough occupying the failed plugin's chain position. */
   private _addWamPlaceholder(
     chain: EffectsChainController,
-    entry: { url: string; bypassed: boolean; state?: unknown },
+    entry: {
+      url?: string;
+      faustDsp?: string;
+      faustName?: string;
+      bypassed: boolean;
+      state?: unknown;
+    },
     message: string
   ): string {
     const { audioContext } = this._requireWiring();
@@ -645,8 +754,9 @@ export class EffectsManager {
     const effectId = chain.add({
       kind: 'wam',
       type: 'wam',
-      url: entry.url,
-      label: entry.url,
+      ...(entry.url !== undefined ? { url: entry.url } : {}),
+      ...(entry.faustDsp !== undefined ? { source: { faust: entry.faustDsp } } : {}),
+      label: entry.url ?? entry.faustName ?? 'Faust effect',
       error: message,
       placeholder: { state: entry.state, bypassed: entry.bypassed },
       instance: { input: node, output: node, applyParams: () => {} },
@@ -731,8 +841,17 @@ function validateSerializedEntries(entries: unknown): asserts entries is Seriali
         throw new Error(PREFIX + 'setEffectsState: native entry requires a params object' + at);
       }
     } else if (e.kind === 'wam') {
-      if (typeof e.url !== 'string' || e.url.length === 0) {
-        throw new Error(PREFIX + 'setEffectsState: wam entry requires a url string' + at);
+      const hasUrl = typeof e.url === 'string' && e.url.length > 0;
+      const hasFaustDsp = typeof e.faustDsp === 'string' && e.faustDsp.trim().length > 0;
+      if (!hasUrl && !hasFaustDsp) {
+        throw new Error(
+          PREFIX +
+            'setEffectsState: wam entry requires a url string or a faustDsp source string' +
+            at
+        );
+      }
+      if (e.faustName !== undefined && typeof e.faustName !== 'string') {
+        throw new Error(PREFIX + 'setEffectsState: faustName must be a string when provided' + at);
       }
     } else {
       throw new Error(PREFIX + 'setEffectsState: unknown entry kind "' + String(e.kind) + '"' + at);

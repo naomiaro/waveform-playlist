@@ -140,8 +140,10 @@ export interface DawEffectAddDetail {
   type: string;
   params: Record<string, number>;
   index: number;
-  /** Plugin source URL (kind 'wam'). */
+  /** Plugin source URL (kind 'wam', url-loaded). */
   url?: string;
+  /** Faust DSP source (kind 'wam', compiled in-browser via @dawcore/faust). */
+  source?: { faust: string };
 }
 
 export interface DawEffectRemoveDetail {
@@ -166,7 +168,10 @@ export interface DawEffectReorderDetail {
 
 export interface DawEffectErrorDetail {
   effectId: string;
-  url: string;
+  /** Plugin source URL (absent for Faust entries, which have no URL). */
+  url?: string;
+  /** Faust DSP source of the failed entry, when applicable. */
+  source?: { faust: string };
   message: string;
 }
 

@@ -40,6 +40,7 @@
     "waveform-data": "^4.5.2"
   },
   "peerDependencies": {
+    "@dawcore/faust": ">=0.0.1",
     "@dawcore/midi": ">=0.0.1",
     "@dawcore/transport": ">=0.0.7",
     "@dawcore/wam": ">=0.0.1",
@@ -48,6 +49,9 @@
     "@waveform-playlist/worklets": ">=12.0.0"
   },
   "peerDependenciesMeta": {
+    "@dawcore/faust": {
+      "optional": true
+    },
     "@dawcore/midi": {
       "optional": true
     },
@@ -62,6 +66,7 @@
     }
   },
   "devDependencies": {
+    "@dawcore/faust": "workspace:*",
     "@dawcore/midi": "workspace:*",
     "@dawcore/transport": "workspace:*",
     "@dawcore/wam": "workspace:*",

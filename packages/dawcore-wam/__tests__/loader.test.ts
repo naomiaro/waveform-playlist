@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   loadWamFactory,
   createWamInstance,
+  createWamInstanceFromFactory,
   cloneInstanceInto,
   _resetWamFactoryCacheForTests,
 } from '../src/loader';
+import type { WamFactory } from '../src/loader';
+
+/** The mocks are structural (no real AudioNode) — cast for direct factory calls. */
+const asFactory = (mockClass: unknown) => mockClass as WamFactory;
 
 function makeDescriptor(overrides: Record<string, unknown> = {}) {
   return {
@@ -256,6 +261,71 @@ describe('createWamInstance', () => {
   });
 });
 
+describe('createWamInstanceFromFactory', () => {
+  it('instantiates via createInstance(hostGroupId, audioContext) without any module load', async () => {
+    const { WamClass, audioNode } = makeWamClass();
+
+    const plugin = await createWamInstanceFromFactory(asFactory(WamClass), ctx, 'group-1');
+
+    expect(WamClass.createInstance).toHaveBeenCalledWith('group-1', ctx);
+    expect(plugin.descriptor.name).toBe('Test Reverb');
+    expect(plugin.audioNode).toBe(audioNode);
+    // No URL — the factory came from somewhere other than a module load
+    // (e.g. an in-browser Faust compile).
+    expect(plugin.url).toBeUndefined();
+  });
+
+  it('validates the descriptor after instantiation and destroys invalid instances', async () => {
+    const { WamClass, audioNode } = makeWamClass({ hasAudioOutput: false });
+
+    await expect(createWamInstanceFromFactory(asFactory(WamClass), ctx, 'group-1')).rejects.toThrow(
+      /audio output/i
+    );
+    expect(audioNode.destroy).toHaveBeenCalled();
+  });
+
+  it('names the failing plugin via the label option in validation errors', async () => {
+    const { WamClass } = makeWamClass({ apiVersion: '1.0.0' });
+
+    await expect(
+      createWamInstanceFromFactory(asFactory(WamClass), ctx, 'group-1', { label: 'My Lowpass' })
+    ).rejects.toThrow(/My Lowpass/);
+  });
+
+  it('applies initialState via the audio node, destroying the instance when it fails', async () => {
+    const { WamClass, audioNode } = makeWamClass();
+    const state = { '/Lowpass/cutoff': 250 };
+
+    await createWamInstanceFromFactory(asFactory(WamClass), ctx, 'group-1', { initialState: state });
+    expect(audioNode.setState).toHaveBeenCalledWith(state);
+
+    const failing = makeWamClass();
+    failing.audioNode.setState.mockRejectedValueOnce(new Error('bad state'));
+    await expect(
+      createWamInstanceFromFactory(asFactory(failing.WamClass), ctx, 'group-1', {
+        initialState: state,
+      })
+    ).rejects.toThrow('bad state');
+    expect(failing.audioNode.destroy).toHaveBeenCalled();
+  });
+
+  it('exposes GUI passthroughs and an idempotent destroy, like the url path', async () => {
+    const { WamClass, instance, audioNode } = makeWamClass();
+    const guiElement = { nodeType: 1 } as unknown as HTMLElement;
+    Object.assign(instance, {
+      createGui: vi.fn(async () => guiElement),
+      destroyGui: vi.fn(),
+    });
+
+    const plugin = await createWamInstanceFromFactory(asFactory(WamClass), ctx, 'group-1');
+
+    await expect(plugin.createGui!()).resolves.toBe(guiElement);
+    plugin.destroy();
+    plugin.destroy();
+    expect(audioNode.destroy).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('cloneInstanceInto', () => {
   it('re-instantiates on the target context with the live instance state', async () => {
     const { WamClass, audioNode } = makeWamClass();
@@ -273,5 +343,16 @@ describe('cloneInstanceInto', () => {
     // The clone received the live instance's state snapshot.
     expect(audioNode.setState).toHaveBeenCalledWith({ preset: 'cathedral' });
     expect(clone.url).toBe(URL_A);
+  });
+
+  it('rejects a factory-created (url-less) instance with an explanatory error', async () => {
+    const { WamClass } = makeWamClass();
+    const live = await createWamInstanceFromFactory(asFactory(WamClass), ctx, 'group-1');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offlineCtx = { sampleRate: 48000 } as any;
+    await expect(cloneInstanceInto(live, offlineCtx, 'offline-group')).rejects.toThrow(
+      /no source URL/i
+    );
   });
 });
