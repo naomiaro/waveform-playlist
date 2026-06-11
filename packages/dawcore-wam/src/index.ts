@@ -31,6 +31,8 @@ export type {
   WamManifestResponse,
   FetchWamLibraryOptions,
 } from './library';
+export { fetchWamDescriptor } from './descriptor';
+export type { WamDescriptorInfo, FetchWamDescriptorOptions } from './descriptor';
 export { createWamTransportBridge } from './transport-bridge';
 export type {
   WamTransportData,
