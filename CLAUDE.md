@@ -45,11 +45,13 @@ npm install @waveform-playlist/browser
 
 **Independent Versioning:** `@dawcore/components` and `@dawcore/transport` have their own version schemes (0.x.x), separate from the main `@waveform-playlist/*` packages.
 
-**First-time scoped packages:** New `@waveform-playlist/*` packages need `--access public` on first npm publish:
+**First-time scoped packages:** New scoped packages (`@waveform-playlist/*`, `@dawcore/*`) need `--access public` on first npm publish:
 
 ```bash
 pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access public
 ```
+
+**Verifying fresh publishes:** `npm view` caches 404s — a just-published new package can look missing for minutes. Verify with `curl -s https://registry.npmjs.org/@scope%2fname` instead.
 
 **Prerelease Tag:** Use `@next` for prerelease versions when preparing future major releases.
 
@@ -172,6 +174,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
 - **Vitest cleanup:** `npx vitest run` in pnpm monorepos can leave orphaned Node processes at ~100% CPU. After running tests across multiple packages, verify with `pgrep -f vitest` and kill strays with `pkill -f vitest` if needed.
+- **Agent worktrees & dev servers:** Background agents run in `.claude/worktrees/agent-*`. When an agent finishes: its dev server dies (browser tabs still open against it fail dynamic imports with misleading "package not installed" hints — reload against a real server), and stale worktrees linger holding their branch names (`git worktree remove --force .claude/worktrees/agent-* && git worktree prune`). Never trust which checkout `pnpm example:*` serves — the startup log prints the cwd.
 
 **CI Validation:** `.github/workflows/ci.yml` runs on PRs to `main`: build and lint (includes prettier check). Fix formatting with `pnpm format` before pushing.
 
@@ -310,6 +313,8 @@ Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Doc
 7. **Pre-Computed Peaks Require Sample Rate Match** — `.dat` file `sample_rate` must match `AudioContext.sampleRate`. On mismatch, `createClip` warns per-clip (with clip name) and consumers fall back to worker-generated peaks. Browser converts offsets for preview (`ratio = wdRate / clipRate`); worker replaces on next cycle. `configureGlobalContext({ sampleRate })` from playout compares against the actual hardware rate — warns, cannot force (Tone.js limitation).
 8. **`sampleRate` Prop for Pre-Computed Peaks Matching** — `WaveformPlaylistProvider` accepts a `sampleRate` prop; `<daw-editor>` reads from the adapter's AudioContext. Peaks fall back to worker on mismatch.
 9. **`@dawcore/*` packages can't be source-aliased in website webpack** — they use Lit `@customElement` decorators which the website's babel-loader doesn't parse without `@babel/plugin-proposal-decorators`. Use built `dist/` via node_modules (matches the `recording` / `annotations` pattern). Add as `workspace:*` dep in `website/package.json`, run `pnpm install` to symlink, no webpack alias needed.
+10. **Webpack statically resolves literal dynamic imports** — even runtime-lazy `import('pkg')` chains are followed at build time. A package whose deps reference Node builtins (e.g. `@shren/faust2wam`'s `fs`/`url`) breaks the Docusaurus build; the website aliases `@dawcore/faust` to `false` since it ships no Faust UI. Vite tolerates the same chain.
+11. **Structural interfaces against another package: verify method NAMES from the class declaration** — grep for `methodName(` can match internal call sites in method bodies (e.g. Transport's `timeToTick() { return this._tempoMap.secondsToTicks(...) }`). A wrong name copied into a structural type AND its test mocks passes every unit test and fails only against the real object — pair structural typing with at least one real-integration check.
 
 ---
 

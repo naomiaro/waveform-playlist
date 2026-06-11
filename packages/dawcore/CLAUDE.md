@@ -24,6 +24,7 @@
 - `editor.addTrack({ name, midi: { notes } })` is the lightweight way to get fully loaded tracks in editor template tests — no fetch/decode. See `daw-editor-layout.test.ts` `makeEditor()`.
 - Test cleanup (spy `mockRestore`, removing appended `daw-editor`s) belongs in `afterEach`, never as the last line of a test body — a failed assertion skips trailing cleanup and silently poisons subsequent tests in the file.
 - After refactoring test cleanup, run `pnpm typecheck` too — vitest passing doesn't catch newly-unused destructured bindings (`TS6133` under `noUnusedLocals`).
+- **Adding an export to `@dawcore/wam` (or `@dawcore/faust`) breaks every existing `vi.mock` of it** — vitest strict mocks throw "No X export is defined on the mock" on property access. Sweep all `vi.mock('@dawcore/wam', ...)` factories in `src/__tests__/` and add the new export (a `vi.fn()` stub suffices) whenever the real package's index grows.
 
 **Dev page:** `pnpm example:dawcore-native` starts Vite at `http://localhost:5173/` (config in `examples/dawcore-native/vite.config.ts`). Uses `website/static/` as publicDir for audio files.
 
