@@ -324,6 +324,8 @@ Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Doc
 
 **Effects/WAM roadmap:** Tracked as GitHub epics with native sub-issues — #412 (unified effects chain), #413 (WAM 2.0, `@dawcore/wam`), #414 (Faust), #415 (WCLAP spike). The architecture/design record lives in the epic issue bodies, not in docs/specs. TODO.md's WAM section is superseded by these issues.
 
+**Web Components migration:** `docs/specs/web-components-migration.md` is the long-lived spec for the `@dawcore/*` WC surface (exception to the remove-specs-when-done rule; audited against code 2026-06-11). Remaining work is tracked as epics #452 (transport/control elements), #453 (record arming + VU meter), #454 (`<daw-player>`), #455 (annotations WC), #456 (accessibility), #457 (custom track controls), #458 (JSX types + CEM), plus standalone issues #489–#494.
+
 **Debug tests:** `debug/tonejs/` contains standalone HTML reproductions of upstream Tone.js bugs. Each file loads Tone.js from CDN with a one-click reproduce button — change the `<script src>` version to test new releases. See `debug/tonejs/README.md`.
 
 **Debug apps:** `debug/standalone-midi/` is a standalone Vite+React app using workspace components (not Docusaurus) for isolating rendering bugs. Run with `cd debug/standalone-midi && pnpm exec vite`.
