@@ -301,7 +301,7 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
   <div id="log"></div>
 
   <script type="module">
-    import { fetchWamLibrary } from '@dawcore/wam';
+    import { fetchWamLibrary, fetchWamDescriptor } from '@dawcore/wam';
     import { NativePlayoutAdapter } from '@dawcore/transport';
 
     const MANIFEST_URL = 'https://www.webaudiomodules.com/community/plugins.json';
@@ -500,20 +500,29 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
           baseUrl: MANIFEST_BASE_URL,
         });
         if (warnings.length > 0) addLog('library: ' + warnings.length + ' entries skipped');
+
+        // Ground truth: SDK-built plugins ship a static descriptor.json next
+        // to their module with the real audio-I/O flags. The registry's
+        // category metadata misclassifies some entries (e.g. "Audio Input"
+        // is tagged Effect but has no audio input), so probe descriptors in
+        // parallel and partition on hasAudioInput && hasAudioOutput. A null
+        // descriptor is expected for registries without the SDK convention —
+        // those entries fall back to the category heuristic. The URL input
+        // above loads anything directly as the escape hatch, and
+        // createWamInstance's validation remains the real gate.
+        const descriptors = await Promise.all(
+          entries.map((entry) => fetchWamDescriptor(entry.url)));
         libraryEl.textContent = '';
 
-        // The community registry categorizes every entry (Effect, Modulation,
-        // Instrument, MIDI, Video). Instrument/MIDI/Video plugins have no
-        // audio input, so createWamInstance would reject them — render them
-        // dimmed and inert instead of letting every click fail. Entries with
-        // no category data (other registries) are assumed insertable; the
-        // URL input above loads anything directly as the escape hatch, and
-        // descriptor validation at load time remains the real gate.
-        const isInsertable = (entry) =>
-          !entry.category ||
-          entry.category.length === 0 ||
-          entry.category.includes('Effect') ||
-          entry.category.includes('Modulation');
+        const isInsertable = (entry, descriptor) => {
+          if (descriptor) {
+            return descriptor.hasAudioInput === true && descriptor.hasAudioOutput === true;
+          }
+          return !entry.category ||
+            entry.category.length === 0 ||
+            entry.category.includes('Effect') ||
+            entry.category.includes('Modulation');
+        };
 
         const renderEntry = (entry, insertable) => {
           const row = document.createElement('div');
@@ -539,14 +548,14 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
           libraryEl.appendChild(row);
         };
 
-        const insertable = entries.filter(isInsertable);
-        const inert = entries.filter((entry) => !isInsertable(entry));
+        const insertable = entries.filter((entry, i) => isInsertable(entry, descriptors[i]));
+        const inert = entries.filter((entry, i) => !isInsertable(entry, descriptors[i]));
         for (const entry of insertable) renderEntry(entry, true);
         if (inert.length > 0) {
           const header = document.createElement('div');
           header.className = 'library-section';
           header.textContent =
-            "instruments / midi / video — can't be inserted into an effects chain";
+            "not insertable in an effects chain — needs audio in + out";
           libraryEl.appendChild(header);
           for (const entry of inert) renderEntry(entry, false);
         }
