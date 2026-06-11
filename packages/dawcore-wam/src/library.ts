@@ -21,6 +21,8 @@ export interface WamLibraryEntry {
   /** Absolute URL of a screenshot/thumbnail (resolved against the manifest URL). */
   thumbnail?: string;
   keywords?: string[];
+  /** Registry categories (e.g. "Effect", "Instrument", "MIDI"). Normalized to an array. */
+  category?: string[];
 }
 
 export interface WamLibraryResult {
@@ -234,6 +236,11 @@ function parseObjectEntry(
   }
   if (Array.isArray(raw.keywords)) {
     entry.keywords = raw.keywords.filter((k): k is string => typeof k === 'string');
+  }
+  if (Array.isArray(raw.category)) {
+    entry.category = raw.category.filter((c): c is string => typeof c === 'string');
+  } else if (typeof raw.category === 'string' && raw.category.trim() !== '') {
+    entry.category = [raw.category];
   }
   return { entry };
 }

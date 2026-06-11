@@ -321,6 +321,7 @@ describe('fetchWamLibrary — optional fields', () => {
         vendor: { name: 'nested' },
         thumbnail: false,
         keywords: 'effect',
+        category: 42,
       },
     ]);
 
@@ -344,6 +345,48 @@ describe('fetchWamLibrary — optional fields', () => {
     const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
 
     expect(entries[0].keywords).toEqual(['effect', 'reverb']);
+  });
+
+  it('passes through category as a string array', async () => {
+    const fetchFn = makeFetchFn([
+      {
+        name: 'Reverb',
+        url: 'https://plugins.example.com/reverb/index.js',
+        category: ['Effect', 'Reverb'],
+      },
+    ]);
+
+    const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
+
+    expect(entries[0].category).toEqual(['Effect', 'Reverb']);
+  });
+
+  it('wraps a bare-string category in an array', async () => {
+    const fetchFn = makeFetchFn([
+      {
+        name: 'Reverb',
+        url: 'https://plugins.example.com/reverb/index.js',
+        category: 'Effect',
+      },
+    ]);
+
+    const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
+
+    expect(entries[0].category).toEqual(['Effect']);
+  });
+
+  it('filters non-string items out of category', async () => {
+    const fetchFn = makeFetchFn([
+      {
+        name: 'Reverb',
+        url: 'https://plugins.example.com/reverb/index.js',
+        category: ['Effect', 7, null, 'Reverb'],
+      },
+    ]);
+
+    const { entries } = await fetchWamLibrary(MANIFEST_URL, { fetchFn });
+
+    expect(entries[0].category).toEqual(['Effect', 'Reverb']);
   });
 });
 
@@ -494,6 +537,7 @@ describe('fetchWamLibrary — real-world manifests', () => {
       thumbnail:
         'https://www.webaudiomodules.com/community/plugins/burns-audio/distortion/screenshot.png',
       keywords: ['effect', 'distortion'],
+      category: ['Effect', 'Distortion'],
     });
   });
 
