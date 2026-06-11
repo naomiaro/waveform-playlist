@@ -29,6 +29,8 @@ export class EffectsManager {
   private _masterTarget: EventTarget;
   private _masterChain: EffectsChainController | null = null;
   private _trackChains = new Map<string, EffectsChainController>();
+  /** Per-chain restore ownership — a newer setEffectsState supersedes a stale in-flight one. */
+  private _restoreTokens = new WeakMap<EffectsChainController, symbol>();
 
   constructor(getAdapter: () => AdapterLike | null, masterEventTarget: EventTarget) {
     this._getAdapter = getAdapter;
@@ -327,10 +329,17 @@ export class EffectsManager {
     target: EventTarget,
     entries: SerializedEffectEntry[]
   ): Promise<void> {
+    // Last writer wins: a newer restore takes ownership of the chain and the
+    // stale one aborts at its next checkpoint instead of interleaving entries.
+    const token = Symbol('restore');
+    this._restoreTokens.set(chain, token);
+    const superseded = () => this._restoreTokens.get(chain) !== token;
+
     for (const existing of chain.entries) {
       this._runOp(chain, target, 'remove', existing.id);
     }
     for (const entry of entries) {
+      if (superseded()) return;
       if (entry.kind === 'native') {
         const id = this._addToChain(chain, target, entry.type, entry.params);
         if (entry.bypassed) {
@@ -340,10 +349,17 @@ export class EffectsManager {
       }
       try {
         const id = await this._addWamToChain(chain, target, entry.url, entry.state);
+        if (superseded()) {
+          // A newer restore cleared the chain while this plugin loaded —
+          // remove (and thereby destroy) the late arrival.
+          this._runOp(chain, target, 'remove', id);
+          return;
+        }
         if (entry.bypassed) {
           this._runOp(chain, target, 'setBypassed', id, true);
         }
       } catch (err) {
+        if (superseded()) return;
         const message = err instanceof Error ? err.message : String(err);
         console.warn(
           PREFIX + 'setEffectsState: plugin "' + entry.url + '" failed to restore: ' + message
@@ -389,6 +405,21 @@ export class EffectsManager {
     const fromIndex = entries.findIndex((e) => e.id === effectId);
     if (!chain || fromIndex === -1) {
       console.warn(PREFIX + 'effects.' + op + ': unknown effectId "' + effectId + '"');
+      return;
+    }
+    if (entries[fromIndex].error !== undefined && (op === 'setParams' || op === 'setBypassed')) {
+      // Error placeholders are inert passthroughs — silently "succeeding"
+      // would mislead the consumer into thinking the edit took effect.
+      console.warn(
+        PREFIX +
+          'effects.' +
+          op +
+          ': effect "' +
+          effectId +
+          '" is a failed-plugin placeholder (' +
+          entries[fromIndex].error +
+          ') — edit ignored. Remove it or retry the restore.'
+      );
       return;
     }
     switch (op) {

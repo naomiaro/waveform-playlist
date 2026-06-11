@@ -214,6 +214,60 @@ describe('effects chain persistence', () => {
     });
   });
 
+  it('a plugin whose getState rejects degrades to a state-less entry instead of failing the snapshot', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor.addEffect('native-gain');
+    await editor.addWamPlugin(PLUGIN_URL);
+    plugin.getState.mockRejectedValueOnce(new Error('worklet crashed'));
+
+    const saved = await editor.getEffectsState();
+
+    expect(saved).toHaveLength(2);
+    expect(saved[1]).toEqual({ kind: 'wam', url: PLUGIN_URL, bypassed: false });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('worklet crashed'));
+  });
+
+  it('a superseding setEffectsState aborts the stale restore (last writer wins)', async () => {
+    let resolveInstance!: (p: ReturnType<typeof makeMockPlugin>) => void;
+    createWamInstance.mockReset().mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveInstance = resolve;
+      })
+    );
+
+    const slow = editor.setEffectsState([
+      { kind: 'wam', url: PLUGIN_URL, bypassed: false },
+      { kind: 'native', type: 'native-gain', params: { gain: 0.9 }, bypassed: false },
+    ]);
+    const fast = editor.setEffectsState([
+      { kind: 'native', type: 'native-stereo-panner', params: { pan: 0.5 }, bypassed: false },
+    ]);
+    await fast;
+    resolveInstance(plugin);
+    await slow;
+
+    // Only the newest restore's content survives; the stale wam was discarded.
+    expect(editor.effects).toHaveLength(1);
+    expect(editor.effects[0].type).toBe('native-stereo-panner');
+    expect(plugin.destroy).toHaveBeenCalled();
+  });
+
+  it('param/bypass edits on an error placeholder warn and no-op', async () => {
+    createWamInstance.mockRejectedValueOnce(new Error('404'));
+    await editor.setEffectsState([{ kind: 'wam', url: PLUGIN_URL, bypassed: false }]);
+    const placeholderId = editor.effects[0].id;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onChange = vi.fn();
+    editor.addEventListener('daw-effect-change', onChange as EventListener);
+
+    editor.setEffectParams(placeholderId, { gain: 0.5 });
+    editor.setEffectBypassed(placeholderId, false);
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(editor.effects[0].bypassed).toBe(true);
+  });
+
   it('works per-track on <daw-track>', async () => {
     const track = await appendTrack();
     track.addEffect('native-gain', { gain: 0.7 });

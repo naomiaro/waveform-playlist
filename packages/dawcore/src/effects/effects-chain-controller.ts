@@ -65,7 +65,19 @@ export class EffectsChainController {
               ...(entry.placeholder.state !== undefined ? { state: entry.placeholder.state } : {}),
             };
           }
-          const state = await entry.instance.getState?.();
+          let state: unknown;
+          try {
+            state = await entry.instance.getState?.();
+          } catch (err) {
+            // One misbehaving plugin must not poison the whole snapshot —
+            // emit the entry without state and let the consumer persist the rest.
+            console.warn(
+              '[waveform-playlist] serialize: plugin "' +
+                (entry.url ?? entry.type) +
+                '" getState failed: ' +
+                String(err)
+            );
+          }
           return {
             kind: 'wam',
             url: entry.url ?? '',
