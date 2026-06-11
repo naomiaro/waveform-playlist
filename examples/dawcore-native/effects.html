@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — effects chain demo</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 0.95rem;
+      color: #888;
+      margin: 0 0 10px 0;
+      font-weight: normal;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    button {
+      cursor: pointer;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid currentColor;
+      padding: 6px 14px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    button:hover { opacity: 0.8; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    .rack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 560px;
+    }
+    .rack:empty::after {
+      content: 'no effects — dry signal';
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      color: #555;
+    }
+    .effect {
+      background: #1a1a2e;
+      border-left: 3px solid #63C75F;
+      padding: 8px 12px;
+    }
+    .effect.bypassed {
+      border-left-color: #555;
+      opacity: 0.6;
+    }
+    .effect-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .effect-header .name {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #c49a6c;
+      flex: 1;
+    }
+    .effect-header button {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+    }
+    .effect-header button.active {
+      background: #63C75F;
+      color: #0f0f1a;
+      border-color: #63C75F;
+    }
+    .param {
+      display: grid;
+      grid-template-columns: 90px 1fr 90px;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.78rem;
+      margin-bottom: 2px;
+    }
+    .param .value {
+      font-family: 'Courier New', monospace;
+      color: #888;
+      text-align: right;
+    }
+    input[type="range"] {
+      accent-color: #63C75F;
+      width: 100%;
+    }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore — effects chain demo</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
+    <daw-track id="synth-track" src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <div class="section">
+    <h2>Synth track effects</h2>
+    <div class="controls">
+      <button id="add-filter" disabled>+ Lowpass Filter</button>
+      <button id="add-delay" disabled>+ Delay</button>
+    </div>
+    <div class="rack" id="track-rack"></div>
+  </div>
+
+  <div class="section">
+    <h2>Master effects</h2>
+    <div class="controls">
+      <button id="add-compressor">+ Compressor</button>
+    </div>
+    <div class="rack" id="master-rack"></div>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { getEffectDefinitions } from '@dawcore/components';
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+
+    const editor = document.getElementById('editor');
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    const adapter = new NativePlayoutAdapter(audioCtx);
+    editor.adapter = adapter;
+
+    const synthTrack = document.getElementById('synth-track');
+    const trackRack = document.getElementById('track-rack');
+    const masterRack = document.getElementById('master-rack');
+    const definitions = getEffectDefinitions();
+
+    const log = document.getElementById('log');
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = msg;
+      log.prepend(line);
+      while (log.children.length > 20) log.lastChild.remove();
+    }
+
+    // --- Rack rendering ---
+    // `target` is anything with the effects API: <daw-track> (per-track chain)
+    // or <daw-editor> (master chain). Rebuilt from `target.effects` state.
+    function renderRack(target, rack) {
+      rack.textContent = '';
+      for (const effect of target.effects) {
+        const definition = definitions.get(effect.type);
+        const row = document.createElement('div');
+        row.className = 'effect' + (effect.bypassed ? ' bypassed' : '');
+
+        const header = document.createElement('div');
+        header.className = 'effect-header';
+
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = definition ? definition.label : effect.type;
+        header.appendChild(name);
+
+        const bypassBtn = document.createElement('button');
+        bypassBtn.textContent = 'Bypass';
+        bypassBtn.classList.toggle('active', effect.bypassed);
+        bypassBtn.addEventListener('click', () => {
+          target.setEffectBypassed(effect.id, !effect.bypassed);
+          renderRack(target, rack);
+        });
+        header.appendChild(bypassBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          target.removeEffect(effect.id);
+          renderRack(target, rack);
+        });
+        header.appendChild(removeBtn);
+
+        row.appendChild(header);
+
+        for (const [paramName, def] of Object.entries(definition ? definition.params : {})) {
+          const param = document.createElement('div');
+          param.className = 'param';
+
+          const label = document.createElement('span');
+          label.textContent = paramName;
+          param.appendChild(label);
+
+          const slider = document.createElement('input');
+          slider.type = 'range';
+          slider.min = def.min;
+          slider.max = def.max;
+          slider.step = def.step;
+          slider.value = effect.params[paramName];
+
+          const value = document.createElement('span');
+          value.className = 'value';
+          const unit = def.unit ? ' ' + def.unit : '';
+          value.textContent = slider.value + unit;
+
+          slider.addEventListener('input', () => {
+            target.setEffectParams(effect.id, { [paramName]: Number(slider.value) });
+            value.textContent = slider.value + unit;
+          });
+
+          param.appendChild(slider);
+          param.appendChild(value);
+          row.appendChild(param);
+        }
+
+        rack.appendChild(row);
+      }
+    }
+
+    // --- Add buttons ---
+    document.getElementById('add-filter').addEventListener('click', () => {
+      synthTrack.addEffect('native-filter', { frequency: 800 });
+      renderRack(synthTrack, trackRack);
+    });
+    document.getElementById('add-delay').addEventListener('click', () => {
+      synthTrack.addEffect('native-delay');
+      renderRack(synthTrack, trackRack);
+    });
+    document.getElementById('add-compressor').addEventListener('click', () => {
+      editor.addEffect('native-compressor', { threshold: -36 });
+      renderRack(editor, masterRack);
+    });
+
+    // Per-track chains wire into the transport's track nodes — enable the
+    // track buttons once the synth track's audio is loaded.
+    editor.addEventListener('daw-track-ready', (e) => {
+      addLog('track-ready: ' + e.detail.trackId);
+      if (e.detail.trackId === synthTrack.trackId) {
+        document.getElementById('add-filter').disabled = false;
+        document.getElementById('add-delay').disabled = false;
+      }
+    });
+
+    // --- daw-effect-* events (track events bubble up to the editor) ---
+    editor.addEventListener('daw-effect-add', (e) =>
+      addLog('effect-add: ' + e.detail.type + ' (' + e.detail.effectId + ') at index ' + e.detail.index));
+    editor.addEventListener('daw-effect-remove', (e) =>
+      addLog('effect-remove: ' + e.detail.effectId));
+    editor.addEventListener('daw-effect-change', (e) =>
+      addLog('effect-change: ' + e.detail.effectId + ' ' + JSON.stringify(e.detail.params)));
+    editor.addEventListener('daw-effect-bypass', (e) =>
+      addLog('effect-bypass: ' + e.detail.effectId + ' bypassed=' + e.detail.bypassed));
+    editor.addEventListener('daw-effect-reorder', (e) =>
+      addLog('effect-reorder: ' + e.detail.effectId + ' ' + e.detail.fromIndex + ' -> ' + e.detail.toIndex));
+  </script>
+</body>
+</html>

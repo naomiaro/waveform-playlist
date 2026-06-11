@@ -15,6 +15,7 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **Pre-computed peaks** — Instant waveform rendering from `.dat` files before audio decodes
 - **MIDI tracks** — Programmatic MIDI clips render as piano-roll via `<daw-piano-roll>`. Playback via Tone.js adapter (native MIDI synth deferred). See [MIDI Tracks](#midi-tracks).
 - **Track controls** — Volume, pan, mute, solo per track via `<daw-track-controls>`
+- **Effects chains** — Per-track and master effect chains with built-in `native-*` effects and WAM 2.0 plugins via `@dawcore/wam`. See [Effects](#effects).
 - **Transport access** — Tempo, metronome, count-in, meter, effects via `@dawcore/transport`
 - **CSS theming** — Dark mode by default, fully customizable via CSS custom properties
 - **Native Web Audio** — Uses `@dawcore/transport` for playback scheduling. No Tone.js dependency.
@@ -202,6 +203,45 @@ adapter.transport.on('countIn', ({ beat, totalBeats }) => {
 adapter.transport.connectTrackOutput('track-id', reverbNode);
 ```
 
+## Effects
+
+Per-track and master effect chains (requires `@dawcore/transport` >= 0.0.13). `<daw-track>` owns its track chain; `<daw-editor>` owns the master chain — same API on both:
+
+```javascript
+const track = document.querySelector('daw-track');
+
+// Built-in native-* effects: native-gain, native-filter, native-compressor,
+// native-stereo-panner, native-delay
+const filterId = track.addEffect('native-filter', { frequency: 800 });
+const compressorId = editor.addEffect('native-compressor'); // master chain
+
+track.setEffectParams(filterId, { frequency: 2000 });  // live, during playback
+track.setEffectBypassed(filterId, true);
+track.moveEffect(filterId, 1);
+track.removeEffect(filterId);
+console.log(track.effects);  // [{ id, kind, type, params, bypassed }, ...]
+```
+
+Effect events dispatch from the owning element and bubble to the editor:
+
+```javascript
+editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));
+// also: daw-effect-remove, daw-effect-change, daw-effect-bypass, daw-effect-reorder
+```
+
+Register custom effects with `registerEffect(type, definition)`; inspect built-ins with `getEffectDefinitions()` (exports from `@dawcore/components`).
+
+### WAM Plugins
+
+[Web Audio Modules 2.0](https://www.webaudiomodules.com/) plugins load into the same chains via the optional `@dawcore/wam` peer (`npm install @dawcore/wam`):
+
+```javascript
+const wamId = await track.addWamPlugin('https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js');
+// WAM entries are ordinary chain entries — bypass/move/remove/events all work
+```
+
+See `examples/dawcore-native/effects.html` for a runnable demo.
+
 ## Programmatic File Loading
 
 ```javascript
@@ -303,11 +343,11 @@ Core orchestrator. Attributes:
 
 JS properties: `audioContext`, `recordingStream`, `engine`.
 
-Methods: `loadFiles(fileList)`, `splitAtPlayhead()`.
+Methods: `loadFiles(fileList)`, `splitAtPlayhead()`, plus the master-chain effects API (see [Effects](#effects)).
 
 ### `<daw-track>`
 
-Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `mono`, `render-mode` (`'waveform' | 'piano-roll'`, default `'waveform'`).
+Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `mono`, `render-mode` (`'waveform' | 'piano-roll'`, default `'waveform'`). Also exposes the per-track effects API (see [Effects](#effects)).
 
 ### `<daw-clip>`
 
@@ -355,6 +395,10 @@ editor.addEventListener('daw-recording-complete', (e) => {
   // e.preventDefault() to skip automatic clip creation
   console.log(e.detail.audioBuffer);
 });
+
+// Effects (track events bubble up to the editor)
+editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));
+editor.addEventListener('daw-effect-change', (e) => console.log(e.detail));
 
 // Errors
 editor.addEventListener('daw-track-error', (e) => console.error(e.detail));
