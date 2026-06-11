@@ -135,6 +135,8 @@ When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute
 
 `connectTrackOutput(trackId, node)` accepts any AudioNode chain (Tone.js effects, WAM plugins, native nodes). The transport has zero knowledge of Tone.js.
 
+`connectMasterOutput(node)` / `disconnectMasterOutput()` are the master-bus equivalents — the chain is inserted between the master gain and `audioContext.destination` via `MasterNode.connectEffects`. Master insertion uses a **targeted** `disconnect(destination)` (not blanket `disconnect()`) so parallel taps on `masterOutputNode` (analyzers, recorders) survive chain connect/disconnect. The caller routes the chain's output to `audioContext.destination`.
+
 ## NativePlayoutAdapter
 
 Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (required + optional: `addTrack`, `removeTrack`, `updateTrack`). `init()` resumes suspended AudioContext and waits for Safari warmup (see Patterns). `transport` getter exposes the Transport for direct access to tempo, metronome, and effects hooks.

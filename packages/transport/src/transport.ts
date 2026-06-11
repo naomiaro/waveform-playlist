@@ -637,6 +637,22 @@ export class Transport {
     return this._masterNode.output;
   }
 
+  /**
+   * Insert an effects chain on the master bus, between the master gain and
+   * audioContext.destination. Accepts any AudioNode chain (Tone.js effects,
+   * WAM plugins, native nodes). The caller is responsible for connecting the
+   * chain's output to audioContext.destination. Calling again replaces the
+   * previous chain. Parallel taps on `masterOutputNode` are unaffected.
+   */
+  connectMasterOutput(node: AudioNode): void {
+    this._masterNode.connectEffects(node);
+  }
+
+  /** Remove the master effects chain and restore direct routing to audioContext.destination. */
+  disconnectMasterOutput(): void {
+    this._masterNode.disconnectEffects();
+  }
+
   // --- Events ---
 
   on<K extends TransportEventType>(event: K, cb: TransportEvents[K]): void {
@@ -706,7 +722,7 @@ export class Transport {
 
   private _initAudioGraph(audioContext: AudioContext): void {
     this._masterNode = new MasterNode(audioContext);
-    this._masterNode.output.connect(audioContext.destination);
+    this._masterNode.connectOutput(audioContext.destination);
 
     const toAudioTime = (transportTime: number) => this._clock.toAudioTime(transportTime);
 

@@ -554,4 +554,69 @@ describe('Transport', () => {
     // Should not throw — extra args are ignored
     expect(noArgListener).toHaveBeenCalledTimes(1);
   });
+
+  describe('master effects hook (#416)', () => {
+    function getMasterGain(ctx: AudioContext) {
+      // MasterNode creates the first GainNode during Transport construction.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (ctx.createGain as any).mock.results[0].value;
+    }
+
+    function createMockChainInput() {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return { connect: vi.fn(), disconnect: vi.fn() } as any;
+    }
+
+    it('connectMasterOutput inserts the chain between master gain and destination', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      const chainInput = createMockChainInput();
+
+      transport.connectMasterOutput(chainInput);
+
+      const masterGain = getMasterGain(ctx);
+      expect(masterGain.disconnect).toHaveBeenCalledWith(ctx.destination);
+      expect(masterGain.connect).toHaveBeenCalledWith(chainInput);
+    });
+
+    it('disconnectMasterOutput restores direct routing to destination', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      const chainInput = createMockChainInput();
+
+      transport.connectMasterOutput(chainInput);
+      transport.disconnectMasterOutput();
+
+      const masterGain = getMasterGain(ctx);
+      expect(masterGain.disconnect).toHaveBeenCalledWith(chainInput);
+      const lastConnect = masterGain.connect.mock.calls.at(-1)[0];
+      expect(lastConnect).toBe(ctx.destination);
+    });
+
+    it('connectMasterOutput twice replaces the chain without double-connections', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      const firstChain = createMockChainInput();
+      const secondChain = createMockChainInput();
+
+      transport.connectMasterOutput(firstChain);
+      transport.connectMasterOutput(secondChain);
+
+      const masterGain = getMasterGain(ctx);
+      expect(masterGain.disconnect).toHaveBeenCalledWith(firstChain);
+      expect(masterGain.connect.mock.calls.map((c: unknown[]) => c[0])).toEqual([
+        ctx.destination,
+        firstChain,
+        secondChain,
+      ]);
+    });
+
+    it('dispose while master chain connected does not throw', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.connectMasterOutput(createMockChainInput());
+
+      expect(() => transport.dispose()).not.toThrow();
+    });
+  });
 });

@@ -10,7 +10,7 @@ Native Web Audio transport for multi-track audio scheduling, looping, tempo, and
 - **Built-in metronome** — Beat-grid click scheduling with accent on beat 1. Default synthesized click sounds out of the box.
 - **Count-in (pre-roll)** — Configurable bars of click sounds before playback begins. Beat-by-beat events for UI countdown.
 - **Per-track signal chain** — Native GainNode (volume) → StereoPannerNode → GainNode (mute) → effects hook → master output.
-- **Effects plugin hook** — `connectTrackOutput(trackId, node)` inserts any `AudioNode` chain (Tone.js effects, WAM plugins, native nodes).
+- **Effects plugin hook** — `connectTrackOutput(trackId, node)` and `connectMasterOutput(node)` insert any `AudioNode` chain (Tone.js effects, WAM plugins, native nodes) per-track or on the master bus.
 - **Type-safe coordinates** — Branded `Tick` and `Sample` types prevent accidentally passing seconds where ticks or samples are expected. Zero runtime cost.
 - **PlayoutAdapter bridge** — `NativePlayoutAdapter` implements the `PlayoutAdapter` interface from `@waveform-playlist/engine`.
 
@@ -156,6 +156,17 @@ transport.connectTrackOutput('vocals', reverb);
 
 // Remove effects — restores direct routing to master
 transport.disconnectTrackOutput('vocals');
+
+// Master bus effects — inserted between master gain and destination
+const compressor = audioContext.createDynamicsCompressor();
+compressor.connect(audioContext.destination);
+
+transport.connectMasterOutput(compressor);
+
+// Remove master effects — restores direct routing to destination.
+// Parallel taps on transport.masterOutputNode (analyzers, recorders)
+// are unaffected by connect/disconnect.
+transport.disconnectMasterOutput();
 ```
 
 ## API
@@ -224,8 +235,10 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `isCountingIn()` — whether count-in is active
 
 **Effects:**
-- `connectTrackOutput(trackId, node)` — Insert effects chain
-- `disconnectTrackOutput(trackId)` — Remove effects chain
+- `connectTrackOutput(trackId, node)` — Insert per-track effects chain
+- `disconnectTrackOutput(trackId)` — Remove per-track effects chain
+- `connectMasterOutput(node)` — Insert master bus effects chain
+- `disconnectMasterOutput()` — Remove master bus effects chain
 
 **Events:**
 - `on(event, callback)` / `off(event, callback)`
