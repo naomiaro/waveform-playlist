@@ -102,6 +102,8 @@ describe('seekTo', () => {
       stop: vi.fn(),
       play: vi.fn(),
       init: vi.fn().mockResolvedValue(undefined),
+      getAudibleTime: vi.fn().mockReturnValue(0),
+      getCurrentTime: vi.fn().mockReturnValue(0),
     };
     el._isPlaying = true;
     const stopSpy = vi.spyOn(el, 'stop');

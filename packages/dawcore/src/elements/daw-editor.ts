@@ -84,6 +84,7 @@ import type { EffectState, SerializedEffectEntry } from '../effects/types';
 import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
 import { extractPeaks } from '../workers/waveformDataUtils';
 import { ScrollSyncController } from '../controllers/scroll-sync-controller';
+import { PlaybackAnimationController } from '../controllers/playback-animation-controller';
 
 /** Height of the ruler band — single source for the ruler element and the header row. */
 const RULER_HEIGHT = 30;
@@ -583,6 +584,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
+  private _playbackAnimation = new PlaybackAnimationController(this);
   private _spectrogramController: SpectrogramController | null = null;
   private _clipPointer = new ClipPointerHandler(this);
   get _clipHandler() {
@@ -2565,42 +2567,39 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       `;
     });
   }
-  // --- Playhead ---
+  // --- Playback animation (single RAF loop: playhead + daw-timeupdate) ---
+  /** Convert playback seconds to a timeline pixel offset for the active mode. */
+  private _timeToPixels = (time: number): number => {
+    if (this.scaleMode === 'beats') {
+      return this._secondsToTicks(time) / this.ticksPerPixel;
+    }
+    return (time * this.effectiveSampleRate) / this.samplesPerPixel;
+  };
+
   _startPlayhead() {
-    const playhead = this._getPlayhead();
-    if (!playhead || !this._engine) return;
+    if (!this._engine) return;
     const engine = this._engine;
     // engine.getAudibleTime(): while playing, engine time minus hardware DAC
     // latency (outputLatency) and scheduler lookahead (0.1s on Tone-backed
     // adapters, 0 native), held at the play-start position during the
     // pre-roll window. Without the subtraction the playhead leads audio by
     // ~100ms with the Tone adapter.
-    const audibleTime = (): number => engine.getAudibleTime();
-    if (this.scaleMode === 'beats') {
-      const secondsToTicksFn = (s: number) => this._secondsToTicks(s);
-      playhead.startBeatsAnimationWithMap(audibleTime, secondsToTicksFn, this.ticksPerPixel);
-    } else {
-      playhead.startAnimation(audibleTime, this.effectiveSampleRate, this.samplesPerPixel);
-    }
+    // Runs even when the playhead element isn't rendered (empty/indefinite
+    // editors) so daw-timeupdate consumers still get frames.
+    this._playbackAnimation.start(
+      () => engine.getAudibleTime(),
+      this._timeToPixels,
+      () => this._getPlayhead()
+    );
   }
   _stopPlayhead() {
-    const playhead = this._getPlayhead();
-    if (!playhead) return;
     // Resting playhead displays the raw position — latency compensation is a
     // playback-time concept (Transport scheduling vs audible output). A
     // seeked/stopped/paused cursor shows exactly the commanded position.
     // Storage (`_currentTime`) is already raw, so play() resumes correctly.
     const t = this._currentTime;
     const visualTime = Number.isFinite(t) ? Math.max(0, t) : 0;
-    if (this.scaleMode === 'beats') {
-      playhead.stopBeatsAnimationWithMap(
-        visualTime,
-        (s: number) => this._secondsToTicks(s),
-        this.ticksPerPixel
-      );
-    } else {
-      playhead.stopAnimation(visualTime, this.effectiveSampleRate, this.samplesPerPixel);
-    }
+    this._playbackAnimation.stop(visualTime, this._timeToPixels, () => this._getPlayhead());
   }
   private _getPlayhead(): DawPlayheadElement | null {
     return this.shadowRoot?.querySelector('daw-playhead') as DawPlayheadElement | null;

@@ -56,17 +56,18 @@ describe('daw-editor seek playhead position', () => {
 
   it('seekTo while stopped positions the resting playhead at the exact time', () => {
     const playhead = editor.shadowRoot!.querySelector('daw-playhead') as HTMLElement & {
-      stopAnimation: (time: number, sampleRate: number, spp: number) => void;
+      setPosition: (px: number) => void;
     };
     expect(playhead).toBeTruthy();
-    const stopSpy = vi.fn();
-    playhead.stopAnimation = stopSpy;
+    const posSpy = vi.fn();
+    playhead.setPosition = posSpy;
 
     editor.seekTo(5);
 
-    expect(stopSpy).toHaveBeenCalled();
-    const visualTime = stopSpy.mock.calls[stopSpy.mock.calls.length - 1][0];
-    // Exact click time — NOT 5 − outputLatency − lookAhead = 4.89.
-    expect(visualTime).toBe(5);
+    expect(posSpy).toHaveBeenCalled();
+    const px = posSpy.mock.calls[posSpy.mock.calls.length - 1][0];
+    // Exact click time converted to pixels — NOT 5 − outputLatency − lookAhead.
+    const expectedPx = (5 * 48000) / editor.samplesPerPixel;
+    expect(px).toBe(expectedPx);
   });
 });
