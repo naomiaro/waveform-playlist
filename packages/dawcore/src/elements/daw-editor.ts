@@ -72,7 +72,7 @@ import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
 import { EffectsManager } from '../effects/effects-manager';
-import type { EffectState } from '../effects/types';
+import type { EffectState, SerializedEffectEntry } from '../effects/types';
 import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
 import { extractPeaks } from '../workers/waveformDataUtils';
 import { ScrollSyncController } from '../controllers/scroll-sync-controller';
@@ -391,6 +391,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._effects.addMasterWamPlugin(url, initialState);
   }
 
+  /** Snapshot the master chain in its persisted form (see dawcore README). */
+  getEffectsState(): Promise<SerializedEffectEntry[]> {
+    return this._effectsManager?.getMasterEffectsState() ?? Promise.resolve([]);
+  }
+
+  /** Replace the master chain with a persisted snapshot. */
+  setEffectsState(entries: SerializedEffectEntry[]): Promise<void> {
+    return this._effects.setMasterEffectsState(entries);
+  }
+
   /** Internal — <daw-track> effects API delegates here (dawcore-internal contract). */
   _trackAddEffect(
     trackId: string,
@@ -423,6 +433,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     initialState?: unknown
   ): Promise<string> {
     return this._effects.addTrackWamPlugin(trackId, target, url, initialState);
+  }
+
+  _trackGetEffectsState(trackId: string): Promise<SerializedEffectEntry[]> {
+    return this._effectsManager?.getTrackEffectsState(trackId) ?? Promise.resolve([]);
+  }
+
+  _trackSetEffectsState(
+    trackId: string,
+    target: EventTarget,
+    entries: SerializedEffectEntry[]
+  ): Promise<void> {
+    return this._effects.setTrackEffectsState(trackId, target, entries);
   }
 
   get audioContext(): AudioContext {

@@ -2,7 +2,7 @@ import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
 import type { RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
-import type { EffectState as TrackEffectState } from '../effects/types';
+import type { EffectState as TrackEffectState, SerializedEffectEntry } from '../effects/types';
 
 /** Structural view of the editor's dawcore-internal track-effects contract —
  *  avoids a value-import cycle between daw-track and daw-editor. */
@@ -27,6 +27,12 @@ interface TrackEffectsDelegate {
     url: string,
     initialState?: unknown
   ): Promise<string>;
+  _trackGetEffectsState(trackId: string): Promise<SerializedEffectEntry[]>;
+  _trackSetEffectsState(
+    trackId: string,
+    target: EventTarget,
+    entries: SerializedEffectEntry[]
+  ): Promise<void>;
 }
 
 @customElement('daw-track')
@@ -76,6 +82,17 @@ export class DawTrackElement extends LitElement {
   /** Load a WAM plugin (via the optional @dawcore/wam peer) into this track's chain. */
   addWamPlugin(url: string, initialState?: unknown): Promise<string> {
     return this._effectsEditor()._trackAddWamPlugin(this.trackId, this, url, initialState);
+  }
+
+  /** Snapshot this track's chain in its persisted form (see dawcore README). */
+  getEffectsState(): Promise<SerializedEffectEntry[]> {
+    const editor = this.closest('daw-editor') as TrackEffectsDelegate | null;
+    return editor?._trackGetEffectsState(this.trackId) ?? Promise.resolve([]);
+  }
+
+  /** Replace this track's chain with a persisted snapshot. */
+  setEffectsState(entries: SerializedEffectEntry[]): Promise<void> {
+    return this._effectsEditor()._trackSetEffectsState(this.trackId, this, entries);
   }
 
   removeEffect(effectId: string): void {

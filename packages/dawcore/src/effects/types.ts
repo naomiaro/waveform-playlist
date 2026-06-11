@@ -17,6 +17,8 @@ export interface EffectInstance {
   output: AudioNode;
   applyParams: (params: Record<string, number>) => void;
   dispose?: () => void;
+  /** Serializable snapshot of plugin-internal state (WAM getState). */
+  getState?: () => Promise<unknown>;
 }
 
 /** A registered effect type. `create` must work on any BaseAudioContext so
@@ -48,6 +50,10 @@ export interface EffectChainItem {
   url?: string;
   /** Human-readable name (e.g. a WAM descriptor's name). */
   label?: string;
+  /** Why this entry is a non-functional placeholder (e.g. plugin URL unreachable on restore). */
+  error?: string;
+  /** Placeholder restore data: what the entry SHOULD be once its plugin loads. */
+  placeholder?: { state?: unknown; bypassed: boolean };
 }
 
 /** Public, serializable view of one chain entry. */
@@ -59,7 +65,13 @@ export interface EffectState {
   bypassed: boolean;
   url?: string;
   label?: string;
+  error?: string;
 }
+
+/** Persisted form of a chain — see README for the consumer contract. */
+export type SerializedEffectEntry =
+  | { kind: 'native'; type: string; params: Record<string, number>; bypassed: boolean }
+  | { kind: 'wam'; url: string; bypassed: boolean; state?: unknown };
 
 /** Result of creating an effect via the registry. */
 export interface CreatedEffect {

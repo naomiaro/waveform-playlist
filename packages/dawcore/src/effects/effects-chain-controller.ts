@@ -1,4 +1,4 @@
-import type { EffectChainItem, EffectState } from './types';
+import type { EffectChainItem, EffectState, SerializedEffectEntry } from './types';
 
 interface ChainEntry extends EffectChainItem {
   id: string;
@@ -47,7 +47,40 @@ export class EffectsChainController {
       bypassed: entry.bypassed,
       ...(entry.url !== undefined ? { url: entry.url } : {}),
       ...(entry.label !== undefined ? { label: entry.label } : {}),
+      ...(entry.error !== undefined ? { error: entry.error } : {}),
     }));
+  }
+
+  /** Snapshot the chain in its persisted form. WAM entries are asked for
+   *  their live state; placeholders re-emit the state they were saved with. */
+  serialize(): Promise<SerializedEffectEntry[]> {
+    return Promise.all(
+      this._entries.map(async (entry): Promise<SerializedEffectEntry> => {
+        if (entry.kind === 'wam') {
+          if (entry.placeholder) {
+            return {
+              kind: 'wam',
+              url: entry.url ?? '',
+              bypassed: entry.placeholder.bypassed,
+              ...(entry.placeholder.state !== undefined ? { state: entry.placeholder.state } : {}),
+            };
+          }
+          const state = await entry.instance.getState?.();
+          return {
+            kind: 'wam',
+            url: entry.url ?? '',
+            bypassed: entry.bypassed,
+            ...(state !== undefined ? { state } : {}),
+          };
+        }
+        return {
+          kind: 'native',
+          type: entry.type,
+          params: { ...entry.params },
+          bypassed: entry.bypassed,
+        };
+      })
+    );
   }
 
   get disposed(): boolean {

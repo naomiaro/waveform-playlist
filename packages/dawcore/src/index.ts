@@ -91,6 +91,7 @@ export type {
   DawEffectChangeDetail,
   DawEffectBypassDetail,
   DawEffectReorderDetail,
+  DawEffectErrorDetail,
   LoadFilesResult,
 } from './events';
 
@@ -105,4 +106,5 @@ export type {
   EffectParamDef,
   EffectInstance,
   EffectState,
+  SerializedEffectEntry,
 } from './effects/types';

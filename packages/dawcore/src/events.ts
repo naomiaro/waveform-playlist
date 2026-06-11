@@ -164,6 +164,12 @@ export interface DawEffectReorderDetail {
   toIndex: number;
 }
 
+export interface DawEffectErrorDetail {
+  effectId: string;
+  url: string;
+  message: string;
+}
+
 // ---------------------------------------------------------------------------
 // Event map — augments HTMLElementEventMap for typed addEventListener
 // ---------------------------------------------------------------------------
@@ -202,6 +208,7 @@ export interface DawEventMap {
   'daw-effect-change': CustomEvent<DawEffectChangeDetail>;
   'daw-effect-bypass': CustomEvent<DawEffectBypassDetail>;
   'daw-effect-reorder': CustomEvent<DawEffectReorderDetail>;
+  'daw-effect-error': CustomEvent<DawEffectErrorDetail>;
 }
 
 // Helper type for creating typed custom events

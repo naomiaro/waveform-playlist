@@ -184,6 +184,24 @@ For instant waveform rendering before audio finishes decoding:
 
 The `.dat` file renders the waveform immediately. Audio decodes in the background for playback.
 
+## Effects Persistence
+
+`getEffectsState()` / `setEffectsState(entries)` on `<daw-editor>` (master chain) and `<daw-track>` snapshot and restore effect chains. Persist the returned array however you like (localStorage, server, project file):
+
+```js
+const saved = await editor.getEffectsState();
+// [
+//   { kind: 'native', type: 'native-delay', params: {...}, bypassed: false },
+//   { kind: 'wam', url: 'https://…/index.js', bypassed: false, state: {…} },
+// ]
+localStorage.setItem('master-fx', JSON.stringify(saved));
+
+// later / next session
+await editor.setEffectsState(JSON.parse(localStorage.getItem('master-fx')));
+```
+
+WAM entries carry the plugin's own `getState()` snapshot, reapplied on restore. If a saved plugin URL is unreachable, the restore **continues**: the entry becomes a bypassed passthrough placeholder at its saved position (a `daw-effect-error` event fires with `{effectId, url, message}`), and its saved state is retained so re-serializing round-trips it for a later retry.
+
 ## Transport Access
 
 Transport-specific APIs are on the `NativePlayoutAdapter` reference:
