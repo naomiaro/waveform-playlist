@@ -311,6 +311,8 @@ Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Doc
 
 **Plans directory:** `plans/` contains future feature specs (waveform service, listening test tool).
 
+**Effects/WAM roadmap:** Tracked as GitHub epics with native sub-issues — #412 (unified effects chain), #413 (WAM 2.0, `@dawcore/wam`), #414 (Faust), #415 (WCLAP spike). The architecture/design record lives in the epic issue bodies, not in docs/specs. TODO.md's WAM section is superseded by these issues.
+
 **Debug tests:** `debug/tonejs/` contains standalone HTML reproductions of upstream Tone.js bugs. Each file loads Tone.js from CDN with a one-click reproduce button — change the `<script src>` version to test new releases. See `debug/tonejs/README.md`.
 
 **Debug apps:** `debug/standalone-midi/` is a standalone Vite+React app using workspace components (not Docusaurus) for isolating rendering bugs. Run with `cd debug/standalone-midi && pnpm exec vite`.
@@ -348,4 +350,4 @@ Package-specific conventions, architecture, and patterns live in each package's 
 
 ---
 
-**Last Updated:** 2026-03-31
+**Last Updated:** 2026-06-10
