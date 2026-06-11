@@ -1,4 +1,5 @@
 import { EffectsChainController } from './effects-chain-controller';
+import { loadWamModule, loadFaustModule } from './optional-modules';
 import { createEffectInstance, getEffectDefinitions } from './effect-registry';
 import type { EffectChainItem, EffectState, SerializedEffectEntry } from './types';
 
@@ -256,38 +257,14 @@ export class EffectsManager {
     return { audioContext, transport };
   }
 
-  /** Dynamic-import the optional @dawcore/wam peer with an install hint. */
-  private async _loadWamModule(feature: string): Promise<typeof import('@dawcore/wam')> {
-    try {
-      return await import('@dawcore/wam');
-    } catch (originalErr) {
-      // Log the original error so debugging isn't blocked when the failure
-      // is something other than "not installed" (broken exports map, CSP, …).
-      console.warn(PREFIX + '@dawcore/wam dynamic import failed: ' + String(originalErr));
-      throw new Error(
-        PREFIX +
-          '@dawcore/wam is required for ' +
-          feature +
-          '. Install with: npm install @dawcore/wam'
-      );
-    }
+  /** Dynamic-import the optional @dawcore/wam peer with an actionable error. */
+  private _loadWamModule(feature: string): Promise<typeof import('@dawcore/wam')> {
+    return loadWamModule(feature);
   }
 
-  /** Dynamic-import the optional @dawcore/faust peer with an install hint. */
-  private async _loadFaustModule(feature: string): Promise<typeof import('@dawcore/faust')> {
-    try {
-      return await import('@dawcore/faust');
-    } catch (originalErr) {
-      // Log the original error so debugging isn't blocked when the failure
-      // is something other than "not installed" (broken exports map, CSP, …).
-      console.warn(PREFIX + '@dawcore/faust dynamic import failed: ' + String(originalErr));
-      throw new Error(
-        PREFIX +
-          '@dawcore/faust is required for ' +
-          feature +
-          '. Install with: npm install @dawcore/faust'
-      );
-    }
+  /** Dynamic-import the optional @dawcore/faust peer with an actionable error. */
+  private _loadFaustModule(feature: string): Promise<typeof import('@dawcore/faust')> {
+    return loadFaustModule(feature);
   }
 
   private async _openGui(
