@@ -41,6 +41,7 @@
 - Relative plugin/thumbnail URLs resolve against the manifest URL; **`baseUrl` option exists because webaudiomodules.com keeps `path` relative to `community/plugins/`, not the manifest** — manifest-relative resolution alone 404s there.
 - Invalid entries skip with `[waveform-playlist]`-prefixed messages collected into `warnings` (never fail the manifest); unreachable/invalid-JSON/unrecognized-shape/zero-valid-entries reject. Entry `url` feeds straight into `createWamInstance` — descriptor validation stays at load time.
 - Real-world fixture manifests live as constants in `__tests__/library.test.ts` with source URLs in comments.
+- `fetchWamDescriptor(pluginUrl, { fetchFn? })` → `WamDescriptorInfo | null` — best-effort probe of the static `descriptor.json` SDK builds ship next to the module (`.../index.js` → `.../descriptor.json`); ground truth for audio-I/O flags where registry `category` lies (e.g. "Audio Input" is tagged Effect but has `hasAudioInput=false`). Null on ANY failure by contract (no throw, no warning) — absence is expected for non-SDK registries; callers fall back to `category`, and `createWamInstance` stays authoritative.
 
 ## Offline Cloning (`cloneInstanceInto`, #426)
 
