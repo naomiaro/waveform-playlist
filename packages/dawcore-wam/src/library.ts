@@ -265,7 +265,11 @@ function deriveNameFromUrl(url: string): string {
   const segments = new URL(url).pathname.split('/').filter((s) => s !== '');
   for (let i = segments.length - 1; i >= 0; i--) {
     const base = decodeURIComponent(segments[i]).replace(/\.[a-z0-9]+$/i, '');
-    if (base !== '' && !GENERIC_URL_SEGMENTS.has(base.toLowerCase())) {
+    // index-prefixed entry filenames (index.js, indexGUIStandard.js, …) are
+    // build artifacts, not plugin names — fall through to the directory.
+    const isGeneric =
+      GENERIC_URL_SEGMENTS.has(base.toLowerCase()) || base.toLowerCase().startsWith('index');
+    if (base !== '' && !isGeneric) {
       return base;
     }
   }

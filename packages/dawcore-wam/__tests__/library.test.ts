@@ -516,5 +516,10 @@ describe('fetchWamLibrary — real-world manifests', () => {
     expect(entries[13].name).toBe('quadrafuzz');
     expect(entries[14].name).toBe('WamSampler');
     expect(entries[10].name).toBe('faustPingPongDelay');
+    // index-prefixed filenames (indexGUIStandard.js) are generic too — the
+    // name must come from the plugin's directory, and must not collide
+    // across different plugins sharing the same entry filename.
+    expect(entries[0].name).toBe('clarinetMIDI');
+    expect(entries[1].name).toBe('JUNO6v2');
   });
 });
