@@ -1,2 +1,2 @@
-export { ensureWamHost, _resetWamHostCacheForTests } from './host';
+export { ensureWamHost } from './host';
 export type { WamHostInfo } from './host';

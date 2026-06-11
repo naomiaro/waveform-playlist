@@ -344,6 +344,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 - `packages/spectrogram/CLAUDE.md` — Integration context, SpectrogramChannel index
 - `packages/dawcore/CLAUDE.md` — Lit Web Components, native AudioContext (no Tone.js), element types, CSS theming
 - `packages/transport/CLAUDE.md` — Native Web Audio transport, scheduler, clock, MeterMap, PlayoutAdapter bridge
+- `packages/dawcore-wam/CLAUDE.md` — WAM 2.0 plugin hosting, host init, SDK pinning, wam-studio reference
 - `website/CLAUDE.md` — Docusaurus site, CSS pitfalls, custom pages
 
 ---
