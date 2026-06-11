@@ -126,6 +126,15 @@
 - **Discriminator name should not collide with sibling field names** — `ClipDescriptor` originally used `source: 'dom' | 'drop'` next to `src: string`; reading `clipDesc.source === 'dom'` and `clipDesc.src` on adjacent lines was a real readability hazard. Use `kind` for discriminators in this codebase.
 - **3+ narrowing sites = type predicate** — when a discriminated-union check (`c.kind === 'dom' && c.clipId === ...`) appears at multiple call sites, extract `isDomClip(c): c is DomClipDescriptor` co-located with the type definition. Five sites was the threshold that paid for the helper in PR #383.
 
+## Effects Chain (core, #417)
+
+- **`src/effects/`** — `EffectsChainController` (ordered chain between owned input/output gains) + effect registry (`registerEffect`/`getEffectDefinitions`/`createEffectInstance`, five `native-*` built-ins). Element APIs (`<daw-track>.addEffect` etc.) are #418; WAM entries join via #422.
+- **Entries are kind-agnostic** — chain operations never branch on `kind` (`'native' | 'wam' | ...`). New plugin standards wrap their node into `EffectChainItem` and get move/remove/bypass/events for free.
+- **Topology rebuilds, params never** — `setParams` calls the instance's `applyParams` in place. Rebuilds sever ONLY the chain's own outgoing edges (`input.disconnect()` + each entry's `output.disconnect()`) — never the consumer's edges into `input` / out of `output`.
+- **Bypass is two-mode** — definitions with `wetParam` bypass by zeroing wet (stored/restored, no rebuild); others are removed from the series with the instance kept alive at its position. `setParams` on a bypassed wet effect stores the new wet without making it audible.
+- **Registry definitions take `BaseAudioContext`** — same definitions must serve offline rendering (#426). Don't add `AudioContext`-only API usage to built-ins.
+- **Registry tests** — call `_resetEffectRegistryForTests()` in `beforeEach` (module-level Map; built-ins re-registered). Test-only helpers are exported from their module but NOT from `src/index.ts`.
+
 ## CSS Theming
 
 Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DOM:
