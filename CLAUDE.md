@@ -63,6 +63,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - ✅ **CLAUDE.md** - Architectural decisions, conventions, patterns (minimal, timeless)
 - ✅ **PROJECT_STRUCTURE.md** - Architecture, file organization, data flow (NO progress/todos)
 
+**PROJECT_STRUCTURE.md is audited after structural changes:** after adding packages, directories, or architectural subsystems, audit PROJECT_STRUCTURE.md and update it in the same PR. Structure/data-flow only — no progress notes (existing rule).
+
 **When completing work:**
 
 1. Update CLAUDE.md only if architectural decision or pattern established

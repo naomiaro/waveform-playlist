@@ -4,7 +4,7 @@
 
 Waveform-playlist is a **monorepo** organized with pnpm workspaces. It's a multitrack Web Audio editor and player with canvas-based waveform visualizations.
 
-**Stack:** React + Tone.js + styled-components (v10 released)
+**Stack:** React + Tone.js + styled-components (`@waveform-playlist/*` packages); Lit Web Components + native Web Audio (`@dawcore/*` packages)
 
 ## Monorepo Structure
 
@@ -14,22 +14,38 @@ waveform-playlist/
 │   ├── annotations/       # 📦 OPTIONAL: Annotation components & hooks
 │   ├── browser/           # Main React package (provider, hooks, components)
 │   ├── core/              # Core types and interfaces
-│   ├── dawcore/           # Web Components (Lit) — framework-agnostic DAW UI
+│   ├── dawcore/           # Web Components (Lit) — framework-agnostic DAW UI (@dawcore/components)
+│   ├── dawcore-faust/     # @dawcore/faust — in-browser Faust DSP → WAM compilation
+│   ├── dawcore-midi/      # @dawcore/midi — framework-agnostic MIDI parsing (optional peer of dawcore)
 │   ├── dawcore-spectrogram/  # Framework-agnostic FFT computation, worker, viewport orchestrator
+│   ├── dawcore-wam/       # @dawcore/wam — WAM 2.0 plugin hosting (host, loader, GUI, library, transport bridge)
+│   ├── engine/            # Framework-agnostic timeline engine
 │   ├── loaders/           # Audio file loaders
 │   ├── media-element-playout/  # Audio playback (HTMLAudioElement, no Tone.js)
-│   ├── engine/            # Framework-agnostic timeline engine
 │   ├── midi/              # 📦 OPTIONAL: MIDI file parsing, piano roll, SoundFont playback
 │   ├── playout/           # Audio playback (Tone.js wrapper)
 │   ├── recording/         # 📦 OPTIONAL: Audio recording hooks (no UI components)
 │   ├── spectrogram/       # 📦 OPTIONAL: FFT computation, worker rendering, color maps
+│   ├── transport/         # @dawcore/transport — native Web Audio transport (clock, scheduler, clip player)
 │   ├── ui-components/     # Reusable React UI components (incl. SegmentedVUMeter)
 │   ├── webaudio-peaks/    # Waveform peak generation
 │   └── worklets/          # Shared AudioWorklet processors (metering, recording)
 │
+├── examples/              # Standalone Vite example apps (decoupled from package builds)
+│   ├── dawcore-native/    # Web Components + NativePlayoutAdapter (basic, multiclip, effects, record, …)
+│   ├── dawcore-tone/      # Web Components + TonePlayoutAdapter (Tone.js backend, MIDI, SoundFont)
+│   └── dawcore-wam/       # WAM 2.0 plugins end-to-end (library picker, GUIs, Faust compilation, export)
+│
+├── debug/                 # Standalone reproductions and debug apps
+│   ├── tonejs/            # HTML reproductions of upstream Tone.js bugs
+│   ├── standalone-midi/   # Vite+React app for isolating rendering bugs
+│   └── standalone-multi-clip/  # Vite+React multi-clip debug app
+│
+├── e2e/                   # Playwright end-to-end tests
+│
 └── website/               # Docusaurus documentation site
     ├── src/
-    │   ├── components/examples/  # React example components (18 examples)
+    │   ├── components/examples/  # React example components (20 examples)
     │   │   ├── MinimalExample.tsx
     │   │   ├── StemTracksExample.tsx
     │   │   ├── StereoExample.tsx
@@ -48,7 +64,9 @@ waveform-playlist/
     │   │   ├── MediaElementExample.tsx       # HTMLAudioElement streaming
     │   │   ├── MirSpectrogramExample.tsx     # Spectrogram visualization
     │   │   ├── MobileAnnotationsExample.tsx  # Mobile-optimized annotations
-    │   │   └── MobileMultiClipExample.tsx    # Mobile-optimized multi-clip
+    │   │   ├── MobileMultiClipExample.tsx    # Mobile-optimized multi-clip
+    │   │   ├── WcBasicExample.tsx            # Web Components (<daw-editor>) basic
+    │   │   └── WcMulticlipExample.tsx        # Web Components multi-clip
     │   ├── pages/examples/       # Example page wrappers
     │   ├── hooks/                # Docusaurus-specific hooks
     │   │   └── useDocusaurusTheme.ts
@@ -583,7 +601,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Layout (frozen panes):** `.scroll-area` owns both scroll axes; the ruler band and controls column live in clipped viewports kept in sync via `translate3d` transforms by `ScrollSyncController` (also forwards wheel events — vertical over controls, horizontal scrub over the ruler). Track rows and `daw-track-controls` share identical border-box geometry from one per-track `trackHeight`, so the two columns align exactly.
 - **Build:** tsup — `pnpm typecheck && tsup`. `sideEffects: true` (element imports register custom elements globally).
 - **Testing:** vitest with happy-dom. Run with `cd packages/dawcore && npx vitest run`.
-- **Dev pages:** `pnpm example:dawcore-native` (Vite, `examples/dawcore-native/`) and `pnpm example:dawcore-tone` (`examples/dawcore-tone/`). Resolve workspace packages from source via Vite aliases.
+- **Dev pages:** `pnpm example:dawcore-native` (Vite, `examples/dawcore-native/`), `pnpm example:dawcore-tone` (`examples/dawcore-tone/`), and `pnpm example:dawcore-wam` (`examples/dawcore-wam/`). Resolve workspace packages from source via Vite aliases.
 - **Key Elements:**
   - `<daw-editor>` — Core orchestrator. Builds engine lazily on first track load. Attributes: `interactive-clips`, `clip-headers`, `clip-header-height`. Methods: `undo()`, `redo()`, `togglePlayPause()`, `seekTo()`. Getters: `canUndo`, `canRedo`.
   - `<daw-track>`, `<daw-clip>` — Declarative data elements (light DOM)
@@ -597,8 +615,46 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - `splitAtPlayhead` (`interactions/split-handler.ts`) — Split clip at current playhead position (S key)
   - `clip-peak-sync.ts` — Regenerates peaks after split/trim via `_syncPeaksForChangedClips`
   - Move uses incremental deltas with `skipAdapter` (60fps); trim accumulates delta and calls engine once on drop
-- **Dependencies:** Lit, `@dawcore/spectrogram`, `waveform-data`; peers: `@waveform-playlist/core`, `@waveform-playlist/engine` (required), `@dawcore/transport`, `@dawcore/midi`, `@waveform-playlist/worklets` (optional — adapter, MIDI loading, recording)
+- **Effects Chain (`src/effects/`):**
+  - `effects-chain-controller.ts` — `EffectsChainController`, an ordered effect chain wired between owned input/output gain nodes; chain operations (add/remove/move/bypass) are kind-agnostic (`'native' | 'wam'`)
+  - `effect-registry.ts` — `registerEffect` / `getEffectDefinitions` / `createEffectInstance` with five `native-*` built-in effects (BaseAudioContext nodes)
+  - `effects-manager.ts` — `EffectsManager`, per-editor ownership of the master chain + per-track chains, wiring into the transport's `connectTrackOutput` / `connectMasterOutput` hooks, GUI lifecycle cache, persistence (`getEffectsState()` / `setEffectsState()`), and the WAM transport bridge
+  - `optional-modules.ts` — dynamic imports of the optional `@dawcore/wam` / `@dawcore/faust` peers with install-hint rethrow (the `@dawcore/midi` pattern)
+  - Element API: `addEffect` / `addWamPlugin(url)` / `addFaustEffect(dspCode)` / `removeEffect` / `setEffectParams` / `setEffectBypassed` / `moveEffect` / `openEffectGui` / `closeEffectGui` on `<daw-editor>` (master chain) and `<daw-track>` (delegates to the editor); `daw-effect-*` events
+- **Offline Export (`interactions/export-audio.ts`):** `editor.exportAudio({sampleRate?, startTime?, duration?, channels?})` renders through all effect chains on an `OfflineAudioContext` — clips scheduled statically (no Transport), chains rebuilt from persisted state
+- **Dependencies:** Lit, `@dawcore/spectrogram`, `waveform-data`; peers: `@waveform-playlist/core`, `@waveform-playlist/engine` (required), `@dawcore/transport`, `@dawcore/midi`, `@dawcore/wam`, `@dawcore/faust`, `@waveform-playlist/worklets` (optional — adapter, MIDI loading, WAM plugins, Faust compilation, recording)
 - **Location:** `packages/dawcore/`
+
+#### `@dawcore/transport`
+
+- **Purpose:** Native Web Audio transport — replaces Tone.js Transport/scheduling with zero dependencies. Tone.js remains available only for effects (consumer-side, optional).
+- **Architecture:** Layered — core (clock/scheduler/timer) → timeline (samples/ticks/tempo: `TempoMap`, `MeterMap`, branded `Tick`/`Sample` types) → audio (track nodes, `ClipPlayer`, metronome) → transport (orchestrator) → adapter (`NativePlayoutAdapter`, the `PlayoutAdapter` bridge for `PlaylistEngine`)
+- **Scheduler:** Sliding-window event generation driven by `requestAnimationFrame` with ~200ms lookahead; integer-tick loop boundaries (no float drift at loop wrap)
+- **Effects insertion hooks:** `connectTrackOutput(trackId, node)` inserts any AudioNode chain (native, WAM, Tone.js) into a track's output path; `connectMasterOutput(node)` / `disconnectMasterOutput()` do the same between the master gain and `audioContext.destination`. The transport has zero knowledge of plugin types.
+- **Events:** `seek(time)` emits a `seek` event (`{ seconds }`) — consumed by the WAM transport bridge among others
+- **Dependencies:** None (zero runtime deps; `@waveform-playlist/core`/`engine` are type-only devDeps)
+- **Location:** `packages/transport/`
+
+#### `@dawcore/wam`
+
+- **Purpose:** Framework-agnostic WAM 2.0 (Web Audio Modules) plugin hosting. Optional peer of `@dawcore/components`, loaded via dynamic import — non-WAM users pay zero bundle cost.
+- **Modules:**
+  - `host.ts` — `ensureWamHost(audioContext)`: idempotent per-context host initialization (accepts suspended `OfflineAudioContext` for offline export)
+  - `loader.ts` — `loadWamFactory(url)` (URL-cached dynamic import), `createWamInstance(url, ctx, hostGroupId)` and `createWamInstanceFromFactory(factory, …)` with effect-only descriptor validation (audio input + output required); wrapper `WamPluginInstance` splits GUI and audio lifecycles
+  - `gui.ts` — plain-DOM GUI helpers: `createParameterPanel` / `createWamParameterPanel` (generic slider panel fallback for headless plugins, themable via `--daw-*` CSS vars)
+  - `library.ts` — `fetchWamLibrary(manifestUrl)`: schema-validated `library.json` plugin discovery (webaudiomodules.com community format and variants)
+  - `transport-bridge.ts` — `createWamTransportBridge(transport, getPluginNodes)`: broadcasts `wam-transport` events (tempo, time signature, bar position) to live plugin nodes on play/pause/stop/seek/tempo/meter changes
+  - `cloneInstanceInto(instance, targetContext, hostGroupId)` — re-instantiates a plugin on another context (e.g. `OfflineAudioContext`) and transfers state, for offline export
+- **No DOM frameworks:** No Lit/React — UI-flavored pieces are plain-DOM factories so a future React layer can reuse them
+- **Dependencies:** `@webaudiomodules/api`, `@webaudiomodules/sdk` (exact-pinned alpha SDKs)
+- **Location:** `packages/dawcore-wam/`
+
+#### `@dawcore/faust`
+
+- **Purpose:** In-browser Faust DSP → WAM 2.0 compilation. `compileFaustToWam(dspCode, { name? })` lazily loads the `@shren/faust2wam` compiler (single self-contained ~8 MB ESM bundle, no CDN fetches) and returns a WAM factory class. Optional peer of `@dawcore/components` via dynamic import.
+- **Integration:** Instantiation of the compiled class goes through `@dawcore/wam`'s `createWamInstanceFromFactory` — this package never duplicates validate/wrap logic. In dawcore, `addFaustEffect(dspCode)` compiles before touching the chain (compile errors propagate unchanged with line/column diagnostics), then inserts a `kind: 'wam'` chain entry with `source: { faust: dspCode }` and no URL; persistence and offline export recompile from the saved DSP source.
+- **Dependencies:** `@shren/faust2wam` (exact-pinned)
+- **Location:** `packages/dawcore-faust/`
 
 ## Data Flow Architecture
 
@@ -975,6 +1031,53 @@ Provider statechange handler:
     └─ onTracksChange(state.tracks) → parent updates tracks prop
 ```
 
+### Effects & Plugin Audio Path (dawcore)
+
+Per-track and master effect chains insert into the native transport's signal path:
+
+```
+Clip source (AudioBufferSourceNode)
+    ↓
+TrackNode (volume → pan → mute)
+    ↓
+Per-track EffectsChainController        ← transport.connectTrackOutput(trackId, chain)
+    (ordered entries: native-* | wam)
+    ↓
+Master gain
+    ↓
+Master EffectsChainController           ← transport.connectMasterOutput(chain)
+    ↓
+audioContext.destination
+```
+
+**WAM plugin lifecycle:**
+
+```
+editor.addWamPlugin(url)  /  editor.addFaustEffect(dspCode)
+    ↓
+dynamic import @dawcore/wam (and @dawcore/faust for compilation)
+    ↓
+ensureWamHost(audioContext)             # idempotent per context
+    ↓
+createWamInstance(url, …)               # or compileFaustToWam → createWamInstanceFromFactory
+    ↓
+EffectsChainController entry { kind: 'wam' }   # input = output = plugin audioNode
+    ↓
+WAM transport bridge broadcasts wam-transport events (play/seek/tempo/meter)
+```
+
+**Offline export path** (`editor.exportAudio()`):
+
+```
+OfflineAudioContext
+    ├─ Clips scheduled statically: source.start(when, offset, duration) — no Transport
+    ├─ Chains rebuilt from persisted state (getEffectsState):
+    │   ├─ native entries via the effect registry
+    │   └─ WAM entries via ensureWamHost(offlineCtx) + re-instantiation with saved state
+    │       (worklets are context-bound; Faust entries recompile from saved DSP)
+    └─ startRendering() → AudioBuffer → WAV
+```
+
 ## Example Page Flow
 
 ### Example Components (Docusaurus)
@@ -1169,7 +1272,7 @@ const { formatTime } = useTimeFormat();
 
 ### Example Components
 
-See `website/src/components/examples/` for 16 complete examples covering minimal setup, stem tracks, effects, fades, recording, annotations, spectrogram, and more.
+See `website/src/components/examples/` for 20 complete examples covering minimal setup, stem tracks, effects, fades, recording, annotations, spectrogram, Web Components, and more. Standalone Vite apps in `examples/` (`dawcore-native`, `dawcore-tone`, `dawcore-wam`) cover the `@dawcore/*` Web Components stack.
 
 ### Documentation
 
