@@ -1,6 +1,6 @@
 import { EffectsChainController } from './effects-chain-controller';
-import { createEffectInstance } from './effect-registry';
-import type { EffectState, SerializedEffectEntry } from './types';
+import { createEffectInstance, getEffectDefinitions } from './effect-registry';
+import type { EffectChainItem, EffectState, SerializedEffectEntry } from './types';
 
 const PREFIX = '[waveform-playlist] ';
 
@@ -18,6 +18,24 @@ interface AdapterLike {
   transport?: EffectsTransportLike;
 }
 
+/** A created (and cached) GUI element plus its idempotent destroyer. */
+interface GuiRecord {
+  element: HTMLElement;
+  destroy: () => void;
+}
+
+function makeGuiRecord(element: HTMLElement, destroyImpl: () => void): GuiRecord {
+  let destroyed = false;
+  return {
+    element,
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      destroyImpl();
+    },
+  };
+}
+
 /**
  * Owns all effect chains for one editor: the master chain plus one chain per
  * track. Wires chains into the adapter's transport hooks and dispatches the
@@ -31,6 +49,10 @@ export class EffectsManager {
   private _trackChains = new Map<string, EffectsChainController>();
   /** Per-chain restore ownership — a newer setEffectsState supersedes a stale in-flight one. */
   private _restoreTokens = new WeakMap<EffectsChainController, symbol>();
+  /** Cached GUI elements by effectId — close hides, only removal destroys. */
+  private _guis = new Map<string, GuiRecord>();
+  /** In-flight GUI creation by effectId — concurrent opens share one build. */
+  private _guiPending = new Map<string, Promise<GuiRecord>>();
   /** Live WAM plugin nodes across all chains, fed to the wam-transport bridge. */
   private _wamNodes = new Set<import('@dawcore/wam').WamTransportNode>();
   private _transportBridge: { notifyNodeAdded(node: unknown): void; dispose(): void } | null = null;
@@ -124,6 +146,34 @@ export class EffectsManager {
     this._runOp(this._trackChains.get(trackId) ?? null, target, op, effectId, arg);
   }
 
+  // --- Effect GUIs ---
+
+  /** Open (lazily creating) the GUI for a master-chain effect. */
+  openMasterEffectGui(effectId: string, container: HTMLElement): Promise<HTMLElement> {
+    return this._openGui(this._masterChain, this._masterTarget, effectId, container);
+  }
+
+  /** Open (lazily creating) the GUI for a track-chain effect. */
+  openTrackEffectGui(
+    trackId: string,
+    target: EventTarget,
+    effectId: string,
+    container: HTMLElement
+  ): Promise<HTMLElement> {
+    return this._openGui(this._trackChains.get(trackId) ?? null, target, effectId, container);
+  }
+
+  /** Hide an open GUI. The element stays cached so reopen is instant —
+   *  audio processing is never interrupted. */
+  closeEffectGui(effectId: string): void {
+    const record = this._guis.get(effectId);
+    if (!record) {
+      console.warn(PREFIX + 'closeEffectGui: no open GUI for effectId "' + effectId + '"');
+      return;
+    }
+    record.element.remove();
+  }
+
   // --- Lifecycle ---
 
   /** Transport setTracks rebuilds TrackNodes, severing chain hookups — re-wire. */
@@ -140,6 +190,9 @@ export class EffectsManager {
     const chain = this._trackChains.get(trackId);
     if (!chain) return;
     this._trackChains.delete(trackId);
+    for (const entry of chain.entries) {
+      this._destroyGui(entry.id);
+    }
     try {
       this._getAdapter()?.transport?.disconnectTrackOutput(trackId);
     } catch (err) {
@@ -156,6 +209,9 @@ export class EffectsManager {
       this.disposeTrackChain(trackId);
     }
     if (this._masterChain) {
+      for (const entry of this._masterChain.entries) {
+        this._destroyGui(entry.id);
+      }
       try {
         this._getAdapter()?.transport?.disconnectMasterOutput();
       } catch (err) {
@@ -183,6 +239,182 @@ export class EffectsManager {
       );
     }
     return { audioContext, transport };
+  }
+
+  /** Dynamic-import the optional @dawcore/wam peer with an install hint. */
+  private async _loadWamModule(feature: string): Promise<typeof import('@dawcore/wam')> {
+    try {
+      return await import('@dawcore/wam');
+    } catch (originalErr) {
+      // Log the original error so debugging isn't blocked when the failure
+      // is something other than "not installed" (broken exports map, CSP, …).
+      console.warn(PREFIX + '@dawcore/wam dynamic import failed: ' + String(originalErr));
+      throw new Error(
+        PREFIX +
+          '@dawcore/wam is required for ' +
+          feature +
+          '. Install with: npm install @dawcore/wam'
+      );
+    }
+  }
+
+  private async _openGui(
+    chain: EffectsChainController | null,
+    target: EventTarget,
+    effectId: string,
+    container: HTMLElement
+  ): Promise<HTMLElement> {
+    if (!container || typeof container.appendChild !== 'function') {
+      throw new Error(PREFIX + 'openEffectGui: container must be a DOM element');
+    }
+    const entry = chain?.getEntry(effectId);
+    if (!chain || !entry) {
+      throw new Error(PREFIX + 'openEffectGui: unknown effectId "' + effectId + '"');
+    }
+    if (entry.error !== undefined) {
+      throw new Error(
+        PREFIX +
+          'openEffectGui: effect "' +
+          effectId +
+          '" is a failed-plugin placeholder (' +
+          entry.error +
+          ') — no GUI is available. Remove it or retry the restore.'
+      );
+    }
+
+    const cached = this._guis.get(effectId);
+    if (cached) {
+      container.appendChild(cached.element);
+      return cached.element;
+    }
+
+    let pending = this._guiPending.get(effectId);
+    if (!pending) {
+      pending = this._createGuiRecord(chain, target, entry, effectId).finally(() => {
+        this._guiPending.delete(effectId);
+      });
+      this._guiPending.set(effectId, pending);
+    }
+    const record = await pending;
+
+    // The effect (or its whole chain) may have been removed while the GUI
+    // was building — a late mount would leak a GUI for a destroyed plugin.
+    if (chain.disposed || !chain.getEntry(effectId)) {
+      this._guis.delete(effectId);
+      record.element.remove();
+      try {
+        record.destroy();
+      } catch (err) {
+        console.warn(
+          PREFIX +
+            'openEffectGui: destroying a late GUI for "' +
+            effectId +
+            '" failed: ' +
+            String(err)
+        );
+      }
+      throw new Error(
+        PREFIX +
+          'openEffectGui: effect "' +
+          effectId +
+          '" was removed while its GUI was loading; the GUI was discarded.'
+      );
+    }
+
+    this._guis.set(effectId, record);
+    container.appendChild(record.element);
+    return record.element;
+  }
+
+  /** Build a GUI record: the plugin's own GUI when available, otherwise the
+   *  generic parameter panel from @dawcore/wam. */
+  private async _createGuiRecord(
+    chain: EffectsChainController,
+    target: EventTarget,
+    entry: EffectChainItem & { id: string },
+    effectId: string
+  ): Promise<GuiRecord> {
+    const { instance } = entry;
+    if (typeof instance.createGui === 'function') {
+      try {
+        const element = await instance.createGui();
+        return makeGuiRecord(element, () => instance.destroyGui?.(element));
+      } catch (err) {
+        console.warn(
+          PREFIX +
+            'openEffectGui: plugin createGui failed for "' +
+            effectId +
+            '" — falling back to the generic parameter panel: ' +
+            String(err)
+        );
+      }
+    }
+    const element = await this._createFallbackPanel(chain, target, entry, effectId);
+    // The generic panel is plain DOM owned by this manager — removal from the
+    // document (done by _destroyGui) is its entire teardown.
+    return makeGuiRecord(element, () => {});
+  }
+
+  /** The generic parameter panel — one code path for "no custom GUI":
+   *  native entries render from the registry's params metadata, WAM entries
+   *  from getParameterInfo(). Edits route through the regular setParams op so
+   *  they hit the audio (applyParams → setParameterValues for WAM) AND
+   *  dispatch daw-effect-change like any other parameter edit. */
+  private async _createFallbackPanel(
+    chain: EffectsChainController,
+    target: EventTarget,
+    entry: EffectChainItem & { id: string },
+    effectId: string
+  ): Promise<HTMLElement> {
+    const wamModule = await this._loadWamModule('openEffectGui() parameter panels');
+    const onChange = (paramId: string, value: number) => {
+      this._runOp(chain, target, 'setParams', effectId, { [paramId]: value });
+    };
+
+    if (entry.kind === 'native') {
+      const definition = getEffectDefinitions().get(entry.type);
+      if (!definition) {
+        throw new Error(
+          PREFIX + 'openEffectGui: no registry definition for effect type "' + entry.type + '"'
+        );
+      }
+      const params = Object.entries(definition.params).map(([id, def]) => ({
+        id,
+        min: def.min,
+        max: def.max,
+        ...(def.step !== undefined ? { step: def.step } : {}),
+        ...(def.unit !== undefined ? { unit: def.unit } : {}),
+        value: entry.params[id] ?? definition.defaults[id],
+      }));
+      return wamModule.createParameterPanel(params, onChange);
+    }
+
+    if (typeof entry.instance.getParameterInfo !== 'function') {
+      throw new Error(
+        PREFIX +
+          'openEffectGui: effect "' +
+          effectId +
+          '" has no GUI and exposes no parameter info — nothing to render.'
+      );
+    }
+    return wamModule.createWamParameterPanel(
+      { getParameterInfo: () => entry.instance.getParameterInfo!() },
+      { onParamChange: onChange }
+    );
+  }
+
+  /** Detach + destroy a cached GUI. Called only from removal paths — close
+   *  never destroys. Safe when no GUI was ever opened. */
+  private _destroyGui(effectId: string): void {
+    const record = this._guis.get(effectId);
+    if (!record) return;
+    this._guis.delete(effectId);
+    record.element.remove();
+    try {
+      record.destroy();
+    } catch (err) {
+      console.warn(PREFIX + 'destroyGui failed for effect "' + effectId + '": ' + String(err));
+    }
   }
 
   private _ensureMasterChain(): EffectsChainController {
@@ -246,20 +478,7 @@ export class EffectsManager {
     initialState?: unknown
   ): Promise<string> {
     const { audioContext } = this._requireWiring();
-
-    let wamModule: typeof import('@dawcore/wam');
-    try {
-      wamModule = await import('@dawcore/wam');
-    } catch (originalErr) {
-      // Log the original error so debugging isn't blocked when the failure
-      // is something other than "not installed" (broken exports map, CSP, …).
-      console.warn(PREFIX + '@dawcore/wam dynamic import failed: ' + String(originalErr));
-      throw new Error(
-        PREFIX +
-          '@dawcore/wam is required for addWamPlugin(). Install with: npm install @dawcore/wam'
-      );
-    }
-
+    const wamModule = await this._loadWamModule('addWamPlugin()');
     const { hostGroupId } = await wamModule.ensureWamHost(audioContext);
     const plugin = await wamModule.createWamInstance(url, audioContext, hostGroupId, {
       initialState,
@@ -299,6 +518,11 @@ export class EffectsManager {
             plugin.destroy();
           },
           getState: () => plugin.getState(),
+          getParameterInfo: () => plugin.getParameterInfo(),
+          ...(plugin.createGui ? { createGui: () => plugin.createGui!() } : {}),
+          ...(plugin.destroyGui
+            ? { destroyGui: (gui: HTMLElement) => plugin.destroyGui!(gui) }
+            : {}),
         },
         params: {},
       });
@@ -463,6 +687,7 @@ export class EffectsManager {
     }
     switch (op) {
       case 'remove':
+        this._destroyGui(effectId);
         chain.remove(effectId);
         this._dispatch(target, 'daw-effect-remove', { effectId });
         break;

@@ -260,6 +260,20 @@ const wamId = await track.addWamPlugin('https://www.webaudiomodules.com/communit
 
 See `examples/dawcore-native/effects.html` for a runnable demo.
 
+### Effect GUIs
+
+`openEffectGui(effectId, container)` / `closeEffectGui(effectId)` on both elements mount an effect's GUI into a container **you** provide (your own panel, drawer, floating window — dawcore ships no plugin-window UI):
+
+```javascript
+const panel = document.querySelector('#fx-panel');
+
+const guiEl = await track.openEffectGui(wamId, panel); // WAM plugins mount their own GUI
+track.closeEffectGui(wamId); // hides — audio keeps processing, element stays cached
+await track.openEffectGui(wamId, panel); // instant reopen, same element
+```
+
+The GUI is created lazily on first open and only destroyed (`destroyGui`) when the effect — or its track — is removed from the chain. Plugins without a GUI, and `native-*` effects, get a generic parameter panel (labeled sliders from the plugin's `getParameterInfo()` or the registry's params metadata) rendered by `@dawcore/wam`; slider edits apply live and dispatch `daw-effect-change` like any other parameter edit.
+
 ## Programmatic File Loading
 
 ```javascript

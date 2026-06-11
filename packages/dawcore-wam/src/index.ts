@@ -9,6 +9,14 @@ export type {
   WamPluginInstance,
   CreateWamInstanceOptions,
 } from './loader';
+export { createParameterPanel, createWamParameterPanel } from './gui';
+export type {
+  ParameterPanelParam,
+  ParameterPanelChangeHandler,
+  WamParameterInfoLike,
+  WamParameterPanelNode,
+  CreateWamParameterPanelOptions,
+} from './gui';
 export { fetchWamLibrary } from './library';
 export type {
   WamLibraryEntry,

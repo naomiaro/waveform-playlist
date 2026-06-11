@@ -19,6 +19,13 @@ export interface EffectInstance {
   dispose?: () => void;
   /** Serializable snapshot of plugin-internal state (WAM getState). */
   getState?: () => Promise<unknown>;
+  /** Builds the plugin's own GUI element (WAM createGui). GUI lifecycle is
+   *  independent of audio — hiding/destroying a GUI never stops processing. */
+  createGui?: () => Promise<HTMLElement>;
+  /** Releases a GUI element previously built by `createGui` (WAM destroyGui). */
+  destroyGui?: (gui: HTMLElement) => void;
+  /** Parameter metadata for the generic fallback panel (WAM getParameterInfo). */
+  getParameterInfo?: () => Promise<unknown>;
 }
 
 /** A registered effect type. `create` must work on any BaseAudioContext so
