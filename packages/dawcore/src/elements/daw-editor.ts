@@ -59,8 +59,14 @@ import type {
   DawClipIdDetail,
   DawClipErrorDetail,
   DawErrorDetail,
+  DawTimeFormatChangeDetail,
   LoadFilesResult,
 } from '../events';
+import {
+  isTimeDisplayFormat,
+  TIME_DISPLAY_FORMATS,
+  type TimeDisplayFormat,
+} from '../utils/time-display-format';
 import { loadFiles as loadFilesImpl } from '../interactions/file-loader';
 import {
   loadMidiImpl,
@@ -120,6 +126,46 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.requestUpdate('samplesPerPixel', old);
   }
   private _samplesPerPixel = 1024;
+
+  private _timeFormat: TimeDisplayFormat = 'hh:mm:ss.sss';
+
+  /**
+   * Time display format used by <daw-time-display> and (future, #463) the
+   * selection inputs. Lives on the editor — the target element owns the
+   * state, the transport controls reflect it (native-form style).
+   */
+  @property({ attribute: 'time-format', reflect: true, noAccessor: true })
+  get timeFormat(): TimeDisplayFormat {
+    return this._timeFormat;
+  }
+  set timeFormat(value: TimeDisplayFormat) {
+    if (!isTimeDisplayFormat(value)) {
+      console.warn(
+        '[dawcore] timeFormat: invalid format "' +
+          String(value) +
+          '" ignored. Valid formats: ' +
+          TIME_DISPLAY_FORMATS.join(', ')
+      );
+      return;
+    }
+    if (value === this._timeFormat) return;
+    const old = this._timeFormat;
+    this._timeFormat = value;
+    this.requestUpdate('timeFormat', old);
+    this.dispatchEvent(
+      new CustomEvent<DawTimeFormatChangeDetail>('daw-time-format-change', {
+        bubbles: true,
+        composed: true,
+        detail: { format: value },
+      })
+    );
+  }
+
+  /** Set the time display format. Sugar over the `timeFormat` property. */
+  setTimeFormat(format: TimeDisplayFormat): void {
+    this.timeFormat = format;
+  }
+
   @property({ type: Number, attribute: 'wave-height' }) waveHeight = 128;
   @property({ type: Boolean }) timescale = false;
   @property({ type: Boolean }) mono = false;
@@ -2387,6 +2433,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return this._engine.getCurrentTime();
     }
     return this._currentTime;
+  }
+  /** Read-only: whether playback is running (HTMLMediaElement-adjacent). */
+  get isPlaying(): boolean {
+    return this._isPlaying;
+  }
+  /** Read-only: total content duration in seconds. */
+  get duration(): number {
+    return this._duration;
   }
   get isRecording(): boolean {
     return this._recordingController.isRecording;

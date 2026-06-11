@@ -1,5 +1,6 @@
 import type { DawTrackElement } from './elements/daw-track';
 import type { DawClipElement } from './elements/daw-clip';
+import type { TimeDisplayFormat } from './utils/time-display-format';
 
 // ---------------------------------------------------------------------------
 // Event detail types
@@ -12,6 +13,15 @@ export interface DawSelectionDetail {
 
 export interface DawSeekDetail {
   time: number;
+}
+
+export interface DawTimeUpdateDetail {
+  /** Current playback time in seconds (latency-compensated while playing). */
+  time: number;
+}
+
+export interface DawTimeFormatChangeDetail {
+  format: TimeDisplayFormat;
 }
 
 export interface DawTrackSelectDetail {
@@ -182,6 +192,8 @@ export interface DawEffectErrorDetail {
 export interface DawEventMap {
   'daw-selection': CustomEvent<DawSelectionDetail>;
   'daw-seek': CustomEvent<DawSeekDetail>;
+  'daw-timeupdate': CustomEvent<DawTimeUpdateDetail>;
+  'daw-time-format-change': CustomEvent<DawTimeFormatChangeDetail>;
   'daw-track-select': CustomEvent<DawTrackSelectDetail>;
   'daw-track-connected': CustomEvent<DawTrackConnectedDetail>;
   'daw-track-update': CustomEvent<DawTrackIdDetail>;
