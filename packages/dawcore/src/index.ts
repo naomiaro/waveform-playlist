@@ -108,3 +108,4 @@ export type {
   EffectState,
   SerializedEffectEntry,
 } from './effects/types';
+export type { ExportOptions, ExportAudioHost } from './interactions/export-audio';

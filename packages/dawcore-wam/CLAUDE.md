@@ -32,6 +32,10 @@
 - Invalid entries skip with `[waveform-playlist]`-prefixed messages collected into `warnings` (never fail the manifest); unreachable/invalid-JSON/unrecognized-shape/zero-valid-entries reject. Entry `url` feeds straight into `createWamInstance` — descriptor validation stays at load time.
 - Real-world fixture manifests live as constants in `__tests__/library.test.ts` with source URLs in comments.
 
+## Offline Cloning (`cloneInstanceInto`, #426)
+
+`cloneInstanceInto(instance, targetContext, hostGroupId)` — WAM nodes are AudioWorklets bound to one context; offline rendering re-instantiates from the URL-cached factory on the OfflineAudioContext and transfers `getState()` (wam-studio `cloneInto` pattern). `ensureWamHost` already accepts suspended offline contexts.
+
 ## Transport Bridge (`src/transport-bridge.ts`, #425)
 
 `createWamTransportBridge(transport, getPluginNodes)` — broadcasts `wam-transport` events ({playing, tempo, timeSig, currentBar, currentBarStarted}) to all live plugin nodes on play/pause/stop/seek/tempochange/meterchange. **Variable-tempo boundary crossings emit no transport event** — a rAF watcher (active only while playing) compares tempo/meter at the playhead each frame and rebroadcasts on change. `currentBarStarted` is AudioContext time: `ctx.currentTime - (transportSeconds - barStartSeconds)`. Structural `TransportQueryLike` keeps the transport package plugin-free; `WamTransportNode.scheduleEvents` is optional (the loader's structural node type can't require it) and guarded. dawcore's `EffectsManager` creates the bridge lazily on first `addWamPlugin`, feeds it the live-node Set (entries' dispose closures self-remove), and skips it silently when the adapter transport lacks the query surface.

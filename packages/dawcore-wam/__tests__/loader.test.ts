@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   loadWamFactory,
   createWamInstance,
+  cloneInstanceInto,
   _resetWamFactoryCacheForTests,
 } from '../src/loader';
 
@@ -191,5 +192,25 @@ describe('createWamInstance', () => {
 
     expect(audioNode.setState).toHaveBeenCalledWith({ preset: 'room' });
     expect(audioNode.getParameterInfo).toHaveBeenCalled();
+  });
+});
+
+describe('cloneInstanceInto', () => {
+  it('re-instantiates on the target context with the live instance state', async () => {
+    const { WamClass, audioNode } = makeWamClass();
+    const importFn = makeImportFn({ default: WamClass });
+    const live = await createWamInstance(URL_A, ctx, 'group-1', { importFn });
+    audioNode.getState.mockResolvedValueOnce({ preset: 'cathedral' });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offlineCtx = { sampleRate: 48000 } as any;
+    const clone = await cloneInstanceInto(live, offlineCtx, 'offline-group');
+
+    // Factory came from the cache — no re-import.
+    expect(importFn).toHaveBeenCalledTimes(1);
+    expect(WamClass.createInstance).toHaveBeenLastCalledWith('offline-group', offlineCtx);
+    // The clone received the live instance's state snapshot.
+    expect(audioNode.setState).toHaveBeenCalledWith({ preset: 'cathedral' });
+    expect(clone.url).toBe(URL_A);
   });
 });

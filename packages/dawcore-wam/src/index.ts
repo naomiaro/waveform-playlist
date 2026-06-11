@@ -1,6 +1,6 @@
 export { ensureWamHost } from './host';
 export type { WamHostInfo } from './host';
-export { loadWamFactory, createWamInstance } from './loader';
+export { loadWamFactory, createWamInstance, cloneInstanceInto } from './loader';
 export type {
   WamFactory,
   WamModuleImport,

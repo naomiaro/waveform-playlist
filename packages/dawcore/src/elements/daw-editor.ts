@@ -72,6 +72,8 @@ import { addRecordedClip } from '../interactions/recording-clip';
 import { splitAtPlayhead as performSplitAtPlayhead } from '../interactions/split-handler';
 import { syncPeaksForChangedClips } from '../interactions/clip-peak-sync';
 import { EffectsManager } from '../effects/effects-manager';
+import { exportAudioImpl } from '../interactions/export-audio';
+import type { ExportOptions } from '../interactions/export-audio';
 import type { EffectState, SerializedEffectEntry } from '../effects/types';
 import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
 import { extractPeaks } from '../workers/waveformDataUtils';
@@ -399,6 +401,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   /** Replace the master chain with a persisted snapshot. */
   setEffectsState(entries: SerializedEffectEntry[]): Promise<void> {
     return this._effects.setMasterEffectsState(entries);
+  }
+
+  /**
+   * Render the session offline through all effect chains (per-track +
+   * master), including WAM plugins (re-instantiated on the offline context
+   * with their live state). Returns the rendered AudioBuffer.
+   */
+  exportAudio(options?: ExportOptions): Promise<AudioBuffer> {
+    return exportAudioImpl(
+      {
+        effectiveSampleRate: this.effectiveSampleRate,
+        duration: this._duration,
+        tracks: [...this._engineTracks.values()],
+        getMasterEffectsState: () => this.getEffectsState(),
+        getTrackEffectsState: (trackId) => this._trackGetEffectsState(trackId),
+      },
+      options
+    );
   }
 
   /** Internal — <daw-track> effects API delegates here (dawcore-internal contract). */

@@ -180,6 +180,26 @@ function validateEffectDescriptor(descriptor: WamPluginDescriptor | undefined, u
   }
 }
 
+/**
+ * Re-create a live plugin on another context (typically an
+ * OfflineAudioContext for export rendering) with the live instance's state.
+ * WAM nodes are AudioWorklets bound to one context — they cannot be moved,
+ * only cloned via getState/setState (the wam-studio cloneInto pattern).
+ * The factory comes from the URL cache, so no re-fetch occurs.
+ */
+export async function cloneInstanceInto(
+  instance: WamPluginInstance,
+  targetContext: BaseAudioContext,
+  hostGroupId: string,
+  options: { importFn?: WamModuleImport } = {}
+): Promise<WamPluginInstance> {
+  const state = await instance.getState();
+  return createWamInstance(instance.url, targetContext, hostGroupId, {
+    initialState: state,
+    importFn: options.importFn,
+  });
+}
+
 /** Test-only: drop all cached factory loads. */
 export function _resetWamFactoryCacheForTests(): void {
   factoryCache = new Map();
