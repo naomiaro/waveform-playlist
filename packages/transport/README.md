@@ -55,9 +55,12 @@ import { NativePlayoutAdapter } from '@dawcore/transport';
 const audioContext = new AudioContext({ sampleRate: 48000 });
 const adapter = new NativePlayoutAdapter(audioContext);
 
-// Use as daw-editor's adapter factory
+// Use as daw-editor's playout adapter
 const editor = document.querySelector('daw-editor');
-editor.adapterFactory = () => new NativePlayoutAdapter(audioContext);
+editor.adapter = adapter;
+
+// Transport-specific APIs stay available on your adapter reference
+adapter.transport.setMetronomeEnabled(true);
 ```
 
 ### Metronome
@@ -216,7 +219,8 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setLoopSamples(enabled, startSample: Sample, endSample: Sample)` — Set loop region in samples (convenience)
 
 **Tempo & Meter:**
-- `setTempo(bpm, atTick?, options?)` / `getTempo(atTick?: Tick)` — options: `{ interpolation: 'step' | 'linear' | { type: 'curve', slope } }`
+- `setTempo(bpm, atTick?, options?)` / `getTempo(atTick?: Tick)` — options: `{ interpolation: 'step' | 'linear' | { type: 'curve', slope } }`. Returns `boolean`: a defaulted `atTick` is the single-BPM convenience path and is refused (with a warning) when the tempo map has more than one entry — pass an explicit `atTick` to modify a tempo curve.
+- `removeTempo(atTick: Tick)` — remove the tempo entry at a tick (the tick-0 entry cannot be removed)
 - `clearTempos()` — remove all tempo entries
 - `setMeter(numerator, denominator, atTick?: Tick)` / `getMeter(atTick?: Tick)`
 - `removeMeter(atTick: Tick)` / `clearMeters()`
@@ -239,10 +243,12 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `disconnectTrackOutput(trackId)` — Remove per-track effects chain
 - `connectMasterOutput(node)` — Insert master bus effects chain
 - `disconnectMasterOutput()` — Remove master bus effects chain
+- `masterOutputNode` (getter) — Master gain node, for parallel taps (analyzers, recorders) that should survive chain connect/disconnect
 
 **Events:**
 - `on(event, callback)` / `off(event, callback)`
-- Events: `play`, `pause`, `stop`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`
+- Events: `play`, `pause`, `stop`, `seek`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`
+- `seek` payload: `{ seconds: number }`
 - `tempochange` payload: `{ bpm: number, atTick: Tick }`
 - `meterchange` payload: `{ numerator: number, denominator: number, atTick: Tick }`
 - `countIn` payload: `{ beat: number, totalBeats: number }`
@@ -258,15 +264,27 @@ new NativePlayoutAdapter(audioContext: AudioContext, options?: TransportOptions)
 
 Implements `PlayoutAdapter` from `@waveform-playlist/engine`. All methods delegate to the internal `Transport` instance.
 
-- `adapter.transport` — Direct access to the `Transport` for tempo, metronome, and effects APIs
+- `adapter.transport` — Direct access to the `Transport` for tempo, metronome, count-in, and effects APIs
+- `adapter.ppqn` — Tick resolution, read by the engine on construction
+- `adapter.masterOutputNode` — Master gain node for parallel taps (analyzers, recorders)
+- `adapter.init()` — Resumes a suspended AudioContext and waits for the hardware pipeline to warm up (Safari needs this before clips scheduled at time 0 play on time)
+- `setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)` — tempo/meter surface the engine uses for tick-based timeline math
+
+## Examples
+
+[`examples/dawcore-native/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-native) pairs this transport with the `@dawcore/components` editor: metronome, tempo automation, mixed meter, beat-map grids, effects, and recording pages (`pnpm example:dawcore-native`).
 
 ## Architecture
 
-See [TRANSPORT.md](./TRANSPORT.md) for the full architecture guide.
+See [TRANSPORT.md](https://github.com/naomiaro/waveform-playlist/blob/main/packages/transport/TRANSPORT.md) for the full architecture guide.
 
 ## How It Works
 
-See [EDUCATIONAL.md](./EDUCATIONAL.md) for an in-depth explanation of the math and timing models behind audio transport systems.
+See [EDUCATIONAL.md](https://github.com/naomiaro/waveform-playlist/blob/main/packages/transport/EDUCATIONAL.md) for an in-depth explanation of the math and timing models behind audio transport systems.
+
+## Documentation
+
+Full guides at [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/).
 
 ## License
 

@@ -10,6 +10,8 @@ This package is framework-agnostic (no Lit, no React). `@dawcore/components` con
 npm install @dawcore/wam
 ```
 
+`@dawcore/components` declares this package as an *optional* peer dependency, so package managers won't install it for you — add it to your own dependencies (as above) to enable the WAM methods on `<daw-editor>` and `<daw-track>`. Standalone use (any Web Audio app) needs no other packages.
+
 ## Using with `@dawcore/components`
 
 The typical path: install this package next to `@dawcore/components` and use the WAM methods on `<daw-editor>` (master chain) and `<daw-track>` (per-track chain). Host initialization is implicit — the first `addWamPlugin()` call sets up the WAM host on the editor's AudioContext.
@@ -53,7 +55,7 @@ See [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree
 
 ## Custom effects with Faust
 
-You don't have to wait for someone to publish the effect you need — [Faust](https://faust.grame.fr/) is a DSP language that compiles to a standard WAM 2.0 bundle via [faust2wam](https://github.com/webaudiomodules/faust2wam). The generated plugins load through `addWamPlugin(url)` with **zero special handling**: descriptor validation, chain insertion, bypass, the auto-generated GUI, `getState()`/`setState()` persistence, and offline export all work out of the box.
+You don't have to wait for someone to publish the effect you need — [Faust](https://faust.grame.fr/) is a DSP language that compiles to a standard WAM 2.0 bundle via [`@shren/faust2wam`](https://www.npmjs.com/package/@shren/faust2wam). The generated plugins load through `addWamPlugin(url)` with **zero special handling**: descriptor validation, chain insertion, bypass, the auto-generated GUI, `getState()`/`setState()` persistence, and offline export all work out of the box.
 
 The complete workflow, starting from a one-line lowpass filter:
 
@@ -66,12 +68,11 @@ process = fi.lowpass(2, hslider("cutoff", 1000, 20, 20000, 1));
 
 (That's a mono filter. Track chains are stereo, so in practice duplicate it across both channels: `cutoff = hslider("cutoff", 1000, 20, 20000, 1); process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);` — or reach for the stereo demos in the standard library like `dm.zita_light` or `dm.flanger_demo`.)
 
-**2. Compile it** with the faust2wam CLI (Node 16+, no Faust toolchain needed — the compiler ships as WebAssembly):
+**2. Compile it** with the `faust2wam` CLI from npm (no Faust toolchain needed — the compiler ships as WebAssembly):
 
 ```bash
-git clone https://github.com/webaudiomodules/faust2wam
-cd faust2wam && npm install
-node faust2wam.js lowpass.dsp out/lowpass
+npm install -D @shren/faust2wam
+npx faust2wam lowpass.dsp out/lowpass
 ```
 
 **3. Host the bundle** — `out/lowpass/` is a self-contained static directory (`index.js`, `descriptor.json`, `dsp-module.wasm`, dsp metadata, and vendored `sdk/`, `sdk-parammgr/`, `faustwasm/`, `faust-ui/` runtimes). Serve it from any static host; cross-origin hosting needs `Access-Control-Allow-Origin` headers (see the CORS note above). The `fftw/` and `host/` directories and the `.map`/`.d.ts` files are only needed for `-fft` plugins and standalone testing — safe to omit when hosting plain effects.
@@ -91,7 +92,7 @@ Faust-generated plugins are well-behaved WAM citizens; quirks observed (none nee
 - The GUI element sizes itself from faust-ui's computed `minWidth`/`minHeight` (inline styles, scrollable container) — it lays out fine in a normal document flow without a fixed-size plugin window.
 - Parameter names/addresses derive from the DSP source (`declare name` + control labels), and the descriptor identifier becomes `fr.grame.faust.<name>` with vendor `Faust User`.
 
-**No build step at all?** [`@dawcore/faust`](../dawcore-faust) compiles Faust DSP source **in the browser** — paste code, get a live plugin. `<daw-track>.addFaustEffect(dspCode)` uses it (optional peer dep, ~2.5 MB gzipped compiler loaded on first use only) and instantiates the result through this package's `createWamInstanceFromFactory`.
+**No build step at all?** [`@dawcore/faust`](https://www.npmjs.com/package/@dawcore/faust) compiles Faust DSP source **in the browser** — paste code, get a live plugin. It wraps `@shren/faust2wam`'s browser API (the same `generate()` the CLI uses). `<daw-track>.addFaustEffect(dspCode)` uses it (optional peer dep, ~2.5 MB gzipped compiler loaded on first use only) and instantiates the result through this package's `createWamInstanceFromFactory`.
 
 ## Standalone Usage
 
@@ -141,7 +142,7 @@ const { entries, warnings } = await fetchWamLibrary(
 
 An entry's `url` feeds straight into `createWamInstance(url, ...)`. Descriptor validation still happens at load time — manifests can lie.
 
-**Factories without URLs** — when you already hold a WebAudioModule class (e.g. one generated in-browser by [`@dawcore/faust`](../dawcore-faust)), instantiate it through the same validate/wrap pipeline with `createWamInstanceFromFactory`:
+**Factories without URLs** — when you already hold a WebAudioModule class (e.g. one generated in-browser by [`@dawcore/faust`](https://www.npmjs.com/package/@dawcore/faust)), instantiate it through the same validate/wrap pipeline with `createWamInstanceFromFactory`:
 
 ```typescript
 import { createWamInstanceFromFactory } from '@dawcore/wam';
@@ -230,3 +231,12 @@ offlinePlugin.destroy();
 ```
 
 This is how `<daw-editor>.exportAudio()` renders WAM chains offline: each persisted entry is re-instantiated on the `OfflineAudioContext` with its saved state, and all offline instances are destroyed after rendering.
+
+## Examples & Documentation
+
+- [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-wam) — end-to-end demo (`pnpm example:dawcore-wam`)
+- Guides: [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/docs/web-components/getting-started)
+
+## License
+
+MIT

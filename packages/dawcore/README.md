@@ -10,12 +10,16 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **Drag interactions** — Move clips, trim boundaries, split at playhead
 - **Keyboard shortcuts** — Play/pause, split, undo/redo via `<daw-keyboard-shortcuts>`
 - **Undo/redo** — Full transaction-based undo with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z
-- **File drop** — Drag audio files onto the editor to add tracks
+- **File drop** — Drag audio files onto the editor to add tracks (enable with the `file-drop` attribute)
 - **Recording** — Live mic recording with waveform preview, pause/resume, cancelable clip creation
 - **Pre-computed peaks** — Instant waveform rendering from `.dat` files before audio decodes
-- **MIDI tracks** — Programmatic MIDI clips render as piano-roll via `<daw-piano-roll>`. Playback via Tone.js adapter (native MIDI synth deferred). See [MIDI Tracks](#midi-tracks).
+- **MIDI tracks** — Declarative or programmatic MIDI clips render as piano-roll. Playback via the Tone.js adapter. See [MIDI Tracks](#midi-tracks).
+- **MIDI file loading** — `editor.loadMidi(urlOrFile)` parses a `.mid` file into piano-roll tracks via the optional `@dawcore/midi` peer
+- **Spectrogram rendering** — `<daw-track render-mode="spectrogram">` renders FFT spectrograms via `@dawcore/spectrogram`
 - **Track controls** — Volume, pan, mute, solo per track via `<daw-track-controls>`
-- **Effects chains** — Per-track and master effect chains with built-in `native-*` effects and WAM 2.0 plugins via `@dawcore/wam`. See [Effects](#effects).
+- **Effects chains** — Per-track and master effect chains with built-in `native-*` effects, WAM 2.0 plugins via `@dawcore/wam`, and in-browser-compiled Faust DSP via `@dawcore/faust`. See [Effects](#effects).
+- **Effect GUIs and persistence** — Mount plugin GUIs into your own panels; snapshot and restore whole chains. See [Effect GUIs](#effect-guis) and [Effects Persistence](#effects-persistence).
+- **Offline export** — `editor.exportAudio()` renders the session (clips, mix, all effect chains) to an `AudioBuffer`. See [Offline Export](#offline-export).
 - **Transport access** — Tempo, metronome, count-in, meter, effects via `@dawcore/transport`
 - **CSS theming** — Dark mode by default, fully customizable via CSS custom properties
 - **Native Web Audio** — Uses `@dawcore/transport` for playback scheduling. No Tone.js dependency.
@@ -26,21 +30,27 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 npm install @dawcore/components
 ```
 
-Peer dependencies:
+Required peer dependencies:
+
 ```bash
 npm install @waveform-playlist/core @waveform-playlist/engine
 ```
 
 Audio backend (choose one — see [Choosing an Audio Backend](#choosing-an-audio-backend)):
+
 ```bash
 npm install @dawcore/transport          # Native Web Audio (recommended)
 # or
 npm install @waveform-playlist/playout tone  # Tone.js
 ```
 
-Optional (for recording):
+Optional peer dependencies — each is dynamic-imported on first use, so you only install (and ship) what you use:
+
 ```bash
-npm install @waveform-playlist/worklets
+npm install @waveform-playlist/worklets  # recording
+npm install @dawcore/midi                # editor.loadMidi()
+npm install @dawcore/wam                 # WAM 2.0 plugins (addWamPlugin) + generic effect GUIs
+npm install @dawcore/faust @dawcore/wam  # in-browser Faust compilation (addFaustEffect)
 ```
 
 ## Quick Start
@@ -94,7 +104,7 @@ adapter.transport.setCountIn(true);
 
 ### Tone.js (effects, MIDI synths)
 
-Uses Tone.js for audio processing. Single tempo/meter only. **Required for MIDI playback** — the native adapter has no MIDI synth yet, so MIDI clips render as piano-roll but are silent.
+Uses Tone.js for audio processing. Single tempo/meter only. **Required for MIDI playback** — the native adapter has no MIDI synth, so MIDI clips render as piano-roll but play silently on it.
 
 ```bash
 npm install @waveform-playlist/playout tone
@@ -129,7 +139,7 @@ For multiple clips per track with independent positioning:
 
 ## MIDI Tracks
 
-Programmatic MIDI clips render as piano-roll. Playback requires the Tone.js adapter (the native adapter has no MIDI synth yet). Use the `editor.addTrack({ midi })` sugar for the simplest path:
+Programmatic MIDI clips render as piano-roll. Playback requires the Tone.js adapter (the native adapter has no MIDI synth). Use the `editor.addTrack({ midi })` sugar for the simplest path:
 
 ```javascript
 import { createToneAdapter } from '@waveform-playlist/playout';
@@ -165,7 +175,7 @@ This expands to a `<daw-track render-mode="piano-roll">` containing a `<daw-clip
 </script>
 ```
 
-A clip is treated as MIDI iff `clip.midiNotes != null`. MIDI clips skip audio fetch + decode + peak generation. Trim handles and split-at-playhead are inert on MIDI clips for now (note slicing is a follow-up). Move drag works.
+A clip is treated as MIDI iff `clip.midiNotes != null`. MIDI clips skip audio fetch + decode + peak generation. Move drag works on MIDI clips; trim handles and split-at-playhead are inert on them.
 
 **Theming:** the piano-roll honors `--daw-piano-roll-note-color` (default `#2a7070`), `--daw-piano-roll-selected-note-color` (default `#3d9e9e`), and `--daw-piano-roll-background` (default `#1a1a2e`).
 
@@ -393,26 +403,39 @@ Core orchestrator. Attributes:
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `samples-per-pixel` | number | `1024` | Zoom level |
-| `sample-rate` | number | `48000` | AudioContext sample rate hint |
-| `wave-height` | number | `100` | Track waveform height in pixels |
+| `samples-per-pixel` | number | `1024` | Zoom level (clamped to the pre-computed peaks floor when one is active) |
+| `wave-height` | number | `128` | Track waveform height in pixels |
 | `timescale` | boolean | `false` | Show time ruler |
 | `clip-headers` | boolean | `false` | Show clip name headers |
+| `clip-header-height` | number | `20` | Clip header height in pixels |
 | `interactive-clips` | boolean | `false` | Enable drag/trim/split |
+| `file-drop` | boolean | `false` | Accept audio files dropped onto the editor |
 | `mono` | boolean | `false` | Merge stereo to mono display |
-| `eager-resume` | boolean | `false` | Resume AudioContext on first user gesture |
+| `bar-width` / `bar-gap` | number | `1` / `0` | Waveform bar rendering style |
+| `indefinite-playback` | boolean | `false` | Keep ruler/timeline filling the viewport with no clips |
+| `scale-mode` | string | `'temporal'` | `'temporal'` (seconds) or `'beats'` (tick-linear grid) |
+| `ticks-per-pixel` | number | `24` | Zoom level in beats mode |
+| `snap-to` | string | `'off'` | Grid snapping in beats mode (`'bar'`, `'beat'`, `'1/2'`…`'1/16'`, `'off'`) |
+| `eager-resume` | string | — | Resume AudioContext on first gesture; bare attribute targets the editor, or pass `"document"` / a CSS selector |
 
-JS properties: `audioContext`, `recordingStream`, `engine`.
+JS properties: `adapter` (required `PlayoutAdapter`), `recordingStream`, `bpm`, `ppqn`, `timeSignature`, `meterEntries`, `secondsToTicks` / `ticksToSeconds` (variable-tempo callbacks), `spectrogramConfig`, `spectrogramColorMap`. Read-only: `engine`, `audioContext` (from the adapter), `tracks`, `selection`, `selectedTrackId`, `currentTime`, `canUndo` / `canRedo`, `isRecording`.
 
-Methods: `loadFiles(fileList)`, `splitAtPlayhead()`, plus the master-chain effects API (see [Effects](#effects)).
+Methods:
+
+- Playback: `play(startTime?)`, `pause()`, `stop()`, `togglePlayPause()`, `seekTo(time)`
+- Loading: `loadFiles(files)`, `loadMidi(urlOrFile, options?)`, `ready()`
+- Tracks & clips: `addTrack(config)`, `removeTrack(id)`, `updateTrack(id, partial)`, `addClip(trackId, config)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`
+- Editing: `splitAtPlayhead()`, `undo()`, `redo()`, `setSelection(start, end)`
+- Recording: `startRecording(stream?, options?)`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`, `togglePauseRecording()`
+- Effects & export: the master-chain effects API (see [Effects](#effects)), `getEffectsState()` / `setEffectsState(entries)`, `openEffectGui()` / `closeEffectGui()`, `exportAudio(options?)`
 
 ### `<daw-track>`
 
-Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `mono`, `render-mode` (`'waveform' | 'piano-roll'`, default `'waveform'`). Also exposes the per-track effects API (see [Effects](#effects)).
+Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `render-mode` (`'waveform' | 'piano-roll' | 'spectrogram'`, default `'waveform'`). JS property: `spectrogramConfig` (per-track spectrogram override). Also exposes the per-track effects API (see [Effects](#effects)).
 
 ### `<daw-clip>`
 
-Declarative clip data. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `midi-channel`, `midi-program`. JS-only property: `midiNotes: MidiNoteData[] | null` (note arrays are too large for attributes).
+Declarative clip data. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `midi-channel`, `midi-program`. JS-only property: `midiNotes: MidiNoteData[] | null` (note arrays are too large for attributes).
 
 ### `<daw-piano-roll>`
 
@@ -460,12 +483,16 @@ editor.addEventListener('daw-recording-complete', (e) => {
 // Effects (track events bubble up to the editor)
 editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));
 editor.addEventListener('daw-effect-change', (e) => console.log(e.detail));
+// also: daw-effect-remove, daw-effect-bypass, daw-effect-reorder
 
 // Errors
 editor.addEventListener('daw-track-error', (e) => console.error(e.detail));
 editor.addEventListener('daw-error', (e) => console.error(e.detail));
 editor.addEventListener('daw-files-load-error', (e) => console.error(e.detail));
+editor.addEventListener('daw-effect-error', (e) => console.error(e.detail));
 ```
+
+All events and their `detail` payloads are typed in the exported `DawEventMap`.
 
 ## Custom AudioContext
 
@@ -478,6 +505,13 @@ editor.adapter = adapter;
 ```
 
 Set the adapter before tracks load. The provided context is used for decoding, playback, and recording.
+
+## Examples & Documentation
+
+- [`examples/dawcore-native/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-native) — native transport: basics, multi-clip, metronome, beats grid, beat maps, effects, spectrogram, recording (`pnpm example:dawcore-native`)
+- [`examples/dawcore-tone/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-tone) — Tone.js adapter: MIDI, SoundFont playback (`pnpm example:dawcore-tone`)
+- [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-wam) — WAM plugins end-to-end + in-browser Faust compilation (`pnpm example:dawcore-wam`)
+- Guides: [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/docs/web-components/getting-started)
 
 ## License
 
