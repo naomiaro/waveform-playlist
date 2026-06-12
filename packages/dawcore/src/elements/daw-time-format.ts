@@ -3,7 +3,8 @@ import { customElement, state } from 'lit/decorators.js';
 import {
   resolveTransportTarget,
   targetSupports,
-  warnOnce,
+  targetUndetermined,
+  warnNoTargetOnce,
   warnUnsupportedOnce,
 } from '../utils/transport-capability';
 import {
@@ -43,8 +44,16 @@ export class DawTimeFormatElement extends LitElement {
     return resolveTransportTarget(this);
   }
 
+  /**
+   * False when the target doesn't implement setTimeFormat. An undetermined
+   * target (missing, or a not-yet-upgraded custom element) gets the benefit
+   * of the doubt and stays enabled — interaction-time resolution warns if
+   * it's still unusable.
+   */
   private get _targetSupported(): boolean {
-    return targetSupports(this.target, ['setTimeFormat']);
+    const target = this.target;
+    if (targetUndetermined(target)) return true;
+    return targetSupports(target, ['setTimeFormat']);
   }
 
   private _onFormatChange = (e: Event) => {
@@ -52,23 +61,19 @@ export class DawTimeFormatElement extends LitElement {
     const detail = (e as DawEvent<'daw-time-format-change'>).detail;
     if (isTimeDisplayFormat(detail.format)) {
       this._format = detail.format;
-      // If _format didn't change value, Lit won't schedule an update and
-      // updated() won't run — sync the IDL value eagerly here so the select
-      // always reflects the programmatic format even when the value is unchanged.
-      const select = this.shadowRoot?.querySelector('select');
-      if (select && select.value !== this._format) {
-        select.value = this._format;
-      }
     }
+  };
+
+  private _onPointerEnter = () => {
+    // A target that became resolvable since the last render should
+    // re-evaluate before the click lands.
+    this.requestUpdate();
   };
 
   private _onPointerDown = () => {
     const target = this.target;
     if (!target) {
-      warnOnce(
-        this,
-        '[dawcore] <daw-time-format> has no target. Check <daw-transport for="..."> references a valid element id.'
-      );
+      warnNoTargetOnce(this);
       return;
     }
     if (!this._targetSupported) {
@@ -80,6 +85,7 @@ export class DawTimeFormatElement extends LitElement {
     super.connectedCallback();
     document.addEventListener('daw-time-format-change', this._onFormatChange);
     this.addEventListener('pointerdown', this._onPointerDown);
+    this.addEventListener('pointerenter', this._onPointerEnter);
     // Defer until the transport target has upgraded, then sync + re-render.
     requestAnimationFrame(() => {
       if (!this.isConnected) return;
@@ -95,6 +101,7 @@ export class DawTimeFormatElement extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener('daw-time-format-change', this._onFormatChange);
     this.removeEventListener('pointerdown', this._onPointerDown);
+    this.removeEventListener('pointerenter', this._onPointerEnter);
   }
 
   protected updated() {
@@ -112,11 +119,7 @@ export class DawTimeFormatElement extends LitElement {
     const target = this.target as (HTMLElement & { setTimeFormat?: (f: string) => void }) | null;
     if (!target) {
       // Stale-render race guard: the target can vanish between render and change.
-      warnOnce(
-        this,
-        '[dawcore] <daw-time-format> has no target. Check <daw-transport for="..."> ' +
-          'references a valid element.'
-      );
+      warnNoTargetOnce(this);
       return;
     }
     target.setTimeFormat?.(value);

@@ -6,6 +6,12 @@ beforeAll(async () => {
 });
 
 describe('DawRecordButtonElement', () => {
+  afterEach(() => {
+    // Failed assertions skip trailing in-test cleanup — reset here so a
+    // failure can't leak orphan elements into the next describe.
+    document.body.innerHTML = '';
+  });
+
   it('is registered as a custom element', () => {
     expect(customElements.get('daw-record-button')).toBeDefined();
   });
@@ -19,7 +25,7 @@ describe('DawRecordButtonElement', () => {
     document.body.removeChild(el);
   });
 
-  it('renders disabled when there is no target (no <daw-transport> parent)', async () => {
+  it('stays enabled while the target is missing (click-time resolution warns instead of latching disabled)', async () => {
     const el = document.createElement('daw-record-button') as any;
     document.body.appendChild(el);
     // Wait for connectedCallback rAF + Lit update
@@ -27,7 +33,7 @@ describe('DawRecordButtonElement', () => {
     await el.updateComplete;
 
     const button = el.shadowRoot?.querySelector('button');
-    expect(button?.disabled).toBe(true);
+    expect(button?.disabled).toBe(false);
     document.body.removeChild(el);
   });
 });
@@ -82,6 +88,33 @@ describe('daw-record-button capability detection (#474 foundation)', () => {
     button.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('startRecording');
+  });
+
+  it('enables once a late target appears', async () => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<daw-transport for="late-target"><daw-record-button></daw-record-button></daw-transport>'
+    );
+    const button = document.querySelector('daw-record-button')! as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    await nextFrame();
+    await button.updateComplete;
+    const inner = button.shadowRoot!.querySelector('button')!;
+    // Benefit of the doubt: no latching disabled while the target is missing.
+    expect(inner.disabled).toBe(false);
+
+    const startRecording = vi.fn();
+    const late = document.createElement('div');
+    late.id = 'late-target';
+    Object.assign(late, { startRecording, stopRecording: vi.fn() });
+    document.body.appendChild(late);
+
+    button.dispatchEvent(new Event('pointerenter', { bubbles: true }));
+    await button.updateComplete;
+    expect(inner.disabled).toBe(false);
+    inner.click();
+    expect(startRecording).toHaveBeenCalled();
   });
 
   it('warns once on pointer interaction when the transport target is missing', async () => {

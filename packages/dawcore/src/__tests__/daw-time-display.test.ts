@@ -79,6 +79,27 @@ describe('daw-time-display without a target', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it('re-syncs timeFormat from the target on late recovery', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<daw-transport for="late-ed"><daw-time-display></daw-time-display></daw-transport>'
+    );
+    const display = document.querySelector('daw-time-display') as DawTimeDisplayElement;
+    await nextFrame();
+    await display.updateComplete;
+    expect(display.shadowRoot!.textContent).toContain('--:--:--');
+
+    const late = document.createElement('div');
+    late.id = 'late-ed';
+    Object.assign(late, { currentTime: 0, timeFormat: 'seconds' });
+    document.body.appendChild(late);
+    dispatchFrom(late, 'daw-timeupdate', { time: 3.5 });
+    await display.updateComplete;
+    expect(display.shadowRoot!.textContent).toContain('3.500');
+    expect(display.shadowRoot!.textContent).not.toContain('00:00:03.500');
+  });
+
   it('does not warn when removed before the deferred initial sync', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const display = document.createElement('daw-time-display') as DawTimeDisplayElement;

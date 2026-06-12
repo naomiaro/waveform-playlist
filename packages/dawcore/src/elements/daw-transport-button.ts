@@ -2,7 +2,8 @@ import { LitElement, css } from 'lit';
 import {
   resolveTransportTarget,
   targetSupports,
-  warnOnce,
+  targetUndetermined,
+  warnNoTargetOnce,
   warnUnsupportedOnce,
 } from '../utils/transport-capability';
 
@@ -26,11 +27,18 @@ export class DawTransportButton extends LitElement {
     return (this.constructor as typeof DawTransportButton).requiredTargetMethods;
   }
 
-  /** False when this control declares requirements its target doesn't meet. */
+  /**
+   * False when this control declares requirements its target doesn't meet.
+   * An undetermined target (missing, or a not-yet-upgraded custom element)
+   * gets the benefit of the doubt and stays enabled — click-time resolution
+   * warns if it's still unusable.
+   */
   protected get targetSupported(): boolean {
     const required = this._requiredMethods;
     if (required.length === 0) return true;
-    return targetSupports(this.target, required);
+    const target = this.target;
+    if (targetUndetermined(target)) return true;
+    return targetSupports(target, required);
   }
 
   connectedCallback() {
@@ -38,6 +46,9 @@ export class DawTransportButton extends LitElement {
     // Disabled inner buttons swallow clicks — listen on the host so an
     // unsupported control still explains itself on first interaction.
     this.addEventListener('pointerdown', this._onCapabilityPointerDown);
+    // A target that became resolvable since the last render should
+    // re-evaluate before the click lands.
+    this.addEventListener('pointerenter', this._onCapabilityPointerEnter);
     // The transport `for` id resolves after connect (target may upgrade
     // later) — re-render once it's resolvable so disabled state is accurate.
     requestAnimationFrame(() => {
@@ -49,20 +60,22 @@ export class DawTransportButton extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.removeEventListener('pointerdown', this._onCapabilityPointerDown);
+    this.removeEventListener('pointerenter', this._onCapabilityPointerEnter);
   }
+
+  private _onCapabilityPointerEnter = () => {
+    this.requestUpdate();
+  };
 
   private _onCapabilityPointerDown = () => {
     const target = this.target;
     if (!target) {
-      // A control with requirements renders disabled when the target is
-      // missing — without this warn, a bad <daw-transport for> id would be
-      // silent. Controls with no requirements stay enabled and warn in their
-      // own click handlers instead.
+      // A control with requirements stays enabled when the target is missing
+      // (benefit of the doubt) — without this warn, a bad <daw-transport for>
+      // id would be silent. Controls with no requirements warn in their own
+      // click handlers instead.
       if (this._requiredMethods.length > 0) {
-        warnOnce(
-          this,
-          `[dawcore] <${this.tagName.toLowerCase()}> has no target. Check <daw-transport for="..."> references a valid element id.`
-        );
+        warnNoTargetOnce(this);
       }
       return;
     }

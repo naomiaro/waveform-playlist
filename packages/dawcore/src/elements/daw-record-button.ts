@@ -1,6 +1,7 @@
 import { html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { DawTransportButton } from './daw-transport-button';
+import { warnNoTargetOnce } from '../utils/transport-capability';
 
 @customElement('daw-record-button')
 export class DawRecordButtonElement extends DawTransportButton {
@@ -80,9 +81,7 @@ export class DawRecordButtonElement extends DawTransportButton {
     const target = this.target;
     // Stale-render race guard: the target can vanish between render and click.
     if (!target) {
-      console.warn(
-        '[dawcore] <daw-record-button> has no target. Check <daw-transport for="..."> references a valid <daw-editor> id.'
-      );
+      warnNoTargetOnce(this);
       return;
     }
     target.startRecording(target.recordingStream);

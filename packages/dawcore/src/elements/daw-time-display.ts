@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { resolveTransportTarget, warnOnce } from '../utils/transport-capability';
+import { resolveTransportTarget, warnNoTargetOnce } from '../utils/transport-capability';
 import {
   formatDisplayTime,
   isTimeDisplayFormat,
@@ -21,9 +21,9 @@ import type { DawEvent } from '../events';
  */
 @customElement('daw-time-display')
 export class DawTimeDisplayElement extends LitElement {
-  @state() private _time = 0;
+  /** Null until the first successful target sync or daw-timeupdate. */
+  @state() private _time: number | null = null;
   @state() private _format: TimeDisplayFormat = 'hh:mm:ss.sss';
-  @state() private _hasTarget = false;
 
   static styles = css`
     span {
@@ -43,7 +43,11 @@ export class DawTimeDisplayElement extends LitElement {
 
   private _onTimeUpdate = (e: Event) => {
     if (e.target !== this.target) return;
-    this._hasTarget = true;
+    if (this._time === null) {
+      // Late-target recovery: pick up the format we missed at connect time.
+      const timeFormat = (e.target as HTMLElement & { timeFormat?: unknown }).timeFormat;
+      if (isTimeDisplayFormat(timeFormat)) this._format = timeFormat;
+    }
     this._time = (e as DawEvent<'daw-timeupdate'>).detail.time;
   };
 
@@ -74,15 +78,12 @@ export class DawTimeDisplayElement extends LitElement {
     if (!this.isConnected) return;
     const target = this.target;
     if (!target || typeof (target as { currentTime?: unknown }).currentTime !== 'number') {
-      warnOnce(
+      warnNoTargetOnce(
         this,
-        '[dawcore] <daw-time-display> has no target. Check <daw-transport for="..."> ' +
-          'references a valid element. The display recovers automatically once the ' +
-          'target dispatches daw-timeupdate.'
+        ' The display recovers automatically once the target dispatches daw-timeupdate.'
       );
       return;
     }
-    this._hasTarget = true;
     this._time = (target as unknown as { currentTime: number }).currentTime;
     const fmt = (target as { timeFormat?: unknown }).timeFormat;
     if (isTimeDisplayFormat(fmt)) {
@@ -91,7 +92,7 @@ export class DawTimeDisplayElement extends LitElement {
   }
 
   render() {
-    const text = this._hasTarget ? formatDisplayTime(this._time, this._format) : '--:--:--';
+    const text = this._time === null ? '--:--:--' : formatDisplayTime(this._time, this._format);
     return html`<span role="status" aria-label="Playback time" aria-live="off">${text}</span>`;
   }
 }

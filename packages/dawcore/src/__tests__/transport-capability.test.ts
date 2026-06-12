@@ -3,6 +3,7 @@ import '../index';
 import {
   resolveTransportTarget,
   targetSupports,
+  warnOnce,
   warnUnsupportedOnce,
 } from '../utils/transport-capability';
 
@@ -25,6 +26,24 @@ describe('targetSupports', () => {
 
   it('returns true for an empty requirement list on a non-null target', () => {
     expect(targetSupports({}, [])).toBe(true);
+  });
+});
+
+describe('warnOnce', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('distinct messages on the same element each warn once', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('div');
+    warnOnce(el, 'message A');
+    warnOnce(el, 'message A');
+    warnOnce(el, 'message B');
+    warnOnce(el, 'message B');
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toBe('message A');
+    expect(warn.mock.calls[1][0]).toBe('message B');
   });
 });
 

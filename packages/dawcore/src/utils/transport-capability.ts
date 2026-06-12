@@ -25,18 +25,53 @@ export function targetSupports(target: unknown, methods: readonly string[]): boo
   return methods.every((m) => typeof (target as Record<string, unknown>)[m] === 'function');
 }
 
-const warned = new WeakSet<Element>();
+/**
+ * True when the target cannot be judged yet: it is missing entirely, or it is
+ * a custom element that has not upgraded (its methods don't exist until the
+ * definition loads). Capability-gated controls give these the benefit of the
+ * doubt and stay enabled — click-time resolution warns if still unusable —
+ * instead of latching disabled before the app finishes booting.
+ */
+export function targetUndetermined(target: HTMLElement | null): boolean {
+  if (!target) return true;
+  const name = target.localName;
+  return name.includes('-') && customElements.get(name) === undefined;
+}
+
+const warned = new WeakMap<Element, Set<string>>();
 
 /**
  * One-time console warning for a transport control.
- * Dedup is per element — an element warns at most once total, regardless of
- * how many different warn* calls are made for it. This means a missing-target
- * warn and an unsupported-target warn share the same gate.
+ * Dedup is per element per message — distinct messages on the same element
+ * each warn once, while repeats of the same message stay silent. A
+ * missing-target warn and an unsupported-target warn no longer suppress each
+ * other.
  */
 export function warnOnce(element: Element, message: string): void {
-  if (warned.has(element)) return;
-  warned.add(element);
+  let messages = warned.get(element);
+  if (!messages) {
+    messages = new Set();
+    warned.set(element, messages);
+  }
+  if (messages.has(message)) return;
+  messages.add(message);
   console.warn(message);
+}
+
+/**
+ * One-time canonical warning for a control whose transport target is missing.
+ * Every no-target site uses this single sentence so the message-keyed
+ * {@link warnOnce} dedup collapses pointerdown-time and click-time warns into
+ * one warning total. An optional suffix appends extra element-specific
+ * context after the canonical text (still one message key per suffix).
+ */
+export function warnNoTargetOnce(element: Element, suffix?: string): void {
+  warnOnce(
+    element,
+    `[dawcore] <${element.tagName.toLowerCase()}> has no target. Check ` +
+      '<daw-transport for="..."> references a valid element id.' +
+      (suffix ?? '')
+  );
 }
 
 /**

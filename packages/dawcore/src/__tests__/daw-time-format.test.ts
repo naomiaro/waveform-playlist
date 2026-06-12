@@ -11,9 +11,22 @@ describe('daw-time-format', () => {
   beforeEach(async () => {
     fakeEditor = document.createElement('div');
     fakeEditor.id = 'fake-ed';
+    // Mirror the real editor contract: setTimeFormat dispatches
+    // daw-time-format-change on actual changes (and never on same-value sets).
     Object.assign(fakeEditor, {
       timeFormat: 'hh:mm:ss',
-      setTimeFormat: vi.fn(),
+      setTimeFormat: vi.fn((format: string) => {
+        const ed = fakeEditor as HTMLElement & { timeFormat?: string };
+        if (ed.timeFormat === format) return;
+        ed.timeFormat = format;
+        fakeEditor.dispatchEvent(
+          new CustomEvent('daw-time-format-change', {
+            bubbles: true,
+            composed: true,
+            detail: { format },
+          })
+        );
+      }),
     });
     document.body.appendChild(fakeEditor);
     document.body.insertAdjacentHTML(
@@ -95,6 +108,9 @@ describe('daw-time-format', () => {
     const el = document.querySelector('daw-time-format') as DawTimeFormatElement;
     await nextFrame();
     await el.updateComplete;
+    // Benefit of the doubt: a missing target keeps the select enabled —
+    // interaction-time resolution warns instead of latching disabled.
+    expect(el.shadowRoot!.querySelector('select')!.disabled).toBe(false);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     el.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     el.dispatchEvent(new Event('pointerdown', { bubbles: true }));
