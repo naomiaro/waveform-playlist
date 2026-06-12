@@ -1,10 +1,8 @@
 import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
-import { AnimationController } from '../controllers/animation-controller';
 
 @customElement('daw-playhead')
 export class DawPlayheadElement extends LitElement {
-  private _animation = new AnimationController(this);
   private _line: HTMLElement | null = null;
 
   static styles = css`
@@ -38,70 +36,6 @@ export class DawPlayheadElement extends LitElement {
    *  The editor's PlaybackAnimationController drives this each frame — the
    *  playhead owns no animation loop or time math of its own. */
   setPosition(px: number) {
-    if (this._line) {
-      this._line.style.transform = `translate3d(${px}px, 0, 0)`;
-    }
-  }
-
-  startAnimation(getTime: () => number, sampleRate: number, samplesPerPixel: number) {
-    this._animation.start(() => {
-      const time = getTime();
-      const px = (time * sampleRate) / samplesPerPixel;
-      if (this._line) {
-        this._line.style.transform = `translate3d(${px}px, 0, 0)`;
-      }
-    });
-  }
-
-  stopAnimation(time: number, sampleRate: number, samplesPerPixel: number) {
-    this._animation.stop();
-    const px = (time * sampleRate) / samplesPerPixel;
-    if (this._line) {
-      this._line.style.transform = `translate3d(${px}px, 0, 0)`;
-    }
-  }
-
-  startBeatsAnimation(getTime: () => number, bpm: number, ppqn: number, ticksPerPixel: number) {
-    const ticksPerSecond = (bpm * ppqn) / 60;
-    this._animation.start(() => {
-      const time = getTime();
-      const px = (time * ticksPerSecond) / ticksPerPixel;
-      if (this._line) {
-        this._line.style.transform = `translate3d(${px}px, 0, 0)`;
-      }
-    });
-  }
-
-  stopBeatsAnimation(time: number, bpm: number, ppqn: number, ticksPerPixel: number) {
-    this._animation.stop();
-    const px = (time * bpm * ppqn) / (60 * ticksPerPixel);
-    if (this._line) {
-      this._line.style.transform = `translate3d(${px}px, 0, 0)`;
-    }
-  }
-
-  startBeatsAnimationWithMap(
-    getTime: () => number,
-    secondsToTicks: (s: number) => number,
-    ticksPerPixel: number
-  ) {
-    this._animation.start(() => {
-      const time = getTime();
-      const tick = secondsToTicks(time);
-      const px = tick / ticksPerPixel;
-      if (this._line) {
-        this._line.style.transform = `translate3d(${px}px, 0, 0)`;
-      }
-    });
-  }
-
-  stopBeatsAnimationWithMap(
-    time: number,
-    secondsToTicks: (s: number) => number,
-    ticksPerPixel: number
-  ) {
-    this._animation.stop();
-    const px = secondsToTicks(time) / ticksPerPixel;
     if (this._line) {
       this._line.style.transform = `translate3d(${px}px, 0, 0)`;
     }

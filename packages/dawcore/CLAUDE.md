@@ -44,7 +44,7 @@
 **Visual elements (Shadow DOM):**
 
 - `<daw-waveform>` — Chunked canvas rendering (1000px chunks). Receives peaks as JS properties. Uses dirty pixel tracking for incremental rendering — `updatePeaks(startIndex, endIndex)` marks a range dirty without full redraw. Bits derived from typed array (Int8Array→8, Int16Array→16). Drawing batched via `requestAnimationFrame`.
-- `<daw-playhead>` — RAF-animated vertical line via `AnimationController`.
+- `<daw-playhead>` — Pure visual element; exposes `setPosition(px)`. The editor's `PlaybackAnimationController` drives it each frame (single RAF loop that also dispatches `daw-timeupdate`).
 - `<daw-ruler>` — Temporal time scale with tick marks. Ported from `SmartScale` (temporal mode only, beats & bars deferred). Computes ticks once in `willUpdate()`, reused by both `render()` and `updated()`.
 
 **Control elements:**
@@ -159,7 +159,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Reactive Controllers
 
-- `AnimationController` — Start/stop RAF loops, auto-cleanup on `hostDisconnected`. Used by `<daw-playhead>`.
+- `AnimationController` — Start/stop RAF loops, auto-cleanup on `hostDisconnected`. Used by `PlaybackAnimationController`.
 - `ViewportController` — Scroll-aware visible range with overscan buffer (1.5x). Attached to `.scroll-area` via `scrollSelector`. See Virtual Scrolling section.
 - `EngineController` — (Scaffolded, not yet wired) DOM traversal to find closest `<daw-editor>`. Will be used by sub-elements that need engine access.
 - `AudioResumeController` — One-shot AudioContext resume on first user gesture (`pointerdown`/`keydown`). Configurable target: host element (default), `'document'`, or CSS selector. Used by `<daw-editor eager-resume>`. Exported for standalone use.

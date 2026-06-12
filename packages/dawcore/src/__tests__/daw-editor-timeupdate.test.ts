@@ -54,11 +54,22 @@ describe('daw-editor daw-timeupdate', () => {
     await editor.updateComplete;
     // Mock RAF only AFTER setup — connectedCallback paths defer via real RAF.
     rafCallbacks = [];
+    let nextRafId = 1;
+    const rafIds = new Map<number, FrameRequestCallback>();
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+      const id = nextRafId++;
+      rafIds.set(id, cb);
       rafCallbacks.push(cb);
-      return rafCallbacks.length;
+      return id;
     });
-    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id: number) => {
+      const cb = rafIds.get(id);
+      if (cb) {
+        rafIds.delete(id);
+        const idx = rafCallbacks.indexOf(cb);
+        if (idx !== -1) rafCallbacks.splice(idx, 1);
+      }
+    });
   });
 
   afterEach(() => {

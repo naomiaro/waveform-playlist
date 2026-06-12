@@ -47,10 +47,10 @@ export class PlaybackAnimationController {
     timeToPixels: (time: number) => number,
     getPlayhead: () => PlayheadLike | null
   ): void {
-    // The editor's stop path reaches here twice (engine 'stop' handler at
-    // daw-editor.ts:1919 AND editor.stop() both call _stopPlayhead). Dedupe:
-    // dispatch only when the loop was actually running or the settled time
-    // changed (seek-while-stopped must still fire its event).
+    // The editor's stop path reaches here twice (the engine 'stop' handler
+    // registered in _buildEngine AND editor.stop() both call _stopPlayhead).
+    // Dedupe: dispatch only when the loop was actually running or the settled
+    // time changed (seek-while-stopped must still fire its event).
     const wasRunning = this._running;
     this._running = false;
     this._animation.stop();
