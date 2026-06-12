@@ -51,7 +51,10 @@ export { AudioResumeController } from './controllers/audio-resume-controller';
 export { RecordingController } from './controllers/recording-controller';
 export type { RecordingOptions, RecordingSession } from './controllers/recording-controller';
 export { PlaybackAnimationController } from './controllers/playback-animation-controller';
-export type { PlayheadLike } from './controllers/playback-animation-controller';
+export type {
+  PlayheadLike,
+  PlaybackAnimationOptions,
+} from './controllers/playback-animation-controller';
 export {
   TIME_DISPLAY_FORMATS,
   isTimeDisplayFormat,

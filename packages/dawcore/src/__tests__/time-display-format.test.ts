@@ -75,4 +75,14 @@ describe('time-display-format', () => {
     expect(formatDisplayTime(59.9999, 'hh:mm:ss.sss')).toBe('00:00:59.999');
     expect(formatDisplayTime(119.99999, 'hh:mm:ss.sss')).toBe('00:01:59.999');
   });
+
+  it('does not render stored decimal values 1ms low (float truncation)', () => {
+    expect(formatDisplayTime(1.001, 'hh:mm:ss.sss')).toBe('00:00:01.001');
+    expect(formatDisplayTime(75.345, 'hh:mm:ss.sss')).toBe('00:01:15.345');
+  });
+
+  it('still truncates at the minute boundary after the epsilon', () => {
+    expect(formatDisplayTime(59.9999, 'hh:mm:ss.sss')).toBe('00:00:59.999');
+    expect(formatDisplayTime(59.99999999, 'hh:mm:ss.sss')).toBe('00:00:59.999');
+  });
 });

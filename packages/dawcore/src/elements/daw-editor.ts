@@ -147,6 +147,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           '" ignored. Valid formats: ' +
           TIME_DISPLAY_FORMATS.join(', ')
       );
+      // Self-heal the DOM: a rejected attribute value would otherwise stick
+      // (reflection never runs for a rejected set), leaving attribute and
+      // property permanently divergent.
+      if (
+        this.hasAttribute('time-format') &&
+        this.getAttribute('time-format') !== this._timeFormat
+      ) {
+        this.setAttribute('time-format', this._timeFormat);
+      }
       return;
     }
     if (value === this._timeFormat) return;
@@ -584,7 +593,20 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
-  private _playbackAnimation = new PlaybackAnimationController(this);
+  // Closures (not direct references) — _timeToPixels/_getPlayhead are
+  // declared later in the class body; class-field init order would read
+  // `undefined` for a direct reference here.
+  private _playbackAnimation = new PlaybackAnimationController(this, {
+    timeToPixels: (time) => this._timeToPixels(time),
+    getPlayhead: () => this._getPlayhead(),
+  });
+  /**
+   * True while a seek-while-playing stop+play transition is in flight.
+   * Suppresses the transient settle dispatch from the engine 'stop' handler
+   * (which would otherwise leak a backward-jumping daw-timeupdate at the
+   * play-start position). Non-private: pointer-handler's seek path sets it.
+   */
+  _inSeekTransition = false;
   private _spectrogramController: SpectrogramController | null = null;
   private _clipPointer = new ClipPointerHandler(this);
   get _clipHandler() {
@@ -2367,8 +2389,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return;
     }
     if (this._isPlaying) {
-      // Transport needs stop+play to reschedule audio sources at new position
-      this.stop();
+      // Transport needs stop+play to reschedule audio sources at new position.
+      // Suppress the transient settle dispatch — engine.stop() rewinds to the
+      // play-start position and consumers would see the time jump backward
+      // for one event before frames resume at the seek target.
+      this._inSeekTransition = true;
+      try {
+        this.stop();
+      } finally {
+        this._inSeekTransition = false;
+      }
       this.play(time);
     } else {
       this._engine.seek(time);
@@ -2586,11 +2616,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // ~100ms with the Tone adapter.
     // Runs even when the playhead element isn't rendered (empty/indefinite
     // editors) so daw-timeupdate consumers still get frames.
-    this._playbackAnimation.start(
-      () => engine.getAudibleTime(),
-      this._timeToPixels,
-      () => this._getPlayhead()
-    );
+    this._playbackAnimation.start(() => engine.getAudibleTime());
   }
   _stopPlayhead() {
     // Resting playhead displays the raw position — latency compensation is a
@@ -2599,7 +2625,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Storage (`_currentTime`) is already raw, so play() resumes correctly.
     const t = this._currentTime;
     const visualTime = Number.isFinite(t) ? Math.max(0, t) : 0;
-    this._playbackAnimation.stop(visualTime, this._timeToPixels, () => this._getPlayhead());
+    this._playbackAnimation.stop(visualTime, { dispatch: !this._inSeekTransition });
   }
   private _getPlayhead(): DawPlayheadElement | null {
     return this.shadowRoot?.querySelector('daw-playhead') as DawPlayheadElement | null;

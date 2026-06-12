@@ -73,6 +73,7 @@ function createMockHost(
     _selectionStartTime: 0,
     _selectionEndTime: 0,
     _dragOver: false,
+    _inSeekTransition: false,
     _selectedTrackId: null as string | null,
     _setSelectedTrackId: vi.fn(),
     _startPlayhead: vi.fn(),

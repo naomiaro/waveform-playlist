@@ -86,6 +86,30 @@ describe('daw-editor timeFormat + public playback getters', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it('self-heals an invalid time-format attribute back to the accepted value', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor.setTimeFormat('seconds');
+    await editor.updateComplete;
+    editor.setAttribute('time-format', 'bogus');
+    await editor.updateComplete;
+    expect(editor.timeFormat).toBe('seconds');
+    expect(editor.getAttribute('time-format')).toBe('seconds');
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('self-heals an invalid parse-time time-format attribute back to the default', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const container = document.createElement('div');
+    container.innerHTML = '<daw-editor time-format="bogus"></daw-editor>';
+    document.body.appendChild(container);
+    const parsed = container.querySelector('daw-editor') as DawEditorElement;
+    await parsed.updateComplete;
+    expect(parsed.timeFormat).toBe('hh:mm:ss.sss');
+    expect(parsed.getAttribute('time-format')).toBe('hh:mm:ss.sss');
+    expect(warn).toHaveBeenCalled();
+    container.remove();
+  });
+
   it('exposes read-only isPlaying, false initially', () => {
     expect(editor.isPlaying).toBe(false);
   });

@@ -137,6 +137,20 @@ describe('daw-editor daw-timeupdate', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
+  it('seek while playing does not dispatch a transient timeupdate at the play-start position', async () => {
+    await editor.play(2);
+    stepFrame();
+    const times: number[] = [];
+    const handler = (e: Event) => times.push((e as CustomEvent).detail.time);
+    editor.addEventListener('daw-timeupdate', handler);
+    editor.seekTo(5);
+    await editor.updateComplete;
+    editor.removeEventListener('daw-timeupdate', handler);
+    // No event at the old play-start position (2) — the transient internal
+    // stop must not leak a backward-jumping time to consumers.
+    expect(times).not.toContain(2);
+  });
+
   it('stops dispatching after stop (no further frames fire events)', async () => {
     await editor.play();
     stepFrame();

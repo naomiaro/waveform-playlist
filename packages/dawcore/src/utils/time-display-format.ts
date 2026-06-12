@@ -20,18 +20,20 @@ function clockFormat(totalSeconds: number, decimals: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor(totalSeconds / 60) % 60;
   const secsRem = totalSeconds % 60;
-  // Truncate (not round) to prevent overflow across the minute boundary (59.9999s -> 59.999, not 60.000)
-  const secs =
-    decimals === 0
-      ? Math.floor(secsRem).toString().padStart(2, '0')
-      : (Math.floor(secsRem * Math.pow(10, decimals)) / Math.pow(10, decimals)).toFixed(decimals);
-  return (
-    String(hours).padStart(2, '0') +
-    ':' +
-    String(minutes).padStart(2, '0') +
-    ':' +
-    (decimals === 0 ? secs : secs.padStart(decimals + 3, '0'))
-  );
+  // Truncate (not round) to prevent overflow across the minute boundary
+  // (59.9999s -> 59.999, not 60.000). The epsilon compensates for binary
+  // float representation (1.001 * 1000 === 1000.9999...; plain floor would
+  // render it 1ms low); the Math.min clamp keeps the boundary guard airtight
+  // for values the epsilon would otherwise push over (59.9999999...).
+  let secs: string;
+  if (decimals === 0) {
+    secs = String(Math.min(Math.floor(secsRem + 1e-6), 59)).padStart(2, '0');
+  } else {
+    const factor = 10 ** decimals;
+    const truncated = Math.min(Math.floor(secsRem * factor + 1e-6), 60 * factor - 1);
+    secs = (truncated / factor).toFixed(decimals).padStart(decimals + 3, '0');
+  }
+  return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + secs;
 }
 
 /** Format seconds for display. Non-finite or negative input renders as 0. */

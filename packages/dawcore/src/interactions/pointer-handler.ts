@@ -21,6 +21,8 @@ export interface PointerHandlerHost {
   _selectionStartTime: number;
   _selectionEndTime: number;
   _dragOver: boolean;
+  /** Suppresses the transient settle daw-timeupdate during stop+play seeks. */
+  _inSeekTransition: boolean;
   _setSelectedTrackId(trackId: string | null): void;
   _startPlayhead(): void;
   _stopPlayhead(): void;
@@ -247,8 +249,17 @@ export class PointerHandler {
     if (h._engine) {
       h._engine.setSelection(0, 0);
       if (wasPlaying) {
-        // Tone.js needs stop + play to reschedule audio sources
-        h._engine.stop();
+        // Tone.js needs stop + play to reschedule audio sources.
+        // Suppress the transient settle dispatch — engine.stop() rewinds to
+        // the play-start position and the editor's engine-'stop' handler would
+        // leak a backward-jumping daw-timeupdate before frames resume at the
+        // seek target.
+        h._inSeekTransition = true;
+        try {
+          h._engine.stop();
+        } finally {
+          h._inSeekTransition = false;
+        }
         h._engine.play(time);
         h._startPlayhead();
       } else {
