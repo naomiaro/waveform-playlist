@@ -15,6 +15,7 @@ import './elements/daw-track-controls';
 import './elements/daw-record-button';
 import './elements/daw-keyboard-shortcuts';
 import './elements/daw-spectrogram';
+import './elements/daw-time-display';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
