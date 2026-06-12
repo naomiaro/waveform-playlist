@@ -111,7 +111,9 @@ export class DawTimeFormatElement extends LitElement {
     const value = (e.target as HTMLSelectElement).value as TimeDisplayFormat;
     const target = this.target as (HTMLElement & { setTimeFormat?: (f: string) => void }) | null;
     if (!target) {
-      console.warn(
+      // Stale-render race guard: the target can vanish between render and change.
+      warnOnce(
+        this,
         '[dawcore] <daw-time-format> has no target. Check <daw-transport for="..."> ' +
           'references a valid element.'
       );

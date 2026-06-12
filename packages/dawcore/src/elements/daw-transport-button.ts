@@ -40,7 +40,10 @@ export class DawTransportButton extends LitElement {
     this.addEventListener('pointerdown', this._onCapabilityPointerDown);
     // The transport `for` id resolves after connect (target may upgrade
     // later) — re-render once it's resolvable so disabled state is accurate.
-    requestAnimationFrame(() => this.requestUpdate());
+    requestAnimationFrame(() => {
+      if (!this.isConnected) return;
+      this.requestUpdate();
+    });
   }
 
   disconnectedCallback() {
