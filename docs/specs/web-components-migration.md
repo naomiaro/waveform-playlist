@@ -2049,7 +2049,7 @@ Create `@dawcore/components` package with core elements:
 - [ ] `<daw-rewind-button>` / `<daw-fast-forward-button>` → #460
 - [ ] `<daw-loop-button>` + editor loop API → #461
 - [ ] `<daw-zoom-in>` / `<daw-zoom-out>` → #462
-- [ ] `<daw-time-display>` / `<daw-time-format>` → #459
+- [x] `<daw-time-display>` / `<daw-time-format>` → #459
 - [ ] `<daw-selection-start>` / `<daw-selection-end>` → #463
 - [ ] `<daw-tempo>` / `<daw-time-signature>` → #464
 - [ ] `<daw-snap-to>` / `<daw-scale-mode>` → #465

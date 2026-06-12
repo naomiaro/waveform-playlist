@@ -37,6 +37,8 @@ export { DawTrackControlsElement } from './elements/daw-track-controls';
 export { DawRecordButtonElement } from './elements/daw-record-button';
 export { DawKeyboardShortcutsElement } from './elements/daw-keyboard-shortcuts';
 export { DawSpectrogramElement } from './elements/daw-spectrogram';
+export { DawTimeDisplayElement } from './elements/daw-time-display';
+export { DawTimeFormatElement } from './elements/daw-time-format';
 export { SpectrogramController } from './controllers/spectrogram-controller';
 export type {
   KeyBinding,
@@ -48,6 +50,21 @@ export type {
 export { AudioResumeController } from './controllers/audio-resume-controller';
 export { RecordingController } from './controllers/recording-controller';
 export type { RecordingOptions, RecordingSession } from './controllers/recording-controller';
+export { PlaybackAnimationController } from './controllers/playback-animation-controller';
+export type { PlayheadLike } from './controllers/playback-animation-controller';
+export {
+  TIME_DISPLAY_FORMATS,
+  isTimeDisplayFormat,
+  formatDisplayTime,
+  parseDisplayTime,
+} from './utils/time-display-format';
+export type { TimeDisplayFormat } from './utils/time-display-format';
+export {
+  resolveTransportTarget,
+  targetSupports,
+  warnOnce,
+  warnUnsupportedOnce,
+} from './utils/transport-capability';
 
 export type {
   TrackDescriptor,
@@ -94,6 +111,8 @@ export type {
   DawEffectBypassDetail,
   DawEffectReorderDetail,
   DawEffectErrorDetail,
+  DawTimeUpdateDetail,
+  DawTimeFormatChangeDetail,
   LoadFilesResult,
 } from './events';
 

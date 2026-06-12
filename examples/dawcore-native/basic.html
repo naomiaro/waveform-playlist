@@ -55,6 +55,8 @@
     <daw-play-button></daw-play-button>
     <daw-pause-button></daw-pause-button>
     <daw-stop-button></daw-stop-button>
+    <daw-time-display></daw-time-display>
+    <daw-time-format></daw-time-format>
   </daw-transport>
 
   <div id="log"></div>
@@ -77,6 +79,7 @@
     editor.addEventListener('daw-selection', (e) => addLog('selection: ' + e.detail.start.toFixed(3) + ' - ' + e.detail.end.toFixed(3)));
     editor.addEventListener('daw-track-ready', (e) => addLog('track-ready: ' + e.detail.trackId));
     editor.addEventListener('daw-files-load-error', (e) => addLog('load-error: ' + e.detail.file.name));
+    editor.addEventListener('daw-time-format-change', (e) => addLog('time-format: ' + e.detail.format));
   </script>
 </body>
 </html>
