@@ -165,6 +165,9 @@ export class Transport {
     this._scheduler.reset(currentTime);
 
     this._endTime = endTime;
+    this._scheduler.setPlayEnd(
+      endTime !== undefined ? this._tempoMap.secondsToTicks(endTime) : null
+    );
 
     this._clock.start();
 
@@ -209,6 +212,7 @@ export class Transport {
     this._silenceAll();
     this._playing = false;
     this._endTime = undefined;
+    this._scheduler.setPlayEnd(null);
     if (wasPlaying) {
       this._emit('stop');
     }
@@ -233,6 +237,7 @@ export class Transport {
     // Clear stale endTime — seeking past a previous endTime shouldn't
     // cause immediate stop on the next play()
     this._endTime = undefined;
+    this._scheduler.setPlayEnd(null);
 
     // Resume playback only if was playing normally (not counting in)
     if (wasPlaying && !wasCountingIn) {
@@ -789,6 +794,9 @@ export class Transport {
     this._countingIn = true;
     this._playing = true;
     this._endTime = endTime;
+    this._scheduler.setPlayEnd(
+      endTime !== undefined ? this._tempoMap.secondsToTicks(endTime) : null
+    );
 
     const playPositionTick = this._tempoMap.secondsToTicks(currentTime);
     const meter = this._meterMap.getMeter(playPositionTick);

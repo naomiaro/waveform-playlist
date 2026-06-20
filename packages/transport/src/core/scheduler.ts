@@ -17,6 +17,7 @@ export class Scheduler<T extends SchedulerEvent> {
   private _loopEnabled = false;
   private _loopStart = 0; // integer ticks
   private _loopEnd = 0; // integer ticks
+  private _playEnd: number | null = null; // integer ticks; hard end bound (non-loop)
   private _onLoop:
     | ((loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => void)
     | undefined;
@@ -70,6 +71,15 @@ export class Scheduler<T extends SchedulerEvent> {
     this.setLoop(enabled, startTick, endTick);
   }
 
+  /** Hard end bound (ticks) for non-loop playback: the lookahead window never
+   *  generates events at or beyond this tick, so audio (metronome clicks, clips)
+   *  can't be scheduled past the playback end and sound a beat into the next
+   *  (nonexistent) bar. Null = unbounded. Set from Transport.play()'s endTime; the
+   *  loop path is unaffected (loopEnd already bounds it). */
+  setPlayEnd(endTick: Tick | null): void {
+    this._playEnd = endTick == null ? null : Math.round(endTick);
+  }
+
   /** Reset scheduling cursor. Takes seconds (from Clock), converts to ticks. */
   reset(timeSeconds: number): void {
     this._rightEdge = this._tempoMap.secondsToTicks(timeSeconds);
@@ -112,9 +122,12 @@ export class Scheduler<T extends SchedulerEvent> {
       return;
     }
 
-    if (targetTick > this._rightEdge) {
-      this._generateAndConsume(this._rightEdge, targetTick);
-      this._rightEdge = targetTick;
+    // Clamp the lookahead window to the play-end bound so nothing is generated at or
+    // beyond it (generate() uses `tick < toTick`, so the boundary tick is excluded).
+    const bound = this._playEnd !== null && targetTick > this._playEnd ? this._playEnd : targetTick;
+    if (bound > this._rightEdge) {
+      this._generateAndConsume(this._rightEdge, bound);
+      this._rightEdge = bound;
     }
   }
 

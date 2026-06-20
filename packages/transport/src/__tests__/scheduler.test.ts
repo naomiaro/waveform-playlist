@@ -156,4 +156,38 @@ describe('Scheduler (tick-based)', () => {
     scheduler.advance(0);
     expect(listener.consumed.length).toBeGreaterThan(count1);
   });
+
+  it('setPlayEnd: lookahead never generates at or beyond the play-end bound', () => {
+    // Big lookahead so a single advance() would otherwise overshoot far past the bound.
+    const scheduler = createScheduler(10);
+    const listener = createMockListener();
+    scheduler.addListener(listener);
+    scheduler.setPlayEnd(960 as Tick); // bound = tick 960 (events at step 480)
+    scheduler.advance(0);
+    // Ticks 0 and 480 are < 960; the boundary tick 960 (and beyond) is excluded.
+    expect(listener.consumed.map((e) => e.tick)).toEqual([0, 480]);
+  });
+
+  it('setPlayEnd: further advances generate nothing once the bound is reached', () => {
+    const scheduler = createScheduler(10);
+    const listener = createMockListener();
+    scheduler.addListener(listener);
+    scheduler.setPlayEnd(960 as Tick);
+    scheduler.advance(0);
+    const afterFirst = listener.consumed.length;
+    scheduler.advance(1.0);
+    expect(listener.consumed.length).toBe(afterFirst); // nothing past the bound
+  });
+
+  it('setPlayEnd(null) restores unbounded scheduling', () => {
+    const scheduler = createScheduler(10);
+    const listener = createMockListener();
+    scheduler.addListener(listener);
+    scheduler.setPlayEnd(960 as Tick);
+    scheduler.advance(0);
+    const bounded = listener.consumed.length;
+    scheduler.setPlayEnd(null);
+    scheduler.advance(0);
+    expect(listener.consumed.length).toBeGreaterThan(bounded); // generates past 960 again
+  });
 });
