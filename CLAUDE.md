@@ -169,6 +169,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Lint**: `pnpm lint` - Prettier check + ESLint across all packages. **Always run before committing.** This is a root-only script; run from repo root or use `pnpm -w lint`. Fix formatting issues with `pnpm format`.
 - **`examples/**/*.html` are outside lint scope** — `pnpm lint` only covers `packages/**/src/**/*.{ts,tsx}`; prettier flags every example HTML file if run on them directly. Match the existing file style by hand, don't reformat them.
 - **New packages**: After adding a new `packages/*/package.json`, run `pnpm install` and commit `pnpm-lock.yaml`. CI uses `--frozen-lockfile` and will fail if the lockfile is stale.
+- **Transitive Dependabot alerts**: try `pnpm update -r <pkg>...` first (refreshes the lockfile within parents' existing ranges) before adding a `pnpm.overrides` entry — most alerts are just stale lockfile patches the parent range already allows. Reserve overrides for a version an intermediary pins *below* the fix (forced; may break upstream's tested range, e.g. js-yaml 3.x via gray-matter).
 - **Dev server**: `pnpm --filter website start` - Docusaurus dev server
 - **Example: dawcore-native**: `pnpm example:dawcore-native` — Vite dev server at localhost:5173 (Vite falls back to next free port when 5173 is taken; check the server's startup log for the actual URL)
 - **Example: dawcore-tone**: `pnpm example:dawcore-tone` — Vite dev server at localhost:5174 (same fallback behavior — log shows the actual port)
