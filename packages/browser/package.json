@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/browser",
-  "version": "13.1.1",
+  "version": "13.1.2",
   "description": "Browser bundle for waveform-playlist with React",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -68,8 +68,8 @@
     "@dnd-kit/abstract": "^0.3.0",
     "@dnd-kit/dom": "^0.3.0",
     "@dnd-kit/react": "^0.3.0",
-    "@waveform-playlist/annotations": "workspace:*",
-    "@waveform-playlist/recording": "workspace:*",
+    "@waveform-playlist/annotations": "workspace:^",
+    "@waveform-playlist/recording": "workspace:^",
     "react": "^18.2.0 || ^19.0.0",
     "react-dom": "^18.2.0 || ^19.0.0",
     "styled-components": "^6.0.0",

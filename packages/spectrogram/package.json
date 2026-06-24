@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/spectrogram",
-  "version": "13.0.2",
+  "version": "13.0.3",
   "description": "React Provider + UI for spectrograms — wraps @dawcore/spectrogram",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -59,7 +59,7 @@
     "@waveform-playlist/core": "workspace:*"
   },
   "peerDependencies": {
-    "@waveform-playlist/browser": "workspace:*",
+    "@waveform-playlist/browser": "workspace:^",
     "react": "^18.0.0",
     "styled-components": "^6.0.0"
   }
