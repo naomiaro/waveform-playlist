@@ -69,8 +69,7 @@
     "overrides": {
       "joi@<17.13.4": "17.13.4",
       "serialize-javascript@<7.0.5": "7.0.5",
-      "uuid@<11.1.1": "^11.1.1",
-      "webpack": "5.104.1"
+      "uuid@<11.1.1": "^11.1.1"
     }
   },
   "homepage": "http://naomiaro.github.io/waveform-playlist",
