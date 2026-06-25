@@ -12,6 +12,7 @@ export {
   usePlaylistState,
   usePlaylistControls,
   usePlaylistData,
+  usePlaylistDataOptional,
 } from './WaveformPlaylistContext';
 export type { WaveformTrack, TrackState, FrameData } from './WaveformPlaylistContext';
 

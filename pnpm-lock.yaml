@@ -153,6 +153,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.7
         version: 18.3.7(@types/react@18.3.31)
+      jsdom:
+        specifier: ^28.1.0
+        version: 28.1.0
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(@swc/core@1.15.41)(postcss@8.5.15)(typescript@5.9.3)

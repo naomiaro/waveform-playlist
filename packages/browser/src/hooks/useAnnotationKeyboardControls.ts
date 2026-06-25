@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import type { AnnotationData } from '@waveform-playlist/core';
-import { usePlaylistData } from '../WaveformPlaylistContext';
+import { usePlaylistDataOptional } from '../WaveformPlaylistContext';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
@@ -21,6 +21,14 @@ interface UseAnnotationKeyboardControlsOptions {
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   /** Optional: callback to start playback at a time with optional duration */
   onPlay?: (startTime: number, duration?: number) => void;
+  /**
+   * Pixels-per-sample for auto-scroll positioning. Falls back to the
+   * WaveformPlaylistProvider context when omitted (WebAudio path). Pass
+   * explicitly when used outside that provider (e.g. the MediaElement path).
+   */
+  samplesPerPixel?: number;
+  /** Sample rate for auto-scroll positioning. Falls back to context. */
+  sampleRate?: number;
 }
 
 /**
@@ -65,8 +73,16 @@ export function useAnnotationKeyboardControls({
   enabled = true,
   scrollContainerRef,
   onPlay,
+  samplesPerPixel: samplesPerPixelProp,
+  sampleRate: sampleRateProp,
 }: UseAnnotationKeyboardControlsOptions) {
-  const { samplesPerPixel, sampleRate } = usePlaylistData();
+  // Auto-scroll positioning needs samplesPerPixel/sampleRate. Prefer explicit
+  // props (works in the MediaElement path); otherwise read them from the
+  // WaveformPlaylistProvider context when present. usePlaylistDataOptional()
+  // returns null instead of throwing, so this hook is safe outside that provider.
+  const playlistData = usePlaylistDataOptional();
+  const samplesPerPixel = samplesPerPixelProp ?? playlistData?.samplesPerPixel;
+  const sampleRate = sampleRateProp ?? playlistData?.sampleRate;
 
   const activeIndex = useMemo(() => {
     if (!activeAnnotationId) return -1;

@@ -1778,3 +1778,11 @@ export const usePlaylistData = () => {
   }
   return context;
 };
+
+/**
+ * Like {@link usePlaylistData} but returns `null` instead of throwing when there
+ * is no WaveformPlaylistProvider ancestor. Use this in hooks/components that may
+ * also run in the MediaElement path (MediaElementPlaylistProvider), where the
+ * WebAudio playlist context is absent.
+ */
+export const usePlaylistDataOptional = () => useContext(PlaylistDataContext);
