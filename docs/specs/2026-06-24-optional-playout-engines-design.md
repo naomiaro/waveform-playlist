@@ -85,6 +85,16 @@ not call them. A custom-adapter consumer who needs audio decoding brings their o
 follow-up revisits `useAudioTracks`). This boundary is documented, not silently left
 half-required. Tracked as a follow-up issue.
 
+**Implemented in Task 14 (issue #510):** All Tier-3 symbols — `useAudioTracks`,
+`useDynamicTracks`, `useDynamicEffects`, `useTrackDynamicEffects`, `useExportWav`,
+`useMasterAnalyser`, `useOutputMeter`, `ExportWavButton`, and the effects
+factory/definitions (`effectDefinitions`, `effectCategories`, `getEffectDefinition`,
+`getEffectsByCategory`, `createEffectInstance`, `createEffectChain`) — are re-exported
+exclusively from `@waveform-playlist/browser/tone`. The core
+`@waveform-playlist/browser` entry is structurally free of `tone`/`playout` (verified by
+`coreBarrelEngineFree.test.ts`). Full bundle-level decoupling is achieved via the `/tone`
+split: a MediaElement-only or custom-adapter consumer resolves zero `tone`/`playout` bytes.
+
 ## Changes
 
 ### 1. `packages/browser/package.json` — install graph

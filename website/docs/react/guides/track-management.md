@@ -167,7 +167,8 @@ function TrackSelector() {
 Track management (adding, removing, reordering) is handled by updating the `tracks` prop passed to `WaveformPlaylistProvider`. The provider does not have built-in `addTrack` / `removeTrack` / `moveTrack` methods — you manage tracks in your own state:
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, useAudioTracks } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function TrackManagementExample() {
   const { tracks: initialTracks, loading } = useAudioTracks([
@@ -243,10 +244,10 @@ const { tracks, loading } = useAudioTracks([
 import {
   WaveformPlaylistProvider,
   Waveform,
-  useAudioTracks,
   usePlaylistControls,
   usePlaylistData,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function TrackControlRow({ trackIndex }: { trackIndex: number }) {
   const { trackStates } = usePlaylistData();

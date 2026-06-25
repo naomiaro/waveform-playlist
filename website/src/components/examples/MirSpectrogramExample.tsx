@@ -13,12 +13,12 @@ import {
   ZoomOutButton,
   AutomaticScrollCheckbox,
   ClearAllButton,
-  useAudioTracks,
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import type { AudioTrackConfig } from '@waveform-playlist/browser/tone';
 import type { SpectrogramConfig, RenderMode, ClipTrack } from '@waveform-playlist/core';
 import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
-import type { AudioTrackConfig } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 import { decodeAudioFiles } from '../../utils/decodeAudioFiles';

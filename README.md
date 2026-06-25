@@ -32,6 +32,8 @@ npm install @waveform-playlist/browser tone @dnd-kit/react
 > - Custom adapter: `npm install @waveform-playlist/browser` and pass `createAdapter` (no `tone`).
 >
 > The `Tone` convenience re-export was removed in v14 — `import * as Tone from 'tone'` directly.
+>
+> **v14:** effects, WAV export, output metering, and the `useAudioTracks`/`useDynamicTracks` loaders import from `@waveform-playlist/browser/tone`.
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton } from '@waveform-playlist/browser';

@@ -20,15 +20,17 @@ import {
   AudioPosition,
   ZoomInButton,
   ZoomOutButton,
+  usePlaylistData,
+  usePlaylistControls,
+  KeyboardShortcuts,
+} from '@waveform-playlist/browser';
+import {
   ExportWavButton,
   useDynamicEffects,
   useTrackDynamicEffects,
   useAudioTracks,
-  usePlaylistData,
-  usePlaylistControls,
   useExportWav,
-  KeyboardShortcuts,
-} from '@waveform-playlist/browser';
+} from '@waveform-playlist/browser/tone';
 import {
   Controls,
   Header,
@@ -43,7 +45,7 @@ import {
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { EffectRack, TrackEffectControls } from '../effects';
-import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser';
+import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
 
 const Container = styled.div`
   display: flex;

@@ -222,7 +222,7 @@ Expands or narrows the stereo image.
 ### Dynamic Master Effects (Add/Remove at Runtime)
 
 ```tsx
-import { useDynamicEffects, effectDefinitions } from '@waveform-playlist/browser';
+import { useDynamicEffects, effectDefinitions } from '@waveform-playlist/browser/tone';
 
 function EffectsPanel() {
   const {

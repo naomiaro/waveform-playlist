@@ -12,11 +12,11 @@ import {
   ZoomOutButton,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
-  useAudioTracks,
   loadWaveformData,
   waveformDataToPeaks,
   getWaveformDataMetadata,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 // Channel import removed - no longer using preview rendering
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 

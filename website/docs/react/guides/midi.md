@@ -161,7 +161,8 @@ MIDI and audio tracks can be played together. Both `useMidiTracks` and `useAudio
 
 ```tsx
 import { useMidiTracks } from '@waveform-playlist/midi';
-import { useAudioTracks, WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function MixedPlayer() {
   const { tracks: midiTracks, loading: midiLoading } = useMidiTracks(

@@ -11,9 +11,9 @@ import {
   ZoomOutButton,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
-  useAudioTracks,
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 

@@ -42,7 +42,8 @@ waveform-playlist is a React component library for building browser-based audio 
 ## Quick Start
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton, useAudioTracks } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function App() {
   const { tracks, loading } = useAudioTracks([
@@ -79,21 +80,27 @@ Both providers use React Context with 4 split contexts for performance.
 
 ## Key Hooks
 
-- `useAudioTracks(configs, options?)` — Load audio files into ClipTrack[] for the provider (declarative, configs-driven). Options: `{ immediate: true }` renders placeholder tracks instantly while audio decodes
-- `useDynamicTracks()` — Imperative hook for runtime track additions (drag-and-drop, file picker). Creates placeholder tracks instantly while audio decodes in parallel
-- `useDynamicEffects()` — Master effects chain with runtime add/remove/parameter updates
-- `useTrackDynamicEffects()` — Per-track effects management
+*From `@waveform-playlist/browser` (core, engine-free):*
 - `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip()
 - `useDragSensors(opts?)` — Configures PointerSensor activation constraints for DragDropProvider (distance-based default, optional touch-optimized mode)
 - `ClipCollisionModifier` — Collision detection modifier for clip moves, prevents overlapping clips
 - `SnapToGridModifier` — Snap-to-grid modifier for clip moves. Two modes: `'beats'` (PPQN tick grid) and `'timescale'` (sample-based grid). Snaps absolute position, not delta.
 - `noDropAnimationPlugins` — Disables Feedback plugin drop animation for clip moves
 - `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip()
-- `useExportWav()` — Offline WAV export with effects support
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
 - `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0)
 - `useUndoState(opts)` — Undo/redo state (canUndo, canRedo, undo, redo) with engine delegation
 - `KeyboardShortcuts` — Self-closing component for declarative keyboard shortcut setup. Props: `playback` (Space/Escape/0), `clipSplitting` ('s' key), `annotations` (arrow nav, boundary editing), `undo` (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z), `additionalShortcuts`. All booleans default to false. Reads all required data from context.
+
+*From `@waveform-playlist/browser/tone` (Tone.js batteries-included):*
+- `useAudioTracks(configs, options?)` — Load audio files into ClipTrack[] for the provider (declarative, configs-driven). Options: `{ immediate: true }` renders placeholder tracks instantly while audio decodes
+- `useDynamicTracks()` — Imperative hook for runtime track additions (drag-and-drop, file picker). Creates placeholder tracks instantly while audio decodes in parallel
+- `useDynamicEffects()` — Master effects chain with runtime add/remove/parameter updates
+- `useTrackDynamicEffects()` — Per-track effects management
+- `useExportWav()` — Offline WAV export with effects support
+- `useOutputMeter(options?)` — Real-time master output VU meter levels. Returns per-channel `levels`, `peakLevels`, and `resetPeak()`
+- `ExportWavButton` — Pre-built button component wired to useExportWav
+- `effectDefinitions`, `effectCategories`, `getEffectDefinition`, `getEffectsByCategory`, `createEffectInstance`, `createEffectChain` — Effects factory and registry
 
 ### MIDI Hooks (from `@waveform-playlist/midi`)
 
@@ -124,7 +131,7 @@ Both providers use React Context with 4 split contexts for performance.
 - `useRecording(stream, options)` — Low-level recording via AudioWorklet with live peaks
 - `useMicrophoneAccess()` — Request mic permission, enumerate devices, get MediaStream
 - `useMicrophoneLevel(stream, options?)` — Real-time VU meter levels from mic stream (supports multi-channel via `channelCount` option)
-- `useOutputMeter(options?)` — Real-time master output VU meter levels (from `@waveform-playlist/browser`). Returns per-channel `levels`, `peakLevels`, and `resetPeak()`
+- `useOutputMeter(options?)` — Real-time master output VU meter levels (from `@waveform-playlist/browser/tone`). Returns per-channel `levels`, `peakLevels`, and `resetPeak()`
 
 ## Key Components
 
@@ -133,7 +140,8 @@ Both providers use React Context with 4 split contexts for performance.
 - `Waveform` — Main visualization. Props: showClipHeaders, interactiveClips, renderPlayhead, renderTrackControls, showFades, touchOptimized
 - `ClipInteractionProvider` — Declarative wrapper for clip drag/move/trim/snap/collision. Props: snap (boolean, auto-detects beats vs timescale from BeatsAndBarsProvider context), touchOptimized. Auto-enables interactiveClips on descendant Waveform. Replaces manual DragDropProvider + useClipDragHandlers + modifier setup. `useClipInteractionEnabled()` hook returns true when inside this provider.
 - `KeyboardShortcuts` — Self-closing component for declarative keyboard shortcut setup. Props: `playback`, `clipSplitting`, `annotations`, `undo`, `additionalShortcuts`. All booleans default to false. Must be inside WaveformPlaylistProvider.
-- Buttons: PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton, LoopButton, SetLoopRegionButton, ClearAllButton, ZoomInButton, ZoomOutButton, ExportWavButton
+- Buttons (from `@waveform-playlist/browser`): PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton, LoopButton, SetLoopRegionButton, ClearAllButton, ZoomInButton, ZoomOutButton
+- Buttons (from `@waveform-playlist/browser/tone`): ExportWavButton
 - Controls: MasterVolumeControl, TimeFormatSelect, AudioPosition, SelectionTimeInputs, AutomaticScrollCheckbox, ContinuousPlayCheckbox
 
 ## Documentation

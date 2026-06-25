@@ -12,7 +12,7 @@ Waveform Playlist supports multiple methods for loading audio, from simple URL l
 The `useAudioTracks` hook is the recommended way to load audio files:
 
 ```tsx
-import { useAudioTracks } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function MyPlaylist() {
   const { tracks, loading, error, progress } = useAudioTracks([
@@ -132,7 +132,8 @@ When the hardware rate matches, pre-computed peaks render instantly. On mismatch
 Load the waveform data first, then pass it to `useAudioTracks`:
 
 ```tsx
-import { useAudioTracks, loadWaveformData } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { loadWaveformData } from '@waveform-playlist/browser';
 
 function MyPlaylist() {
   const [waveformData, setWaveformData] = useState(null);

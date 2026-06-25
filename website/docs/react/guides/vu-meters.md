@@ -97,7 +97,7 @@ function InputMeter() {
 The `useOutputMeter` hook monitors playback output levels. It must be used inside a `WaveformPlaylistProvider`:
 
 ```tsx
-import { useOutputMeter } from '@waveform-playlist/browser';
+import { useOutputMeter } from '@waveform-playlist/browser/tone';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 function OutputMeter() {

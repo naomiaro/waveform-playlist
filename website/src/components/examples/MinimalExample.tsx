@@ -16,8 +16,8 @@ import {
   PauseButton,
   StopButton,
   AudioPosition,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 

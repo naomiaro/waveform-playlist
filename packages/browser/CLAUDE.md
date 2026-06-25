@@ -21,6 +21,16 @@
   passes no `sampleRate` prop sees 48000 for the brief pre-first-load window.
 - **Removed in 14.0.0:** the `Tone` convenience re-export. Import `tone` directly.
 
+### `/tone` subpath (Tone batteries-included surface)
+
+The core `@waveform-playlist/browser` entry is structurally free of `tone`/`playout`
+(verified transitively by `coreBarrelEngineFree.test.ts`). All Tone-coupled exports —
+`useAudioTracks`, `useDynamicTracks`, the effects hooks + factory/definitions,
+`useExportWav` + `ExportWavButton`, `useOutputMeter`, `useMasterAnalyser` — live at
+`@waveform-playlist/browser/tone`. A MediaElement-only or custom-adapter consumer never
+resolves `tone`/`playout` under any bundler. `useAudioTracks`/`useDynamicTracks` moved
+here because they decode on the Tone global context.
+
 ## Build (tsup)
 
 Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` and `peerDependencies` — no manual `external` list needed. Previously used Vite with a manual external list that drifted (#317).

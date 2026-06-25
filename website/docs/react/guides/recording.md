@@ -22,8 +22,8 @@ import { useState } from 'react';
 import {
   WaveformPlaylistProvider,
   Waveform,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import {
   useRecording,
   useMicrophoneAccess,
@@ -418,7 +418,7 @@ Recordings are captured as raw PCM audio using an AudioWorklet. After recording,
 Use the `ExportWavButton` component or the `useExportWav` hook to download recordings:
 
 ```tsx
-import { ExportWavButton } from '@waveform-playlist/browser';
+import { ExportWavButton } from '@waveform-playlist/browser/tone';
 
 function RecordingWithExport() {
   return (
@@ -437,7 +437,8 @@ function RecordingWithExport() {
 Or use the hook for more control:
 
 ```tsx
-import { useExportWav, usePlaylistData } from '@waveform-playlist/browser';
+import { usePlaylistData } from '@waveform-playlist/browser';
+import { useExportWav } from '@waveform-playlist/browser/tone';
 
 function DownloadRecording() {
   const { tracks, trackStates } = usePlaylistData();
@@ -494,9 +495,9 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  ExportWavButton,
   usePlaybackAnimation,
 } from '@waveform-playlist/browser';
+import { ExportWavButton } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 import { createTrack, type ClipTrack } from '@waveform-playlist/core';

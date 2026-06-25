@@ -346,6 +346,8 @@ type TrackClipPeaks = ClipPeaks[];
 
 ## useAudioTracks
 
+*From `@waveform-playlist/browser/tone`*
+
 ```typescript
 function useAudioTracks(
   configs: AudioTrackConfig[],
@@ -387,6 +389,8 @@ interface UseAudioTracksOptions {
 
 ## useDynamicTracks
 
+*From `@waveform-playlist/browser/tone`*
+
 ```typescript
 type TrackSource =
   | File                                      // Drag-and-drop / file input
@@ -416,6 +420,8 @@ Imperative complement to `useAudioTracks`. Creates placeholder tracks (`clips: [
 ---
 
 ## Effects Hooks
+
+*All effects hooks and factory/definition exports are from `@waveform-playlist/browser/tone`*
 
 ### useDynamicEffects
 
@@ -778,6 +784,8 @@ interface UseMicrophoneLevelReturn {
 
 ### useOutputMeter
 
+*From `@waveform-playlist/browser/tone`*
+
 ```typescript
 function useOutputMeter(options?: UseOutputMeterOptions): UseOutputMeterReturn;
 
@@ -822,6 +830,8 @@ interface SegmentedVUMeterProps {
 ---
 
 ## Export
+
+*From `@waveform-playlist/browser/tone`*
 
 ### useExportWav
 
@@ -920,9 +930,12 @@ interface WaveformProps {
 ## Pre-built Components
 
 ```
-Buttons: PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton,
+Buttons (from @waveform-playlist/browser):
+         PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton,
          SkipBackwardButton, SkipForwardButton, LoopButton, SetLoopRegionButton,
-         ZoomInButton, ZoomOutButton, ExportWavButton, DownloadAnnotationsButton
+         ZoomInButton, ZoomOutButton, DownloadAnnotationsButton
+Buttons (from @waveform-playlist/browser/tone):
+         ExportWavButton
 Controls: MasterVolumeControl, TimeFormatSelect, AudioPosition, SelectionTimeInputs
 Checkboxes: AutomaticScrollCheckbox, ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox
 Playheads: Playhead, PlayheadWithMarker (from @waveform-playlist/ui-components)

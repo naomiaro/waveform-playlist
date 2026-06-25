@@ -19,8 +19,8 @@ import {
   ZoomInButton,
   ZoomOutButton,
   AutomaticScrollCheckbox,
-  useDynamicTracks,
 } from '@waveform-playlist/browser';
+import { useDynamicTracks } from '@waveform-playlist/browser/tone';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 

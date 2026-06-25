@@ -23,15 +23,14 @@ import {
   // PlayButton, PauseButton, StopButton omitted — recording example uses
   // custom versions that are disabled during recording
   AudioPosition,
-  ExportWavButton,
   ClipInteractionProvider,
   usePlaybackAnimation,
   usePlaylistData,
   usePlaylistControls,
   usePlaylistState,
-  useOutputMeter,
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
+import { ExportWavButton, useOutputMeter } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
 import {
   RecordButton,

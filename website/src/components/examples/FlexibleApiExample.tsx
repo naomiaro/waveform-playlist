@@ -31,7 +31,6 @@ import '@radix-ui/themes/styles.css';
 import {
   WaveformPlaylistProvider,
   Waveform,
-  useAudioTracks,
   usePlaylistControls,
   usePlaybackAnimation,
   usePlaylistData,
@@ -41,6 +40,7 @@ import {
   type TimeFormat,
   type ClipTrack,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 

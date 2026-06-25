@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser';
-import { effectCategories } from '@waveform-playlist/browser';
+import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
+import { effectCategories } from '@waveform-playlist/browser/tone';
 
 // Compact button for track controls
 const EffectsButton = styled.button<{ $hasEffects: boolean }>`

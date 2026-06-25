@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import type { EffectDefinition } from '@waveform-playlist/browser';
-import { effectCategories } from '@waveform-playlist/browser';
+import type { EffectDefinition } from '@waveform-playlist/browser/tone';
+import { effectCategories } from '@waveform-playlist/browser/tone';
 
 const SelectorContainer = styled.div`
   display: flex;

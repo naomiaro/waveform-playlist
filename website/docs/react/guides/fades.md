@@ -76,7 +76,8 @@ Volume
 The simplest way to add fades is through the `useAudioTracks` hook:
 
 ```tsx
-import { useAudioTracks, WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function MyPlaylist() {
   const { tracks, loading } = useAudioTracks([
