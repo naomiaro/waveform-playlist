@@ -9,14 +9,12 @@ import React, {
   type ReactNode,
 } from 'react';
 import { ThemeProvider } from 'styled-components';
-import {
-  configureGlobalContext,
-  createToneAdapter,
-  getGlobalAudioContext,
-  type EffectsFunction,
-  type TrackEffectsFunction,
-  type SoundFontCache,
+import type {
+  EffectsFunction,
+  TrackEffectsFunction,
+  SoundFontCache,
 } from '@waveform-playlist/playout';
+import { resolvePlayoutAdapter } from './playout/resolvePlayoutAdapter';
 import { PlaylistEngine, type EngineState, type PlayoutAdapter } from '@waveform-playlist/engine';
 import {
   type ClipTrack,
@@ -29,7 +27,6 @@ import {
   type WaveformPlaylistTheme,
   defaultTheme,
 } from '@waveform-playlist/ui-components';
-import { getContext } from 'tone';
 import { extractPeaksFromWaveformDataFull } from './waveformDataLoader';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type WaveformData from 'waveform-data';
@@ -109,6 +106,8 @@ export interface PlaybackAnimationContextValue {
   audioStartPositionRef: React.RefObject<number>; // Audio position when playback started
   /** Returns raw playback time from engine (auto-wraps at loop boundaries). */
   getPlaybackTime: () => number;
+  /** Current time of the adapter's AudioContext, in seconds. */
+  getAudioContextTime: () => number;
   /**
    * Returns the current adapter scheduler lookahead (Tone ~0.1s, native 0).
    * Use this for any audible-latency calculation that must match the playhead
@@ -287,6 +286,13 @@ export interface WaveformPlaylistProviderProps {
    *  this rate via standardized-audio-context. Pre-computed peaks (.dat files)
    *  render instantly when they match. On mismatch, falls back to worker. */
   sampleRate?: number;
+  /** Factory for a custom PlayoutAdapter. When omitted, the Tone.js engine
+   *  (@waveform-playlist/playout) is dynamically imported — so a custom adapter
+   *  lets a consumer use neither @waveform-playlist/playout nor tone. Called once
+   *  per engine rebuild; the provider owns and disposes the returned instance.
+   *  Pass a stable reference (module-level or useCallback) — it is read directly
+   *  inside the curated `loadAudio` effect, not via its dependency array. */
+  createAdapter?: () => PlayoutAdapter;
   children: ReactNode;
 }
 
@@ -313,6 +319,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   deferEngineRebuild = false,
   indefinitePlayback = false,
   sampleRate: sampleRateProp,
+  createAdapter,
   children,
 }) => {
   // Default progressBarWidth to barWidth + barGap (fills gaps)
@@ -421,27 +428,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Provider-level ref for scroll-position math and animation loop pixel
   // calculation. Distinct from useZoomControls's internal ref (statechange guard).
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  // AudioContext sample rate — single source of truth. Guarded for SSR where
-  // AudioContext is undefined. Rate never changes after context creation.
-  // If sampleRateHint is provided, configure the context before reading the rate.
-  const [initialSampleRate] = useState<number>(() => {
-    if (typeof AudioContext === 'undefined') return sampleRateProp ?? 48000;
-    try {
-      if (sampleRateProp !== undefined) {
-        return configureGlobalContext({ sampleRate: sampleRateProp });
-      }
-      return getGlobalAudioContext().sampleRate;
-    } catch (err) {
-      console.warn(
-        '[waveform-playlist] Failed to configure AudioContext: ' +
-          String(err) +
-          ' — falling back to ' +
-          (sampleRateProp ?? 48000) +
-          ' Hz'
-      );
-      return sampleRateProp ?? 48000;
-    }
-  });
+  // Provisional sample rate until the adapter (which owns the AudioContext) is
+  // created in loadAudio. Reconciled from adapter.audioContext.sampleRate there.
+  // (#510: avoids a static @waveform-playlist/playout import at mount.)
+  const [initialSampleRate] = useState<number>(() => sampleRateProp ?? 48000);
   const sampleRateRef = useRef<number>(initialSampleRate);
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
@@ -726,6 +716,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       pendingResumeRef.current = { position: resumePosition };
     }
 
+    let cancelled = false;
+
     const loadAudio = async () => {
       try {
         // Extract all audio buffers from all clips across all tracks
@@ -783,10 +775,23 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         lastTracksVersionRef.current = 0;
         engineTracksRef.current = null;
 
-        // Create engine with Tone.js adapter
-        // Reset init flag — new adapter needs Tone.start() on first play
+        // Create engine adapter — custom if provided, else Tone.js (dynamically imported).
+        // Reset init flag — new adapter needs AudioContext resume on first play.
         audioInitializedRef.current = false;
-        const adapter = createToneAdapter({ effects, soundFontCache: soundFontCacheRef.current });
+        const adapter = await resolvePlayoutAdapter({
+          createAdapter,
+          effects,
+          soundFontCache: soundFontCacheRef.current,
+          sampleRate: sampleRateProp,
+        });
+        if (cancelled) {
+          adapter.dispose();
+          return;
+        }
+        // Reconcile sample rate from the adapter's own AudioContext. The setState
+        // calls later in loadAudio trigger a re-render that propagates this via
+        // `const sampleRate = sampleRateRef.current` at render.
+        sampleRateRef.current = adapter.audioContext.sampleRate;
         adapterRef.current = adapter;
         const engine = new PlaylistEngine({
           adapter,
@@ -876,6 +881,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     loadAudio();
 
     return () => {
+      cancelled = true;
       // Skip disposal when the next render's guard will keep the engine alive.
       // skipEngineDisposeRef is set during the render phase (before this cleanup runs).
       if (skipEngineDisposeRef.current) {
@@ -1037,6 +1043,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setPeaksDataArray(allTrackPeaks);
   }, [tracks, samplesPerPixel, mono, waveformDataCache, deferEngineRebuild]);
 
+  // Audio clock from the adapter's own AudioContext (#510 — replaces tone's
+  // getContext()). Stable; reads a ref so identity never changes.
+  const getAudioContextTime = useCallback(
+    () => adapterRef.current?.audioContext.currentTime ?? 0,
+    []
+  );
+
   // Returns current playback time from engine (auto-wraps at loop boundaries).
   // Falls back to manual calculation when engine is unavailable.
   const getPlaybackTimeFallbackWarnedRef = useRef(false);
@@ -1052,9 +1065,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           'Falling back to manual elapsed time (loop wrapping will not work).'
       );
     }
-    const elapsed = getContext().currentTime - (playbackStartTimeRef.current ?? 0);
+    const elapsed = getAudioContextTime() - (playbackStartTimeRef.current ?? 0);
     return (audioStartPositionRef.current ?? 0) + elapsed;
-  }, []);
+  }, [getAudioContextTime]);
 
   // Resting (non-playing) cursor positions display the raw time unchanged.
   // Latency compensation (outputLatency + lookAhead) models the gap between
@@ -1233,8 +1246,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           engineRef.current.stop();
           stopAnimationLoop();
 
-          const context = getContext();
-          const timeNow = context.currentTime;
+          const timeNow = getAudioContextTime();
           playbackStartTimeRef.current = timeNow;
           audioStartPositionRef.current = currentPos;
 
@@ -1254,7 +1266,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(false);
       stopAnimationLoop();
     });
-  }, [continuousPlay, isPlaying, startAnimationLoop, stopAnimationLoop, animationFrameRef]);
+  }, [
+    continuousPlay,
+    isPlaying,
+    startAnimationLoop,
+    stopAnimationLoop,
+    animationFrameRef,
+    getAudioContextTime,
+  ]);
 
   // Resume playback after tracks change (e.g., after splitting a clip during playback)
   useEffect(() => {
@@ -1263,8 +1282,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         const { position } = pendingResumeRef.current;
         pendingResumeRef.current = null;
 
-        const context = getContext();
-        const timeNow = context.currentTime;
+        const timeNow = getAudioContextTime();
         playbackStartTimeRef.current = timeNow;
         audioStartPositionRef.current = position;
 
@@ -1284,7 +1302,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(false);
       stopAnimationLoop();
     });
-  }, [tracks, startAnimationLoop, stopAnimationLoop]);
+  }, [tracks, startAnimationLoop, stopAnimationLoop, getAudioContextTime]);
 
   // Playback controls
   const play = useCallback(
@@ -1308,10 +1326,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       engineRef.current.seek(actualStartTime);
       stopAnimationLoop();
 
-      // Record timing for accurate position tracking using Tone.js context
-      const context = getContext();
-      // Tone.js context wraps Web Audio - need to use .currentTime from wrapped context
-      const startTimeNow = context.currentTime;
+      // Record timing for accurate position tracking using the adapter's AudioContext
+      const startTimeNow = getAudioContextTime();
       playbackStartTimeRef.current = startTimeNow;
       audioStartPositionRef.current = actualStartTime;
 
@@ -1341,7 +1357,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(true);
       startAnimationLoop();
     },
-    [startAnimationLoop, stopAnimationLoop, setCurrentTimeRefs]
+    [startAnimationLoop, stopAnimationLoop, setCurrentTimeRefs, getAudioContextTime]
   );
 
   const pause = useCallback(() => {
@@ -1520,6 +1536,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       playbackStartTimeRef,
       audioStartPositionRef,
       getPlaybackTime,
+      getAudioContextTime,
       getLookAhead,
       registerFrameCallback,
       unregisterFrameCallback,
@@ -1532,6 +1549,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       playbackStartTimeRef,
       audioStartPositionRef,
       getPlaybackTime,
+      getAudioContextTime,
       getLookAhead,
       registerFrameCallback,
       unregisterFrameCallback,
