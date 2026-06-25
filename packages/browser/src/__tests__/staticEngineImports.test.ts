@@ -17,6 +17,7 @@ const FILES = [
   'components/PlaylistVisualization.tsx',
   'index.tsx',
   'soundFontSync.ts',
+  'hooks/useAnnotationDragHandlers.ts',
 ];
 
 const FORBIDDEN = [

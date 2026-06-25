@@ -17,13 +17,17 @@ afterEach(() => warnSpy.mockRestore());
 
 describe('resolvePlayoutAdapter — @waveform-playlist/playout unavailable', () => {
   it('rejects with the friendly install hint', async () => {
-    await expect(resolvePlayoutAdapter({})).rejects.toThrow(/npm install @waveform-playlist\/playout tone/);
+    await expect(resolvePlayoutAdapter({})).rejects.toThrow(
+      /npm install @waveform-playlist\/playout tone/
+    );
   });
 
   it('console.warns the original module-resolution error', async () => {
     await expect(resolvePlayoutAdapter({})).rejects.toThrow();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[waveform-playlist] @waveform-playlist/playout dynamic import failed:')
+      expect.stringContaining(
+        '[waveform-playlist] @waveform-playlist/playout dynamic import failed:'
+      )
     );
   });
 
