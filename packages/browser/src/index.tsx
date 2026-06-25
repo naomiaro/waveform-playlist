@@ -1,7 +1,3 @@
-// Re-export Tone.js for convenience
-import * as Tone from 'tone';
-export { Tone };
-
 // Export types from playout
 export type { EffectsFunction, TrackEffectsFunction } from '@waveform-playlist/playout';
 
