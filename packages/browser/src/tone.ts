@@ -35,12 +35,7 @@ export {
   createEffectInstance,
   createEffectChain,
 } from './effects';
-export type {
-  EffectDefinition,
-  EffectParameter,
-  ParameterType,
-  EffectInstance,
-} from './effects';
+export type { EffectDefinition, EffectParameter, ParameterType, EffectInstance } from './effects';
 
 export { ExportWavButton } from './components/ExportControls';
 export type { ExportWavButtonProps } from './components/ExportControls';
