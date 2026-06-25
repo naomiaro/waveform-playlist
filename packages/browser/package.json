@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/browser",
-  "version": "13.1.3",
+  "version": "14.0.0",
   "description": "Browser bundle for waveform-playlist with React",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -58,8 +58,6 @@
     "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/engine": "workspace:*",
     "@waveform-playlist/loaders": "workspace:*",
-    "@waveform-playlist/media-element-playout": "workspace:*",
-    "@waveform-playlist/playout": "workspace:*",
     "@waveform-playlist/ui-components": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*",
     "uuid": "^13.0.2",
@@ -70,6 +68,8 @@
     "@dnd-kit/dom": "^0.3.0",
     "@dnd-kit/react": "^0.3.0",
     "@waveform-playlist/annotations": "workspace:^",
+    "@waveform-playlist/media-element-playout": "workspace:^",
+    "@waveform-playlist/playout": "workspace:^",
     "@waveform-playlist/recording": "workspace:^",
     "react": "^18.2.0 || ^19.0.0",
     "react-dom": "^18.2.0 || ^19.0.0",
@@ -80,7 +80,16 @@
     "@waveform-playlist/annotations": {
       "optional": true
     },
+    "@waveform-playlist/media-element-playout": {
+      "optional": true
+    },
+    "@waveform-playlist/playout": {
+      "optional": true
+    },
     "@waveform-playlist/recording": {
+      "optional": true
+    },
+    "tone": {
       "optional": true
     }
   }
