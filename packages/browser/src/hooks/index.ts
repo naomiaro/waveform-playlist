@@ -19,11 +19,6 @@ export type { SelectedTrackControls, UseSelectedTrackProps } from './useSelected
 export { useUndoState } from './useUndoState';
 export type { UndoControls, UseUndoStateProps } from './useUndoState';
 
-export { useMasterAnalyser } from './useAudioEffects';
-
-export { useAudioTracks } from './useAudioTracks';
-export type { AudioTrackConfig, UseAudioTracksOptions } from './useAudioTracks';
-
 export { useClipDragHandlers } from './useClipDragHandlers';
 
 export { useAnnotationDragHandlers } from './useAnnotationDragHandlers';
@@ -45,32 +40,9 @@ export type {
 
 export { useAnnotationKeyboardControls } from './useAnnotationKeyboardControls';
 
-export { useDynamicEffects } from './useDynamicEffects';
-export type { UseDynamicEffectsReturn, ActiveEffect } from './useDynamicEffects';
-
-export { useTrackDynamicEffects } from './useTrackDynamicEffects';
-export type {
-  UseTrackDynamicEffectsReturn,
-  TrackActiveEffect,
-  TrackEffectsState,
-} from './useTrackDynamicEffects';
-
-export { useExportWav } from './useExportWav';
-export type {
-  ExportOptions,
-  ExportResult,
-  UseExportWavReturn,
-  TrackEffectsFunction as ExportTrackEffectsFunction,
-} from './useExportWav';
-
 export { useAnimationFrameLoop } from './useAnimationFrameLoop';
 export type { AnimationFrameLoopControls } from './useAnimationFrameLoop';
 
 export { useWaveformDataCache } from './useWaveformDataCache';
 export type { UseWaveformDataCacheReturn } from './useWaveformDataCache';
 
-export { useDynamicTracks } from './useDynamicTracks';
-export type { TrackSource, TrackLoadError, UseDynamicTracksReturn } from './useDynamicTracks';
-
-export { useOutputMeter } from './useOutputMeter';
-export type { UseOutputMeterOptions, UseOutputMeterReturn } from './useOutputMeter';

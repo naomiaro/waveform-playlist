@@ -36,49 +36,18 @@ export {
   useKeyboardShortcuts,
   getShortcutLabel,
   usePlaybackShortcuts,
-  useAudioTracks,
   useZoomControls,
   useTimeFormat,
   useMasterVolume,
-  useMasterAnalyser,
-  useDynamicEffects,
-  useTrackDynamicEffects,
-  useExportWav,
-  useDynamicTracks,
-  useOutputMeter,
 } from './hooks';
 export type {
-  AudioTrackConfig,
   UsePlaybackShortcutsOptions,
   UsePlaybackShortcutsReturn,
   ZoomControls,
   TimeFormatControls,
   MasterVolumeControls,
-  UseDynamicEffectsReturn,
-  ActiveEffect,
-  UseTrackDynamicEffectsReturn,
-  TrackActiveEffect,
-  TrackEffectsState,
-  ExportOptions,
-  ExportResult,
-  UseExportWavReturn,
-  TrackSource,
-  TrackLoadError,
-  UseDynamicTracksReturn,
-  UseOutputMeterOptions,
-  UseOutputMeterReturn,
 } from './hooks';
 
-// Export effect definitions and factory
-export {
-  effectDefinitions,
-  effectCategories,
-  getEffectDefinition,
-  getEffectsByCategory,
-} from './effects';
-export type { EffectDefinition, EffectParameter, ParameterType } from './effects';
-export { createEffectInstance, createEffectChain } from './effects';
-export type { EffectInstance } from './effects';
 export {
   PlayButton,
   PauseButton,
@@ -101,7 +70,6 @@ export {
   LinkEndpointsCheckbox,
   EditableCheckbox,
   DownloadAnnotationsButton,
-  ExportWavButton,
   Waveform,
   MediaElementWaveform,
   MediaElementPlaylist,
@@ -112,7 +80,6 @@ export {
 } from './components';
 export type { KeyboardShortcutsProps } from './components/KeyboardShortcuts';
 export type { ClearAllButtonProps } from './components/PlaybackControls';
-export type { ExportWavButtonProps } from './components/ExportControls';
 export type { WaveformProps } from './components/Waveform';
 export type { MediaElementWaveformProps } from './components/MediaElementWaveform';
 export type { MediaElementPlaylistProps } from './components/MediaElementPlaylist';

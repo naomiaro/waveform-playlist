@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./tone": {
+      "types": "./dist/tone.d.ts",
+      "import": "./dist/tone.mjs",
+      "require": "./dist/tone.js"
     }
   },
   "sideEffects": false,
