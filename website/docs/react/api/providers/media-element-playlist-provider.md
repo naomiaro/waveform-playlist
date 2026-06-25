@@ -304,6 +304,10 @@ interface MediaElementPlaylistProviderProps {
   barWidth?: number;
   barGap?: number;
   progressBarWidth?: number;
+
+  // Custom engine
+  /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout */
+  createPlayout?: () => MediaElementPlayout;
 }
 ```
 

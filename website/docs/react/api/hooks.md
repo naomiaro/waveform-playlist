@@ -142,6 +142,10 @@ function usePlaybackAnimation(): {
    *  audible-latency calculation that must match the playhead. */
   getLookAhead: () => number;
 
+  /** AudioContext.currentTime from the playout adapter (raw hardware clock). */
+  getAudioContextTime: () => number;
+  /** AudioContext.outputLatency from the playout adapter. */
+  getOutputLatency: () => number;
   /** Register a per-frame callback driven by the shared animation loop. */
   registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
   unregisterFrameCallback: (id: string) => void;

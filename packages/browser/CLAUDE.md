@@ -1,5 +1,26 @@
 # Browser Package (`@waveform-playlist/browser`)
 
+## Optional Playout Engines (#510)
+
+`@waveform-playlist/playout`, `@waveform-playlist/media-element-playout`, and `tone` are
+**optional `peerDependencies`**. The providers load the default engine via dynamic
+`import()` through `src/playout/resolvePlayoutAdapter.ts` / `resolveMediaElementPlayout.ts`
+(factory-or-dynamic, install-hint rethrow — the `@dawcore/midi` `loadMidiImpl` pattern).
+
+- `WaveformPlaylistProvider` accepts `createAdapter?: () => PlayoutAdapter`. When supplied,
+  neither `@waveform-playlist/playout` nor `tone` is imported.
+- `MediaElementPlaylistProvider` accepts `createPlayout?: () => MediaElementPlayout`.
+- **The provider static import graph must stay engine-free** — enforced by
+  `src/__tests__/staticEngineImports.test.ts`. Use `import type` for engine types and
+  `await import()` for engine values. Adding a static engine import to those files fails CI.
+- **Tier-3 boundary:** effects/export/meter/`useAudioTracks`/dynamic-tracks hooks remain
+  Tone-coupled. They are opt-in and tree-shaken when unused, so they do not pull `tone` into
+  the provider graph. (`useAudioTracks` decoupling is a follow-up.)
+- **Sample rate at mount** is provisional (`sampleRate` prop or 48000) and reconciled from
+  `adapter.audioContext.sampleRate` on first `loadAudio`. A Tone consumer at 44100 Hz that
+  passes no `sampleRate` prop sees 48000 for the brief pre-first-load window.
+- **Removed in 14.0.0:** the `Tone` convenience re-export. Import `tone` directly.
+
 ## Build (tsup)
 
 Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` and `peerDependencies` — no manual `external` list needed. Previously used Vite with a manual external list that drifted (#317).

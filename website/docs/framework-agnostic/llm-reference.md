@@ -49,6 +49,8 @@ interface WaveformPlaylistProviderProps {
   indefinitePlayback?: boolean;           // Default: false
   /** Desired AudioContext sample rate for pre-computed peaks matching */
   sampleRate?: number;
+  /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone */
+  createAdapter?: () => PlayoutAdapter;
 }
 ```
 
@@ -91,6 +93,8 @@ interface MediaElementPlaylistProviderProps {
   barWidth?: number;                     // Default: 1
   barGap?: number;                       // Default: 0
   progressBarWidth?: number;             // Default: barWidth + barGap
+  /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout */
+  createPlayout?: () => MediaElementPlayout;
 }
 ```
 
@@ -184,6 +188,10 @@ interface PlaybackAnimationContextValue {
   getPlaybackTime: () => number;
   /** Current adapter scheduler lookahead (Tone ~0.1s, native 0). */
   getLookAhead: () => number;
+  /** AudioContext.currentTime from the playout adapter (raw hardware clock). */
+  getAudioContextTime: () => number;
+  /** AudioContext.outputLatency from the playout adapter. */
+  getOutputLatency: () => number;
   /** Register/unregister per-frame callbacks driven by the shared rAF loop. */
   registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
   unregisterFrameCallback: (id: string) => void;

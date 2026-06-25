@@ -19,7 +19,7 @@ waveform-playlist is a React component library for building browser-based audio 
 
 ## Packages
 
-- `@waveform-playlist/browser` — Main package: React components, hooks, effects
+- `@waveform-playlist/browser` — Main package: React components, hooks, effects. Playout engines (`@waveform-playlist/playout` + `tone`, or `@waveform-playlist/media-element-playout`) are optional peer dependencies; provide `createAdapter`/`createPlayout` to inject a custom engine.
 - `@waveform-playlist/core` — Data model: ClipTrack, AudioClip, sample-based math
 - `@waveform-playlist/engine` — Framework-agnostic timeline engine: PlaylistEngine class, pure clip/timeline operations, event emitter. Owns selection, loop, zoom, volume, selectedTrackId, and clip mutation state. Seek/play beyond audio duration is supported (silence where there's no audio).
 - `@waveform-playlist/playout` — Audio playback: Tone.js adapter (implements PlayoutAdapter from engine), global AudioContext. Incremental track updates via updateTrack/replaceClips — no full playout rebuild on clip operations. Optional adapter methods: addTrack, removeTrack, updateTrack.

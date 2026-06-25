@@ -26,6 +26,13 @@ npm install @waveform-playlist/browser tone @dnd-kit/react
 
 > **Note**: `tone` and `@dnd-kit/react` are peer dependencies and must be installed separately. `@dnd-kit/dom` and `@dnd-kit/abstract` are transitive dependencies of `@dnd-kit/react`.
 
+> **v14:** the playout engines are optional peers. Install the one(s) you use:
+> - WebAudio/Tone path: `npm install @waveform-playlist/browser @waveform-playlist/playout tone`
+> - MediaElement path: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout`
+> - Custom adapter: `npm install @waveform-playlist/browser` and pass `createAdapter` (no `tone`).
+>
+> The `Tone` convenience re-export was removed in v14 — `import * as Tone from 'tone'` directly.
+
 ```tsx
 import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton } from '@waveform-playlist/browser';
 import { createTrack, createClipFromSeconds } from '@waveform-playlist/core';

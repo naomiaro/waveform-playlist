@@ -404,6 +404,8 @@ interface WaveformPlaylistProviderProps {
   /** Desired AudioContext sample rate. Pre-computed peaks (.dat) render
    *  instantly when they match. On mismatch, falls back to worker. */
   sampleRate?: number;
+  /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone */
+  createAdapter?: () => PlayoutAdapter;
 }
 ```
 
