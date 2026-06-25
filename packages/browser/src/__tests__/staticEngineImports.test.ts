@@ -1,7 +1,15 @@
-// Issue #510: the provider/render static import graph must never STATICALLY
-// (non-type) import the optional engines or tone. `import type` and dynamic
-// `import()` are allowed. This guards criteria 2 (MediaElement-only) and 3
-// (custom adapter) at the source level.
+// Issue #510: FAST NON-TRANSITIVE guard — scans each listed file individually
+// (no bundling). It catches direct static imports in those files, but NOT
+// transitive imports introduced by their dependencies (e.g. a helper they call
+// that itself imports tone). For the authoritative barrel-level guarantee, see
+// `coreBarrelEngineFree.test.ts` which bundles src/index.tsx end-to-end with
+// esbuild and asserts zero static tone/@waveform-playlist/playout imports in
+// the entire transitive closure.
+//
+// The provider/render static import graph must never STATICALLY (non-type)
+// import the optional engines or tone. `import type` and dynamic `import()`
+// are allowed. This guards criteria 2 (MediaElement-only) and 3 (custom
+// adapter) at the source level.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
