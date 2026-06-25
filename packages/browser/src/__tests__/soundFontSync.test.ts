@@ -1,17 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import type { SoundFontCache } from '@waveform-playlist/playout';
-
-// soundFontSync now VALUE-imports isToneAdapter from the playout barrel,
-// which imports Tone.js at module scope — that crashes in the node test
-// env. Mock the barrel with the guard's actual logic; the real guard is
-// unit-tested in packages/playout (TonePlayoutAdapter.test.ts).
-vi.mock('@waveform-playlist/playout', () => ({
-  isToneAdapter: (adapter: unknown): boolean =>
-    typeof (adapter as { setSoundFontCache?: unknown } | null | undefined)?.setSoundFontCache ===
-    'function',
-}));
-
 import { syncSoundFontCacheToAdapter } from '../soundFontSync';
 
 const cache = { isLoaded: true } as unknown as SoundFontCache;

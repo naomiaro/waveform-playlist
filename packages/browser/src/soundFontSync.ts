@@ -1,5 +1,26 @@
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import { isToneAdapter, type SoundFontCache } from '@waveform-playlist/playout';
+import type { SoundFontCache } from '@waveform-playlist/playout';
+
+/** Adapters that accept a SoundFontCache (e.g. the Tone.js adapter). */
+interface SoundFontCapableAdapter {
+  setSoundFontCache(cache: SoundFontCache | undefined): void;
+}
+
+/**
+ * Structural check for soundfont support — avoids a runtime import of
+ * `@waveform-playlist/playout` (its `isToneAdapter` is exactly this check,
+ * `typeof adapter.setSoundFontCache === 'function'`). Keeping it structural
+ * lets the core barrel stay engine-free (#510) and works for any custom
+ * adapter that exposes `setSoundFontCache`.
+ */
+function supportsSoundFont(
+  adapter: PlayoutAdapter | null
+): adapter is PlayoutAdapter & SoundFontCapableAdapter {
+  return (
+    adapter != null &&
+    typeof (adapter as Partial<SoundFontCapableAdapter>).setSoundFontCache === 'function'
+  );
+}
 
 /**
  * Forward a (possibly late-loaded or swapped) SoundFontCache to the live
@@ -11,6 +32,6 @@ export function syncSoundFontCacheToAdapter(
   adapter: PlayoutAdapter | null,
   cache: SoundFontCache | undefined
 ): void {
-  if (!isToneAdapter(adapter)) return;
+  if (!supportsSoundFont(adapter)) return;
   adapter.setSoundFontCache(cache);
 }

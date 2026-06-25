@@ -16,6 +16,7 @@ const FILES = [
   'MediaElementPlaylistContext.tsx',
   'components/PlaylistVisualization.tsx',
   'index.tsx',
+  'soundFontSync.ts',
 ];
 
 const FORBIDDEN = [
