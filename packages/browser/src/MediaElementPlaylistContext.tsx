@@ -9,7 +9,8 @@ import React, {
   type ReactNode,
 } from 'react';
 import { ThemeProvider } from 'styled-components';
-import { MediaElementPlayout, type FadeConfig } from '@waveform-playlist/media-element-playout';
+import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
+import { resolveMediaElementPlayout } from './playout/resolveMediaElementPlayout';
 import { type WaveformDataObject } from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
 import type { AnnotationData } from '@waveform-playlist/core';
@@ -132,6 +133,9 @@ export interface MediaElementPlaylistProviderProps {
   audioContext?: AudioContext;
   /** Callback when audio is ready */
   onReady?: () => void;
+  /** Factory for a custom MediaElement playout. When omitted, the bundled engine
+   *  (@waveform-playlist/media-element-playout) is dynamically imported. */
+  createPlayout?: () => MediaElementPlayout;
   children: ReactNode;
 }
 
@@ -168,6 +172,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   audioContext,
   onAnnotationsChange,
   onReady,
+  createPlayout,
   children,
 }) => {
   const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
@@ -248,44 +253,65 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
   // Initialize playout and load track
   useEffect(() => {
-    const playout = new MediaElementPlayout({
-      playbackRate: initialPlaybackRate,
-      preservesPitch,
-    });
+    let cancelled = false;
+    let createdPlayout: MediaElementPlayout | null = null;
 
-    playout.addTrack({
-      source: track.source,
-      peaks: track.waveformData,
-      name: track.name,
-      audioContext,
-      fadeIn: track.fadeIn,
-      fadeOut: track.fadeOut,
-    });
+    (async () => {
+      let playout: MediaElementPlayout;
+      try {
+        playout = await resolveMediaElementPlayout({
+          createPlayout,
+          playbackRate: initialPlaybackRate,
+          preservesPitch,
+        });
+      } catch (err) {
+        console.warn('[waveform-playlist] MediaElement playout failed to load: ' + String(err));
+        return;
+      }
+      if (cancelled) {
+        playout.dispose();
+        return;
+      }
+      createdPlayout = playout;
 
-    // Set up time update callback
-    const mediaTrack = playout.getTrack(playout['track']?.id ?? '');
-    if (mediaTrack) {
-      mediaTrack.setOnTimeUpdateCallback((time) => {
-        currentTimeRef.current = time;
+      playout.addTrack({
+        source: track.source,
+        peaks: track.waveformData,
+        name: track.name,
+        audioContext,
+        fadeIn: track.fadeIn,
+        fadeOut: track.fadeOut,
       });
-    }
 
-    // Set up playback complete callback
-    playout.setOnPlaybackComplete(() => {
-      stopAnimationFrameLoop();
-      setIsPlaying(false);
-      setActiveAnnotationId(null);
-      currentTimeRef.current = 0;
-      setCurrentTime(0);
-    });
+      // Set up time update callback
+      const mediaTrack = playout.getTrack(playout['track']?.id ?? '');
+      if (mediaTrack) {
+        mediaTrack.setOnTimeUpdateCallback((time) => {
+          currentTimeRef.current = time;
+        });
+      }
 
-    playoutRef.current = playout;
-    setDuration(track.waveformData.duration);
-    onReady?.();
+      // Set up playback complete callback
+      playout.setOnPlaybackComplete(() => {
+        stopAnimationFrameLoop();
+        setIsPlaying(false);
+        setActiveAnnotationId(null);
+        currentTimeRef.current = 0;
+        setCurrentTime(0);
+      });
+
+      playoutRef.current = playout;
+      setDuration(track.waveformData.duration);
+      onReady?.();
+    })();
 
     return () => {
+      cancelled = true;
       stopAnimationFrameLoop();
-      playout.dispose();
+      if (createdPlayout) {
+        createdPlayout.dispose();
+      }
+      playoutRef.current = null;
     };
   }, [
     track.source,
@@ -299,6 +325,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     onReady,
     stopAnimationFrameLoop,
     setActiveAnnotationId,
+    createPlayout,
   ]);
 
   // Generate peaks from waveform data

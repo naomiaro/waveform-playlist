@@ -13,6 +13,7 @@ const FILES = [
   'WaveformPlaylistContext.tsx',
   'playout/resolvePlayoutAdapter.ts',
   'playout/resolveMediaElementPlayout.ts',
+  'MediaElementPlaylistContext.tsx',
 ];
 
 const FORBIDDEN = [
