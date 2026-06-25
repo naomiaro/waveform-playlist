@@ -14,6 +14,7 @@ const FILES = [
   'playout/resolvePlayoutAdapter.ts',
   'playout/resolveMediaElementPlayout.ts',
   'MediaElementPlaylistContext.tsx',
+  'components/PlaylistVisualization.tsx',
   'index.tsx',
 ];
 

@@ -114,6 +114,11 @@ export interface PlaybackAnimationContextValue {
    * (e.g., recording live-preview peak slicing).
    */
   getLookAhead: () => number;
+  /**
+   * Returns the adapter AudioContext's output latency in seconds.
+   * Use this for audible-latency calculations (e.g., recording live-preview peak slicing).
+   */
+  getOutputLatency: () => number;
   /** Register a per-frame callback driven by the single animation loop. */
   registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
   /** Unregister a per-frame callback. */
@@ -1099,6 +1104,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     return engineRef.current?.lookAhead ?? 0;
   }, []);
 
+  const getOutputLatency = useCallback((): number => {
+    const audioCtx = adapterRef.current?.audioContext;
+    return audioCtx && 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
+  }, []);
+
   const registerFrameCallback = useCallback((id: string, cb: (data: FrameData) => void) => {
     frameCallbacksRef.current.set(id, cb);
   }, []);
@@ -1538,6 +1548,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       getPlaybackTime,
       getAudioContextTime,
       getLookAhead,
+      getOutputLatency,
       registerFrameCallback,
       unregisterFrameCallback,
     }),
@@ -1551,6 +1562,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       getPlaybackTime,
       getAudioContextTime,
       getLookAhead,
+      getOutputLatency,
       registerFrameCallback,
       unregisterFrameCallback,
     ]

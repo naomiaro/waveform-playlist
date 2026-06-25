@@ -1,7 +1,6 @@
 import React, { useContext, useRef, useState, useMemo, type ReactNode, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import {
   Playlist,
   Track as TrackComponent,
@@ -118,6 +117,7 @@ const CustomPlayhead: React.FC<{
     playbackStartTimeRef,
     audioStartPositionRef,
     getPlaybackTime,
+    getAudioContextTime,
   } = usePlaybackAnimation();
 
   // Use visualTimeRef so the initial position matches the audible output
@@ -135,7 +135,7 @@ const CustomPlayhead: React.FC<{
     samplesPerPixel,
     sampleRate,
     controlsOffset: 0,
-    getAudioContextTime: () => getGlobalAudioContext().currentTime,
+    getAudioContextTime,
     getPlaybackTime,
   }) as React.ReactElement;
 };
@@ -186,7 +186,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  const { isPlaying, getLookAhead } = usePlaybackAnimation();
+  const { isPlaying, getLookAhead, getOutputLatency } = usePlaybackAnimation();
   const {
     selectionStart,
     selectionEnd,
@@ -739,9 +739,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                       // (shared `audibleLatencySamples`) and dawcore's preview-skip
                       // pattern. `getLookAhead()` reads from the same engine the
                       // playhead's animation loop uses — keeps the two in lockstep.
-                      const audioCtx = getGlobalAudioContext();
-                      const outputLatency =
-                        'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
+                      const outputLatency = getOutputLatency();
                       const lookAhead = getLookAhead();
                       const latencyOffsetSamples = audibleLatencySamples(
                         outputLatency,
