@@ -295,6 +295,11 @@ When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, com
 - `examples/dawcore-native/` — Web components + NativePlayoutAdapter (moved from `packages/dawcore/dev/`)
 - `examples/dawcore-tone/` — Web components + TonePlayoutAdapter (Tone.js backend)
 - `examples/dawcore-wam/` — WAM 2.0 plugins end-to-end: community-library picker, GUIs, localStorage persistence, WAV export, plus in-browser Faust compilation (textarea → `addFaustEffect`). `@dawcore/wam` and `@dawcore/faust` are source-aliased (pure TS, no Lit decorators), which also resolves dawcore's dynamic imports of both
+- `examples/media-element-player/` — React `MediaElementPlaylistProvider` starter; depends on only `@waveform-playlist/browser` + `@waveform-playlist/media-element-playout` (no `playout`/`tone`). First React example here — see the React-example note below.
+
+**Adding a React example (not a web-component HTML page):** it must be a pnpm workspace member — add `examples/*` to `pnpm-workspace.yaml` and give the example a `package.json`, or `react`/`react-dom`/`styled-components` won't resolve (the dawcore examples sidestep this by not using React). In `vite.config.ts`: source-alias `@waveform-playlist/browser` (its `index.tsx` entry is engine-free, so the dev server never resolves `tone`/`playout`) AND set `resolve.dedupe: ['react', 'react-dom', 'styled-components']` — without dedupe the aliased packages load a second React copy → "Invalid hook call". `@dnd-kit/*` are *required* `browser` peers (they tree-shake out of a MediaElement-only bundle but must be installed). examples/ are outside `build`/`lint`/`typecheck` (all `packages/*`-only), so example `.tsx` isn't CI-checked.
+
+**Verify an example actually renders with a headless browser** (Playwright/chrome-devtools MCP), not curl — Vite serving modules `200` proves they *transform*, not that the React app *mounts* (duplicate-React "Invalid hook call" only appears at render). `curl` was also flaky in the shell tool; prefer the MCP browser or `node`'s http.
 
 ### ESLint Baseline
 
