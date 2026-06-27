@@ -13,13 +13,24 @@
 - **The provider static import graph must stay engine-free** — enforced by
   `src/__tests__/staticEngineImports.test.ts`. Use `import type` for engine types and
   `await import()` for engine values. Adding a static engine import to those files fails CI.
-- **Tier-3 boundary:** effects/export/meter/`useAudioTracks`/dynamic-tracks hooks remain
-  Tone-coupled. They are opt-in and tree-shaken when unused, so they do not pull `tone` into
-  the provider graph. (`useAudioTracks` decoupling is a follow-up.)
+- **Tier-3 (Tone-coupled) surface moved to `/tone`**, NOT left in the core graph (see the
+  `/tone` subpath section below). In-graph modules that couldn't move were decoupled instead:
+  `soundFontSync` (structural `setSoundFontCache` check, not `isToneAdapter` from playout) and
+  `useAnnotationDragHandlers` (tone-free `sampleRate` default).
 - **Sample rate at mount** is provisional (`sampleRate` prop or 48000) and reconciled from
   `adapter.audioContext.sampleRate` on first `loadAudio`. A Tone consumer at 44100 Hz that
   passes no `sampleRate` prop sees 48000 for the brief pre-first-load window.
 - **Removed in 14.0.0:** the `Tone` convenience re-export. Import `tone` directly.
+- **Async effect cancel-race:** making a provider's init effect async (via `await import`)
+  opens a dispose-before-resolve window. Guard with a per-run `let cancelled = false` (set
+  `true` in cleanup); after the await, `if (cancelled) { instance.dispose(); return; }` BEFORE
+  assigning refs/state. The MediaElement cleanup disposes the `createdPlayout` capture (the
+  this-run instance), not a stale local.
+- **Test the dynamic-import seam, not the provider:** factory-or-dynamic-import logic lives in
+  tiny pure async modules (`resolvePlayoutAdapter`/`resolveMediaElementPlayout`), unit-tested
+  directly — `vi.doMock(pkg, () => { throw })` simulates a missing peer (no-peer install-hint
+  test); the bypass test asserts the factory short-circuits before `import()`. Avoids mounting
+  the heavy provider in jsdom (separate file per `vi.doMock`, per the dawcore midi precedent).
 
 ### `/tone` subpath (Tone batteries-included surface)
 
