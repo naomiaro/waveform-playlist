@@ -133,6 +133,10 @@ export interface MediaElementPlaylistProviderProps {
   audioContext?: AudioContext;
   /** Callback when audio is ready */
   onReady?: () => void;
+  /** Called when playout initialization fails (e.g. a missing optional peer,
+   *  a throwing `createPlayout`, or an `addTrack` error). The provider already
+   *  logs the error; use this to surface it in your UI. */
+  onError?: (err: Error) => void;
   /** Factory for a custom MediaElement playout. When omitted, the bundled engine
    *  (@waveform-playlist/media-element-playout) is dynamically imported. */
   createPlayout?: () => MediaElementPlayout;
@@ -172,6 +176,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   audioContext,
   onAnnotationsChange,
   onReady,
+  onError,
   createPlayout,
   children,
 }) => {
@@ -257,52 +262,51 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     let createdPlayout: MediaElementPlayout | null = null;
 
     (async () => {
-      let playout: MediaElementPlayout;
       try {
-        playout = await resolveMediaElementPlayout({
+        const playout = await resolveMediaElementPlayout({
           createPlayout,
           playbackRate: initialPlaybackRate,
           preservesPitch,
         });
-      } catch (err) {
-        console.warn('[waveform-playlist] MediaElement playout failed to load: ' + String(err));
-        return;
-      }
-      if (cancelled) {
-        playout.dispose();
-        return;
-      }
-      createdPlayout = playout;
+        if (cancelled) {
+          playout.dispose();
+          return;
+        }
+        createdPlayout = playout;
 
-      playout.addTrack({
-        source: track.source,
-        peaks: track.waveformData,
-        name: track.name,
-        audioContext,
-        fadeIn: track.fadeIn,
-        fadeOut: track.fadeOut,
-      });
-
-      // Set up time update callback
-      const mediaTrack = playout.getTrack(playout['track']?.id ?? '');
-      if (mediaTrack) {
-        mediaTrack.setOnTimeUpdateCallback((time) => {
-          currentTimeRef.current = time;
+        playout.addTrack({
+          source: track.source,
+          peaks: track.waveformData,
+          name: track.name,
+          audioContext,
+          fadeIn: track.fadeIn,
+          fadeOut: track.fadeOut,
         });
+
+        // Set up time update callback
+        const mediaTrack = playout.getTrack(playout['track']?.id ?? '');
+        if (mediaTrack) {
+          mediaTrack.setOnTimeUpdateCallback((time) => {
+            currentTimeRef.current = time;
+          });
+        }
+
+        // Set up playback complete callback
+        playout.setOnPlaybackComplete(() => {
+          stopAnimationFrameLoop();
+          setIsPlaying(false);
+          setActiveAnnotationId(null);
+          currentTimeRef.current = 0;
+          setCurrentTime(0);
+        });
+
+        playoutRef.current = playout;
+        setDuration(track.waveformData.duration);
+        onReady?.();
+      } catch (err) {
+        console.warn('[waveform-playlist] MediaElement playout init failed: ' + String(err));
+        onError?.(err instanceof Error ? err : new Error(String(err)));
       }
-
-      // Set up playback complete callback
-      playout.setOnPlaybackComplete(() => {
-        stopAnimationFrameLoop();
-        setIsPlaying(false);
-        setActiveAnnotationId(null);
-        currentTimeRef.current = 0;
-        setCurrentTime(0);
-      });
-
-      playoutRef.current = playout;
-      setDuration(track.waveformData.duration);
-      onReady?.();
     })();
 
     return () => {
@@ -323,6 +327,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     initialPlaybackRate,
     preservesPitch,
     onReady,
+    onError,
     stopAnimationFrameLoop,
     setActiveAnnotationId,
     createPlayout,

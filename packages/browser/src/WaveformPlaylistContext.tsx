@@ -258,6 +258,10 @@ export interface WaveformPlaylistProviderProps {
   };
   effects?: EffectsFunction;
   onReady?: () => void;
+  /** Called when audio/engine initialization fails (e.g. a missing optional peer,
+   *  a throwing `createAdapter`, or an invalid `zoomLevels`/`samplesPerPixel`). The
+   *  provider already logs the error; use this to surface it in your UI. */
+  onError?: (err: Error) => void;
   /** @deprecated Use onAnnotationsChange instead */
   onAnnotationUpdate?: (annotations: AnnotationData[]) => void;
   /** Callback when annotations are changed (drag, edit, etc.) */
@@ -314,6 +318,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   annotationList,
   effects,
   onReady,
+  onError,
   onAnnotationUpdate: _onAnnotationUpdate,
   onAnnotationsChange,
   barWidth = 1,
@@ -879,7 +884,21 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         onReady?.();
       } catch (error) {
-        console.warn('[waveform-playlist] Error loading audio:', String(error));
+        // Dispose an adapter created before the engine failed to build (e.g. invalid
+        // zoomLevels make `new PlaylistEngine` throw) — the cleanup skips it because
+        // engineRef was never assigned, so it would otherwise leak a live AudioContext.
+        if (!engineRef.current && adapterRef.current) {
+          try {
+            adapterRef.current.dispose();
+          } catch (disposeErr) {
+            console.warn(
+              '[waveform-playlist] adapter dispose after load failure threw: ' + String(disposeErr)
+            );
+          }
+          adapterRef.current = null;
+        }
+        console.warn('[waveform-playlist] Error loading audio: ' + String(error));
+        onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     };
 
@@ -912,6 +931,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // to the live adapter by the sync effect below; only adapter creation reads it
     // (via soundFontCacheRef).
     onReady,
+    onError,
     effects,
     stopAnimationFrameLoop,
     onSelectionEngineState,

@@ -42,7 +42,16 @@ export async function resolvePlayoutAdapter(
   }
 
   if (opts.sampleRate !== undefined) {
-    mod.configureGlobalContext({ sampleRate: opts.sampleRate });
+    // Non-fatal: a failed context configuration falls back to the default rate
+    // (restores pre-#510 behavior — it was caught in the old mount-time initializer).
+    try {
+      mod.configureGlobalContext({ sampleRate: opts.sampleRate });
+    } catch (ctxErr) {
+      console.warn(
+        '[waveform-playlist] configureGlobalContext failed (continuing with default rate): ' +
+          String(ctxErr)
+      );
+    }
   }
   return mod.createToneAdapter({ effects: opts.effects, soundFontCache: opts.soundFontCache });
 }
