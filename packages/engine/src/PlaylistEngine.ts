@@ -702,31 +702,46 @@ export class PlaylistEngine {
   }
 
   // ---------------------------------------------------------------------------
-  // Per-Track Audio (delegates to adapter)
+  // Per-Track Audio (forwards to adapter, persists into _tracks, emits)
   // ---------------------------------------------------------------------------
+  //
+  // Each setter forwards to the adapter, mirrors the change into the engine's
+  // own _tracks (so a later adapter rebuild via setTracks keeps the value),
+  // and — like every other track-mutating method — bumps _tracksVersion and
+  // emits statechange. Consumers that gate a resync on tracksVersion (e.g.
+  // @dawcore/components' <daw-editor>) must hear about mixer changes too;
+  // otherwise an unrelated setTracks rebuild reverts live mixer state (#501).
 
   setTrackVolume(trackId: string, volume: number): void {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.volume = volume;
     this._adapter?.setTrackVolume(trackId, volume);
+    this._tracksVersion++;
+    this._emitStateChange();
   }
 
   setTrackMute(trackId: string, muted: boolean): void {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.muted = muted;
     this._adapter?.setTrackMute(trackId, muted);
+    this._tracksVersion++;
+    this._emitStateChange();
   }
 
   setTrackSolo(trackId: string, soloed: boolean): void {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.soloed = soloed;
     this._adapter?.setTrackSolo(trackId, soloed);
+    this._tracksVersion++;
+    this._emitStateChange();
   }
 
   setTrackPan(trackId: string, pan: number): void {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.pan = pan;
     this._adapter?.setTrackPan(trackId, pan);
+    this._tracksVersion++;
+    this._emitStateChange();
   }
 
   // ---------------------------------------------------------------------------

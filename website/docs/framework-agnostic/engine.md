@@ -455,7 +455,7 @@ Consumers can trust that `EngineState.selectionStart <= selectionEnd` and `loopS
 
 ### tracksVersion Counter
 
-The `tracksVersion` field in `EngineState` is a monotonic counter that increments **only** on track mutations (`setTracks`, `addTrack`, `removeTrack`, `moveClip`, `trimClip`, `splitClip`). It does **not** increment on selection, zoom, volume, or loop changes. Use it to skip expensive operations (like audio graph rebuilds) when only non-track state changed.
+The `tracksVersion` field in `EngineState` is a monotonic counter that increments on track mutations (`setTracks`, `addTrack`, `removeTrack`, `moveClip`, `trimClip`, `splitClip`) and on per-track mixer changes (`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`). It does **not** increment on selection, zoom, **master** volume, or loop changes. Use it to skip expensive operations (like audio graph rebuilds) when only non-track state changed — but note that per-track mixer changes do bump it, so a consumer that gates an audio-graph rebuild purely on `tracksVersion` should additionally check whether clip structure actually changed.
 
 ## Example: Vanilla JavaScript
 

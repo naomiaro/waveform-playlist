@@ -447,7 +447,26 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('does not increment on selection, zoom, volume, or loop changes', () => {
+    it('increments on per-track mixer setters (volume, mute, solo, pan)', () => {
+      const engine = new PlaylistEngine();
+      engine.setTracks([makeTrack('t1', [])]);
+      const version = engine.getState().tracksVersion;
+
+      engine.setTrackVolume('t1', 0.5);
+      expect(engine.getState().tracksVersion).toBe(version + 1);
+
+      engine.setTrackMute('t1', true);
+      expect(engine.getState().tracksVersion).toBe(version + 2);
+
+      engine.setTrackSolo('t1', true);
+      expect(engine.getState().tracksVersion).toBe(version + 3);
+
+      engine.setTrackPan('t1', -0.5);
+      expect(engine.getState().tracksVersion).toBe(version + 4);
+      engine.dispose();
+    });
+
+    it('does not increment on selection, zoom, master volume, or loop changes', () => {
       const engine = new PlaylistEngine({ zoomLevels: [256, 512, 1024] });
       engine.setTracks([makeTrack('t1', [])]);
       const version = engine.getState().tracksVersion;
@@ -687,6 +706,36 @@ describe('PlaylistEngine', () => {
       expect(track!.muted).toBe(true);
       expect(track!.soloed).toBe(true);
       expect(track!.pan).toBe(-0.7);
+
+      engine.dispose();
+    });
+
+    it('emits statechange carrying updated mixer state for each per-track setter', () => {
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+
+      engine.setTrackVolume('t1', 0.5);
+      engine.setTrackMute('t1', true);
+      engine.setTrackSolo('t1', true);
+      engine.setTrackPan('t1', -0.5);
+
+      expect(listener).toHaveBeenCalledTimes(4);
+
+      const lastState = listener.mock.calls[listener.mock.calls.length - 1][0] as {
+        tracks: ClipTrack[];
+      };
+      const track = lastState.tracks.find((t) => t.id === 't1');
+      expect(track).toBeDefined();
+      expect(track!.volume).toBe(0.5);
+      expect(track!.muted).toBe(true);
+      expect(track!.soloed).toBe(true);
+      expect(track!.pan).toBe(-0.5);
 
       engine.dispose();
     });
