@@ -189,6 +189,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **Type Migration Gotcha:** When moving types between packages, `pnpm typecheck` resolves workspace packages via `dist/` (not source). Build the source package first: `pnpm --filter @waveform-playlist/PACKAGE build` before `pnpm typecheck`. Same applies to *adding* fields to interfaces in upstream packages — downstream `pnpm typecheck` won't see new optional properties (`TS2353` / `TS2339`) until the upstream is rebuilt. Also grep the entire repo for old import paths — easy to miss straggling imports.
 
+**Downstream tests resolve engine via `dist/`, not source:** after changing engine *behavior* (not just types), run `pnpm --filter @waveform-playlist/engine build` before running `browser`/`dawcore` vitest, or they exercise the OLD behavior (a RED-check against unbuilt source gives a false pass). The `dawcore`/`browser` packages' own source is transformed from TS on the fly by vitest, so changes *within* those packages need no rebuild.
+
 ### E2E Testing with Playwright
 
 - **Run tests**: `pnpm test`, `pnpm test:ui` (interactive), `pnpm test:headed` (visible browser). The `test` script is root-only — use `pnpm -w run test` from package directories.
