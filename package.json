@@ -24,7 +24,8 @@
     "version:bump": "node scripts/bump-version.js",
     "example:dawcore-native": "vite --config examples/dawcore-native/vite.config.ts",
     "example:dawcore-tone": "vite --config examples/dawcore-tone/vite.config.ts",
-    "example:dawcore-wam": "vite --config examples/dawcore-wam/vite.config.ts"
+    "example:dawcore-wam": "vite --config examples/dawcore-wam/vite.config.ts",
+    "example:media-element": "vite --config examples/media-element-player/vite.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

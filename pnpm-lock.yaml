@@ -50,6 +50,46 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@20.19.42)
 
+  examples/media-element-player:
+    dependencies:
+      '@dnd-kit/abstract':
+        specifier: ^0.3.0
+        version: 0.3.2
+      '@dnd-kit/dom':
+        specifier: ^0.3.0
+        version: 0.3.2
+      '@dnd-kit/react':
+        specifier: ^0.3.0
+        version: 0.3.2(react-dom@18.3.1)(react@18.3.1)
+      '@waveform-playlist/browser':
+        specifier: workspace:*
+        version: link:../../packages/browser
+      '@waveform-playlist/media-element-playout':
+        specifier: workspace:*
+        version: link:../../packages/media-element-playout
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      styled-components:
+        specifier: ^6.0.0
+        version: 6.4.2(react-dom@18.3.1)(react@18.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.31)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^8.0.0
+        version: 8.0.16(@types/node@20.19.42)
+
   packages/annotations:
     dependencies:
       '@dnd-kit/react':
@@ -2757,7 +2797,6 @@ packages:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       tslib: 2.8.1
-    dev: true
 
   /@dnd-kit/react@0.3.2(react-dom@19.2.7)(react@18.3.1):
     resolution: {integrity: sha512-1Opg1xw6I75Z95c+rF2NJa0pdGb8rLAENtuopKtJ1J0PudWlz+P6yL137xy/6DV43uaRmNGtsdbMbR0yRYJ72g==}
@@ -17020,7 +17059,7 @@ packages:
       debug: 4.4.3
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 7.3.5(@types/node@20.19.42)
+      vite: 6.4.3(@types/node@20.19.42)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -17078,57 +17117,6 @@ packages:
     dependencies:
       '@types/node': 20.19.42
       esbuild: 0.25.12
-      fdir: 6.5.0(picomatch@4.0.4)
-      picomatch: 4.0.4
-      postcss: 8.5.15
-      rollup: 4.61.1
-      tinyglobby: 0.2.17
-    optionalDependencies:
-      fsevents: 2.3.3
-    dev: true
-
-  /vite@7.3.5(@types/node@20.19.42):
-    resolution: {integrity: sha512-KuOaNhcnGFN2zIPGA7wRmzF+lJA1sea7rHq17aiJ++9lzY1WWG6Jpwqwe1KNbRVPIqHmr8GLYx7jbrQcN/7/ww==}
-    engines: {node: ^20.19.0 || >=22.12.0}
-    hasBin: true
-    peerDependencies:
-      '@types/node': ^20.19.0 || >=22.12.0
-      jiti: '>=1.21.0'
-      less: ^4.0.0
-      lightningcss: ^1.21.0
-      sass: ^1.70.0
-      sass-embedded: ^1.70.0
-      stylus: '>=0.54.8'
-      sugarss: ^5.0.0
-      terser: ^5.16.0
-      tsx: ^4.8.1
-      yaml: ^2.4.2
-    peerDependenciesMeta:
-      '@types/node':
-        optional: true
-      jiti:
-        optional: true
-      less:
-        optional: true
-      lightningcss:
-        optional: true
-      sass:
-        optional: true
-      sass-embedded:
-        optional: true
-      stylus:
-        optional: true
-      sugarss:
-        optional: true
-      terser:
-        optional: true
-      tsx:
-        optional: true
-      yaml:
-        optional: true
-    dependencies:
-      '@types/node': 20.19.42
-      esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
       postcss: 8.5.15

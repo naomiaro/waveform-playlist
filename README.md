@@ -220,7 +220,12 @@ Run the examples locally:
 pnpm example:dawcore-native  # Native Web Audio — localhost:5173
 pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
 pnpm example:dawcore-wam     # WAM 2.0 plugins + Faust — localhost:5175
+pnpm example:media-element   # MediaElement-only React starter (no Tone) — localhost:5176
 ```
+
+The **[media-element-player](examples/media-element-player/)** starter is a minimal React
+single-track player using only `@waveform-playlist/browser` + `@waveform-playlist/media-element-playout`
+(no `@waveform-playlist/playout`, no `tone`) — see its [README](examples/media-element-player/README.md).
 
 **dawcore-native** example pages:
 

@@ -1,0 +1,27 @@
+{
+  "name": "@waveform-playlist/example-media-element-player",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MediaElement-only starter — single-track player with pitch-preserving speed, no Tone.js / no @waveform-playlist/playout.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@waveform-playlist/browser": "workspace:*",
+    "@waveform-playlist/media-element-playout": "workspace:*",
+    "@dnd-kit/abstract": "^0.3.0",
+    "@dnd-kit/dom": "^0.3.0",
+    "@dnd-kit/react": "^0.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "styled-components": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}
