@@ -8,10 +8,11 @@ interface SoundFontCapableAdapter {
 
 /**
  * Structural check for soundfont support — avoids a runtime import of
- * `@waveform-playlist/playout` (its `isToneAdapter` is exactly this check,
- * `typeof adapter.setSoundFontCache === 'function'`). Keeping it structural
- * lets the core barrel stay engine-free (#510) and works for any custom
- * adapter that exposes `setSoundFontCache`.
+ * `@waveform-playlist/playout`. `isToneAdapter` from playout does the same
+ * structural check (via optional chaining); our local `supportsSoundFont`
+ * adds an explicit `adapter != null` guard. Keeping it structural lets the
+ * core barrel stay engine-free (#510) and works for any custom adapter that
+ * exposes `setSoundFontCache`.
  */
 function supportsSoundFont(
   adapter: PlayoutAdapter | null

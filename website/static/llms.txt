@@ -99,6 +99,7 @@ Both providers use React Context with 4 split contexts for performance.
 - `useTrackDynamicEffects()` — Per-track effects management
 - `useExportWav()` — Offline WAV export with effects support
 - `useOutputMeter(options?)` — Real-time master output VU meter levels. Returns per-channel `levels`, `peakLevels`, and `resetPeak()`
+- `useMasterAnalyser(fftSize?)` — FFT analyser wired in parallel to the master output. Returns `{ analyserRef, masterEffects }` — pass `masterEffects` to the provider's `effects` prop and read frequency data from `analyserRef.current`
 - `ExportWavButton` — Pre-built button component wired to useExportWav
 - `effectDefinitions`, `effectCategories`, `getEffectDefinition`, `getEffectsByCategory`, `createEffectInstance`, `createEffectChain` — Effects factory and registry
 

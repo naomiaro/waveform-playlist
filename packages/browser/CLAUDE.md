@@ -21,11 +21,7 @@
   `adapter.audioContext.sampleRate` on first `loadAudio`. A Tone consumer at 44100 Hz that
   passes no `sampleRate` prop sees 48000 for the brief pre-first-load window.
 - **Removed in 14.0.0:** the `Tone` convenience re-export. Import `tone` directly.
-- **Async effect cancel-race:** making a provider's init effect async (via `await import`)
-  opens a dispose-before-resolve window. Guard with a per-run `let cancelled = false` (set
-  `true` in cleanup); after the await, `if (cancelled) { instance.dispose(); return; }` BEFORE
-  assigning refs/state. The MediaElement cleanup disposes the `createdPlayout` capture (the
-  this-run instance), not a stale local.
+- **Async effect cancel-race:** making a provider's init effect async (via `await import`) opens a dispose-before-resolve window. Both providers guard with `let cancelled = false`. In **WaveformPlaylistContext** cleanup only sets `cancelled = true`; dispose happens inside the async `loadAudio` body's `if (cancelled) { adapter.dispose(); return; }`. In **MediaElementPlaylistContext** the cleanup itself disposes the `createdPlayout` capture.
 - **Test the dynamic-import seam, not the provider:** factory-or-dynamic-import logic lives in
   tiny pure async modules (`resolvePlayoutAdapter`/`resolveMediaElementPlayout`), unit-tested
   directly — `vi.doMock(pkg, () => { throw })` simulates a missing peer (no-peer install-hint
@@ -261,14 +257,14 @@ The `soundFontCache` prop is deliberately EXCLUDED from the `loadAudio` effect d
 
 **Rule:** Never derive `sampleRate` from clips or AudioBuffers — use the AudioContext hardware rate. All decoded audio and recordings run at this rate.
 
-- `WaveformPlaylistContext`: `sampleRateRef` initialized via `useState` lazy initializer. If `sampleRate` prop is provided, calls `configureGlobalContext({ sampleRate })` first (compares against hardware rate, warns on mismatch). Otherwise falls back to `getGlobalAudioContext().sampleRate`. One-time read on mount — rate never changes after context creation.
+- `WaveformPlaylistContext`: `sampleRateRef` seeded from `sampleRate` prop ?? `48000` (provisional, no playout call) during the `useState` initializer. After the adapter is created in `loadAudio`, the ref is reconciled from `adapter.audioContext.sampleRate` (the real hardware rate). A Tone consumer that passes no `sampleRate` prop sees 48000 for the brief pre-first-load window.
 - `useAudioTracks`: `contextSampleRateRef` set from `audioContext.sampleRate` in `loadTracks`.
 - `useExportWav`: calls `getGlobalAudioContext().sampleRate` directly.
 - **Never** fall back to 44100 or derive from `tracks[0].clips[0]?.sampleRate` — that fails in recording-only workflows.
 
 ## sampleRate From Context (Not Props)
 
-Internal hooks (`useClipDragHandlers`, `useClipSplitting`, `useAnnotationKeyboardControls`) read `sampleRate` from `usePlaylistData()` — do NOT add it as a parameter. `useAnnotationDragHandlers` accepts optional `sampleRate` (defaults to `getGlobalAudioContext().sampleRate`) because it's used in both WaveformPlaylist and MediaElement contexts. `SnapToGridModifier` and `calculateBoundaryTrim` are not hooks — they still receive `sampleRate` as a parameter from callers that have context access.
+Internal hooks (`useClipDragHandlers`, `useClipSplitting`, `useAnnotationKeyboardControls`) read `sampleRate` from `usePlaylistData()` — do NOT add it as a parameter. `useAnnotationDragHandlers` accepts optional `sampleRate` (defaults to `48000` — tone-free engine default; providers pass the real rate from context) because it's used in both WaveformPlaylist and MediaElement contexts. `SnapToGridModifier` and `calculateBoundaryTrim` are not hooks — they still receive `sampleRate` as a parameter from callers that have context access.
 
 ## Aligned Peak Resampling (waveformDataLoader.ts)
 

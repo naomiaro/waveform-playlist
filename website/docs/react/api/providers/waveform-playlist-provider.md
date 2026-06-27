@@ -227,12 +227,26 @@ interface PlaybackAnimationContextValue {
   isPlaying: boolean;
   currentTime: number;
   currentTimeRef: RefObject<number>;
+  /** Visually-aligned playback time (audible time while playing; raw position otherwise). */
+  visualTimeRef: RefObject<number>;
   playbackStartTimeRef: RefObject<number>;
   audioStartPositionRef: RefObject<number>;
   /** Returns current playback time from engine (auto-wraps at loop boundaries). */
   getPlaybackTime: () => number;
+  /** Current time of the adapter's AudioContext, in seconds. */
+  getAudioContextTime: () => number;
+  /** Adapter scheduler lookahead in seconds (~0.1 s for Tone.js, 0 for native). */
+  getLookAhead: () => number;
+  /** Adapter AudioContext output latency in seconds. */
+  getOutputLatency: () => number;
+  /** Register a per-frame callback driven by the single animation loop. */
+  registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
+  /** Unregister a per-frame callback. */
+  unregisterFrameCallback: (id: string) => void;
 }
 ```
+
+See [hooks.md](/docs/react/api/hooks) for the full interface with JSDoc comments.
 
 ### State (usePlaylistState)
 
