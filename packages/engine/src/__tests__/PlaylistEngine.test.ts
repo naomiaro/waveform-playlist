@@ -447,22 +447,17 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('increments on per-track mixer setters (volume, mute, solo, pan)', () => {
+    it('does NOT increment on per-track mixer setters (those bump mixerVersion)', () => {
       const engine = new PlaylistEngine();
       engine.setTracks([makeTrack('t1', [])]);
       const version = engine.getState().tracksVersion;
 
       engine.setTrackVolume('t1', 0.5);
-      expect(engine.getState().tracksVersion).toBe(version + 1);
-
       engine.setTrackMute('t1', true);
-      expect(engine.getState().tracksVersion).toBe(version + 2);
-
       engine.setTrackSolo('t1', true);
-      expect(engine.getState().tracksVersion).toBe(version + 3);
-
       engine.setTrackPan('t1', -0.5);
-      expect(engine.getState().tracksVersion).toBe(version + 4);
+
+      expect(engine.getState().tracksVersion).toBe(version);
       engine.dispose();
     });
 
@@ -500,6 +495,49 @@ describe('PlaylistEngine', () => {
 
       warnSpy.mockRestore();
       expect(engine.getState().tracksVersion).toBe(version);
+      engine.dispose();
+    });
+  });
+
+  describe('mixerVersion counter', () => {
+    it('starts at 0', () => {
+      const engine = new PlaylistEngine();
+      expect(engine.getState().mixerVersion).toBe(0);
+      engine.dispose();
+    });
+
+    it('increments on each per-track mixer setter (volume, mute, solo, pan)', () => {
+      const engine = new PlaylistEngine();
+      engine.setTracks([makeTrack('t1', [])]);
+      const version = engine.getState().mixerVersion;
+
+      engine.setTrackVolume('t1', 0.5);
+      expect(engine.getState().mixerVersion).toBe(version + 1);
+
+      engine.setTrackMute('t1', true);
+      expect(engine.getState().mixerVersion).toBe(version + 2);
+
+      engine.setTrackSolo('t1', true);
+      expect(engine.getState().mixerVersion).toBe(version + 3);
+
+      engine.setTrackPan('t1', -0.5);
+      expect(engine.getState().mixerVersion).toBe(version + 4);
+      engine.dispose();
+    });
+
+    it('does not increment on structural mutations or other state changes', () => {
+      const engine = new PlaylistEngine({ zoomLevels: [256, 512, 1024] });
+      const clip = makeClip({ id: 'c1', startSample: 44100, durationSamples: 44100 });
+      engine.setTracks([makeTrack('t1', [clip])]);
+      const version = engine.getState().mixerVersion;
+
+      engine.addTrack(makeTrack('t2', []));
+      engine.moveClip('t1', 'c1', 1000);
+      engine.setMasterVolume(0.5);
+      engine.zoomIn();
+      engine.selectTrack('t1');
+
+      expect(engine.getState().mixerVersion).toBe(version);
       engine.dispose();
     });
   });

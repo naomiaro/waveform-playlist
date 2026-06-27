@@ -102,4 +102,39 @@ describe('<daw-editor> mixer-change persistence (#501)', () => {
 
     document.body.removeChild(editor);
   });
+
+  it('does not rewire track effect chains on a mixer-only change, but does on a structural change', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    const adapter = makeMockAdapter();
+    editor.adapter = adapter;
+    document.body.appendChild(editor);
+
+    const trackAEl = await editor.addTrack(midiTrackConfig('A'));
+    const trackAId: string = trackAEl.trackId;
+
+    // Stand in an effects manager so we can observe rewireTrackChains() — the
+    // live audio-graph reconnect that must NOT run on every mixer change (#501).
+    const rewireSpy = vi.fn();
+    editor._effectsManager = {
+      rewireTrackChains: rewireSpy,
+      disposeAll: vi.fn(),
+      disposeTrackChain: vi.fn(),
+    };
+
+    // Mixer-only change (bumps mixerVersion, not tracksVersion) → no rewire.
+    editor.dispatchEvent(
+      new CustomEvent('daw-track-control', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId: trackAId, prop: 'volume', value: 0.5 },
+      })
+    );
+    expect(rewireSpy).not.toHaveBeenCalled();
+
+    // Structural change (bumps tracksVersion) → rewire runs.
+    await editor.addTrack(midiTrackConfig('B'));
+    expect(rewireSpy).toHaveBeenCalled();
+
+    document.body.removeChild(editor);
+  });
 });

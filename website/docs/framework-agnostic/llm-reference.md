@@ -686,7 +686,8 @@ interface PlaylistEngineOptions {
 
 interface EngineState {
   tracks: ClipTrack[];
-  tracksVersion: number;        // Monotonic counter; increments on track mutations + per-track mixer changes (volume/mute/solo/pan)
+  tracksVersion: number;        // Monotonic counter; increments on structural track mutations only
+  mixerVersion: number;         // Monotonic counter; increments on per-track mixer edits (volume/mute/solo/pan)
   duration: number;
   currentTime: number;
   isPlaying: boolean;

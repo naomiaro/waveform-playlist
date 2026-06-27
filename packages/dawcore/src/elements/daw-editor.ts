@@ -1957,18 +1957,30 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         .sort((a, b) => a - b),
     });
     let lastTracksVersion = -1;
+    let lastMixerVersion = -1;
     engine.on('statechange', (engineState) => {
       this._isPlaying = engineState.isPlaying;
       this._duration = engineState.duration;
       this._selectedTrackId = engineState.selectedTrackId;
-      // Sync clip positions when tracks change (moveClip, trimClip, splitClip)
-      if (engineState.tracksVersion !== lastTracksVersion) {
+      const structuralChange = engineState.tracksVersion !== lastTracksVersion;
+      // Per-track mixer edits (volume/mute/solo/pan) bump mixerVersion, NOT
+      // tracksVersion (#501). Refresh the _engineTracks cache on either so the
+      // next setTracks rebuild keeps live mixer state — but only run the
+      // expensive structural work below for true structural changes, never on
+      // every volume/pan drag frame.
+      const mixerChange = engineState.mixerVersion !== lastMixerVersion;
+      if (structuralChange || mixerChange) {
         lastTracksVersion = engineState.tracksVersion;
+        lastMixerVersion = engineState.mixerVersion;
         const nextTracks = new Map<string, ClipTrack>();
         for (const track of engineState.tracks) {
           nextTracks.set(track.id, track);
         }
         this._engineTracks = nextTracks;
+      }
+      // Sync clip positions when tracks change structurally (moveClip, trimClip,
+      // splitClip, setTracks, addTrack, removeTrack).
+      if (structuralChange) {
         // Transport setTracks rebuilds TrackNodes, severing effects hookups.
         this._effectsManager?.rewireTrackChains();
         // Regenerate peaks for new or trimmed clips.

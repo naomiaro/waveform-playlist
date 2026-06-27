@@ -41,6 +41,7 @@ export class PlaylistEngine {
   private _bpm: number;
   private _ppqn: number;
   private _tracksVersion = 0;
+  private _mixerVersion = 0;
   private _adapter: PlayoutAdapter | null;
   private _disposed = false;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
@@ -163,6 +164,7 @@ export class PlaylistEngine {
     return {
       tracks: this._tracks.map((t) => ({ ...t, clips: [...t.clips] })),
       tracksVersion: this._tracksVersion,
+      mixerVersion: this._mixerVersion,
       duration: calculateDuration(this._tracks),
       currentTime: this._currentTime,
       isPlaying: this._isPlaying,
@@ -707,16 +709,19 @@ export class PlaylistEngine {
   //
   // Each setter forwards to the adapter, mirrors the change into the engine's
   // own _tracks (so a later adapter rebuild via setTracks keeps the value),
-  // and — like every other track-mutating method — bumps _tracksVersion and
-  // emits statechange. Consumers that gate a resync on tracksVersion (e.g.
-  // @dawcore/components' <daw-editor>) must hear about mixer changes too;
-  // otherwise an unrelated setTracks rebuild reverts live mixer state (#501).
+  // and bumps _mixerVersion + emits statechange. These are NOT structural
+  // changes, so they deliberately do NOT bump _tracksVersion — that would make
+  // tracksVersion-gated consumers re-run expensive structural work (audio-graph
+  // rewire, peak regeneration) on every volume/pan drag frame. Consumers that
+  // cache a track snapshot (e.g. @dawcore/components' <daw-editor>) watch
+  // _mixerVersion to refresh that cache cheaply, so an unrelated setTracks
+  // rebuild no longer reverts live mixer state (#501).
 
   setTrackVolume(trackId: string, volume: number): void {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.volume = volume;
     this._adapter?.setTrackVolume(trackId, volume);
-    this._tracksVersion++;
+    this._mixerVersion++;
     this._emitStateChange();
   }
 
@@ -724,7 +729,7 @@ export class PlaylistEngine {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.muted = muted;
     this._adapter?.setTrackMute(trackId, muted);
-    this._tracksVersion++;
+    this._mixerVersion++;
     this._emitStateChange();
   }
 
@@ -732,7 +737,7 @@ export class PlaylistEngine {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.soloed = soloed;
     this._adapter?.setTrackSolo(trackId, soloed);
-    this._tracksVersion++;
+    this._mixerVersion++;
     this._emitStateChange();
   }
 
@@ -740,7 +745,7 @@ export class PlaylistEngine {
     const track = this._tracks.find((t) => t.id === trackId);
     if (track) track.pan = pan;
     this._adapter?.setTrackPan(trackId, pan);
-    this._tracksVersion++;
+    this._mixerVersion++;
     this._emitStateChange();
   }
 

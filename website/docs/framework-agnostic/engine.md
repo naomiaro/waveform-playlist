@@ -97,7 +97,8 @@ The returned `EngineState` contains:
 | Field | Type | Description |
 |-------|------|-------------|
 | `tracks` | `ClipTrack[]` | Defensive copy of all tracks and clips |
-| `tracksVersion` | `number` | Monotonic counter — increments on any track mutation |
+| `tracksVersion` | `number` | Monotonic counter — increments on structural track mutations only |
+| `mixerVersion` | `number` | Monotonic counter — increments on per-track mixer edits (volume/mute/solo/pan) |
 | `duration` | `number` | Total timeline duration in seconds |
 
 **Playback**
@@ -455,7 +456,9 @@ Consumers can trust that `EngineState.selectionStart <= selectionEnd` and `loopS
 
 ### tracksVersion Counter
 
-The `tracksVersion` field in `EngineState` is a monotonic counter that increments on track mutations (`setTracks`, `addTrack`, `removeTrack`, `moveClip`, `trimClip`, `splitClip`) and on per-track mixer changes (`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`). It does **not** increment on selection, zoom, **master** volume, or loop changes. Use it to skip expensive operations (like audio graph rebuilds) when only non-track state changed — but note that per-track mixer changes do bump it, so a consumer that gates an audio-graph rebuild purely on `tracksVersion` should additionally check whether clip structure actually changed.
+The `tracksVersion` field in `EngineState` is a monotonic counter that increments **only** on structural track mutations (`setTracks`, `addTrack`, `removeTrack`, `moveClip`, `trimClip`, `splitClip`). It does **not** increment on selection, zoom, master volume, or loop changes, nor on per-track mixer edits. Use it to skip expensive operations (like audio graph rebuilds or peak regeneration) when only non-structural state changed.
+
+Per-track mixer edits (`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`) instead bump a separate `mixerVersion` counter (and emit `statechange`). This lets a consumer that caches a track snapshot refresh that cache — so live mixer state survives a later `setTracks` rebuild — without re-running the structural work gated on `tracksVersion`. The split matters because mixer setters fire continuously during a volume/pan slider drag.
 
 ## Example: Vanilla JavaScript
 
@@ -563,6 +566,7 @@ import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 interface EngineState {
   tracks: ClipTrack[];
   tracksVersion: number;
+  mixerVersion: number;
   duration: number;
   currentTime: number;
   isPlaying: boolean;

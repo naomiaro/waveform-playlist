@@ -69,8 +69,10 @@ export interface PlayoutAdapter {
  */
 export interface EngineState {
   tracks: ClipTrack[];
-  /** Monotonic counter incremented on any tracks mutation (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). */
+  /** Monotonic counter incremented on any structural tracks mutation (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). Does NOT change on per-track mixer edits — see `mixerVersion`. */
   tracksVersion: number;
+  /** Monotonic counter incremented on per-track mixer edits (setTrackVolume, setTrackMute, setTrackSolo, setTrackPan). Lets consumers refresh a cached track snapshot to keep mixer state without triggering the structural resync work (audio-graph rewire, peak regeneration) gated on `tracksVersion`. */
+  mixerVersion: number;
   duration: number;
   currentTime: number;
   isPlaying: boolean;
