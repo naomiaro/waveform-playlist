@@ -35,7 +35,8 @@ async function staticEngineImportsInEntry(entry: string): Promise<string[]> {
   const code = result.outputFiles[0].text;
   // Static `… from "tone"` / `… from "@waveform-playlist/playout"`. Dynamic
   // import("…") has no `from` and is not matched.
-  const re = /from\s*"(tone|@waveform-playlist\/playout)"/g;
+  const re =
+    /from\s*"(tone|@waveform-playlist\/playout|@waveform-playlist\/media-element-playout)"/g;
   return [...code.matchAll(re)].map((m) => m[1]);
 }
 
