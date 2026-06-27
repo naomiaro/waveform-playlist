@@ -2,10 +2,14 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { ClipTrack } from '@waveform-playlist/core';
 
 // Regression test for #501: PlaylistEngine's per-track mixer setters
-// (setTrackVolume/Mute/Solo/Pan) must emit statechange + bump tracksVersion so
-// <daw-editor>'s tracksVersion-gated resync keeps `_engineTracks` fresh. Without
-// that, an unrelated `addTrack` (which rebuilds the engine via
-// `engine.setTracks([...this._engineTracks.values()])`) reverts live mixer state.
+// (setTrackVolume/Mute/Solo/Pan) emit statechange + bump the dedicated
+// `mixerVersion` counter (NOT `tracksVersion`). <daw-editor> refreshes its
+// `_engineTracks` cache when EITHER counter changes, so live mixer state
+// survives a later rebuild — without that, an unrelated `addTrack` (which
+// rebuilds the engine via `engine.setTracks([...this._engineTracks.values()])`)
+// reverts live mixer state. The structural-only work (rewireTrackChains,
+// peak regeneration) stays gated on `tracksVersion` so it never runs on the
+// per-frame mixer edits a volume/pan slider drag produces.
 
 beforeAll(async () => {
   await import('../elements/daw-editor');
@@ -24,6 +28,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Remove any editors a test attached. Cleanup belongs here, not at the end of
+  // a test body — a failed assertion would skip a trailing removeChild and leave
+  // the editor attached (its disconnectedCallback never runs), poisoning later
+  // tests in the file (dawcore CLAUDE.md test-hygiene rule).
+  document.body.querySelectorAll('daw-editor').forEach((el) => el.remove());
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -99,8 +108,6 @@ describe('<daw-editor> mixer-change persistence (#501)', () => {
     const rebuiltA = rebuiltTracks.find((t) => t.id === trackAId);
     expect(rebuiltA).toBeDefined();
     expect(rebuiltA!.muted).toBe(true);
-
-    document.body.removeChild(editor);
   });
 
   it('does not rewire track effect chains on a mixer-only change, but does on a structural change', async () => {
@@ -134,7 +141,5 @@ describe('<daw-editor> mixer-change persistence (#501)', () => {
     // Structural change (bumps tracksVersion) → rewire runs.
     await editor.addTrack(midiTrackConfig('B'));
     expect(rewireSpy).toHaveBeenCalled();
-
-    document.body.removeChild(editor);
   });
 });

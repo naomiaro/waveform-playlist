@@ -254,7 +254,7 @@ engine.off(event, listener): void;
 | `pause` | `() => void` | Playback pauses |
 | `stop` | `() => void` | Playback stops |
 
-The `statechange` event fires on every mutation (tracks, selection, zoom, volume, playback state). Use the `tracksVersion` field to distinguish track-specific changes from other state updates.
+The `statechange` event fires on every mutation (tracks, selection, zoom, volume, playback state). Use the `tracksVersion` field to distinguish structural track changes, and `mixerVersion` to distinguish per-track mixer edits (volume/mute/solo/pan), from other state updates.
 
 ### Cleanup
 

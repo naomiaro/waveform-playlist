@@ -540,6 +540,39 @@ describe('PlaylistEngine', () => {
       expect(engine.getState().mixerVersion).toBe(version);
       engine.dispose();
     });
+
+    it('bumps mixerVersion and emits even when the target track is absent', () => {
+      // The adapter forward (and the version bump + emit) are deliberately
+      // unconditional — a consumer may target a track the engine has not
+      // ingested yet. Guard against regressing the bump inside the `if (track)`.
+      const engine = new PlaylistEngine();
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+      const version = engine.getState().mixerVersion;
+
+      engine.setTrackMute('ghost', true);
+
+      expect(engine.getState().mixerVersion).toBe(version + 1);
+      expect(listener).toHaveBeenCalledTimes(1);
+      engine.dispose();
+    });
+
+    it('advances independently from tracksVersion across interleaved changes', () => {
+      const engine = new PlaylistEngine();
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      engine.setTracks([makeTrack('t1', [clip])]);
+      const tracksV0 = engine.getState().tracksVersion;
+      const mixerV0 = engine.getState().mixerVersion;
+
+      engine.setTrackVolume('t1', 0.4); // mixer
+      engine.moveClip('t1', 'c1', 1000); // structural
+      engine.setTrackPan('t1', -0.2); // mixer
+
+      const state = engine.getState();
+      expect(state.mixerVersion).toBe(mixerV0 + 2);
+      expect(state.tracksVersion).toBe(tracksV0 + 1);
+      engine.dispose();
+    });
   });
 
   describe('clip editing adapter sync', () => {
