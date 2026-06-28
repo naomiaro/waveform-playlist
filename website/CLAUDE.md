@@ -74,7 +74,7 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 
 ## Docusaurus Native Examples
 
-**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source: `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source. `annotations`, `recording` → dist/ (have build artifacts like worklets).
+**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source: `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source. `annotations`, `recording` → dist/ (have build artifacts like worklets). **Rebuild these after pulling/merging source changes** (`pnpm --filter @waveform-playlist/recording build`) — the website serves their `dist`, so stale `dist` makes examples show `X does not exist in type` errors and run old behaviour despite correct source.
 
 **SSR/SSG pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use `createLazyExample` from `BrowserOnlyWrapper`:
 
