@@ -742,7 +742,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                       // this, the playhead — which now uses audible time — would
                       // appear behind the right edge of the recorded waveform.
                       // Mirrors useIntegratedRecording's finalization compensation
-                      // (shared `audibleLatencySamples`) and dawcore's preview-skip
+                      // (shared `resolveRecordingOffsetSamples`) and dawcore's preview-skip
                       // pattern. `getLookAhead()` reads from the same engine the
                       // playhead's animation loop uses — keeps the two in lockstep.
                       const latencyOffsetSamples = resolveRecordingOffsetSamples({

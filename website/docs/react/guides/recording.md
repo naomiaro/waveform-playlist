@@ -454,6 +454,10 @@ const { isRecording, recordingPeaks, ... } =
   recordingState={isRecording ? {
     isRecording,
     trackId: selectedTrackId,
+    // startSample/durationSamples are derived by the consumer — see the full
+    // recording example. Typically: startSample = recordingStartSample (the
+    // captured record-start position) and
+    // durationSamples = Math.floor(duration * sampleRate).
     startSample,
     durationSamples,
     peaks: recordingPeaks,

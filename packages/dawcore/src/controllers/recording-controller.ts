@@ -28,6 +28,7 @@ export interface RecordingOptions {
    * Absolute replacement for the auto-computed `outputLatency`-based value —
    * use this to apply an externally-measured round-trip latency. `0` disables
    * compensation; when omitted, the auto-computed value is used.
+   * Negative or non-finite values are treated as 0.
    */
   latencyOffset?: number;
 }
