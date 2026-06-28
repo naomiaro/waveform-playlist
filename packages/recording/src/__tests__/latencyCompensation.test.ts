@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { resolveRecordingOffsetSamples } from '@waveform-playlist/core';
 
 /**
  * Latency compensation logic extracted from useIntegratedRecording.stopRecording.
@@ -16,6 +17,7 @@ interface LatencyCompensationInput {
   sampleRate: number;
   outputLatency: number;
   lookAhead: number;
+  overrideSeconds?: number;
   recordingStartTime: number;
   lastClipEndSample: number;
 }
@@ -29,7 +31,7 @@ interface LatencyCompensationResult {
 
 /**
  * Pure function mirroring the latency compensation logic from
- * useIntegratedRecording.stopRecording (lines 188-208)
+ * useIntegratedRecording.stopRecording — delegates to the shared resolver.
  */
 function computeLatencyCompensation(input: LatencyCompensationInput): LatencyCompensationResult {
   const {
@@ -37,6 +39,7 @@ function computeLatencyCompensation(input: LatencyCompensationInput): LatencyCom
     sampleRate,
     outputLatency,
     lookAhead,
+    overrideSeconds,
     recordingStartTime,
     lastClipEndSample,
   } = input;
@@ -44,8 +47,12 @@ function computeLatencyCompensation(input: LatencyCompensationInput): LatencyCom
   const recordStartTimeSamples = Math.floor(recordingStartTime * sampleRate);
   const startSample = Math.max(recordStartTimeSamples, lastClipEndSample);
 
-  const totalLatency = outputLatency + lookAhead;
-  const latencyOffsetSamples = Math.floor(totalLatency * sampleRate);
+  const latencyOffsetSamples = resolveRecordingOffsetSamples({
+    overrideSeconds,
+    outputLatency,
+    lookAhead,
+    sampleRate,
+  });
   const effectiveDuration = Math.max(0, bufferLength - latencyOffsetSamples);
 
   return {
@@ -197,5 +204,26 @@ describe('latency compensation', () => {
     expect(result.durationSamples).toBe(0);
     expect(result.offsetSamples).toBe(48510);
     expect(result.discarded).toBe(true);
+  });
+
+  it('override seconds replaces the auto-computed latency', () => {
+    const result = computeLatencyCompensation({
+      ...defaultInput,
+      overrideSeconds: 0.05, // 50ms wins over auto (0.11s)
+    });
+
+    // floor(0.05 * 44100) = 2205
+    expect(result.offsetSamples).toBe(2205);
+    expect(result.durationSamples).toBe(44100 - 2205);
+  });
+
+  it('override of 0 disables compensation', () => {
+    const result = computeLatencyCompensation({
+      ...defaultInput,
+      overrideSeconds: 0,
+    });
+
+    expect(result.offsetSamples).toBe(0);
+    expect(result.durationSamples).toBe(44100);
   });
 });

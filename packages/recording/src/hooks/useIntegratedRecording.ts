@@ -8,7 +8,11 @@ import { useRecording } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
 import type { MicrophoneDevice } from '../types';
-import { type ClipTrack, type AudioClip, audibleLatencySamples } from '@waveform-playlist/core';
+import {
+  type ClipTrack,
+  type AudioClip,
+  resolveRecordingOffsetSamples,
+} from '@waveform-playlist/core';
 import {
   resumeGlobalAudioContext,
   getGlobalAudioContext,
@@ -39,6 +43,16 @@ export interface IntegratedRecordingOptions {
    * Default: 1024
    */
   samplesPerPixel?: number;
+
+  /**
+   * Latency offset to skip at the start of the recording, in **seconds**.
+   * Absolute replacement for the auto-computed `outputLatency + lookAhead` value
+   * — use this to apply an externally-measured round-trip latency. `0` disables
+   * compensation; when omitted, the auto-computed value is used. Pass the same
+   * value into the provider's `recordingState.latencyOffset` so the live preview
+   * matches the finalized clip.
+   */
+  latencyOffset?: number;
 }
 
 export interface UseIntegratedRecordingReturn {
@@ -80,7 +94,7 @@ export function useIntegratedRecording(
   selectedTrackId: string | null,
   options: IntegratedRecordingOptions = {}
 ): UseIntegratedRecordingReturn {
-  const { currentTime = 0, audioConstraints, ...recordingOptions } = options;
+  const { currentTime = 0, audioConstraints, latencyOffset, ...recordingOptions } = options;
 
   // Track if we're currently monitoring (for auto-resume audio context)
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -196,23 +210,20 @@ export function useIntegratedRecording(
 
       const startSample = Math.max(recordStartTimeSamples, lastClipEndSample);
 
-      // Latency compensation:
-      // Two sources of delay between recording start and audible playback:
-      // 1. Tone.js lookAhead (~100ms) — Transport schedules audio ahead of real time
-      // 2. Output latency — hardware DAC delay before audio reaches speakers
-      // The user hears playback delayed by both, so they perform late relative
-      // to the timeline. Skip that duration at the start of the recorded audio.
-      // Shared formula with the live preview in PlaylistVisualization — keep both
-      // paths using `audibleLatencySamples` so trim widths match.
+      // Latency compensation: an explicit latencyOffset (seconds) replaces the
+      // auto-computed outputLatency + lookAhead window. Shared resolver with the
+      // live preview in PlaylistVisualization — keep both using the same value so
+      // trim widths match.
       const audioContext = getGlobalAudioContext();
       const outputLatency = audioContext.outputLatency ?? 0;
       const toneContext = getGlobalContext();
       const lookAhead = toneContext.lookAhead ?? 0;
-      const latencyOffsetSamples = audibleLatencySamples(
+      const latencyOffsetSamples = resolveRecordingOffsetSamples({
+        overrideSeconds: latencyOffset,
         outputLatency,
         lookAhead,
-        buffer.sampleRate
-      );
+        sampleRate: buffer.sampleRate,
+      });
 
       // Guard: very short recordings (< latency compensation) would produce negative duration
       const effectiveDuration = Math.max(0, buffer.length - latencyOffsetSamples);
