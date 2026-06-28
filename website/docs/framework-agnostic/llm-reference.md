@@ -739,6 +739,11 @@ interface IntegratedRecordingOptions {
   channelCount?: number;      // Default: 1 (auto-detected from stream; fallback)
   samplesPerPixel?: number;   // Default: 1024
   bits?: 8 | 16;             // Default: 16
+  /** Latency to skip at the start of the recording, in seconds.
+   *  Absolute replacement for the auto-computed outputLatency+lookAhead value.
+   *  0 disables compensation; negative/non-finite treated as 0.
+   *  Pass the same value to recordingState.latencyOffset so the live preview matches the finalized clip. */
+  latencyOffset?: number;
 }
 
 interface UseIntegratedRecordingReturn {
@@ -759,6 +764,27 @@ interface UseIntegratedRecordingReturn {
   requestMicAccess: () => Promise<void>;
   changeDevice: (deviceId: string) => Promise<void>;
   recordingPeaks: (Int8Array | Int16Array)[];
+}
+```
+
+### RecordingOptions (`@dawcore/components`)
+
+Options for `editor.startRecording(stream?, options?)` on `<daw-editor>`:
+
+```typescript
+interface RecordingOptions {
+  trackId?: string;
+  bits?: 8 | 16;
+  /** Fallback channel count when stream doesn't report one via getSettings(). Must be 1 or 2. */
+  channelCount?: 1 | 2;
+  startSample?: number;
+  /** Start playback during recording so user hears existing tracks. */
+  overdub?: boolean;
+  /** Latency to skip at the start of the recording, in seconds.
+   *  Absolute replacement for the auto-computed outputLatency-based value.
+   *  0 disables compensation; negative/non-finite treated as 0.
+   *  When omitted, the auto-computed outputLatency value is used. */
+  latencyOffset?: number;
 }
 ```
 
@@ -922,6 +948,10 @@ interface WaveformProps {
     durationSamples: number;
     peaks: (Int8Array | Int16Array)[];  // Per-channel live peaks
     bits: 8 | 16;                       // Bit depth of peak values
+    /** Latency to skip in live preview, in seconds. Must match the latencyOffset passed to
+     *  useIntegratedRecording so the preview aligns with the finalized clip.
+     *  Omit to use the auto-computed value. */
+    latencyOffset?: number;
   };
 }
 ```

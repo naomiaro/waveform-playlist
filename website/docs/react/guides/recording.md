@@ -411,6 +411,62 @@ function RecordToPlaylist() {
 }
 ```
 
+## Latency Compensation
+
+When recording, there is typically a small delay between when audio enters the microphone and when it is captured. By default, `useIntegratedRecording` automatically compensates for this delay using `AudioContext.outputLatency` plus Tone.js scheduler lookahead (~0.1 s).
+
+### Overriding with a Measured Latency
+
+If you have measured the actual round-trip latency of your audio interface (for example via a loopback test), you can supply that value directly with the `latencyOffset` option (in **seconds**):
+
+```tsx
+const recording = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+  currentTime,
+  latencyOffset: 0.023, // 23 ms externally-measured round-trip latency
+});
+```
+
+**Semantics:**
+
+| Value | Behaviour |
+|-------|-----------|
+| Omitted | Auto-computed value (`outputLatency` + Tone.js `lookAhead`) |
+| `0` | Compensation disabled — clip starts at the recorded sample |
+| Positive number | Absolute replacement for the auto-computed value (seconds) |
+| Negative or non-finite | Treated as `0` (no compensation) |
+
+`latencyOffset` is an **absolute replacement**, not an additive offset. Setting it to `0.023` always skips exactly 23 ms of captured audio, regardless of the hardware's `outputLatency`.
+
+### Keeping Preview and Clip in Sync
+
+For the live waveform preview to match the finalized clip, pass the **same** value to both `useIntegratedRecording` and the `recordingState.latencyOffset` prop on `<Waveform>`:
+
+```tsx
+const LATENCY = 0.023; // your measured latency, in seconds
+
+const { isRecording, recordingPeaks, ... } =
+  useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+    currentTime,
+    latencyOffset: LATENCY,
+  });
+
+<Waveform
+  recordingState={isRecording ? {
+    isRecording,
+    trackId: selectedTrackId,
+    startSample,
+    durationSamples,
+    peaks: recordingPeaks,
+    bits: 16,
+    latencyOffset: LATENCY, // must match the value above
+  } : undefined}
+/>
+```
+
+If `latencyOffset` is omitted from `recordingState`, the preview uses the same auto-computed value as `useIntegratedRecording`.
+
+---
+
 ## Download Recorded Audio
 
 Recordings are captured as raw PCM audio using an AudioWorklet. After recording, the audio is available as an `AudioBuffer` which can be exported to WAV format.

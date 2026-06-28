@@ -128,7 +128,7 @@ Both providers use React Context with 4 split contexts for performance.
 
 ### Recording Hooks (from `@waveform-playlist/recording`)
 
-- `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: mic access, VU meter, start/stop/pause recording, auto-adds clips to selected track
+- `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: mic access, VU meter, start/stop/pause recording, auto-adds clips to selected track; recording latency compensation is configurable via `latencyOffset` (seconds) on both the React `IntegratedRecordingOptions` and the dawcore `RecordingOptions` passed to `editor.startRecording()`
 - `useRecording(stream, options)` — Low-level recording via AudioWorklet with live peaks
 - `useMicrophoneAccess()` — Request mic permission, enumerate devices, get MediaStream
 - `useMicrophoneLevel(stream, options?)` — Real-time VU meter levels from mic stream (supports multi-channel via `channelCount` option)
