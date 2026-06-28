@@ -189,6 +189,8 @@ const rebuildChain = useCallback(() => {
 
 **AudioContext Init Pattern:** `audioInitializedRef` guards `engine.init()` (AudioContext resume via `Tone.start()`). Only the first play call awaits init; subsequent plays skip it entirely — no microtask yield. Reset to `false` when engine is rebuilt in `loadAudio`. This keeps the stop→play path fully synchronous after first play, preventing audio layering race conditions.
 
+**Engine is always persistent (never torn down on empty).** `loadAudio` creates the `PlaylistEngine`+adapter eagerly on mount and reuses it via `setTracks([])` when the timeline empties — it is NOT disposed at `tracks.length === 0`. This keeps a ready Transport so the first play/record never races an async engine rebuild or pays build latency (the cause of the intermittent "frozen recording playhead" — recording into an empty timeline auto-creates a track, and the overdub `play()` used to win the race against the rebuild and no-op). Lazy *module* loading (dynamic import, #510) is unchanged — only the lifecycle is eager; an empty-on-mount provider holds a suspended AudioContext (resume still deferred to first play). The 0→1 track add takes the synchronous incremental path (`isIncrementalAdd` no longer requires `prevTracks.length > 0`; still gated on an existing engine).
+
 ## Playhead outputLatency Compensation
 
 `getPlaybackTime()` returns **raw engine time** — no latency subtraction. **Storage refs (`currentTimeRef`, pause/seek targets) must stay raw** so `play(time)` resumes correctly — subtracting latency from storage compounds on every pause/resume cycle.
