@@ -34,7 +34,7 @@ import {
   usePlaylistData,
   type ClipPeaks,
 } from '../WaveformPlaylistContext';
-import { audibleLatencySamples, type Peaks } from '@waveform-playlist/core';
+import { resolveRecordingOffsetSamples, type Peaks } from '@waveform-playlist/core';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
@@ -96,6 +96,12 @@ export interface PlaylistVisualizationProps {
     durationSamples: number;
     peaks: (Int8Array | Int16Array)[];
     bits: 8 | 16;
+    /**
+     * Latency offset (seconds) to skip in the live preview. Absolute replacement
+     * for the auto-computed outputLatency + lookAhead value. Pass the same value
+     * given to useIntegratedRecording so preview and finalized clip match.
+     */
+    latencyOffset?: number;
   };
 }
 
@@ -739,13 +745,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                       // (shared `audibleLatencySamples`) and dawcore's preview-skip
                       // pattern. `getLookAhead()` reads from the same engine the
                       // playhead's animation loop uses — keeps the two in lockstep.
-                      const outputLatency = getOutputLatency();
-                      const lookAhead = getLookAhead();
-                      const latencyOffsetSamples = audibleLatencySamples(
-                        outputLatency,
-                        lookAhead,
-                        sampleRate
-                      );
+                      const latencyOffsetSamples = resolveRecordingOffsetSamples({
+                        overrideSeconds: recordingState.latencyOffset,
+                        outputLatency: getOutputLatency(),
+                        lookAhead: getLookAhead(),
+                        sampleRate,
+                      });
                       const latencyPixels = Math.floor(latencyOffsetSamples / samplesPerPixel);
                       const skipPeakElements = latencyPixels * 2; // each pixel is a min/max pair
                       const previewDuration = Math.max(

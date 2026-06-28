@@ -58,6 +58,12 @@ export interface WaveformProps {
     durationSamples: number; // Current recording length
     peaks: (Int8Array | Int16Array)[]; // Per-channel live peaks data
     bits: 8 | 16; // Bit depth of peak values
+    /**
+     * Latency offset (seconds) to skip in the live preview. Absolute replacement
+     * for the auto-computed outputLatency + lookAhead value. Pass the same value
+     * given to useIntegratedRecording so preview and finalized clip match.
+     */
+    latencyOffset?: number;
   };
 }
 
