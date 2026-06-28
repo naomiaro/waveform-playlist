@@ -735,6 +735,24 @@ This usually means the worklet file couldn't be loaded. Check:
 
 This is harmless and occurs when the worklet is loaded multiple times (e.g., hot reloading during development). The hook handles this gracefully.
 
+### Integrating third-party AudioWorklet code
+
+Recording (and the rest of `@waveform-playlist/playout`) runs on a shared global audio context from `getGlobalContext()` / `getGlobalAudioContext()`. That context is Tone.js's, and its `rawContext` is **always** a [`standardized-audio-context`](https://github.com/chrisguttandin/standardized-audio-context) ponyfill — **not** a native `BaseAudioContext` / `AudioContext`. This is deliberate: the ponyfill normalizes cross-browser Web Audio differences (e.g. Firefox `AudioWorkletNode` / `AudioParam`).
+
+Two consequences for third-party Web Audio code you run alongside the playlist:
+
+- `getGlobalAudioContext() instanceof window.AudioContext` is `false`.
+- The **native** `AudioWorkletNode` constructor rejects it — `new AudioWorkletNode(getGlobalAudioContext(), 'my-processor')` throws `TypeError: parameter 1 is not of type 'BaseAudioContext'` (same in Chrome and Firefox).
+
+So don't hardcode the native constructor. Use the dependency-injection pattern from [`chrisguttandin/limiter-audio-worklet`](https://github.com/chrisguttandin/limiter-audio-worklet) — accept the `AudioWorkletNode` constructor and the module loader as parameters — or import `AudioWorkletNode` from `standardized-audio-context`, so your code works on a native **or** ponyfilled context. That is exactly what `@waveform-playlist/worklets` does:
+
+```ts
+// caller supplies addModule for whichever context type is in use
+await addRecordingWorkletModule((url) => ctx.audioWorklet.addModule(url));
+```
+
+If you genuinely need a native `AudioContext`, own it yourself via the web-components surface (`@dawcore/*`), which uses native Web Audio rather than Tone.
+
 ## Browser Compatibility
 
 Recording requires:
