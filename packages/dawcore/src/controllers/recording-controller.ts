@@ -1,7 +1,12 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import type { Bits } from '@waveform-playlist/core';
 import type { DawWaveformElement } from '../elements/daw-waveform';
-import { appendPeaks, concatenateAudioData, createAudioBuffer } from '@waveform-playlist/core';
+import {
+  appendPeaks,
+  concatenateAudioData,
+  createAudioBuffer,
+  resolveRecordingOffsetSamples,
+} from '@waveform-playlist/core';
 import type {
   DawRecordingStartDetail,
   DawRecordingCompleteDetail,
@@ -18,6 +23,13 @@ export interface RecordingOptions {
   startSample?: number;
   /** Start playback during recording so user hears existing tracks. */
   overdub?: boolean;
+  /**
+   * Latency offset to skip at the start of the recording, in **seconds**.
+   * Absolute replacement for the auto-computed `outputLatency`-based value —
+   * use this to apply an externally-measured round-trip latency. `0` disables
+   * compensation; when omitted, the auto-computed value is used.
+   */
+  latencyOffset?: number;
 }
 
 export interface RecordingSession {
@@ -180,9 +192,15 @@ export class RecordingController implements ReactiveController {
       const startSample =
         options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
 
-      // Compute latency offset once at start (doesn't change during session)
-      const outputLatency = rawCtx.outputLatency ?? 0;
-      const latencySamples = Math.floor(outputLatency * rawCtx.sampleRate);
+      // Compute latency offset once at start (doesn't change during session).
+      // An explicit latencyOffset option (seconds) replaces the outputLatency
+      // estimate; native transport has no scheduler look-ahead (lookAhead: 0).
+      const latencySamples = resolveRecordingOffsetSamples({
+        overrideSeconds: options.latencyOffset,
+        outputLatency: rawCtx.outputLatency ?? 0,
+        lookAhead: 0,
+        sampleRate: rawCtx.sampleRate,
+      });
 
       // Use host methods when available (supports standardized-audio-context),
       // fall back to native AudioContext methods.

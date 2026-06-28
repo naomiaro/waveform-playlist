@@ -817,4 +817,28 @@ describe('RecordingController', () => {
     expect(events).not.toContain('daw-recording-pause');
     expect(events).not.toContain('daw-recording-resume');
   });
+
+  it('latencyOffset option overrides the auto-computed offset', async () => {
+    // outputLatency=0 → the auto-computed offset would be 0; the override must win.
+    host.audioContext.outputLatency = 0;
+    host._addRecordedClip = vi.fn();
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), {
+      trackId: 'track-1',
+      latencyOffset: 0.01, // 10ms
+    });
+    simulateWorkletData('track-1', 48000); // 1 second of audio
+
+    await controller.stopRecording();
+
+    // offsetSamples = floor(0.01 * 48000) = 480; durationSamples = 48000 - 480 = 47520
+    expect(host._addRecordedClip).toHaveBeenCalledWith(
+      'track-1',
+      expect.anything(),
+      expect.any(Number),
+      47520, // effectiveDuration
+      480 // latencyOffsetSamples (from the override, not outputLatency)
+    );
+  });
 });
