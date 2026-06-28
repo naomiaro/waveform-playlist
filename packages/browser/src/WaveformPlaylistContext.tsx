@@ -708,30 +708,21 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setTrackStates([]);
       setPeaksDataArray([]);
 
-      // With indefinitePlayback (recording-style setups), keep a persistent
-      // engine alive even with no tracks so recording into an empty timeline
-      // has a ready Transport. Without this the engine is rebuilt async when the
-      // first track is auto-created, and the overdub play() races that rebuild —
-      // intermittently no-opping (frozen playhead) and paying first-record latency.
-      if (indefinitePlaybackRef.current) {
-        if (engineRef.current) {
-          // Keep the existing engine; just clear its tracks.
-          engineRef.current.setTracks([]);
-          prevTracksRef.current = tracks;
-          return;
-        }
-        // No engine yet (initial mount with no tracks): fall through to the
-        // loadAudio path below, which builds a persistent engine for 0 tracks.
-      } else {
-        // Default lazy behavior: dispose the engine when the timeline is empty.
-        if (engineRef.current) {
-          engineRef.current.dispose();
-          engineRef.current = null;
-          adapterRef.current = null;
-        }
+      // Always keep a persistent engine alive — even with no tracks — so the
+      // Transport is ready before playback/recording starts. Without this the
+      // engine is rebuilt asynchronously when the first track is added, and
+      // play() races that rebuild — intermittently no-opping (frozen
+      // playhead/time) and paying first-record latency. The engine is still
+      // created via dynamic import (lazy module load preserved, #510); only its
+      // lifecycle is eager.
+      if (engineRef.current) {
+        // Keep the existing engine; just clear its tracks.
+        engineRef.current.setTracks([]);
         prevTracksRef.current = tracks;
         return;
       }
+      // No engine yet (initial mount with no tracks): fall through to the
+      // loadAudio path below, which builds a persistent engine for 0 tracks.
     }
 
     // Capture playback state before rebuilding playout (read from ref, not state,
