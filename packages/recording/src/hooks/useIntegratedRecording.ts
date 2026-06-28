@@ -261,7 +261,7 @@ export function useIntegratedRecording(
 
       setTracks(newTracks);
     }
-  }, [tracks, setTracks, stopRec]);
+  }, [tracks, setTracks, stopRec, latencyOffset]);
 
   // Auto-select first device when available, or fallback if selected device was unplugged
   useEffect(() => {
