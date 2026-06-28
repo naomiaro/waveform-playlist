@@ -464,9 +464,18 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         setSelectedTrackId(null);
       }
 
-      setTracks(tracks.filter((_, i) => i !== trackIndex));
+      const remaining = tracks.filter((_, i) => i !== trackIndex);
+      setTracks(remaining);
+
+      // When the timeline is emptied, send the playhead home. Otherwise the
+      // stale playhead position (e.g. the end of a prior recording) persists, so
+      // the next recording would start from there instead of 0 — and the playhead
+      // would be parked off-screen, making the progress bar appear frozen.
+      if (remaining.length === 0) {
+        seekTo(0);
+      }
     },
-    [tracks, setTracks, selectedTrackId, setSelectedTrackId, isRecording, stopRecording, stop]
+    [tracks, setTracks, selectedTrackId, setSelectedTrackId, isRecording, stopRecording, stop, seekTo]
   );
 
   return (
