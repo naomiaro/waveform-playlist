@@ -96,6 +96,9 @@
     const editor = document.getElementById('editor');
     const adapter = createToneAdapter();
     editor.adapter = adapter;
+    // Pre-build the engine so the first record/play has no engine-build latency.
+    // dawcore keeps the engine alive for the editor's lifetime once built.
+    editor.ready().catch((err) => addLog('engine init failed: ' + err.message));
     const log = document.getElementById('log');
     const micBtn = document.getElementById('mic-btn');
     const micStatus = document.getElementById('mic-status');
