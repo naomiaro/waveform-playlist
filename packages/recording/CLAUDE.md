@@ -109,6 +109,8 @@ const normalized = gainToNormalized(rawPeak);
 
 The clip's `offsetSamples` skips this combined latency period. `durationSamples` is reduced by the same amount. This aligns the user's performance (timed to what they hear) with the timeline.
 
+**Configurable offset (#502):** `latencyOffset?` (seconds) on `RecordingOptions` (dawcore) / `IntegratedRecordingOptions` (React) overrides the auto-computed compensation — absolute replacement; `0` disables; negative/non-finite → 0; omitted → auto. All consumers (dawcore `RecordingController`, `useIntegratedRecording`, `PlaylistVisualization` preview) resolve via `resolveRecordingOffsetSamples()` in core — the override-vs-auto single source of truth; don't reimplement `outputLatency`/`lookAhead` math. dawcore passes `lookAhead: 0` (native transport); the React live preview must thread the same value into `recordingState.latencyOffset` to match the finalized clip.
+
 **Overdub flow (in RecordingExample):** `startRecordingWithPlayback()` starts recording first, then calls `play(currentTime)`. Stop button stops playback, which auto-triggers recording stop via `wasPlayingRef` effect. Record button is start-only (not a toggle).
 
 ## Multi-Instance Worklet Registration Gap

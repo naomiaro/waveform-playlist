@@ -307,6 +307,8 @@ When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, com
 
 Root flat ESLint config (`eslint.config.mjs`) with TypeScript + React Hooks checks. Run `pnpm lint` before committing — catches missing hook deps, unused variables, hook-rule violations.
 
+**`pnpm typecheck` and vitest do NOT catch `react-hooks/exhaustive-deps`** — a missing hook dependency is an ESLint *error* that passes both and surfaces only on full `pnpm -w lint`. Because lint output carries ~359 pre-existing `@typescript-eslint/no-explicit-any` *warnings*, the real signal is the `✖ N problems (E errors, W warnings)` summary / exit code (require **0 errors**, exit 0) — don't grep the noisy output for "error" or trust scoped per-file typecheck.
+
 ### Docusaurus Native Examples
 
 Docusaurus-native React components (no Jekyll). See `website/CLAUDE.md` for the `createLazyExample` SSR/SSG pattern, webpack aliases, and theme integration.
