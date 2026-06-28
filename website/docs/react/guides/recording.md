@@ -415,6 +415,10 @@ function RecordToPlaylist() {
 
 When recording, there is typically a small delay between when audio enters the microphone and when it is captured. By default, `useIntegratedRecording` automatically compensates for this delay using `AudioContext.outputLatency` plus Tone.js scheduler lookahead (~0.1 s).
 
+:::tip Try it live
+The [recording example](pathname:///waveform-playlist/examples/recording) has a **Latency (s)** input in its toolbar — enter a value in seconds and record to apply the override, or leave it empty for the auto-computed value.
+:::
+
 ### Overriding with a Measured Latency
 
 If you have measured the actual round-trip latency of your audio interface (for example via a loopback test), you can supply that value directly with the `latencyOffset` option (in **seconds**):

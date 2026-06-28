@@ -69,6 +69,10 @@
       <option value="">No mic access</option>
     </select>
     <span id="mic-status" style="font-size:0.7rem;font-family:'Courier New',monospace;color:#888;"></span>
+    <label style="font-size:0.7rem;font-family:'Courier New',monospace;color:#888;display:flex;align-items:center;gap:4px;" title="Override the auto-computed latency compensation with a value in SECONDS. Leave empty for auto.">
+      latency (s)
+      <input id="latency-input" type="number" step="0.001" min="0" placeholder="auto" style="width:70px;background:#1a1a2e;color:#e0d4c8;border:1px solid currentColor;padding:4px;font:inherit;" />
+    </label>
   </div>
 
   <daw-editor
@@ -225,9 +229,12 @@
       }
 
       const streamChannels = editor.recordingStream.getAudioTracks()[0]?.getSettings()?.channelCount;
+      // Optional manual latency override (seconds) — empty = auto-computed.
+      const latencyRaw = document.getElementById('latency-input').value;
       await editor.startRecording(editor.recordingStream, {
         overdub: true,
         ...(streamChannels && { channelCount: streamChannels }),
+        ...(latencyRaw !== '' && { latencyOffset: Number(latencyRaw) }),
       });
     }, { capture: true });
 

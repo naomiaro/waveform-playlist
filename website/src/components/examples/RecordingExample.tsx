@@ -79,6 +79,29 @@ const ToolbarSection = styled.div<{ $grow?: boolean; $noBorder?: boolean }>`
   ${(props) => props.$grow && 'flex-shrink: 1;'}
 `;
 
+const LatencyField = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Courier New', Monaco, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--gray-9);
+  text-transform: uppercase;
+  white-space: nowrap;
+`;
+
+const LatencyInput = styled.input`
+  width: 64px;
+  padding: 3px 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--gray-6);
+  border-radius: 4px;
+  color: var(--gray-12);
+  font-family: 'Courier New', Monaco, monospace;
+  font-size: 0.75rem;
+`;
+
 const MeterLabel = styled.span`
   font-family: 'Courier New', Monaco, monospace;
   font-size: 0.6875rem;
@@ -170,6 +193,11 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // Flag to auto-start recording after creating a new track
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false);
 
+  // Optional manual latency-offset override, in SECONDS (matches the API unit).
+  // undefined = auto-computed (outputLatency + Tone lookAhead). Set this to try
+  // an externally-measured round-trip latency (issue #502).
+  const [latencyOffset, setLatencyOffset] = useState<number | undefined>(undefined);
+
   // Capture timeline position at record start for live preview positioning
   const recordStartTimeRef = useRef(0);
 
@@ -194,7 +222,11 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     changeDevice,
     error,
     recordingPeaks,
-  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime, channelCount: 2 });
+  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+    currentTime,
+    channelCount: 2,
+    latencyOffset,
+  });
 
   // Sample rate info — flag potential resampling between mic and AudioContext
   const micSampleRate = stream?.getAudioTracks()[0]?.getSettings()?.sampleRate ?? null;
@@ -532,6 +564,24 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           )}
         </ToolbarSection>
 
+        {/* Latency offset override (seconds) */}
+        <ToolbarSection>
+          <LatencyField title="Override the auto-computed latency compensation (outputLatency + lookAhead) with a value in seconds. Leave empty for auto. Set an externally-measured round-trip latency for best alignment (#502).">
+            Latency&nbsp;(s)
+            <LatencyInput
+              type="number"
+              step="0.001"
+              min="0"
+              placeholder="auto"
+              value={latencyOffset ?? ''}
+              disabled={isRecording}
+              onChange={(e) =>
+                setLatencyOffset(e.target.value === '' ? undefined : Number(e.target.value))
+              }
+            />
+          </LatencyField>
+        </ToolbarSection>
+
         {/* Meters */}
         <ToolbarSection $grow>
           <MeterGroup>
@@ -593,6 +643,9 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                   durationSamples: Math.floor(duration * sampleRate),
                   peaks: recordingPeaks,
                   bits: 16,
+                  // Same override the hook uses, so the live preview matches the
+                  // finalized clip (otherwise preview uses the auto value).
+                  latencyOffset,
                 }
               : undefined
           }
