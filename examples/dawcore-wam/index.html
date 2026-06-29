@@ -128,6 +128,14 @@
       font-size: 0.75rem;
       color: #555;
     }
+    .rack-group { max-width: 720px; margin-bottom: 16px; }
+    .rack-title {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #c49a6c;
+      margin-bottom: 4px;
+    }
+    .rack-title .kind { color: #888; }
     .effect {
       background: #1a1a2e;
       border-left: 3px solid #63C75F;
@@ -230,8 +238,8 @@
   <script type="module">import '@dawcore/components';</script>
 
   <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop>
-    <daw-track src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
-    <daw-track src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
+    <daw-track id="track-kick" src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
+    <daw-track id="track-bass" src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
     <daw-track id="synth-track" src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
   </daw-editor>
 
@@ -252,7 +260,6 @@
     <div class="controls">
       <label for="target">to</label>
       <select id="target">
-        <option value="synth">Synth track</option>
         <option value="master">Master</option>
       </select>
       <input id="plugin-url" type="url"
@@ -289,13 +296,8 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
   </div>
 
   <div class="section">
-    <h2>Synth track plugins</h2>
-    <div class="rack" id="synth-rack"></div>
-  </div>
-
-  <div class="section">
-    <h2>Master plugins</h2>
-    <div class="rack" id="master-rack"></div>
+    <h2>Plugin chains — one rack per track + master</h2>
+    <div id="racks"></div>
   </div>
 
   <div id="log"></div>
@@ -315,31 +317,77 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
     const adapter = new NativePlayoutAdapter(audioCtx);
     editor.adapter = adapter;
 
-    const synthTrack = document.getElementById('synth-track');
-    // `target` is anything with the effects API: <daw-track> (per-track chain)
-    // or <daw-editor> (master chain).
-    const chains = {
-      synth: { target: synthTrack, rack: document.getElementById('synth-rack') },
-      master: { target: editor, rack: document.getElementById('master-rack') },
+    // --- Target abstraction ---------------------------------------------------
+    // A "target" is the master bus ('master') or a track (its trackId). The
+    // editor exposes the SAME effects surface both ways — master methods
+    // (addWamPlugin, openEffectGui, …) and per-track-by-id methods
+    // (addTrackWamPlugin(trackId, …), openTrackEffectGui(trackId, …), …) — so the
+    // UI never special-cases which chain it edits. The per-track-by-id methods
+    // also reach drag-dropped tracks, which have no <daw-track> element.
+    const MASTER = 'master';
+    const isMaster = (t) => t === MASTER;
+    const fx = {
+      effects: (t) => (isMaster(t) ? editor.effects : editor.trackEffects(t)),
+      addWam: (t, url) =>
+        isMaster(t) ? editor.addWamPlugin(url) : editor.addTrackWamPlugin(t, url),
+      addFaust: (t, dsp, opts) =>
+        isMaster(t) ? editor.addFaustEffect(dsp, opts) : editor.addTrackFaustEffect(t, dsp, opts),
+      openGui: (t, id, host) =>
+        isMaster(t) ? editor.openEffectGui(id, host) : editor.openTrackEffectGui(t, id, host),
+      closeGui: (t, id) =>
+        isMaster(t) ? editor.closeEffectGui(id) : editor.closeTrackEffectGui(t, id),
+      bypass: (t, id, b) =>
+        isMaster(t) ? editor.setEffectBypassed(id, b) : editor.setTrackEffectBypassed(t, id, b),
+      move: (t, id, i) =>
+        isMaster(t) ? editor.moveEffect(id, i) : editor.moveTrackEffect(t, id, i),
+      remove: (t, id) => (isMaster(t) ? editor.removeEffect(id) : editor.removeTrackEffect(t, id)),
+      getState: (t) => (isMaster(t) ? editor.getEffectsState() : editor.getTrackEffectsState(t)),
+      setState: (t, e) =>
+        isMaster(t) ? editor.setEffectsState(e) : editor.setTrackEffectsState(t, e),
     };
 
+    // Master + every current track. editor.tracks is the public enumeration —
+    // it carries each trackId and includes drag-dropped tracks (no element).
+    const targets = () => [
+      { key: MASTER, label: 'Master' },
+      ...editor.tracks.map((t) => ({ key: t.trackId, label: t.name || 'Untitled' })),
+    ];
+
+    const errText = (err) => (err && err.message ? err.message : String(err));
+
     const log = document.getElementById('log');
-    function addLog(msg) {
+    function addLog(m) {
       const line = document.createElement('div');
-      line.textContent = msg;
+      line.textContent = m;
       log.prepend(line);
       while (log.children.length > 30) log.lastChild.remove();
     }
 
-    // --- Rack rendering ---
-    // Effect ids whose GUI panel is open; survives rack re-renders because
+    const targetSelect = document.getElementById('target');
+    const racksEl = document.getElementById('racks');
+    const addUrlBtn = document.getElementById('add-url');
+
+    // --- Target dropdown (rebuilt as tracks load / unload) ---
+    function rebuildTargetSelect() {
+      const prev = targetSelect.value;
+      targetSelect.textContent = '';
+      for (const { key, label } of targets()) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = isMaster(key) ? 'Master' : label + ' (track)';
+        targetSelect.appendChild(opt);
+      }
+      targetSelect.value = [...targetSelect.options].some((o) => o.value === prev) ? prev : MASTER;
+    }
+
+    // --- Rack rendering -------------------------------------------------------
+    // Effect ids whose GUI panel is open; survives re-renders because
     // openEffectGui caches the GUI element (reopen remounts the same node).
     const openGuis = new Set();
 
-    function renderRack(key) {
-      const { target, rack } = chains[key];
+    function renderRack(targetKey, rack) {
       rack.textContent = '';
-      const effects = target.effects;
+      const effects = fx.effects(targetKey);
       effects.forEach((effect, i) => {
         const row = document.createElement('div');
         row.className = 'effect'
@@ -364,15 +412,15 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
         guiBtn.addEventListener('click', () => {
           if (openGuis.has(effect.id)) {
             openGuis.delete(effect.id);
-            target.closeEffectGui(effect.id);
+            fx.closeGui(targetKey, effect.id);
             guiBtn.classList.remove('active');
           } else {
             openGuis.add(effect.id);
             guiBtn.classList.add('active');
-            target.openEffectGui(effect.id, guiHost).catch((err) => {
+            fx.openGui(targetKey, effect.id, guiHost).catch((err) => {
               openGuis.delete(effect.id);
               guiBtn.classList.remove('active');
-              addLog('gui failed: ' + (err && err.message ? err.message : err));
+              addLog('gui failed: ' + errText(err));
             });
           }
         });
@@ -382,27 +430,27 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
         bypassBtn.textContent = 'Bypass';
         bypassBtn.classList.toggle('active', effect.bypassed);
         bypassBtn.addEventListener('click', () => {
-          target.setEffectBypassed(effect.id, !effect.bypassed);
+          fx.bypass(targetKey, effect.id, !effect.bypassed);
         });
         header.appendChild(bypassBtn);
 
         const upBtn = document.createElement('button');
         upBtn.textContent = '↑';
         upBtn.disabled = i === 0;
-        upBtn.addEventListener('click', () => target.moveEffect(effect.id, i - 1));
+        upBtn.addEventListener('click', () => fx.move(targetKey, effect.id, i - 1));
         header.appendChild(upBtn);
 
         const downBtn = document.createElement('button');
         downBtn.textContent = '↓';
         downBtn.disabled = i === effects.length - 1;
-        downBtn.addEventListener('click', () => target.moveEffect(effect.id, i + 1));
+        downBtn.addEventListener('click', () => fx.move(targetKey, effect.id, i + 1));
         header.appendChild(downBtn);
 
         const removeBtn = document.createElement('button');
         removeBtn.textContent = 'Remove';
         removeBtn.addEventListener('click', () => {
           openGuis.delete(effect.id);
-          target.removeEffect(effect.id);
+          fx.remove(targetKey, effect.id);
         });
         header.appendChild(removeBtn);
 
@@ -420,58 +468,74 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
 
         // Remount cached GUIs after a re-render.
         if (openGuis.has(effect.id)) {
-          target.openEffectGui(effect.id, guiHost).catch((err) => {
+          fx.openGui(targetKey, effect.id, guiHost).catch((err) => {
             openGuis.delete(effect.id);
-            addLog('gui remount failed: ' + (err && err.message ? err.message : err));
+            addLog('gui remount failed: ' + errText(err));
           });
         }
       });
     }
 
+    // One labelled rack per target (master + every track), all visible.
     function renderAll() {
-      renderRack('synth');
-      renderRack('master');
+      racksEl.textContent = '';
+      for (const { key, label } of targets()) {
+        const group = document.createElement('div');
+        group.className = 'rack-group';
+
+        const title = document.createElement('div');
+        title.className = 'rack-title';
+        title.textContent = label;
+        if (!isMaster(key)) {
+          const kind = document.createElement('span');
+          kind.className = 'kind';
+          kind.textContent = ' · track';
+          title.appendChild(kind);
+        }
+        group.appendChild(title);
+
+        const rack = document.createElement('div');
+        rack.className = 'rack';
+        renderRack(key, rack);
+        group.appendChild(rack);
+
+        racksEl.appendChild(group);
+      }
     }
 
-    // --- Adding plugins ---
-    async function addWam(key, url) {
-      const { target } = chains[key];
+    // --- Adding plugins -------------------------------------------------------
+    async function addWam(url) {
+      const target = targetSelect.value;
       try {
         // Loading WAM worklets requires a running context — the calling
         // click/pointer event is the user gesture that allows resume().
         await audioCtx.resume();
-        await target.addWamPlugin(url);
+        await fx.addWam(target, url);
       } catch (err) {
-        addLog('add failed: ' + (err && err.message ? err.message : err));
+        addLog('add failed: ' + errText(err));
       }
     }
 
     const urlInput = document.getElementById('plugin-url');
-    const addUrlBtn = document.getElementById('add-url');
-    addUrlBtn.addEventListener('click', () => {
-      const url = urlInput.value.trim() || urlInput.placeholder;
-      addWam(document.getElementById('target').value, url);
-    });
+    addUrlBtn.addEventListener('click', () =>
+      addWam(urlInput.value.trim() || urlInput.placeholder));
 
     // --- Bundled Faust effects (pre-compiled with faust2wam) ---
-    // Standard WAM 2.0 bundles — they go through the exact same addWamPlugin
-    // path as community plugins, zero special handling.
+    // Standard WAM 2.0 bundles — same addWam path as community plugins.
     for (const btn of document.querySelectorAll('.faust-add')) {
-      btn.addEventListener('click', () =>
-        addWam(document.getElementById('target').value, new URL(btn.dataset.url, location.href).href));
+      btn.addEventListener('click', () => addWam(new URL(btn.dataset.url, location.href).href));
     }
 
     // --- Faust compiled in the browser (dynamic mode) ---
-    // addFaustEffect dynamically imports @dawcore/faust (which loads the
-    // Faust compiler WASM) on first use — nothing Faust-related is in the
-    // page's initial bundle. Compile errors carry Faust's line/column
-    // diagnostics and leave the chain untouched.
+    // addFaustEffect dynamically imports @dawcore/faust (the Faust compiler
+    // WASM) on first use. Compile errors carry Faust's line/column diagnostics
+    // and leave the chain untouched.
     const faustCompileBtn = document.getElementById('faust-compile');
     const faustErrorEl = document.getElementById('faust-error');
     faustCompileBtn.addEventListener('click', async () => {
       const dsp = document.getElementById('faust-dsp').value;
       const name = document.getElementById('faust-name').value.trim() || undefined;
-      const { target } = chains[document.getElementById('target').value];
+      const target = targetSelect.value;
       faustErrorEl.classList.remove('visible');
       faustErrorEl.textContent = '';
       faustCompileBtn.disabled = true;
@@ -479,10 +543,10 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
       try {
         // WAM host init needs a running context — this click is the gesture.
         await audioCtx.resume();
-        await target.addFaustEffect(dsp, { name });
+        await fx.addFaust(target, dsp, { name });
         addLog('faust compiled: ' + (name || 'FaustDSP'));
       } catch (err) {
-        faustErrorEl.textContent = err && err.message ? err.message : String(err);
+        faustErrorEl.textContent = errText(err);
         faustErrorEl.classList.add('visible');
         addLog('faust compile failed');
       } finally {
@@ -549,8 +613,7 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
           }
 
           if (insertable) {
-            row.addEventListener('click', () =>
-              addWam(document.getElementById('target').value, entry.url));
+            row.addEventListener('click', () => addWam(entry.url));
           }
           libraryEl.appendChild(row);
         };
@@ -568,26 +631,31 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
         }
       } catch (err) {
         libraryEl.textContent = '';
-        addLog('library failed: ' + (err && err.message ? err.message : err));
+        addLog('library failed: ' + errText(err));
       }
     });
 
-    // --- Persistence: save both chains to localStorage on every change ---
+    // --- Persistence ----------------------------------------------------------
+    // Save master + each DECLARED track's chain. Declared <daw-track id="…">
+    // tracks key on their stable element id (the trackId is regenerated each
+    // load). Drag-dropped tracks are NOT persisted — their audio is a local
+    // File that can't be restored across a reload.
     let restoring = false;
     let saveTimer = 0;
     function scheduleSave() {
       if (restoring) return;
       clearTimeout(saveTimer);
       saveTimer = setTimeout(async () => {
-        const state = {
-          synth: await synthTrack.getEffectsState(),
-          master: await editor.getEffectsState(),
-        };
+        const tracks = {};
+        for (const el of editor.querySelectorAll('daw-track[id]')) {
+          if (el.trackId) tracks[el.id] = await fx.getState(el.trackId);
+        }
+        const state = { master: await fx.getState(MASTER), tracks };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }, 150);
     }
 
-    // --- Restore on reload: needs the synth track loaded AND a user gesture
+    // --- Restore on reload: needs the chain's track ready AND a user gesture
     // (WAM host init loads an AudioWorklet, which needs a running context).
     const banner = document.getElementById('restore-banner');
     let pendingRestore = null;
@@ -596,31 +664,26 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
-    if (pendingRestore && (pendingRestore.synth?.length || pendingRestore.master?.length)) {
-      banner.classList.add('visible');
-    } else {
-      pendingRestore = null;
-    }
+    const hasSaved = pendingRestore && (pendingRestore.master?.length ||
+      Object.values(pendingRestore.tracks || {}).some((e) => e?.length));
+    if (hasSaved) banner.classList.add('visible');
+    else pendingRestore = null;
 
-    let synthReady = false;
     let gestureSeen = false;
+    const readyTracks = new Set();  // trackIds that have fired daw-track-ready
+    const restoredKeys = new Set(); // persistence keys already restored
 
-    async function maybeRestore() {
-      if (!pendingRestore || !synthReady || !gestureSeen) return;
-      const saved = pendingRestore;
-      pendingRestore = null;
-      banner.classList.remove('visible');
+    async function restoreInto(targetKey, entries, label) {
+      if (!entries?.length) return;
       restoring = true;
       try {
         await audioCtx.resume();
-        // Restore is sequential and resilient: a plugin URL that fails to
-        // load becomes a bypassed placeholder (daw-effect-error fires) and
-        // the rest of the chain still restores.
-        if (saved.synth?.length) await synthTrack.setEffectsState(saved.synth);
-        if (saved.master?.length) await editor.setEffectsState(saved.master);
-        addLog('restored chains from localStorage');
+        // Resilient: a plugin URL that fails to load becomes a bypassed
+        // placeholder (daw-effect-error fires) and the rest still restores.
+        await fx.setState(targetKey, entries);
+        addLog('restored ' + label + ' chain');
       } catch (err) {
-        addLog('restore failed: ' + (err && err.message ? err.message : err));
+        addLog('restore failed: ' + errText(err));
       } finally {
         restoring = false;
       }
@@ -628,36 +691,86 @@ process = fi.lowpass(2, cutoff), fi.lowpass(2, cutoff);</textarea>
       scheduleSave();
     }
 
-    document.addEventListener('pointerdown', async () => {
+    function restoreTrackEl(el) {
+      if (!pendingRestore || !el.id || !el.trackId) return;
+      if (restoredKeys.has(el.id) || !readyTracks.has(el.trackId)) return;
+      const entries = pendingRestore.tracks?.[el.id];
+      if (entries?.length) {
+        restoredKeys.add(el.id);
+        restoreInto(el.trackId, entries, el.id);
+      }
+    }
+
+    function runRestore() {
+      if (!pendingRestore || !gestureSeen) return;
+      banner.classList.remove('visible');
+      if (!restoredKeys.has(MASTER) && pendingRestore.master?.length) {
+        restoredKeys.add(MASTER);
+        restoreInto(MASTER, pendingRestore.master, 'master');
+      }
+      for (const el of editor.querySelectorAll('daw-track[id]')) restoreTrackEl(el);
+    }
+
+    document.addEventListener('pointerdown', () => {
       gestureSeen = true;
-      maybeRestore();
+      runRestore();
     }, { once: true, capture: true });
 
-    // Per-track chains wire into the transport's track nodes — enable adding
-    // once the synth track's audio is loaded.
+    // --- Track lifecycle: keep the dropdown + racks in sync (public events) ---
     editor.addEventListener('daw-track-ready', (e) => {
-      addLog('track-ready: ' + e.detail.trackId);
-      if (e.detail.trackId === synthTrack.trackId) {
-        synthReady = true;
-        addUrlBtn.disabled = false;
-        maybeRestore();
+      const { trackId } = e.detail;
+      readyTracks.add(trackId);
+      addLog('track-ready: ' + trackId);
+      rebuildTargetSelect();
+      renderAll();
+      if (gestureSeen) {
+        const el = [...editor.querySelectorAll('daw-track[id]')].find((t) => t.trackId === trackId);
+        if (el) restoreTrackEl(el);
       }
+    });
+
+    editor.addEventListener('daw-track-removed', (e) => {
+      readyTracks.delete(e.detail.trackId);
+      addLog('track-removed: ' + e.detail.trackId);
+      rebuildTargetSelect();
+      renderAll();
+      scheduleSave();
     });
 
     // --- daw-effect-* events (track events bubble up to the editor) ---
     // Any chain change re-renders the racks and persists the new state.
     // daw-effect-change (parameter edits) only persists — re-rendering would
     // tear down the GUI panel mid-drag.
+    //
+    // The event detail's `effectId` is an auto-generated handle ('effect-1', …),
+    // not user-facing. Resolve it to "<target> · <effect name>" by scanning the
+    // chains — works for drag-dropped tracks too (their events dispatch from the
+    // editor, so e.target alone can't tell them from master). A just-removed
+    // effect is gone from every chain, so fall back to the id there.
+    function describeEffect(effectId) {
+      for (const { key, label } of targets()) {
+        const e = fx.effects(key).find((x) => x.id === effectId);
+        if (e) return (isMaster(key) ? 'Master' : label) + ' · ' + (e.label || e.type);
+      }
+      return effectId;
+    }
     for (const type of ['daw-effect-add', 'daw-effect-remove', 'daw-effect-bypass', 'daw-effect-reorder', 'daw-effect-error']) {
       editor.addEventListener(type, (e) => {
-        addLog(type.replace('daw-effect-', 'effect-') + ': '
-          + (e.detail.url || e.detail.effectId)
+        addLog(type.replace('daw-effect-', '') + ': ' + describeEffect(e.detail.effectId)
           + (e.detail.message ? ' — ' + e.detail.message : ''));
         renderAll();
         scheduleSave();
       });
     }
     editor.addEventListener('daw-effect-change', () => scheduleSave());
+
+    // "Add from URL" works immediately — Master is always a valid target, and
+    // tracks appear in the dropdown only once they fire daw-track-ready.
+    addUrlBtn.disabled = false;
+
+    // Initial paint (Master rack; tracks fill in as they load).
+    rebuildTargetSelect();
+    renderAll();
 
     // --- Offline export: render through all chains, download as WAV ---
     const exportBtn = document.getElementById('export');

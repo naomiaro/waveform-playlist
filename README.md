@@ -256,7 +256,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 
 **dawcore-wam** example pages:
 
-- [`index.html`](examples/dawcore-wam/index.html) — WAM 2.0 plugin hosting end to end: load community plugins by URL or from the [webaudiomodules.com](https://www.webaudiomodules.com/) library, open plugin GUIs, reorder/bypass chains, save and restore chains (including state) via localStorage, export the mix to WAV through `exportAudio()`, and compile Faust DSP to a live effect in the browser (`@dawcore/faust`) — plus pre-compiled Faust effects served from this repo
+- [`index.html`](examples/dawcore-wam/index.html) — WAM 2.0 plugin hosting end to end: insert plugins on **any track or the master bus** (one rack per track + master), with the target chosen from a dropdown that tracks every track — including stems **dragged-and-dropped** onto the editor (`file-drop`). Load community plugins by URL or from the [webaudiomodules.com](https://www.webaudiomodules.com/) library, open plugin GUIs, reorder/bypass chains, save and restore chains (including state) via localStorage, export the mix to WAV through `exportAudio()`, and compile Faust DSP to a live effect in the browser (`@dawcore/faust`) — plus pre-compiled Faust effects served from this repo
 
 **Spec & roadmap:** [`docs/specs/web-components-migration.md`](docs/specs/web-components-migration.md) — full element catalogue, attribute/property/event tables, programmatic API contracts, theming tokens, and migration phases.
 
