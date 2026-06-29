@@ -384,6 +384,8 @@ editor.removeEffect(effectId: string): void
 editor.setEffectParams(effectId: string, params: Record<string, number>): void
 editor.setEffectBypassed(effectId: string, bypassed: boolean): void
 editor.moveEffect(effectId: string, newIndex: number): void
+editor.openEffectGui(effectId: string, container: HTMLElement): Promise<HTMLElement> // Mount a master-chain effect's GUI into a consumer-provided container
+editor.closeEffectGui(effectId: string): void                                        // Detach the GUI (cached for reopen)
 // Offline rendering
 editor.exportAudio(options?: ExportOptions): Promise<AudioBuffer>
 // MIDI loading
@@ -468,6 +470,8 @@ track.removeEffect(effectId: string): void
 track.setEffectParams(effectId: string, params: Record<string, number>): void
 track.setEffectBypassed(effectId: string, bypassed: boolean): void
 track.moveEffect(effectId: string, newIndex: number): void
+track.openEffectGui(effectId: string, container: HTMLElement): Promise<HTMLElement>  // Mount a per-track effect's GUI into a consumer-provided container
+track.closeEffectGui(effectId: string): void                                         // Detach the GUI (cached for reopen)
 ```
 
 When `arm()` is called without a `deviceId`, it uses the default input device. The method requests mic permission via `getUserMedia()` and stores the stream for use when recording starts. Calling `arm()` on an already-armed track with a different `deviceId` switches the input device.
@@ -880,6 +884,22 @@ Richer effects come from plugin standards rather than a large built-in set:
 - `addFaustEffect(dspCode, { name? })` compiles Faust DSP source in the browser to a WAM (optional `@dawcore/faust` peer).
 
 Chain operations never branch on entry kind — native and plugin entries support the same bypass/reorder/remove/params surface.
+
+### Effect GUIs
+
+Effect editor GUIs are **host-agnostic** — the consumer supplies the container element the panel mounts into. The same two methods are available on both `<daw-editor>` (master chain) and `<daw-track>` (per-track chain):
+
+- `openEffectGui(effectId, container)` mounts the effect's GUI into `container` and resolves with the mounted element. WAM plugins render their own GUI (`createGui`); native effects — and WAM plugins that ship no custom GUI — get a generic parameter panel built from the registry param definitions. A panel edit routes through the same path as `setEffectParams`, so it applies the change AND dispatches `daw-effect-change`.
+- `closeEffectGui(effectId)` detaches the panel but **caches** it — reopening remounts the same element, preserving GUI state. The GUI is destroyed only when the effect is removed from the chain. Calling `closeEffectGui` on a never-opened id warns but never throws; an error-placeholder entry refuses to open.
+
+```javascript
+// Open a WAM plugin's GUI into your own container element
+const panel = document.getElementById('plugin-panel');
+await track.openEffectGui(wamId, panel);
+
+// Detach (cached — reopen is cheap and preserves state)
+track.closeEffectGui(wamId);
+```
 
 ### Effect Registry
 
