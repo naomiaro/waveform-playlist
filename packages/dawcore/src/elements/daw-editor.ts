@@ -596,15 +596,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
   /**
    * Event-dispatch source for a per-track effect op: the track's `<daw-track>`
-   * light-DOM element when one exists (so `daw-effect-*` bubble from it exactly
-   * as the element-method path does), else the editor itself for element-less
-   * tracks (drag-dropped / programmatic).
+   * element when one exists (so `daw-effect-*` bubble from it exactly as the
+   * element-method path does), else the editor itself for element-less tracks
+   * (drag-dropped / programmatic). Reads the `_trackElements` index the editor
+   * already maintains across the track connect/remove lifecycle — O(1), and the
+   * same resolution `removeTrack` uses — rather than re-querying the DOM per op.
    */
   private _trackEventTarget(trackId: string): EventTarget {
-    const el = Array.from(this.querySelectorAll('daw-track')).find(
-      (t) => (t as { trackId?: string }).trackId === trackId
-    );
-    return el ?? this;
+    return this._trackElements.get(trackId) ?? this;
   }
 
   get audioContext(): AudioContext {
