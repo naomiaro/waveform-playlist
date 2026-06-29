@@ -71,6 +71,7 @@ export {
 
 export type {
   TrackDescriptor,
+  TrackWithId,
   ClipDescriptor,
   DomClipDescriptor,
   DropClipDescriptor,

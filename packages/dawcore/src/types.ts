@@ -22,6 +22,11 @@ export interface TrackDescriptor {
   clips: ClipDescriptor[];
 }
 
+/** A `TrackDescriptor` plus its `trackId` — the shape returned by `editor.tracks`
+ *  so consumers can map a track's name to the `trackId` the per-track APIs
+ *  (`addTrackEffect`, `removeTrack`, `updateTrack`, …) are keyed by. */
+export type TrackWithId = TrackDescriptor & { trackId: string };
+
 /**
  * Common fields shared by all clip descriptors regardless of source.
  */

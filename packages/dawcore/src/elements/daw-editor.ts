@@ -14,6 +14,7 @@ import type {
 } from '@waveform-playlist/core';
 import type {
   TrackDescriptor,
+  TrackWithId,
   ClipDescriptor,
   DomClipDescriptor,
   TrackConfig,
@@ -853,8 +854,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _setSelectedTrackId(trackId: string | null) {
     this._selectedTrackId = trackId;
   }
-  get tracks(): TrackDescriptor[] {
-    return [...this._tracks.values()];
+  get tracks(): TrackWithId[] {
+    return [...this._tracks.entries()].map(([trackId, descriptor]) => ({
+      trackId,
+      ...descriptor,
+    }));
   }
   get selectedTrackId(): string | null {
     return this._selectedTrackId;
@@ -1082,6 +1086,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._currentTime = 0;
       this._stopPlayhead();
     }
+    // Outbound notification (symmetric with daw-track-ready) — fired after
+    // _tracks is updated so handlers reading editor.tracks see the removal.
+    this.dispatchEvent(
+      new CustomEvent<DawTrackIdDetail>('daw-track-removed', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId },
+      })
+    );
   }
   private _onTrackUpdate = (e: CustomEvent) => {
     const trackId = e.detail?.trackId as string;

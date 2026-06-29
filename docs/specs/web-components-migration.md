@@ -319,7 +319,7 @@ file-drop            Boolean   false    Accept dropped audio/MIDI files
 **Properties (JS only):**
 ```typescript
 editor.adapter: PlayoutAdapter       // Required — consumer-provided audio backend (#378)
-editor.tracks: TrackDescriptor[]     // Editor-level track descriptors (not engine ClipTracks)
+editor.tracks: TrackWithId[]         // {trackId, name, …} for every track incl. element-less (dropped/programmatic); the trackId keys the per-track APIs (addTrackEffect, removeTrack, updateTrack, …)
 editor.isPlaying: boolean            // Playback state
 editor.isRecording: boolean          // Recording state (any track recording)
 editor.armedTrackIds: string[]       // Track IDs with record-armed attribute
@@ -429,6 +429,7 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 'daw-files-load-error'  // Decode/parse failed: detail: {file: File, error: string}
 // Programmatic mutation
 'daw-track-ready'       // Track finished loading: detail: {trackId}
+'daw-track-removed'     // Track removed (DOM removal / removeTrack / controls): detail: {trackId} — fired after editor.tracks reflects the removal
 'daw-track-error'       // Track failed to load: detail: {trackId, error}
 'daw-clip-ready'        // Clip finished loading: detail: {trackId, clipId}
 'daw-clip-error'        // Clip failed to load: detail: {trackId, clipId, error}
