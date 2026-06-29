@@ -171,4 +171,18 @@ describe('<daw-editor> per-track effects API (by trackId)', () => {
     ]);
     expect(editor.trackEffects(track.trackId)[0].params.gain).toBe(0.4);
   });
+
+  it('mutating ops on an unknown trackId warn and no-op (no throw)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => {
+      editor.removeTrackEffect('ghost-track', 'fx-1');
+      editor.setTrackEffectParams('ghost-track', 'fx-1', { gain: 1 });
+      editor.setTrackEffectBypassed('ghost-track', 'fx-1', true);
+      editor.moveTrackEffect('ghost-track', 'fx-1', 0);
+    }).not.toThrow();
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[waveform-playlist]'));
+    expect(editor.trackEffects('ghost-track')).toHaveLength(0);
+  });
 });
