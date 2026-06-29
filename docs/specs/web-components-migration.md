@@ -901,6 +901,35 @@ await track.openEffectGui(wamId, panel);
 track.closeEffectGui(wamId);
 ```
 
+### Per-Track Effects by ID (element-less tracks)
+
+The `<daw-track>` element methods above require a `<daw-track>` DOM element. Tracks created **without** one — drag-dropped via `<daw-editor file-drop>`, or `editor.addTrack(...)` when the consumer doesn't hold the returned element — have a `trackId` but no element to call methods on. `<daw-editor>` exposes the same per-track surface addressed by `trackId` so those tracks can carry their own insert chain:
+
+```typescript
+editor.addTrackEffect(trackId: string, type: string, params?: Record<string, number>): string
+editor.addTrackWamPlugin(trackId: string, url: string, initialState?: unknown): Promise<string>
+editor.addTrackFaustEffect(trackId: string, dspCode: string, options?: { name?: string }): Promise<string>
+editor.removeTrackEffect(trackId: string, effectId: string): void
+editor.setTrackEffectParams(trackId: string, effectId: string, params: Record<string, number>): void
+editor.setTrackEffectBypassed(trackId: string, effectId: string, bypassed: boolean): void
+editor.moveTrackEffect(trackId: string, effectId: string, newIndex: number): void
+editor.trackEffects(trackId: string): EffectState[]
+editor.openTrackEffectGui(trackId: string, effectId: string, container: HTMLElement): Promise<HTMLElement>
+editor.closeTrackEffectGui(trackId: string, effectId: string): void
+editor.getTrackEffectsState(trackId: string): Promise<SerializedEffectEntry[]>
+editor.setTrackEffectsState(trackId: string, entries: SerializedEffectEntry[]): Promise<void>
+```
+
+`daw-effect-*` events dispatch from the track's `<daw-track>` element when one exists (so they bubble identically to the element-method path), else from the editor for element-less tracks. The `<daw-track>` element methods are thin sugar over these — `track.addEffect(type)` is `editor.addTrackEffect(track.trackId, type)` — so both entry points hit the same chain and fire the same events.
+
+```javascript
+// A stem dropped onto <daw-editor file-drop> — no <daw-track> element exists.
+editor.addEventListener('daw-track-ready', async (e) => {
+  const { trackId } = e.detail;
+  await editor.addTrackWamPlugin(trackId, 'https://example.com/plugin/index.js');
+});
+```
+
 ### Effect Registry
 
 Custom native effects register alongside the built-ins:
