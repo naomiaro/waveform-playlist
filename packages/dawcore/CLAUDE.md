@@ -229,7 +229,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Typed Events
 
-- **`DawEventMap`** in `src/events.ts` — all 12 custom events with typed details. Use `new CustomEvent<DetailType>(...)` at dispatch sites.
+- **`DawEventMap`** in `src/events.ts` — all custom events with typed details. Use `new CustomEvent<DetailType>(...)` at dispatch sites.
 - **`LoadFilesResult`** — named return type for `loadFiles()`, exported from index.
 - **`PointerEngineContract`** in `interactions/pointer-handler.ts` — narrow engine interface (5 methods). `PointerHandlerHost._engine` uses this, not `PlaylistEngine` directly.
 - Always dispatch `daw-track-select` event on both engine and no-engine paths.

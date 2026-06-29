@@ -104,4 +104,31 @@ describe('<daw-editor> track enumeration', () => {
     // editor.tracks reflects the removal by the time the event fires
     expect(editor.tracks).toHaveLength(0);
   });
+
+  it('does not fire daw-track-removed for a <daw-track> removed before it connected', async () => {
+    const onRemoved = vi.fn();
+    editor.addEventListener('daw-track-removed', onRemoved as EventListener);
+
+    // Append then synchronously remove — the deferred daw-track-connected
+    // (setTimeout 0) never runs, so the track is never registered in _tracks.
+    const track = document.createElement('daw-track') as DawTrackElement;
+    editor.appendChild(track);
+    track.remove();
+    await flush(); // MutationObserver processes the removal
+
+    // Symmetric with daw-track-ready: a track that never became ready must not
+    // emit a removal.
+    expect(onRemoved).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch daw-track-removed on a detached editor (pattern #36)', async () => {
+    const track = await appendTrack('Kick');
+    const onRemoved = vi.fn();
+    editor.addEventListener('daw-track-removed', onRemoved as EventListener);
+
+    editor.remove(); // detach — a bubbling/composed event can't reach ancestors now
+    editor.removeTrack(track.trackId); // element-less path → _onTrackRemoved synchronously
+
+    expect(onRemoved).not.toHaveBeenCalled();
+  });
 });

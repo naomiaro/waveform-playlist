@@ -1054,6 +1054,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._loadTrack(trackId, descriptor);
   };
   private _onTrackRemoved(trackId: string) {
+    // Captured before the cleanup below mutates _tracks — gates the outbound
+    // event so it only fires for a track that was actually registered.
+    const existed = this._tracks.has(trackId);
     this._trackElements.delete(trackId);
     this._effectsManager?.disposeTrackChain(trackId);
     // Clean up per-clip data before removing the track (need clip IDs from engine tracks)
@@ -1088,13 +1091,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     // Outbound notification (symmetric with daw-track-ready) — fired after
     // _tracks is updated so handlers reading editor.tracks see the removal.
-    this.dispatchEvent(
-      new CustomEvent<DawTrackIdDetail>('daw-track-removed', {
-        bubbles: true,
-        composed: true,
-        detail: { trackId },
-      })
-    );
+    // Only for a track that was registered, and never on a detached editor
+    // (a bubbling/composed event can't reach ancestors — CLAUDE.md pattern #36).
+    if (existed && this.isConnected) {
+      this.dispatchEvent(
+        new CustomEvent<DawTrackIdDetail>('daw-track-removed', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId },
+        })
+      );
+    }
   }
   private _onTrackUpdate = (e: CustomEvent) => {
     const trackId = e.detail?.trackId as string;
