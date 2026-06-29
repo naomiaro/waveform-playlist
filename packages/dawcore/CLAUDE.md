@@ -124,6 +124,7 @@
 ## Programmatic Track + Clip API
 
 - **Imperative methods on `<daw-editor>`** — `editor.ready()` (build engine without tracks), `addTrack(config)`, `removeTrack(id)`, `updateTrack(id, partial)`, `addClip(trackId, config)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`. All thin wrappers around DOM mutation — they build `<daw-track>` / `<daw-clip>` elements and let the existing event pipeline handle loading. Both declarative DOM mutation and these methods feed the same `_loadTrack` / `_loadAndAppendClip` path.
+- **`editor.tracks` returns `TrackWithId[]`** (`{ trackId, ...descriptor }`) — the public enumeration of trackId + name for EVERY track incl. element-less (drag-dropped / programmatic) ones. The only public way to map a name to the `trackId` the per-track-by-id APIs (`addTrackEffect`, `removeTrack`, `updateTrack`, …) are keyed by — the id is otherwise just the internal `_tracks` Map key.
 - **Treat `editor.engine` as read-only from consumer code** — `engine.setTracks` directly works for rendering (peaks-sync reads `clip.audioBuffer`) but skips `_tracks` descriptor population, so `<daw-track-controls>` shows "Untitled" / default volume. Use the editor methods for mutation; reach into `engine` only for taps (`masterOutputNode`, analyzers).
 - **DOM ↔ engine clip-id alignment** — `clip.id = clipDesc.clipId` in `_loadTrack` aligns engine clip ids with `<daw-clip>.clipId`. Required for `editor.removeClip(trackId, clipId)` lookups. `ClipDescriptor.clipId` is optional (file drops, recording-clip don't set it; engine auto-generates).
 - **`<daw-clip>` lifecycle events** — `daw-clip-connected` (deferred via `setTimeout(0)`) and `daw-clip-update` (fires only after first render, on any reflected property change). Editor's `_onClipConnected` skips during initial track load (`_engineTracks` doesn't have the parent yet); late-append goes through `_loadAndAppendClip`.
@@ -230,6 +231,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 ## Typed Events
 
 - **`DawEventMap`** in `src/events.ts` — all custom events with typed details. Use `new CustomEvent<DetailType>(...)` at dispatch sites.
+- **`daw-track-removed`** (detail `{ trackId }`) — outbound removal notification, symmetric with `daw-track-ready`. Dispatched from `_onTrackRemoved` ONLY when `existed && this.isConnected`: capture `existed = this._tracks.has(trackId)` at the TOP (cleanup mutates `_tracks` before the dispatch), and gate on `isConnected` per pattern #36 (reachable on a detached editor via `removeTrack`'s element-less branch). The MutationObserver calls `_onTrackRemoved` even for a `<daw-track>` removed before its deferred `daw-track-connected` ran (never registered) — exactly what the `existed` gate filters.
 - **`LoadFilesResult`** — named return type for `loadFiles()`, exported from index.
 - **`PointerEngineContract`** in `interactions/pointer-handler.ts` — narrow engine interface (5 methods). `PointerHandlerHost._engine` uses this, not `PlaylistEngine` directly.
 - Always dispatch `daw-track-select` event on both engine and no-engine paths.
