@@ -496,78 +496,115 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         duration: this._duration,
         tracks: [...this._engineTracks.values()],
         getMasterEffectsState: () => this.getEffectsState(),
-        getTrackEffectsState: (trackId) => this._trackGetEffectsState(trackId),
+        getTrackEffectsState: (trackId) => this.getTrackEffectsState(trackId),
       },
       options
     );
   }
 
-  /** Internal — <daw-track> effects API delegates here (dawcore-internal contract). */
-  _trackAddEffect(
-    trackId: string,
-    target: EventTarget,
-    type: string,
-    params?: Record<string, number>
-  ): string {
-    return this._effects.addTrackEffect(trackId, target, type, params);
+  // --- Per-track effects API (public, keyed by trackId) ---
+  // Mirrors the master-chain methods above and the <daw-track> element methods,
+  // but addresses a track by id so element-less tracks (drag-dropped, or
+  // programmatic tracks the consumer doesn't hold an element for) can carry
+  // their own insert chain. Effect events dispatch from the track's <daw-track>
+  // element when one exists, else from the editor (see _trackEventTarget).
+
+  /** Add a native registry effect to a track's chain. */
+  addTrackEffect(trackId: string, type: string, params?: Record<string, number>): string {
+    return this._effects.addTrackEffect(trackId, this._trackEventTarget(trackId), type, params);
   }
 
-  _trackEffectOp(
-    trackId: string,
-    target: EventTarget,
-    op: 'remove' | 'setParams' | 'setBypassed' | 'move',
-    effectId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    arg?: any
-  ): void {
-    this._effects.trackOp(trackId, target, op, effectId, arg);
-  }
-
-  _trackEffects(trackId: string): EffectState[] {
+  /** Snapshot of a track's effect chain (empty array for an unknown track). */
+  trackEffects(trackId: string): EffectState[] {
     return this._effectsManager?.trackEffects(trackId) ?? [];
   }
 
-  _trackAddWamPlugin(
-    trackId: string,
-    target: EventTarget,
-    url: string,
-    initialState?: unknown
-  ): Promise<string> {
-    return this._effects.addTrackWamPlugin(trackId, target, url, initialState);
+  removeTrackEffect(trackId: string, effectId: string): void {
+    this._effects.trackOp(trackId, this._trackEventTarget(trackId), 'remove', effectId);
   }
 
-  _trackAddFaustEffect(
+  setTrackEffectParams(trackId: string, effectId: string, params: Record<string, number>): void {
+    this._effects.trackOp(trackId, this._trackEventTarget(trackId), 'setParams', effectId, params);
+  }
+
+  setTrackEffectBypassed(trackId: string, effectId: string, bypassed: boolean): void {
+    this._effects.trackOp(
+      trackId,
+      this._trackEventTarget(trackId),
+      'setBypassed',
+      effectId,
+      bypassed
+    );
+  }
+
+  moveTrackEffect(trackId: string, effectId: string, newIndex: number): void {
+    this._effects.trackOp(trackId, this._trackEventTarget(trackId), 'move', effectId, newIndex);
+  }
+
+  /** Load a WAM plugin (via the optional @dawcore/wam peer) into a track's chain. */
+  addTrackWamPlugin(trackId: string, url: string, initialState?: unknown): Promise<string> {
+    return this._effects.addTrackWamPlugin(
+      trackId,
+      this._trackEventTarget(trackId),
+      url,
+      initialState
+    );
+  }
+
+  /** Compile Faust DSP (via the optional @dawcore/faust peer) into a track's chain. */
+  addTrackFaustEffect(
     trackId: string,
-    target: EventTarget,
     dspCode: string,
     options?: { name?: string }
   ): Promise<string> {
-    return this._effects.addTrackFaustEffect(trackId, target, dspCode, options);
+    return this._effects.addTrackFaustEffect(
+      trackId,
+      this._trackEventTarget(trackId),
+      dspCode,
+      options
+    );
   }
 
-  _trackOpenEffectGui(
+  /** Open (lazily creating) the GUI for a track-chain effect into a container. */
+  openTrackEffectGui(
     trackId: string,
-    target: EventTarget,
     effectId: string,
     container: HTMLElement
   ): Promise<HTMLElement> {
-    return this._effects.openTrackEffectGui(trackId, target, effectId, container);
+    return this._effects.openTrackEffectGui(
+      trackId,
+      this._trackEventTarget(trackId),
+      effectId,
+      container
+    );
   }
 
-  _trackCloseEffectGui(_trackId: string, effectId: string): void {
+  /** Hide a track-chain effect's GUI (cached for reopen — never destroys). */
+  closeTrackEffectGui(_trackId: string, effectId: string): void {
     this._effects.closeEffectGui(effectId);
   }
 
-  _trackGetEffectsState(trackId: string): Promise<SerializedEffectEntry[]> {
+  /** Snapshot a track's chain in its persisted form (see dawcore README). */
+  getTrackEffectsState(trackId: string): Promise<SerializedEffectEntry[]> {
     return this._effectsManager?.getTrackEffectsState(trackId) ?? Promise.resolve([]);
   }
 
-  _trackSetEffectsState(
-    trackId: string,
-    target: EventTarget,
-    entries: SerializedEffectEntry[]
-  ): Promise<void> {
-    return this._effects.setTrackEffectsState(trackId, target, entries);
+  /** Replace a track's chain from a persisted snapshot. */
+  setTrackEffectsState(trackId: string, entries: SerializedEffectEntry[]): Promise<void> {
+    return this._effects.setTrackEffectsState(trackId, this._trackEventTarget(trackId), entries);
+  }
+
+  /**
+   * Event-dispatch source for a per-track effect op: the track's `<daw-track>`
+   * light-DOM element when one exists (so `daw-effect-*` bubble from it exactly
+   * as the element-method path does), else the editor itself for element-less
+   * tracks (drag-dropped / programmatic).
+   */
+  private _trackEventTarget(trackId: string): EventTarget {
+    const el = Array.from(this.querySelectorAll('daw-track')).find(
+      (t) => (t as { trackId?: string }).trackId === trackId
+    );
+    return el ?? this;
   }
 
   get audioContext(): AudioContext {

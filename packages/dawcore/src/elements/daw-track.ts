@@ -4,48 +4,32 @@ import type { PropertyValues } from 'lit';
 import type { RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
 import type { EffectState as TrackEffectState, SerializedEffectEntry } from '../effects/types';
 
-/** Structural view of the editor's dawcore-internal track-effects contract —
- *  avoids a value-import cycle between daw-track and daw-editor. */
+/** Structural view of the editor's public per-track effects API (keyed by
+ *  trackId) — avoids a value-import cycle between daw-track and daw-editor.
+ *  These are the same methods consumers can call directly on <daw-editor> for
+ *  element-less (drag-dropped / programmatic) tracks; the element just supplies
+ *  its own trackId. */
 interface TrackEffectsDelegate {
-  _trackAddEffect(
+  addTrackEffect(trackId: string, type: string, params?: Record<string, number>): string;
+  trackEffects(trackId: string): TrackEffectState[];
+  removeTrackEffect(trackId: string, effectId: string): void;
+  setTrackEffectParams(trackId: string, effectId: string, params: Record<string, number>): void;
+  setTrackEffectBypassed(trackId: string, effectId: string, bypassed: boolean): void;
+  moveTrackEffect(trackId: string, effectId: string, newIndex: number): void;
+  addTrackWamPlugin(trackId: string, url: string, initialState?: unknown): Promise<string>;
+  addTrackFaustEffect(
     trackId: string,
-    target: EventTarget,
-    type: string,
-    params?: Record<string, number>
-  ): string;
-  _trackEffectOp(
-    trackId: string,
-    target: EventTarget,
-    op: 'remove' | 'setParams' | 'setBypassed' | 'move',
-    effectId: string,
-    arg?: unknown
-  ): void;
-  _trackEffects(trackId: string): TrackEffectState[];
-  _trackAddWamPlugin(
-    trackId: string,
-    target: EventTarget,
-    url: string,
-    initialState?: unknown
-  ): Promise<string>;
-  _trackAddFaustEffect(
-    trackId: string,
-    target: EventTarget,
     dspCode: string,
     options?: { name?: string }
   ): Promise<string>;
-  _trackOpenEffectGui(
+  openTrackEffectGui(
     trackId: string,
-    target: EventTarget,
     effectId: string,
     container: HTMLElement
   ): Promise<HTMLElement>;
-  _trackCloseEffectGui(trackId: string, effectId: string): void;
-  _trackGetEffectsState(trackId: string): Promise<SerializedEffectEntry[]>;
-  _trackSetEffectsState(
-    trackId: string,
-    target: EventTarget,
-    entries: SerializedEffectEntry[]
-  ): Promise<void>;
+  closeTrackEffectGui(trackId: string, effectId: string): void;
+  getTrackEffectsState(trackId: string): Promise<SerializedEffectEntry[]>;
+  setTrackEffectsState(trackId: string, entries: SerializedEffectEntry[]): Promise<void>;
 }
 
 @customElement('daw-track')
@@ -89,12 +73,12 @@ export class DawTrackElement extends LitElement {
   // --- Effects API (delegates to the owning <daw-editor>) ---
 
   addEffect(type: string, params?: Record<string, number>): string {
-    return this._effectsEditor()._trackAddEffect(this.trackId, this, type, params);
+    return this._effectsEditor().addTrackEffect(this.trackId, type, params);
   }
 
   /** Load a WAM plugin (via the optional @dawcore/wam peer) into this track's chain. */
   addWamPlugin(url: string, initialState?: unknown): Promise<string> {
-    return this._effectsEditor()._trackAddWamPlugin(this.trackId, this, url, initialState);
+    return this._effectsEditor().addTrackWamPlugin(this.trackId, url, initialState);
   }
 
   /**
@@ -103,18 +87,18 @@ export class DawTrackElement extends LitElement {
    * keep their Faust line/column diagnostics and leave the chain untouched.
    */
   addFaustEffect(dspCode: string, options?: { name?: string }): Promise<string> {
-    return this._effectsEditor()._trackAddFaustEffect(this.trackId, this, dspCode, options);
+    return this._effectsEditor().addTrackFaustEffect(this.trackId, dspCode, options);
   }
 
   /** Snapshot this track's chain in its persisted form (see dawcore README). */
   getEffectsState(): Promise<SerializedEffectEntry[]> {
     const editor = this.closest('daw-editor') as TrackEffectsDelegate | null;
-    return editor?._trackGetEffectsState(this.trackId) ?? Promise.resolve([]);
+    return editor?.getTrackEffectsState(this.trackId) ?? Promise.resolve([]);
   }
 
   /** Replace this track's chain with a persisted snapshot. */
   setEffectsState(entries: SerializedEffectEntry[]): Promise<void> {
-    return this._effectsEditor()._trackSetEffectsState(this.trackId, this, entries);
+    return this._effectsEditor().setTrackEffectsState(this.trackId, entries);
   }
 
   /**
@@ -123,33 +107,33 @@ export class DawTrackElement extends LitElement {
    * the element is cached for reopen. See <daw-editor>.openEffectGui.
    */
   openEffectGui(effectId: string, container: HTMLElement): Promise<HTMLElement> {
-    return this._effectsEditor()._trackOpenEffectGui(this.trackId, this, effectId, container);
+    return this._effectsEditor().openTrackEffectGui(this.trackId, effectId, container);
   }
 
   /** Hide an effect's GUI (cached for reopen — never destroys). */
   closeEffectGui(effectId: string): void {
-    this._effectsEditor()._trackCloseEffectGui(this.trackId, effectId);
+    this._effectsEditor().closeTrackEffectGui(this.trackId, effectId);
   }
 
   removeEffect(effectId: string): void {
-    this._effectsEditor()._trackEffectOp(this.trackId, this, 'remove', effectId);
+    this._effectsEditor().removeTrackEffect(this.trackId, effectId);
   }
 
   setEffectParams(effectId: string, params: Record<string, number>): void {
-    this._effectsEditor()._trackEffectOp(this.trackId, this, 'setParams', effectId, params);
+    this._effectsEditor().setTrackEffectParams(this.trackId, effectId, params);
   }
 
   setEffectBypassed(effectId: string, bypassed: boolean): void {
-    this._effectsEditor()._trackEffectOp(this.trackId, this, 'setBypassed', effectId, bypassed);
+    this._effectsEditor().setTrackEffectBypassed(this.trackId, effectId, bypassed);
   }
 
   moveEffect(effectId: string, newIndex: number): void {
-    this._effectsEditor()._trackEffectOp(this.trackId, this, 'move', effectId, newIndex);
+    this._effectsEditor().moveTrackEffect(this.trackId, effectId, newIndex);
   }
 
   get effects(): TrackEffectState[] {
     const editor = this.closest('daw-editor') as TrackEffectsDelegate | null;
-    return editor?._trackEffects(this.trackId) ?? [];
+    return editor?.trackEffects(this.trackId) ?? [];
   }
 
   private _effectsEditor(): TrackEffectsDelegate {
