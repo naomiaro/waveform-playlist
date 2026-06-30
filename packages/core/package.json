@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/core",
-  "version": "12.3.0",
+  "version": "12.4.0",
   "description": "Core types, interfaces and utilities for waveform-playlist",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

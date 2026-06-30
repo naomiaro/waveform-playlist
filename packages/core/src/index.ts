@@ -4,3 +4,4 @@ export * from './utils';
 export * from './clipTimeHelpers';
 export * from './fades';
 export * from './keyboard';
+export * from './probeRangeSupport';
