@@ -155,4 +155,59 @@ describe('DawPlayerElement — playback wiring', () => {
     expect(el.audioElement).toBe(first);
     expect(el.audioElement!.src).toContain('episode-2.mp3');
   });
+
+  describe('DawPlayerElement — events', () => {
+    function loadedPlayer(): DawPlayerElement {
+      const el = makePlayer();
+      el.src = 'episode.mp3';
+      return el;
+    }
+
+    it('dispatches daw-ready when metadata loads', async () => {
+      const el = loadedPlayer();
+      await el.updateComplete;
+      const ready = vi.fn();
+      el.addEventListener('daw-ready', ready);
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      expect(ready).toHaveBeenCalledTimes(1);
+    });
+
+    it('dispatches daw-play / daw-pause / daw-ended from native events', async () => {
+      const el = loadedPlayer();
+      await el.updateComplete;
+      const play = vi.fn();
+      const pause = vi.fn();
+      const ended = vi.fn();
+      el.addEventListener('daw-play', play);
+      el.addEventListener('daw-pause', pause);
+      el.addEventListener('daw-ended', ended);
+      const audio = el.audioElement!;
+      audio.dispatchEvent(new Event('play'));
+      audio.dispatchEvent(new Event('pause'));
+      audio.dispatchEvent(new Event('ended'));
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(pause).toHaveBeenCalledTimes(1);
+      expect(ended).toHaveBeenCalledTimes(1);
+    });
+
+    it('dispatches daw-error with operation:load on a media error', async () => {
+      const el = loadedPlayer();
+      await el.updateComplete;
+      const onError = vi.fn();
+      el.addEventListener('daw-error', onError);
+      // MediaElementTrack emits error(audioElement.error); our MockAudio.error is undefined → null path
+      el.audioElement!.dispatchEvent(new Event('error'));
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0].detail.operation).toBe('load');
+    });
+
+    it('dispatches daw-stop when stop() is called', async () => {
+      const el = loadedPlayer();
+      await el.updateComplete;
+      const stop = vi.fn();
+      el.addEventListener('daw-stop', stop);
+      el.stop();
+      expect(stop).toHaveBeenCalledTimes(1);
+    });
+  });
 });

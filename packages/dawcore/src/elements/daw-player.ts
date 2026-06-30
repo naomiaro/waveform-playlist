@@ -1,6 +1,8 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { AnimationController } from '../controllers/animation-controller';
+import type { DawPlayheadElement } from './daw-playhead';
 
 // Side-effect imports register the child custom elements used in the template.
 import './daw-waveform';
@@ -52,6 +54,10 @@ export class DawPlayerElement extends LitElement {
 
   private _engine: MediaElementPlayout = new MediaElementPlayout();
   private _trackId: string | null = null;
+  private _anim = new AnimationController(this);
+  private _metadataLoaded = false;
+  private _readyDispatched = false;
+  private _waveformData: import('waveform-data').default | null = null;
 
   static styles = css`
     :host {
@@ -65,6 +71,15 @@ export class DawPlayerElement extends LitElement {
       overflow: hidden;
     }
   `;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this._engine.on('loadedmetadata', this._onLoadedMetadata);
+    this._engine.on('play', this._onPlay);
+    this._engine.on('pause', this._onPause);
+    this._engine.on('ended', this._onEnded);
+    this._engine.on('error', this._onError);
+  }
 
   render() {
     return html`
@@ -96,6 +111,9 @@ export class DawPlayerElement extends LitElement {
   }
   stop(): void {
     this._engine.stop();
+    this._anim.stop();
+    this._updatePlayhead();
+    this._dispatch('daw-stop');
   }
   seekTo(time: number): void {
     this._engine.seekTo(time);
@@ -132,7 +150,74 @@ export class DawPlayerElement extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._anim.stop();
+    this._engine.off('loadedmetadata', this._onLoadedMetadata);
+    this._engine.off('play', this._onPlay);
+    this._engine.off('pause', this._onPause);
+    this._engine.off('ended', this._onEnded);
+    this._engine.off('error', this._onError);
     this._engine.dispose();
+  }
+
+  // --- Private event handlers (arrow fields for stable identity) ---
+
+  private _dispatch<T>(name: string, detail?: T): void {
+    this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail }));
+  }
+
+  private _onLoadedMetadata = (): void => {
+    this._metadataLoaded = true;
+    this._maybeDispatchReady();
+  };
+
+  private _onPlay = (): void => {
+    this._dispatch('daw-play');
+    this._anim.start(this._frame);
+  };
+
+  private _onPause = (): void => {
+    this._anim.stop();
+    this._updatePlayhead();
+    this._dispatch('daw-pause');
+  };
+
+  private _onEnded = (): void => {
+    this._anim.stop();
+    this._dispatch('daw-ended');
+  };
+
+  private _onError = (err: MediaError | null): void => {
+    console.warn('[dawcore] <daw-player> failed to load src: ' + (err?.message ?? 'unknown'));
+    this._dispatch('daw-error', { operation: 'load', error: err });
+  };
+
+  /** rAF tick while playing: positions the playhead and emits daw-timeupdate. */
+  private _frame = (): void => {
+    this._updatePlayhead();
+    this._dispatch('daw-timeupdate', { time: this._engine.getCurrentTime() });
+  };
+
+  private _maybeDispatchReady(): void {
+    if (this._readyDispatched) return;
+    if (this._metadataLoaded && (!this.peaksSrc || this._waveformData !== null)) {
+      this._readyDispatched = true;
+      this._dispatch('daw-ready');
+    }
+  }
+
+  private get _playhead(): DawPlayheadElement | null {
+    return this.shadowRoot?.querySelector('daw-playhead') ?? null;
+  }
+
+  private _updatePlayhead(): void {
+    const d = this._engine.duration;
+    if (d <= 0) return;
+    const px = (this._engine.getCurrentTime() / d) * this._timelineWidth;
+    this._playhead?.setPosition(px);
+  }
+
+  private get _timelineWidth(): number {
+    return this.shadowRoot?.querySelector<HTMLElement>('.waveform-area')?.clientWidth ?? 0;
   }
 }
 
