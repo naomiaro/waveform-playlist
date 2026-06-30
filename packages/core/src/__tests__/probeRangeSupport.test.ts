@@ -21,13 +21,18 @@ describe('probeRangeSupport', () => {
     await expect(probeRangeSupport('https://host/audio.mp3', impl)).resolves.toBe('supported');
   });
 
-  it('sends a GET with Range: bytes=0-1', async () => {
+  it('sends a cache-bypassing GET with Range: bytes=0-1, and aborts (206 path)', async () => {
     const { impl, calls } = fetchReturning(206);
     await probeRangeSupport('https://host/audio.mp3', impl);
     expect(calls).toHaveLength(1);
     const init = calls[0].init!;
     expect(init.method).toBe('GET');
     expect((init.headers as Record<string, string>).Range).toBe('bytes=0-1');
+    // Bypass the HTTP cache — a cached full 200 must not be mistaken for the
+    // server ignoring Range (RFC 7234 allows satisfying a range from a cached 200).
+    expect(init.cache).toBe('no-store');
+    // Abort runs on every path (here the 206 / 'supported' path), not just 200.
+    expect((init.signal as AbortSignal).aborted).toBe(true);
   });
 
   it('returns "unsupported" on 200 (host ignored Range, returned full body)', async () => {

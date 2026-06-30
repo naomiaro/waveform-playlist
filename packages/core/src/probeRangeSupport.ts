@@ -24,7 +24,8 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
  *
  * @param url       The audio URL to probe.
  * @param fetchImpl Injectable fetch (defaults to the global `fetch`) — pass a
- *                  stub in tests so no real network is hit.
+ *                  stub in tests so no real network is hit, and pass an explicit
+ *                  implementation on runtimes without a global `fetch`.
  */
 export async function probeRangeSupport(
   url: string,
@@ -35,6 +36,9 @@ export async function probeRangeSupport(
     const res = await fetchImpl(url, {
       method: 'GET',
       headers: { Range: 'bytes=0-1' },
+      // Bypass the HTTP cache: RFC 7234 lets a UA satisfy a range request from a
+      // cached full 200, which would falsely read as the server ignoring Range.
+      cache: 'no-store',
       signal: controller.signal,
     });
     if (res.status === 206) return 'supported';
