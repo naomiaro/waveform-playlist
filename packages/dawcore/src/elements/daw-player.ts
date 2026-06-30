@@ -109,7 +109,11 @@ export class DawPlayerElement extends LitElement {
             .totalWidth=${width}
           ></daw-ruler>`
         : null}
-      <div class="waveform-area" style="height:${this.waveHeight}px">
+      <div
+        class="waveform-area"
+        style="height:${this.waveHeight}px"
+        @pointerdown=${this._onPointerDown}
+      >
         ${repeat(
           this._channelPeaks,
           (_p, i) => i,
@@ -242,6 +246,16 @@ export class DawPlayerElement extends LitElement {
   get audioElement(): HTMLAudioElement | null {
     return this._trackId ? (this._engine.getTrack(this._trackId)?.element ?? null) : null;
   }
+
+  private _onPointerDown = (e: PointerEvent): void => {
+    const area = e.currentTarget as HTMLElement;
+    const width = area.clientWidth;
+    const d = this._engine.duration;
+    if (width <= 0 || d <= 0) return;
+    const ratio = Math.max(0, Math.min(1, e.offsetX / width));
+    this.seekTo(ratio * d);
+    this._updatePlayhead();
+  };
 
   disconnectedCallback(): void {
     super.disconnectedCallback();

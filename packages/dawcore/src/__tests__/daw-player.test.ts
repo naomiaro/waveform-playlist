@@ -213,6 +213,31 @@ describe('DawPlayerElement — playback wiring', () => {
   });
 });
 
+describe('DawPlayerElement — seek interaction', () => {
+  let OriginalAudio: typeof Audio;
+  beforeAll(() => {
+    OriginalAudio = globalThis.Audio;
+    // @ts-expect-error test double
+    globalThis.Audio = MockAudio;
+  });
+  afterAll(() => {
+    globalThis.Audio = OriginalAudio;
+  });
+
+  it('click on the waveform area seeks proportionally', async () => {
+    const el = makePlayer();
+    el.src = 'episode.mp3'; // MockAudio.duration = 120
+    await el.updateComplete;
+    const area = el.shadowRoot!.querySelector<HTMLElement>('.waveform-area')!;
+    Object.defineProperty(area, 'clientWidth', { value: 200, configurable: true });
+    // 50% across a 200px area → 60s of a 120s track
+    const ev = new MouseEvent('pointerdown', { clientX: 100, bubbles: true });
+    Object.defineProperty(ev, 'offsetX', { value: 100 });
+    area.dispatchEvent(ev);
+    expect(el.audioElement!.currentTime).toBeCloseTo(60, 1);
+  });
+});
+
 describe('DawPlayerElement — waveform', () => {
   let origClientWidthDescriptor: PropertyDescriptor | undefined;
 
