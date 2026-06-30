@@ -36,6 +36,7 @@
   ],
   "dependencies": {
     "@dawcore/spectrogram": "workspace:*",
+    "@waveform-playlist/media-element-playout": "workspace:*",
     "lit": "^3.3.3",
     "waveform-data": "^4.5.2"
   },

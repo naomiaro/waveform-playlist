@@ -17,6 +17,7 @@ import './elements/daw-keyboard-shortcuts';
 import './elements/daw-spectrogram';
 import './elements/daw-time-display';
 import './elements/daw-time-format';
+import './elements/daw-player';
 
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
@@ -39,6 +40,7 @@ export { DawKeyboardShortcutsElement } from './elements/daw-keyboard-shortcuts';
 export { DawSpectrogramElement } from './elements/daw-spectrogram';
 export { DawTimeDisplayElement } from './elements/daw-time-display';
 export { DawTimeFormatElement } from './elements/daw-time-format';
+export { DawPlayerElement } from './elements/daw-player';
 export { SpectrogramController } from './controllers/spectrogram-controller';
 export type {
   KeyBinding,

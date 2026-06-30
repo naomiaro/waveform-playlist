@@ -201,6 +201,8 @@ export interface DawEventMap {
   'daw-track-removed': CustomEvent<DawTrackIdDetail>;
   'daw-track-error': CustomEvent<DawTrackErrorDetail>;
   'daw-files-load-error': CustomEvent<DawFilesLoadErrorDetail>;
+  'daw-ready': CustomEvent<void>;
+  'daw-ended': CustomEvent<void>;
   'daw-play': CustomEvent<void>;
   'daw-pause': CustomEvent<void>;
   'daw-stop': CustomEvent<void>;

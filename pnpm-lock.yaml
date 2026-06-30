@@ -226,6 +226,9 @@ importers:
       '@dawcore/spectrogram':
         specifier: workspace:*
         version: link:../dawcore-spectrogram
+      '@waveform-playlist/media-element-playout':
+        specifier: workspace:*
+        version: link:../media-element-playout
       lit:
         specifier: ^3.3.3
         version: 3.3.3
