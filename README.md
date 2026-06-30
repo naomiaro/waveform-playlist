@@ -240,6 +240,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 - [`analyser.html`](examples/dawcore-native/analyser.html) — Spectrum analyser connected to master output
 - [`spectrogram.html`](examples/dawcore-native/spectrogram.html) — Per-track FFT spectrograms via `render-mode="spectrogram"` with color-map and frequency-scale controls
 - [`effects.html`](examples/dawcore-native/effects.html) — Per-track and master insert effects (`native-*` registry) with live parameter sliders, bypass, and `daw-effect-*` event log
+- [`player.html`](examples/dawcore-native/player.html) — Lightweight `<daw-player>` single-track HTMLMediaElement player: waveform with `peaks-src` + timescale ruler, and a scrubber-only fallback (no `peaks-src`), with `daw-ready`/`daw-timeupdate`/`daw-play`/`daw-stop` event log
 
 **dawcore-tone** example pages:
 

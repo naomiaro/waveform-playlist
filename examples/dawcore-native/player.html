@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>daw-player — lightweight HTMLMediaElement player</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 0.95rem;
+      color: #a09080;
+      margin: 24px 0 8px;
+    }
+    daw-player {
+      display: block;
+      max-width: 800px;
+      margin-bottom: 12px;
+    }
+    #player-waveform {
+      --daw-wave-color: #89b4fa;
+      --daw-playhead-color: #f38ba8;
+    }
+    #player-scrubber {
+      --daw-wave-color: #a6e3a1;
+      --daw-playhead-color: #fab387;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    button {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      border: 1px solid #313244;
+      border-radius: 4px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    button:hover {
+      background: #313244;
+    }
+    #log {
+      margin-top: 16px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>&lt;daw-player&gt;</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <h2>With waveform (peaks-src)</h2>
+  <daw-player
+    id="player-waveform"
+    src="/media/audio/AlbertKader_Whiptails/01_Loop1.opus"
+    peaks-src="/media/audio/AlbertKader_Whiptails/01_Loop1.dat"
+    wave-height="96"
+    timescale
+  ></daw-player>
+  <div class="controls">
+    <button id="play-waveform">Play</button>
+    <button id="pause-waveform">Pause</button>
+    <button id="stop-waveform">Stop</button>
+  </div>
+
+  <h2>Scrubber only (no peaks-src)</h2>
+  <daw-player
+    id="player-scrubber"
+    src="/media/audio/sonnet.mp3"
+    wave-height="64"
+  ></daw-player>
+  <div class="controls">
+    <button id="play-scrubber">Play</button>
+    <button id="pause-scrubber">Pause</button>
+    <button id="stop-scrubber">Stop</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    const waveform = document.getElementById('player-waveform');
+    const scrubber = document.getElementById('player-scrubber');
+    const log = document.getElementById('log');
+
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.textContent = msg;
+      log.prepend(line);
+      while (log.children.length > 20) log.lastChild.remove();
+    }
+
+    document.getElementById('play-waveform').onclick = () => waveform.play();
+    document.getElementById('pause-waveform').onclick = () => waveform.pause();
+    document.getElementById('stop-waveform').onclick = () => waveform.stop();
+
+    document.getElementById('play-scrubber').onclick = () => scrubber.play();
+    document.getElementById('pause-scrubber').onclick = () => scrubber.pause();
+    document.getElementById('stop-scrubber').onclick = () => scrubber.stop();
+
+    waveform.addEventListener('daw-ready', (e) => addLog('waveform daw-ready, duration=' + e.target.duration.toFixed(2) + 's'));
+    waveform.addEventListener('daw-play', () => addLog('waveform daw-play'));
+    waveform.addEventListener('daw-pause', () => addLog('waveform daw-pause'));
+    waveform.addEventListener('daw-stop', () => addLog('waveform daw-stop'));
+    waveform.addEventListener('daw-ended', () => addLog('waveform daw-ended'));
+    waveform.addEventListener('daw-timeupdate', (e) => {
+      document.title = 'waveform ' + e.detail.time.toFixed(1) + 's';
+    });
+
+    scrubber.addEventListener('daw-ready', (e) => addLog('scrubber daw-ready, duration=' + e.target.duration.toFixed(2) + 's'));
+    scrubber.addEventListener('daw-play', () => addLog('scrubber daw-play'));
+    scrubber.addEventListener('daw-pause', () => addLog('scrubber daw-pause'));
+    scrubber.addEventListener('daw-stop', () => addLog('scrubber daw-stop'));
+    scrubber.addEventListener('daw-ended', () => addLog('scrubber daw-ended'));
+  </script>
+</body>
+</html>

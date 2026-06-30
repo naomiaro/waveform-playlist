@@ -43,7 +43,7 @@ React packages without a Web Components equivalent yet: annotations (epic #455) 
 
 ## Custom Elements
 
-> **Implementation status:** the core editor elements are shipped. Elements listed in this spec that don't exist yet are tracked in epics: transport/control elements (#452), record arming + VU meter (#453), `<daw-player>` (#454), annotations (#455), individual track-control elements (#457).
+> **Implementation status:** the core editor elements are shipped. `<daw-player>` core (#473) is implemented. Elements listed in this spec that don't exist yet are tracked in epics: transport/control elements (#452), record arming + VU meter (#453), `<daw-player>` follow-ups — effects (#475), `<daw-playback-rate>` (#476), transport-compat tests (#474), annotations (#477) — annotations (#455), individual track-control elements (#457).
 
 ### Core Elements
 
@@ -576,7 +576,7 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 ### `<daw-player>` API
 
-> Tracked in epic #454 — not yet implemented. The class-based playout it would wrap exists in `@waveform-playlist/media-element-playout`.
+> Core implemented in #473 (epic #454). Wraps `@waveform-playlist/media-element-playout`. Outstanding follow-ups: effects (#475), `<daw-playback-rate>` element (#476), transport-compat tests (#474), annotations (#477).
 
 A lightweight single-track audio player that uses `HTMLMediaElement` (`<audio>`) internally — no Tone.js, no PlaylistEngine. Ideal for podcast players, music previews, audiobook readers, or any scenario that needs waveform visualization without multi-track editing.
 
@@ -2077,7 +2077,7 @@ Create `@dawcore/components` package with core elements:
 - [x] Recording core: start/stop/pause/resume via editor methods, worklet capture, live waveform preview (arming surface — epic #453)
 - [x] Custom events for state changes (recording/track/clip/effect events; `daw-ready` / `daw-timeupdate` / `daw-tracks-change` — #459, #468; `daw-record-arm` — #469)
 - [ ] Accessibility — ARIA roles/labels, keyboard track navigation, live region, focus indicators → **epic #456**
-- [ ] `<daw-player>` — lightweight single-track HTMLMediaElement player → **epic #454**
+- [x] `<daw-player>` — lightweight single-track HTMLMediaElement player → core done (#473); follow-ups: effects (#475), `<daw-playback-rate>` (#476), transport-compat tests (#474), annotations (#477)
 - [ ] `<daw-playback-rate>` — playback speed transport element → #476
 
 ### Phase 2: Interactions
