@@ -317,6 +317,8 @@ Root flat ESLint config (`eslint.config.mjs`) with TypeScript + React Hooks chec
 
 **`pnpm typecheck` and vitest do NOT catch `react-hooks/exhaustive-deps`** — a missing hook dependency is an ESLint *error* that passes both and surfaces only on full `pnpm -w lint`. Because lint output carries ~359 pre-existing `@typescript-eslint/no-explicit-any` *warnings*, the real signal is the `✖ N problems (E errors, W warnings)` summary / exit code (require **0 errors**, exit 0) — don't grep the noisy output for "error" or trust scoped per-file typecheck.
 
+**`Set<Function>` triggers `@typescript-eslint/no-unsafe-function-type` (an ESLint *error*)** — same trap class: `pnpm typecheck` and vitest pass it, only full `pnpm -w lint` flags it. Event-emitter listener stores need either an inline `// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type` (as `PlaylistEngine` does) or a typed-union `Set<Events[keyof Events]>` (with one localized cast at the `_emit`/attach call site).
+
 ### Docusaurus Native Examples
 
 Docusaurus-native React components (no Jekyll). See `website/CLAUDE.md` for the `createLazyExample` SSR/SSG pattern, webpack aliases, and theme integration.
@@ -376,6 +378,7 @@ Package-specific conventions, architecture, and patterns live in each package's 
 
 - `packages/engine/CLAUDE.md` — PlaylistEngine, PlayoutAdapter, operations
 - `packages/playout/CLAUDE.md` — Tone.js adapter, AudioContext, ToneTrack internals
+- `packages/media-element-playout/CLAUDE.md` — HTMLAudioElement single-track engine, player-mode (resume/setSource/events), playbackRate-reset gotcha
 - `packages/browser/CLAUDE.md` — Hooks architecture, effects, animation, context providers
 - `packages/ui-components/CLAUDE.md` — Theming, virtual scrolling, ClipViewportOrigin
 - `packages/recording/CLAUDE.md` — AudioWorklets, Firefox compat, VU meter, mic access
