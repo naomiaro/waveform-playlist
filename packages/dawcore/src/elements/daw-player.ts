@@ -196,6 +196,11 @@ export class DawPlayerElement extends LitElement {
 
   private _loadSource(): void {
     if (!this.src) return;
+    // Re-arm the daw-ready gate so a new audio source fires a fresh event.
+    // _peaksSettled is intentionally NOT touched here — for a src-only swap the
+    // existing peaks remain valid; _loadPeaks resets it when peaks-src changes.
+    this._metadataLoaded = false;
+    this._readyDispatched = false;
     const track = this._engine.setSource({ source: this.src });
     this._trackId = track.id;
     this._engine.setPlaybackRate(this._playbackRate);
@@ -251,6 +256,9 @@ export class DawPlayerElement extends LitElement {
     const area = e.currentTarget as HTMLElement;
     const width = area.clientWidth;
     const d = this._engine.duration;
+    // _engine.duration coerces NaN→0 upstream (MediaElementTrack.duration is
+    // `audioElement.duration || _peaks?.duration || 0`), so `d <= 0` also
+    // covers the pre-metadata/NaN case — no separate NaN check needed.
     if (width <= 0 || d <= 0) return;
     const ratio = Math.max(0, Math.min(1, e.offsetX / width));
     this.seekTo(ratio * d);
@@ -294,6 +302,7 @@ export class DawPlayerElement extends LitElement {
 
   private _onEnded = (): void => {
     this._anim.stop();
+    this._updatePlayhead(); // snap playhead to end rather than leaving it ≤1 frame short
     this._dispatch('daw-ended');
   };
 

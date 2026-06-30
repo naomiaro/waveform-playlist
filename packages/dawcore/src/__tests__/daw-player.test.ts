@@ -211,6 +211,70 @@ describe('DawPlayerElement — playback wiring', () => {
       expect(stop).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('daw-ready re-arm on src change (I1)', () => {
+    it('fires daw-ready a second time after src-only swap', async () => {
+      // No peaks-src → _peaksSettled=true immediately on first update
+      const el = makePlayer();
+      el.src = 'episode.mp3';
+      await el.updateComplete;
+      const ready = vi.fn();
+      el.addEventListener('daw-ready', ready);
+      // First loadedmetadata → daw-ready fires (count: 1)
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      expect(ready).toHaveBeenCalledTimes(1);
+      // Swap src only (peaks-src unchanged/absent → _loadPeaks not re-called)
+      el.src = 'episode-2.mp3';
+      await el.updateComplete;
+      // Fresh loadedmetadata for new source → daw-ready must fire again (count: 2)
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      expect(ready).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not fire daw-ready prematurely when both src and peaks-src change (stale-metadata guard)', async () => {
+      const minimalWd = { sample_rate: 48000 };
+      // First peaks load resolves immediately
+      vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockResolvedValue(minimalWd as never);
+      const el = makePlayer();
+      el.src = 'a.mp3';
+      el.peaksSrc = 'a.dat';
+      await el.updateComplete;
+      const ready = vi.fn();
+      el.addEventListener('daw-ready', ready);
+      // Flush microtasks so first _loadPeaks async continuation runs (_peaksSettled=true)
+      await Promise.resolve();
+      await Promise.resolve();
+      // Fire first loadedmetadata → daw-ready fires (count: 1)
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      expect(ready).toHaveBeenCalledTimes(1);
+
+      // Set up a controlled (pending) peaks mock for the new source
+      let resolveNewPeaks!: (v: unknown) => void;
+      const newPeaksPromise = new Promise<unknown>((res) => {
+        resolveNewPeaks = res;
+      });
+      vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockReturnValue(newPeaksPromise as never);
+      // Swap both src and peaks-src in a single Lit update cycle
+      el.src = 'b.mp3';
+      el.peaksSrc = 'b.dat';
+      await el.updateComplete;
+
+      // Resolve new peaks BEFORE dispatching new loadedmetadata (the stale-metadata race)
+      resolveNewPeaks(minimalWd);
+      // Flush the awaited _loadPeaks continuation
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // BUG (pre-fix): _metadataLoaded stayed true from the old src, so daw-ready
+      // would have fired prematurely here (count would be 2).
+      // FIX: _loadSource resets _metadataLoaded=false so the gate stays closed.
+      expect(ready).toHaveBeenCalledTimes(1);
+
+      // Fresh loadedmetadata for new source → daw-ready now fires correctly (count: 2)
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      expect(ready).toHaveBeenCalledTimes(2);
+    });
+  });
 });
 
 describe('DawPlayerElement — seek interaction', () => {
