@@ -61,6 +61,8 @@ export class DawPlayerElement extends LitElement {
   private _anim = new AnimationController(this);
   private _metadataLoaded = false;
   private _readyDispatched = false;
+  /** True once peaks resolution is complete: succeeded, failed, or no peaks-src set. */
+  private _peaksSettled = false;
   private _waveformData: import('waveform-data').default | null = null;
   @state() private _channelPeaks: Peaks[] = [];
   private _sampleRate = 48000;
@@ -135,21 +137,29 @@ export class DawPlayerElement extends LitElement {
   private async _loadPeaks(): Promise<void> {
     this._waveformData = null;
     this._readyDispatched = false; // re-arm ready for the new source
+    this._peaksSettled = false; // new load in progress; wait for outcome before firing daw-ready
     if (!this.peaksSrc) {
+      // No peaks-src — peaks are settled immediately (scrubber-only is a valid ready state).
+      this._peaksSettled = true;
       this._renderWaveform();
+      this._maybeDispatchReady();
       return;
     }
     const requested = this.peaksSrc;
     try {
       const wd = await loadWaveformDataFromUrl(requested);
-      if (this.peaksSrc !== requested) return; // stale — a newer peaks-src won
+      if (this.peaksSrc !== requested) return; // stale — a newer peaks-src won (don't settle)
       this._waveformData = wd;
       this._sampleRate = wd.sample_rate;
+      this._peaksSettled = true;
       this._renderWaveform();
       this._maybeDispatchReady();
     } catch (err) {
       console.warn('[dawcore] <daw-player> failed to load peaks-src: ' + String(err));
-      this._renderWaveform(); // scrubber-only
+      // A failed waveform must not permanently block daw-ready — the player IS ready to play.
+      this._peaksSettled = true;
+      this._renderWaveform(); // scrubber-only fallback
+      this._maybeDispatchReady();
     }
   }
 
@@ -168,7 +178,12 @@ export class DawPlayerElement extends LitElement {
     this._channelPeaks = peakData.data;
   }
 
-  /** samples-per-pixel used by the ruler so its time labels span the full width. */
+  /**
+   * Samples-per-pixel used by the ruler so its time labels span the full width.
+   * This is intentionally a separate time-based SPP (duration × sampleRate / width)
+   * for the ruler labels — equivalent to the waveform SPP when the WaveformData spans
+   * the full audio duration; may differ for pre-trimmed peaks.
+   */
   private _channelSpp(width: number): number {
     const d = this._engine.duration;
     if (d <= 0 || width <= 0) return 1;
@@ -281,7 +296,7 @@ export class DawPlayerElement extends LitElement {
 
   private _maybeDispatchReady(): void {
     if (this._readyDispatched) return;
-    if (this._metadataLoaded && (!this.peaksSrc || this._waveformData !== null)) {
+    if (this._metadataLoaded && this._peaksSettled) {
       this._readyDispatched = true;
       this._dispatch('daw-ready');
     }

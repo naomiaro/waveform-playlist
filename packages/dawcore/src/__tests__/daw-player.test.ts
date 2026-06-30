@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import type { DawPlayerElement } from '../elements/daw-player';
 import * as peaksLoader from '../interactions/peaks-loader';
 
@@ -228,14 +228,27 @@ describe('DawPlayerElement — waveform', () => {
         return 500;
       },
     });
+  });
 
-    // happy-dom canvas has no 2D context; stub it so child <daw-waveform> draws are no-ops
+  // Fix 2: re-establish the spy before every test — the outer afterEach calls
+  // vi.restoreAllMocks(), which tears it down after the first test if set in beforeAll.
+  beforeEach(() => {
+    // happy-dom canvas has no 2D context; stub it so child <daw-waveform> and
+    // <daw-ruler> draws are no-ops (ruler uses beginPath/moveTo/lineTo/stroke/fillText).
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
       clearRect: vi.fn(),
       resetTransform: vi.fn(),
       scale: vi.fn(),
       fillRect: vi.fn(),
       fillStyle: '',
+      strokeStyle: '',
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      fillText: vi.fn(),
+      measureText: vi.fn().mockReturnValue({ width: 0 }),
+      setTransform: vi.fn(),
     } as unknown as CanvasRenderingContext2D);
   });
 
@@ -317,5 +330,53 @@ describe('DawPlayerElement — waveform', () => {
     el.timescale = true;
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector('daw-ruler')).toBeTruthy();
+  });
+
+  // Fix 1 regression tests: daw-ready must fire even when peaks-src fails or is absent
+  describe('daw-ready readiness (peaks-settled gate)', () => {
+    let OriginalAudio: typeof Audio;
+    beforeAll(() => {
+      OriginalAudio = globalThis.Audio;
+      // @ts-expect-error test double
+      globalThis.Audio = MockAudio;
+    });
+    afterAll(() => {
+      globalThis.Audio = OriginalAudio;
+    });
+
+    it('fires daw-ready once when peaks-src fails to load (scrubber fallback)', async () => {
+      vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockRejectedValue(new Error('404'));
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const el = makePlayer();
+      el.src = 'episode.mp3';
+      el.peaksSrc = 'missing.dat';
+      await el.updateComplete;
+      const ready = vi.fn();
+      el.addEventListener('daw-ready', ready);
+      // Wait for the async load to reject, then dispatch metadata
+      await vi.waitFor(() => expect(console.warn).toHaveBeenCalled());
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      await vi.waitFor(() => expect(ready).toHaveBeenCalledTimes(1));
+      // Scrubber-only — no waveform channel elements
+      expect(el.shadowRoot!.querySelectorAll('daw-waveform').length).toBe(0);
+    });
+
+    it('fires daw-ready exactly once when peaks-src succeeds (no double-fire)', async () => {
+      vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockResolvedValue(
+        fakeWaveformData(2) as never
+      );
+      const el = makePlayer();
+      el.src = 'episode.mp3';
+      el.peaksSrc = 'episode.dat';
+      await el.updateComplete;
+      const ready = vi.fn();
+      el.addEventListener('daw-ready', ready);
+      // Wait for peaks to settle (waveforms rendered), then fire metadata
+      await vi.waitFor(() =>
+        expect(el.shadowRoot!.querySelectorAll('daw-waveform').length).toBe(2)
+      );
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      expect(ready).toHaveBeenCalledTimes(1);
+    });
   });
 });
