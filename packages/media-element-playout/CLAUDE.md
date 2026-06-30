@@ -15,11 +15,14 @@ Second-persona affordances for single-track *players* (podcast/audiobook, `<daw-
 ## Gotchas
 
 - **`.load()` / assigning `.src` resets `playbackRate` to 1.0** (HTML load algorithm → `defaultPlaybackRate`). `load()` must re-apply `this._playbackRate` after the swap, or a 1.5× player silently drops to 1.0× on the next source while the `playbackRate` getter still reports 1.5. `volume`/`muted`/`preservesPitch` are **not** reset — only `playbackRate`. In tests, a no-op `load = vi.fn()` mock hides this — model the reset (`load = vi.fn(() => { this.playbackRate = 1; })`) or the regression test has no teeth.
+- **`seekTo()` clamps to `duration`, which is `0` until `loadedmetadata` fires** (the `duration` getter is `audioElement.duration || peaks.duration || 0`). Seeking right after `addTrack()` in a real browser silently lands at 0 — await `loadedmetadata` (or supply `peaks` with a duration) before seeking. Unit tests sidestep this by setting the mock's `currentTime` directly.
 - **`createMediaElementSource()` is once-per-element** — in-place `load()` reuses the element precisely to keep that source node (and its effects routing) alive. Recreating the track builds a new element + node.
 - **Event-listener `Set` type** — `Set<Function>` is a `@typescript-eslint/no-unsafe-function-type` ESLint *error* (see root CLAUDE.md "ESLint Baseline"). This package uses the typed-union `Set<MediaElementTrackEvents[keyof MediaElementTrackEvents]>` with one localized cast at the `_emit`/attach call site.
 
 ## Testing
 
 Run `pnpm --filter @waveform-playlist/media-element-playout test` (or `npx vitest run` from the package dir). Tests inject a `MockAudioElement extends EventTarget` (real `dispatchEvent` for `play`/`pause`/`loadedmetadata`/`error`/`ended`/`timeupdate`, no DOM env) — register it as `globalThis.Audio` to exercise the owns-element string-source path. `__tests__/` is **outside** `typecheck` (`tsconfig` `include: ["src/**/*"]`) and lint (`packages/**/src/**`) scope, so only vitest checks it — type/lint errors in tests won't surface there; verify the **source** via `pnpm --filter @waveform-playlist/media-element-playout typecheck` + full `pnpm -w lint`.
+
+**Manual browser smoke:** reuse `examples/media-element-player/`'s Vite (it source-aliases this package + `core` and serves `website/static`) with a temp `smoke.html` that imports `MediaElementPlayout` directly (pure TS, no React) and is driven via Playwright MCP `browser_evaluate`. Use an **in-page WAV blob** as the source — headless Chromium won't reliably load a network `.mp3`, while PCM WAV fires `loadedmetadata` deterministically — await `loadedmetadata` before `seekTo`, and assert on synchronous state + real events rather than playback progress (autoplay is gesture-gated; MCP tabs throttle rAF/timers).
 
 **Build:** tsup → ESM + CJS + DTS into `dist/` (gitignored; built at publish time, not committed).
