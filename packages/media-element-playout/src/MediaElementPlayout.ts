@@ -105,6 +105,8 @@ export class MediaElementPlayout {
    * the track. Returns the active track.
    */
   setSource(options: MediaElementTrackOptions): MediaElementTrack {
+    // A source swap stops current playback (in-place load() pauses; recreate disposes).
+    this._isPlaying = false;
     if (this.track && typeof options.source === 'string') {
       this.track.load(options.source, { peaks: options.peaks, name: options.name });
       return this.track;

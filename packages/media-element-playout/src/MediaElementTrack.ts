@@ -353,6 +353,9 @@ export class MediaElementTrack {
     if (opts.name !== undefined) {
       this._name = opts.name;
     }
+    // The HTML load algorithm resets playbackRate to defaultPlaybackRate (1.0);
+    // re-apply the configured rate so it survives the source swap.
+    this.audioElement.playbackRate = this._playbackRate;
   }
 
   /**

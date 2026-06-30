@@ -33,7 +33,10 @@ class MockAudioElement extends EventTarget {
   pause = vi.fn(() => {
     this.paused = true;
   });
-  load = vi.fn();
+  load = vi.fn(() => {
+    // Model the HTML load algorithm resetting playbackRate to defaultPlaybackRate (1.0).
+    this.playbackRate = 1;
+  });
 
   constructor(src = '') {
     super();
@@ -288,5 +291,26 @@ describe('setSource() / in-place source swap', () => {
     expect(borrowed.src).toBe('borrowed.mp3'); // unchanged
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('own their audio element'));
     warnSpy.mockRestore();
+  });
+
+  it('preserves the configured playback rate across an in-place source swap', () => {
+    const playout = new MediaElementPlayout({ playbackRate: 1.5 });
+    playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+    expect(el.playbackRate).toBe(1.5); // set on construction
+
+    playout.setSource({ source: 'b.mp3' }); // in-place: browser resets rate, load() must re-apply
+    expect(el.playbackRate).toBe(1.5);
+    expect(playout.playbackRate).toBe(1.5);
+  });
+
+  it('setSource() clears isPlaying (a swap stops current playback)', () => {
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    playout.play(undefined, 0);
+    expect(playout.isPlaying).toBe(true);
+
+    playout.setSource({ source: 'b.mp3' });
+    expect(playout.isPlaying).toBe(false);
   });
 });
