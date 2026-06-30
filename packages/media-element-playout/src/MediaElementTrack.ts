@@ -16,8 +16,9 @@ interface VendorPrefixedPitch {
 export interface MediaElementTrackOptions {
   /** The audio source - can be a URL, Blob URL, or HTMLAudioElement */
   source: string | HTMLAudioElement;
-  /** Pre-computed waveform data for visualization (required - no AudioBuffer decoding) */
-  peaks: WaveformDataObject;
+  /** Pre-computed waveform data for visualization. Optional — omit for
+   *  scrubber-only / headless players that don't render a waveform. */
+  peaks?: WaveformDataObject;
   /** Track ID */
   id?: string;
   /** Track name for display */
@@ -62,7 +63,7 @@ export interface MediaElementTrackOptions {
 export class MediaElementTrack {
   private audioElement: HTMLAudioElement;
   private ownsElement: boolean; // Whether we created the element (need to clean up)
-  private _peaks: WaveformDataObject;
+  private _peaks: WaveformDataObject | null;
   private _id: string;
   private _name: string;
   private _playbackRate: number = 1;
@@ -79,7 +80,7 @@ export class MediaElementTrack {
   private _fadeOut: FadeConfig | undefined;
 
   constructor(options: MediaElementTrackOptions) {
-    this._peaks = options.peaks;
+    this._peaks = options.peaks ?? null;
     this._id = options.id ?? `track-${Date.now()}`;
     this._name = options.name ?? 'Track';
     this._playbackRate = options.playbackRate ?? 1;
@@ -441,7 +442,7 @@ export class MediaElementTrack {
     return this._name;
   }
 
-  get peaks(): WaveformDataObject {
+  get peaks(): WaveformDataObject | null {
     return this._peaks;
   }
 
@@ -450,7 +451,7 @@ export class MediaElementTrack {
   }
 
   get duration(): number {
-    return this.audioElement.duration || this._peaks.duration;
+    return this.audioElement.duration || this._peaks?.duration || 0;
   }
 
   get isPlaying(): boolean {

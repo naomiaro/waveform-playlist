@@ -105,7 +105,7 @@ class MediaElementPlayout {
 ```typescript
 interface MediaElementTrackOptions {
   source: string | HTMLAudioElement;  // URL or audio element
-  peaks: WaveformDataObject;          // Pre-computed peaks
+  peaks?: WaveformDataObject;         // Pre-computed peaks (optional — omit for scrubber-only / headless players)
   id?: string;
   name?: string;
   volume?: number;

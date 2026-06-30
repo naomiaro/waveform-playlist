@@ -248,7 +248,7 @@ export class MediaElementPlayout {
   get sampleRate(): number {
     // HTMLAudioElement doesn't expose sample rate directly
     // Return a common default - peaks will have the actual sample rate
-    return this.track?.peaks.sample_rate ?? 44100;
+    return this.track?.peaks?.sample_rate ?? 44100;
   }
 
   /**
