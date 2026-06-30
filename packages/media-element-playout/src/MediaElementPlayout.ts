@@ -7,7 +7,7 @@ import {
 export interface MediaElementPlayoutOptions {
   /** Initial master volume (0.0 to 1.0) */
   masterVolume?: number;
-  /** Initial playback rate (0.5 to 2.0) */
+  /** Initial playback rate (0.25 to 4.0) */
   playbackRate?: number;
   /** Whether to preserve pitch when changing playback rate (default: true).
    *  Set to false when using an external pitch processor like SoundTouch. */
@@ -21,7 +21,7 @@ export interface MediaElementPlayoutOptions {
  * that need pitch-preserving playback rate control.
  *
  * Key features:
- * - Pitch-preserving playback rate (0.5x - 2.0x)
+ * - Pitch-preserving playback rate (0.25x - 4.0x)
  * - Uses pre-computed peaks (no AudioBuffer required)
  * - Simpler API for single-track playback
  *
@@ -232,10 +232,10 @@ export class MediaElementPlayout {
   }
 
   /**
-   * Set playback rate (0.5 to 2.0, pitch preserved).
+   * Set playback rate (0.25 to 4.0, pitch preserved).
    */
   setPlaybackRate(rate: number): void {
-    this._playbackRate = Math.max(0.5, Math.min(2.0, rate));
+    this._playbackRate = Math.max(0.25, Math.min(4.0, rate));
     if (this.track) {
       this.track.setPlaybackRate(this._playbackRate);
     }

@@ -25,7 +25,7 @@ export interface MediaElementTrackOptions {
   name?: string;
   /** Initial volume (0.0 to 1.0) */
   volume?: number;
-  /** Initial playback rate (0.5 to 2.0) */
+  /** Initial playback rate (0.25 to 4.0) */
   playbackRate?: number;
   /** Whether to preserve pitch when changing playback rate (default: true) */
   preservesPitch?: boolean;
@@ -71,7 +71,7 @@ export interface MediaElementTrackEvents {
  * Single-track playback using HTMLAudioElement.
  *
  * Benefits over AudioBuffer/Tone.js:
- * - Pitch-preserving playback rate (0.5x - 2.0x) via browser's built-in algorithm
+ * - Pitch-preserving playback rate (0.25x - 4.0x) via browser's built-in algorithm
  * - No AudioBuffer decoding required (uses pre-computed peaks for visualization)
  * - Simpler, lighter-weight for single-track use cases
  *
@@ -395,10 +395,10 @@ export class MediaElementTrack {
   }
 
   /**
-   * Set playback rate (0.5 to 2.0, pitch preserved)
+   * Set playback rate (0.25 to 4.0, pitch preserved)
    */
   setPlaybackRate(rate: number): void {
-    const clampedRate = Math.max(0.5, Math.min(2.0, rate));
+    const clampedRate = Math.max(0.25, Math.min(4.0, rate));
     this._playbackRate = clampedRate;
     this.audioElement.playbackRate = clampedRate;
   }
