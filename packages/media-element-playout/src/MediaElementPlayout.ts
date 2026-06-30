@@ -39,7 +39,10 @@ export class MediaElementPlayout {
   private _isPlaying: boolean = false;
   private onPlaybackCompleteCallback?: () => void;
   /** Consumer event listeners, retained so they re-attach across track swaps. */
-  private _eventListeners: Map<string, Set<Function>> = new Map();
+  private _eventListeners: Map<
+    string,
+    Set<MediaElementTrackEvents[keyof MediaElementTrackEvents]>
+  > = new Map();
 
   constructor(options: MediaElementPlayoutOptions = {}) {
     this._masterVolume = options.masterVolume ?? 1;
@@ -267,7 +270,10 @@ export class MediaElementPlayout {
    * ended / timeupdate) without reaching into track.element. Listeners are
    * retained and re-attached automatically when the source is swapped.
    */
-  on<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void {
+  on<K extends keyof MediaElementTrackEvents>(
+    event: K,
+    listener: MediaElementTrackEvents[K]
+  ): void {
     if (!this._eventListeners.has(event)) {
       this._eventListeners.set(event, new Set());
     }
@@ -278,7 +284,10 @@ export class MediaElementPlayout {
   /**
    * Unsubscribe a previously registered lifecycle listener.
    */
-  off<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void {
+  off<K extends keyof MediaElementTrackEvents>(
+    event: K,
+    listener: MediaElementTrackEvents[K]
+  ): void {
     this._eventListeners.get(event)?.delete(listener);
     this.track?.off(event, listener);
   }

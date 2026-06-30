@@ -90,7 +90,8 @@ export class MediaElementTrack {
   private _volume: number;
   private onStopCallback?: () => void;
   private onTimeUpdateCallback?: (time: number) => void;
-  private _listeners: Map<string, Set<Function>> = new Map();
+  private _listeners: Map<string, Set<MediaElementTrackEvents[keyof MediaElementTrackEvents]>> =
+    new Map();
 
   // Web Audio nodes (only when audioContext is provided)
   private _audioContext: AudioContext | null = null;
@@ -479,7 +480,10 @@ export class MediaElementTrack {
    * Subscribe to a track lifecycle event. Multiple listeners per event are
    * supported. Mirrors PlaylistEngine's on()/off() emitter.
    */
-  on<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void {
+  on<K extends keyof MediaElementTrackEvents>(
+    event: K,
+    listener: MediaElementTrackEvents[K]
+  ): void {
     if (!this._listeners.has(event)) {
       this._listeners.set(event, new Set());
     }
@@ -489,7 +493,10 @@ export class MediaElementTrack {
   /**
    * Unsubscribe a previously registered listener.
    */
-  off<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void {
+  off<K extends keyof MediaElementTrackEvents>(
+    event: K,
+    listener: MediaElementTrackEvents[K]
+  ): void {
     this._listeners.get(event)?.delete(listener);
   }
 
@@ -498,7 +505,7 @@ export class MediaElementTrack {
     if (listeners) {
       for (const listener of listeners) {
         try {
-          listener(...args);
+          (listener as (...a: unknown[]) => void)(...args);
         } catch (error) {
           console.warn(
             '[waveform-playlist] MediaElementTrack: error in event listener: ' + String(error)

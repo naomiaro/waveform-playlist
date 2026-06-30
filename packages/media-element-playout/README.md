@@ -56,7 +56,7 @@ playout.play(0);           // Play from beginning
 playout.setPlaybackRate(0.75);  // Slow down to 75% speed (pitch preserved)
 playout.pause();
 playout.seekTo(30);        // Seek to 30 seconds
-playout.play();            // Resume
+playout.resume();          // Resume from the current position (does NOT reset to 0)
 
 // Clean up
 playout.dispose();
@@ -79,15 +79,21 @@ class MediaElementPlayout {
 
   // Track management
   addTrack(options: MediaElementTrackOptions): MediaElementTrack;
+  setSource(options: MediaElementTrackOptions): MediaElementTrack;  // silent in-place replace
   removeTrack(trackId: string): void;
   getTrack(trackId: string): MediaElementTrack | undefined;
 
   // Playback
   play(when?: number, offset?: number, duration?: number): void;
+  resume(): void;            // resume from current position (no reset to 0)
   pause(): void;
   stop(): void;
   seekTo(time: number): void;
   getCurrentTime(): number;
+
+  // Lifecycle events (typed via MediaElementTrackEvents)
+  on<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void;
+  off<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void;
 
   // Volume & Rate
   setMasterVolume(volume: number): void;
@@ -112,6 +118,31 @@ interface MediaElementTrackOptions {
   playbackRate?: number;
 }
 ```
+
+## Player Mode
+
+Beyond the timeline/editor API, three affordances make this engine pleasant to
+reuse as a single-track **player** (podcast/audiobook players, `<daw-player>`):
+
+```typescript
+// Resume from the current position (play() with no offset resets to 0)
+playout.resume();
+
+// Swap to the next source in place — no "Only one track is supported" warning,
+// and any Web Audio routing/effects are preserved across the swap
+playout.setSource({ source: '/audio/episode-2.mp3', name: 'Episode 2' });
+
+// Observe media lifecycle without reaching into the audio element
+playout.on('loadedmetadata', () => console.log('duration:', playout.duration));
+playout.on('play', () => updateTransportUI('playing'));
+playout.on('pause', () => updateTransportUI('paused'));
+playout.on('error', (err) => surfaceError(err));
+playout.off('play', handler); // unsubscribe
+```
+
+`on()` listeners are retained across `setSource()` swaps — register them once.
+The same `on()/off()` and `resume()`/`load()` methods exist on `MediaElementTrack`
+for power users. Event names and payloads are typed via `MediaElementTrackEvents`.
 
 ## Generating Peaks
 
