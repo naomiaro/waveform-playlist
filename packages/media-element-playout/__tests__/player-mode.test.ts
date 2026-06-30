@@ -75,3 +75,95 @@ describe('resume()', () => {
     expect(el.currentTime).toBe(0);
   });
 });
+
+describe('MediaElementTrack lifecycle event emitter', () => {
+  it('emits loadedmetadata / play / pause on dispatched native events', () => {
+    const playout = new MediaElementPlayout();
+    const track = playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+
+    const onLoaded = vi.fn();
+    const onPlay = vi.fn();
+    const onPause = vi.fn();
+    track.on('loadedmetadata', onLoaded);
+    track.on('play', onPlay);
+    track.on('pause', onPause);
+
+    el.dispatchEvent(new Event('loadedmetadata'));
+    el.dispatchEvent(new Event('play'));
+    el.dispatchEvent(new Event('pause'));
+
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+    expect(onPlay).toHaveBeenCalledTimes(1);
+    expect(onPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits error with the element MediaError', () => {
+    const playout = new MediaElementPlayout();
+    const track = playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+    const mediaError = { code: 4, message: 'unsupported' } as unknown as MediaError;
+    el.error = mediaError;
+
+    const onError = vi.fn();
+    track.on('error', onError);
+    el.dispatchEvent(new Event('error'));
+
+    expect(onError).toHaveBeenCalledWith(mediaError);
+  });
+
+  it('off() removes a listener', () => {
+    const playout = new MediaElementPlayout();
+    const track = playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+
+    const onPlay = vi.fn();
+    track.on('play', onPlay);
+    track.off('play', onPlay);
+    el.dispatchEvent(new Event('play'));
+
+    expect(onPlay).not.toHaveBeenCalled();
+  });
+
+  it('a throwing listener does not break sibling listeners', () => {
+    const playout = new MediaElementPlayout();
+    const track = playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const thrower = vi.fn(() => {
+      throw new Error('boom');
+    });
+    const good = vi.fn();
+    track.on('play', thrower);
+    track.on('play', good);
+    el.dispatchEvent(new Event('play'));
+
+    expect(good).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  it('emits ended and timeupdate alongside the legacy callbacks', () => {
+    const playout = new MediaElementPlayout();
+    const track = playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+
+    const onEnded = vi.fn();
+    const onTime = vi.fn();
+    const legacyStop = vi.fn();
+    const legacyTime = vi.fn();
+    track.on('ended', onEnded);
+    track.on('timeupdate', onTime);
+    track.setOnStopCallback(legacyStop);
+    track.setOnTimeUpdateCallback(legacyTime);
+
+    el.currentTime = 5;
+    el.dispatchEvent(new Event('timeupdate'));
+    el.dispatchEvent(new Event('ended'));
+
+    expect(onTime).toHaveBeenCalledWith(5);
+    expect(legacyTime).toHaveBeenCalledWith(5);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(legacyStop).toHaveBeenCalledTimes(1);
+  });
+});
