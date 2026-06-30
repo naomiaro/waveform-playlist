@@ -270,6 +270,16 @@ export class MediaElementTrack {
   }
 
   /**
+   * Resume playback from the current position without resetting currentTime.
+   * Reuses play()'s fade re-scheduling and AudioContext-resume machinery —
+   * passing the current position as the offset is a no-op seek that leaves
+   * playback where it was.
+   */
+  resume(): void {
+    this.play(this.currentTime);
+  }
+
+  /**
    * Pause playback
    */
   pause(): void {

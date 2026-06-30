@@ -134,6 +134,16 @@ export class MediaElementPlayout {
   }
 
   /**
+   * Resume playback from the current position (player-mode affordance).
+   * Unlike play() with no offset (which resets to 0), this keeps currentTime.
+   * Delegates to play() with the current position as the offset, so all of
+   * play()'s machinery (AudioContext resume, fades, _isPlaying) is reused.
+   */
+  resume(): void {
+    this.play(undefined, this.getCurrentTime());
+  }
+
+  /**
    * Pause playback.
    */
   pause(): void {
