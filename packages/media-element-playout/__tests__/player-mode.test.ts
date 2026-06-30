@@ -204,4 +204,17 @@ describe('MediaElementPlayout event forwarding', () => {
 
     expect(onPause).not.toHaveBeenCalled();
   });
+
+  it('listeners survive track replacement (addTrack called twice)', () => {
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    const onPlay = vi.fn();
+    playout.on('play', onPlay);
+
+    playout.addTrack({ source: 'b.mp3' }); // replace: old track disposed, new created
+    const newEl = created[1];
+    newEl.dispatchEvent(new Event('play'));
+
+    expect(onPlay).toHaveBeenCalledTimes(1);
+  });
 });
