@@ -74,8 +74,14 @@ it is the least net-new code and leaves a clean seam for #475.
 
 `MediaElementTrack` already exposes the getters the player needs — `element`,
 `currentTime`, `duration`, `isPlaying`, `volume`, `playbackRate`, `peaks`, `outputNode`
-— so **no change to the `media-element-playout` package is required**. `player.audioElement`
-is simply `engine.getTrack(id)?.element`.
+— so `player.audioElement` is simply `engine.getTrack(id)?.element`.
+
+**One small `media-element-playout` change is required:** `setPlaybackRate` hard-clamps
+to `0.5–2.0` in both `MediaElementTrack` and `MediaElementPlayout`, but this element's
+`playback-rate` range is `0.25–4.0` (which `HTMLMediaElement` supports). Widen both
+clamps (and their doc comments) to `0.25–4.0` and ship a minor `media-element-playout`
+version bump. The change is additive — existing `0.5–2.0` callers are unaffected;
+previously-rejected wider values now pass through.
 
 ### New vs. reused files
 
