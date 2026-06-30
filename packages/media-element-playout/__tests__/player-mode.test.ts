@@ -167,3 +167,41 @@ describe('MediaElementTrack lifecycle event emitter', () => {
     expect(legacyStop).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('MediaElementPlayout event forwarding', () => {
+  it('forwards play events from the current track', () => {
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+
+    const onPlay = vi.fn();
+    playout.on('play', onPlay);
+    el.dispatchEvent(new Event('play'));
+
+    expect(onPlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('listeners registered before any track re-attach to the first track', () => {
+    const playout = new MediaElementPlayout();
+    const onLoaded = vi.fn();
+    playout.on('loadedmetadata', onLoaded); // no track yet
+
+    playout.addTrack({ source: 'a.mp3' });
+    created[0].dispatchEvent(new Event('loadedmetadata'));
+
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+  });
+
+  it('off() stops forwarding', () => {
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    const el = created[0];
+
+    const onPause = vi.fn();
+    playout.on('pause', onPause);
+    playout.off('pause', onPause);
+    el.dispatchEvent(new Event('pause'));
+
+    expect(onPause).not.toHaveBeenCalled();
+  });
+});

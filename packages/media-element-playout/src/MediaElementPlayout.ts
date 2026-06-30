@@ -1,4 +1,8 @@
-import { MediaElementTrack, type MediaElementTrackOptions } from './MediaElementTrack';
+import {
+  MediaElementTrack,
+  type MediaElementTrackOptions,
+  type MediaElementTrackEvents,
+} from './MediaElementTrack';
 
 export interface MediaElementPlayoutOptions {
   /** Initial master volume (0.0 to 1.0) */
@@ -34,6 +38,8 @@ export class MediaElementPlayout {
   private _preservesPitch: boolean;
   private _isPlaying: boolean = false;
   private onPlaybackCompleteCallback?: () => void;
+  /** Consumer event listeners, retained so they re-attach across track swaps. */
+  private _eventListeners: Map<string, Set<Function>> = new Map();
 
   constructor(options: MediaElementPlayoutOptions = {}) {
     this._masterVolume = options.masterVolume ?? 1;
@@ -78,6 +84,10 @@ export class MediaElementPlayout {
         this.onPlaybackCompleteCallback();
       }
     });
+
+    // Re-attach any consumer listeners to the newly created track (covers the
+    // first track and the addTrack-replace path).
+    this._attachListenersToTrack();
 
     return this.track;
   }
@@ -229,6 +239,46 @@ export class MediaElementPlayout {
   }
 
   /**
+   * Subscribe to a lifecycle event (loadedmetadata / play / pause / error /
+   * ended / timeupdate) without reaching into track.element. Listeners are
+   * retained and re-attached automatically when the source is swapped.
+   */
+  on<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void {
+    if (!this._eventListeners.has(event)) {
+      this._eventListeners.set(event, new Set());
+    }
+    this._eventListeners.get(event)!.add(listener);
+    this.track?.on(event, listener);
+  }
+
+  /**
+   * Unsubscribe a previously registered lifecycle listener.
+   */
+  off<K extends keyof MediaElementTrackEvents>(event: K, listener: MediaElementTrackEvents[K]): void {
+    this._eventListeners.get(event)?.delete(listener);
+    this.track?.off(event, listener);
+  }
+
+  /**
+   * Attach every registered listener to the current track. Called after a new
+   * track is created so subscriptions survive source swaps. The cast is safe:
+   * the event→listener correlation was enforced by the typed on() that filled
+   * the registry; TS cannot track it through this loop.
+   */
+  private _attachListenersToTrack(): void {
+    const track = this.track;
+    if (!track) return;
+    for (const [event, listeners] of this._eventListeners) {
+      for (const listener of listeners) {
+        track.on(
+          event as keyof MediaElementTrackEvents,
+          listener as MediaElementTrackEvents[keyof MediaElementTrackEvents]
+        );
+      }
+    }
+  }
+
+  /**
    * Clean up resources.
    */
   dispose(): void {
@@ -236,6 +286,7 @@ export class MediaElementPlayout {
       this.track.dispose();
       this.track = null;
     }
+    this._eventListeners.clear();
   }
 
   // Getters
