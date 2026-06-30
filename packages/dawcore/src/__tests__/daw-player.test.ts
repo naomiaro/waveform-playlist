@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import type { DawPlayerElement } from '../elements/daw-player';
+import * as peaksLoader from '../interactions/peaks-loader';
 
 beforeAll(async () => {
   await import('../elements/daw-player');
@@ -209,5 +210,112 @@ describe('DawPlayerElement — playback wiring', () => {
       el.stop();
       expect(stop).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('DawPlayerElement — waveform', () => {
+  let origClientWidthDescriptor: PropertyDescriptor | undefined;
+
+  beforeAll(() => {
+    // happy-dom has no layout engine; stub clientWidth so _timelineWidth > 0
+    origClientWidthDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'clientWidth'
+    );
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return 500;
+      },
+    });
+
+    // happy-dom canvas has no 2D context; stub it so child <daw-waveform> draws are no-ops
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect: vi.fn(),
+      resetTransform: vi.fn(),
+      scale: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: '',
+    } as unknown as CanvasRenderingContext2D);
+  });
+
+  afterAll(() => {
+    if (origClientWidthDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', origClientWidthDescriptor);
+    } else {
+      // Remove the override if original didn't exist
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>)['clientWidth'];
+    }
+  });
+
+  function fakeWaveformData(channels: number) {
+    // Minimal WaveformData-like stub matching what extractPeaks reads.
+    return {
+      bits: 16,
+      channels,
+      length: 100,
+      scale: 256,
+      sample_rate: 48000,
+      duration: (100 * 256) / 48000,
+      resample: () => fakeWaveformData(channels),
+      channel: () => ({
+        min_array: () => new Int16Array(50).fill(-10),
+        max_array: () => new Int16Array(50).fill(10),
+      }),
+    };
+  }
+
+  it('renders one <daw-waveform> per channel when peaks-src loads', async () => {
+    vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockResolvedValue(
+      fakeWaveformData(2) as never
+    );
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    el.peaksSrc = 'episode.dat';
+    await el.updateComplete;
+    await vi.waitFor(() => {
+      const waves = el.shadowRoot!.querySelectorAll('daw-waveform');
+      expect(waves.length).toBe(2);
+    });
+  });
+
+  it('mono attribute collapses to a single waveform', async () => {
+    vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockResolvedValue(
+      fakeWaveformData(2) as never
+    );
+    const el = makePlayer();
+    el.mono = true;
+    el.src = 'episode.mp3';
+    el.peaksSrc = 'episode.dat';
+    await el.updateComplete;
+    await vi.waitFor(() => {
+      expect(el.shadowRoot!.querySelectorAll('daw-waveform').length).toBe(1);
+    });
+  });
+
+  it('renders no waveform (scrubber-only) when peaks-src is absent', async () => {
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelectorAll('daw-waveform').length).toBe(0);
+  });
+
+  it('falls back to scrubber-only when peaks-src fails to load', async () => {
+    vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockRejectedValue(new Error('404'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    el.peaksSrc = 'missing.dat';
+    await el.updateComplete;
+    await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(el.shadowRoot!.querySelectorAll('daw-waveform').length).toBe(0);
+  });
+
+  it('renders a <daw-ruler> when timescale is set', async () => {
+    const el = makePlayer();
+    el.timescale = true;
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('daw-ruler')).toBeTruthy();
   });
 });

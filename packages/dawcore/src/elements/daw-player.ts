@@ -1,8 +1,12 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import { AnimationController } from '../controllers/animation-controller';
 import type { DawPlayheadElement } from './daw-playhead';
+import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
+import { extractPeaks } from '../workers/waveformDataUtils';
+import type { Peaks } from '@waveform-playlist/core';
 
 // Side-effect imports register the child custom elements used in the template.
 import './daw-waveform';
@@ -58,6 +62,9 @@ export class DawPlayerElement extends LitElement {
   private _metadataLoaded = false;
   private _readyDispatched = false;
   private _waveformData: import('waveform-data').default | null = null;
+  @state() private _channelPeaks: Peaks[] = [];
+  private _sampleRate = 48000;
+  private _resizeObserver: ResizeObserver | null = null;
 
   static styles = css`
     :host {
@@ -79,12 +86,40 @@ export class DawPlayerElement extends LitElement {
     this._engine.on('pause', this._onPause);
     this._engine.on('ended', this._onEnded);
     this._engine.on('error', this._onError);
+    this._resizeObserver = new ResizeObserver(() => this._renderWaveform());
+    // Observe after first render so .waveform-area exists.
+    requestAnimationFrame(() => {
+      const area = this.shadowRoot?.querySelector('.waveform-area');
+      if (area) this._resizeObserver?.observe(area);
+    });
   }
 
   render() {
+    const width = this._timelineWidth;
+    const channels = this._channelPeaks.length;
+    const channelHeight = channels > 0 ? this.waveHeight / channels : this.waveHeight;
     return html`
-      ${this.timescale ? html`<daw-ruler></daw-ruler>` : null}
-      <div class="waveform-area">
+      ${this.timescale
+        ? html`<daw-ruler
+            .samplesPerPixel=${this._channelSpp(width)}
+            .sampleRate=${this._sampleRate}
+            .duration=${this._engine.duration}
+            .totalWidth=${width}
+          ></daw-ruler>`
+        : null}
+      <div class="waveform-area" style="height:${this.waveHeight}px">
+        ${repeat(
+          this._channelPeaks,
+          (_p, i) => i,
+          (peaks) =>
+            html`<daw-waveform
+              .peaks=${peaks}
+              .length=${width}
+              .waveHeight=${channelHeight}
+              .barWidth=${this.barWidth}
+              .barGap=${this.barGap}
+            ></daw-waveform>`
+        )}
         <daw-playhead></daw-playhead>
       </div>
     `;
@@ -93,6 +128,51 @@ export class DawPlayerElement extends LitElement {
   protected updated(changed: PropertyValues): void {
     if (changed.has('src')) this._loadSource();
     if (changed.has('playbackRate')) this._engine.setPlaybackRate(this._playbackRate);
+    if (changed.has('peaksSrc')) this._loadPeaks();
+    if (changed.has('mono') || changed.has('waveHeight')) this._renderWaveform();
+  }
+
+  private async _loadPeaks(): Promise<void> {
+    this._waveformData = null;
+    this._readyDispatched = false; // re-arm ready for the new source
+    if (!this.peaksSrc) {
+      this._renderWaveform();
+      return;
+    }
+    const requested = this.peaksSrc;
+    try {
+      const wd = await loadWaveformDataFromUrl(requested);
+      if (this.peaksSrc !== requested) return; // stale — a newer peaks-src won
+      this._waveformData = wd;
+      this._sampleRate = wd.sample_rate;
+      this._renderWaveform();
+      this._maybeDispatchReady();
+    } catch (err) {
+      console.warn('[dawcore] <daw-player> failed to load peaks-src: ' + String(err));
+      this._renderWaveform(); // scrubber-only
+    }
+  }
+
+  /** Recompute fit-to-width peaks from the loaded WaveformData. No-op without data. */
+  private _renderWaveform(): void {
+    const wd = this._waveformData;
+    const width = this._timelineWidth;
+    if (!wd || width <= 0) {
+      this._channelPeaks = [];
+      return;
+    }
+    // Resample so the peak count ≈ the host width (fit-to-width).
+    const totalSamples = wd.length * wd.scale;
+    const samplesPerPixel = Math.max(wd.scale, Math.ceil(totalSamples / width));
+    const peakData = extractPeaks(wd, samplesPerPixel, this.mono);
+    this._channelPeaks = peakData.data;
+  }
+
+  /** samples-per-pixel used by the ruler so its time labels span the full width. */
+  private _channelSpp(width: number): number {
+    const d = this._engine.duration;
+    if (d <= 0 || width <= 0) return 1;
+    return Math.max(1, Math.ceil((d * this._sampleRate) / width));
   }
 
   private _loadSource(): void {
@@ -151,6 +231,8 @@ export class DawPlayerElement extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._anim.stop();
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
     this._engine.off('loadedmetadata', this._onLoadedMetadata);
     this._engine.off('play', this._onPlay);
     this._engine.off('pause', this._onPause);
