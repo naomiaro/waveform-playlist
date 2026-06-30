@@ -19,6 +19,7 @@ Framework-agnostic types, pure functions, and utilities shared across all packag
 | `clipTimeHelpers.ts` | Sample→seconds converters: `clipStartTime`, `clipEndTime`, `clipOffsetTime`, `clipDurationTime`, `clipPixelWidth` |
 | `fades.ts` | Fade curve generators (linear, exponential, logarithmic, sCurve) — pure functions for Web Audio `AudioParam` |
 | `keyboard.ts` | `KeyboardShortcut` interface + `handleKeyboardEvent` — framework-agnostic shortcut handler |
+| `probeRangeSupport.ts` | `probeRangeSupport(url, fetchImpl?)` + `RangeSupport` type — detect HTTP range-request support (`GET` `Range: bytes=0-1`, `cache:'no-store'`, abort the body; `206`→supported / `200`→unsupported / throw→unknown). Positive-failure-only: CORS-opaque/network throw is `unknown`, not a failure. Injectable `fetch` for tests |
 | `constants.ts` | `MAX_CANVAS_WIDTH` (1000px virtual scroll chunk size) |
 | `utils/conversions.ts` | Unit converters: `samplesToSeconds`, `secondsToSamples`, `samplesToPixels`, `pixelsToSamples`, `pixelsToSeconds`, `secondsToPixels` |
 | `utils/dBUtils.ts` | Decibel utilities: `gainToDb`, `dBToNormalized`, `normalizedToDb`, `gainToNormalized` |
