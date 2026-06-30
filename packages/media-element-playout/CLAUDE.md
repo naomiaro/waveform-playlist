@@ -14,6 +14,7 @@ Second-persona affordances for single-track *players* (podcast/audiobook, `<daw-
 
 ## Gotchas
 
+- **`setPlaybackRate` clamps to 0.25–4.0** (widened from 0.5–2.0 in v12.3.0 for `<daw-player>`) on both `MediaElementTrack` and `MediaElementPlayout`. `HTMLMediaElement` supports the wider range. The constructor-time `playbackRate` option is applied WITHOUT clamping — only `setPlaybackRate()` clamps.
 - **`.load()` / assigning `.src` resets `playbackRate` to 1.0** (HTML load algorithm → `defaultPlaybackRate`). `load()` must re-apply `this._playbackRate` after the swap, or a 1.5× player silently drops to 1.0× on the next source while the `playbackRate` getter still reports 1.5. `volume`/`muted`/`preservesPitch` are **not** reset — only `playbackRate`. In tests, a no-op `load = vi.fn()` mock hides this — model the reset (`load = vi.fn(() => { this.playbackRate = 1; })`) or the regression test has no teeth.
 - **`seekTo()` clamps to `duration`, which is `0` until `loadedmetadata` fires** (the `duration` getter is `audioElement.duration || peaks.duration || 0`). Seeking right after `addTrack()` in a real browser silently lands at 0 — await `loadedmetadata` (or supply `peaks` with a duration) before seeking. Unit tests sidestep this by setting the mock's `currentTime` directly.
 - **`createMediaElementSource()` is once-per-element** — in-place `load()` reuses the element precisely to keep that source node (and its effects routing) alive. Recreating the track builds a new element + node.
