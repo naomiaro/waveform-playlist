@@ -218,3 +218,75 @@ describe('MediaElementPlayout event forwarding', () => {
     expect(onPlay).toHaveBeenCalledTimes(1);
   });
 });
+
+function makePeaks(overrides: Partial<WaveformDataObject> = {}): WaveformDataObject {
+  return { sample_rate: 44100, duration: 0, ...overrides } as WaveformDataObject;
+}
+
+describe('setSource() / in-place source swap', () => {
+  it('replaces the source in place without warning and reuses the same element', () => {
+    const playout = new MediaElementPlayout();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const first = playout.setSource({ source: 'a.mp3' });
+    expect(created).toHaveLength(1);
+    expect(created[0].src).toBe('a.mp3');
+
+    const second = playout.setSource({ source: 'b.mp3' });
+
+    expect(second).toBe(first); // same track instance — in-place reuse
+    expect(created).toHaveLength(1); // no new element created
+    expect(created[0].src).toBe('b.mp3'); // src swapped
+    expect(created[0].load).toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('updates peaks (replace) and name (when provided) on swap', () => {
+    const playout = new MediaElementPlayout();
+    const track = playout.setSource({ source: 'a.mp3', peaks: makePeaks({ duration: 10 }) });
+
+    playout.setSource({ source: 'b.mp3', name: 'Show 2' });
+    expect(track.peaks).toBeNull(); // peaks not provided for b.mp3 → cleared
+    expect(track.name).toBe('Show 2');
+  });
+
+  it('keeps consumer listeners working across an in-place swap', () => {
+    const playout = new MediaElementPlayout();
+    const onLoaded = vi.fn();
+    playout.on('loadedmetadata', onLoaded);
+
+    playout.setSource({ source: 'a.mp3' });
+    created[0].dispatchEvent(new Event('loadedmetadata'));
+    playout.setSource({ source: 'b.mp3' }); // in-place, same element
+    created[0].dispatchEvent(new Event('loadedmetadata'));
+
+    expect(onLoaded).toHaveBeenCalledTimes(2);
+  });
+
+  it('addTrack() still warns when replacing an existing track', () => {
+    const playout = new MediaElementPlayout();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    playout.addTrack({ source: 'a.mp3' });
+    playout.addTrack({ source: 'b.mp3' }); // replace via addTrack → warns
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Only one track is supported')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('track.load() warns and no-ops for a borrowed element', () => {
+    const borrowed = new MockAudioElement('borrowed.mp3');
+    const track = new MediaElementTrack({ source: borrowed as unknown as HTMLAudioElement });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    track.load('new.mp3');
+
+    expect(borrowed.src).toBe('borrowed.mp3'); // unchanged
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('own their audio element'));
+    warnSpy.mockRestore();
+  });
+});

@@ -323,6 +323,38 @@ export class MediaElementTrack {
   }
 
   /**
+   * Swap the audio source in place, reusing the existing <audio> element.
+   * Because the MediaElementAudioSourceNode is once-per-element, reusing the
+   * element preserves any Web Audio routing/effects across the swap.
+   *
+   * Only supported when this track owns its element (constructed from a URL
+   * string). A borrowed element (constructed from an HTMLAudioElement) warns
+   * and no-ops — swapping a consumer-owned element's src is out of contract.
+   *
+   * Peaks are coupled to the specific audio, so they are replaced (defaulting
+   * to null when omitted). Name is a label, so it updates only when provided.
+   */
+  load(source: string, opts: { peaks?: WaveformDataObject; name?: string } = {}): void {
+    if (!this.ownsElement) {
+      console.warn(
+        '[waveform-playlist] MediaElementTrack: load() is only supported for tracks that ' +
+          'own their audio element (constructed from a URL string). A track constructed from ' +
+          'an existing HTMLAudioElement cannot swap its source in place.'
+      );
+      return;
+    }
+    this._cancelFades();
+    this.audioElement.pause();
+    this.audioElement.src = source;
+    this.audioElement.load();
+    this.audioElement.currentTime = 0;
+    this._peaks = opts.peaks ?? null;
+    if (opts.name !== undefined) {
+      this._name = opts.name;
+    }
+  }
+
+  /**
    * Pause playback
    */
   pause(): void {

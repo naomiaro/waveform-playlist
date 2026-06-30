@@ -93,6 +93,30 @@ export class MediaElementPlayout {
   }
 
   /**
+   * Replace the playout's source (player-mode affordance). The documented
+   * single-track replace path — does NOT warn like addTrack().
+   *
+   * For URL (string) sources with an existing track, swaps in place via
+   * track.load(), reusing the element and preserving Web Audio routing. For a
+   * provided HTMLAudioElement source, or when there is no track yet, (re)creates
+   * the track. Returns the active track.
+   */
+  setSource(options: MediaElementTrackOptions): MediaElementTrack {
+    if (this.track && typeof options.source === 'string') {
+      this.track.load(options.source, { peaks: options.peaks, name: options.name });
+      return this.track;
+    }
+    // First source, or swapping to a provided element: (re)create the track.
+    // Dispose silently — this is the documented single-track replace path, not
+    // the multi-track misuse that addTrack() warns about.
+    if (this.track) {
+      this.track.dispose();
+      this.track = null;
+    }
+    return this.addTrack(options);
+  }
+
+  /**
    * Remove a track by ID.
    */
   removeTrack(trackId: string): void {
