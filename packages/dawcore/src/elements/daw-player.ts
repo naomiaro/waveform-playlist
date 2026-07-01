@@ -135,7 +135,10 @@ export class DawPlayerElement extends LitElement {
     if (changed.has('src')) this._loadSource();
     if (changed.has('playbackRate')) this._engine.setPlaybackRate(this._playbackRate);
     if (changed.has('peaksSrc')) this._loadPeaks();
-    if (changed.has('mono') || changed.has('waveHeight')) this._renderWaveform();
+    // Only `mono` changes the derived peaks; `wave-height` only affects display
+    // height, which render() reads directly (recomputing peaks for it is wasteful
+    // and, on first update, sets @state mid-cycle → a Lit change-in-update warning).
+    if (changed.has('mono')) this._renderWaveform();
   }
 
   private async _loadPeaks(): Promise<void> {
@@ -172,7 +175,9 @@ export class DawPlayerElement extends LitElement {
     const wd = this._waveformData;
     const width = this._timelineWidth;
     if (!wd || width <= 0) {
-      this._channelPeaks = [];
+      // Avoid churning @state with a fresh empty array when already empty —
+      // a redundant reassignment during updated() schedules a wasted re-render.
+      if (this._channelPeaks.length > 0) this._channelPeaks = [];
       return;
     }
     // Resample so the peak count ≈ the host width (fit-to-width).

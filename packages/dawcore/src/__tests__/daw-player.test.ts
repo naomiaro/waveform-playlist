@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import type { DawPlayerElement } from '../elements/daw-player';
 import * as peaksLoader from '../interactions/peaks-loader';
+import * as waveformDataUtils from '../workers/waveformDataUtils';
 
 beforeAll(async () => {
   await import('../elements/daw-player');
@@ -419,6 +420,35 @@ describe('DawPlayerElement — waveform', () => {
     el.timescale = true;
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector('daw-ruler')).toBeTruthy();
+  });
+
+  it('changing wave-height does not recompute peaks (only updates display height)', async () => {
+    vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockResolvedValue(
+      fakeWaveformData(1) as never
+    );
+    const extractSpy = vi.spyOn(waveformDataUtils, 'extractPeaks');
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    el.peaksSrc = 'episode.dat';
+    el.waveHeight = 100;
+    await el.updateComplete;
+    await vi.waitFor(() => {
+      expect(el.shadowRoot!.querySelectorAll('daw-waveform').length).toBe(1);
+    });
+    // Guard: confirm the spy actually intercepts the load-time extraction, else the
+    // "not called again" assertion below would pass trivially and mean nothing.
+    const callsAfterLoad = extractSpy.mock.calls.length;
+    expect(callsAfterLoad).toBeGreaterThan(0);
+
+    el.waveHeight = 64;
+    await el.updateComplete;
+
+    // wave-height only affects display height (render() reads it directly); it must
+    // NOT recompute the fit-to-width peaks (a recompute sets @state mid-updated() →
+    // a Lit change-in-update warning + wasted render).
+    expect(extractSpy.mock.calls.length).toBe(callsAfterLoad);
+    const wf = el.shadowRoot!.querySelector('daw-waveform') as HTMLElement & { waveHeight: number };
+    expect(wf.waveHeight).toBe(64);
   });
 
   // Fix 1 regression tests: daw-ready must fire even when peaks-src fails or is absent
