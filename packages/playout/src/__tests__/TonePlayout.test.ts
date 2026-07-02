@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Track } from '@waveform-playlist/core';
 
 // vi.hoisted runs before vi.mock hoisting, making these available in mock factories
-const { mockTransport, mockVolume, mockGain } = vi.hoisted(() => {
-  const mockGain = {
+const { mockTransport, mockVolume, mockMasterTap } = vi.hoisted(() => {
+  const mockMasterTap = {
     connect: vi.fn(),
+    disconnect: vi.fn(),
     dispose: vi.fn(),
     input: {},
   };
@@ -27,15 +29,16 @@ const { mockTransport, mockVolume, mockGain } = vi.hoisted(() => {
       connect: vi.fn(),
       chain: vi.fn(),
       dispose: vi.fn(),
-      input: {},
+      // nested `.input` stands in for the native GainNode behind Volume.input
+      input: { input: {} },
     },
-    mockGain,
+    mockMasterTap,
   };
 });
 
 vi.mock('tone', () => ({
   Volume: vi.fn().mockImplementation(() => mockVolume),
-  Gain: vi.fn().mockImplementation(() => mockGain),
+  Gain: vi.fn().mockImplementation(() => mockMasterTap),
   getTransport: vi.fn().mockReturnValue(mockTransport),
   getDestination: vi.fn(),
   getContext: vi.fn().mockReturnValue({ sampleRate: 44100 }),
@@ -44,18 +47,64 @@ vi.mock('tone', () => ({
   ToneAudioNode: vi.fn(),
 }));
 
-// Mock track classes — we only need PlayableTrack interface
-vi.mock('../ToneTrack', () => ({
-  ToneTrack: vi.fn(),
-}));
-vi.mock('../MidiToneTrack', () => ({
-  MidiToneTrack: vi.fn(),
-}));
+// Mock track classes. Instances are built by assigning onto `this` (never
+// returning an object literal) so `new ToneTrack(...)` keeps the mocked
+// constructor's prototype — required for `track instanceof ToneTrack` checks
+// in TonePlayout's effects-transport hooks to resolve correctly.
+vi.mock('../ToneTrack', () => {
+  const ToneTrack = vi.fn(function (
+    this: Record<string, unknown>,
+    options: { track: { id: string; muted?: boolean } }
+  ) {
+    this.id = options.track.id;
+    this.muted = options.track.muted ?? false;
+    this.connectEffects = vi.fn();
+    this.disconnectEffects = vi.fn();
+    this.stopAllSources = vi.fn();
+    this.cancelFades = vi.fn();
+    this.dispose = vi.fn();
+    this.setMute = vi.fn();
+    this.setSolo = vi.fn();
+    this.setVolume = vi.fn();
+    this.setPan = vi.fn();
+  });
+  return { ToneTrack };
+});
+vi.mock('../MidiToneTrack', () => {
+  const MidiToneTrack = vi.fn(function (
+    this: Record<string, unknown>,
+    options: { track: { id: string; muted?: boolean } }
+  ) {
+    this.id = options.track.id;
+    this.muted = options.track.muted ?? false;
+    this.stopAllSources = vi.fn();
+    this.cancelFades = vi.fn();
+    this.dispose = vi.fn();
+    this.setMute = vi.fn();
+    this.setSolo = vi.fn();
+    this.setVolume = vi.fn();
+    this.setPan = vi.fn();
+  });
+  return { MidiToneTrack };
+});
 vi.mock('../SoundFontToneTrack', () => ({
   SoundFontToneTrack: vi.fn(),
 }));
 
 import { TonePlayout } from '../TonePlayout';
+
+function makeTrack(id = 't1'): Track {
+  return {
+    id,
+    name: 'Test',
+    gain: 1,
+    muted: false,
+    soloed: false,
+    stereoPan: 0,
+    startTime: 0,
+    endTime: 1,
+  };
+}
 
 function createMockTrack(id: string) {
   return {
@@ -272,6 +321,61 @@ describe('TonePlayout', () => {
       playout.stop();
 
       expect(mockTransport.off).not.toHaveBeenCalledWith('loop', expect.anything());
+    });
+  });
+
+  describe('effects transport hooks', () => {
+    it('connectTrackOutput delegates to the ToneTrack', () => {
+      const playout = new TonePlayout();
+      const track = playout.addTrack({ clips: [], track: makeTrack('t1') });
+      const spy = vi.spyOn(track, 'connectEffects');
+      const node = {} as AudioNode;
+
+      playout.connectTrackOutput('t1', node);
+
+      expect(spy).toHaveBeenCalledWith(node);
+    });
+
+    it('connectTrackOutput throws for unknown track ids', () => {
+      const playout = new TonePlayout();
+
+      expect(() => playout.connectTrackOutput('nope', {} as AudioNode)).toThrow(/unknown track/);
+    });
+
+    it('connectTrackOutput throws for MIDI tracks', () => {
+      const playout = new TonePlayout();
+      playout.addMidiTrack({ clips: [], track: makeTrack('m1') });
+
+      expect(() => playout.connectTrackOutput('m1', {} as AudioNode)).toThrow(/MIDI/);
+    });
+
+    it('disconnectTrackOutput is a no-op for unknown ids', () => {
+      const playout = new TonePlayout();
+
+      expect(() => playout.disconnectTrackOutput('nope')).not.toThrow();
+    });
+
+    it('connectMasterOutput reroutes the master tap; disconnectMasterOutput restores it', () => {
+      const playout = new TonePlayout();
+      const node = { name: 'chain-in' } as unknown as AudioNode;
+
+      playout.connectMasterOutput(node);
+
+      expect(mockMasterTap.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockMasterTap.connect).toHaveBeenCalledWith(node);
+
+      mockMasterTap.connect.mockClear();
+      playout.disconnectMasterOutput();
+
+      expect(mockMasterTap.disconnect).toHaveBeenCalledWith(node);
+      expect(mockMasterTap.connect).toHaveBeenCalledTimes(1); // back to destination
+    });
+
+    it('masterBusInputNode returns the native gain behind masterVolume.input', () => {
+      const playout = new TonePlayout();
+
+      // mockVolume.input.input is the native GainNode stand-in in this file's mocks
+      expect(playout.masterBusInputNode).toBe(mockVolume.input.input);
     });
   });
 });

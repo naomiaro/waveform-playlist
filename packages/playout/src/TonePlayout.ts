@@ -41,6 +41,7 @@ export class TonePlayout {
   private _loopEnabled = false;
   private _loopStart = 0;
   private _loopEnd = 0;
+  private _masterChainNode: AudioNode | null = null;
 
   constructor(options: TonePlayoutOptions = {}) {
     this.masterVolume = new Volume(gainToDb(options.masterGain ?? 1));
@@ -333,6 +334,69 @@ export class TonePlayout {
    *  The tap's native GainNode is on the same standardized-audio-context as adapter.audioContext. */
   get masterOutputNode(): GainNode {
     return this._masterTap.input;
+  }
+
+  /**
+   * Native GainNode behind masterVolume.input — the master-bus junction that
+   * per-track effect chains reconnect into (pre master volume). Distinct from
+   * masterOutputNode (the post-volume tap for analyzers).
+   */
+  get masterBusInputNode(): GainNode {
+    return (this.masterVolume.input as unknown as Gain).input;
+  }
+
+  /** Insert an external chain on a track: muteGain → node (caller wires node onward). */
+  connectTrackOutput(trackId: string, node: AudioNode): void {
+    const track = this.tracks.get(trackId);
+    if (!track) {
+      throw new Error('[waveform-playlist] connectTrackOutput: unknown track "' + trackId + '"');
+    }
+    if (!(track instanceof ToneTrack)) {
+      throw new Error(
+        '[waveform-playlist] connectTrackOutput: per-track effects chains are not supported ' +
+          'for MIDI tracks on the Tone adapter (track "' +
+          trackId +
+          '")'
+      );
+    }
+    track.connectEffects(node);
+  }
+
+  /** Restore a track's direct connection. No-op for unknown or MIDI tracks. */
+  disconnectTrackOutput(trackId: string): void {
+    const track = this.tracks.get(trackId);
+    if (track instanceof ToneTrack) {
+      track.disconnectEffects();
+    }
+  }
+
+  /**
+   * Insert an external master chain after the tap: masterVolume → [closure
+   * effects] → tap → node (caller wires node.output → ctx.destination).
+   */
+  connectMasterOutput(node: AudioNode): void {
+    if (this._masterChainNode) {
+      this._masterTap.disconnect(this._masterChainNode);
+    } else {
+      this._masterTap.disconnect(getDestination());
+    }
+    this._masterTap.connect(node);
+    this._masterChainNode = node;
+  }
+
+  /** Restore tap → destination. Safe when no master chain is connected. */
+  disconnectMasterOutput(): void {
+    if (!this._masterChainNode) return;
+    try {
+      this._masterTap.disconnect(this._masterChainNode);
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] disconnectMasterOutput: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
+    }
+    this._masterTap.connect(getDestination());
+    this._masterChainNode = null;
   }
 
   setSolo(trackId: string, soloed: boolean): void {
