@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore + Tone.js — WAM plugins</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 0.95rem;
+      color: #888;
+      margin: 0 0 10px 0;
+      font-weight: normal;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button {
+      cursor: pointer;
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid currentColor;
+      padding: 6px 14px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    button:hover { opacity: 0.8; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    select, input[type="url"] {
+      background: #1a1a2e;
+      color: #e0d4c8;
+      border: 1px solid #555;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    input[type="url"] { flex: 1; min-width: 280px; }
+    .library {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 560px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .library-entry {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      background: #1a1a2e;
+      padding: 6px 10px;
+      cursor: pointer;
+      border-left: 3px solid #333;
+    }
+    .library-entry:hover { border-left-color: #63C75F; }
+    .library-entry .name {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #c49a6c;
+    }
+    .library-entry .vendor {
+      font-size: 0.75rem;
+      color: #888;
+    }
+    .library-entry.inert {
+      cursor: default;
+      opacity: 0.45;
+    }
+    .library-entry.inert:hover { border-left-color: #333; }
+    .library-section {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-top: 8px;
+    }
+    .rack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 720px;
+    }
+    .rack:empty::after {
+      content: 'no plugins — dry signal';
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      color: #555;
+    }
+    .rack-group { max-width: 720px; margin-bottom: 16px; }
+    .rack-title {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #c49a6c;
+      margin-bottom: 4px;
+    }
+    .rack-title .kind { color: #888; }
+    .effect {
+      background: #1a1a2e;
+      border-left: 3px solid #63C75F;
+      padding: 8px 12px;
+    }
+    .effect.bypassed {
+      border-left-color: #555;
+      opacity: 0.6;
+    }
+    .effect.errored {
+      border-left-color: #d08070;
+    }
+    .effect-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .effect-header .name {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #c49a6c;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .effect-header button {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+    }
+    .effect-header button.active {
+      background: #63C75F;
+      color: #0f0f1a;
+      border-color: #63C75F;
+    }
+    .effect .error {
+      font-size: 0.75rem;
+      color: #d08070;
+      margin-top: 6px;
+    }
+    .gui-host {
+      margin-top: 8px;
+    }
+    .gui-host:empty { display: none; }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>dawcore + Tone.js — WAM plugins</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale file-drop>
+    <daw-track id="track-kick" src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
+    <daw-track id="track-synth" src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+    <button id="export">Export WAV</button>
+  </daw-transport>
+
+  <div class="section">
+    <h2>Add a WAM plugin</h2>
+    <div class="controls">
+      <label for="target">to</label>
+      <select id="target">
+        <option value="master">Master</option>
+      </select>
+      <input id="plugin-url" type="url"
+             placeholder="https://www.webaudiomodules.com/community/plugins/wimmics/BigMuff/index.js" />
+      <button id="add-url">Add from URL</button>
+      <button id="add-bigmuff">+ BigMuff (quick add)</button>
+      <button id="load-library">Browse community library</button>
+    </div>
+    <div class="library" id="library"></div>
+  </div>
+
+  <div class="section">
+    <h2>Faust (pre-compiled with faust2wam, served from this repo)</h2>
+    <div class="controls">
+      <button id="add-faust-lowpass">Add Faust Lowpass (pre-compiled)</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Plugin chains — one rack per track + master</h2>
+    <div id="racks"></div>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { createToneAdapter, configureGlobalContext } from '@waveform-playlist/playout';
+    import { fetchWamLibrary, fetchWamDescriptor } from '@dawcore/wam';
+
+    // Native AudioContext is required for WAM AudioWorklet hosting — the Tone
+    // adapter runs Tone.js scheduling ON TOP of that same context (see
+    // packages/playout/CLAUDE.md). Must be called BEFORE createToneAdapter().
+    configureGlobalContext({ nativeAudioContext: true, sampleRate: 48000 });
+    const adapter = createToneAdapter();
+    const editor = document.getElementById('editor');
+    editor.adapter = adapter;
+    editor.ready();
+
+    const MANIFEST_URL = 'https://www.webaudiomodules.com/community/plugins.json';
+    // The community registry keeps entry paths relative to community/plugins/,
+    // not to the manifest itself — hence the explicit baseUrl.
+    const MANIFEST_BASE_URL = 'https://www.webaudiomodules.com/community/plugins/';
+    const BIGMUFF_URL = 'https://www.webaudiomodules.com/community/plugins/wimmics/BigMuff/index.js';
+
+    // --- Target abstraction ---------------------------------------------------
+    // A "target" is the master bus ('master') or a track (its trackId). The
+    // editor exposes the SAME effects surface both ways — master methods
+    // (addWamPlugin, openEffectGui, …) and per-track-by-id methods
+    // (addTrackWamPlugin(trackId, …), openTrackEffectGui(trackId, …), …) — so
+    // the UI never special-cases which chain it edits.
+    const MASTER = 'master';
+    const isMaster = (t) => t === MASTER;
+    const fx = {
+      effects: (t) => (isMaster(t) ? editor.effects : editor.trackEffects(t)),
+      addWam: (t, url) =>
+        isMaster(t) ? editor.addWamPlugin(url) : editor.addTrackWamPlugin(t, url),
+      openGui: (t, id, host) =>
+        isMaster(t) ? editor.openEffectGui(id, host) : editor.openTrackEffectGui(t, id, host),
+      closeGui: (t, id) =>
+        isMaster(t) ? editor.closeEffectGui(id) : editor.closeTrackEffectGui(t, id),
+      bypass: (t, id, b) =>
+        isMaster(t) ? editor.setEffectBypassed(id, b) : editor.setTrackEffectBypassed(t, id, b),
+      remove: (t, id) => (isMaster(t) ? editor.removeEffect(id) : editor.removeTrackEffect(t, id)),
+    };
+
+    // Master + every current track. editor.tracks is the public enumeration —
+    // it carries each trackId and includes drag-dropped tracks (no element).
+    const targets = () => [
+      { key: MASTER, label: 'Master' },
+      ...editor.tracks.map((t) => ({ key: t.trackId, label: t.name || 'Untitled' })),
+    ];
+
+    const errText = (err) => (err && err.message ? err.message : String(err));
+
+    const log = document.getElementById('log');
+    function addLog(m) {
+      const line = document.createElement('div');
+      line.textContent = m;
+      log.prepend(line);
+      while (log.children.length > 30) log.lastChild.remove();
+    }
+
+    const targetSelect = document.getElementById('target');
+    const racksEl = document.getElementById('racks');
+
+    // --- Target dropdown (rebuilt as tracks load / unload) ---
+    function rebuildTargetSelect() {
+      const prev = targetSelect.value;
+      targetSelect.textContent = '';
+      for (const { key, label } of targets()) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = isMaster(key) ? 'Master' : label + ' (track)';
+        targetSelect.appendChild(opt);
+      }
+      targetSelect.value = [...targetSelect.options].some((o) => o.value === prev) ? prev : MASTER;
+    }
+
+    // --- Rack rendering -------------------------------------------------------
+    // Effect ids whose GUI panel is open; survives re-renders because
+    // openEffectGui caches the GUI element (reopen remounts the same node).
+    const openGuis = new Set();
+
+    function renderRack(targetKey, rack) {
+      rack.textContent = '';
+      const effects = fx.effects(targetKey);
+      effects.forEach((effect) => {
+        const row = document.createElement('div');
+        row.className = 'effect'
+          + (effect.bypassed ? ' bypassed' : '')
+          + (effect.error ? ' errored' : '');
+
+        const header = document.createElement('div');
+        header.className = 'effect-header';
+
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = effect.label || effect.type;
+        header.appendChild(name);
+
+        const guiHost = document.createElement('div');
+        guiHost.className = 'gui-host';
+
+        const guiBtn = document.createElement('button');
+        guiBtn.textContent = 'GUI';
+        guiBtn.disabled = Boolean(effect.error); // placeholders refuse to open
+        guiBtn.classList.toggle('active', openGuis.has(effect.id));
+        guiBtn.addEventListener('click', () => {
+          if (openGuis.has(effect.id)) {
+            openGuis.delete(effect.id);
+            fx.closeGui(targetKey, effect.id);
+            guiBtn.classList.remove('active');
+          } else {
+            openGuis.add(effect.id);
+            guiBtn.classList.add('active');
+            fx.openGui(targetKey, effect.id, guiHost).catch((err) => {
+              openGuis.delete(effect.id);
+              guiBtn.classList.remove('active');
+              addLog('gui failed: ' + errText(err));
+            });
+          }
+        });
+        header.appendChild(guiBtn);
+
+        const bypassBtn = document.createElement('button');
+        bypassBtn.textContent = 'Bypass';
+        bypassBtn.classList.toggle('active', effect.bypassed);
+        bypassBtn.addEventListener('click', () => {
+          fx.bypass(targetKey, effect.id, !effect.bypassed);
+        });
+        header.appendChild(bypassBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          openGuis.delete(effect.id);
+          fx.remove(targetKey, effect.id);
+        });
+        header.appendChild(removeBtn);
+
+        row.appendChild(header);
+
+        if (effect.error) {
+          const error = document.createElement('div');
+          error.className = 'error';
+          error.textContent = 'failed to load: ' + effect.error;
+          row.appendChild(error);
+        }
+
+        row.appendChild(guiHost);
+        rack.appendChild(row);
+
+        // Remount cached GUIs after a re-render.
+        if (openGuis.has(effect.id)) {
+          fx.openGui(targetKey, effect.id, guiHost).catch((err) => {
+            openGuis.delete(effect.id);
+            addLog('gui remount failed: ' + errText(err));
+          });
+        }
+      });
+    }
+
+    // One labelled rack per target (master + every track), all visible.
+    function renderAll() {
+      racksEl.textContent = '';
+      for (const { key, label } of targets()) {
+        const group = document.createElement('div');
+        group.className = 'rack-group';
+
+        const title = document.createElement('div');
+        title.className = 'rack-title';
+        title.textContent = label;
+        if (!isMaster(key)) {
+          const kind = document.createElement('span');
+          kind.className = 'kind';
+          kind.textContent = ' · track';
+          title.appendChild(kind);
+        }
+        group.appendChild(title);
+
+        const rack = document.createElement('div');
+        rack.className = 'rack';
+        renderRack(key, rack);
+        group.appendChild(rack);
+
+        racksEl.appendChild(group);
+      }
+    }
+
+    // --- Adding plugins -------------------------------------------------------
+    async function addWam(url) {
+      const target = targetSelect.value;
+      try {
+        // Loading WAM worklets requires a running context — the calling
+        // click/pointer event is the user gesture that allows resume().
+        await editor.audioContext.resume();
+        await fx.addWam(target, url);
+      } catch (err) {
+        addLog('add failed: ' + errText(err));
+      }
+    }
+
+    const urlInput = document.getElementById('plugin-url');
+    document.getElementById('add-url').addEventListener('click', () =>
+      addWam(urlInput.value.trim() || urlInput.placeholder));
+    document.getElementById('add-bigmuff').addEventListener('click', () => addWam(BIGMUFF_URL));
+
+    // --- Bundled Faust effect (pre-compiled with faust2wam) --------------------
+    // A pre-compiled Faust WAM is an ordinary WAM 2.0 module — it loads through
+    // the same addWam path as community plugins, no @dawcore/faust involved.
+    document.getElementById('add-faust-lowpass').addEventListener('click', () =>
+      addWam(new URL('/faust-wams/lowpass/index.js', location.href).href));
+
+    // --- Community library picker ---
+    const libraryEl = document.getElementById('library');
+    document.getElementById('load-library').addEventListener('click', async () => {
+      libraryEl.textContent = 'loading…';
+      try {
+        const { entries, warnings } = await fetchWamLibrary(MANIFEST_URL, {
+          baseUrl: MANIFEST_BASE_URL,
+        });
+        if (warnings.length > 0) addLog('library: ' + warnings.length + ' entries skipped');
+
+        // Ground truth: SDK-built plugins ship a static descriptor.json next
+        // to their module with the real audio-I/O flags. A null descriptor is
+        // expected for registries without the SDK convention — those entries
+        // fall back to the category heuristic. The URL input above loads
+        // anything directly as the escape hatch, and createWamInstance's
+        // validation remains the real gate.
+        const descriptors = await Promise.all(
+          entries.map((entry) => fetchWamDescriptor(entry.url)));
+        libraryEl.textContent = '';
+
+        const isInsertable = (entry, descriptor) => {
+          if (descriptor) {
+            return descriptor.hasAudioInput !== false && descriptor.hasAudioOutput !== false;
+          }
+          return !entry.category ||
+            entry.category.includes('Effect') ||
+            entry.category.includes('Modulation');
+        };
+
+        const renderEntry = (entry, insertable) => {
+          const row = document.createElement('div');
+          row.className = insertable ? 'library-entry' : 'library-entry inert';
+          row.title = entry.description || entry.url;
+
+          const name = document.createElement('span');
+          name.className = 'name';
+          name.textContent = entry.name;
+          row.appendChild(name);
+
+          if (entry.vendor) {
+            const vendor = document.createElement('span');
+            vendor.className = 'vendor';
+            vendor.textContent = entry.vendor;
+            row.appendChild(vendor);
+          }
+
+          if (insertable) {
+            row.addEventListener('click', () => addWam(entry.url));
+          }
+          libraryEl.appendChild(row);
+        };
+
+        const insertable = entries.filter((entry, i) => isInsertable(entry, descriptors[i]));
+        const inert = entries.filter((entry, i) => !isInsertable(entry, descriptors[i]));
+        for (const entry of insertable) renderEntry(entry, true);
+        if (inert.length > 0) {
+          const header = document.createElement('div');
+          header.className = 'library-section';
+          header.textContent =
+            "not insertable in an effects chain — needs audio in + out";
+          libraryEl.appendChild(header);
+          for (const entry of inert) renderEntry(entry, false);
+        }
+      } catch (err) {
+        libraryEl.textContent = '';
+        addLog('library failed: ' + errText(err));
+      }
+    });
+
+    // --- Track lifecycle: keep the dropdown + racks in sync (public events) ---
+    editor.addEventListener('daw-track-ready', (e) => {
+      addLog('track-ready: ' + e.detail.trackId);
+      rebuildTargetSelect();
+      renderAll();
+    });
+
+    editor.addEventListener('daw-track-removed', (e) => {
+      addLog('track-removed: ' + e.detail.trackId);
+      rebuildTargetSelect();
+      renderAll();
+    });
+
+    editor.addEventListener('daw-track-error', (e) => {
+      addLog('track-error: ' + e.detail.trackId + ' — ' + errText(e.detail.error));
+    });
+
+    editor.addEventListener('daw-error', (e) => {
+      addLog('error: ' + e.detail.operation + ' — ' + errText(e.detail.error));
+    });
+
+    // --- daw-effect-* events (track events bubble up to the editor) ----------
+    // The event detail's `effectId` is an auto-generated handle ('effect-1', …),
+    // not user-facing. Resolve it to "<target> · <effect name>" by scanning the
+    // chains — a just-removed effect is gone from every chain, so fall back to
+    // the raw id there.
+    function describeEffect(effectId) {
+      for (const { key, label } of targets()) {
+        const e = fx.effects(key).find((x) => x.id === effectId);
+        if (e) return (isMaster(key) ? 'Master' : label) + ' · ' + (e.label || e.type);
+      }
+      return effectId;
+    }
+    for (const type of ['daw-effect-add', 'daw-effect-remove', 'daw-effect-bypass', 'daw-effect-error']) {
+      editor.addEventListener(type, (e) => {
+        addLog(type.replace('daw-effect-', '') + ': ' + describeEffect(e.detail.effectId)
+          + (e.detail.message ? ' — ' + e.detail.message : ''));
+        renderAll();
+      });
+    }
+
+    // Initial paint (Master rack; tracks fill in as they load).
+    rebuildTargetSelect();
+    renderAll();
+
+    // --- Offline export: render through all chains, download as WAV -----------
+    const exportBtn = document.getElementById('export');
+    exportBtn.addEventListener('click', async () => {
+      exportBtn.disabled = true;
+      exportBtn.textContent = 'Rendering…';
+      try {
+        // exportAudio re-instantiates WAM plugins on an OfflineAudioContext
+        // with their saved state (worklets are bound to one context).
+        const buffer = await editor.exportAudio();
+        const blob = new Blob([encodeWav(buffer)], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'dawcore-tone-wam-export.wav';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        addLog('exported ' + buffer.duration.toFixed(2) + 's @ ' + buffer.sampleRate + ' Hz');
+      } catch (err) {
+        addLog('export failed: ' + errText(err));
+      } finally {
+        exportBtn.disabled = false;
+        exportBtn.textContent = 'Export WAV';
+      }
+    });
+
+    // Minimal 16-bit PCM WAV encoder (interleaved, little-endian).
+    function encodeWav(buffer) {
+      const numChannels = buffer.numberOfChannels;
+      const dataLength = buffer.length * numChannels * 2;
+      const arrayBuffer = new ArrayBuffer(44 + dataLength);
+      const view = new DataView(arrayBuffer);
+      const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + dataLength, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);                                  // fmt chunk size
+      view.setUint16(20, 1, true);                                   // PCM
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, buffer.sampleRate, true);
+      view.setUint32(28, buffer.sampleRate * numChannels * 2, true); // byte rate
+      view.setUint16(32, numChannels * 2, true);                     // block align
+      view.setUint16(34, 16, true);                                  // bits per sample
+      writeString(36, 'data');
+      view.setUint32(40, dataLength, true);
+      const channels = [];
+      for (let c = 0; c < numChannels; c++) channels.push(buffer.getChannelData(c));
+      let offset = 44;
+      for (let i = 0; i < buffer.length; i++) {
+        for (let c = 0; c < numChannels; c++) {
+          const s = Math.max(-1, Math.min(1, channels[c][i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+          offset += 2;
+        }
+      }
+      return arrayBuffer;
+    }
+  </script>
+</body>
+</html>
