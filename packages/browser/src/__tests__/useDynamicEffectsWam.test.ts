@@ -75,6 +75,7 @@ vi.mock('tone', () => {
   };
 });
 
+import React from 'react';
 import { useDynamicEffects } from '../hooks/useDynamicEffects';
 import { connect } from 'tone';
 import type { Volume, ToneAudioNode } from 'tone';
@@ -134,6 +135,18 @@ describe('useDynamicEffects — WAM entries', () => {
     act(() => result.current.removeEffect(id));
     expect(destroy).toHaveBeenCalled();
     expect(result.current.activeEffects).toHaveLength(0);
+  });
+
+  it('addWamEffect works under StrictMode double-invoked effects', async () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.StrictMode, null, children);
+    const { result } = renderHook(() => useDynamicEffects(), { wrapper });
+    let id = '';
+    await act(async () => {
+      id = await result.current.addWamEffect('https://example.com/p/index.js');
+    });
+    expect(id).toMatch(/^wam_/);
+    expect(result.current.activeEffects.some((e) => e.instanceId === id)).toBe(true);
   });
 
   it('addWamEffect aborts and destroys the plugin if the hook unmounts before it resolves', async () => {

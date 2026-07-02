@@ -190,7 +190,14 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
       initialState !== undefined ? { initialState } : undefined
     );
     if (!isMountedRef.current) {
-      plugin.destroy();
+      try {
+        plugin.destroy();
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] Error destroying WAM plugin after unmount: ' +
+            (err instanceof Error ? err.message : String(err))
+        );
+      }
       throw new Error(
         '[waveform-playlist] addWamEffect aborted: hook unmounted before the plugin finished loading.'
       );
@@ -363,6 +370,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
 
   // Cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     const effectInstances = effectInstancesRef.current;
     return () => {
       isMountedRef.current = false;
