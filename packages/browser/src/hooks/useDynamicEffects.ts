@@ -6,7 +6,7 @@ import {
   type EffectDefinition,
 } from '../effects/effectDefinitions';
 import { createEffectInstance, type EffectInstance } from '../effects/effectFactory';
-import { Analyser, Volume, ToneAudioNode } from 'tone';
+import { Analyser, Volume, ToneAudioNode, connect } from 'tone';
 
 export interface ActiveEffect {
   instanceId: string;
@@ -96,7 +96,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
       analyserNode.connect(destination);
     } else {
       // Connect: masterGain -> effect1 -> effect2 -> ... -> analyser -> destination
-      let currentNode: ToneAudioNode = masterGainNode;
+      let currentNode: ToneAudioNode | AudioNode = masterGainNode;
 
       instances.forEach((inst) => {
         try {
@@ -104,12 +104,12 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
         } catch (e) {
           console.warn(`[waveform-playlist] Error disconnecting effect "${inst.id}":`, e);
         }
-        currentNode.connect(inst.effect);
+        connect(currentNode, inst.effect);
         currentNode = inst.effect;
       });
 
       // Connect last effect to analyser
-      currentNode.connect(analyserNode);
+      connect(currentNode, analyserNode);
       analyserNode.connect(destination);
     }
   }, []);
@@ -248,15 +248,15 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
         analyserNode.connect(destination);
       } else {
         // Connect: masterGain -> effect1 -> effect2 -> ... -> analyser -> destination
-        let currentNode: ToneAudioNode = masterGainNode;
+        let currentNode: ToneAudioNode | AudioNode = masterGainNode;
 
         instances.forEach((inst) => {
-          currentNode.connect(inst.effect);
+          connect(currentNode, inst.effect);
           currentNode = inst.effect;
         });
 
         // Connect last effect to analyser
-        currentNode.connect(analyserNode);
+        connect(currentNode, analyserNode);
         analyserNode.connect(destination);
       }
 
@@ -306,15 +306,15 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
         masterGainNode.connect(destination);
       } else {
         // Connect: masterGain -> effect1 -> effect2 -> ... -> destination
-        let currentNode: ToneAudioNode = masterGainNode;
+        let currentNode: ToneAudioNode | AudioNode = masterGainNode;
 
         offlineInstances.forEach((inst) => {
-          currentNode.connect(inst.effect);
+          connect(currentNode, inst.effect);
           currentNode = inst.effect;
         });
 
         // Connect last effect to destination
-        currentNode.connect(destination);
+        connect(currentNode, destination);
       }
 
       return function cleanup() {

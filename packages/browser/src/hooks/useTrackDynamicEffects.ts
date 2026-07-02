@@ -6,7 +6,7 @@ import {
   type EffectDefinition,
 } from '../effects/effectDefinitions';
 import { createEffectInstance, type EffectInstance } from '../effects/effectFactory';
-import { Gain, ToneAudioNode } from 'tone';
+import { Gain, ToneAudioNode, connect } from 'tone';
 
 export interface TrackActiveEffect {
   instanceId: string;
@@ -97,7 +97,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       graphEnd.connect(masterGainNode);
     } else {
       // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-      let currentNode: ToneAudioNode = graphEnd;
+      let currentNode: ToneAudioNode | AudioNode = graphEnd;
 
       instances.forEach((inst) => {
         try {
@@ -108,12 +108,12 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
             e
           );
         }
-        currentNode.connect(inst.effect);
+        connect(currentNode, inst.effect);
         currentNode = inst.effect;
       });
 
       // Connect last effect to master
-      currentNode.connect(masterGainNode);
+      connect(currentNode, masterGainNode);
     }
   }, []);
 
@@ -281,15 +281,15 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
           graphEnd.connect(masterGainNode);
         } else {
           // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-          let currentNode: ToneAudioNode = graphEnd;
+          let currentNode: ToneAudioNode | AudioNode = graphEnd;
 
           instances.forEach((inst) => {
-            currentNode.connect(inst.effect);
+            connect(currentNode, inst.effect);
             currentNode = inst.effect;
           });
 
           // Connect last effect to master
-          currentNode.connect(masterGainNode);
+          connect(currentNode, masterGainNode);
         }
 
         return function cleanup() {
@@ -349,15 +349,15 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
           graphEnd.connect(masterGainNode);
         } else {
           // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-          let currentNode: ToneAudioNode = graphEnd;
+          let currentNode: ToneAudioNode | AudioNode = graphEnd;
 
           offlineInstances.forEach((inst) => {
-            currentNode.connect(inst.effect);
+            connect(currentNode, inst.effect);
             currentNode = inst.effect;
           });
 
           // Connect last effect to master
-          currentNode.connect(masterGainNode);
+          connect(currentNode, masterGainNode);
         }
 
         return function cleanup() {
