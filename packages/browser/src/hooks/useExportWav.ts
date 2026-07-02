@@ -7,11 +7,9 @@ import {
   type ClipTrack,
   type FadeType,
 } from '@waveform-playlist/core';
-import {
-  type EffectsFunction,
-  getUnderlyingAudioParam,
-  getGlobalAudioContext,
-} from '@waveform-playlist/playout';
+import { getUnderlyingAudioParam, getGlobalAudioContext } from '@waveform-playlist/playout';
+import type { Volume, Gain, ToneAudioNode } from 'tone';
+import { renderToneOffline } from '../utils/renderToneOffline';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
 
 /** Function type for per-track effects (same as in @waveform-playlist/core) */
@@ -20,6 +18,27 @@ export type TrackEffectsFunction = (
   destination: unknown,
   isOffline: boolean
 ) => void | (() => void);
+
+/** Cleanup returned by an offline effects function (disposes offline instances / WAM clones). */
+export type OfflineEffectsCleanup = void | (() => void);
+
+/**
+ * Master-chain effects function for offline rendering. May return a Promise —
+ * WAM entries are re-instantiated asynchronously on the offline context.
+ * Every live EffectsFunction is assignable to this type.
+ */
+export type OfflineEffectsFunction = (
+  masterVolume: Volume,
+  destination: ToneAudioNode,
+  isOffline: boolean
+) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
+
+/** Per-track variant of OfflineEffectsFunction. */
+export type OfflineTrackEffectsFunction = (
+  graphEnd: Gain,
+  masterGainNode: ToneAudioNode,
+  isOffline: boolean
+) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
 export interface ExportOptions extends WavEncoderOptions {
   /** Filename for download (without extension) */
@@ -33,16 +52,17 @@ export interface ExportOptions extends WavEncoderOptions {
   /** Whether to apply effects (fades, etc.) - defaults to true */
   applyEffects?: boolean;
   /**
-   * Optional Tone.js effects function for master effects. When provided, export renders
-   * through the effects chain. The function receives isOffline=true.
+   * Optional effects function for master effects. When provided, export renders
+   * through the effects chain (WAM entries included — re-instantiated on the
+   * offline context). The function receives isOffline=true and may be async.
    */
-  effectsFunction?: EffectsFunction;
+  effectsFunction?: OfflineEffectsFunction;
   /**
    * Optional function to create offline track effects.
-   * Takes a trackId and returns a TrackEffectsFunction for offline rendering.
+   * Takes a trackId and returns an offline effects function for that track.
    * This is used instead of track.effects to avoid AudioContext mismatch issues.
    */
-  createOfflineTrackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
+  createOfflineTrackEffects?: (trackId: string) => OfflineTrackEffectsFunction | undefined;
   /** Progress callback (0-1) */
   onProgress?: (progress: number) => void;
 }
@@ -80,7 +100,8 @@ interface TrackState {
 
 /**
  * Hook for exporting the waveform playlist to WAV format.
- * Uses Tone.Offline for non-real-time rendering, mirroring the live playback graph.
+ * Uses a Tone offline render (native OfflineAudioContext in native-context mode),
+ * mirroring the live playback graph.
  */
 export function useExportWav(): UseExportWavReturn {
   const [isExporting, setIsExporting] = useState(false);
@@ -204,9 +225,13 @@ export function useExportWav(): UseExportWavReturn {
 }
 
 /**
- * Render the playlist offline using Tone.Offline.
- * Mirrors the live playback graph: Player → fadeGain → trackVolume → trackPan → trackMute → masterVolume → destination.
- * Effects chains (master and per-track) are conditionally inserted when provided.
+ * Render the playlist offline. Uses renderToneOffline — a hand-rolled
+ * Tone.Offline variant that renders on a NATIVE OfflineAudioContext in
+ * native-context mode so mixed Tone + WAM chains can be hosted (#536).
+ * Mirrors the live playback graph: Player → fadeGain → trackVolume →
+ * trackPan → trackMute → masterVolume → destination. Effects chains (master
+ * and per-track) are conditionally inserted when provided; their cleanups
+ * (which destroy offline WAM clones) always run after the render.
  */
 async function renderOffline(
   tracksToRender: { track: ClipTrack; state: TrackState; index: number }[],
@@ -214,11 +239,13 @@ async function renderOffline(
   duration: number,
   sampleRate: number,
   applyEffects: boolean,
-  effectsFunction: EffectsFunction | undefined,
-  createOfflineTrackEffects: ((trackId: string) => TrackEffectsFunction | undefined) | undefined,
+  effectsFunction: OfflineEffectsFunction | undefined,
+  createOfflineTrackEffects:
+    | ((trackId: string) => OfflineTrackEffectsFunction | undefined)
+    | undefined,
   onProgress: (progress: number) => void
 ): Promise<AudioBuffer> {
-  const { Offline, Volume, Gain, Panner, Player, ToneAudioBuffer } = await import('tone');
+  const { Volume, Gain, Panner, Player, ToneAudioBuffer } = await import('tone');
 
   onProgress(0.1);
 
@@ -233,18 +260,19 @@ async function renderOffline(
     1
   );
 
-  let buffer;
+  const cleanups: Array<() => void> = [];
   try {
-    buffer = await Offline(
-      async ({ transport, destination }) => {
+    const audioBuffer = await renderToneOffline(
+      async (context) => {
         // Master volume at unity gain
         const masterVolume = new Volume(0);
 
-        // Conditionally insert master effects chain
+        // Conditionally insert master effects chain (may be async — WAM cloning)
         if (effectsFunction && applyEffects) {
-          effectsFunction(masterVolume, destination, true);
+          const cleanup = await effectsFunction(masterVolume, context.destination, true);
+          if (cleanup) cleanups.push(cleanup);
         } else {
-          masterVolume.connect(destination);
+          masterVolume.connect(context.destination);
         }
 
         for (const { track, state } of audibleTracks) {
@@ -255,10 +283,11 @@ async function renderOffline(
           const trackPan = new Panner({ pan: state.pan, channelCount: trackChannelCount(track) });
           const trackMute = new Gain(state.muted ? 0 : 1);
 
-          // Conditionally insert per-track effects chain
+          // Conditionally insert per-track effects chain (may be async — WAM cloning)
           const trackEffects = createOfflineTrackEffects?.(track.id);
           if (trackEffects && applyEffects) {
-            trackEffects(trackMute, masterVolume, true);
+            const cleanup = await trackEffects(trackMute, masterVolume, true);
+            if (cleanup) cleanups.push(cleanup);
           } else {
             trackMute.connect(masterVolume);
           }
@@ -270,7 +299,7 @@ async function renderOffline(
           // Schedule each clip
           for (const clip of track.clips) {
             const {
-              audioBuffer,
+              audioBuffer: clipBuffer,
               startSample,
               durationSamples,
               offsetSamples,
@@ -280,7 +309,7 @@ async function renderOffline(
             } = clip;
 
             // Skip clips without audioBuffer (peaks-only clips can't be exported)
-            if (!audioBuffer) {
+            if (!clipBuffer) {
               console.warn(
                 '[waveform-playlist] Skipping clip "' +
                   (clip.name || clip.id) +
@@ -295,7 +324,7 @@ async function renderOffline(
             const offset = offsetSamples / sampleRate;
 
             // Create player and clip-level fade gain
-            const toneBuffer = new ToneAudioBuffer(audioBuffer);
+            const toneBuffer = new ToneAudioBuffer(clipBuffer);
             const player = new Player(toneBuffer);
             const fadeGain = new Gain(clipGain);
 
@@ -321,27 +350,34 @@ async function renderOffline(
           }
         }
 
-        transport.start(0);
+        context.transport.start(0);
       },
       duration,
       outputChannels,
       sampleRate
     );
+
+    onProgress(0.9);
+    return audioBuffer;
   } catch (err) {
     if (err instanceof Error) {
       throw err;
-    } else {
-      throw new Error('Tone.Offline rendering failed: ' + String(err));
+    }
+    throw new Error('Offline rendering failed: ' + String(err));
+  } finally {
+    // Always dispose offline effect instances / destroy WAM clones —
+    // success or failure. Warn-and-continue per cleanup.
+    for (const cleanup of cleanups) {
+      try {
+        cleanup();
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] Export cleanup error: ' +
+            (err instanceof Error ? err.message : String(err))
+        );
+      }
     }
   }
-
-  onProgress(0.9);
-
-  const result = buffer.get();
-  if (!result) {
-    throw new Error('Offline rendering produced no audio buffer');
-  }
-  return result;
 }
 
 /**
