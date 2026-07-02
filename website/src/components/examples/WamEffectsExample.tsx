@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { type ClipTrack } from '@waveform-playlist/core';
-import { configureGlobalContext, supportsNativeContextMode } from '@waveform-playlist/playout';
+import {
+  configureGlobalContext,
+  isNativeGlobalContext,
+  supportsNativeContextMode,
+} from '@waveform-playlist/playout';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -458,6 +462,13 @@ const WamControls: React.FC<WamControlsProps> = ({
 export function WamEffectsExample() {
   const { theme } = useDocusaurusTheme();
 
+  // The module-scope configureGlobalContext() call above only runs once per
+  // page load — if another audio example already created the global context
+  // (e.g. via client-side navigation), it warns-and-ignores and native mode
+  // never activates. Read the ACTUAL mode once per mount; it can't change
+  // without a reload, so no state/effect is needed.
+  const wamActive = wamSupported && isNativeGlobalContext();
+
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string>('');
   const [addingKey, setAddingKey] = useState<string | null>(null);
@@ -566,10 +577,17 @@ export function WamEffectsExample() {
         </Banner>
       )}
 
+      {wamSupported && !wamActive && (
+        <Banner>
+          Another example already started this page's audio engine in compatibility mode. Reload
+          this page to enable WAM plugins.
+        </Banner>
+      )}
+
       {status && <StatusLine $tone={status.tone}>{status.text}</StatusLine>}
 
       <LibraryBrowser
-        wamEnabled={wamSupported}
+        wamEnabled={wamActive}
         addingKey={addingKey}
         selectedTrackName={selectedTrackName}
         onAddWam={handleAddWam}

@@ -34,7 +34,16 @@ export const WamEffectGui: React.FC<WamEffectGuiProps> = ({ plugin, className })
           );
         }
         if (cancelled) {
-          if (gui) plugin.destroyGui?.(gui);
+          if (gui) {
+            try {
+              plugin.destroyGui?.(gui);
+            } catch (destroyErr) {
+              console.warn(
+                '[waveform-playlist] Error destroying WAM GUI: ' +
+                  (destroyErr instanceof Error ? destroyErr.message : String(destroyErr))
+              );
+            }
+          }
           gui = null;
           return;
         }
@@ -52,7 +61,14 @@ export const WamEffectGui: React.FC<WamEffectGuiProps> = ({ plugin, className })
       cancelled = true;
       if (gui) {
         gui.remove();
-        plugin.destroyGui?.(gui);
+        try {
+          plugin.destroyGui?.(gui);
+        } catch (destroyErr) {
+          console.warn(
+            '[waveform-playlist] Error destroying WAM GUI: ' +
+              (destroyErr instanceof Error ? destroyErr.message : String(destroyErr))
+          );
+        }
       }
     };
   }, [plugin]);

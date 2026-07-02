@@ -888,7 +888,7 @@ Both effects hooks also host third-party [WAM 2.0](https://www.webaudiomodules.c
 Manage master effects chain with real-time parameter updates.
 
 ```typescript
-function useDynamicEffects(): UseDynamicEffectsReturn;
+function useDynamicEffects(fftSize?: number): UseDynamicEffectsReturn; // default: 256
 ```
 
 #### Returns

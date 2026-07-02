@@ -208,7 +208,7 @@
       <input id="plugin-url" type="url"
              placeholder="https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js" />
       <button id="add-url">Add from URL</button>
-      <button id="add-bigmuff">+ Delay (Burns Audio, quick add)</button>
+      <button id="add-delay">+ Delay (Burns Audio, quick add)</button>
       <button id="load-library">Browse community library</button>
     </div>
     <div class="library" id="library"></div>
@@ -429,7 +429,7 @@
     const urlInput = document.getElementById('plugin-url');
     document.getElementById('add-url').addEventListener('click', () =>
       addWam(urlInput.value.trim() || urlInput.placeholder));
-    document.getElementById('add-bigmuff').addEventListener('click', () => addWam(QUICK_ADD_URL));
+    document.getElementById('add-delay').addEventListener('click', () => addWam(QUICK_ADD_URL));
 
     // --- Bundled Faust effect (pre-compiled with faust2wam) --------------------
     // A pre-compiled Faust WAM is an ordinary WAM 2.0 module — it loads through

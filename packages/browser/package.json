@@ -72,10 +72,10 @@
     "waveform-data": "^4.5.2"
   },
   "peerDependencies": {
+    "@dawcore/wam": "workspace:^",
     "@dnd-kit/abstract": "^0.3.0",
     "@dnd-kit/dom": "^0.3.0",
     "@dnd-kit/react": "^0.3.0",
-    "@dawcore/wam": "workspace:^",
     "@waveform-playlist/annotations": "workspace:^",
     "@waveform-playlist/media-element-playout": "workspace:^",
     "@waveform-playlist/playout": "workspace:^",

@@ -43,6 +43,28 @@ describe('WamEffectGui', () => {
     expect(destroyGui).toHaveBeenCalledWith(gui);
   });
 
+  it('does not throw when destroyGui throws during unmount cleanup', async () => {
+    const gui = document.createElement('div');
+    gui.className = 'plugin-gui';
+    const destroyGui = vi.fn(() => {
+      throw new Error('boom');
+    });
+    const plugin = {
+      audioNode: {},
+      createGui: vi.fn(async () => gui),
+      destroyGui,
+      destroy: vi.fn(),
+    } as unknown as WamPluginInstance;
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { container, unmount } = render(<WamEffectGui plugin={plugin} />);
+    await waitFor(() => expect(container.querySelector('.plugin-gui')).not.toBeNull());
+    expect(() => unmount()).not.toThrow();
+    expect(destroyGui).toHaveBeenCalledWith(gui);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it('falls back to the generic parameter panel for headless plugins', async () => {
     const plugin = { audioNode: {}, destroy: vi.fn() } as unknown as WamPluginInstance;
     const { container } = render(<WamEffectGui plugin={plugin} />);
