@@ -481,13 +481,16 @@ export function WamEffectsExample() {
     }
   }, [loadedTracks]);
 
+  // Destructure the stable callback to satisfy exhaustive-deps.
+  const { getTrackEffectsFunction } = trackFx;
+
   // Attach per-track effects functions so WAM/native inserts can be added live.
   // Depend on the stable callback, not the whole `trackFx` object (a fresh object
   // every render) — otherwise this memo recomputes on every render, producing new
   // track objects and forcing a full engine rebuild on every interaction.
   const tracksWithEffects = useMemo(
-    () => tracks.map((track) => ({ ...track, effects: trackFx.getTrackEffectsFunction(track.id) })),
-    [tracks, trackFx.getTrackEffectsFunction]
+    () => tracks.map((track) => ({ ...track, effects: getTrackEffectsFunction(track.id) })),
+    [tracks, getTrackEffectsFunction]
   );
 
   const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
@@ -501,6 +504,10 @@ export function WamEffectsExample() {
     [createOfflineEffectsFunction]
   );
 
+  // Destructure stable callbacks to satisfy exhaustive-deps.
+  const { addWamEffect } = masterFx;
+  const { addWamEffectToTrack } = trackFx;
+
   const handleAddWam = useCallback(
     async (url: string, label: string, target: 'master' | 'track') => {
       const trackId = target === 'track' ? selectedTrackId : '';
@@ -513,9 +520,9 @@ export function WamEffectsExample() {
       setStatus(null);
       try {
         if (target === 'master') {
-          await masterFx.addWamEffect(url);
+          await addWamEffect(url);
         } else {
-          await trackFx.addWamEffectToTrack(trackId, url);
+          await addWamEffectToTrack(trackId, url);
         }
         setStatus({
           tone: 'ok',
@@ -536,7 +543,7 @@ export function WamEffectsExample() {
         setAddingKey(null);
       }
     },
-    [masterFx.addWamEffect, trackFx.addWamEffectToTrack, selectedTrackId, selectedTrackName]
+    [addWamEffect, addWamEffectToTrack, selectedTrackId, selectedTrackName]
   );
 
   const masterEntries = masterFx.activeEffects;
