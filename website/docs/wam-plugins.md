@@ -119,6 +119,8 @@ const { entries, warnings } = await fetchWamLibrary(
 const descriptor = await fetchWamDescriptor(entries[0].url);
 ```
 
+Declared `apiVersion` values starting with `1` mark legacy WAM 1.0 entries (rejected on insert), while an absent field usually means a WAM 2.0 SDK build.
+
 Install note: `@dawcore/wam` is an **optional peer dependency** of `@waveform-playlist/browser` — install it explicitly:
 
 ```bash

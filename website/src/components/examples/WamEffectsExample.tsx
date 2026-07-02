@@ -102,6 +102,9 @@ const audioConfigs = [
 
 interface LibraryPlugin extends WamLibraryEntry {
   insertable: boolean;
+  // Set only when NOT insertable, so the card can render a specific reason
+  // instead of the generic "no audio I/O" note.
+  nonInsertableReason?: 'legacy-wam1' | 'no-audio-io';
 }
 
 type LibraryStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -117,12 +120,24 @@ function useWamLibrary() {
       const withDescriptors = await Promise.all(
         entries.map(async (entry) => {
           const descriptor = await fetchWamDescriptor(entry.url);
+          // A declared apiVersion starting with "1" positively identifies a
+          // legacy WAM 1.0 build — reject regardless of audio-I/O flags. The
+          // SDK only stamps apiVersion on the RUNTIME instance descriptor, so
+          // an absent field here is NOT a signal of 1.0 — most WAM 2.0 SDK
+          // builds simply omit it from the static descriptor.json.
+          if (descriptor?.apiVersion?.startsWith('1')) {
+            return { ...entry, insertable: false, nonInsertableReason: 'legacy-wam1' as const };
+          }
           // Absent flags != false: the SDK runtime-defaults audio I/O to true.
           const audioIO =
             descriptor !== null
               ? descriptor.hasAudioInput !== false && descriptor.hasAudioOutput !== false
               : (entry.category ?? []).some((c) => c.toLowerCase() === 'effect');
-          return { ...entry, insertable: audioIO };
+          return {
+            ...entry,
+            insertable: audioIO,
+            nonInsertableReason: audioIO ? undefined : ('no-audio-io' as const),
+          };
         })
       );
       setPlugins(withDescriptors);
@@ -376,7 +391,11 @@ const LibraryBrowser: React.FC<LibraryBrowserProps> = ({
                 )}
                 <CardButtons>
                   {!plugin.insertable ? (
-                    <DisabledNote>Instrument / no audio I/O — not insertable</DisabledNote>
+                    <DisabledNote>
+                      {plugin.nonInsertableReason === 'legacy-wam1'
+                        ? 'WAM 1.0 (legacy) — not insertable'
+                        : 'Instrument / no audio I/O — not insertable'}
+                    </DisabledNote>
                   ) : wamEnabled ? (
                     <>
                       <GhostButton

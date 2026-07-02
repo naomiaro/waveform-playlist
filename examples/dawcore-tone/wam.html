@@ -453,20 +453,32 @@
         // fall back to the category heuristic. The URL input above loads
         // anything directly as the escape hatch, and createWamInstance's
         // validation remains the real gate.
+        //
+        // apiVersion is asymmetric: the SDK only stamps it reliably on the
+        // RUNTIME instance descriptor, not the static file — a static probe
+        // can only POSITIVELY identify WAM 1.0 (declared "1.x"). An absent
+        // apiVersion is NOT a 1.0 signal; most WAM 2.0 SDK builds simply omit
+        // it here. So: declared "1.x" -> legacy, rejected; absent -> falls
+        // through to the audio-I/O / category check below.
         const descriptors = await Promise.all(
           entries.map((entry) => fetchWamDescriptor(entry.url)));
         libraryEl.textContent = '';
 
-        const isInsertable = (entry, descriptor) => {
-          if (descriptor) {
-            return descriptor.hasAudioInput !== false && descriptor.hasAudioOutput !== false;
+        const getInsertReason = (entry, descriptor) => {
+          if (descriptor && descriptor.apiVersion && descriptor.apiVersion.startsWith('1')) {
+            return 'legacy-wam1';
           }
-          return !entry.category ||
-            entry.category.includes('Effect') ||
-            entry.category.includes('Modulation');
+          const audioIO = descriptor
+            ? descriptor.hasAudioInput !== false && descriptor.hasAudioOutput !== false
+            : Boolean(
+                !entry.category ||
+                  entry.category.includes('Effect') ||
+                  entry.category.includes('Modulation')
+              );
+          return audioIO ? null : 'no-audio-io';
         };
 
-        const renderEntry = (entry, insertable) => {
+        const renderEntry = (entry, insertable, reason) => {
           const row = document.createElement('div');
           row.className = insertable ? 'library-entry' : 'library-entry inert';
           row.title = entry.description || entry.url;
@@ -475,6 +487,13 @@
           name.className = 'name';
           name.textContent = entry.name;
           row.appendChild(name);
+
+          if (reason === 'legacy-wam1') {
+            const legacy = document.createElement('span');
+            legacy.className = 'vendor';
+            legacy.textContent = 'WAM 1.0';
+            row.appendChild(legacy);
+          }
 
           if (entry.vendor) {
             const vendor = document.createElement('span');
@@ -489,16 +508,20 @@
           libraryEl.appendChild(row);
         };
 
-        const insertable = entries.filter((entry, i) => isInsertable(entry, descriptors[i]));
-        const inert = entries.filter((entry, i) => !isInsertable(entry, descriptors[i]));
-        for (const entry of insertable) renderEntry(entry, true);
+        const withReason = entries.map((entry, i) => ({
+          entry,
+          reason: getInsertReason(entry, descriptors[i]),
+        }));
+        const insertable = withReason.filter((x) => x.reason === null);
+        const inert = withReason.filter((x) => x.reason !== null);
+        for (const { entry } of insertable) renderEntry(entry, true, null);
         if (inert.length > 0) {
           const header = document.createElement('div');
           header.className = 'library-section';
           header.textContent =
-            "not insertable in an effects chain — needs audio in + out";
+            "not insertable in an effects chain — needs audio in + out, or is WAM 1.0 (legacy)";
           libraryEl.appendChild(header);
-          for (const entry of inert) renderEntry(entry, false);
+          for (const { entry, reason } of inert) renderEntry(entry, false, reason);
         }
       } catch (err) {
         libraryEl.textContent = '';
