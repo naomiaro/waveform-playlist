@@ -132,6 +132,43 @@ Features:
 
 ---
 
+### WAM! Kick It Up a Notch
+
+Host third-party [Web Audio Modules (WAM 2.0)](https://www.webaudiomodules.com/) plugins alongside the built-in Tone.js effects — community plugin browser, native plugin GUIs, master and per-track chains.
+
+[View WAM! Kick It Up a Notch](/examples/wam-effects)
+
+```tsx
+import { useDynamicEffects, WamEffectGui } from '@waveform-playlist/browser/tone';
+
+function MasterRack() {
+  const { activeEffects, addWamEffect, getWamPlugin } = useDynamicEffects();
+
+  return (
+    <div>
+      <button onClick={() => addWamEffect('https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js')}>
+        + Simple Delay
+      </button>
+      {activeEffects.map((effect) =>
+        effect.kind === 'wam' ? (
+          <WamEffectGui key={effect.instanceId} plugin={getWamPlugin(effect.instanceId)} />
+        ) : null
+      )}
+    </div>
+  );
+}
+```
+
+See the [WAM Plugins guide](/docs/wam-plugins) for native-context setup, bypass semantics, and plugin discovery.
+
+Features:
+- WAM 2.0 plugin hosting on a native AudioContext
+- Community plugin browser (`fetchWamLibrary`)
+- Mixed chains — Tone.js effects alongside hosted WAM plugins
+- Native plugin GUIs with generic-panel fallback
+
+---
+
 ## Feature Demonstrations
 
 ### BBC Peaks / Waveform Data

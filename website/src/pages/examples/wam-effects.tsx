@@ -1,6 +1,7 @@
 import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
+import Link from '@docusaurus/Link';
 import { createLazyExample } from '../../components/BrowserOnlyWrapper';
 import { AudioCredits } from '../../components/AudioCredits';
 
@@ -54,8 +55,8 @@ export default function WamEffectsExamplePage(): React.ReactElement {
             <li>Per-track and master effect racks with bypass and remove</li>
           </ul>
           <p>
-            See the <a href="/waveform-playlist/docs/wam-plugins">WAM Plugins guide</a> for the full
-            API walkthrough (the guide ships alongside this page).
+            See the <Link to="/docs/wam-plugins">WAM Plugins guide</Link> for the full API
+            walkthrough (the guide ships alongside this page).
           </p>
         </div>
 

@@ -881,6 +881,8 @@ function SplitButton() {
 
 ## Effects Hooks
 
+Both effects hooks also host third-party [WAM 2.0](https://www.webaudiomodules.com/) plugins alongside the built-in Tone.js effects — see the [WAM Plugins guide](/docs/wam-plugins) for native-context setup, bypass semantics, `WamEffectGui`, and plugin discovery.
+
 ### useDynamicEffects
 
 Manage master effects chain with real-time parameter updates.
@@ -896,6 +898,15 @@ interface UseDynamicEffectsReturn {
   activeEffects: ActiveEffect[];
   availableEffects: EffectDefinition[];
   addEffect: (effectId: string) => void;
+  /**
+   * Hosts a WAM plugin from a module URL and appends it to the master chain.
+   * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
+   * from @waveform-playlist/playout before any audio initialization.
+   * WAM entries are skipped during offline WAV export (not supported yet).
+   */
+  addWamEffect: (url: string, initialState?: unknown) => Promise<string>;
+  /** Live plugin handle for a hosted WAM entry (for GUI mounting via WamEffectGui). */
+  getWamPlugin: (instanceId: string) => WamPluginInstance | undefined;
   removeEffect: (instanceId: string) => void;
   updateParameter: (instanceId: string, paramName: string, value: number | string | boolean) => void;
   toggleBypass: (instanceId: string) => void;
@@ -903,13 +914,18 @@ interface UseDynamicEffectsReturn {
   clearAllEffects: () => void;
   masterEffects: EffectsFunction;
   createOfflineEffectsFunction: () => EffectsFunction | undefined;
-  analyserRef: RefObject<any>;
+  analyserRef: RefObject<Analyser | null>;
 }
 
 interface ActiveEffect {
   instanceId: string;
   effectId: string;
-  parameters: Record<string, number>;
+  /** 'native' = built-in Tone effect; 'wam' = hosted WAM plugin. */
+  kind: 'native' | 'wam';
+  /** Module URL for wam entries. */
+  url?: string;
+  definition: EffectDefinition;
+  params: Record<string, number | string | boolean>;
   bypassed: boolean;
 }
 ```
@@ -926,13 +942,41 @@ function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn;
 
 ```typescript
 interface UseTrackDynamicEffectsReturn {
-  trackEffects: Map<string, TrackActiveEffect[]>;
-  addTrackEffect: (trackId: string, effectId: string) => void;
-  removeTrackEffect: (trackId: string, instanceId: string) => void;
-  updateTrackParameter: (trackId: string, instanceId: string, paramId: string, value: number) => void;
-  toggleTrackBypass: (trackId: string, instanceId: string) => void;
-  createTrackEffectsFunction: (trackId: string) => TrackEffectsFunction;
-  createOfflineTrackEffectsFunction: (trackId: string) => TrackEffectsFunction;
+  trackEffectsState: Map<string, TrackActiveEffect[]>;
+  addEffectToTrack: (trackId: string, effectId: string) => void;
+  /**
+   * Hosts a WAM plugin from a module URL and appends it to a track's effect chain.
+   * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
+   * from @waveform-playlist/playout before any audio initialization.
+   * WAM entries are skipped during offline WAV export (not supported yet).
+   */
+  addWamEffectToTrack: (trackId: string, url: string, initialState?: unknown) => Promise<string>;
+  /** Live plugin handle for a hosted WAM entry on a track (for GUI mounting via WamEffectGui). */
+  getTrackWamPlugin: (trackId: string, instanceId: string) => WamPluginInstance | undefined;
+  removeEffectFromTrack: (trackId: string, instanceId: string) => void;
+  updateTrackEffectParameter: (
+    trackId: string,
+    instanceId: string,
+    paramName: string,
+    value: number | string | boolean
+  ) => void;
+  toggleBypass: (trackId: string, instanceId: string) => void;
+  clearTrackEffects: (trackId: string) => void;
+  getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
+  createOfflineTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
+  availableEffects: EffectDefinition[];
+}
+
+interface TrackActiveEffect {
+  instanceId: string;
+  effectId: string;
+  /** 'native' = built-in Tone effect; 'wam' = hosted WAM plugin. */
+  kind: 'native' | 'wam';
+  /** Module URL for wam entries. */
+  url?: string;
+  definition: EffectDefinition;
+  params: Record<string, number | string | boolean>;
+  bypassed: boolean;
 }
 ```
 
@@ -1323,3 +1367,4 @@ Hooks must be used within their providers:
 - [Components](/docs/react/api/components)
 - [Recording Guide](/docs/react/guides/recording)
 - [Annotations Guide](/docs/react/guides/annotations)
+- [WAM Plugins Guide](/docs/wam-plugins)
