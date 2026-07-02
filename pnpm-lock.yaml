@@ -710,6 +710,9 @@ importers:
       '@dawcore/transport':
         specifier: workspace:*
         version: link:../packages/transport
+      '@dawcore/wam':
+        specifier: workspace:*
+        version: link:../packages/dawcore-wam
       '@dnd-kit/abstract':
         specifier: ^0.3.2
         version: 0.3.2
