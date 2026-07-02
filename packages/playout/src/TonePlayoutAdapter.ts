@@ -13,7 +13,7 @@ import type { ClipInfo } from './ToneTrack';
 import type { MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 import { now } from 'tone';
-import { getGlobalAudioContext, getGlobalContext } from './audioContext';
+import { getGlobalAudioContext, getGlobalContext, isNativeGlobalContext } from './audioContext';
 
 export interface ToneAdapterOptions {
   effects?: EffectsFunction;
@@ -23,6 +23,20 @@ export interface ToneAdapterOptions {
   ppqn?: number;
 }
 
+/**
+ * Effects wiring hooks consumed by dawcore's EffectsManager (structural match
+ * for its EffectsTransportLike). All hooks require native-context mode —
+ * effect chains carry native AudioNodes (incl. WAM worklets) that cannot join
+ * a standardized-audio-context graph.
+ */
+export interface ToneEffectsTransport {
+  connectTrackOutput(trackId: string, node: AudioNode): void;
+  disconnectTrackOutput(trackId: string): void;
+  connectMasterOutput(node: AudioNode): void;
+  disconnectMasterOutput(): void;
+  readonly masterOutputNode: AudioNode;
+}
+
 export interface ToneAdapter extends PlayoutAdapter {
   /**
    * Provide or swap the SoundFont after creation. Rebuilds only the MIDI
@@ -30,6 +44,8 @@ export interface ToneAdapter extends PlayoutAdapter {
    * Pass undefined to revert MIDI tracks to PolySynth synthesis.
    */
   setSoundFontCache(cache: SoundFontCache | undefined): void;
+  /** Effects wiring hooks (dawcore EffectsManager). Requires native-context mode. */
+  readonly transport: ToneEffectsTransport;
 }
 
 /**
@@ -223,6 +239,31 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       }
     });
   }
+
+  function requireEffectsPlayout(): TonePlayout {
+    if (!isNativeGlobalContext()) {
+      throw new Error(
+        '[waveform-playlist] Effects chains on the Tone adapter require a native ' +
+          'AudioContext. Call configureGlobalContext({ nativeAudioContext: true }) from ' +
+          '@waveform-playlist/playout before any audio initialization.'
+      );
+    }
+    if (!playout) {
+      throw new Error('[waveform-playlist] adapter.transport accessed after dispose.');
+    }
+    return playout;
+  }
+
+  const effectsTransport: ToneEffectsTransport = {
+    connectTrackOutput: (trackId, node) =>
+      requireEffectsPlayout().connectTrackOutput(trackId, node),
+    disconnectTrackOutput: (trackId) => requireEffectsPlayout().disconnectTrackOutput(trackId),
+    connectMasterOutput: (node) => requireEffectsPlayout().connectMasterOutput(node),
+    disconnectMasterOutput: () => requireEffectsPlayout().disconnectMasterOutput(),
+    get masterOutputNode(): AudioNode {
+      return requireEffectsPlayout().masterBusInputNode;
+    },
+  };
 
   return {
     async init(): Promise<void> {
@@ -497,6 +538,10 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
         );
       }
       return playout.masterOutputNode;
+    },
+
+    get transport(): ToneEffectsTransport {
+      return effectsTransport;
     },
 
     setSoundFontCache(cache: SoundFontCache | undefined): void {

@@ -6,6 +6,7 @@ vi.mock('../audioContext', () => ({
     sampleRate: 48000,
   } as unknown as AudioContext),
   getGlobalContext: vi.fn().mockReturnValue({ lookAhead: 0.1 }),
+  isNativeGlobalContext: vi.fn(() => true),
 }));
 
 // Mock TonePlayout before importing adapter
@@ -36,6 +37,11 @@ vi.mock('../TonePlayout', () => {
       dispose: vi.fn(),
       setOnPlaybackComplete: vi.fn(),
       setLoop: vi.fn(),
+      connectTrackOutput: vi.fn(),
+      disconnectTrackOutput: vi.fn(),
+      connectMasterOutput: vi.fn(),
+      disconnectMasterOutput: vi.fn(),
+      masterBusInputNode: { nodeType: 1 },
     })),
   };
 });
@@ -47,6 +53,7 @@ vi.mock('tone', () => ({
 
 import { createToneAdapter, isToneAdapter } from '../TonePlayoutAdapter';
 import { TonePlayout } from '../TonePlayout';
+import { isNativeGlobalContext } from '../audioContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import type { SoundFontCache } from '../SoundFontCache';
@@ -1085,6 +1092,60 @@ describe('createToneAdapter', () => {
     it('rejects adapters without the soundfont capability', () => {
       const bare = { play: vi.fn(), pause: vi.fn() } as unknown as PlayoutAdapter;
       expect(isToneAdapter(bare)).toBe(false);
+    });
+  });
+
+  describe('adapter.transport (effects hooks)', () => {
+    it('is structurally compatible with dawcore EffectsTransportLike', () => {
+      // Copied verbatim from packages/dawcore/src/effects/effects-manager.ts —
+      // guards against the wrong-method-name trap (root CLAUDE.md pattern #11).
+      interface EffectsTransportLike {
+        connectTrackOutput(trackId: string, node: AudioNode): void;
+        disconnectTrackOutput(trackId: string): void;
+        connectMasterOutput(node: AudioNode): void;
+        disconnectMasterOutput(): void;
+        readonly masterOutputNode: AudioNode;
+      }
+      vi.mocked(isNativeGlobalContext).mockReturnValue(true);
+      const adapter = createToneAdapter();
+      const t: EffectsTransportLike = adapter.transport; // compile-time check
+      expect(typeof t.connectTrackOutput).toBe('function');
+    });
+
+    it('delegates hooks to the playout when native mode is on', () => {
+      vi.mocked(isNativeGlobalContext).mockReturnValue(true);
+      const adapter = createToneAdapter();
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      const node = {} as AudioNode;
+
+      adapter.transport.connectTrackOutput('t1', node);
+      expect(mockInstance.connectTrackOutput).toHaveBeenCalledWith('t1', node);
+
+      adapter.transport.connectMasterOutput(node);
+      expect(mockInstance.connectMasterOutput).toHaveBeenCalledWith(node);
+
+      expect(adapter.transport.masterOutputNode).toBe(mockInstance.masterBusInputNode);
+
+      adapter.transport.disconnectTrackOutput('t1');
+      adapter.transport.disconnectMasterOutput();
+      expect(mockInstance.disconnectTrackOutput).toHaveBeenCalledWith('t1');
+      expect(mockInstance.disconnectMasterOutput).toHaveBeenCalled();
+    });
+
+    it('throws a configure-native-context error when the global context is standardized', () => {
+      vi.mocked(isNativeGlobalContext).mockReturnValue(false);
+      const adapter = createToneAdapter();
+      expect(() => adapter.transport.connectMasterOutput({} as AudioNode)).toThrow(
+        /configureGlobalContext\(\{ nativeAudioContext: true \}\)/
+      );
+    });
+
+    it('throws after dispose', () => {
+      vi.mocked(isNativeGlobalContext).mockReturnValue(true);
+      const adapter = createToneAdapter();
+      adapter.dispose();
+      expect(() => adapter.transport.connectMasterOutput({} as AudioNode)).toThrow(/dispose/);
     });
   });
 });

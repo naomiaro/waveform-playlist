@@ -42,4 +42,4 @@ export { getUnderlyingAudioParam } from './fades';
 
 // Export Tone.js adapter for engine integration
 export { createToneAdapter, isToneAdapter } from './TonePlayoutAdapter';
-export type { ToneAdapterOptions, ToneAdapter } from './TonePlayoutAdapter';
+export type { ToneAdapterOptions, ToneAdapter, ToneEffectsTransport } from './TonePlayoutAdapter';
