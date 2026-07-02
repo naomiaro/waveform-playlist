@@ -25,6 +25,8 @@ export {
   resumeGlobalAudioContext,
   getGlobalAudioContextState,
   closeGlobalAudioContext,
+  isNativeGlobalContext,
+  supportsNativeContextMode,
 } from './audioContext';
 export type { AudioContextOptions } from './audioContext';
 
