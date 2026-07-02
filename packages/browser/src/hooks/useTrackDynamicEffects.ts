@@ -9,6 +9,8 @@ import {
 import { createEffectInstance, type EffectInstance } from '../effects/effectFactory';
 import { loadWamModule } from '../effects/loadWam';
 import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamEffectFactory';
+import { buildOfflineChain, connectOfflineChain } from '../effects/offlineChain';
+import type { OfflineTrackEffectsFunction } from './useExportWav';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
 import { Gain, ToneAudioNode, connect } from 'tone';
 
@@ -39,7 +41,6 @@ export interface UseTrackDynamicEffectsReturn {
    * Hosts a WAM plugin from a module URL and appends it to a track's effect chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
-   * Note: WAM entries are skipped during offline WAV export (not supported yet).
    * Resolves with the new entry's instanceId.
    */
   addWamEffectToTrack: (trackId: string, url: string, initialState?: unknown) => Promise<string>;
@@ -58,9 +59,11 @@ export interface UseTrackDynamicEffectsReturn {
 
   /**
    * Creates a fresh effects function for a track for offline rendering.
-   * This creates new effect instances that work in the offline AudioContext.
+   * Native effects are re-created on the offline context; WAM entries are
+   * re-instantiated with the live instance's state transferred. May reject —
+   * a WAV export never silently renders without an effect the live chain has.
    */
-  createOfflineTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
+  createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction | undefined;
 
   // Available effects
   availableEffects: EffectDefinition[];
@@ -443,60 +446,44 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   }, []);
 
   /**
-   * Creates a fresh effects function for a track for offline rendering.
-   * This creates new effect instances in the offline context, avoiding the
-   * AudioContext mismatch issue that occurs when reusing real-time effects.
+   * Creates a fresh effects function for a track for offline rendering. Native
+   * effects are re-created on the offline context; WAM entries are
+   * re-instantiated from the live instance's state (cloneInstanceInto).
    */
   const createOfflineTrackEffectsFunction = useCallback(
-    (trackId: string): TrackEffectsFunction | undefined => {
+    (trackId: string): OfflineTrackEffectsFunction | undefined => {
       const trackEffects = trackEffectsState.get(trackId) || [];
-
-      // WAM plugins cannot be re-instantiated in Tone.Offline's context — skip them.
-      const wamCount = trackEffects.filter((e) => e.kind === 'wam' && !e.bypassed).length;
-      if (wamCount > 0) {
-        console.warn(
-          '[waveform-playlist] ' +
-            wamCount +
-            ' WAM effect(s) are skipped in WAV export — WAM offline rendering is not supported yet.'
-        );
-      }
-
-      // Get non-bypassed native effects
-      const nonBypassedEffects = trackEffects.filter((e) => !e.bypassed && e.kind !== 'wam');
-
-      if (nonBypassedEffects.length === 0) {
+      // Bypassed entries are excluded offline: natives keep the existing
+      // exclusion; WAM entries use disconnection bypass (parity with live).
+      const nonBypassed = trackEffects.filter((e) => !e.bypassed);
+      if (nonBypassed.length === 0) {
         return undefined;
       }
+      const hasWam = nonBypassed.some((e) => e.kind === 'wam');
 
-      // Return a function that creates fresh effect instances
-      return (graphEnd: Gain, masterGainNode: ToneAudioNode, _isOffline: boolean) => {
-        // Create fresh effect instances for offline context
-        const offlineInstances: EffectInstance[] = [];
-
-        for (const activeEffect of nonBypassedEffects) {
-          const instance = createEffectInstance(activeEffect.definition, activeEffect.params);
-          offlineInstances.push(instance);
+      return async (graphEnd: Gain, masterGainNode: ToneAudioNode, _isOffline: boolean) => {
+        if (hasWam && !isNativeGlobalContext()) {
+          throw new Error(
+            '[waveform-playlist] WAV export with WAM effects requires a native AudioContext. ' +
+              'Call configureGlobalContext({ nativeAudioContext: true }) from ' +
+              '@waveform-playlist/playout before any audio initialization.'
+          );
         }
-
-        if (offlineInstances.length === 0) {
-          // No effects - connect directly
-          graphEnd.connect(masterGainNode);
-        } else {
-          // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-          let currentNode: ToneAudioNode | AudioNode = graphEnd;
-
-          offlineInstances.forEach((inst) => {
-            connect(currentNode, inst.effect);
-            currentNode = inst.effect;
-          });
-
-          // Connect last effect to master
-          connect(currentNode, masterGainNode);
-        }
-
-        return function cleanup() {
-          offlineInstances.forEach((inst) => inst.dispose());
-        };
+        // Tone nodes inside the offline build are created on the current
+        // (offline) global context — its rawContext must host the WAM clones.
+        const rawContext = graphEnd.context.rawContext as unknown as BaseAudioContext;
+        const { instances, dispose } = await buildOfflineChain(
+          nonBypassed,
+          (instanceId) => {
+            const inst = trackEffectInstancesRef.current.get(trackId)?.get(instanceId) as
+              | WamEffectInstance
+              | undefined;
+            return inst?.kind === 'wam' ? inst.plugin : undefined;
+          },
+          rawContext
+        );
+        connectOfflineChain(graphEnd, instances, masterGainNode);
+        return dispose;
       };
     },
     [trackEffectsState]
