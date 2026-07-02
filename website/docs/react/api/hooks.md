@@ -902,7 +902,7 @@ interface UseDynamicEffectsReturn {
    * Hosts a WAM plugin from a module URL and appends it to the master chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
-   * WAM entries are skipped during offline WAV export (not supported yet).
+   * WAM entries render in offline WAV export (re-instantiated on the offline context).
    */
   addWamEffect: (url: string, initialState?: unknown) => Promise<string>;
   /** Live plugin handle for a hosted WAM entry (for GUI mounting via WamEffectGui). */
@@ -913,7 +913,14 @@ interface UseDynamicEffectsReturn {
   reorderEffects: (fromIndex: number, toIndex: number) => void;
   clearAllEffects: () => void;
   masterEffects: EffectsFunction;
-  createOfflineEffectsFunction: () => EffectsFunction | undefined;
+  /**
+   * Creates a fresh effects function for offline rendering. Native effects are
+   * re-created on the offline context; WAM entries are re-instantiated from
+   * their URL-cached factories with the live instance's state transferred.
+   * The returned function may be async and may reject — a WAV export never
+   * silently renders without an effect the live chain has.
+   */
+  createOfflineEffectsFunction: () => OfflineEffectsFunction | undefined;
   analyserRef: RefObject<Analyser | null>;
 }
 
@@ -948,7 +955,7 @@ interface UseTrackDynamicEffectsReturn {
    * Hosts a WAM plugin from a module URL and appends it to a track's effect chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
-   * WAM entries are skipped during offline WAV export (not supported yet).
+   * WAM entries render in offline WAV export (re-instantiated on the offline context).
    */
   addWamEffectToTrack: (trackId: string, url: string, initialState?: unknown) => Promise<string>;
   /** Live plugin handle for a hosted WAM entry on a track (for GUI mounting via WamEffectGui). */
@@ -963,7 +970,13 @@ interface UseTrackDynamicEffectsReturn {
   toggleBypass: (trackId: string, instanceId: string) => void;
   clearTrackEffects: (trackId: string) => void;
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
-  createOfflineTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
+  /**
+   * Creates a fresh effects function for a track for offline rendering. Native
+   * effects are re-created on the offline context; WAM entries are
+   * re-instantiated with the live instance's state transferred. May reject —
+   * a WAV export never silently renders without an effect the live chain has.
+   */
+  createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction | undefined;
   availableEffects: EffectDefinition[];
 }
 
@@ -1120,7 +1133,7 @@ interface ExportOptions {
   trackIndex?: number;    // Track index for individual export
   bitDepth?: 16 | 32;     // WAV bit depth (default: 16)
   applyEffects?: boolean; // Apply fades and effects (default: true)
-  effectsFunction?: EffectsFunction;  // Tone.js effects chain for export
+  effectsFunction?: OfflineEffectsFunction;  // Effects chain for export (native + WAM)
   autoDownload?: boolean; // Trigger automatic download (default: true)
   onProgress?: (progress: number) => void;
 }
@@ -1128,14 +1141,16 @@ interface ExportOptions {
 
 ### Effects Function
 
-When an `effectsFunction` is provided and `applyEffects` is true, export uses `Tone.Offline` to render through the effects chain. This allows exporting with reverb, delay, and other Tone.js effects.
+When an `effectsFunction` is provided and `applyEffects` is true, export renders through the effects chain — native Tone.js effects and hosted WAM plugins alike. WAM entries are re-instantiated on the offline context from their URL-cached factories with the live instance's state transferred; a WAM plugin that fails to re-instantiate fails the export. The function may return a cleanup callback synchronously or asynchronously.
 
 ```typescript
-type EffectsFunction = (
+type OfflineEffectsCleanup = void | (() => void);
+
+type OfflineEffectsFunction = (
   masterVolume: Volume,
   destination: ToneAudioNode,
   isOffline: boolean  // true during export
-) => void | (() => void);
+) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 ```
 
 ### ExportResult
