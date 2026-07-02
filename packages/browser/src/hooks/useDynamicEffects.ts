@@ -40,6 +40,7 @@ export interface UseDynamicEffectsReturn {
    * Hosts a WAM plugin from a module URL and appends it to the master chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
+   * WAM entries render in offline WAV export (re-instantiated on the offline context).
    * Resolves with the new entry's instanceId.
    */
   addWamEffect: (url: string, initialState?: unknown) => Promise<string>;
@@ -384,9 +385,9 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   }, []);
 
   /**
-   * Creates a fresh effects function for offline rendering.
-   * This creates new effect instances in the offline context, avoiding the
-   * AudioContext mismatch issue that occurs when reusing real-time effects.
+   * Creates a fresh effects function for offline rendering. Native effects
+   * are re-created on the offline context; WAM entries are re-instantiated
+   * from the live instance's state (cloneInstanceInto), asynchronously.
    */
   const createOfflineEffectsFunction = useCallback((): OfflineEffectsFunction | undefined => {
     // Bypassed entries are excluded offline: natives keep the existing

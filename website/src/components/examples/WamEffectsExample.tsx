@@ -526,8 +526,7 @@ export function WamEffectsExample() {
   const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
   const selectedTrackName = selectedTrack?.name ?? 'Track';
 
-  // Recompute offline export functions only when the effect chains change — the
-  // master hook logs a WAM-skip warning each call, so we avoid per-render churn.
+  // Recompute offline export functions only when the effect chains change.
   const { createOfflineEffectsFunction } = masterFx;
   const offlineMaster = useMemo(
     () => createOfflineEffectsFunction(),

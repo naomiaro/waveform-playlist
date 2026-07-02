@@ -82,13 +82,13 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Bypass Pattern:** When bypassing, store original wet value and set to 0. On re-enable, restore original wet value (not always 1).
 
-**Offline Rendering:** Both hooks provide `createOfflineEffectsFunction()` for WAV export via `Tone.Offline`.
+**Offline Rendering:** Both hooks provide `createOffline*EffectsFunction()` (`createOfflineEffectsFunction` / `createOfflineTrackEffectsFunction`) for WAV export. The returned function may be async — native effects are re-created synchronously on the offline context, while WAM entries are re-instantiated via `cloneInstanceInto` with the live instance's `getState()` transferred. Bypassed WAM entries are excluded (disconnection bypass, parity with live). A WAM clone failure fails the export rather than silently rendering without it (fail-loud).
 
 **Documentation:** `website/docs/effects.md`
 
 ## WAV Export (useExportWav)
 
-**Single render path:** Export uses `Tone.Offline` exclusively via `renderOffline()`. The offline graph mirrors the live playback topology (`Player → fadeGain → trackVolume → trackPan → trackMute → masterVolume → destination`). Master and per-track effects chains are conditionally inserted when provided.
+**Single render path:** Export renders via `renderToneOffline()` (`src/utils/renderToneOffline.ts`), a hand-rolled `Tone.Offline` equivalent. It wraps a native `OfflineAudioContext` in a Tone `OfflineContext` when `isNativeGlobalContext()` is true (required to host WAM worklets offline), and constructs the standard `OfflineContext` otherwise. The previous global Tone context is restored in a `finally` block — unlike upstream `Tone.Offline`, a build that throws can't leave the offline context installed as the app's global context. Renders are serialized through a module-level promise queue: the async graph build (WAM host init + clone can take 100ms–1s) makes overlapping `getContext()`/`setContext()` swaps a real risk — a concurrent second export would capture the first's offline context as "previous" and restore a spent `OfflineAudioContext` as the global context. The offline graph mirrors the live playback topology (`Player → fadeGain → trackVolume → trackPan → trackMute → masterVolume → destination`); master and per-track effects chains are conditionally inserted when provided, and their cleanups (destroying offline WAM clones) run in a `finally` block regardless of success or failure.
 
 **Why single path:** Previously had a native `OfflineAudioContext` path (no effects) and a `Tone.Offline` path (with effects). The dual paths diverged — the native path used `StereoPannerNode` (correct stereo) while the Tone path used `Panner` without `channelCount: 2` (stereo→mono downmix). Unifying prevents this class of bug.
 

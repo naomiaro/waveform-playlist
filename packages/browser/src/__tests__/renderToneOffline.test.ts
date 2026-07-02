@@ -106,4 +106,25 @@ describe('renderToneOffline', () => {
       /produced no audio buffer/
     );
   });
+
+  it('serializes concurrent renders — the global context is never restored to a spent offline context', async () => {
+    // Stateful context tracking: getContext returns whatever setContext last set.
+    let current: unknown = previousContext;
+    state.getContext.mockImplementation(() => current);
+    state.setContext.mockImplementation((ctx: unknown) => {
+      current = ctx;
+    });
+    // Slow builds so the two renders would overlap without serialization.
+    const slowBuild = () => new Promise<void>((r) => setTimeout(r, 20));
+    const [a, b] = await Promise.all([
+      renderToneOffline(slowBuild, 1, 2, 48000),
+      renderToneOffline(slowBuild, 1, 2, 48000),
+    ]);
+    expect(a).toBe(renderedAudioBuffer);
+    expect(b).toBe(renderedAudioBuffer);
+    // After both complete, the global context must be the ORIGINAL previous
+    // context — under interleaving, the last restore leaves an offline context.
+    expect(current).toBe(previousContext);
+    expect(current).not.toBeInstanceOf(MockOfflineContext);
+  });
 });

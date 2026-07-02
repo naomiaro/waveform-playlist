@@ -41,6 +41,7 @@ export interface UseTrackDynamicEffectsReturn {
    * Hosts a WAM plugin from a module URL and appends it to a track's effect chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
+   * WAM entries render in offline WAV export (re-instantiated on the offline context).
    * Resolves with the new entry's instanceId.
    */
   addWamEffectToTrack: (trackId: string, url: string, initialState?: unknown) => Promise<string>;

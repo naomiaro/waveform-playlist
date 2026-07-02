@@ -357,7 +357,6 @@ async function renderOffline(
       sampleRate
     );
 
-    onProgress(0.9);
     return audioBuffer;
   } catch (err) {
     if (err instanceof Error) {
