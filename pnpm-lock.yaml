@@ -184,6 +184,9 @@ importers:
         specifier: ^4.5.2
         version: 4.5.2
     devDependencies:
+      '@dawcore/wam':
+        specifier: workspace:*
+        version: link:../dawcore-wam
       '@types/node':
         specifier: ^20.19.42
         version: 20.19.42
