@@ -147,7 +147,8 @@ Runnable demo: `examples/dawcore-tone/wam.html` (`pnpm example:dawcore-tone`).
 
 - **WAV export skips WAM entries** (follow-up planned). `useExportWav()` renders offline via `Tone.Offline`, which creates its own `standardized-audio-context` context and cannot host WAM worklets. `createOfflineEffectsFunction()` and `createOfflineTrackEffectsFunction()` skip WAM entries with a console warning — only native Tone.js effects render into the exported WAV. A follow-up would render exports on a native `OfflineAudioContext` instead, mirroring dawcore's `exportAudio()`.
 - **No tempo/transport broadcast on the Tone adapter** (follow-up planned). `@dawcore/wam`'s transport bridge (tempo-synced delays, LFOs, arpeggiators) needs a query surface the Tone adapter's `transport` doesn't implement yet. WAM plugins on the Tone backend receive audio but no transport/tempo events.
-- **MIDI-track per-track chains are unsupported on the Tone adapter.** `useTrackDynamicEffects` wires per-track chains through the adapter's `connectTrackOutput(trackId, node)`, which expects an audio playout track. MIDI clips route through `MidiToneTrack`/`SoundFontToneTrack` instead, so per-track effects (WAM or native) added to a MIDI-only track are not connected to playback.
+- **Web Components (`<daw-editor>`) on the Tone adapter:** per-track effect chains use the adapter's `transport.connectTrackOutput(trackId, node)` hook, which supports audio tracks only — adding a per-track chain to a MIDI-only track throws. Master chains work for all track types.
+- **React hooks** are unaffected by this limitation: `useTrackDynamicEffects` wires chains through the track-effects closure, which applies to audio, MIDI, and SoundFont playout tracks alike.
 
 ## See also
 
