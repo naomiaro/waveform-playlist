@@ -1,16 +1,27 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { EffectsFunction } from '@waveform-playlist/playout';
+import {
+  isNativeGlobalContext,
+  getGlobalAudioContext,
+  type EffectsFunction,
+} from '@waveform-playlist/playout';
 import {
   effectDefinitions,
   getEffectDefinition,
   type EffectDefinition,
 } from '../effects/effectDefinitions';
 import { createEffectInstance, type EffectInstance } from '../effects/effectFactory';
+import { loadWamModule } from '../effects/loadWam';
+import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamEffectFactory';
+import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
 import { Analyser, Volume, ToneAudioNode, connect } from 'tone';
 
 export interface ActiveEffect {
   instanceId: string;
   effectId: string;
+  /** 'native' = built-in Tone effect; 'wam' = hosted WAM plugin. */
+  kind: 'native' | 'wam';
+  /** Module URL for wam entries. */
+  url?: string;
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
   bypassed: boolean;
@@ -23,6 +34,16 @@ export interface UseDynamicEffectsReturn {
 
   // Actions
   addEffect: (effectId: string) => void;
+  /**
+   * Hosts a WAM plugin from a module URL and appends it to the master chain.
+   * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
+   * from @waveform-playlist/playout before any audio initialization.
+   * Note: WAM entries are skipped during offline WAV export (not supported yet).
+   * Resolves with the new entry's instanceId.
+   */
+  addWamEffect: (url: string, initialState?: unknown) => Promise<string>;
+  /** Live plugin handle for a hosted WAM entry (for GUI mounting via WamEffectGui). */
+  getWamPlugin: (instanceId: string) => WamPluginInstance | undefined;
   removeEffect: (instanceId: string) => void;
   updateParameter: (
     instanceId: string,
@@ -85,8 +106,10 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
       console.warn('[waveform-playlist] Error disconnecting master effects chain:', e);
     }
 
-    // Get effect instances in order
-    const instances = effects
+    // Get effect instances in order. Bypassed WAM entries are dropped from the
+    // chain entirely (disconnection bypass — WAM has no wet param).
+    const audible = effects.filter((ae) => !(ae.kind === 'wam' && ae.bypassed));
+    const instances = audible
       .map((ae) => effectInstancesRef.current.get(ae.instanceId))
       .filter((inst): inst is EffectInstance => inst !== undefined);
 
@@ -136,12 +159,62 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     const newActiveEffect: ActiveEffect = {
       instanceId: instance.instanceId,
       effectId: definition.id,
+      kind: 'native',
       definition,
       params,
       bypassed: false,
     };
 
     setActiveEffects((prev) => [...prev, newActiveEffect]);
+  }, []);
+
+  // Host a WAM plugin and append it to the chain. Requires native-context mode.
+  const addWamEffect = useCallback(async (url: string, initialState?: unknown): Promise<string> => {
+    if (!isNativeGlobalContext()) {
+      throw new Error(
+        '[waveform-playlist] WAM plugins require a native AudioContext. Call ' +
+          'configureGlobalContext({ nativeAudioContext: true }) from ' +
+          '@waveform-playlist/playout before any audio initialization.'
+      );
+    }
+    const wam = await loadWamModule();
+    const ctx = getGlobalAudioContext();
+    const { hostGroupId } = await wam.ensureWamHost(ctx);
+    const plugin = await wam.createWamInstance(
+      url,
+      ctx,
+      hostGroupId,
+      initialState !== undefined ? { initialState } : undefined
+    );
+    const instance = createWamEffectInstance(plugin);
+    effectInstancesRef.current.set(instance.instanceId, instance);
+
+    const definition: EffectDefinition = {
+      id: instance.id,
+      name: plugin.descriptor?.name ?? url,
+      category: 'wam',
+      description: 'WAM plugin',
+      parameters: [],
+    };
+    setActiveEffects((prev) => [
+      ...prev,
+      {
+        instanceId: instance.instanceId,
+        effectId: instance.id,
+        kind: 'wam',
+        url,
+        definition,
+        params: {},
+        bypassed: false,
+      },
+    ]);
+    return instance.instanceId;
+  }, []);
+
+  // Live plugin handle for GUI mounting (WamEffectGui).
+  const getWamPlugin = useCallback((instanceId: string): WamPluginInstance | undefined => {
+    const inst = effectInstancesRef.current.get(instanceId) as WamEffectInstance | undefined;
+    return inst?.kind === 'wam' ? inst.plugin : undefined;
   }, []);
 
   // Remove an effect
@@ -181,6 +254,14 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     if (!effect) return;
 
     const newBypassed = !effect.bypassed;
+
+    if (effect.kind === 'wam') {
+      // Disconnection bypass: the rebuild effect drops bypassed wam entries.
+      setActiveEffects((prev) =>
+        prev.map((e) => (e.instanceId === instanceId ? { ...e, bypassed: newBypassed } : e))
+      );
+      return;
+    }
 
     // Update the actual effect instance
     // When bypassing: set wet to 0
@@ -236,9 +317,11 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
         analyserNode,
       };
 
-      // Build initial chain - read from ref to get current state
+      // Build initial chain - read from ref to get current state.
+      // Bypassed WAM entries are dropped (disconnection bypass — no wet param).
       const effects = activeEffectsRef.current;
-      const instances = effects
+      const audible = effects.filter((ae) => !(ae.kind === 'wam' && ae.bypassed));
+      const instances = audible
         .map((ae) => effectInstancesRef.current.get(ae.instanceId))
         .filter((inst): inst is EffectInstance => inst !== undefined);
 
@@ -284,8 +367,18 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
    * AudioContext mismatch issue that occurs when reusing real-time effects.
    */
   const createOfflineEffectsFunction = useCallback((): EffectsFunction | undefined => {
-    // Get non-bypassed effects
-    const nonBypassedEffects = activeEffects.filter((e) => !e.bypassed);
+    // WAM plugins cannot be re-instantiated in Tone.Offline's context — skip them.
+    const wamCount = activeEffects.filter((e) => e.kind === 'wam' && !e.bypassed).length;
+    if (wamCount > 0) {
+      console.warn(
+        '[waveform-playlist] ' +
+          wamCount +
+          ' WAM effect(s) are skipped in WAV export — WAM offline rendering is not supported yet.'
+      );
+    }
+
+    // Get non-bypassed native effects
+    const nonBypassedEffects = activeEffects.filter((e) => !e.bypassed && e.kind !== 'wam');
 
     if (nonBypassedEffects.length === 0) {
       return undefined;
@@ -327,6 +420,8 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     activeEffects,
     availableEffects: effectDefinitions,
     addEffect,
+    addWamEffect,
+    getWamPlugin,
     removeEffect,
     updateParameter,
     toggleBypass,

@@ -187,6 +187,9 @@ importers:
       '@dawcore/wam':
         specifier: workspace:*
         version: link:../dawcore-wam
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@19.2.7)(react@19.2.7)
       '@types/node':
         specifier: ^20.19.42
         version: 20.19.42
@@ -8720,6 +8723,29 @@ packages:
       '@types/react-dom': 18.3.7(@types/react@18.3.31)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
+    dev: true
+
+  /@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@19.2.7)(react@19.2.7):
+    resolution: {integrity: sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@testing-library/dom': ^10.0.0
+      '@types/react': ^18.0.0 || ^19.0.0
+      '@types/react-dom': ^18.0.0 || ^19.0.0
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+    dependencies:
+      '@babel/runtime': 7.29.7
+      '@testing-library/dom': 10.4.1
+      '@types/react': 18.3.31
+      '@types/react-dom': 18.3.7(@types/react@18.3.31)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
     dev: true
 
   /@testing-library/user-event@14.6.1(@testing-library/dom@10.4.1):
