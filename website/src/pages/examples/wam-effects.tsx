@@ -15,9 +15,9 @@ const DESCRIPTION =
 
 export default function WamEffectsExamplePage(): React.ReactElement {
   return (
-    <Layout title="WAM Plugins Example" description={DESCRIPTION}>
+    <Layout title="WAM! Kick It Up a Notch" description={DESCRIPTION}>
       <Head>
-        <meta property="og:title" content="WAM Plugins Example - Waveform Playlist" />
+        <meta property="og:title" content="WAM! Kick It Up a Notch - Waveform Playlist" />
         <meta property="og:description" content={DESCRIPTION} />
         <meta
           property="og:image"
@@ -25,7 +25,7 @@ export default function WamEffectsExamplePage(): React.ReactElement {
         />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="WAM Plugins Example - Waveform Playlist" />
+        <meta name="twitter:title" content="WAM! Kick It Up a Notch - Waveform Playlist" />
         <meta name="twitter:description" content={DESCRIPTION} />
         <meta
           name="twitter:image"
@@ -33,10 +33,11 @@ export default function WamEffectsExamplePage(): React.ReactElement {
         />
       </Head>
       <main className="container margin-vert--lg">
-        <h1>WAM Plugins Example</h1>
+        <h1>WAM! Kick It Up a Notch</h1>
         <p style={{ marginBottom: '2rem' }}>
-          Host <a href="https://www.webaudiomodules.com/">Web Audio Modules (WAM 2.0)</a> plugins in
-          a multitrack session. Browse the community registry, mount each plugin&apos;s native GUI,
+          Kick your mix up a notch: host{' '}
+          <a href="https://www.webaudiomodules.com/">Web Audio Modules (WAM 2.0)</a> plugins in a
+          multitrack session. Browse the community registry, mount each plugin&apos;s native GUI,
           and mix WAM plugins with built-in Tone.js effects in per-track and master chains.
         </p>
 

@@ -482,9 +482,12 @@ export function WamEffectsExample() {
   }, [loadedTracks]);
 
   // Attach per-track effects functions so WAM/native inserts can be added live.
+  // Depend on the stable callback, not the whole `trackFx` object (a fresh object
+  // every render) — otherwise this memo recomputes on every render, producing new
+  // track objects and forcing a full engine rebuild on every interaction.
   const tracksWithEffects = useMemo(
     () => tracks.map((track) => ({ ...track, effects: trackFx.getTrackEffectsFunction(track.id) })),
-    [tracks, trackFx]
+    [tracks, trackFx.getTrackEffectsFunction]
   );
 
   const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
@@ -533,7 +536,7 @@ export function WamEffectsExample() {
         setAddingKey(null);
       }
     },
-    [masterFx, trackFx, selectedTrackId, selectedTrackName]
+    [masterFx.addWamEffect, trackFx.addWamEffectToTrack, selectedTrackId, selectedTrackName]
   );
 
   const masterEntries = masterFx.activeEffects;
