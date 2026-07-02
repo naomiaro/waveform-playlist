@@ -29,7 +29,7 @@ import type { EffectDefinition } from './effectDefinitions';
 
 // Type for effect instance with common methods
 export interface EffectInstance {
-  effect: ToneAudioNode; // Tone.js effect instance
+  effect: ToneAudioNode | AudioNode; // Tone.js effect, or a native node (WAM plugins)
   id: string;
   instanceId: string;
   dispose: () => void;
