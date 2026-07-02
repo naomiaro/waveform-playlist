@@ -39,3 +39,9 @@ export type { EffectDefinition, EffectParameter, ParameterType, EffectInstance }
 
 export { ExportWavButton } from './components/ExportControls';
 export type { ExportWavButtonProps } from './components/ExportControls';
+
+export { WamEffectGui } from './components/WamEffectGui';
+export type { WamEffectGuiProps } from './components/WamEffectGui';
+export { loadWamModule } from './effects/loadWam';
+export { createWamEffectInstance } from './effects/wamEffectFactory';
+export type { WamEffectInstance } from './effects/wamEffectFactory';
