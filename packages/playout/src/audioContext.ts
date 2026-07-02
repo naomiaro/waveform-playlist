@@ -4,15 +4,26 @@
  * Provides a single AudioContext shared across the entire application.
  * This context is used by Tone.js for playback and by all recording/monitoring hooks.
  *
- * Uses Tone.js's Context class which wraps standardized-audio-context for
- * cross-browser compatibility (fixes Firefox AudioListener issues).
+ * Supports both native AudioContext (WAM 2.0 plugin hosting, requires
+ * AudioListener AudioParams — Firefox fallback to standardized-audio-context)
+ * and standardized-audio-context wrapper for cross-browser compatibility.
  */
 
 import { Context, setContext } from 'tone';
 
 let globalToneContext: Context | null = null;
+let _nativeMode = false;
 
 export interface AudioContextOptions {
+  /**
+   * Create the global context around a NATIVE AudioContext instead of
+   * standardized-audio-context. Required for WAM 2.0 plugin hosting — WAM
+   * worklets subclass the native AudioWorkletNode and cannot join a
+   * standardized-audio-context graph. Falls back to the default context
+   * (with a console warning) on browsers missing AudioListener AudioParams
+   * (Firefox), where Tone.js Listener initialization would throw.
+   */
+  nativeAudioContext?: boolean;
   /** Desired sample rate. Creates a standardized-audio-context AudioContext
    *  at this rate, bypassing Tone.js 15.1.22's limitation. Cross-browser safe. */
   sampleRate?: number;
@@ -21,20 +32,53 @@ export interface AudioContextOptions {
 }
 
 /**
+ * Whether this browser can run Tone.js on a raw native AudioContext.
+ * Firefox lacks the AudioListener AudioParams (positionX/…/upZ) that Tone's
+ * Listener wraps eagerly at context initialization (Tone.js #681) —
+ * standardized-audio-context polyfills them, native contexts cannot.
+ */
+export function supportsNativeContextMode(): boolean {
+  return (
+    typeof AudioContext !== 'undefined' &&
+    typeof AudioListener !== 'undefined' &&
+    'positionX' in AudioListener.prototype
+  );
+}
+
+/**
+ * True when the global context wraps a native AudioContext (WAM-capable).
+ */
+export function isNativeGlobalContext(): boolean {
+  return _nativeMode && globalToneContext !== null;
+}
+
+/** Test-only: clears the module singleton. Not exported from the package index. */
+export function _resetGlobalContextForTests(): void {
+  globalToneContext = null;
+  _nativeMode = false;
+}
+
+/**
  * Configure the global AudioContext with sample rate and latency hints.
- * Creates a standardized-audio-context AudioContext (cross-browser, fixes
- * Firefox AudioListener bug) and wraps it in Tone.js Context.
+ * Supports both native AudioContext (for WAM 2.0 hosting) and standardized-audio-context.
  *
  * Should be called BEFORE getGlobalContext(). If the context already exists
  * (e.g., from resumeGlobalAudioContext), warns and returns the existing rate.
  *
  * ```ts
  * configureGlobalContext({ sampleRate: 48000, latencyHint: 0 })
+ * configureGlobalContext({ nativeAudioContext: true, sampleRate: 48000 })
  * ```
  */
 export function configureGlobalContext(options: AudioContextOptions): number {
   if (globalToneContext) {
     const existingRate = (globalToneContext.rawContext as AudioContext).sampleRate;
+    if (options.nativeAudioContext && !_nativeMode) {
+      console.warn(
+        '[playout] configureGlobalContext: context already created — nativeAudioContext ' +
+          'ignored. Call configureGlobalContext before any audio operations.'
+      );
+    }
     if (options.sampleRate !== undefined && options.sampleRate !== existingRate) {
       console.warn(
         '[playout] configureGlobalContext: context already created at ' +
@@ -46,10 +90,30 @@ export function configureGlobalContext(options: AudioContextOptions): number {
     }
     return existingRate;
   }
-  // TODO: Tone.js 15.1.22 doesn't pass sampleRate to standardized-audio-context,
-  // and passing a StdAudioContext directly to new Context() causes "param must be
-  // an AudioParam" errors. Wait for Tone.js to release the sampleRate fix.
-  // For now, create a standard Context and compare rates.
+
+  if (options.nativeAudioContext) {
+    if (supportsNativeContextMode()) {
+      const nativeCtx = new AudioContext({
+        ...(options.sampleRate !== undefined ? { sampleRate: options.sampleRate } : {}),
+        ...(options.latencyHint !== undefined ? { latencyHint: options.latencyHint } : {}),
+      });
+      // Tone's Context constructor accepts an existing context; its typing is
+      // standardized-audio-context's, so cast through the constructor params.
+      globalToneContext = new Context(
+        nativeCtx as unknown as ConstructorParameters<typeof Context>[0]
+      );
+      setContext(globalToneContext);
+      _nativeMode = true;
+      return nativeCtx.sampleRate;
+    }
+    console.warn(
+      '[playout] nativeAudioContext requested but this browser does not implement the ' +
+        'AudioListener AudioParams Tone.js needs on a native context (Firefox). Falling back ' +
+        'to the standardized-audio-context default — WAM plugin hosting is unavailable.'
+    );
+  }
+
+  // Default (standardized-audio-context) path — unchanged behavior.
   globalToneContext = new Context();
   setContext(globalToneContext);
   const actualRate = (globalToneContext.rawContext as AudioContext).sampleRate;
@@ -127,5 +191,6 @@ export async function closeGlobalAudioContext(): Promise<void> {
   if (globalToneContext && globalToneContext.rawContext.state !== 'closed') {
     await globalToneContext.close();
     globalToneContext = null;
+    _nativeMode = false;
   }
 }

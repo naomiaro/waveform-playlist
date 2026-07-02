@@ -51,6 +51,9 @@ export class ToneTrack {
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
+  private _destination: ToneAudioNode;
+  private _hasClosureEffects: boolean;
+  private _effectsChainNode: AudioNode | null = null;
   // Guard against ghost tick schedule callbacks. After stop/start cycles with
   // loops, stale Clock._lastUpdate causes ticks from the previous cycle to fire
   // Transport.schedule() callbacks at past positions (e.g., time 0 clips fire
@@ -75,14 +78,15 @@ export class ToneTrack {
     this.volumeNode.chain(this.panNode, this.muteGain);
 
     // Connect to destination or apply effects chain
-    const destination = options.destination || getDestination();
+    this._destination = options.destination || getDestination();
+    this._hasClosureEffects = Boolean(options.effects);
     if (options.effects) {
-      const cleanup = options.effects(this.muteGain, destination, false);
+      const cleanup = options.effects(this.muteGain, this._destination, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
     } else {
-      this.muteGain.connect(destination);
+      this.muteGain.connect(this._destination);
     }
 
     // Create clips array - support both legacy single buffer and modern clips array
@@ -542,6 +546,45 @@ export class ToneTrack {
 
   setSolo(soloed: boolean): void {
     this.track.soloed = soloed;
+  }
+
+  /**
+   * Insert an external effects chain: reroute muteGain → node instead of
+   * muteGain → destination. The caller wires the chain's output onward
+   * (dawcore's EffectsManager connects it to the master bus input).
+   * Mutually exclusive with the TrackEffectsFunction closure model.
+   */
+  connectEffects(node: AudioNode): void {
+    if (this._hasClosureEffects) {
+      throw new Error(
+        '[waveform-playlist] Track "' +
+          this.track.id +
+          '" was built with a TrackEffectsFunction closure — transport effects hooks and ' +
+          'closure effects are mutually exclusive.'
+      );
+    }
+    if (this._effectsChainNode) {
+      this.muteGain.disconnect(this._effectsChainNode);
+    } else {
+      this.muteGain.disconnect(this._destination);
+    }
+    this.muteGain.connect(node);
+    this._effectsChainNode = node;
+  }
+
+  /** Restore the direct muteGain → destination connection. Safe when nothing is connected. */
+  disconnectEffects(): void {
+    if (!this._effectsChainNode) return;
+    try {
+      this.muteGain.disconnect(this._effectsChainNode);
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] disconnectEffects: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
+    }
+    this.muteGain.connect(this._destination);
+    this._effectsChainNode = null;
   }
 
   dispose(): void {

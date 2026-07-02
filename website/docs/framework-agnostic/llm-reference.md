@@ -432,6 +432,8 @@ interface UseDynamicEffectsReturn {
   activeEffects: ActiveEffect[];
   availableEffects: EffectDefinition[];
   addEffect: (effectId: string) => void;
+  addWamEffect: (url: string, initialState?: unknown) => Promise<string>;
+  getWamPlugin: (instanceId: string) => WamPluginInstance | undefined;
   removeEffect: (instanceId: string) => void;
   updateParameter: (instanceId: string, paramName: string, value: number | string | boolean) => void;
   toggleBypass: (instanceId: string) => void;
@@ -439,12 +441,14 @@ interface UseDynamicEffectsReturn {
   clearAllEffects: () => void;
   masterEffects: EffectsFunction;
   createOfflineEffectsFunction: () => EffectsFunction | undefined;
-  analyserRef: RefObject<any>;
+  analyserRef: RefObject<Analyser | null>;
 }
 
 interface ActiveEffect {
   instanceId: string;
   effectId: string;
+  kind: 'native' | 'wam';
+  url?: string;               // Module URL for wam entries
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
   bypassed: boolean;
@@ -459,6 +463,8 @@ function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn;
 interface UseTrackDynamicEffectsReturn {
   trackEffectsState: Map<string, TrackActiveEffect[]>;
   addEffectToTrack: (trackId: string, effectId: string) => void;
+  addWamEffectToTrack: (trackId: string, url: string, initialState?: unknown) => Promise<string>;
+  getTrackWamPlugin: (trackId: string, instanceId: string) => WamPluginInstance | undefined;
   removeEffectFromTrack: (trackId: string, instanceId: string) => void;
   updateTrackEffectParameter: (trackId: string, instanceId: string, paramName: string, value: number | string | boolean) => void;
   toggleBypass: (trackId: string, instanceId: string) => void;
@@ -471,10 +477,68 @@ interface UseTrackDynamicEffectsReturn {
 interface TrackActiveEffect {
   instanceId: string;
   effectId: string;
+  kind: 'native' | 'wam';
+  url?: string;               // Module URL for wam entries
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
   bypassed: boolean;
 }
+```
+
+---
+
+## WAM Plugins (`@dawcore/wam` + native AudioContext mode)
+
+*Native-context management is from `@waveform-playlist/playout`. `WamEffectGui`/`WamEffectInstance` are from `@waveform-playlist/browser/tone`. See the [WAM Plugins guide](/docs/wam-plugins).*
+
+```typescript
+interface AudioContextOptions {
+  /** Create the global context around a native AudioContext (required for WAM 2.0
+   *  hosting). Falls back to the default context on browsers missing AudioListener
+   *  AudioParams (Firefox). */
+  nativeAudioContext?: boolean;
+  sampleRate?: number;
+  latencyHint?: AudioContextLatencyCategory | number;
+}
+
+function configureGlobalContext(options: AudioContextOptions): number;
+
+/** Whether this browser can run Tone.js on a raw native AudioContext (false on Firefox). */
+function supportsNativeContextMode(): boolean;
+
+/** True when the global context wraps a native AudioContext (WAM-capable). */
+function isNativeGlobalContext(): boolean;
+
+/** Effects wiring hooks consumed by dawcore's EffectsManager. All hooks require
+ *  native-context mode. */
+interface ToneEffectsTransport {
+  connectTrackOutput(trackId: string, node: AudioNode): void;
+  disconnectTrackOutput(trackId: string): void;
+  connectMasterOutput(node: AudioNode): void;
+  disconnectMasterOutput(): void;
+  readonly masterOutputNode: AudioNode;
+}
+
+// On ToneAdapter (createToneAdapter() return type):
+//   readonly transport: ToneEffectsTransport;
+```
+
+```typescript
+// From @waveform-playlist/browser/tone
+
+interface WamEffectInstance extends EffectInstance {
+  kind: 'wam';
+  plugin: WamPluginInstance;   // from @dawcore/wam
+  url?: string;
+}
+
+interface WamEffectGuiProps {
+  /** Live plugin handle from getWamPlugin/getTrackWamPlugin. */
+  plugin: WamPluginInstance | undefined;
+  className?: string;
+}
+
+function loadWamModule(): Promise<typeof import('@dawcore/wam')>;
 ```
 
 ---

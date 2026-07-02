@@ -32,6 +32,7 @@ const FORBIDDEN = [
   'tone',
   '@waveform-playlist/playout',
   '@waveform-playlist/media-element-playout',
+  '@dawcore/wam',
 ];
 
 // `import (type)? ... from '<spec>'` (multi-line bodies via [\s\S]*?) plus

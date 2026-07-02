@@ -20,6 +20,7 @@ waveform-playlist is a React component library for building browser-based audio 
 ## Packages
 
 - `@waveform-playlist/browser` — Main package: React components, hooks, effects. Playout engines (`@waveform-playlist/playout` + `tone`, or `@waveform-playlist/media-element-playout`) are optional peer dependencies; provide `createAdapter`/`createPlayout` to inject a custom engine.
+- WAM 2.0 plugin hosting (from `@waveform-playlist/browser/tone`) — `addWamEffect`/`addWamEffectToTrack` host third-party [Web Audio Modules](https://www.webaudiomodules.com/) plugins alongside built-in Tone.js effects, requires native AudioContext mode (`configureGlobalContext({ nativeAudioContext: true })` from `@waveform-playlist/playout`; Firefox falls back automatically). `WamEffectGui` mounts plugin GUIs; `fetchWamLibrary`/`fetchWamDescriptor` from the optional `@dawcore/wam` peer discover community plugins. Same native-context call enables WAM hosting on `<daw-editor>`'s Tone.js backend (`createToneAdapter()`).
 - `@waveform-playlist/core` — Data model: ClipTrack, AudioClip, sample-based math
 - `@waveform-playlist/engine` — Framework-agnostic timeline engine: PlaylistEngine class, pure clip/timeline operations, event emitter. Owns selection, loop, zoom, volume, selectedTrackId, and clip mutation state. Seek/play beyond audio duration is supported (silence where there's no audio).
 - `@waveform-playlist/playout` — Audio playback: Tone.js adapter (implements PlayoutAdapter from engine), global AudioContext. Incremental track updates via updateTrack/replaceClips — no full playout rebuild on clip operations. Optional adapter methods: addTrack, removeTrack, updateTrack.
@@ -151,4 +152,6 @@ Both providers use React Context with 4 split contexts for performance.
 - LLM API reference: https://naomiaro.github.io/waveform-playlist/docs/api/llm-reference
 - Engine guide (framework-agnostic): https://naomiaro.github.io/waveform-playlist/docs/guides/engine
 - Examples: https://naomiaro.github.io/waveform-playlist/docs/examples
+- WAM Plugins guide: https://naomiaro.github.io/waveform-playlist/docs/wam-plugins
+- WAM example ("WAM! Kick It Up a Notch"): https://naomiaro.github.io/waveform-playlist/examples/wam-effects
 - GitHub: https://github.com/naomiaro/waveform-playlist

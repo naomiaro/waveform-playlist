@@ -51,6 +51,8 @@
     "README.md"
   ],
   "devDependencies": {
+    "@dawcore/wam": "workspace:*",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20.19.42",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
@@ -70,6 +72,7 @@
     "waveform-data": "^4.5.2"
   },
   "peerDependencies": {
+    "@dawcore/wam": "workspace:^",
     "@dnd-kit/abstract": "^0.3.0",
     "@dnd-kit/dom": "^0.3.0",
     "@dnd-kit/react": "^0.3.0",
@@ -83,6 +86,9 @@
     "tone": "^15.0.0"
   },
   "peerDependenciesMeta": {
+    "@dawcore/wam": {
+      "optional": true
+    },
     "@waveform-playlist/annotations": {
       "optional": true
     },

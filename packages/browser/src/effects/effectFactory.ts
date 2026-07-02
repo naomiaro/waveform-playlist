@@ -23,13 +23,14 @@ import {
   Gate,
   StereoWidener,
   ToneAudioNode,
+  connect,
 } from 'tone';
 import type { InputNode } from 'tone';
 import type { EffectDefinition } from './effectDefinitions';
 
 // Type for effect instance with common methods
 export interface EffectInstance {
-  effect: ToneAudioNode; // Tone.js effect instance
+  effect: ToneAudioNode | AudioNode; // Tone.js effect, or a native node (WAM plugins)
   id: string;
   instanceId: string;
   dispose: () => void;
@@ -182,8 +183,8 @@ export function createEffectInstance(
  * Create a chain of effects connected in series
  */
 export function createEffectChain(effects: EffectInstance[]): {
-  input: ToneAudioNode;
-  output: ToneAudioNode;
+  input: ToneAudioNode | AudioNode;
+  output: ToneAudioNode | AudioNode;
   dispose: () => void;
 } {
   if (effects.length === 0) {
@@ -192,7 +193,7 @@ export function createEffectChain(effects: EffectInstance[]): {
 
   // Connect effects in series
   for (let i = 0; i < effects.length - 1; i++) {
-    effects[i].effect.connect(effects[i + 1].effect);
+    connect(effects[i].effect, effects[i + 1].effect);
   }
 
   return {

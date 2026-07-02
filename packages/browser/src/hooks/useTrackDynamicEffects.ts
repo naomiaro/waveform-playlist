@@ -1,16 +1,24 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { TrackEffectsFunction } from '../index';
+import { isNativeGlobalContext, getGlobalAudioContext } from '@waveform-playlist/playout';
 import {
   effectDefinitions,
   getEffectDefinition,
   type EffectDefinition,
 } from '../effects/effectDefinitions';
 import { createEffectInstance, type EffectInstance } from '../effects/effectFactory';
-import { Gain, ToneAudioNode } from 'tone';
+import { loadWamModule } from '../effects/loadWam';
+import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamEffectFactory';
+import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
+import { Gain, ToneAudioNode, connect } from 'tone';
 
 export interface TrackActiveEffect {
   instanceId: string;
   effectId: string;
+  /** 'native' = built-in Tone effect; 'wam' = hosted WAM plugin. */
+  kind: 'native' | 'wam';
+  /** Module URL for wam entries. */
+  url?: string;
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
   bypassed: boolean;
@@ -27,6 +35,16 @@ export interface UseTrackDynamicEffectsReturn {
 
   // Actions
   addEffectToTrack: (trackId: string, effectId: string) => void;
+  /**
+   * Hosts a WAM plugin from a module URL and appends it to a track's effect chain.
+   * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
+   * from @waveform-playlist/playout before any audio initialization.
+   * Note: WAM entries are skipped during offline WAV export (not supported yet).
+   * Resolves with the new entry's instanceId.
+   */
+  addWamEffectToTrack: (trackId: string, url: string, initialState?: unknown) => Promise<string>;
+  /** Live plugin handle for a hosted WAM entry on a track (for GUI mounting via WamEffectGui). */
+  getTrackWamPlugin: (trackId: string, instanceId: string) => WamPluginInstance | undefined;
   removeEffectFromTrack: (trackId: string, instanceId: string) => void;
   updateTrackEffectParameter: (
     trackId: string,
@@ -60,6 +78,9 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   // Track effect instances per track (for audio processing)
   const trackEffectInstancesRef = useRef<Map<string, Map<string, EffectInstance>>>(new Map());
 
+  // Guards addWamEffectToTrack's async window — set false by the unmount cleanup.
+  const isMountedRef = useRef(true);
+
   // Track graph nodes per track for rebuilding chains
   const trackGraphNodesRef = useRef<
     Map<
@@ -87,8 +108,10 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       console.warn(`[waveform-playlist] Error disconnecting track "${trackId}" effect chain:`, e);
     }
 
-    // Get effect instances in order
-    const instances = trackEffects
+    // Get effect instances in order. Bypassed WAM entries are dropped from the
+    // chain entirely (disconnection bypass — WAM has no wet param).
+    const audible = trackEffects.filter((ae) => !(ae.kind === 'wam' && ae.bypassed));
+    const instances = audible
       .map((ae) => instancesMap?.get(ae.instanceId))
       .filter((inst): inst is EffectInstance => inst !== undefined);
 
@@ -97,7 +120,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       graphEnd.connect(masterGainNode);
     } else {
       // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-      let currentNode: ToneAudioNode = graphEnd;
+      let currentNode: ToneAudioNode | AudioNode = graphEnd;
 
       instances.forEach((inst) => {
         try {
@@ -108,12 +131,12 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
             e
           );
         }
-        currentNode.connect(inst.effect);
+        connect(currentNode, inst.effect);
         currentNode = inst.effect;
       });
 
       // Connect last effect to master
-      currentNode.connect(masterGainNode);
+      connect(currentNode, masterGainNode);
     }
   }, []);
 
@@ -144,6 +167,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     const newActiveEffect: TrackActiveEffect = {
       instanceId: instance.instanceId,
       effectId: definition.id,
+      kind: 'native',
       definition,
       params,
       bypassed: false,
@@ -156,6 +180,87 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       return newState;
     });
   }, []);
+
+  // Host a WAM plugin and append it to a track's chain. Requires native-context mode.
+  const addWamEffectToTrack = useCallback(
+    async (trackId: string, url: string, initialState?: unknown): Promise<string> => {
+      if (!isNativeGlobalContext()) {
+        throw new Error(
+          '[waveform-playlist] WAM plugins require a native AudioContext. Call ' +
+            'configureGlobalContext({ nativeAudioContext: true }) from ' +
+            '@waveform-playlist/playout before any audio initialization.'
+        );
+      }
+      const wam = await loadWamModule();
+      const ctx = getGlobalAudioContext();
+      const { hostGroupId } = await wam.ensureWamHost(ctx);
+      const plugin = await wam.createWamInstance(
+        url,
+        ctx,
+        hostGroupId,
+        initialState !== undefined ? { initialState } : undefined
+      );
+      if (!isMountedRef.current) {
+        try {
+          plugin.destroy();
+        } catch (err) {
+          console.warn(
+            '[waveform-playlist] Error destroying WAM plugin after unmount: ' +
+              (err instanceof Error ? err.message : String(err))
+          );
+        }
+        throw new Error(
+          '[waveform-playlist] addWamEffectToTrack aborted: hook unmounted before the plugin finished loading.'
+        );
+      }
+      const instance = createWamEffectInstance(plugin);
+
+      // Initialize maps if needed
+      if (!trackEffectInstancesRef.current.has(trackId)) {
+        trackEffectInstancesRef.current.set(trackId, new Map());
+      }
+      trackEffectInstancesRef.current.get(trackId)!.set(instance.instanceId, instance);
+
+      const definition: EffectDefinition = {
+        id: instance.id,
+        name: plugin.descriptor?.name ?? url,
+        category: 'wam',
+        description: 'WAM plugin',
+        parameters: [],
+      };
+
+      setTrackEffectsState((prev) => {
+        const newState = new Map(prev);
+        const existing = newState.get(trackId) || [];
+        newState.set(trackId, [
+          ...existing,
+          {
+            instanceId: instance.instanceId,
+            effectId: instance.id,
+            kind: 'wam',
+            url,
+            definition,
+            params: {},
+            bypassed: false,
+          },
+        ]);
+        return newState;
+      });
+
+      return instance.instanceId;
+    },
+    []
+  );
+
+  // Live plugin handle for GUI mounting (WamEffectGui).
+  const getTrackWamPlugin = useCallback(
+    (trackId: string, instanceId: string): WamPluginInstance | undefined => {
+      const instancesMap = trackEffectInstancesRef.current.get(trackId);
+      const inst = instancesMap?.get(instanceId) as WamEffectInstance | undefined;
+      return inst?.kind === 'wam' ? inst.plugin : undefined;
+    },
+    []
+  );
 
   // Remove an effect from a track
   const removeEffectFromTrack = useCallback((trackId: string, instanceId: string) => {
@@ -211,6 +316,20 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     if (!effect) return;
 
     const newBypassed = !effect.bypassed;
+
+    if (effect.kind === 'wam') {
+      // Disconnection bypass: the rebuild effect drops bypassed wam entries.
+      setTrackEffectsState((prev) => {
+        const newState = new Map(prev);
+        const existing = newState.get(trackId) || [];
+        newState.set(
+          trackId,
+          existing.map((e) => (e.instanceId === instanceId ? { ...e, bypassed: newBypassed } : e))
+        );
+        return newState;
+      });
+      return;
+    }
 
     // Update the actual effect instance
     // When bypassing: set wet to 0
@@ -271,8 +390,10 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
         const trackEffects = trackEffectsStateRef.current.get(trackId) || [];
         const instancesMap = trackEffectInstancesRef.current.get(trackId);
 
-        // Get effect instances in order
-        const instances = trackEffects
+        // Get effect instances in order. Bypassed WAM entries are dropped from
+        // the chain entirely (disconnection bypass — WAM has no wet param).
+        const audible = trackEffects.filter((ae) => !(ae.kind === 'wam' && ae.bypassed));
+        const instances = audible
           .map((ae) => instancesMap?.get(ae.instanceId))
           .filter((inst): inst is EffectInstance => inst !== undefined);
 
@@ -281,15 +402,15 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
           graphEnd.connect(masterGainNode);
         } else {
           // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-          let currentNode: ToneAudioNode = graphEnd;
+          let currentNode: ToneAudioNode | AudioNode = graphEnd;
 
           instances.forEach((inst) => {
-            currentNode.connect(inst.effect);
+            connect(currentNode, inst.effect);
             currentNode = inst.effect;
           });
 
           // Connect last effect to master
-          currentNode.connect(masterGainNode);
+          connect(currentNode, masterGainNode);
         }
 
         return function cleanup() {
@@ -309,8 +430,10 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
 
   // Cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     const trackEffectInstances = trackEffectInstancesRef.current;
     return () => {
+      isMountedRef.current = false;
       trackEffectInstances.forEach((instancesMap) => {
         instancesMap.forEach((inst) => inst.dispose());
         instancesMap.clear();
@@ -327,8 +450,19 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   const createOfflineTrackEffectsFunction = useCallback(
     (trackId: string): TrackEffectsFunction | undefined => {
       const trackEffects = trackEffectsState.get(trackId) || [];
-      // Get non-bypassed effects
-      const nonBypassedEffects = trackEffects.filter((e) => !e.bypassed);
+
+      // WAM plugins cannot be re-instantiated in Tone.Offline's context — skip them.
+      const wamCount = trackEffects.filter((e) => e.kind === 'wam' && !e.bypassed).length;
+      if (wamCount > 0) {
+        console.warn(
+          '[waveform-playlist] ' +
+            wamCount +
+            ' WAM effect(s) are skipped in WAV export — WAM offline rendering is not supported yet.'
+        );
+      }
+
+      // Get non-bypassed native effects
+      const nonBypassedEffects = trackEffects.filter((e) => !e.bypassed && e.kind !== 'wam');
 
       if (nonBypassedEffects.length === 0) {
         return undefined;
@@ -349,15 +483,15 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
           graphEnd.connect(masterGainNode);
         } else {
           // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-          let currentNode: ToneAudioNode = graphEnd;
+          let currentNode: ToneAudioNode | AudioNode = graphEnd;
 
           offlineInstances.forEach((inst) => {
-            currentNode.connect(inst.effect);
+            connect(currentNode, inst.effect);
             currentNode = inst.effect;
           });
 
           // Connect last effect to master
-          currentNode.connect(masterGainNode);
+          connect(currentNode, masterGainNode);
         }
 
         return function cleanup() {
@@ -371,6 +505,8 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   return {
     trackEffectsState,
     addEffectToTrack,
+    addWamEffectToTrack,
+    getTrackWamPlugin,
     removeEffectFromTrack,
     updateTrackEffectParameter,
     toggleBypass,

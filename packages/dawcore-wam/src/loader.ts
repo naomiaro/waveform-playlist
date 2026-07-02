@@ -68,7 +68,13 @@ export interface CreateWamInstanceOptions {
   importFn?: WamModuleImport;
 }
 
-const defaultImport: WamModuleImport = (url) => import(/* @vite-ignore */ url);
+// Both bundler directives are load-bearing: webpackIgnore keeps webpack/Rspack
+// (the Docusaurus website) from statically resolving the variable URL — without
+// it, runtime plugin loads fail with "Cannot find module <url>" — and
+// @vite-ignore does the same for Vite (the examples/ dev servers). tsup/esbuild
+// preserves inline import() comments into dist (verified in dist/index.mjs).
+const defaultImport: WamModuleImport = (url) =>
+  import(/* webpackIgnore: true */ /* @vite-ignore */ url);
 
 let factoryCache = new Map<string, Promise<WamFactory>>();
 

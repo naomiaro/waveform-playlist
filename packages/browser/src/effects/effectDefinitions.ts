@@ -20,7 +20,15 @@ export interface EffectParameter {
 export interface EffectDefinition {
   id: string;
   name: string;
-  category: 'delay' | 'reverb' | 'modulation' | 'distortion' | 'filter' | 'dynamics' | 'spatial';
+  category:
+    | 'delay'
+    | 'reverb'
+    | 'modulation'
+    | 'distortion'
+    | 'filter'
+    | 'dynamics'
+    | 'spatial'
+    | 'wam';
   description: string;
   parameters: EffectParameter[];
 }

@@ -9,8 +9,18 @@ import { defaultFetch, type WamManifestFetch } from './library';
  * file omitted it, NOT that the capability is missing — the WAM SDK defaults
  * `hasAudioInput`/`hasAudioOutput` to `true` at runtime, so gate on explicit
  * denial (`!== false`), never on presence (`=== true`).
+ *
+ * `apiVersion` is asymmetric: the WAM SDK only stamps it on the RUNTIME
+ * instance descriptor, not consistently on the static file, so a static
+ * probe can only *positively* identify WAM 1.0 builds (a declared value
+ * starting with `"1"`). An absent `apiVersion` does NOT mean 1.0 — most
+ * WAM 2.0 SDK builds simply omit it from `descriptor.json`. Callers must
+ * treat `apiVersion?.startsWith('1')` as the only rejection signal and
+ * absence as insertable; `createWamInstance` remains authoritative at load
+ * time regardless.
  */
 export interface WamDescriptorInfo {
+  readonly apiVersion?: string;
   readonly hasAudioInput?: boolean;
   readonly hasAudioOutput?: boolean;
   readonly hasMidiInput?: boolean;
@@ -78,6 +88,8 @@ export async function fetchWamDescriptor(
   const record = payload as Record<string, unknown>;
 
   return {
+    ...(typeof record.apiVersion === 'string' &&
+      record.apiVersion.length > 0 && { apiVersion: record.apiVersion }),
     ...(typeof record.hasAudioInput === 'boolean' && { hasAudioInput: record.hasAudioInput }),
     ...(typeof record.hasAudioOutput === 'boolean' && { hasAudioOutput: record.hasAudioOutput }),
     ...(typeof record.hasMidiInput === 'boolean' && { hasMidiInput: record.hasMidiInput }),

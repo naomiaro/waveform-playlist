@@ -20,6 +20,7 @@
     "@dawcore/midi": "workspace:*",
     "@dawcore/spectrogram": "workspace:*",
     "@dawcore/transport": "workspace:*",
+    "@dawcore/wam": "workspace:*",
     "@dnd-kit/abstract": "^0.3.2",
     "@dnd-kit/dom": "^0.3.2",
     "@dnd-kit/react": "^0.3.2",

@@ -143,6 +143,60 @@ describe('fetchWamDescriptor — boolean flags', () => {
   });
 });
 
+describe('fetchWamDescriptor — apiVersion', () => {
+  it('returns apiVersion when the descriptor declares a legacy WAM 1.0 value', async () => {
+    const fetchFn = makeFetchFn({ apiVersion: '1.0.0', hasAudioOutput: true });
+
+    const result = await fetchWamDescriptor('https://plugins.example.com/legacy/index.js', {
+      fetchFn,
+    });
+
+    expect(result).toEqual({ apiVersion: '1.0.0', hasAudioOutput: true });
+  });
+
+  it('omits apiVersion when the descriptor does not declare it (2.0 SDK build)', async () => {
+    const fetchFn = makeFetchFn({ hasAudioOutput: true, hasAudioInput: true });
+
+    const result = await fetchWamDescriptor('https://plugins.example.com/modern/index.js', {
+      fetchFn,
+    });
+
+    expect(result).toEqual({ hasAudioOutput: true, hasAudioInput: true });
+    expect(result).not.toHaveProperty('apiVersion');
+  });
+
+  it('returns empty object (distinct from null) when the descriptor declares neither apiVersion nor flags', async () => {
+    const fetchFn = makeFetchFn({ identifier: 'some.plugin' });
+
+    const result = await fetchWamDescriptor('https://plugins.example.com/bare/index.js', {
+      fetchFn,
+    });
+
+    expect(result).toEqual({});
+    expect(result).not.toBeNull();
+  });
+
+  it('drops a non-string apiVersion value', async () => {
+    const fetchFn = makeFetchFn({ apiVersion: 2, hasAudioOutput: true });
+
+    const result = await fetchWamDescriptor('https://plugins.example.com/malformed/index.js', {
+      fetchFn,
+    });
+
+    expect(result).toEqual({ hasAudioOutput: true });
+  });
+
+  it('drops an empty-string apiVersion value', async () => {
+    const fetchFn = makeFetchFn({ apiVersion: '', hasAudioOutput: true });
+
+    const result = await fetchWamDescriptor('https://plugins.example.com/empty-version/index.js', {
+      fetchFn,
+    });
+
+    expect(result).toEqual({ hasAudioOutput: true });
+  });
+});
+
 describe('fetchWamDescriptor — error handling', () => {
   it('returns null when HTTP response is not ok', async () => {
     const fetchFn = makeFetchFn(null, { ok: false, status: 404, statusText: 'Not Found' });
