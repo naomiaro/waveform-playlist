@@ -34,7 +34,16 @@ export function createWamEffectInstance(plugin: WamPluginInstance): WamEffectIns
     effect: node,
     id: 'wam:' + (plugin.descriptor?.name ?? plugin.url ?? 'plugin'),
     instanceId,
-    dispose: () => plugin.destroy(),
+    dispose: () => {
+      try {
+        plugin.destroy();
+      } catch (err) {
+        console.warn(
+          '[waveform-playlist] Error destroying WAM plugin: ' +
+            (err instanceof Error ? err.message : String(err))
+        );
+      }
+    },
     setParameter: (name, value) => {
       if (typeof value !== 'number') return;
       const target = plugin.audioNode as unknown as WamParamTarget;

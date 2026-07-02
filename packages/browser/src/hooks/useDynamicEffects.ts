@@ -81,6 +81,9 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   // Track effect instances (for audio processing)
   const effectInstancesRef = useRef<Map<string, EffectInstance>>(new Map());
 
+  // Guards addWamEffect's async window — set false by the unmount cleanup.
+  const isMountedRef = useRef(true);
+
   // Analyser for visualization
   const analyserRef = useRef<Analyser | null>(null);
 
@@ -186,6 +189,12 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
       hostGroupId,
       initialState !== undefined ? { initialState } : undefined
     );
+    if (!isMountedRef.current) {
+      plugin.destroy();
+      throw new Error(
+        '[waveform-playlist] addWamEffect aborted: hook unmounted before the plugin finished loading.'
+      );
+    }
     const instance = createWamEffectInstance(plugin);
     effectInstancesRef.current.set(instance.instanceId, instance);
 
@@ -356,6 +365,7 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   useEffect(() => {
     const effectInstances = effectInstancesRef.current;
     return () => {
+      isMountedRef.current = false;
       effectInstances.forEach((inst) => inst.dispose());
       effectInstances.clear();
     };

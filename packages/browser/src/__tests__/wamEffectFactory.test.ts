@@ -40,6 +40,19 @@ describe('createWamEffectInstance', () => {
     expect(plugin.destroy).toHaveBeenCalled();
   });
 
+  it('dispose swallows a throwing destroy and warns instead of propagating', () => {
+    const plugin = makePlugin();
+    (plugin.destroy as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('destroy boom');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const inst = createWamEffectInstance(plugin);
+    expect(() => inst.dispose()).not.toThrow();
+    expect(plugin.destroy).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('destroy boom'));
+    warn.mockRestore();
+  });
+
   it('connect/disconnect route through the tone helpers (native↔Tone bridging)', () => {
     const plugin = makePlugin();
     const inst = createWamEffectInstance(plugin);

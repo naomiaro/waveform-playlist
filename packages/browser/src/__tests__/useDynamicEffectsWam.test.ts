@@ -76,6 +76,8 @@ vi.mock('tone', () => {
 });
 
 import { useDynamicEffects } from '../hooks/useDynamicEffects';
+import { connect } from 'tone';
+import type { Volume, ToneAudioNode } from 'tone';
 
 describe('useDynamicEffects — WAM entries', () => {
   beforeEach(() => {
@@ -132,6 +134,72 @@ describe('useDynamicEffects — WAM entries', () => {
     act(() => result.current.removeEffect(id));
     expect(destroy).toHaveBeenCalled();
     expect(result.current.activeEffects).toHaveLength(0);
+  });
+
+  it('addWamEffect aborts and destroys the plugin if the hook unmounts before it resolves', async () => {
+    let resolvePlugin!: (value: unknown) => void;
+    const pluginPromise = new Promise((resolve) => {
+      resolvePlugin = resolve;
+    });
+    createWamInstance.mockImplementationOnce(() => pluginPromise);
+
+    const { result, unmount } = renderHook(() => useDynamicEffects());
+
+    let addPromise: Promise<string> = Promise.resolve('');
+    act(() => {
+      addPromise = result.current.addWamEffect('https://example.com/p/index.js');
+    });
+
+    act(() => {
+      unmount();
+    });
+
+    resolvePlugin({
+      url: 'https://example.com/p/index.js',
+      descriptor: { name: 'BigMuff' },
+      audioNode: fakeAudioNode,
+      getState: vi.fn(),
+      setState: vi.fn(),
+      getParameterInfo: vi.fn(),
+      destroy,
+    });
+
+    await expect(addPromise).rejects.toThrow(/unmounted/);
+    expect(destroy).toHaveBeenCalled();
+    // Hook already unmounted — result.current is frozen at the last render before
+    // unmount, which never saw the plugin land (the guard fired before setActiveEffects).
+    expect(result.current.activeEffects.some((e) => e.kind === 'wam')).toBe(false);
+  });
+
+  it('toggleBypass excludes the wam node from the rebuilt chain, and re-includes it on un-bypass', async () => {
+    const { result } = renderHook(() => useDynamicEffects());
+
+    let id = '';
+    await act(async () => {
+      id = await result.current.addWamEffect('https://example.com/p/index.js');
+    });
+
+    const mockVolume = { connect: vi.fn(), disconnect: vi.fn() } as unknown as Volume;
+    const mockDestination = { connect: vi.fn() } as unknown as ToneAudioNode;
+
+    act(() => {
+      result.current.masterEffects(mockVolume, mockDestination, false);
+    });
+
+    (connect as ReturnType<typeof vi.fn>).mockClear();
+
+    act(() => {
+      result.current.toggleBypass(id);
+    });
+
+    expect(connect).not.toHaveBeenCalledWith(expect.anything(), fakeAudioNode);
+    expect(connect).not.toHaveBeenCalledWith(fakeAudioNode, expect.anything());
+
+    act(() => {
+      result.current.toggleBypass(id);
+    });
+
+    expect(connect).toHaveBeenCalledWith(mockVolume, fakeAudioNode);
   });
 
   it('createOfflineEffectsFunction skips wam entries with a warning', async () => {
