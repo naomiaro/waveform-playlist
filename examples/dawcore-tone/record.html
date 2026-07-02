@@ -96,7 +96,14 @@
   <div id="log"></div>
 
   <script type="module">
-    import { createToneAdapter } from '@waveform-playlist/playout';
+    import { createToneAdapter, configureGlobalContext } from '@waveform-playlist/playout';
+
+    // Spike flag: ?native=1 runs this demo on a native AudioContext (WAM mode).
+    if (new URLSearchParams(location.search).has('native')) {
+      configureGlobalContext({ nativeAudioContext: true });
+      console.log('[demo] native AudioContext mode enabled');
+    }
+
     const editor = document.getElementById('editor');
     const adapter = createToneAdapter();
     editor.adapter = adapter;
