@@ -46,6 +46,7 @@ const mockPanner = {
 const mockMuteGain = {
   gain: { value: 1 },
   connect: vi.fn(),
+  disconnect: vi.fn(),
   dispose: vi.fn(),
 };
 
@@ -405,6 +406,51 @@ describe('ToneTrack', () => {
       // Should not throw
       track.removeScheduledClip(5);
       expect(mockTransport.clear).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('connectEffects / disconnectEffects', () => {
+    it('reroutes muteGain from destination to the chain input', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      const chainInput = { name: 'chain-in' } as unknown as AudioNode;
+      mockMuteGain.connect.mockClear();
+      track.connectEffects(chainInput);
+      expect(mockMuteGain.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockMuteGain.connect).toHaveBeenCalledWith(chainInput);
+    });
+
+    it('disconnectEffects restores the destination connection', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      const chainInput = { name: 'chain-in' } as unknown as AudioNode;
+      track.connectEffects(chainInput);
+      mockMuteGain.connect.mockClear();
+      mockMuteGain.disconnect.mockClear();
+      track.disconnectEffects();
+      expect(mockMuteGain.disconnect).toHaveBeenCalledWith(chainInput);
+      expect(mockMuteGain.connect).toHaveBeenCalledTimes(1); // back to destination
+    });
+
+    it('disconnectEffects is a no-op when nothing is connected', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      mockMuteGain.disconnect.mockClear();
+      track.disconnectEffects();
+      expect(mockMuteGain.disconnect).not.toHaveBeenCalled();
+    });
+
+    it('throws when the track was built with an effects closure', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack(), effects: () => undefined });
+      expect(() => track.connectEffects({} as AudioNode)).toThrow(/TrackEffectsFunction/);
+    });
+
+    it('swaps chain nodes when connectEffects is called twice', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      const a = { name: 'a' } as unknown as AudioNode;
+      const b = { name: 'b' } as unknown as AudioNode;
+      track.connectEffects(a);
+      mockMuteGain.disconnect.mockClear();
+      track.connectEffects(b);
+      expect(mockMuteGain.disconnect).toHaveBeenCalledWith(a);
+      expect(mockMuteGain.connect).toHaveBeenCalledWith(b);
     });
   });
 });
