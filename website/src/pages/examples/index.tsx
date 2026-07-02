@@ -20,6 +20,7 @@ import {
   WaveformIcon,
   MusicNotesIcon,
   MetronomeIcon,
+  PlugsConnectedIcon,
 } from '@phosphor-icons/react';
 import styles from './examples.module.css';
 
@@ -71,8 +72,15 @@ const examples = [
     title: 'Effects',
     description: 'Transform. Distort. Elevate.',
     path: 'effects',
-    category: 'advanced',
+    category: 'effects',
     icon: <SlidersHorizontalIcon weight="light" aria-hidden="true" />,
+  },
+  {
+    title: 'WAM! Kick It Up a Notch',
+    description: 'Community plugins. Native GUIs. Plugged in.',
+    path: 'wam-effects',
+    category: 'effects',
+    icon: <PlugsConnectedIcon weight="light" aria-hidden="true" />,
   },
   {
     title: 'Recording',
@@ -154,21 +162,31 @@ const examples = [
 ];
 
 // Floating particle component
-const Particle: React.FC<{ delay: number; duration: number; size: number }> = ({ delay, duration, size }) => (
+const Particle: React.FC<{ delay: number; duration: number; size: number }> = ({
+  delay,
+  duration,
+  size,
+}) => (
   <div
     className={styles.particle}
-    style={{
-      '--delay': `${delay}s`,
-      '--duration': `${duration}s`,
-      '--size': `${size}px`,
-      left: `${Math.random() * 100}%`,
-    } as React.CSSProperties}
+    style={
+      {
+        '--delay': `${delay}s`,
+        '--duration': `${duration}s`,
+        '--size': `${size}px`,
+        left: `${Math.random() * 100}%`,
+      } as React.CSSProperties
+    }
   />
 );
 
 // Waveform SVG decoration
 const WaveformDecoration: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={`${styles.waveformSvg} ${className || ''}`} viewBox="0 0 200 60" preserveAspectRatio="none">
+  <svg
+    className={`${styles.waveformSvg} ${className || ''}`}
+    viewBox="0 0 200 60"
+    preserveAspectRatio="none"
+  >
     <defs>
       <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stopColor="var(--ifm-color-primary)" stopOpacity="0.1" />
@@ -223,8 +241,26 @@ const CircularVisualizer: React.FC<{ className?: string }> = ({ className }) => 
       </radialGradient>
     </defs>
     <circle cx="100" cy="100" r="80" fill="none" stroke="url(#circleGrad)" strokeWidth="1" />
-    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="0.5" opacity="0.2" className={styles.pulseCircle} />
-    <circle cx="100" cy="100" r="40" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="0.5" opacity="0.3" className={styles.pulseCircle2} />
+    <circle
+      cx="100"
+      cy="100"
+      r="60"
+      fill="none"
+      stroke="var(--ifm-color-primary)"
+      strokeWidth="0.5"
+      opacity="0.2"
+      className={styles.pulseCircle}
+    />
+    <circle
+      cx="100"
+      cy="100"
+      r="40"
+      fill="none"
+      stroke="var(--ifm-color-primary)"
+      strokeWidth="0.5"
+      opacity="0.3"
+      className={styles.pulseCircle2}
+    />
     {[...Array(24)].map((_, i) => {
       const angle = (i / 24) * Math.PI * 2;
       const innerR = 85;
@@ -261,6 +297,7 @@ export default function Examples(): React.ReactElement {
   const categories = [
     { id: 'foundation', title: 'Foundation', subtitle: 'Where it begins' },
     { id: 'playback', title: 'Playback', subtitle: 'Feel the flow' },
+    { id: 'effects', title: 'Effects', subtitle: 'Shape the signal' },
     { id: 'advanced', title: 'Advanced', subtitle: 'Push the limits' },
     { id: 'tools', title: 'Tools', subtitle: 'Precision instruments' },
     { id: 'mobile', title: 'Smaller Screens', subtitle: 'Big vision, compact canvas' },
@@ -273,13 +310,25 @@ export default function Examples(): React.ReactElement {
     >
       <Head>
         <meta property="og:title" content="Examples - Waveform Playlist" />
-        <meta property="og:description" content="Interactive demos of Waveform Playlist - multi-track editing, effects, recording, annotations, and more" />
-        <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/waveform-playlist-examples.png" />
+        <meta
+          property="og:description"
+          content="Interactive demos of Waveform Playlist - multi-track editing, effects, recording, annotations, and more"
+        />
+        <meta
+          property="og:image"
+          content="https://naomiaro.github.io/waveform-playlist/img/social/waveform-playlist-examples.png"
+        />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Examples - Waveform Playlist" />
-        <meta name="twitter:description" content="Interactive demos of Waveform Playlist - multi-track editing, effects, recording, annotations, and more" />
-        <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/waveform-playlist-examples.png" />
+        <meta
+          name="twitter:description"
+          content="Interactive demos of Waveform Playlist - multi-track editing, effects, recording, annotations, and more"
+        />
+        <meta
+          name="twitter:image"
+          content="https://naomiaro.github.io/waveform-playlist/img/social/waveform-playlist-examples.png"
+        />
       </Head>
       {/* Hero Section */}
       <div className={styles.heroSection}>
@@ -300,14 +349,15 @@ export default function Examples(): React.ReactElement {
 
           {/* Floating particles */}
           <div className={styles.particleContainer}>
-            {mounted && [...Array(20)].map((_, i) => (
-              <Particle
-                key={i}
-                delay={Math.random() * 10}
-                duration={15 + Math.random() * 10}
-                size={2 + Math.random() * 4}
-              />
-            ))}
+            {mounted &&
+              [...Array(20)].map((_, i) => (
+                <Particle
+                  key={i}
+                  delay={Math.random() * 10}
+                  duration={15 + Math.random() * 10}
+                  size={2 + Math.random() * 4}
+                />
+              ))}
           </div>
 
           {/* SVG decorations */}
@@ -318,9 +368,12 @@ export default function Examples(): React.ReactElement {
         </div>
 
         <div className={styles.heroContent}>
-          <div className={styles.heroGlitch} data-text="EXAMPLES">EXAMPLES</div>
+          <div className={styles.heroGlitch} data-text="EXAMPLES">
+            EXAMPLES
+          </div>
           <p className={styles.heroSubtitle}>
-            Enter the sonic laboratory.<br />
+            Enter the sonic laboratory.
+            <br />
             Each example is a portal to new possibilities.
           </p>
         </div>
@@ -334,7 +387,7 @@ export default function Examples(): React.ReactElement {
       {/* Main Content */}
       <main className={styles.mainContent}>
         {categories.map((category, catIndex) => {
-          const categoryExamples = examples.filter(e => e.category === category.id);
+          const categoryExamples = examples.filter((e) => e.category === category.id);
           return (
             <section
               key={category.id}
