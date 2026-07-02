@@ -34,6 +34,8 @@ describe('native AudioContext mode', () => {
     contextInstances.length = 0;
     vi.stubGlobal('AudioContext', FakeAudioContext);
     vi.stubGlobal('AudioListener', FakeAudioListener);
+    // Add close method to all instances
+    MockContext.prototype.close = vi.fn().mockResolvedValue(undefined);
     const mod = await import('../audioContext');
     mod._resetGlobalContextForTests();
   });
@@ -87,6 +89,20 @@ describe('native AudioContext mode', () => {
   it('isNativeGlobalContext is false by default', async () => {
     const { getGlobalContext, isNativeGlobalContext } = await import('../audioContext');
     getGlobalContext();
+    expect(isNativeGlobalContext()).toBe(false);
+  });
+
+  it('isNativeGlobalContext returns false after close + default recreation', async () => {
+    const {
+      configureGlobalContext,
+      closeGlobalAudioContext,
+      getGlobalContext,
+      isNativeGlobalContext,
+    } = await import('../audioContext');
+    configureGlobalContext({ nativeAudioContext: true });
+    expect(isNativeGlobalContext()).toBe(true);
+    await closeGlobalAudioContext();
+    getGlobalContext(); // recreated as the DEFAULT (standardized) context
     expect(isNativeGlobalContext()).toBe(false);
   });
 });

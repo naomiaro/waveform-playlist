@@ -4,7 +4,7 @@
  * Provides a single AudioContext shared across the entire application.
  * This context is used by Tone.js for playback and by all recording/monitoring hooks.
  *
- * Supports both native AudioContext (WAM 2.0 WAM plugin hosting, requires
+ * Supports both native AudioContext (WAM 2.0 plugin hosting, requires
  * AudioListener AudioParams — Firefox fallback to standardized-audio-context)
  * and standardized-audio-context wrapper for cross-browser compatibility.
  */
@@ -191,5 +191,6 @@ export async function closeGlobalAudioContext(): Promise<void> {
   if (globalToneContext && globalToneContext.rawContext.state !== 'closed') {
     await globalToneContext.close();
     globalToneContext = null;
+    _nativeMode = false;
   }
 }

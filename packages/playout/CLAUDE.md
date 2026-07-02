@@ -245,7 +245,11 @@ const analyser = context.createAnalyser();
 
 ## Native AudioContext for sampleRate Control
 
-**Critical:** `new Context({ sampleRate })` does NOT pass `sampleRate` through to `standardized-audio-context`. The option is silently ignored. Native `AudioContext({ sampleRate, latencyHint: 0 })` wrapped with `new Context(rawContext)` also causes Tone.js internal issues (reverted). `configureGlobalContext()` currently creates a standard `new Context()` and only compares the requested rate against the actual rate — it warns but cannot force the rate. The rate comparison + worker fallback handles mismatches. Revisit when Tone.js or standardized-audio-context supports sampleRate passthrough.
+**`configureGlobalContext({ nativeAudioContext: true })`** creates the global context around a native `AudioContext` — required for WAM 2.0 plugin hosting (WAM worklets subclass the native `AudioWorkletNode` and cannot join a standardized-audio-context graph). In native mode, `sampleRate` IS honored (passed to the native constructor).
+
+**Fallback on Firefox:** The earlier revert's root cause was Firefox's missing AudioListener AudioParams (`positionX`/`Y`/`Z` etc.) — Tone's `Listener` wraps them eagerly at `context.initialize()` and throws "param must be an AudioParam" when they're undefined (Tone.js #681). `supportsNativeContextMode()` feature-detects exactly this and falls back to the standardized-audio-context default with a `[playout]` warning; `isNativeGlobalContext()` reports the live mode.
+
+**Default path (no option):** Unchanged — standardized-audio-context, `sampleRate` compared-but-not-forced (Tone 15.1.22 drops the option; fixed upstream only in the 15.5.x `next` line). With pre-computed peaks, sample-rate mismatches warn and fall back to worker-generated peaks.
 
 ## Context Singleton Warning
 
