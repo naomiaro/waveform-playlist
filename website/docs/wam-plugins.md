@@ -129,6 +129,12 @@ npm install @dawcore/wam
 
 Without it installed, `addWamEffect`/`addWamEffectToTrack` throw a friendly install-hint error on first call. Nothing is imported eagerly, so consumers who never touch WAM APIs pay zero bundle cost.
 
+### Exporting with WAM plugins
+
+`useExportWav()` renders WAM entries into the exported WAV. The offline render happens on a native `OfflineAudioContext` (wrapped in a Tone `OfflineContext`), and `createOfflineEffectsFunction()` / `createOfflineTrackEffectsFunction()` re-instantiate each WAM plugin on that context from its URL-cached factory, transferring the live instance's state (`getState()`) at export time — the same pattern as dawcore's `exportAudio()`. Bypassed WAM entries stay excluded (disconnection bypass, parity with live playback), and a WAM plugin that fails to re-instantiate fails the export rather than silently rendering without it.
+
+The offline render temporarily swaps Tone's global context while the export graph is built — don't add tracks or mutate effect chains while an export is in flight, or nodes created during that window would land on the offline context. Exports themselves are serialized internally, so overlapping calls to `useExportWav()` can't corrupt the global context.
+
 ## Web Components (`<daw-editor>`) on the Tone backend
 
 The same native-context requirement applies to `<daw-editor>` when using the Tone.js adapter. Call `configureGlobalContext` before `createToneAdapter()`:
@@ -147,7 +153,7 @@ Runnable demo: `examples/dawcore-tone/wam.html` (`pnpm example:dawcore-tone`).
 
 ## Limitations
 
-- **WAV export no longer skips WAM entries** (#536). Since #536, `useExportWav()` renders on a native `OfflineAudioContext` wrapped in a Tone `OfflineContext` when native-context mode is active; `createOfflineEffectsFunction()` / `createOfflineTrackEffectsFunction()` re-instantiate each WAM plugin on the offline context from its URL-cached factory with the live instance's state (`getState()`) transferred at export time — the dawcore `exportAudio()` pattern. Bypassed WAM entries stay excluded (disconnection bypass, parity with live). A WAM plugin that fails to re-instantiate fails the export rather than silently rendering without it. The offline render temporarily swaps Tone's global context while the export graph is built — don't add tracks or mutate effect chains while an export is in flight, or nodes created during that window would land on the offline context. Exports themselves are serialized internally, so overlapping calls to `useExportWav()` can't corrupt the global context.
+- **Don't mutate effect chains or add tracks while a WAV export is in flight** — the offline render swaps Tone's global context during the graph build, so nodes created in that window land on the offline context. See [Exporting with WAM plugins](#exporting-with-wam-plugins).
 - **No tempo/transport broadcast on the Tone adapter** ([#537](https://github.com/naomiaro/waveform-playlist/issues/537)). `@dawcore/wam`'s transport bridge (tempo-synced delays, LFOs, arpeggiators) needs a query surface the Tone adapter's `transport` doesn't implement yet. WAM plugins on the Tone backend receive audio but no transport/tempo events (a one-time console warning notes the skip). **If you need transport sync today, host WAM plugins through dawcore's `<daw-editor>` on `NativePlayoutAdapter` (`@dawcore/transport`), where the bridge is active.** In practice no insertable community-registry effect currently consumes transport events — the plugins that do sync (sequencers, modulators) lack effect audio I/O and are rejected at insert — so with registry plugins this gap has no audible impact.
 - **Web Components (`<daw-editor>`) on the Tone adapter:** per-track effect chains use the adapter's `transport.connectTrackOutput(trackId, node)` hook, which supports audio tracks only — adding a per-track chain to a MIDI-only track throws. Master chains work for all track types.
 - **React hooks** are unaffected by this limitation: `useTrackDynamicEffects` wires chains through the track-effects closure, which applies to audio, MIDI, and SoundFont playout tracks alike.
