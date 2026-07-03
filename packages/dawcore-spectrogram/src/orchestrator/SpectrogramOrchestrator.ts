@@ -1,5 +1,9 @@
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
-import { SPECTROGRAM_DEFAULTS, DEFAULT_SPECTROGRAM_COLOR_MAP } from '@waveform-playlist/core';
+import {
+  SPECTROGRAM_DEFAULTS,
+  DEFAULT_SPECTROGRAM_COLOR_MAP,
+  MAX_CANVAS_WIDTH,
+} from '@waveform-playlist/core';
 import { createSpectrogramWorkerPool, SpectrogramAbortError } from '../worker';
 import type { SpectrogramWorkerApi } from '../worker';
 import { ColorLUTCache } from './color-lut-cache';
@@ -338,8 +342,14 @@ export class SpectrogramOrchestrator extends EventTarget {
     }
 
     const fftSize = this.config.fftSize ?? SPECTROGRAM_DEFAULTS.fftSize;
-    const startPx = Math.min(...group.map((c) => c.globalPixelOffset));
-    const endPx = Math.max(...group.map((c) => c.globalPixelOffset + c.widthPx));
+    // `globalPixelOffset` is TIMELINE-absolute (viewport classification needs
+    // scroll-pixel space), but file-space sample math needs CLIP-RELATIVE
+    // pixels — chunk k starts at clip pixel k * MAX_CANVAS_WIDTH by the
+    // chunked-canvas layout contract. Mixing the spaces shifts the FFT range
+    // by the clip's timeline position (#554).
+    const clipRelativeOffsets = group.map((c) => c.chunkIndex * MAX_CANVAS_WIDTH);
+    const startPx = Math.min(...clipRelativeOffsets);
+    const endPx = Math.max(...group.map((c, i) => clipRelativeOffsets[i] + c.widthPx));
     const startSample = clip.offsetSamples + Math.floor(startPx * viewport.samplesPerPixel);
     const endSample = Math.min(
       clip.offsetSamples + clip.durationSamples,
@@ -369,7 +379,7 @@ export class SpectrogramOrchestrator extends EventTarget {
         cacheKey,
         canvasIds: group.map((c) => c.canvasId),
         canvasWidths: group.map((c) => c.widthPx),
-        globalPixelOffsets: group.map((c) => c.globalPixelOffset),
+        globalPixelOffsets: clipRelativeOffsets,
         canvasHeight: first.heightPx,
         devicePixelRatio: this.devicePixelRatio,
         samplesPerPixel: viewport.samplesPerPixel,

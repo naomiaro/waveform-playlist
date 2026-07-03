@@ -17,6 +17,7 @@ import type {
 import { fftMagnitudeDb } from '../computation/fft';
 import { getWindowFunction } from '../computation/windowFunctions';
 import { getFrequencyScale, type FrequencyScaleName } from '../computation/frequencyScales';
+import { pixelColumnToFrame } from '../computation/renderGeometry';
 
 // --- Canvas registry ---
 const canvasRegistry = new Map<string, OffscreenCanvas>();
@@ -35,7 +36,10 @@ const audioDataRegistry = new Map<
 // Bounded to MAX_CACHE_ENTRIES to prevent OOM on long files with many ranges.
 interface FFTCacheEntry {
   spectrograms: SpectrogramData[];
+  /** File-absolute sample position where the FFT data begins (padded range start). */
   sampleOffset: number;
+  /** The clip's start within its audio file — render maps pixel x to file sample clipOffsetSamples + x·spp (#554). */
+  clipOffsetSamples: number;
 }
 const MAX_CACHE_ENTRIES = 16;
 const fftCache = new Map<string, FFTCacheEntry>();
@@ -68,12 +72,13 @@ function generateCacheKey(params: {
   channelIndex: number;
   offsetSamples: number;
   durationSamples: number;
+  clipOffsetSamples: number;
   sampleRate: number;
   compute: SpectrogramComputeConfig;
   mono: boolean;
 }): string {
   const { compute: c } = params;
-  return `${params.clipId}:${params.channelIndex}:${params.offsetSamples}:${params.durationSamples}:${params.sampleRate}:${c.fftSize ?? ''}:${c.zeroPaddingFactor ?? ''}:${c.hopSize ?? ''}:${c.windowFunction ?? ''}:${c.alpha ?? ''}:${params.mono ? 1 : 0}`;
+  return `${params.clipId}:${params.channelIndex}:${params.offsetSamples}:${params.durationSamples}:${params.clipOffsetSamples}:${params.sampleRate}:${c.fftSize ?? ''}:${c.zeroPaddingFactor ?? ''}:${c.hopSize ?? ''}:${c.windowFunction ?? ''}:${c.alpha ?? ''}:${params.mono ? 1 : 0}`;
 }
 
 // --- Message types ---
@@ -326,7 +331,8 @@ function renderSpectrogramToCanvas(
   globalPixelOffsets?: number[],
   gainDbOverride?: number,
   rangeDbOverride?: number,
-  sampleOffset = 0
+  sampleOffset = 0,
+  clipOffsetSamples = 0
 ): void {
   const { frequencyBinCount, frameCount, hopSize, sampleRate } = specData;
   const gainDb = gainDbOverride ?? specData.gainDb;
@@ -370,8 +376,13 @@ function renderSpectrogramToCanvas(
 
     for (let x = 0; x < canvasWidth; x++) {
       const globalX = globalPixelOffset + x;
-      const samplePos = globalX * samplesPerPixel - sampleOffset;
-      const frame = Math.floor(samplePos / hopSize);
+      const frame = pixelColumnToFrame({
+        pixelX: globalX,
+        samplesPerPixel,
+        clipOffsetSamples,
+        fftStartSample: sampleOffset,
+        hopSize,
+      });
 
       if (frame < 0 || frame >= frameCount) continue;
 
@@ -474,6 +485,7 @@ async function handleComputeFFT(msg: ComputeFFTRequest): Promise<void> {
     channelIndex: 0,
     offsetSamples: effectiveOffset,
     durationSamples: effectiveDuration,
+    clipOffsetSamples: offsetSamples,
     sampleRate,
     compute: { fftSize, zeroPaddingFactor, hopSize, windowFunction, alpha: config.alpha },
     mono,
@@ -543,7 +555,11 @@ async function handleComputeFFT(msg: ComputeFFTRequest): Promise<void> {
         spectrograms.push(result);
       }
     }
-    fftCache.set(cacheKey, { spectrograms, sampleOffset: effectiveOffset });
+    fftCache.set(cacheKey, {
+      spectrograms,
+      sampleOffset: effectiveOffset,
+      clipOffsetSamples: offsetSamples,
+    });
   } else {
     // Bump to most-recently-used so scroll-back patterns keep hot entries alive
     touchCacheEntry(cacheKey);
@@ -700,7 +716,8 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         globalPixelOffsets,
         gainDb,
         rangeDb,
-        cacheEntry.sampleOffset
+        cacheEntry.sampleOffset,
+        cacheEntry.clipOffsetSamples
       );
 
       const response: ComputeResponse = { id, type: 'done' };

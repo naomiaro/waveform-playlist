@@ -52,6 +52,15 @@ Stale FFT requests are cancelled via `abortGeneration(generation)` to the pool. 
 
 Per-render-group sample range only, padded by `fftSize` on both sides. Avoids OOM on long clips — never computes a full-clip FFT.
 
+## Pixel Coordinate Conventions (#554)
+
+Two pixel spaces coexist — mixing them shifts the displayed audio by the clip's timeline position:
+
+- **Timeline-absolute** (`CanvasRegistration.globalPixelOffset`, viewport bounds): used ONLY for viewport classification. `<daw-spectrogram>` registers `originX + chunkIndex * 1000`.
+- **Clip-relative** (`chunkIndex * MAX_CANVAS_WIDTH`): used for ALL file-space sample math — the FFT `sampleRange` and the `globalPixelOffsets` sent to `renderChunks`.
+
+The worker maps pixel → audio as `fileSample = clipOffsetSamples + pixel * samplesPerPixel` (`pixelColumnToFrame` in `computation/renderGeometry.ts`); `clipOffsetSamples` is captured on the FFT cache entry (and in the cache key) from the `compute-fft` message, so trimmed clips (`offsetSamples > 0`) display the right region. The React `SpectrogramProvider` already passes clip-relative offsets + `offsetSamples`, so it shares this contract unchanged.
+
 ## tsup ESM-Only Entries Emit `.d.mts`, Not `.d.ts`
 
 The third tsup block (orchestrator subpath) is `format: ['esm']`. tsup emits `dist/orchestrator/index.d.mts` for the types, NOT `.d.ts`. The `package.json` `exports./orchestrator.types` field must match that exact path. Easy to ship wrong — `.d.ts` looks more idiomatic but resolves to nothing for ESM-only entries, breaking TypeScript subpath imports.
