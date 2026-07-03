@@ -57,6 +57,8 @@ export class EffectsManager {
   /** Live WAM plugin nodes across all chains, fed to the wam-transport bridge. */
   private _wamNodes = new Set<import('@dawcore/wam').WamTransportNode>();
   private _transportBridge: { notifyNodeAdded(node: unknown): void; dispose(): void } | null = null;
+  /** One-time warn when the adapter transport can't host the wam-transport bridge. */
+  private _transportBridgeWarned = false;
 
   constructor(getAdapter: () => AdapterLike | null, masterEventTarget: EventTarget) {
     this._getAdapter = getAdapter;
@@ -620,9 +622,9 @@ export class EffectsManager {
 
   /**
    * Lazily create the wam-transport bridge so tempo-synced plugins lock to
-   * the timeline. Skipped (not an error) when the adapter's transport lacks
-   * the query/event surface — the bridge is an enhancement, not a
-   * requirement for audio processing.
+   * the timeline. Skipped (not an error, one-time warn) when the adapter's
+   * transport lacks the query/event surface — the bridge is an enhancement,
+   * not a requirement for audio processing.
    */
   private _ensureTransportBridge(
     wamModule: typeof import('@dawcore/wam')
@@ -639,6 +641,15 @@ export class EffectsManager {
       typeof transport.tickToBar !== 'function' ||
       typeof transport.timeToTick !== 'function'
     ) {
+      if (!this._transportBridgeWarned) {
+        this._transportBridgeWarned = true;
+        console.warn(
+          '[waveform-playlist] wam-transport bridge skipped: the adapter transport does not ' +
+            'implement the query surface (on/getTempo/tickToBar/timeToTick), so WAM plugins ' +
+            "won't receive transport/tempo events. Use NativePlayoutAdapter for transport " +
+            'sync — see issue #537.'
+        );
+      }
       return null;
     }
     this._transportBridge = wamModule.createWamTransportBridge(transport, () => [
