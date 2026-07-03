@@ -4,7 +4,7 @@ import { createSpectrogramWorkerPool, SpectrogramAbortError } from '../worker';
 import type { SpectrogramWorkerApi } from '../worker';
 import { ColorLUTCache } from './color-lut-cache';
 import { classifyViewport, type CanvasMeta, type ViewportBounds } from './viewport-classify';
-import { groupContiguousChunks } from './chunk-grouping';
+import { groupRenderableChunks } from './chunk-grouping';
 
 export interface SpectrogramOrchestratorOptions {
   readonly workerFactory: () => Worker;
@@ -310,7 +310,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     viewport: ViewportState
   ): Promise<void> {
     if (canvases.length === 0) return;
-    const groups = groupContiguousChunks(canvases);
+    const groups = groupRenderableChunks(canvases);
     for (const group of groups) {
       if (this.generation !== generation || this.disposed) return;
       await this.renderGroup(group, generation, viewport);
@@ -390,7 +390,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     viewport: ViewportState
   ): Promise<void> {
     if (canvases.length === 0) return;
-    const groups = groupContiguousChunks(canvases);
+    const groups = groupRenderableChunks(canvases);
     for (const group of groups) {
       if (this.generation !== generation || this.disposed) return;
       await this.yieldUntilIdle();
