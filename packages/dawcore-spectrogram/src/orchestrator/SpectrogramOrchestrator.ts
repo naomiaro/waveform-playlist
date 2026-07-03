@@ -1,10 +1,14 @@
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
-import { SPECTROGRAM_DEFAULTS, DEFAULT_SPECTROGRAM_COLOR_MAP } from '@waveform-playlist/core';
+import {
+  SPECTROGRAM_DEFAULTS,
+  DEFAULT_SPECTROGRAM_COLOR_MAP,
+  MAX_CANVAS_WIDTH,
+} from '@waveform-playlist/core';
 import { createSpectrogramWorkerPool, SpectrogramAbortError } from '../worker';
 import type { SpectrogramWorkerApi } from '../worker';
 import { ColorLUTCache } from './color-lut-cache';
 import { classifyViewport, type CanvasMeta, type ViewportBounds } from './viewport-classify';
-import { groupContiguousChunks } from './chunk-grouping';
+import { groupRenderableChunks } from './chunk-grouping';
 
 export interface SpectrogramOrchestratorOptions {
   readonly workerFactory: () => Worker;
@@ -30,6 +34,13 @@ export interface CanvasRegistration {
   readonly trackId: string;
   readonly channelIndex: number;
   readonly chunkIndex: number;
+  /**
+   * TIMELINE-absolute pixel where this chunk starts. Layout contract: every
+   * canvas of a clip must satisfy
+   * `globalPixelOffset === clipOriginPx + chunkIndex * MAX_CANVAS_WIDTH` —
+   * renderGroup's clip-relative sample math depends on it (#554), and
+   * registerCanvas warns when a registration violates it.
+   */
   readonly globalPixelOffset: number;
   readonly widthPx: number;
   readonly heightPx: number;
@@ -67,6 +78,11 @@ export class SpectrogramOrchestrator extends EventTarget {
   protected colorLUT = new ColorLUTCache();
   protected disposed = false;
   protected renderInFlight = false;
+  // Per-clip timeline origin (globalPixelOffset - chunkIndex * MAX_CANVAS_WIDTH)
+  // with a live canvas count — used to detect layout-contract violations.
+  // The origin resets once all of a clip's canvases unregister, so a moved
+  // clip re-registering at a new position doesn't false-positive.
+  protected clipOrigins = new Map<string, { originPx: number; canvasCount: number }>();
   // Tracks which trackIds have already emitted `viewport-ready` for the
   // current generation. Cleared on every generation bump (setViewport with a
   // real change, setConfig, setColorMap, setDevicePixelRatio) AND in dispose().
@@ -143,17 +159,47 @@ export class SpectrogramOrchestrator extends EventTarget {
       channelIndex: reg.channelIndex,
       chunkIndex: reg.chunkIndex,
     });
+    const originPx = reg.globalPixelOffset - reg.chunkIndex * MAX_CANVAS_WIDTH;
+    const origin = this.clipOrigins.get(reg.clipId);
+    if (!origin) {
+      this.clipOrigins.set(reg.clipId, { originPx, canvasCount: 1 });
+    } else {
+      origin.canvasCount += 1;
+      if (origin.originPx !== originPx) {
+        console.warn(
+          '[dawcore-spectrogram] registerCanvas: ' +
+            reg.canvasId +
+            ' violates the chunk layout contract (chunk ' +
+            reg.chunkIndex +
+            ' at ' +
+            reg.globalPixelOffset +
+            'px implies clip origin ' +
+            originPx +
+            'px, but other canvases imply ' +
+            origin.originPx +
+            'px) — sample math assumes chunkIndex * ' +
+            MAX_CANVAS_WIDTH +
+            'px and this clip will render shifted audio'
+        );
+      }
+    }
     this.pool.registerCanvas(reg.canvasId, reg.canvas);
     if (this.viewport) this.scheduleRender();
   }
 
   unregisterCanvas(canvasId: string): void {
     if (this.disposed) return;
-    if (!this.canvases.has(canvasId)) {
+    const entry = this.canvases.get(canvasId);
+    if (!entry) {
       console.warn('[dawcore-spectrogram] unregisterCanvas: unknown canvas ' + canvasId);
       return;
     }
     this.canvases.delete(canvasId);
+    const origin = this.clipOrigins.get(entry.clipId);
+    if (origin) {
+      origin.canvasCount -= 1;
+      if (origin.canvasCount <= 0) this.clipOrigins.delete(entry.clipId);
+    }
     this.pool.unregisterCanvas(canvasId);
   }
 
@@ -175,10 +221,7 @@ export class SpectrogramOrchestrator extends EventTarget {
       return;
     }
     if (this.viewport && viewportsEqual(this.viewport, state)) return;
-    const prevGeneration = this.generation;
-    this.generation += 1;
-    this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
+    this.bumpGenerationAndAbortStale();
     this.viewport = state;
     this.scheduleRender();
   }
@@ -186,10 +229,7 @@ export class SpectrogramOrchestrator extends EventTarget {
   setConfig(config: SpectrogramConfig): void {
     if (this.disposed) return;
     this.config = config;
-    const prevGeneration = this.generation;
-    this.generation += 1;
-    this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
+    this.bumpGenerationAndAbortStale();
     this.colorLUT.clear();
     this.scheduleRender();
   }
@@ -197,10 +237,7 @@ export class SpectrogramOrchestrator extends EventTarget {
   setColorMap(colorMap: ColorMapValue): void {
     if (this.disposed) return;
     this.colorMap = colorMap;
-    const prevGeneration = this.generation;
-    this.generation += 1;
-    this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
+    this.bumpGenerationAndAbortStale();
     this.scheduleRender();
   }
 
@@ -214,11 +251,21 @@ export class SpectrogramOrchestrator extends EventTarget {
     }
     if (this.devicePixelRatio === dpr) return;
     this.devicePixelRatio = dpr;
-    const prevGeneration = this.generation;
+    this.bumpGenerationAndAbortStale();
+    this.scheduleRender();
+  }
+
+  /**
+   * Start a new render generation and cancel in-flight work from older ones.
+   *
+   * The worker treats work as stale iff `generation < latestGeneration`, so
+   * the abort message must carry the NEW generation — passing the previous
+   * one leaves its in-flight FFTs running to completion (#555).
+   */
+  protected bumpGenerationAndAbortStale(): void {
     this.generation += 1;
     this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
-    this.scheduleRender();
+    this.pool.abortGeneration(this.generation);
   }
 
   dispose(): void {
@@ -226,6 +273,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     this.disposed = true;
     this.clips.clear();
     this.canvases.clear();
+    this.clipOrigins.clear();
     this.viewport = null;
     this.colorLUT.clear();
     this.readyDispatched.clear();
@@ -310,7 +358,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     viewport: ViewportState
   ): Promise<void> {
     if (canvases.length === 0) return;
-    const groups = groupContiguousChunks(canvases);
+    const groups = groupRenderableChunks(canvases);
     for (const group of groups) {
       if (this.generation !== generation || this.disposed) return;
       await this.renderGroup(group, generation, viewport);
@@ -337,8 +385,14 @@ export class SpectrogramOrchestrator extends EventTarget {
     }
 
     const fftSize = this.config.fftSize ?? SPECTROGRAM_DEFAULTS.fftSize;
-    const startPx = Math.min(...group.map((c) => c.globalPixelOffset));
-    const endPx = Math.max(...group.map((c) => c.globalPixelOffset + c.widthPx));
+    // `globalPixelOffset` is TIMELINE-absolute (viewport classification needs
+    // scroll-pixel space), but file-space sample math needs CLIP-RELATIVE
+    // pixels — chunk k starts at clip pixel k * MAX_CANVAS_WIDTH by the
+    // chunked-canvas layout contract. Mixing the spaces shifts the FFT range
+    // by the clip's timeline position (#554).
+    const clipRelativeOffsets = group.map((c) => c.chunkIndex * MAX_CANVAS_WIDTH);
+    const startPx = Math.min(...clipRelativeOffsets);
+    const endPx = Math.max(...group.map((c, i) => clipRelativeOffsets[i] + c.widthPx));
     const startSample = clip.offsetSamples + Math.floor(startPx * viewport.samplesPerPixel);
     const endSample = Math.min(
       clip.offsetSamples + clip.durationSamples,
@@ -368,7 +422,7 @@ export class SpectrogramOrchestrator extends EventTarget {
         cacheKey,
         canvasIds: group.map((c) => c.canvasId),
         canvasWidths: group.map((c) => c.widthPx),
-        globalPixelOffsets: group.map((c) => c.globalPixelOffset),
+        globalPixelOffsets: clipRelativeOffsets,
         canvasHeight: first.heightPx,
         devicePixelRatio: this.devicePixelRatio,
         samplesPerPixel: viewport.samplesPerPixel,
@@ -390,7 +444,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     viewport: ViewportState
   ): Promise<void> {
     if (canvases.length === 0) return;
-    const groups = groupContiguousChunks(canvases);
+    const groups = groupRenderableChunks(canvases);
     for (const group of groups) {
       if (this.generation !== generation || this.disposed) return;
       await this.yieldUntilIdle();

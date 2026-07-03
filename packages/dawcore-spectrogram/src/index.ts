@@ -4,8 +4,14 @@ export {
   computeSpectrogramMono,
   getColorMap,
   getFrequencyScale,
+  pixelColumnToFrame,
+  pixelRowToBin,
 } from './computation';
-export type { FrequencyScaleName } from './computation';
+export type {
+  FrequencyScaleName,
+  PixelColumnToFrameParams,
+  PixelRowToBinParams,
+} from './computation';
 
 // Worker
 export { createSpectrogramWorker, SpectrogramAbortError } from './worker';
@@ -22,6 +28,7 @@ export {
   ColorLUTCache,
   classifyViewport,
   groupContiguousChunks,
+  groupRenderableChunks,
 } from './orchestrator';
 export type {
   SpectrogramOrchestratorOptions,
@@ -33,4 +40,5 @@ export type {
   ViewportBounds,
   ClassifiedTiers,
   ChunkLike,
+  RenderableChunkLike,
 } from './orchestrator';

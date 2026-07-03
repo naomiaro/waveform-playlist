@@ -17,6 +17,7 @@ import type {
 import { fftMagnitudeDb } from '../computation/fft';
 import { getWindowFunction } from '../computation/windowFunctions';
 import { getFrequencyScale, type FrequencyScaleName } from '../computation/frequencyScales';
+import { pixelColumnToFrame, pixelRowToBin } from '../computation/renderGeometry';
 
 // --- Canvas registry ---
 const canvasRegistry = new Map<string, OffscreenCanvas>();
@@ -35,7 +36,10 @@ const audioDataRegistry = new Map<
 // Bounded to MAX_CACHE_ENTRIES to prevent OOM on long files with many ranges.
 interface FFTCacheEntry {
   spectrograms: SpectrogramData[];
+  /** File-absolute sample position where the FFT data begins (padded range start). */
   sampleOffset: number;
+  /** The clip's start within its audio file — render maps pixel x to file sample clipOffsetSamples + x·spp (#554). */
+  clipOffsetSamples: number;
 }
 const MAX_CACHE_ENTRIES = 16;
 const fftCache = new Map<string, FFTCacheEntry>();
@@ -68,12 +72,13 @@ function generateCacheKey(params: {
   channelIndex: number;
   offsetSamples: number;
   durationSamples: number;
+  clipOffsetSamples: number;
   sampleRate: number;
   compute: SpectrogramComputeConfig;
   mono: boolean;
 }): string {
   const { compute: c } = params;
-  return `${params.clipId}:${params.channelIndex}:${params.offsetSamples}:${params.durationSamples}:${params.sampleRate}:${c.fftSize ?? ''}:${c.zeroPaddingFactor ?? ''}:${c.hopSize ?? ''}:${c.windowFunction ?? ''}:${c.alpha ?? ''}:${params.mono ? 1 : 0}`;
+  return `${params.clipId}:${params.channelIndex}:${params.offsetSamples}:${params.durationSamples}:${params.clipOffsetSamples}:${params.sampleRate}:${c.fftSize ?? ''}:${c.zeroPaddingFactor ?? ''}:${c.hopSize ?? ''}:${c.windowFunction ?? ''}:${c.alpha ?? ''}:${params.mono ? 1 : 0}`;
 }
 
 // --- Message types ---
@@ -311,31 +316,86 @@ async function computeMonoFromChannels(
 
 // --- Rendering ---
 
-function renderSpectrogramToCanvas(
-  specData: SpectrogramData,
-  canvasIds: string[],
-  canvasWidths: number[],
-  canvasHeight: number,
-  devicePixelRatio: number,
-  samplesPerPixel: number,
-  colorLUT: Uint8Array,
-  scaleFn: (f: number, minF: number, maxF: number) => number,
-  minFrequency: number,
-  maxFrequency: number,
-  isNonLinear: boolean,
-  globalPixelOffsets?: number[],
-  gainDbOverride?: number,
-  rangeDbOverride?: number,
-  sampleOffset = 0
-): void {
+interface RenderJob {
+  canvasIds: string[];
+  /** Per-chunk CSS widths, parallel to canvasIds. */
+  canvasWidths: number[];
+  /** Clip-relative pixel offset per chunk; omitted → widths accumulate. */
+  globalPixelOffsets?: number[];
+  canvasHeight: number;
+  devicePixelRatio: number;
+  samplesPerPixel: number;
+  colorLUT: Uint8Array;
+  scaleFn: (f: number, minF: number, maxF: number) => number;
+  minFrequency: number;
+  maxFrequency: number;
+  isLinear: boolean;
+  gainDb?: number;
+  rangeDb?: number;
+  /** File-absolute sample where the cached FFT data begins (padded range start). */
+  fftStartSample: number;
+  /** The clip's start within its audio file — pixel x shows file sample clipOffsetSamples + x·spp (#554). */
+  clipOffsetSamples: number;
+}
+
+function renderSpectrogramToCanvas(specData: SpectrogramData, job: RenderJob): void {
+  const {
+    canvasIds,
+    canvasWidths,
+    canvasHeight,
+    devicePixelRatio,
+    samplesPerPixel,
+    colorLUT,
+    scaleFn,
+    minFrequency,
+    maxFrequency,
+    isLinear,
+    globalPixelOffsets,
+    fftStartSample,
+    clipOffsetSamples,
+  } = job;
   const { frequencyBinCount, frameCount, hopSize, sampleRate } = specData;
-  const gainDb = gainDbOverride ?? specData.gainDb;
-  const rawRangeDb = rangeDbOverride ?? specData.rangeDb;
+  const gainDb = job.gainDb ?? specData.gainDb;
+  const rawRangeDb = job.rangeDb ?? specData.rangeDb;
   const rangeDb = rawRangeDb === 0 ? 1 : rawRangeDb;
-  const maxF = maxFrequency > 0 ? maxFrequency : sampleRate / 2;
-  const binToFreq = (bin: number) => (bin / frequencyBinCount) * (sampleRate / 2);
+
+  // Sanitize the frequency band. Config reaches the worker unvalidated; a NaN
+  // minFrequency would flow through pixelRowToBin into Int32Array's NaN→0
+  // coercion and smear bin 0 across the whole canvas, and an inverted band
+  // would flip the axis silently.
+  const nyquist = sampleRate / 2;
+  let minF = Number.isFinite(minFrequency) && minFrequency >= 0 ? minFrequency : 0;
+  let maxF =
+    Number.isFinite(maxFrequency) && maxFrequency > 0 ? Math.min(maxFrequency, nyquist) : nyquist;
+  if (minF >= maxF) {
+    console.warn(
+      '[spectrogram-worker] invalid frequency band ' +
+        minFrequency +
+        '..' +
+        maxFrequency +
+        ' Hz — falling back to 0..' +
+        nyquist
+    );
+    minF = 0;
+    maxF = nyquist;
+  }
 
   let accumulatedOffset = 0;
+
+  // Row → bin depends only on y, never on x, and all chunks in one call share
+  // canvasHeight — compute the mapping once instead of per pixel column.
+  const rowBins = new Int32Array(canvasHeight);
+  for (let y = 0; y < canvasHeight; y++) {
+    rowBins[y] = pixelRowToBin({
+      normalizedY: 1 - y / canvasHeight,
+      frequencyBinCount,
+      sampleRate,
+      minFrequency: minF,
+      maxFrequency: maxF,
+      scaleFn,
+      isLinear,
+    });
+  }
 
   for (let chunkIdx = 0; chunkIdx < canvasIds.length; chunkIdx++) {
     const canvasId = canvasIds[chunkIdx];
@@ -370,34 +430,20 @@ function renderSpectrogramToCanvas(
 
     for (let x = 0; x < canvasWidth; x++) {
       const globalX = globalPixelOffset + x;
-      const samplePos = globalX * samplesPerPixel - sampleOffset;
-      const frame = Math.floor(samplePos / hopSize);
+      const frame = pixelColumnToFrame({
+        pixelX: globalX,
+        samplesPerPixel,
+        clipOffsetSamples,
+        fftStartSample,
+        hopSize,
+      });
 
       if (frame < 0 || frame >= frameCount) continue;
 
       const frameOffset = frame * frequencyBinCount;
 
       for (let y = 0; y < canvasHeight; y++) {
-        const normalizedY = 1 - y / canvasHeight;
-
-        let bin = Math.floor(normalizedY * frequencyBinCount);
-
-        if (isNonLinear) {
-          let lo = 0;
-          let hi = frequencyBinCount - 1;
-          while (lo < hi) {
-            const mid = (lo + hi) >> 1;
-            const freq = binToFreq(mid);
-            const scaled = scaleFn(freq, minFrequency, maxF);
-            if (scaled < normalizedY) {
-              lo = mid + 1;
-            } else {
-              hi = mid;
-            }
-          }
-          bin = lo;
-        }
-
+        const bin = rowBins[y];
         if (bin < 0 || bin >= frequencyBinCount) continue;
 
         const db = specData.data[frameOffset + bin];
@@ -474,6 +520,7 @@ async function handleComputeFFT(msg: ComputeFFTRequest): Promise<void> {
     channelIndex: 0,
     offsetSamples: effectiveOffset,
     durationSamples: effectiveDuration,
+    clipOffsetSamples: offsetSamples,
     sampleRate,
     compute: { fftSize, zeroPaddingFactor, hopSize, windowFunction, alpha: config.alpha },
     mono,
@@ -543,7 +590,11 @@ async function handleComputeFFT(msg: ComputeFFTRequest): Promise<void> {
         spectrograms.push(result);
       }
     }
-    fftCache.set(cacheKey, { spectrograms, sampleOffset: effectiveOffset });
+    fftCache.set(cacheKey, {
+      spectrograms,
+      sampleOffset: effectiveOffset,
+      clipOffsetSamples: offsetSamples,
+    });
   } else {
     // Bump to most-recently-used so scroll-back patterns keep hot entries alive
     touchCacheEntry(cacheKey);
@@ -683,12 +734,11 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
       }
 
       const scaleFn = getFrequencyScale((frequencyScale ?? 'mel') as FrequencyScaleName);
-      const isNonLinear = frequencyScale !== 'linear';
 
-      renderSpectrogramToCanvas(
-        cacheEntry.spectrograms[channelIndex],
+      renderSpectrogramToCanvas(cacheEntry.spectrograms[channelIndex], {
         canvasIds,
         canvasWidths,
+        globalPixelOffsets,
         canvasHeight,
         devicePixelRatio,
         samplesPerPixel,
@@ -696,12 +746,12 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         scaleFn,
         minFrequency,
         maxFrequency,
-        isNonLinear,
-        globalPixelOffsets,
+        isLinear: frequencyScale === 'linear',
         gainDb,
         rangeDb,
-        cacheEntry.sampleOffset
-      );
+        fftStartSample: cacheEntry.sampleOffset,
+        clipOffsetSamples: cacheEntry.clipOffsetSamples,
+      });
 
       const response: ComputeResponse = { id, type: 'done' };
       (self as unknown as Worker).postMessage(response);

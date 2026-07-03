@@ -2,6 +2,11 @@ export interface ChunkLike {
   chunkIndex: number;
 }
 
+export interface RenderableChunkLike extends ChunkLike {
+  clipId: string;
+  channelIndex: number;
+}
+
 /**
  * Group a list of chunks into runs of contiguous chunk indices.
  *
@@ -30,5 +35,32 @@ export function groupContiguousChunks<T extends ChunkLike>(chunks: T[]): T[][] {
     }
   }
   groups.push(current);
+  return groups;
+}
+
+/**
+ * Group render canvases into runs of contiguous chunk indices, partitioned by
+ * `(clipId, channelIndex)` first.
+ *
+ * A track's canvases span multiple channels (one <daw-spectrogram> per channel,
+ * chunk indices shared) and multiple clips (chunk indices restart at 0 per
+ * clip). Grouping by chunk index alone interleaves them — e.g. stereo
+ * [ch0k0, ch1k0, ch0k1, ch1k1] yields the mixed group [ch1k0, ch0k1], which
+ * renderGroup then routes to a single channel's worker with a single clip's
+ * FFT data (issue #553).
+ */
+export function groupRenderableChunks<T extends RenderableChunkLike>(chunks: T[]): T[][] {
+  const partitions = new Map<string, T[]>();
+  for (const chunk of chunks) {
+    const key = chunk.clipId + ' ' + chunk.channelIndex;
+    const list = partitions.get(key) ?? [];
+    list.push(chunk);
+    partitions.set(key, list);
+  }
+
+  const groups: T[][] = [];
+  for (const partition of partitions.values()) {
+    groups.push(...groupContiguousChunks(partition));
+  }
   return groups;
 }

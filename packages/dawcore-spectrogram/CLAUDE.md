@@ -6,6 +6,10 @@
 
 **Testing:** vitest with happy-dom. Tests live at `packages/dawcore-spectrogram/__tests__/` (sibling of `src/`, NOT inside it — `rootDir` is intentionally omitted from `tsconfig.json` so the sibling `__tests__/` and `src/` directories are both picked up via `include`).
 
+**The worker module is directly testable end-to-end** — stub `self.postMessage` (capture array) BEFORE `await import('../src/worker/spectrogram.worker')`, then drive `self.onmessage({ data })` manually; mock OffscreenCanvas with a `getContext` whose `createImageData`/`putImageData` capture pixels. This exercises the real FFT → cache → render pipeline (pixel assertions caught the #554 coordinate bug). `worker-render-mapping.test.ts` is the reference. Vitest per-file isolation keeps the un-restored `self` stubs from leaking across files.
+
+**Shared test mocks live in `__tests__/helpers/`** (`orchestratorTestUtils.ts`: makeMockWorker/makeMockPool/makeOrchestratorWithMockPool; `poolTestUtils.ts`: trackingWorkerFactory/postedMessages/ackComputeFFTs) — extend these instead of copy-pasting mock preambles into new test files.
+
 ## Subpath Exports
 
 - `@dawcore/spectrogram` — re-exports computation + worker + orchestrator class
@@ -20,7 +24,7 @@ Class that owns the worker pool, clip+canvas registries, viewport state, and ren
 
 **Constructor:** `new SpectrogramOrchestrator({ workerFactory, workerPoolSize?, config, colorMap?, devicePixelRatio? })`. The consumer owns worker URL resolution — pass a factory rather than baking URLs into the orchestrator.
 
-**Lifecycle:** `registerClip` (audio data), `registerCanvas` (OffscreenCanvas + metadata), `setViewport`, `setConfig`, `setColorMap`. Each setter that affects render output bumps a generation counter and calls `pool.abortGeneration(prev)` so stale FFT work drops cleanly. `dispose()` is idempotent.
+**Lifecycle:** `registerClip` (audio data), `registerCanvas` (OffscreenCanvas + metadata), `setViewport`, `setConfig`, `setColorMap`. Each setter that affects render output bumps a generation counter and calls `pool.abortGeneration(newGeneration)` so stale FFT work drops cleanly — the worker treats work as stale iff `generation < latestGeneration`, so the abort must carry the NEW generation, never the previous one (#555). `dispose()` is idempotent.
 
 **Protected fields:** `pool`, `config`, `colorMap`, `devicePixelRatio`, `clips`, `canvases`, `viewport`, `generation`, `colorLUT`, `disposed`, `readyDispatched`. Protected (not private) so `noUnusedLocals` doesn't flag dormant fields between task slices.
 
@@ -32,7 +36,7 @@ Class that owns the worker pool, clip+canvas registries, viewport state, and ren
 2. **buffer tier** — 25% overscan; renders right after viewport
 3. **remaining tier** — yields via `requestIdleCallback` (setTimeout fallback) before each contiguous group
 
-Each tier uses `groupContiguousChunks()` so non-contiguous chunk indices (e.g. `[10, 14, 15, 11]`) don't trigger one huge FFT — they're FFT'd as two groups (`10-11`, `14-15`) bounded by `fftSize` padding on each side.
+Each tier uses `groupRenderableChunks()` — canvases are partitioned by `(clipId, channelIndex)` FIRST (a track's canvases span channels and clips whose chunk indices interleave, #553), then split into contiguous chunk-index runs so non-contiguous indices (e.g. `[10, 14, 15, 11]`) don't trigger one huge FFT — they're FFT'd as two groups (`10-11`, `14-15`) bounded by `fftSize` padding on each side. `groupContiguousChunks()` remains the inner contiguity primitive.
 
 Generation is checked after every `await` — stale generations bail without finishing the tier.
 
@@ -42,7 +46,7 @@ Generation is checked after every `await` — stale generations bail without fin
 
 ## Worker Pool Architecture
 
-`createSpectrogramWorkerPool(workerFactory, poolSize = 2)` — kept its existing factory signature; the orchestrator delegates rather than refactoring 15 callsites in the pool test. Pool fans out per-channel FFT across workers; canvases are routed by channel parsed from the canvas ID (`clipId-ch{N}-chunk{M}`).
+`createSpectrogramWorkerPool(workerFactory, poolSize = 2)` — `poolSize` is only the number of pre-spawned workers (clamped to the channel cap, 32). The **one-channel-per-worker invariant is load-bearing**: the worker FFT cache key is channel-agnostic (each worker stores its channel at index 0 under the same key string), so routing two channels to one worker would silently render the wrong channel's data. When audio has more channels than workers, the pool **grows lazily** to one worker per channel (#556), replaying registered clip audio into late-created workers — but only clips that actually have that worker's channel (worker k computes only channelFilter k; worker 0 additionally serves mono with the clip's full data). Canvases are routed by channel parsed from the canvas ID (`clipId-ch{N}-chunk{M}`, anchored regex). Channel-index policy is single-sourced in `assertValidChannelIndex` (integer, 0..cap-1, thrown); `registerCanvas` validates BEFORE the OffscreenCanvas transfer. `terminate()` sets a pool-level flag — post-terminate calls reject or no-op instead of resurrecting workers via growth.
 
 ## Generation-Based Abort
 
@@ -51,6 +55,15 @@ Stale FFT requests are cancelled via `abortGeneration(generation)` to the pool. 
 ## Lazy Per-Batch FFT
 
 Per-render-group sample range only, padded by `fftSize` on both sides. Avoids OOM on long clips — never computes a full-clip FFT.
+
+## Pixel Coordinate Conventions (#554)
+
+Two pixel spaces coexist — mixing them shifts the displayed audio by the clip's timeline position:
+
+- **Timeline-absolute** (`CanvasRegistration.globalPixelOffset`, viewport bounds): used ONLY for viewport classification. `<daw-spectrogram>` registers `originX + chunkIndex * 1000`.
+- **Clip-relative** (`chunkIndex * MAX_CANVAS_WIDTH`): used for ALL file-space sample math — the FFT `sampleRange` and the `globalPixelOffsets` sent to `renderChunks`.
+
+The worker maps pixel → audio as `fileSample = clipOffsetSamples + pixel * samplesPerPixel` (`pixelColumnToFrame` in `computation/renderGeometry.ts`); `clipOffsetSamples` is captured on the FFT cache entry (and in the cache key) from the `compute-fft` message, so trimmed clips (`offsetSamples > 0`) display the right region. The React `SpectrogramProvider` already passes clip-relative offsets + `offsetSamples`, so it shares this contract unchanged.
 
 ## tsup ESM-Only Entries Emit `.d.mts`, Not `.d.ts`
 
