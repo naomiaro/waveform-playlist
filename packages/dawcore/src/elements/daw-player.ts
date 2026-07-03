@@ -291,6 +291,10 @@ export class DawPlayerElement extends LitElement {
 
   private _onLoadedMetadata = (): void => {
     this._metadataLoaded = true;
+    // duration (and the ruler SPP derived from it) is a render input read
+    // straight off the engine — without this, a render that happened before
+    // metadata (peaks usually resolve first) leaves the ruler frozen at 0:00.
+    this.requestUpdate();
     this._maybeDispatchReady();
   };
 
