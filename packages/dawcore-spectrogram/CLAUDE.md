@@ -6,6 +6,10 @@
 
 **Testing:** vitest with happy-dom. Tests live at `packages/dawcore-spectrogram/__tests__/` (sibling of `src/`, NOT inside it — `rootDir` is intentionally omitted from `tsconfig.json` so the sibling `__tests__/` and `src/` directories are both picked up via `include`).
 
+**The worker module is directly testable end-to-end** — stub `self.postMessage` (capture array) BEFORE `await import('../src/worker/spectrogram.worker')`, then drive `self.onmessage({ data })` manually; mock OffscreenCanvas with a `getContext` whose `createImageData`/`putImageData` capture pixels. This exercises the real FFT → cache → render pipeline (pixel assertions caught the #554 coordinate bug). `worker-render-mapping.test.ts` is the reference. Vitest per-file isolation keeps the un-restored `self` stubs from leaking across files.
+
+**Shared test mocks live in `__tests__/helpers/`** (`orchestratorTestUtils.ts`: makeMockWorker/makeMockPool/makeOrchestratorWithMockPool; `poolTestUtils.ts`: trackingWorkerFactory/postedMessages/ackComputeFFTs) — extend these instead of copy-pasting mock preambles into new test files.
+
 ## Subpath Exports
 
 - `@dawcore/spectrogram` — re-exports computation + worker + orchestrator class
