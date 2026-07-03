@@ -63,7 +63,19 @@ export function createSpectrogramWorkerPool(
   createWorker: () => Worker,
   poolSize = defaultPoolSize()
 ): SpectrogramWorkerApi {
+  if (poolSize > MAX_POOL_CHANNELS) {
+    console.warn(
+      '[dawcore-spectrogram] workerPoolSize ' +
+        poolSize +
+        ' exceeds the channel cap (' +
+        MAX_POOL_CHANNELS +
+        ') — clamping; channels beyond the cap are not servable'
+    );
+    poolSize = MAX_POOL_CHANNELS;
+  }
+
   const workers: SpectrogramWorkerApi[] = [];
+  let terminated = false;
   // Registered clip audio, retained so lazily-created workers get the same
   // registrations replayed. Holds references only — the underlying buffers
   // are owned by the caller and copied per-transfer by the worker client.
@@ -100,25 +112,38 @@ export function createSpectrogramWorkerPool(
     );
   }
 
+  /** Single source of the channel-index policy — every path throws the same way. */
+  function assertValidChannelIndex(channelIndex: number): void {
+    if (!Number.isInteger(channelIndex) || channelIndex < 0 || channelIndex >= MAX_POOL_CHANNELS) {
+      throw new Error(
+        '[dawcore-spectrogram] invalid channel index ' +
+          channelIndex +
+          ' (expected an integer in 0..' +
+          (MAX_POOL_CHANNELS - 1) +
+          ')'
+      );
+    }
+  }
+
   /**
    * Return the worker owning `channelIndex`, growing the pool if needed.
-   * New workers get every registered clip's audio replayed before use.
+   * New workers get the registered clips replayed — but only clips that
+   * actually have this worker's channel: worker k computes only
+   * channelFilter k (worker 0 additionally serves mono mixes), so a clip
+   * with fewer than k+1 channels is dead weight on worker k.
    */
   function ensureWorkerForChannel(channelIndex: number): SpectrogramWorkerApi {
-    if (channelIndex >= MAX_POOL_CHANNELS) {
-      console.warn(
-        '[dawcore-spectrogram] channel index ' +
-          channelIndex +
-          ' exceeds the pool growth cap (' +
-          MAX_POOL_CHANNELS +
-          ') — routing to worker 0'
-      );
-      return workers[0];
+    assertValidChannelIndex(channelIndex);
+    if (terminated) {
+      throw new Error('[dawcore-spectrogram] worker pool is terminated');
     }
     while (workers.length <= channelIndex) {
       const w = createSpectrogramWorker(createWorker());
+      const workerIndex = workers.length;
       for (const [clipId, entry] of registeredAudio) {
-        w.registerAudioData(clipId, entry.channelDataArrays, entry.sampleRate);
+        if (entry.channelDataArrays.length > workerIndex) {
+          w.registerAudioData(clipId, entry.channelDataArrays, entry.sampleRate);
+        }
       }
       workers.push(w);
     }
@@ -130,18 +155,27 @@ export function createSpectrogramWorkerPool(
       params: SpectrogramWorkerFFTParams,
       generation = 0
     ): Promise<{ cacheKey: string }> {
+      if (terminated) {
+        throw new Error('[dawcore-spectrogram] worker pool is terminated');
+      }
+      // Channel count from the payload, falling back to pre-registered audio
+      // (the client sends empty arrays for registered clips as an optimization).
+      const channelCount =
+        params.channelDataArrays.length ||
+        registeredAudio.get(params.clipId)?.channelDataArrays.length ||
+        0;
+      if (channelCount === 0) {
+        throw new Error(
+          '[dawcore-spectrogram] computeFFT called with no channel data — ' +
+            'pass channelDataArrays or registerAudioData the clip first'
+        );
+      }
+
       // Mono: single worker computes the mono mix (needs all channel data)
       if (params.mono) {
         return workers[0].computeFFT(params, generation);
       }
 
-      const channelCount = params.channelDataArrays.length;
-      if (channelCount === 0) {
-        throw new Error(
-          '[dawcore-spectrogram] computeFFT called with no channel data — ' +
-            'pass the clip channelDataArrays even when audio is pre-registered'
-        );
-      }
       if (channelCount > MAX_POOL_CHANNELS) {
         throw new Error(
           '[dawcore-spectrogram] computeFFT: ' +
@@ -177,49 +211,64 @@ export function createSpectrogramWorkerPool(
       return (settled[0] as PromiseFulfilledResult<{ cacheKey: string }>).value;
     },
 
-    renderChunks(params: SpectrogramWorkerRenderChunksParams, generation = 0): Promise<void> {
-      if (params.channelIndex >= MAX_POOL_CHANNELS) {
-        return Promise.reject(
-          new Error(
-            '[dawcore-spectrogram] renderChunks: channelIndex ' +
-              params.channelIndex +
-              ' exceeds the pool channel cap (' +
-              MAX_POOL_CHANNELS +
-              ')'
-          )
-        );
-      }
+    // async so ensureWorkerForChannel's policy throws surface as rejections,
+    // matching computeFFT, instead of escaping synchronously.
+    async renderChunks(
+      params: SpectrogramWorkerRenderChunksParams,
+      generation = 0
+    ): Promise<void> {
       const worker = ensureWorkerForChannel(params.channelIndex);
       // Remap channelIndex to 0 — each worker stores its channel at index 0
       return worker.renderChunks({ ...params, channelIndex: 0 }, generation);
     },
 
     abortGeneration(generation: number): void {
+      if (terminated) return;
       for (const w of workers) {
         w.abortGeneration(generation);
       }
     },
 
     registerCanvas(canvasId: string, canvas: OffscreenCanvas): void {
-      const ch = parseChannelFromCanvasId(canvasId);
-      ensureWorkerForChannel(ch).registerCanvas(canvasId, canvas);
+      // Validate BEFORE handing the OffscreenCanvas to any worker — a
+      // rejected registration must not transfer (and strand) the canvas.
+      try {
+        ensureWorkerForChannel(parseChannelFromCanvasId(canvasId)).registerCanvas(canvasId, canvas);
+      } catch (err) {
+        console.warn(
+          '[dawcore-spectrogram] registerCanvas("' +
+            canvasId +
+            '") rejected — canvas not registered: ' +
+            (err instanceof Error ? err.message : String(err))
+        );
+      }
     },
 
     unregisterCanvas(canvasId: string): void {
-      const ch = parseChannelFromCanvasId(canvasId);
-      ensureWorkerForChannel(ch).unregisterCanvas(canvasId);
+      if (terminated) return;
+      // Non-growing lookup: a canvas whose channel worker was never created
+      // cannot be registered anywhere — spawning workers to deliver a no-op
+      // unregister would be pure waste.
+      const worker = workers[parseChannelFromCanvasId(canvasId)];
+      if (!worker) return;
+      worker.unregisterCanvas(canvasId);
     },
 
     registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void {
-      // All workers get full audio data (needed for mono computation);
-      // retained for replay into lazily-created workers.
+      if (terminated) return;
+      // Retained for replay into lazily-created workers.
       registeredAudio.set(clipId, { channelDataArrays, sampleRate });
-      for (const w of workers) {
-        w.registerAudioData(clipId, channelDataArrays, sampleRate);
+      // Worker k computes only channel k (worker 0 additionally serves mono
+      // with the clip's full data), so workers beyond the clip's channel
+      // count would never touch these arrays — don't copy into them.
+      const relevantWorkers = Math.min(channelDataArrays.length, workers.length);
+      for (let i = 0; i < relevantWorkers; i++) {
+        workers[i].registerAudioData(clipId, channelDataArrays, sampleRate);
       }
     },
 
     unregisterAudioData(clipId: string): void {
+      if (terminated) return;
       registeredAudio.delete(clipId);
       for (const w of workers) {
         w.unregisterAudioData(clipId);
@@ -227,6 +276,7 @@ export function createSpectrogramWorkerPool(
     },
 
     terminate(): void {
+      terminated = true;
       registeredAudio.clear();
       for (const w of workers) {
         w.terminate();

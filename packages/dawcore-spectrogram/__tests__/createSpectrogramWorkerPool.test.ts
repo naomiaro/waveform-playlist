@@ -53,7 +53,7 @@ describe('createSpectrogramWorkerPool', () => {
   });
 
   describe('registerAudioData / unregisterAudioData', () => {
-    it('broadcasts registerAudioData to all workers', () => {
+    it('broadcasts registerAudioData to every worker that can compute one of the clip channels', () => {
       const nativeWorkers: ReturnType<typeof createMockNativeWorker>[] = [];
       const pool = createSpectrogramWorkerPool(() => {
         const w = createMockNativeWorker();
@@ -61,7 +61,8 @@ describe('createSpectrogramWorkerPool', () => {
         return w;
       }, 3);
 
-      const data = [new Float32Array(100)];
+      // A 3-channel clip reaches all 3 workers (worker k computes channel k).
+      const data = [new Float32Array(100), new Float32Array(100), new Float32Array(100)];
       pool.registerAudioData('clip1', data, 44100);
 
       for (const w of nativeWorkers) {
