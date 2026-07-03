@@ -88,3 +88,56 @@
   color: var(--ifm-color-emphasis-600);
   padding: 0 0.5rem;
 }
+
+/* <daw-player> — same locked dark palette as the editor (see the design
+   decision at the top of this file). Two accents so the peaks-src player
+   and the scrubber fallback read as distinct instruments. */
+.player,
+.playerAlt {
+  display: block;
+  --daw-background: #0a0a0f;
+  --daw-ruler-background: #0a0a0f;
+  --daw-ruler-color: #c49a6c;
+  margin-bottom: 0.75rem;
+}
+
+.player {
+  --daw-wave-color: #c49a6c;
+  --daw-playhead-color: #d08070;
+}
+
+.playerAlt {
+  --daw-wave-color: #63c75f;
+  --daw-playhead-color: #d08070;
+}
+
+.playerControls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.playerControls button,
+.playerControls select {
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.playerControls button:hover {
+  background: var(--ifm-color-emphasis-200);
+}
+
+.playerControls code {
+  font-size: 0.85rem;
+  padding: 0 0.5rem;
+}
+
+.playerEvent {
+  color: var(--ifm-color-emphasis-600);
+}
