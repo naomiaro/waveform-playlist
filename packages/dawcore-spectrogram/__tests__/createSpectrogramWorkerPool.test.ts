@@ -130,7 +130,7 @@ describe('createSpectrogramWorkerPool', () => {
       expect((w1Register![0] as { canvasId: string }).canvasId).toBe('clip1-ch1-chunk5');
     });
 
-    it('wraps channel index with modulo for pools smaller than channel count', () => {
+    it('grows the pool for channels beyond the initial size instead of wrapping modulo (#556)', () => {
       const nativeWorkers: ReturnType<typeof createMockNativeWorker>[] = [];
       const pool = createSpectrogramWorkerPool(() => {
         const w = createMockNativeWorker();
@@ -138,12 +138,14 @@ describe('createSpectrogramWorkerPool', () => {
         return w;
       }, 2);
 
-      // ch2 % 2 = worker 0
+      // Modulo wrapping (ch2 → worker 0) would silently render channel 0's
+      // cached FFT data for channel 2 — the pool must grow instead.
       pool.registerCanvas('clip1-ch2-chunk0', {} as OffscreenCanvas);
 
-      const w0Calls = (nativeWorkers[0] as unknown as { postMessage: ReturnType<typeof vi.fn> })
+      expect(nativeWorkers.length).toBe(3);
+      const w2Calls = (nativeWorkers[2] as unknown as { postMessage: ReturnType<typeof vi.fn> })
         .postMessage.mock.calls;
-      const registerCall = w0Calls.find(
+      const registerCall = w2Calls.find(
         (c: unknown[]) => (c[0] as { type: string }).type === 'register-canvas'
       );
       expect(registerCall).toBeTruthy();
