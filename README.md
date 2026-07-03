@@ -110,7 +110,6 @@ function App() {
 | `@waveform-playlist/ui-components` | Styled UI components (buttons, sliders, etc.) |
 | `@waveform-playlist/playout` | Tone.js audio engine |
 | `@waveform-playlist/webaudio-peaks` | Peak extraction from AudioBuffer or sample arrays |
-| `@waveform-playlist/loaders` | Audio loaders |
 
 **Optional packages:**
 

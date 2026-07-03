@@ -34,7 +34,6 @@ export default defineConfig({
         repoRoot,
         'packages/ui-components/src/index.tsx'
       ),
-      '@waveform-playlist/loaders': path.resolve(repoRoot, 'packages/loaders/src/index.ts'),
     },
   },
   // Belt-and-suspenders: never try to pre-bundle the engines this path doesn't use.

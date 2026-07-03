@@ -147,9 +147,6 @@ importers:
       '@waveform-playlist/engine':
         specifier: workspace:*
         version: link:../engine
-      '@waveform-playlist/loaders':
-        specifier: workspace:*
-        version: link:../loaders
       '@waveform-playlist/media-element-playout':
         specifier: workspace:^
         version: link:../media-element-playout
@@ -376,25 +373,6 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@20.19.42)(jsdom@25.0.1)
 
-  packages/loaders:
-    dependencies:
-      '@waveform-playlist/core':
-        specifier: workspace:*
-        version: link:../core
-      eventemitter3:
-        specifier: ^5.0.4
-        version: 5.0.4
-    devDependencies:
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(@swc/core@1.15.41)(postcss@8.5.15)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.6
-        version: 3.2.6(@types/node@20.19.42)(jsdom@25.0.1)
-
   packages/media-element-playout:
     dependencies:
       '@waveform-playlist/core':
@@ -591,9 +569,6 @@ importers:
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
-      '@waveform-playlist/loaders':
-        specifier: workspace:*
-        version: link:../loaders
       '@waveform-playlist/playout':
         specifier: workspace:*
         version: link:../playout
@@ -11354,10 +11329,6 @@ packages:
 
   /eventemitter3@4.0.7:
     resolution: {integrity: sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==}
-
-  /eventemitter3@5.0.4:
-    resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
-    dev: false
 
   /events@3.3.0:
     resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
