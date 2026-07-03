@@ -17,11 +17,11 @@ There are three ways to host WAM plugins, and their requirements differ:
 
 | Integration | Audio backend | Native-context setup | Firefox | Plugin transport sync |
 | --- | --- | --- | --- | --- |
-| [React hooks](#react-hooks) | Tone.js | Required | ❌ | ❌ ([#537](https://github.com/naomiaro/waveform-playlist/issues/537)) |
-| [`<daw-editor>` + `createToneAdapter()`](#web-components-daw-editor-on-the-tone-backend) | Tone.js | Required | ❌ | ❌ ([#537](https://github.com/naomiaro/waveform-playlist/issues/537)) |
+| [React hooks](#react-hooks) | Tone.js | Required | ❌ ([Tone#1457](https://github.com/Tonejs/Tone.js/issues/1457)) | ❌ ([#537](https://github.com/naomiaro/waveform-playlist/issues/537)) |
+| [`<daw-editor>` + `createToneAdapter()`](#web-components-daw-editor-on-the-tone-backend) | Tone.js | Required | ❌ ([Tone#1457](https://github.com/Tonejs/Tone.js/issues/1457)) | ❌ ([#537](https://github.com/naomiaro/waveform-playlist/issues/537)) |
 | [`<daw-editor>` + `NativePlayoutAdapter`](#web-components-daw-editor-on-the-native-backend) | Native Web Audio | None — already native | ✅ | ✅ |
 
-The **Firefox** and **setup** columns share one root cause: WAM worklets subclass the native `AudioWorkletNode` and can only live on a native `AudioContext`. The Tone.js backends normally run on a `standardized-audio-context` wrapper and must be switched into native mode (next section) — a mode Firefox can't run because of a Tone.js limitation. The native `@dawcore/transport` backend has no Tone.js in it at all, so none of that applies — including in Firefox.
+The **Firefox** and **setup** columns share one root cause: WAM worklets subclass the native `AudioWorkletNode` and can only live on a native `AudioContext`. The Tone.js backends normally run on a `standardized-audio-context` wrapper and must be switched into native mode (next section) — a mode Firefox can't run because of a Tone.js limitation. The native `@dawcore/transport` backend has no Tone.js in it at all, so none of that applies — including in Firefox. Both constraints are tracked upstream: [Tone#1457](https://github.com/Tonejs/Tone.js/issues/1457) for the Firefox limitation, [webaudiomodules/sdk#12](https://github.com/webaudiomodules/sdk/issues/12) for a clearer SDK error when a plugin lands on a wrapped context.
 
 ## Enable native AudioContext mode (Tone backends)
 
@@ -45,7 +45,7 @@ configureGlobalContext({ nativeAudioContext: true });
 | Safari | ✅ |
 | Firefox | ❌ — falls back automatically |
 
-The Firefox limitation is **Tone.js's, not WAM's**: Firefox does not implement the `AudioListener` position `AudioParam`s (`positionX`/`positionY`/`positionZ`, etc.) that Tone.js's `Listener` wraps eagerly at context initialization. `configureGlobalContext` feature-detects this (via `supportsNativeContextMode()`) and falls back to the default `standardized-audio-context` path with a `[playout]` console warning — built-in Tone.js effects keep working. Any subsequent WAM call (`addWamEffect`, `addWamEffectToTrack`, `editor.addWamPlugin`) throws with the same "requires a native AudioContext" instruction.
+The Firefox limitation is **Tone.js's, not WAM's**: Firefox does not implement the `AudioListener` position `AudioParam`s (`positionX`/`positionY`/`positionZ`, etc.) that Tone.js's `Listener` wraps eagerly at context initialization ([Tone#1457](https://github.com/Tonejs/Tone.js/issues/1457)). `configureGlobalContext` feature-detects this (via `supportsNativeContextMode()`) and falls back to the default `standardized-audio-context` path with a `[playout]` console warning — built-in Tone.js effects keep working. Any subsequent WAM call (`addWamEffect`, `addWamEffectToTrack`, `editor.addWamPlugin`) throws with the same "requires a native AudioContext" instruction.
 
 Firefox users are only excluded from the Tone paths: WAM hosting on the [native backend](#web-components-daw-editor-on-the-native-backend) works in Firefox, since no Tone.js is involved.
 
