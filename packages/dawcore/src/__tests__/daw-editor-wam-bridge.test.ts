@@ -158,4 +158,22 @@ describe('wam-transport bridge wiring', () => {
     await expect(editor.addWamPlugin(PLUGIN_URL)).resolves.toBeTruthy();
     expect(createWamTransportBridge).not.toHaveBeenCalled();
   });
+
+  it('warns once (string-only) when the bridge is skipped — not per plugin add', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (adapter.transport as any).on = undefined;
+    await editor.addWamPlugin(PLUGIN_URL);
+    const second = makeMockPlugin();
+    createWamInstance.mockResolvedValueOnce(second);
+    await editor.addWamPlugin(PLUGIN_URL + '?2');
+
+    const bridgeWarns = warn.mock.calls.filter((c) => String(c[0]).includes('wam-transport'));
+    expect(bridgeWarns).toHaveLength(1);
+    // String-only console convention: a single string argument, no objects.
+    expect(bridgeWarns[0]).toHaveLength(1);
+    expect(typeof bridgeWarns[0][0]).toBe('string');
+    expect(bridgeWarns[0][0]).toContain("won't receive transport/tempo events");
+    warn.mockRestore();
+  });
 });
