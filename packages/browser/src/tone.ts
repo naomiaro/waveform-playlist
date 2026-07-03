@@ -19,7 +19,14 @@ export type {
 } from './hooks/useTrackDynamicEffects';
 
 export { useExportWav } from './hooks/useExportWav';
-export type { ExportOptions, ExportResult, UseExportWavReturn } from './hooks/useExportWav';
+export type {
+  ExportOptions,
+  ExportResult,
+  UseExportWavReturn,
+  OfflineEffectsCleanup,
+  OfflineEffectsFunction,
+  OfflineTrackEffectsFunction,
+} from './hooks/useExportWav';
 
 export { useDynamicTracks } from './hooks/useDynamicTracks';
 export type { TrackSource, TrackLoadError, UseDynamicTracksReturn } from './hooks/useDynamicTracks';

@@ -440,7 +440,7 @@ interface UseDynamicEffectsReturn {
   reorderEffects: (fromIndex: number, toIndex: number) => void;
   clearAllEffects: () => void;
   masterEffects: EffectsFunction;
-  createOfflineEffectsFunction: () => EffectsFunction | undefined;
+  createOfflineEffectsFunction: () => OfflineEffectsFunction | undefined;
   analyserRef: RefObject<Analyser | null>;
 }
 
@@ -470,7 +470,7 @@ interface UseTrackDynamicEffectsReturn {
   toggleBypass: (trackId: string, instanceId: string) => void;
   clearTrackEffects: (trackId: string) => void;
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
-  createOfflineTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
+  createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction | undefined;
   availableEffects: EffectDefinition[];
 }
 
@@ -936,14 +936,33 @@ interface UseExportWavReturn {
   error: string | null;
 }
 
+/** Cleanup returned by an offline effects function (disposes offline instances / WAM clones). */
+type OfflineEffectsCleanup = void | (() => void);
+
+/** Master-chain effects function for offline rendering. May return a Promise —
+ *  WAM entries are re-instantiated asynchronously on the offline context. Every
+ *  live EffectsFunction is assignable to this type. */
+type OfflineEffectsFunction = (
+  masterVolume: Volume,
+  destination: ToneAudioNode,
+  isOffline: boolean
+) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
+
+/** Per-track variant of OfflineEffectsFunction. */
+type OfflineTrackEffectsFunction = (
+  graphEnd: Gain,
+  masterGainNode: ToneAudioNode,
+  isOffline: boolean
+) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
+
 interface ExportOptions {
   filename?: string;
   mode?: 'master' | 'individual';
   trackIndex?: number;
   autoDownload?: boolean;
   applyEffects?: boolean;        // Default: true
-  effectsFunction?: EffectsFunction;
-  createOfflineTrackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
+  effectsFunction?: OfflineEffectsFunction;
+  createOfflineTrackEffects?: (trackId: string) => OfflineTrackEffectsFunction | undefined;
   onProgress?: (progress: number) => void;
   bitDepth?: 16 | 32;
 }

@@ -12,6 +12,8 @@ import {
 import { createEffectInstance, type EffectInstance } from '../effects/effectFactory';
 import { loadWamModule } from '../effects/loadWam';
 import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamEffectFactory';
+import { buildOfflineChain, connectOfflineChain } from '../effects/offlineChain';
+import type { OfflineEffectsFunction } from './useExportWav';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
 import { Analyser, Volume, ToneAudioNode, connect } from 'tone';
 
@@ -38,7 +40,7 @@ export interface UseDynamicEffectsReturn {
    * Hosts a WAM plugin from a module URL and appends it to the master chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
-   * Note: WAM entries are skipped during offline WAV export (not supported yet).
+   * WAM entries render in offline WAV export (re-instantiated on the offline context).
    * Resolves with the new entry's instanceId.
    */
   addWamEffect: (url: string, initialState?: unknown) => Promise<string>;
@@ -58,10 +60,13 @@ export interface UseDynamicEffectsReturn {
   masterEffects: EffectsFunction;
 
   /**
-   * Creates a fresh effects function for offline rendering.
-   * This creates new effect instances that work in the offline AudioContext.
+   * Creates a fresh effects function for offline rendering. Native effects are
+   * re-created on the offline context; WAM entries are re-instantiated from
+   * their URL-cached factories with the live instance's state transferred.
+   * The returned function may be async and may reject — a WAV export never
+   * silently renders without an effect the live chain has.
    */
-  createOfflineEffectsFunction: () => EffectsFunction | undefined;
+  createOfflineEffectsFunction: () => OfflineEffectsFunction | undefined;
 
   // Analyser for visualization
   analyserRef: React.RefObject<Analyser | null>;
@@ -380,57 +385,40 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   }, []);
 
   /**
-   * Creates a fresh effects function for offline rendering.
-   * This creates new effect instances in the offline context, avoiding the
-   * AudioContext mismatch issue that occurs when reusing real-time effects.
+   * Creates a fresh effects function for offline rendering. Native effects
+   * are re-created on the offline context; WAM entries are re-instantiated
+   * from the live instance's state (cloneInstanceInto), asynchronously.
    */
-  const createOfflineEffectsFunction = useCallback((): EffectsFunction | undefined => {
-    // WAM plugins cannot be re-instantiated in Tone.Offline's context — skip them.
-    const wamCount = activeEffects.filter((e) => e.kind === 'wam' && !e.bypassed).length;
-    if (wamCount > 0) {
-      console.warn(
-        '[waveform-playlist] ' +
-          wamCount +
-          ' WAM effect(s) are skipped in WAV export — WAM offline rendering is not supported yet.'
-      );
-    }
-
-    // Get non-bypassed native effects
-    const nonBypassedEffects = activeEffects.filter((e) => !e.bypassed && e.kind !== 'wam');
-
-    if (nonBypassedEffects.length === 0) {
+  const createOfflineEffectsFunction = useCallback((): OfflineEffectsFunction | undefined => {
+    // Bypassed entries are excluded offline: natives keep the existing
+    // exclusion; WAM entries use disconnection bypass (parity with live).
+    const nonBypassed = activeEffects.filter((e) => !e.bypassed);
+    if (nonBypassed.length === 0) {
       return undefined;
     }
+    const hasWam = nonBypassed.some((e) => e.kind === 'wam');
 
-    // Return a function that creates fresh effect instances
-    return (masterGainNode: Volume, destination: ToneAudioNode, _isOffline: boolean) => {
-      // Create fresh effect instances for offline context
-      const offlineInstances: EffectInstance[] = [];
-
-      for (const activeEffect of nonBypassedEffects) {
-        const instance = createEffectInstance(activeEffect.definition, activeEffect.params);
-        offlineInstances.push(instance);
+    return async (masterGainNode: Volume, destination: ToneAudioNode, _isOffline: boolean) => {
+      if (hasWam && !isNativeGlobalContext()) {
+        throw new Error(
+          '[waveform-playlist] WAV export with WAM effects requires a native AudioContext. ' +
+            'Call configureGlobalContext({ nativeAudioContext: true }) from ' +
+            '@waveform-playlist/playout before any audio initialization.'
+        );
       }
-
-      if (offlineInstances.length === 0) {
-        // No effects - connect directly
-        masterGainNode.connect(destination);
-      } else {
-        // Connect: masterGain -> effect1 -> effect2 -> ... -> destination
-        let currentNode: ToneAudioNode | AudioNode = masterGainNode;
-
-        offlineInstances.forEach((inst) => {
-          connect(currentNode, inst.effect);
-          currentNode = inst.effect;
-        });
-
-        // Connect last effect to destination
-        connect(currentNode, destination);
-      }
-
-      return function cleanup() {
-        offlineInstances.forEach((inst) => inst.dispose());
-      };
+      // Tone nodes inside the offline build are created on the current
+      // (offline) global context — its rawContext must host the WAM clones.
+      const rawContext = masterGainNode.context.rawContext as unknown as BaseAudioContext;
+      const { instances, dispose } = await buildOfflineChain(
+        nonBypassed,
+        (instanceId) => {
+          const inst = effectInstancesRef.current.get(instanceId) as WamEffectInstance | undefined;
+          return inst?.kind === 'wam' ? inst.plugin : undefined;
+        },
+        rawContext
+      );
+      connectOfflineChain(masterGainNode, instances, destination);
+      return dispose;
     };
   }, [activeEffects]);
 

@@ -1,8 +1,11 @@
 import React from 'react';
 import { BaseControlButton } from '@waveform-playlist/ui-components';
-import type { EffectsFunction } from '@waveform-playlist/playout';
 import { usePlaylistData } from '../WaveformPlaylistContext';
-import { useExportWav, type TrackEffectsFunction } from '../hooks/useExportWav';
+import {
+  useExportWav,
+  type OfflineEffectsFunction,
+  type OfflineTrackEffectsFunction,
+} from '../hooks/useExportWav';
 
 export interface ExportWavButtonProps {
   /** Button label */
@@ -18,15 +21,15 @@ export interface ExportWavButtonProps {
   /** Whether to apply effects (fades, etc.) - defaults to true */
   applyEffects?: boolean;
   /**
-   * Optional Tone.js effects function for master effects. When provided, export will use Tone.Offline
-   * to render through the effects chain. The function receives isOffline=true.
+   * Optional effects function for master effects. When provided, export renders
+   * through the effects chain (WAM entries included). May be async.
    */
-  effectsFunction?: EffectsFunction;
+  effectsFunction?: OfflineEffectsFunction;
   /**
    * Optional function to create offline track effects.
-   * Takes a trackId and returns a TrackEffectsFunction for offline rendering.
+   * Takes a trackId and returns an offline effects function for that track.
    */
-  createOfflineTrackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
+  createOfflineTrackEffects?: (trackId: string) => OfflineTrackEffectsFunction | undefined;
   /** CSS class name */
   className?: string;
   /** Callback when export completes */

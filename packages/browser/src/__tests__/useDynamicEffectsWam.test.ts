@@ -14,6 +14,7 @@ const createWamInstance = vi.fn().mockResolvedValue({
   getParameterInfo: vi.fn(),
   destroy,
 });
+const cloneInstanceInto = vi.fn();
 
 vi.mock('@dawcore/wam', () => ({
   ensureWamHost: (...a: unknown[]) => ensureWamHost(...a),
@@ -21,7 +22,7 @@ vi.mock('@dawcore/wam', () => ({
   // strict-mock sweep guard: include every export the hook may touch
   createWamInstanceFromFactory: vi.fn(),
   loadWamFactory: vi.fn(),
-  cloneInstanceInto: vi.fn(),
+  cloneInstanceInto: (...a: unknown[]) => cloneInstanceInto(...a),
   createParameterPanel: vi.fn(),
   createWamParameterPanel: vi.fn(),
   fetchWamLibrary: vi.fn(),
@@ -215,14 +216,79 @@ describe('useDynamicEffects — WAM entries', () => {
     expect(connect).toHaveBeenCalledWith(mockVolume, fakeAudioNode);
   });
 
-  it('createOfflineEffectsFunction skips wam entries with a warning', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('createOfflineEffectsFunction clones wam entries onto the offline context, wires and cleans up', async () => {
+    const cloneDestroy = vi.fn();
+    const cloneNode = { ctx: 'offline' };
+    cloneInstanceInto.mockResolvedValueOnce({
+      url: 'https://example.com/p/index.js',
+      descriptor: { name: 'BigMuff' },
+      audioNode: cloneNode,
+      getState: vi.fn(),
+      setState: vi.fn(),
+      getParameterInfo: vi.fn(),
+      destroy: cloneDestroy,
+    });
+
     const { result } = renderHook(() => useDynamicEffects());
     await act(async () => {
       await result.current.addWamEffect('https://example.com/p/index.js');
     });
+
+    const offline = result.current.createOfflineEffectsFunction();
+    expect(offline).toBeDefined();
+
+    const rawContext = { raw: 'offline' };
+    const masterVolume = { context: { rawContext }, connect: vi.fn() } as unknown as Volume;
+    const destination = { name: 'destination' } as unknown as ToneAudioNode;
+
+    const cleanup = await offline!(masterVolume, destination, true);
+
+    expect(ensureWamHost).toHaveBeenLastCalledWith(rawContext);
+    expect(cloneInstanceInto).toHaveBeenCalledWith(
+      expect.objectContaining({ audioNode: fakeAudioNode }),
+      rawContext,
+      'group-1'
+    );
+    expect(connect).toHaveBeenCalledWith(masterVolume, cloneNode);
+    expect(connect).toHaveBeenCalledWith(cloneNode, destination);
+
+    (cleanup as () => void)();
+    expect(cloneDestroy).toHaveBeenCalled();
+  });
+
+  it('createOfflineEffectsFunction excludes bypassed wam entries (undefined when nothing remains)', async () => {
+    const { result } = renderHook(() => useDynamicEffects());
+    let id = '';
+    await act(async () => {
+      id = await result.current.addWamEffect('https://example.com/p/index.js');
+    });
+    act(() => result.current.toggleBypass(id));
     expect(result.current.createOfflineEffectsFunction()).toBeUndefined();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('WAV export'));
-    warn.mockRestore();
+  });
+
+  it('the offline function rejects when the wam clone fails (fail-loud export)', async () => {
+    cloneInstanceInto.mockRejectedValueOnce(new Error('factory exploded'));
+    const { result } = renderHook(() => useDynamicEffects());
+    await act(async () => {
+      await result.current.addWamEffect('https://example.com/p/index.js');
+    });
+    const offline = result.current.createOfflineEffectsFunction();
+    const masterVolume = { context: { rawContext: {} }, connect: vi.fn() } as unknown as Volume;
+    const destination = {} as unknown as ToneAudioNode;
+    await expect(offline!(masterVolume, destination, true)).rejects.toThrow('factory exploded');
+  });
+
+  it('the offline function rejects when wam entries exist on a standardized context (defensive guard)', async () => {
+    const { result } = renderHook(() => useDynamicEffects());
+    await act(async () => {
+      await result.current.addWamEffect('https://example.com/p/index.js');
+    });
+    isNativeGlobalContext.mockReturnValue(false);
+    const offline = result.current.createOfflineEffectsFunction();
+    const masterVolume = { context: { rawContext: {} }, connect: vi.fn() } as unknown as Volume;
+    const destination = {} as unknown as ToneAudioNode;
+    await expect(offline!(masterVolume, destination, true)).rejects.toThrow(
+      /nativeAudioContext: true/
+    );
   });
 });

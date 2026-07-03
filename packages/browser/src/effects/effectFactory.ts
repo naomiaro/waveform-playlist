@@ -119,8 +119,9 @@ export function createEffectInstance(
         effect.dispose();
       } catch (e) {
         console.warn(
-          `[waveform-playlist] Error disposing effect "${definition.id}" (${instanceId}):`,
-          e
+          `[waveform-playlist] Error disposing effect "${definition.id}" (${instanceId}): ${
+            e instanceof Error ? e.message : String(e)
+          }`
         );
       }
     },
@@ -171,8 +172,9 @@ export function createEffectInstance(
         effect.disconnect();
       } catch (e) {
         console.warn(
-          `[waveform-playlist] Error disconnecting effect "${definition.id}" (${instanceId}):`,
-          e
+          `[waveform-playlist] Error disconnecting effect "${definition.id}" (${instanceId}): ${
+            e instanceof Error ? e.message : String(e)
+          }`
         );
       }
     },
