@@ -38,6 +38,8 @@ When a hero section uses `min-height: 100vh` + `align-items: center` and an elem
 - Dev server: `pnpm --filter website start`
 - Build: `pnpm --filter website build`
 - **Bundler is Rspack** (Docusaurus 3.10.1 + `@docusaurus/faster`; the `future: { v4: true }` flag selects it). The `configureWebpack` hook — `babel-loader` source-transpilation + `resolve.alias` (incl. `'@dawcore/faust': false`) — works verbatim under Rspack; no config changes. Storybook (`ui-components`, `@storybook/react-webpack5`) still uses webpack — two bundlers in the monorepo, so webpack can't be removed.
+- Explicit heading ids (`## Heading {#custom-id}`) break the MDX build ("Could not parse expression with acorn" at the heading) — unsupported by this config. Renamed headings change their auto-slugs: update in-file anchor links; the build's broken-anchor check catches misses.
+- Stopping a harness background task kills the pnpm wrapper but can orphan the docusaurus node child holding port 3000 — check `lsof -nP -iTCP:3000 -sTCP:LISTEN`, verify the PID's command path is this repo, kill it, then restart.
 
 ## Custom Pages
 

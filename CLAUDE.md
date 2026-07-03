@@ -53,6 +53,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **Verifying fresh publishes:** `npm view` caches 404s — a just-published new package can look missing for minutes. Verify with `curl -s https://registry.npmjs.org/@scope%2fname` instead.
 
+**Pre-publish workspace-dep sweep:** for every `workspace:*`/`workspace:^` dep of the packages being published, verify local version == registry latest (`curl -s https://registry.npmjs.org/...`) — a feature PR that bumps a package version without publishing it (e.g. media-element-playout 12.3.0 in #473) makes dependents' exact pins unresolvable at install time.
+
 **Build before publishing:** No package defines prepublish hooks — always run `pnpm --filter <pkg> build` before `pnpm publish`, or the tarball ships a stale `dist/`.
 
 **Prerelease Tag:** Use `@next` for prerelease versions when preparing future major releases.

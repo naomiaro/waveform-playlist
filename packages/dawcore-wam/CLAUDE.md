@@ -55,6 +55,12 @@
 
 `createWamTransportBridge(transport, getPluginNodes)` — broadcasts `wam-transport` events ({playing, tempo, timeSig, currentBar, currentBarStarted}) to all live plugin nodes on play/pause/stop/seek/tempochange/meterchange. **Variable-tempo boundary crossings emit no transport event** — a rAF watcher (active only while playing) compares tempo/meter at the playhead each frame and rebroadcasts on change. `currentBarStarted` is AudioContext time: `ctx.currentTime - (transportSeconds - barStartSeconds)`. Structural `TransportQueryLike` keeps the transport package plugin-free; `WamTransportNode.scheduleEvents` is optional (the loader's structural node type can't require it) and guarded. dawcore's `EffectsManager` creates the bridge lazily on first `addWamPlugin`, feeds it the live-node Set (entries' dispose closures self-remove), and skips it with a one-time `[waveform-playlist]` console.warn when the adapter transport lacks the query surface (e.g. the Tone adapter, #537).
 
+## Browser & Node Reality
+
+**Firefox hosts WAM fine on a plain native AudioContext** (verified FF150: `ensureWamHost` + `createWamInstance` + offline render through burns-audio delay, RMS 0.455) — the repo's Firefox limitation is Tone's Listener (playout), never WAM/Gecko. Playwright probe recipe: `firefox.launch({ firefoxUserPrefs: { 'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0 } })`; prefer OfflineAudioContext probes (no gesture/autoplay dance at all).
+
+**`plugin.audioNode` is often NOT an `AudioWorkletNode`** — SDK composite nodes extend GainNode (e.g. burns-audio `DelayPluginNode`). Assert `instanceof AudioNode` or measured signal, never `instanceof AudioWorkletNode`. Registry reality (2026-07-02): the `wam-transport`/`tempo` strings in every SDK bundle are serializer plumbing (identical counts across delay/distortion/reverb/EQ); no insertable registry effect consumes transport events — the syncing plugins (sequencers/modulators) lack effect audio I/O and are rejected at insert.
+
 ## Reference Implementation
 
 wam-studio (local checkout at `~/Code/wam-studio`) — `public/src/Models/Plugin.ts` shows the full plugin lifecycle: `createInstance(hostGroupId, ctx)`, GUI/audio lifecycle split (`createGui`/`destroyGui` independent of `audioNode.destroy()`), and `cloneInto(offlineCtx, groupId)` for offline rendering via getState/setState transfer.
