@@ -143,3 +143,71 @@ describe('spectrogram worker — render mapping honors clip offsetSamples (#554)
     }
   });
 });
+
+describe('spectrogram worker — linear frequency scale (#557)', () => {
+  it('paints the full canvas including the top row (no transparent stripe)', async () => {
+    const sampleRate = 8000;
+    const channel = new Float32Array(4000);
+    for (let i = 0; i < channel.length; i++) {
+      channel[i] = Math.sin(i * 1.234) * Math.sin(i * 0.517) > 0 ? 0.9 : -0.9;
+    }
+
+    handler({
+      data: {
+        type: 'compute-fft',
+        id: 'fft-linear',
+        generation: 0,
+        clipId: 'linear-clip',
+        channelDataArrays: [channel],
+        config: { fftSize: 256, zeroPaddingFactor: 1 },
+        sampleRate,
+        offsetSamples: 0,
+        durationSamples: 4000,
+        mono: false,
+      },
+    });
+    await new Promise((r) => setTimeout(r, 20));
+
+    const fftResponse = posted.find((m) => m.id === 'fft-linear');
+    expect(fftResponse?.type).toBe('cache-key');
+
+    const captured: { img: CapturedImage | null } = { img: null };
+    handler({
+      data: {
+        type: 'register-canvas',
+        canvasId: 'linear-clip-ch0-chunk0',
+        canvas: makeMockCanvas(captured),
+      },
+    });
+
+    handler({
+      data: {
+        type: 'render-chunks',
+        id: 'render-linear',
+        generation: 0,
+        cacheKey: fftResponse!.cacheKey!,
+        canvasIds: ['linear-clip-ch0-chunk0'],
+        canvasWidths: [10],
+        globalPixelOffsets: [0],
+        canvasHeight: 8,
+        devicePixelRatio: 1,
+        samplesPerPixel: 400,
+        colorLUT: grayscaleIdentityLUT(),
+        frequencyScale: 'linear',
+        minFrequency: 0,
+        maxFrequency: 0,
+        gainDb: 20,
+        rangeDb: 80,
+        channelIndex: 0,
+      },
+    });
+
+    expect(posted.find((m) => m.id === 'render-linear')?.type).toBe('done');
+    const { data, width } = captured.img!;
+    // Top row (y = 0) must be opaque — pre-fix, normalizedY = 1 mapped to
+    // bin === frequencyBinCount, was skipped, and the row stayed transparent.
+    for (let x = 0; x < width; x++) {
+      expect(data[x * 4 + 3], 'top-row alpha at column ' + x).toBe(255);
+    }
+  });
+});

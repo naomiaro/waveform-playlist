@@ -17,7 +17,7 @@ import type {
 import { fftMagnitudeDb } from '../computation/fft';
 import { getWindowFunction } from '../computation/windowFunctions';
 import { getFrequencyScale, type FrequencyScaleName } from '../computation/frequencyScales';
-import { pixelColumnToFrame } from '../computation/renderGeometry';
+import { pixelColumnToFrame, pixelRowToBin } from '../computation/renderGeometry';
 
 // --- Canvas registry ---
 const canvasRegistry = new Map<string, OffscreenCanvas>();
@@ -339,9 +339,23 @@ function renderSpectrogramToCanvas(
   const rawRangeDb = rangeDbOverride ?? specData.rangeDb;
   const rangeDb = rawRangeDb === 0 ? 1 : rawRangeDb;
   const maxF = maxFrequency > 0 ? maxFrequency : sampleRate / 2;
-  const binToFreq = (bin: number) => (bin / frequencyBinCount) * (sampleRate / 2);
 
   let accumulatedOffset = 0;
+
+  // Row → bin depends only on y, never on x, and all chunks in one call share
+  // canvasHeight — compute the mapping once instead of per pixel column.
+  const rowBins = new Int32Array(canvasHeight);
+  for (let y = 0; y < canvasHeight; y++) {
+    rowBins[y] = pixelRowToBin({
+      normalizedY: 1 - y / canvasHeight,
+      frequencyBinCount,
+      sampleRate,
+      minFrequency,
+      maxFrequency: maxF,
+      scaleFn,
+      isLinear: !isNonLinear,
+    });
+  }
 
   for (let chunkIdx = 0; chunkIdx < canvasIds.length; chunkIdx++) {
     const canvasId = canvasIds[chunkIdx];
@@ -389,26 +403,7 @@ function renderSpectrogramToCanvas(
       const frameOffset = frame * frequencyBinCount;
 
       for (let y = 0; y < canvasHeight; y++) {
-        const normalizedY = 1 - y / canvasHeight;
-
-        let bin = Math.floor(normalizedY * frequencyBinCount);
-
-        if (isNonLinear) {
-          let lo = 0;
-          let hi = frequencyBinCount - 1;
-          while (lo < hi) {
-            const mid = (lo + hi) >> 1;
-            const freq = binToFreq(mid);
-            const scaled = scaleFn(freq, minFrequency, maxF);
-            if (scaled < normalizedY) {
-              lo = mid + 1;
-            } else {
-              hi = mid;
-            }
-          }
-          bin = lo;
-        }
-
+        const bin = rowBins[y];
         if (bin < 0 || bin >= frequencyBinCount) continue;
 
         const db = specData.data[frameOffset + bin];
