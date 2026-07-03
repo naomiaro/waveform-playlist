@@ -213,10 +213,7 @@ export function createSpectrogramWorkerPool(
 
     // async so ensureWorkerForChannel's policy throws surface as rejections,
     // matching computeFFT, instead of escaping synchronously.
-    async renderChunks(
-      params: SpectrogramWorkerRenderChunksParams,
-      generation = 0
-    ): Promise<void> {
+    async renderChunks(params: SpectrogramWorkerRenderChunksParams, generation = 0): Promise<void> {
       const worker = ensureWorkerForChannel(params.channelIndex);
       // Remap channelIndex to 0 — each worker stores its channel at index 0
       return worker.renderChunks({ ...params, channelIndex: 0 }, generation);
