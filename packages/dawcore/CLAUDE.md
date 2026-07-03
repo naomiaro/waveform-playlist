@@ -192,7 +192,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Ported Utilities
 
-- `peak-rendering.ts` — `aggregatePeaks`, `calculateBarRects`, `calculateFirstBarPosition` (from `ui-components`)
+- `peak-rendering.ts` — `aggregatePeaks`, `calculateBarRects`, `calculateFirstBarPosition`, `addBarToPath` (rounded-bar path builder with square-corner fallback when `ctx.roundRect` is missing) (from `ui-components` — keep mirrored)
+- `<daw-waveform>` rounded bars batch into one path per region draw (`_drawBarRects` with radius hoisted out of the loop) — don't reintroduce per-bar `beginPath`/`fill` in the 60fps dirty-redraw path
 - `smart-scale.ts` — `getScaleInfo`, `computeTemporalTicks` (extracted from `SmartScale.tsx`, temporal mode only)
 - `time-format.ts` — `formatTime` for ruler labels
 
