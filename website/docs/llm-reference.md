@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 6
 title: LLM API Reference
 description: Machine-readable API reference for LLMs and coding agents. All TypeScript interfaces from source.
 ---

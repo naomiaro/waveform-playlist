@@ -62,7 +62,7 @@ When `snap` is enabled, the provider reads from `BeatsAndBarsProvider` context:
 
 :::info Advanced: Manual DragDropProvider Setup
 
-For full control over drag sensors, modifiers, and handlers, you can bypass `ClipInteractionProvider` and configure `DragDropProvider` directly with `useClipDragHandlers`, `useDragSensors`, `ClipCollisionModifier`, and `SnapToGridModifier`. See the [LLM API Reference](/docs/framework-agnostic/llm-reference) for the complete hook and modifier signatures.
+For full control over drag sensors, modifiers, and handlers, you can bypass `ClipInteractionProvider` and configure `DragDropProvider` directly with `useClipDragHandlers`, `useDragSensors`, `ClipCollisionModifier`, and `SnapToGridModifier`. See the [LLM API Reference](/docs/llm-reference) for the complete hook and modifier signatures.
 
 :::
 
