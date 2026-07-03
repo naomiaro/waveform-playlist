@@ -19,8 +19,6 @@
       "@waveform-playlist/spectrogram/*": ["../packages/spectrogram/src/*"],
       "@waveform-playlist/recording": ["../packages/recording/src"],
       "@waveform-playlist/recording/*": ["../packages/recording/src/*"],
-      "@waveform-playlist/loaders": ["../packages/loaders/src"],
-      "@waveform-playlist/loaders/*": ["../packages/loaders/src/*"],
       "@waveform-playlist/midi": ["../packages/midi/src"],
       "@waveform-playlist/midi/*": ["../packages/midi/src/*"]
     }

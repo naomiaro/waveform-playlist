@@ -65,7 +65,6 @@
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/engine": "workspace:*",
-    "@waveform-playlist/loaders": "workspace:*",
     "@waveform-playlist/ui-components": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*",
     "uuid": "^13.0.2",
