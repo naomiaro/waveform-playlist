@@ -175,10 +175,7 @@ export class SpectrogramOrchestrator extends EventTarget {
       return;
     }
     if (this.viewport && viewportsEqual(this.viewport, state)) return;
-    const prevGeneration = this.generation;
-    this.generation += 1;
-    this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
+    this.bumpGenerationAndAbortStale();
     this.viewport = state;
     this.scheduleRender();
   }
@@ -186,10 +183,7 @@ export class SpectrogramOrchestrator extends EventTarget {
   setConfig(config: SpectrogramConfig): void {
     if (this.disposed) return;
     this.config = config;
-    const prevGeneration = this.generation;
-    this.generation += 1;
-    this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
+    this.bumpGenerationAndAbortStale();
     this.colorLUT.clear();
     this.scheduleRender();
   }
@@ -197,10 +191,7 @@ export class SpectrogramOrchestrator extends EventTarget {
   setColorMap(colorMap: ColorMapValue): void {
     if (this.disposed) return;
     this.colorMap = colorMap;
-    const prevGeneration = this.generation;
-    this.generation += 1;
-    this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
+    this.bumpGenerationAndAbortStale();
     this.scheduleRender();
   }
 
@@ -214,11 +205,21 @@ export class SpectrogramOrchestrator extends EventTarget {
     }
     if (this.devicePixelRatio === dpr) return;
     this.devicePixelRatio = dpr;
-    const prevGeneration = this.generation;
+    this.bumpGenerationAndAbortStale();
+    this.scheduleRender();
+  }
+
+  /**
+   * Start a new render generation and cancel in-flight work from older ones.
+   *
+   * The worker treats work as stale iff `generation < latestGeneration`, so
+   * the abort message must carry the NEW generation — passing the previous
+   * one leaves its in-flight FFTs running to completion (#555).
+   */
+  protected bumpGenerationAndAbortStale(): void {
     this.generation += 1;
     this.readyDispatched.clear();
-    this.pool.abortGeneration(prevGeneration);
-    this.scheduleRender();
+    this.pool.abortGeneration(this.generation);
   }
 
   dispose(): void {

@@ -20,7 +20,7 @@ Class that owns the worker pool, clip+canvas registries, viewport state, and ren
 
 **Constructor:** `new SpectrogramOrchestrator({ workerFactory, workerPoolSize?, config, colorMap?, devicePixelRatio? })`. The consumer owns worker URL resolution — pass a factory rather than baking URLs into the orchestrator.
 
-**Lifecycle:** `registerClip` (audio data), `registerCanvas` (OffscreenCanvas + metadata), `setViewport`, `setConfig`, `setColorMap`. Each setter that affects render output bumps a generation counter and calls `pool.abortGeneration(prev)` so stale FFT work drops cleanly. `dispose()` is idempotent.
+**Lifecycle:** `registerClip` (audio data), `registerCanvas` (OffscreenCanvas + metadata), `setViewport`, `setConfig`, `setColorMap`. Each setter that affects render output bumps a generation counter and calls `pool.abortGeneration(newGeneration)` so stale FFT work drops cleanly — the worker treats work as stale iff `generation < latestGeneration`, so the abort must carry the NEW generation, never the previous one (#555). `dispose()` is idempotent.
 
 **Protected fields:** `pool`, `config`, `colorMap`, `devicePixelRatio`, `clips`, `canvases`, `viewport`, `generation`, `colorLUT`, `disposed`, `readyDispatched`. Protected (not private) so `noUnusedLocals` doesn't flag dormant fields between task slices.
 
