@@ -16,6 +16,7 @@ import {
 import {
   extractChunkNumber,
   parseCanvasId,
+  presentChunkIndices,
   groupContiguousIndices,
   classifyChunkTiers,
   computeChunkSampleRange,
@@ -310,11 +311,15 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       api: SpectrogramWorkerApi,
       cacheKey: string,
       channelInfo: { canvasIds: string[]; canvasWidths: number[] },
-      indices: number[],
+      requestedIndices: number[],
       item: { config: SpectrogramConfig; colorMap: ColorMapValue },
       channelIndex: number,
       gen: number
     ) => {
+      // Indices are derived from channel 0's registry; this channel may have
+      // registered fewer canvases so far (#562). Skipped chunks render on the
+      // next pass — registration bumps spectrogramCanvasVersion.
+      const indices = presentChunkIndices(channelInfo, requestedIndices);
       if (indices.length === 0) return;
 
       const canvasIds = indices.map((i) => channelInfo.canvasIds[i]);

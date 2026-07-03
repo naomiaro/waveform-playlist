@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   extractChunkNumber,
+  presentChunkIndices,
   parseCanvasId,
   groupContiguousIndices,
   classifyChunkTiers,
@@ -272,4 +273,20 @@ describe('mapsDiffer', () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('presentChunkIndices (#562)', () => {
+  it('keeps only indices whose canvas is registered for this channel', () => {
+    // Channel 0 has chunks 0..3 registered; this channel only 0..1 so far —
+    // reusing channel-0 indices must not index past the registry.
+    const channelInfo = { canvasIds: ['clip-ch1-chunk0', 'clip-ch1-chunk1'] };
+    expect(presentChunkIndices(channelInfo, [0, 1, 2, 3])).toEqual([0, 1]);
+  });
+
+  it('returns all indices when the channel registry is complete', () => {
+    const channelInfo = {
+      canvasIds: ['clip-ch0-chunk0', 'clip-ch0-chunk1', 'clip-ch0-chunk2'],
+    };
+    expect(presentChunkIndices(channelInfo, [0, 1, 2])).toEqual([0, 1, 2]);
+  });
 });
