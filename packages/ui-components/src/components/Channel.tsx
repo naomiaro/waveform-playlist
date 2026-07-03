@@ -105,6 +105,8 @@ export interface ChannelProps {
   barWidth?: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
   barGap?: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
+  roundedBars?: boolean;
   /** If true, background is transparent (for use with external progress overlay) */
   transparentBackground?: boolean;
   /**
@@ -128,6 +130,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     waveFillColor = 'grey',
     barWidth = 1,
     barGap = 0,
+    roundedBars = false,
     transparentBackground = false,
     drawMode = 'inverted',
   } = props;
@@ -154,7 +157,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   // all chunks need redrawing. When only visibleChunkIndices changes,
   // existing chunks can be skipped (only new mounts need drawing).
   const drawVersion =
-    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}` +
+    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${roundedBars}` +
     `-${waveformColorToCss(waveOutlineColor)}-${waveformColorToCss(waveFillColor)}`;
 
   useLayoutEffect(() => {
@@ -195,6 +198,18 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         const canvasEndGlobal = globalPixelOffset + canvasWidth;
         const firstBarGlobal = calculateFirstBarPosition(canvasStartGlobal, barWidth, step);
 
+        // Rounded bars always use the normal-mode (peak region) rect. In
+        // inverted mode the chunk is pre-filled and the rounded bars are
+        // punched out as transparent holes, so the background/progress
+        // layering behind the canvas keeps working unchanged.
+        const rectMode = roundedBars ? 'normal' : drawMode;
+        const barRadius = barWidth / 2;
+        const punchOut = roundedBars && drawMode === 'inverted';
+        if (punchOut) {
+          ctx.fillRect(0, 0, canvasWidth, waveHeight);
+          ctx.globalCompositeOperation = 'destination-out';
+        }
+
         for (
           let barGlobal = Math.max(0, firstBarGlobal);
           barGlobal < canvasEndGlobal;
@@ -209,11 +224,21 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
           const peak = aggregatePeaks(data, bits, barGlobal, peakEnd);
 
           if (peak) {
-            const rects = calculateBarRects(x, barWidth, h2, peak.min, peak.max, drawMode);
+            const rects = calculateBarRects(x, barWidth, h2, peak.min, peak.max, rectMode);
             for (const rect of rects) {
-              ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+              if (roundedBars) {
+                ctx.beginPath();
+                ctx.roundRect(rect.x, rect.y, rect.width, rect.height, barRadius);
+                ctx.fill();
+              } else {
+                ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+              }
             }
           }
+        }
+
+        if (punchOut) {
+          ctx.globalCompositeOperation = 'source-over';
         }
 
         canvas.dataset.drawVersion = drawVersion;
@@ -230,6 +255,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     length,
     barWidth,
     barGap,
+    roundedBars,
     drawVersion,
     drawMode,
     visibleChunkIndices,

@@ -234,6 +234,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     controls,
     barWidth,
     barGap,
+    roundedBars,
     isReady,
     mono,
   } = usePlaylistData();
@@ -570,6 +571,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
           controls,
           barWidth,
           barGap,
+          roundedBars,
         }}
       >
         <Playlist

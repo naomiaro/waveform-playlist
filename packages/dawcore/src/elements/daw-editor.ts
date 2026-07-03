@@ -182,6 +182,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @property({ type: Boolean }) mono = false;
   @property({ type: Number, attribute: 'bar-width' }) barWidth = 1;
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
+  @property({ type: Boolean, attribute: 'rounded-bars' }) roundedBars = false;
   @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
   @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
@@ -2658,6 +2659,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           .waveHeight=${chH}
           .barWidth=${this.barWidth}
           .barGap=${this.barGap}
+          .roundedBars=${this.roundedBars}
           .visibleStart=${this._viewport.visibleStart}
           .visibleEnd=${this._viewport.visibleEnd}
           .originX=${left}
@@ -2999,6 +3001,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                                   .waveHeight=${chH}
                                   .barWidth=${this.barWidth}
                                   .barGap=${this.barGap}
+                                  .roundedBars=${this.roundedBars}
                                   .visibleStart=${this._viewport.visibleStart}
                                   .visibleEnd=${this._viewport.visibleEnd}
                                   .originX=${clipLeft}

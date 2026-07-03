@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { Peaks, Bits } from '@waveform-playlist/core';
-import { aggregatePeaks, calculateBarRects } from '../utils/peak-rendering';
+import { aggregatePeaks, calculateBarRects, type BarRect } from '../utils/peak-rendering';
 import { getVisibleChunkIndices } from '../utils/viewport';
 
 /** A segment mapping a peak-index range to a pixel range within the waveform. */
@@ -19,7 +19,14 @@ export interface WaveformSegment {
 const MAX_CANVAS_WIDTH = 1000;
 
 /** Layout/data properties that require a full redraw when changed. */
-const LAYOUT_PROPS = new Set(['length', 'waveHeight', 'barWidth', 'barGap', 'segments']);
+const LAYOUT_PROPS = new Set([
+  'length',
+  'waveHeight',
+  'barWidth',
+  'barGap',
+  'roundedBars',
+  'segments',
+]);
 
 /**
  * Group dirty peak indices by canvas chunk. Returns bar-pixel-aligned
@@ -84,6 +91,8 @@ export class DawWaveformElement extends LitElement {
   @property({ type: Number, attribute: false }) waveHeight = 128;
   @property({ type: Number, attribute: false }) barWidth = 1;
   @property({ type: Number, attribute: false }) barGap = 0;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
+  @property({ type: Boolean, attribute: false }) roundedBars = false;
   /** Visible viewport start in pixels (relative to timeline origin). */
   @property({ type: Number, attribute: false }) visibleStart = -Infinity;
   /** Visible viewport end in pixels (relative to timeline origin). */
@@ -232,7 +241,18 @@ export class DawWaveformElement extends LitElement {
         peak.max,
         'normal'
       );
-      for (const r of rects) {
+      this._fillBarRects(ctx, rects);
+    }
+  }
+
+  /** Fill bar rects, with pill-shaped rounded caps when roundedBars is set. */
+  private _fillBarRects(ctx: CanvasRenderingContext2D, rects: Array<BarRect>) {
+    for (const r of rects) {
+      if (this.roundedBars) {
+        ctx.beginPath();
+        ctx.roundRect(r.x, r.y, r.width, r.height, this.barWidth / 2);
+        ctx.fill();
+      } else {
         ctx.fillRect(r.x, r.y, r.width, r.height);
       }
     }
@@ -290,9 +310,7 @@ export class DawWaveformElement extends LitElement {
           peak.max,
           'normal'
         );
-        for (const r of rects) {
-          ctx.fillRect(r.x, r.y, r.width, r.height);
-        }
+        this._fillBarRects(ctx, rects);
       }
     }
   }

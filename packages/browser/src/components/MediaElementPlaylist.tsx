@@ -121,6 +121,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     playoutRef,
     barWidth,
     barGap,
+    roundedBars,
     fadeIn,
     fadeOut,
   } = useMediaElementData();
@@ -267,6 +268,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
           controls,
           barWidth,
           barGap,
+          roundedBars,
         }}
       >
         <Playlist
