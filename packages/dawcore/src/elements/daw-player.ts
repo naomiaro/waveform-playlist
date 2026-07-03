@@ -31,6 +31,7 @@ export class DawPlayerElement extends LitElement {
   @property({ type: Boolean }) mono = false;
   @property({ type: Number, attribute: 'bar-width' }) barWidth = 1;
   @property({ type: Number, attribute: 'bar-gap' }) barGap = 0;
+  @property({ type: Boolean, attribute: 'rounded-bars' }) roundedBars = false;
 
   @property({ type: Number, attribute: 'playback-rate', noAccessor: true })
   get playbackRate(): number {
@@ -124,6 +125,7 @@ export class DawPlayerElement extends LitElement {
               .waveHeight=${channelHeight}
               .barWidth=${this.barWidth}
               .barGap=${this.barGap}
+              .roundedBars=${this.roundedBars}
             ></daw-waveform>`
         )}
         <daw-playhead></daw-playhead>

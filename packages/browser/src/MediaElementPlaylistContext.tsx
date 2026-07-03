@@ -77,6 +77,8 @@ export interface MediaElementDataContextValue {
   controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
+  roundedBars: boolean;
   progressBarWidth: number;
   fadeIn?: FadeConfig;
   fadeOut?: FadeConfig;
@@ -117,6 +119,8 @@ export interface MediaElementPlaylistProviderProps {
   barWidth?: number;
   /** Gap between waveform bars */
   barGap?: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
+  roundedBars?: boolean;
   /** Width of progress bars */
   progressBarWidth?: number;
   /** Callback when annotations are changed (drag, edit, etc.) */
@@ -172,6 +176,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   annotationList,
   barWidth = 1,
   barGap = 0,
+  roundedBars = false,
   progressBarWidth: progressBarWidthProp,
   audioContext,
   onAnnotationsChange,
@@ -557,6 +562,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       controls,
       barWidth,
       barGap,
+      roundedBars,
       progressBarWidth,
       fadeIn: track.fadeIn,
       fadeOut: track.fadeOut,
@@ -571,6 +577,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       controls,
       barWidth,
       barGap,
+      roundedBars,
       progressBarWidth,
       track.fadeIn,
       track.fadeOut,

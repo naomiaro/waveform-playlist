@@ -40,6 +40,7 @@ interface WaveformPlaylistProviderProps {
   onTracksChange?: (tracks: ClipTrack[]) => void;
   barWidth?: number;                      // Default: 1
   barGap?: number;                        // Default: 0
+  roundedBars?: boolean;                  // Default: false — pill caps, radius barWidth/2
   progressBarWidth?: number;              // Default: barWidth + barGap
   /** Defer engine build during progressive loading — tracks render but engine isn't built */
   deferEngineRebuild?: boolean;           // Default: false
@@ -92,6 +93,7 @@ interface MediaElementPlaylistProviderProps {
   onReady?: () => void;
   barWidth?: number;                     // Default: 1
   barGap?: number;                       // Default: 0
+  roundedBars?: boolean;                 // Default: false — pill caps, radius barWidth/2
   progressBarWidth?: number;             // Default: barWidth + barGap
   /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout */
   createPlayout?: () => MediaElementPlayout;
@@ -156,6 +158,7 @@ interface MediaElementDataContextValue {
   controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
+  roundedBars: boolean;
   progressBarWidth: number;
   fadeIn?: FadeConfig;
   fadeOut?: FadeConfig;
@@ -301,6 +304,7 @@ interface PlaylistDataContextValue {
   canZoomOut: boolean;
   barWidth: number;
   barGap: number;
+  roundedBars: boolean;
   progressBarWidth: number;
   isReady: boolean;
   mono: boolean;

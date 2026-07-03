@@ -97,7 +97,7 @@ function App() {
 | [Stereo](https://naomiaro.github.io/waveform-playlist/examples/stereo) | Stereo waveform rendering and pan controls |
 | [Spectrogram](https://naomiaro.github.io/waveform-playlist/examples/mir-spectrogram) | FFT-based spectrogram visualization |
 | [Media Element](https://naomiaro.github.io/waveform-playlist/examples/media-element) | HTMLMediaElement playout with playback rate |
-| [Styling](https://naomiaro.github.io/waveform-playlist/examples/styling) | Bar width, gaps, gradients, and theme colors |
+| [Styling](https://naomiaro.github.io/waveform-playlist/examples/styling) | Bar width, gaps, rounded bars, gradients, and theme colors |
 | [Flexible API](https://naomiaro.github.io/waveform-playlist/examples/flexible-api) | Custom playheads, timestamps, and full UI customization |
 
 ## Packages

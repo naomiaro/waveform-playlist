@@ -139,6 +139,10 @@
 
 **Implementation:** Peak rendering math is extracted into pure functions in `src/utils/peakRendering.ts` (`aggregatePeaks`, `calculateBarRects`, `calculateFirstBarPosition`), tested in `src/__tests__/peakRendering.test.ts` (22 tests). Channel.tsx imports and calls these helpers in its `useLayoutEffect`.
 
+## Rounded Bars (Channel.tsx)
+
+`roundedBars` batches ALL bars of a chunk into ONE path with a single fill — never per-bar `beginPath`/`fill` (perf at barWidth 1 × 1000px chunks) and never `destination-out` punching (leaves `a·(1−a)` residue with semi-transparent outline colors). Inverted+rounded paints the complement via full-chunk `rect()` + bar subpaths + `fill('evenodd')`; gap and no-peak columns become covered by the complement (square inverted leaves them transparent — documented on the prop). `addBarToPath` in `utils/peakRendering.ts` owns the pill radius and the square-corner fallback for browsers without `ctx.roundRect` (Safari <16.4, Firefox <112) — keep it mirrored with dawcore's `peak-rendering.ts` copy.
+
 ## PianoRollChannel (MIDI Visualization)
 
 **Decision:** Canvas-based MIDI note rendering as a third rendering mode alongside waveform and spectrogram.

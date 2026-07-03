@@ -17,6 +17,8 @@ type PlaylistInfo = {
   barWidth: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
   barGap: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
+  roundedBars?: boolean;
   /** Width in pixels of progress bars. Default: barWidth + barGap (fills gaps). Set to barWidth for no gap fill. */
   progressBarWidth?: number;
 };
@@ -34,6 +36,7 @@ export const PlaylistInfoContext = createContext<PlaylistInfo>({
   duration: 30000,
   barWidth: 1,
   barGap: 0,
+  roundedBars: false,
 });
 
 export const usePlaylistInfo = () => useContext(PlaylistInfoContext);

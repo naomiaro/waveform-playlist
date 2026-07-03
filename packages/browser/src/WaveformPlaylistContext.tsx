@@ -218,6 +218,8 @@ export interface PlaylistDataContextValue {
   canZoomOut: boolean;
   barWidth: number;
   barGap: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
+  roundedBars: boolean;
   /** Width in pixels of progress bars. Defaults to barWidth + barGap (fills gaps). */
   progressBarWidth: number;
   /** Whether the playlist has finished loading all tracks */
@@ -270,6 +272,8 @@ export interface WaveformPlaylistProviderProps {
   barWidth?: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
   barGap?: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
+  roundedBars?: boolean;
   /** Width in pixels of progress bars. Default: barWidth + barGap (fills gaps). */
   progressBarWidth?: number;
   /** Callback when engine clip operations (move, trim, split) change tracks.
@@ -323,6 +327,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   onAnnotationsChange,
   barWidth = 1,
   barGap = 0,
+  roundedBars = false,
   progressBarWidth: progressBarWidthProp,
   onTracksChange,
   soundFontCache,
@@ -1758,6 +1763,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       canZoomOut: zoom.canZoomOut,
       barWidth,
       barGap,
+      roundedBars,
       progressBarWidth,
       isReady,
       mono,
@@ -1783,6 +1789,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       zoom.canZoomOut,
       barWidth,
       barGap,
+      roundedBars,
       progressBarWidth,
       isReady,
       mono,

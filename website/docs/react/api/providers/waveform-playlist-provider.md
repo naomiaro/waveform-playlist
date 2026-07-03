@@ -174,6 +174,13 @@ Width in pixels of waveform bars.
 
 Spacing in pixels between waveform bars.
 
+#### `roundedBars`
+
+**Type:** `boolean`
+**Default:** `false`
+
+Draw bars with pill-shaped rounded caps (radius `barWidth / 2`). Most visible with `barWidth` ≥ 3 and a non-zero `barGap`.
+
 #### `progressBarWidth`
 
 **Type:** `number`
@@ -325,6 +332,7 @@ interface PlaylistDataContextValue {
   canZoomOut: boolean;
   barWidth: number;
   barGap: number;
+  roundedBars: boolean;
   progressBarWidth: number;
   isReady: boolean;
   mono: boolean;
@@ -406,6 +414,7 @@ interface WaveformPlaylistProviderProps {
   // Waveform rendering
   barWidth?: number;
   barGap?: number;
+  roundedBars?: boolean;
   progressBarWidth?: number;
 
   // Advanced

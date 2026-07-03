@@ -1,7 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { Peaks, Bits } from '@waveform-playlist/core';
-import { aggregatePeaks, calculateBarRects } from '../utils/peak-rendering';
+import {
+  addBarToPath,
+  aggregatePeaks,
+  calculateBarRects,
+  type BarRect,
+} from '../utils/peak-rendering';
 import { getVisibleChunkIndices } from '../utils/viewport';
 
 /** A segment mapping a peak-index range to a pixel range within the waveform. */
@@ -19,7 +24,14 @@ export interface WaveformSegment {
 const MAX_CANVAS_WIDTH = 1000;
 
 /** Layout/data properties that require a full redraw when changed. */
-const LAYOUT_PROPS = new Set(['length', 'waveHeight', 'barWidth', 'barGap', 'segments']);
+const LAYOUT_PROPS = new Set([
+  'length',
+  'waveHeight',
+  'barWidth',
+  'barGap',
+  'roundedBars',
+  'segments',
+]);
 
 /**
  * Group dirty peak indices by canvas chunk. Returns bar-pixel-aligned
@@ -84,6 +96,8 @@ export class DawWaveformElement extends LitElement {
   @property({ type: Number, attribute: false }) waveHeight = 128;
   @property({ type: Number, attribute: false }) barWidth = 1;
   @property({ type: Number, attribute: false }) barGap = 0;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
+  @property({ type: Boolean, attribute: false }) roundedBars = false;
   /** Visible viewport start in pixels (relative to timeline origin). */
   @property({ type: Number, attribute: false }) visibleStart = -Infinity;
   /** Visible viewport end in pixels (relative to timeline origin). */
@@ -221,6 +235,10 @@ export class DawWaveformElement extends LitElement {
     const canvasWidth = Math.min(MAX_CANVAS_WIDTH, this.length - globalOffset);
     const regionEnd = Math.min(globalOffset + clearEnd, globalOffset + canvasWidth);
 
+    // Rounded bars batch into one path with a single fill per region draw.
+    const barRadius = this.roundedBars ? this.barWidth / 2 : null;
+    if (barRadius !== null) ctx.beginPath();
+
     for (let bar = Math.max(0, firstBar); bar < regionEnd; bar += step) {
       const peak = aggregatePeaks(this._peaks, bits, bar, bar + step);
       if (!peak) continue;
@@ -232,8 +250,23 @@ export class DawWaveformElement extends LitElement {
         peak.max,
         'normal'
       );
-      for (const r of rects) {
+      this._drawBarRects(ctx, rects, barRadius);
+    }
+
+    if (barRadius !== null) ctx.fill();
+  }
+
+  /** Draw bar rects: fillRect when radius is null, else add rounded bars to the current path. */
+  private _drawBarRects(
+    ctx: CanvasRenderingContext2D,
+    rects: Array<BarRect>,
+    radius: number | null
+  ) {
+    for (const r of rects) {
+      if (radius === null) {
         ctx.fillRect(r.x, r.y, r.width, r.height);
+      } else {
+        addBarToPath(ctx, r, radius);
       }
     }
   }
@@ -259,6 +292,8 @@ export class DawWaveformElement extends LitElement {
     ctx.fillStyle = waveColor;
 
     const step = Math.max(1, Math.round(this.barWidth + this.barGap));
+    const barRadius = this.roundedBars ? this.barWidth / 2 : null;
+    if (barRadius !== null) ctx.beginPath();
 
     for (const seg of this.segments) {
       // Skip segments outside this chunk
@@ -290,11 +325,11 @@ export class DawWaveformElement extends LitElement {
           peak.max,
           'normal'
         );
-        for (const r of rects) {
-          ctx.fillRect(r.x, r.y, r.width, r.height);
-        }
+        this._drawBarRects(ctx, rects, barRadius);
       }
     }
+
+    if (barRadius !== null) ctx.fill();
   }
 
   connectedCallback() {

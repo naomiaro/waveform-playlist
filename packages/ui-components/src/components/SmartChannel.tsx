@@ -50,6 +50,7 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
     waveHeight,
     barWidth,
     barGap,
+    roundedBars,
     samplesPerPixel: contextSpp,
     sampleRate: contextSampleRate,
   } = usePlaylistInfo();
@@ -118,6 +119,7 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
             devicePixelRatio={devicePixelRatio}
             barWidth={barWidth}
             barGap={barGap}
+            roundedBars={roundedBars}
             transparentBackground={transparentBackground}
             drawMode={drawMode}
           />
@@ -156,6 +158,7 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
       devicePixelRatio={devicePixelRatio}
       barWidth={barWidth}
       barGap={barGap}
+      roundedBars={roundedBars}
       transparentBackground={transparentBackground}
       drawMode={drawMode}
     />

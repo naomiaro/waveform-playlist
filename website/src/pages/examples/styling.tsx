@@ -12,23 +12,23 @@ export default function StylingExamplePage(): React.ReactElement {
   return (
     <Layout
       title="Styling Example"
-      description="Customize waveform appearance with barWidth, barGap, gradients, and theme colors for dark mode support"
+      description="Customize waveform appearance with barWidth, barGap, roundedBars, gradients, and theme colors for dark mode support"
     >
       <Head>
         <meta property="og:title" content="Styling Example - Waveform Playlist" />
-        <meta property="og:description" content="Customize waveform appearance with barWidth, barGap, gradients, and theme colors for dark mode support" />
+        <meta property="og:description" content="Customize waveform appearance with barWidth, barGap, roundedBars, gradients, and theme colors for dark mode support" />
         <meta property="og:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-styling.png" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Styling Example - Waveform Playlist" />
-        <meta name="twitter:description" content="Customize waveform appearance with barWidth, barGap, gradients, and theme colors for dark mode support" />
+        <meta name="twitter:description" content="Customize waveform appearance with barWidth, barGap, roundedBars, gradients, and theme colors for dark mode support" />
         <meta name="twitter:image" content="https://naomiaro.github.io/waveform-playlist/img/social/example-styling.png" />
       </Head>
       <main className="container margin-vert--lg">
         <h1>Waveform Styling</h1>
         <p>
-          Customize the visual appearance of waveforms using <code>barWidth</code> and <code>barGap</code> props,
-          combined with theme colors.
+          Customize the visual appearance of waveforms using <code>barWidth</code>, <code>barGap</code>, and{' '}
+          <code>roundedBars</code> props, combined with theme colors.
         </p>
 
         <div style={{ marginTop: '2rem' }}>
@@ -70,6 +70,12 @@ export default function StylingExamplePage(): React.ReactElement {
                 <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>4-5</td>
                 <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>2</td>
                 <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>Mobile displays, high-contrast needs</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>Rounded</td>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>3-5</td>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>1-2 + <code>roundedBars</code></td>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>Pill-shaped caps, podcast/social players</td>
               </tr>
             </tbody>
           </table>
