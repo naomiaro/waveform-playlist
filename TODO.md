@@ -2,7 +2,7 @@
 
 Multi-track audio editor roadmap for waveform-playlist.
 
-**Branch:** `main` | **Last Updated:** 2026-03-10
+**Branch:** `main` | **Last Updated:** 2026-07-03
 
 ---
 
@@ -12,8 +12,6 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ### Playback UX
 
-- [ ] **Eager AudioContext resume** — Resume AudioContext on first user interaction (click/keydown) within playlist, before play is pressed. Eliminates ~200-500ms delay on first space bar press. Use `resumeGlobalAudioContext()` (raw context resume), NOT `Tone.start()` which adds ~2s latency on Safari if called redundantly.
-- [ ] **Undo/redo** — Command pattern for reversible operations (clip move, trim, split, delete, volume/pan changes). Expose via `useUndoRedo()` hook with `undo()`, `redo()`, and `canUndo`/`canRedo` state. Consider [`undo-manager`](https://www.npmjs.com/package/undo-manager) as a lightweight foundation.
 - [ ] **Keyboard shortcuts help overlay** — Modal or panel showing all available keyboard shortcuts, triggered by `?` key.
 - [ ] **Accessibility** — ARIA roles and labels for tracks, clips, and transport controls. Focus management for keyboard navigation between tracks and clips.
 - [ ] **Context menus** — Right-click menus on tracks (mute, solo, remove, duplicate) and clips (split, trim, delete, copy).
@@ -81,67 +79,8 @@ Multi-track audio editor roadmap for waveform-playlist.
 
 ### Timeline
 
-- [ ] **Tempo automation / tempo maps** — Support multiple BPMs across the timeline for projects with tempo changes.
-  - Current v1: `BeatsAndBarsProvider` accepts a single global `bpm` and `timeSignature`. `<daw-tempo>` and `<daw-time-signature>` web components reflect/edit these values. PPQN-based integer math in the ruler and snap grid is correct and carries forward.
-  - v2 (tempo map): Engine owns a `TempoMap` (sorted `TempoEvent[]` with sample position, BPM, time signature, curve type). Exposes `getBpmAt(sample)`, `sampleToMusicalTime(sample)`, `musicalTimeToSample(bar, beat, tick)`. Provider subscribes via `statechange`. `<daw-tempo>` / `<daw-time-signature>` show/edit the value at the current playhead position.
-  - Key change: sample ↔ musical time conversion becomes non-linear (must integrate across tempo segments). Affects ruler tick spacing, snap grid, time format display, and Tone.js Transport automation (`bpm.setValueAtTime()`).
-- [ ] **Time signature changes** — Allow time signature to change mid-timeline (e.g., 4/4 → 3/4 → 6/8). Folded into `TempoEvent` so tempo and time signature share the same position-indexed map.
 - [ ] **Sub-beat snap granularities** — Snap to 1/8, 1/16, triplets, and other subdivisions when editing clips.
-- [ ] **Metronome / click track** — Built-in click track that follows tempo and time signature settings. Use `Transport.scheduleRepeat` with musical time subdivisions — scheduling auto-follows BPM changes.
-- [ ] **Musical time formats** — Add `bar:beat` and `bar:beat:tick` options to `<daw-time-format>` / `setTimeFormat()`. Requires tempo map and time signature data. Follows Audacity's approach where the time format selector offers both absolute (hh:mm:ss) and musical (bar:beat) formats.
-
-### WAM Plugin Support
-
-WAM 2.0 is an open plugin standard for the Web Audio API — the browser equivalent of VST/AU. Plugins are loaded at runtime, expose AudioNodes for graph insertion, and provide their own UIs. Supporting WAM opens the door to a growing ecosystem of third-party effects, instruments, and DSP tools without bundling them.
-
-- [x] **WAM host initialization** — Done (#433, `@dawcore/wam` `ensureWamHost`). Original notes: Initialize the WAM host environment on the shared AudioContext so plugins can be instantiated. This is a one-time setup that creates a plugin group for event routing between plugins on the same context.
-  - Call `initializeWamHost(audioContext)` once during playlist initialization (or lazily on first plugin load). Store the returned `hostGroupId` for plugin instantiation.
-  - Expose via a `useWamHost()` hook that returns `{ hostGroupId, isReady }`. The hook should be idempotent — multiple consumers calling it shouldn't re-initialize.
-  - Guard against AudioContext state — host init requires a running context, so defer until after first user gesture (same timing as `resumeGlobalAudioContext()`).
-  - Example: a user opens the effects panel for the first time; the host initializes in the background before any plugin loads.
-
-- [x] **Per-track WAM plugin slot** — Done (#436 + #422): landed as unified-chain entries via `track.addWamPlugin(url)` rather than a separate slot. Original notes: Allow each track to load a single WAM plugin inserted into its audio chain. The plugin's `audioNode` sits between the track's source and its gain/pan stage, processing audio in real time.
-  - Add a `plugin` field to track state: `{ url: string; state?: any } | null`.
-  - On load: dynamically import the plugin's `index.js`, call `PluginFactory.createInstance(hostGroupId, audioContext, savedState)`, and wire `source → plugin.audioNode → gainNode`.
-  - On removal: call `plugin.audioNode.destroy()`, disconnect, and restore direct routing.
-  - Handle hot-swap — replacing one plugin with another should cleanly tear down the old instance before connecting the new one, with no audio glitches (brief mute during swap is acceptable).
-  - Example: a user applies a WAM reverb plugin to a vocal track, then swaps it for a delay — the old reverb is destroyed and the delay takes its place in the chain.
-
-- [x] **Plugin chain (multi-plugin per track)** — Done (#422): WAM plugins are ordered entries in the unified effects chain (move/remove/bypass shared with native effects). Event routing between plugins still future. Original notes: Extend the single-slot model to support an ordered chain of WAM plugins per track, similar to an effects rack. Audio flows through each plugin in sequence.
-  - Track state becomes `plugins: Array<{ url: string; state?: any }>`.
-  - Chain management: insert at position, remove, reorder (drag-and-drop in UI). Reconnect the audio graph on every topology change.
-  - Use WAM event routing (`connectEvents`) between adjacent plugins so automation and MIDI flow through the chain.
-  - Example: a guitar track with a tuner → compressor → amp sim → reverb chain, where the user can reorder or bypass individual plugins.
-
-- [x] **Plugin discovery and loading** — Done (#427 + #421, `@dawcore/wam`): `createWamInstance(url, ...)` for direct URL loading with post-instantiation descriptor validation (apiVersion 2.x, audio in/out required) and per-URL factory caching; `fetchWamLibrary(manifestUrl, { baseUrl? })` parses `library.json` manifests (webaudiomodules.com community registry + pedalboard2/wam-studio shapes) into `{ entries, warnings }`. Runnable picker UI in `examples/dawcore-wam/`. Original notes: Provide a mechanism for users to discover and load WAM plugins from URLs or a curated registry. Plugins are ES modules loaded via dynamic `import()`.
-  - Accept plugin URLs directly (paste a URL to a WAM `index.js`).
-  - Support WAM library manifests (`library.json`) — a JSON file listing available plugins with metadata (name, description, thumbnail, URL). Parse and display as a browsable list.
-  - Validate `WamDescriptor` after loading — check `apiVersion` compatibility, `hasAudioInput`/`hasAudioOutput` flags, and reject incompatible plugins with a clear error message.
-  - Cache loaded plugin factories in a `Map<url, PluginFactory>` so re-instantiating the same plugin on another track doesn't re-fetch.
-  - Example: a user pastes a URL to a community-built WAM compressor; the host fetches it, validates the descriptor, and makes it available in the plugin selector.
-
-- [x] **Plugin GUI embedding** — Done (#423): `openEffectGui(effectId, container)` / `closeEffectGui(effectId)` on `<daw-editor>` and `<daw-track>` mount a plugin's own `createGui()` element into a consumer-provided container; close hides without interrupting audio (element cached for reopen), destroy only on effect removal. GUI-less plugins and `native-*` effects get the generic parameter panel from `@dawcore/wam` (`createWamParameterPanel`). Original notes: Mount WAM plugin GUIs in a panel or floating window. WAM plugins create their own DOM elements via `createGui()`, which can be appended to any container.
-  - Call `await plugin.createGui()` to get an `HTMLElement`. Mount it in a designated panel (e.g., a drawer below the track, or a floating window).
-  - GUIs use ShadowDOM for style isolation — no CSS conflicts with the playlist UI.
-  - Show/hide GUI without destroying the plugin instance (toggling visibility, not mount/unmount).
-  - Provide a fallback for plugins without a GUI — render a generic parameter list using `getParameterInfo()` with sliders for each parameter.
-  - Example: a user clicks the plugin name on a track to open its GUI in a floating panel; closing the panel hides the GUI but the effect keeps processing audio.
-
-- [x] **Plugin state persistence** — Done (#424): `getEffectsState()` / `setEffectsState(entries)` on both elements serialize chains (WAM entries carry the plugin's `getState()` snapshot, reapplied on restore). An unreachable saved URL becomes a bypassed passthrough placeholder at its position (`daw-effect-error` fires, restore continues, saved state round-trips for retry). localStorage reload demo in `examples/dawcore-wam/`. Original notes: Save and restore plugin state so projects can be reopened with the same plugin configurations. WAM plugins support `getState()` and `setState()` for serializable snapshots.
-  - On project save: iterate all tracks, call `await plugin.getState()` for each loaded plugin, and include the state alongside the plugin URL in the project data.
-  - On project load: after instantiating each plugin, call `await plugin.setState(savedState)` to restore parameters, presets, and internal state.
-  - Handle missing plugins gracefully — if a saved plugin URL is unreachable, show a placeholder with the plugin name and skip it rather than failing the entire project load.
-  - Example: a user saves a project with a reverb and delay on two tracks; reopening the project restores both plugins with their exact parameter settings.
-
-- [x] **WAM transport events** — Done (#425, `createWamTransportBridge` in `@dawcore/wam`): broadcasts `wam-transport` events ({playing, tempo, timeSig, currentBar, currentBarStarted}) to all live plugin nodes on play/pause/stop/seek/tempochange/meterchange, plus a rAF watcher for variable-tempo boundary crossings. dawcore's `EffectsManager` wires it automatically on first `addWamPlugin`. Original notes: Broadcast transport state (playhead position, tempo, time signature, playing/stopped) to all loaded WAM plugins via `wam-transport` events. This lets tempo-synced effects (delays, LFOs, arpeggiators) lock to the playlist's timeline.
-  - On play/stop/seek: dispatch `wam-transport` events to all active plugin nodes with current `tempo`, `timeSigNumerator`, `timeSigDenominator`, `currentBar`, and `playing` state.
-  - On tempo or time signature change: re-broadcast updated transport data.
-  - Example: a tempo-synced delay plugin automatically adjusts its delay time when the user changes the project BPM from 120 to 140.
-
-- [x] **Faust DSP integration** — Done (epic #414). Static mode (#429): pre-compiled faust2wam bundles load via plain `addWamPlugin(url)` with zero special handling; three fixtures under `website/static/faust-wams/`. Dynamic mode (#430, `@dawcore/faust`): `addFaustEffect(dspCode, {name?})` on `<daw-editor>`/`<daw-track>` compiles Faust source in the browser via `@shren/faust2wam` `generate()` (optional peer, compiler lazy-loaded on first call), instantiates through `@dawcore/wam`'s `createWamInstanceFromFactory`, and lands in the chain as `kind:'wam'` with `source:{faust}`. Persistence stores `faustDsp`/`faustName` and recompiles on restore and offline export. Compile errors keep Faust's line/column diagnostics; chain untouched on failure. Textarea demo in `examples/dawcore-wam/` ("Faust (compile in browser)" section). Original notes: Support loading Faust DSP code as WAM plugins via `faust2wam`. Faust is a functional DSP language that compiles to WebAssembly — users can write custom effects in a few lines of code and hear them instantly.
-  - Provide a code editor UI (e.g., textarea with syntax highlighting) where users can write or paste Faust code, click "Compile", and apply the resulting effect to a track. (Rich editing is consumer territory — the example uses a plain textarea.)
-  - Auto-extract parameters from Faust's `hslider`/`vslider`/`checkbox` declarations — the compiled plugin's GUI renders controls automatically.
-  - Example: a user writes `process = fi.lowpass(2, hslider("cutoff", 1000, 20, 20000, 1));` in the editor, compiles it, and applies a custom 2nd-order lowpass filter to a track with a cutoff knob.
+- [ ] **Musical time formats** — Add `bar:beat` and `bar:beat:tick` options to `<daw-time-format>` / `setTimeFormat()` (today it offers only `hh:mm:ss.sss` / `hh:mm:ss` / `seconds`). Requires tempo map and time signature data. Follows Audacity's approach where the time format selector offers both absolute (hh:mm:ss) and musical (bar:beat) formats.
 
 ### Project
 
@@ -152,5 +91,3 @@ WAM 2.0 is an open plugin standard for the Web Audio API — the browser equival
 - [ ] **Sticky clip header text** — Keep track/clip name visible when scrolling horizontally using Intersection Observer.
 - [ ] **Contributing guidelines** — Document contribution workflow, code standards, and PR process.
 - [ ] **Revamp GitHub Sponsors tiers** — Update sponsorship tiers and perks via GitHub UI.
-- [ ] **Web Components UI layer** — Build a vanilla TypeScript + native Web Components layer on top of `@waveform-playlist/engine` as the primary UI implementation. Custom elements (`<waveform-playlist>`, `<waveform-track>`, `<waveform-transport>`) with Shadow DOM, attribute/property configuration, and custom events. React 19+ has native Web Components interop, so React users could consume these directly — eliminating the need for a separate React-specific UI layer.
-

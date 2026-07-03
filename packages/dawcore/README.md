@@ -21,6 +21,8 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **Effect GUIs and persistence** — Mount plugin GUIs into your own panels; snapshot and restore whole chains. See [Effect GUIs](#effect-guis) and [Effects Persistence](#effects-persistence).
 - **Offline export** — `editor.exportAudio()` renders the session (clips, mix, all effect chains) to an `AudioBuffer`. See [Offline Export](#offline-export).
 - **Transport access** — Tempo, metronome, count-in, meter, effects via `@dawcore/transport`
+- **Lightweight single-track player** — `<daw-player>` wraps `@waveform-playlist/media-element-playout` (`HTMLMediaElement`, no adapter/AudioContext/PlaylistEngine) for podcast/audiobook-style playback with pitch-preserving rate control (0.25×–4×). See [Single-Track Player](#single-track-player).
+- **Time display & format** — `<daw-time-display>` / `<daw-time-format>` show and switch the playback clock (`hh:mm:ss.sss`, `hh:mm:ss`, `seconds`) for any transport target.
 - **CSS theming** — Dark mode by default, fully customizable via CSS custom properties
 - **Native Web Audio** — Uses `@dawcore/transport` for playback scheduling. No Tone.js dependency.
 
@@ -351,6 +353,33 @@ const result = await editor.loadFiles(fileList);
 </script>
 ```
 
+## Single-Track Player
+
+`<daw-player>` is a standalone element for single-track playback (podcasts, audiobooks, previewing one file) — it wraps `@waveform-playlist/media-element-playout` and needs no `adapter`, `AudioContext`, or `PlaylistEngine`. `@waveform-playlist/media-element-playout` ships as a direct dependency of `@dawcore/components`, so there's nothing extra to install:
+
+```html
+<daw-player
+  id="player"
+  src="/audio/episode.mp3"
+  peaks-src="/audio/episode.dat"
+  wave-height="96"
+  timescale
+></daw-player>
+
+<script type="module">
+  import '@dawcore/components';
+
+  const player = document.getElementById('player');
+  player.addEventListener('daw-ready', () => console.log('duration:', player.duration));
+  player.addEventListener('daw-timeupdate', (e) => console.log(e.detail.time));
+
+  player.play();
+  player.setPlaybackRate(1.5); // pitch-preserving, 0.25x-4x
+</script>
+```
+
+Click the waveform to seek. Omit `peaks-src` for a scrubber-only fallback (no waveform, still playable). See `examples/dawcore-native/player.html` for a runnable demo with both modes.
+
 ## Keyboard Shortcuts
 
 Add `<daw-keyboard-shortcuts>` as a child of `<daw-editor>`:
@@ -412,11 +441,13 @@ Core orchestrator. Attributes:
 | `file-drop` | boolean | `false` | Accept audio files dropped onto the editor |
 | `mono` | boolean | `false` | Merge stereo to mono display |
 | `bar-width` / `bar-gap` | number | `1` / `0` | Waveform bar rendering style |
+| `rounded-bars` | boolean | `false` | Pill-shaped bar caps (radius `bar-width / 2`) |
 | `indefinite-playback` | boolean | `false` | Keep ruler/timeline filling the viewport with no clips |
 | `scale-mode` | string | `'temporal'` | `'temporal'` (seconds) or `'beats'` (tick-linear grid) |
 | `ticks-per-pixel` | number | `24` | Zoom level in beats mode |
 | `snap-to` | string | `'off'` | Grid snapping in beats mode (`'bar'`, `'beat'`, `'1/2'`…`'1/16'`, `'off'`) |
 | `eager-resume` | string | — | Resume AudioContext on first gesture; bare attribute targets the editor, or pass `"document"` / a CSS selector |
+| `time-format` | string | `'hh:mm:ss.sss'` | Clock format read by `<daw-time-display>` / `<daw-time-format>`: `'hh:mm:ss.sss'`, `'hh:mm:ss'`, or `'seconds'` |
 
 JS properties: `adapter` (required `PlayoutAdapter`), `recordingStream`, `bpm`, `ppqn`, `timeSignature`, `meterEntries`, `secondsToTicks` / `ticksToSeconds` (variable-tempo callbacks), `spectrogramConfig`, `spectrogramColorMap`. Read-only: `engine`, `audioContext` (from the adapter), `tracks`, `selection`, `selectedTrackId`, `currentTime`, `canUndo` / `canRedo`, `isRecording`.
 
@@ -424,6 +455,7 @@ Methods:
 
 - Playback: `play(startTime?)`, `pause()`, `stop()`, `togglePlayPause()`, `seekTo(time)`
 - Loading: `loadFiles(files)`, `loadMidi(urlOrFile, options?)`, `ready()`
+- Display: `setTimeFormat(format)` — sugar over the `timeFormat` property, fires `daw-time-format-change`
 - Tracks & clips: `addTrack(config)`, `removeTrack(id)`, `updateTrack(id, partial)`, `addClip(trackId, config)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`
 - Editing: `splitAtPlayhead()`, `undo()`, `redo()`, `setSelection(start, end)`
 - Recording: `startRecording(stream?, options?)`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`, `togglePauseRecording()`
@@ -443,7 +475,7 @@ Visual element for MIDI note rendering. Mounted automatically when the parent tr
 
 ### `<daw-transport for="editor-id">`
 
-Container that resolves target editor. Children: `<daw-play-button>`, `<daw-pause-button>`, `<daw-stop-button>`, `<daw-record-button>`.
+Container that resolves target editor. Children: `<daw-play-button>`, `<daw-pause-button>`, `<daw-stop-button>`, `<daw-record-button>`, `<daw-time-display>`, `<daw-time-format>`.
 
 ### `<daw-track-controls>`
 
@@ -452,6 +484,26 @@ Per-track UI for volume, pan, mute, solo. Receives state from editor, dispatches
 ### `<daw-keyboard-shortcuts>`
 
 Render-less child of `<daw-editor>`. Boolean attributes: `playback`, `splitting`, `undo`.
+
+### `<daw-time-display>`
+
+Formatted playback-time readout. Must be inside a `<daw-transport for="editor-id">` (resolves its target the same way the transport buttons do). Reads the target's `currentTime` / `timeFormat` and stays in sync via bubbled `daw-timeupdate` / `daw-time-format-change` events. `role="status"`, `aria-live="off"`.
+
+### `<daw-time-format>`
+
+`<select>` that sets the time format on the transport target (`target.setTimeFormat(...)`) — the target owns the state, every display/select syncs via `daw-time-format-change`. Renders disabled when the target doesn't implement `setTimeFormat`.
+
+### `<daw-player>`
+
+Standalone single-track player — see [Single-Track Player](#single-track-player). No `adapter`/`AudioContext`/`PlaylistEngine`; wraps `@waveform-playlist/media-element-playout`.
+
+Attributes: `src`, `peaks-src`, `wave-height` (default `128`), `timescale`, `mono`, `bar-width` (default `1`), `bar-gap` (default `0`), `rounded-bars`, `playback-rate` (default `1`, clamped `0.25`–`4`).
+
+Properties: `isPlaying`, `duration`, `currentTime` (get/set), `volume` (get/set), `audioElement` (underlying `HTMLAudioElement | null`).
+
+Methods: `play()`, `pause()`, `stop()`, `seekTo(time)`, `setPlaybackRate(rate)`, `setVolume(volume)`.
+
+Events: `daw-ready`, `daw-play`, `daw-pause`, `daw-stop`, `daw-timeupdate` (`{ time }`), `daw-ended`, `daw-error` (`{ operation, error }`).
 
 ## Events
 
@@ -508,7 +560,7 @@ Set the adapter before tracks load. The provided context is used for decoding, p
 
 ## Examples & Documentation
 
-- [`examples/dawcore-native/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-native) — native transport: basics, multi-clip, metronome, beats grid, beat maps, effects, spectrogram, recording (`pnpm example:dawcore-native`)
+- [`examples/dawcore-native/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-native) — native transport: basics, multi-clip, metronome, beats grid, beat maps, effects, spectrogram, recording, `<daw-player>` (`pnpm example:dawcore-native`)
 - [`examples/dawcore-tone/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-tone) — Tone.js adapter: MIDI, SoundFont playback (`pnpm example:dawcore-tone`)
 - [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-wam) — WAM plugins end-to-end + in-browser Faust compilation (`pnpm example:dawcore-wam`)
 - Guides: [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/docs/web-components/getting-started)

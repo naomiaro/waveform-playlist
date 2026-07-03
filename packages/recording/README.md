@@ -1,14 +1,17 @@
 # @waveform-playlist/recording
 
-Audio recording support for waveform-playlist using AudioWorklet.
+Audio recording support for waveform-playlist using AudioWorklet — mic capture, live waveform preview, VU metering, and overdub, as a set of React hooks.
 
 ## Features
 
-- ✅ **AudioWorklet-based recording** - Low latency, direct PCM access
-- ✅ **Real-time waveform visualization** - See the waveform as you record
-- ✅ **React hooks** - Easy integration with React apps
-- ✅ **Device selection** - Choose from available microphone inputs
-- ✅ **Optional package** - Only include if you need recording
+- **AudioWorklet-based capture** — direct PCM access on the audio thread, no `ScriptProcessorNode`
+- **Live waveform preview** — incremental per-channel peaks as you record, before the final `AudioBuffer` exists
+- **Sample-accurate VU metering** — a dedicated meter worklet measures peak/RMS on every sample, not just once per animation frame
+- **Multi-channel recording** — auto-detects the microphone's actual channel count from the `MediaStream`
+- **Overdub with latency compensation** — record against existing playback; the finalized clip's timeline position accounts for output latency and Tone.js scheduling lookahead, with an optional manual override
+- **Device selection & hot-plug** — enumerate microphones, switch devices mid-session, auto-fallback if the active device disconnects
+- **Pause/resume** — pauses the worklet itself, not just the UI
+- **Hooks only** — no bundled UI components; wire the state into your own controls or `@waveform-playlist/ui-components`'s `SegmentedVUMeter`
 
 ## Installation
 
@@ -16,113 +19,120 @@ Audio recording support for waveform-playlist using AudioWorklet.
 npm install @waveform-playlist/recording
 ```
 
+`@waveform-playlist/recording` requires these peer dependencies:
+
+| Package | Purpose |
+|---------|---------|
+| `react` | ^18.0.0 |
+| `styled-components` | ^6.0.0 — required transitively by `@waveform-playlist/ui-components` |
+| `tone` | ^15.0.0 — recording shares the global AudioContext with `@waveform-playlist/playout` |
+
+Pairs with `@waveform-playlist/browser` — see the [Recording guide](https://naomiaro.github.io/waveform-playlist/docs/react/guides/recording) for a full `WaveformPlaylistProvider` integration.
+
 ## Usage
 
 ### Basic Recording
 
-```typescript
-import { useRecording, useMicrophoneAccess, RecordButton } from '@waveform-playlist/recording';
+```tsx
+import { useMicrophoneAccess, useRecording } from '@waveform-playlist/recording';
 
-function RecordingApp() {
-  const { stream, requestAccess } = useMicrophoneAccess();
-  const { isRecording, startRecording, stopRecording, peaks, duration } = useRecording(stream);
+function RecordButton() {
+  const { stream, hasPermission, requestAccess } = useMicrophoneAccess();
+  const { isRecording, duration, peaks, startRecording, stopRecording } = useRecording(stream);
 
   const handleRecord = async () => {
-    if (!stream) {
+    if (!hasPermission) {
       await requestAccess();
+      return;
     }
 
     if (isRecording) {
       const audioBuffer = await stopRecording();
-      // Use the recorded audio buffer
+      // audioBuffer is the finalized AudioBuffer — add it to a track, upload it, etc.
     } else {
       await startRecording();
     }
   };
 
   return (
-    <div>
-      <RecordButton isRecording={isRecording} onClick={handleRecord} />
-      <p>Duration: {duration.toFixed(1)}s</p>
-      {/* Display waveform using peaks */}
-    </div>
+    <button onClick={handleRecord}>
+      {isRecording ? `Stop (${duration.toFixed(1)}s)` : 'Record'}
+    </button>
   );
 }
 ```
 
-### With Microphone Selection
+### VU Meter
 
-```typescript
-import {
-  useMicrophoneAccess,
-  useRecording,
-  MicrophoneSelector,
-  RecordButton,
-  RecordingIndicator,
-} from '@waveform-playlist/recording';
+`useMicrophoneLevel` drives level monitoring independently of recording — useful for an input-check screen before the user hits record.
 
-function RecordingApp() {
-  const { stream, devices, requestAccess } = useMicrophoneAccess();
-  const { isRecording, duration, startRecording, stopRecording } = useRecording(stream);
-  const [selectedDevice, setSelectedDevice] = useState<string>();
+```tsx
+import { useMicrophoneAccess, useMicrophoneLevel } from '@waveform-playlist/recording';
+import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
-  const handleDeviceChange = async (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    await requestAccess(deviceId);
-  };
-
-  return (
-    <div>
-      <MicrophoneSelector
-        devices={devices}
-        selectedDeviceId={selectedDevice}
-        onDeviceChange={handleDeviceChange}
-      />
-      <RecordButton
-        isRecording={isRecording}
-        onClick={isRecording ? stopRecording : startRecording}
-      />
-      <RecordingIndicator isRecording={isRecording} duration={duration} />
-    </div>
-  );
-}
-```
-
-### Integration with WaveformPlaylist
-
-```typescript
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useRecording, useMicrophoneAccess } from '@waveform-playlist/recording';
-
-function RecordingPlaylist() {
+function MicMonitor() {
   const { stream, requestAccess } = useMicrophoneAccess();
-  const { peaks, audioBuffer, startRecording, stopRecording } = useRecording(stream);
-  const [tracks, setTracks] = useState([]);
-
-  const handleStopRecording = async () => {
-    const buffer = await stopRecording();
-    if (buffer) {
-      // Add recorded track to playlist
-      setTracks([
-        ...tracks,
-        {
-          src: buffer,
-          name: 'Recording',
-        },
-      ]);
-    }
-  };
+  const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
 
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
-      <button onClick={requestAccess}>Request Microphone</button>
-      <button onClick={startRecording}>Record</button>
-      <button onClick={handleStopRecording}>Stop</button>
-      <Waveform />
-    </WaveformPlaylistProvider>
+    <>
+      <button onClick={() => requestAccess()}>Enable Microphone</button>
+      <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+    </>
   );
 }
 ```
+
+### Integrated Recording (with a track list)
+
+`useIntegratedRecording` combines microphone access, metering, and recording into one hook that appends the finalized clip directly to a `ClipTrack[]` — the same array shape used by `@waveform-playlist/browser`'s `WaveformPlaylistProvider`.
+
+```tsx
+import { useIntegratedRecording } from '@waveform-playlist/recording';
+import type { ClipTrack } from '@waveform-playlist/core';
+
+function Recorder({
+  tracks,
+  setTracks,
+  selectedTrackId,
+  currentTime,
+}: {
+  tracks: ClipTrack[];
+  setTracks: (tracks: ClipTrack[]) => void;
+  selectedTrackId: string | null;
+  currentTime: number;
+}) {
+  const {
+    isRecording,
+    duration,
+    levels,
+    peakLevels,
+    devices,
+    selectedDevice,
+    requestMicAccess,
+    changeDevice,
+    startRecording,
+    stopRecording,
+    recordingPeaks, // live per-channel peaks — feed straight into your waveform preview
+    error,
+  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+    currentTime,
+    channelCount: 2,
+  });
+
+  return (
+    <div>
+      <button onClick={() => requestMicAccess()}>Enable Microphone</button>
+      <button onClick={isRecording ? stopRecording : startRecording} disabled={!selectedTrackId}>
+        {isRecording ? `Stop (${duration.toFixed(1)}s)` : 'Record'}
+      </button>
+      {error && <p>{error.message}</p>}
+    </div>
+  );
+}
+```
+
+Stopping adds a new `AudioClip` to `selectedTrackId` at `max(currentTime at record-start, end of last clip on that track)` — safe for overdubbing onto a track that already has clips.
 
 ## API Reference
 
@@ -130,93 +140,95 @@ function RecordingPlaylist() {
 
 #### `useMicrophoneAccess()`
 
-Manages microphone access and device enumeration.
+Manages microphone permission, device enumeration, and hot-plug detection.
 
-**Returns:**
-- `stream: MediaStream | null` - Active microphone stream
-- `devices: MicrophoneDevice[]` - Available microphone devices
-- `hasPermission: boolean` - Whether microphone permission is granted
-- `isLoading: boolean` - Loading state during access request
-- `requestAccess: (deviceId?: string) => Promise<void>` - Request microphone access
-- `stopStream: () => void` - Stop the microphone stream
-- `error: Error | null` - Error state
+**Returns (`UseMicrophoneAccessReturn`):**
+- `stream: MediaStream | null`
+- `devices: MicrophoneDevice[]` — `{ deviceId, label, groupId }`
+- `hasPermission: boolean`
+- `isLoading: boolean`
+- `requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>`
+- `stopStream: () => void`
+- `error: Error | null`
+
+Requested audio constraints default to `echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`, `latency: 0` (raw signal, low latency) — pass `audioConstraints` to override.
 
 #### `useRecording(stream, options?)`
 
-Main recording hook using AudioWorklet.
+The core AudioWorklet-based recording hook.
 
 **Parameters:**
-- `stream: MediaStream | null` - Microphone stream from `useMicrophoneAccess`
+- `stream: MediaStream | null`
 - `options?: RecordingOptions`
-  - `sampleRate?: number` - Sample rate (defaults to AudioContext rate)
-  - `channelCount?: number` - Number of channels (default: 1)
-  - `samplesPerPixel?: number` - Samples per pixel for peaks (default: 1024)
+  - `channelCount?: number` — fallback used only if the stream doesn't report its own channel count (default: `1`)
+  - `samplesPerPixel?: number` — peak resolution for the live preview (default: `1024`)
+  - `bits?: 8 | 16` — peak value bit depth (default: `16`)
 
-**Returns:**
-- `isRecording: boolean` - Whether recording is active
-- `isPaused: boolean` - Whether recording is paused
-- `duration: number` - Recording duration in seconds
-- `peaks: number[]` - Peak data for waveform visualization
-- `audioBuffer: AudioBuffer | null` - Final recorded audio buffer
-- `startRecording: () => Promise<void>` - Start recording
-- `stopRecording: () => Promise<AudioBuffer | null>` - Stop and finalize recording
-- `pauseRecording: () => void` - Pause recording
-- `resumeRecording: () => void` - Resume recording
-- `error: Error | null` - Error state
+**Returns (`UseRecordingReturn`):**
+- `isRecording: boolean`, `isPaused: boolean`, `duration: number` (seconds)
+- `peaks: (Int8Array | Int16Array)[]` — one entry per channel, growing live during recording
+- `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves
+- `level: number`, `peakLevel: number` — reserved for backwards compatibility; prefer `useMicrophoneLevel` for metering
+- `startRecording: () => Promise<void>`
+- `stopRecording: () => Promise<AudioBuffer | null>` — awaits the worklet's final flush before resolving, so the last samples are never dropped
+- `pauseRecording: () => void`, `resumeRecording: () => void` — pause/resume the worklet itself, not just the UI
+- `error: Error | null`
 
-### Components
+#### `useMicrophoneLevel(stream, options?)`
 
-#### `<RecordButton />`
+Sample-accurate VU metering via a separate meter AudioWorklet — independent of `useRecording`, so it works before recording starts.
 
-Button for starting/stopping recording.
+**Parameters:**
+- `stream: MediaStream | null`
+- `options?: UseMicrophoneLevelOptions`
+  - `updateRate?: number` — Hz (default: `60`)
+  - `channelCount?: number` (default: `1`)
 
-**Props:**
-- `isRecording: boolean` - Recording state
-- `onClick: () => void` - Click handler
-- `disabled?: boolean` - Disabled state
-- `className?: string` - CSS class name
+**Returns (`UseMicrophoneLevelReturn`):**
+- `levels: number[]`, `peakLevels: number[]`, `rmsLevels: number[]` — per channel, normalized 0–1
+- `level: number`, `peakLevel: number` — scalar convenience values (max across channels when `channelCount > 1`)
+- `resetPeak: () => void` — clears held peak indicators, e.g. on device switch
+- `error: Error | null`
 
-#### `<MicrophoneSelector />`
+#### `useIntegratedRecording(tracks, setTracks, selectedTrackId, options?)`
 
-Dropdown for selecting microphone device.
+Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `useRecording` together and appends the finalized recording to `tracks` as a new `AudioClip`.
 
-**Props:**
-- `devices: MicrophoneDevice[]` - Available devices
-- `selectedDeviceId?: string` - Currently selected device
-- `onDeviceChange: (deviceId: string) => void` - Change handler
-- `disabled?: boolean` - Disabled state
-- `className?: string` - CSS class name
+**Parameters:**
+- `tracks: ClipTrack[]`, `setTracks: (tracks: ClipTrack[]) => void`, `selectedTrackId: string | null`
+- `options?: IntegratedRecordingOptions`
+  - `currentTime?: number` — playback/cursor position; the clip is captured at this position at record *start* (not stop), so overdubbing while transport is running lands the clip correctly
+  - `audioConstraints?: MediaTrackConstraints`
+  - `channelCount?: number` (default: `1`)
+  - `samplesPerPixel?: number` (default: `1024`)
+  - `latencyOffset?: number` — seconds; overrides the auto-computed `outputLatency + lookAhead` compensation applied to the clip's start. `0` disables compensation; omit to auto-compute
 
-#### `<RecordingIndicator />`
+**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `duration`, `level`, `peakLevel`, `levels`, `peakLevels`, `rmsLevels`), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording`, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), `recordingPeaks` (live per-channel peaks for preview), and a combined `error`.
 
-Visual indicator showing recording status and duration.
+### Types
 
-**Props:**
-- `isRecording: boolean` - Recording state
-- `isPaused?: boolean` - Paused state
-- `duration: number` - Duration in seconds
-- `formatTime?: (seconds: number) => string` - Custom time formatter
-- `className?: string` - CSS class name
+`RecordingState`, `RecordingData`, `MicrophoneDevice`, `RecordingOptions`, `UseRecordingReturn`, `UseMicrophoneAccessReturn` are all exported from the package root for consumers building their own UI around these hooks.
 
 ## Architecture
-
-The recording implementation uses AudioWorklet for low-latency audio capture:
 
 ```
 getUserMedia → MediaStream
                     ↓
-        MediaStreamSource (Web Audio)
+   MediaStreamSource (shared global AudioContext)
                     ↓
-          AudioWorklet Processor
-          (captures raw PCM data)
+    AudioWorklet Processors (from @waveform-playlist/worklets)
+    - recording-processor: captures raw PCM per channel
+    - meter-processor: sample-accurate peak/RMS
                     ↓
-        Main Thread (React Hook)
-          - Accumulates audio data
-          - Generates peaks in real-time
-          - Updates waveform visualization
+        Main Thread (React Hooks)
+          - Accumulates audio data per channel
+          - Generates live peaks incrementally
+          - Updates VU meter state
                     ↓
-         Final AudioBuffer
+   Final AudioBuffer (after stopRecording's stop-handshake)
 ```
+
+Each hook creates its own `MediaStreamSource` from the shared context rather than reusing one across hooks — required for Firefox, which throws if source and destination nodes come from different context instances.
 
 ## Browser Support
 

@@ -4,7 +4,7 @@ A lightweight, HTMLMediaElement-based playout engine for waveform-playlist with 
 
 ## Features
 
-- **Pitch-preserving playback rate** (0.5x - 2.0x) - uses browser's built-in time-stretching
+- **Pitch-preserving playback rate** (0.25x - 4.0x) - uses browser's built-in time-stretching
 - **Pre-computed peaks** - no AudioBuffer decoding required, instant visualization
 - **Lightweight** - no Tone.js dependency
 - **Simple API** - designed for single-track playback use cases
@@ -69,7 +69,7 @@ playout.dispose();
 ```typescript
 interface MediaElementPlayoutOptions {
   masterVolume?: number;  // 0.0 to 1.0 (default: 1.0)
-  playbackRate?: number;  // 0.5 to 2.0 (default: 1.0)
+  playbackRate?: number;  // 0.25 to 4.0 (default: 1.0)
 }
 
 class MediaElementPlayout {
@@ -97,7 +97,7 @@ class MediaElementPlayout {
 
   // Volume & Rate
   setMasterVolume(volume: number): void;
-  setPlaybackRate(rate: number): void;  // 0.5 to 2.0, pitch preserved
+  setPlaybackRate(rate: number): void;  // 0.25 to 4.0, pitch preserved
 
   // State
   readonly isPlaying: boolean;

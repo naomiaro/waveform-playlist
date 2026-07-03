@@ -42,8 +42,8 @@ Note timings are in seconds, already tempo-adjusted by `@tonejs/midi`. Tracks wi
 
 ## Examples & Documentation
 
-- [`examples/dawcore-tone/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-tone) — MIDI piano-roll rendering and playback (`pnpm example:dawcore-tone`)
-- Guides: [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/docs/web-components/getting-started)
+- [`examples/dawcore-tone/midi-load.html`](https://github.com/naomiaro/waveform-playlist/blob/main/examples/dawcore-tone/midi-load.html) — loading a `.mid` file (URL or file input) into `<daw-editor>` via `editor.loadMidi()`, with cancellation (`pnpm example:dawcore-tone`)
+- [MIDI guide](https://naomiaro.github.io/waveform-playlist/docs/react/guides/midi) — covers both the React (`@waveform-playlist/midi`) and Web Components (`@dawcore/components`) paths, which share this package's parser underneath
 
 ## License
 

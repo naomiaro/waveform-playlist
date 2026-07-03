@@ -22,10 +22,10 @@ waveform-playlist/
 │   ├── engine/            # Framework-agnostic timeline engine
 │   ├── loaders/           # Audio file loaders
 │   ├── media-element-playout/  # Audio playback (HTMLAudioElement, no Tone.js)
-│   ├── midi/              # 📦 OPTIONAL: MIDI file parsing, piano roll, SoundFont playback
+│   ├── midi/              # 📦 OPTIONAL: MIDI file parsing + useMidiTracks hook (parser now in @dawcore/midi)
 │   ├── playout/           # Audio playback (Tone.js wrapper)
 │   ├── recording/         # 📦 OPTIONAL: Audio recording hooks (no UI components)
-│   ├── spectrogram/       # 📦 OPTIONAL: FFT computation, worker rendering, color maps
+│   ├── spectrogram/       # 📦 OPTIONAL: React Provider + UI for spectrograms (computation/worker in @dawcore/spectrogram)
 │   ├── transport/         # @dawcore/transport — native Web Audio transport (clock, scheduler, clip player)
 │   ├── ui-components/     # Reusable React UI components (incl. SegmentedVUMeter)
 │   ├── webaudio-peaks/    # Waveform peak generation
@@ -34,7 +34,8 @@ waveform-playlist/
 ├── examples/              # Standalone Vite example apps (decoupled from package builds)
 │   ├── dawcore-native/    # Web Components + NativePlayoutAdapter (basic, multiclip, effects, record, …)
 │   ├── dawcore-tone/      # Web Components + TonePlayoutAdapter (Tone.js backend, MIDI, SoundFont)
-│   └── dawcore-wam/       # WAM 2.0 plugins end-to-end (library picker, GUIs, Faust compilation, export)
+│   ├── dawcore-wam/       # WAM 2.0 plugins end-to-end (library picker, GUIs, Faust compilation, export)
+│   └── media-element-player/  # React MediaElementPlaylistProvider starter (no Tone.js/playout deps)
 │
 ├── debug/                 # Standalone reproductions and debug apps
 │   ├── tonejs/            # HTML reproductions of upstream Tone.js bugs
@@ -93,6 +94,7 @@ waveform-playlist/
   - `dBUtils.ts` — `dBToNormalized`, `normalizedToDb`, `gainToNormalized` (dB ↔ 0-1 conversions for VU meters)
   - `beatsAndBars.ts` — `PPQN` (192), `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid`, `ticksToBarBeatLabel`
   - `keyboard.ts` — `KeyboardShortcut` type, `handleKeyboardEvent()` (matches event to shortcut array), `getShortcutLabel()` (human-readable label from shortcut definition)
+  - `spectrogramCanvasId.ts` — `buildSpectrogramCanvasId()`/`parseSpectrogramCanvasId()`: the canonical `${clipId}-ch${channelIndex}-chunk${chunkIndex}` canvas-ID contract, single-sourced here (zero-dependency, already a dependency of every producer/consumer) so `@waveform-playlist/spectrogram`, `@dawcore/spectrogram`, and the `<daw-spectrogram>` element can't drift on the format (#560)
 
 **Important Architectural Decision: Sample-Based Representation**
 
@@ -340,15 +342,21 @@ const clip = createClipFromSeconds({
   │   └── SnapToGridModifier.ts         # Snap-to-grid (beats or timescale mode)
   ├── plugins/                          # @dnd-kit plugins
   │   └── noDropAnimationPlugins.ts     # Disables Feedback plugin drop animation
+  ├── playout/                           # Optional-engine resolution (#510)
+  │   ├── resolvePlayoutAdapter.ts       # Dynamic-imports @waveform-playlist/playout + tone
+  │   └── resolveMediaElementPlayout.ts  # Dynamic-imports @waveform-playlist/media-element-playout
   ├── effects/                          # Audio effects system
   │   ├── effectDefinitions.ts          # 20 Tone.js effect definitions
   │   ├── effectFactory.ts              # Effect instance creation
   │   └── index.ts
   ├── workers/                          # Web workers
   │   └── peaksWorker.ts                # Inline Blob worker for peak generation
-  └── waveformDataLoader.ts            # BBC waveform-data.js support
+  ├── waveformDataLoader.ts            # BBC waveform-data.js support
+  └── tone.ts                          # `/tone` subpath entry (Tone-coupled exports)
   ```
-- **Build:** Vite + tsup
+- **Build:** tsup, two entry points (`src/index.tsx`, `src/tone.ts`) → core bundle + `/tone` subpath bundle. (Migrated off Vite; tsup auto-externalizes `dependencies`/`peerDependencies`, see root CLAUDE.md pattern 5.)
+- **Optional playout engines (#510):** `@waveform-playlist/playout`, `@waveform-playlist/media-element-playout`, and `tone` are optional `peerDependencies`, not static imports. `WaveformPlaylistProvider`/`MediaElementPlaylistProvider` resolve the default engine via dynamic `import()` (`src/playout/resolvePlayoutAdapter.ts` / `resolveMediaElementPlayout.ts`, factory-or-dynamic with install-hint rethrow) or accept a consumer-supplied `createAdapter?`/`createPlayout?` factory that skips the import entirely.
+- **`/tone` subpath is the Tone-coupled surface:** the core `@waveform-playlist/browser` entry is structurally free of any static `tone`/`playout` import (enforced by `coreBarrelEngineFree.test.ts`). Tone-dependent exports — `useAudioTracks`, `useDynamicTracks`, the effects hooks/factory/definitions, `useExportWav` + `ExportWavButton`, `useOutputMeter`, `useMasterAnalyser`, WAM effect GUI helpers — live at `@waveform-playlist/browser/tone` only. A MediaElement-only or custom-adapter consumer never resolves `tone`/`playout` under any bundler.
 
 ### 🔊 Audio Layer
 
@@ -369,32 +377,38 @@ const clip = createClipFromSeconds({
   - Timed segment playback
   - Track mixing
 - **Dependencies:** Tone.js, Core
+- **Optional peer of `@waveform-playlist/browser`:** resolved via dynamic `import()` (not a static dependency of the core browser bundle) — see the browser package's "Optional playout engines" note above.
 - **Location:** `packages/playout/src/audioContext.ts`
 
 #### `@waveform-playlist/media-element-playout`
 
-- **Purpose:** Lightweight audio playback using HTMLAudioElement (no Tone.js dependency)
-- **Key class:** `MediaElementPlayout`
+- **Purpose:** Lightweight single-track audio playback using HTMLAudioElement (no Tone.js dependency)
+- **Key classes:** `MediaElementPlayout` (engine, single track — warns + disposes on a second `addTrack`) wraps `MediaElementTrack` (one `<audio>` element)
 - **Use Cases:**
   - Large audio files - streams without downloading entire file
   - Pre-computed peaks - use [audiowaveform](https://github.com/bbc/audiowaveform) server-side
-  - Playback rate control - 0.5x to 2.0x with pitch preservation
+  - Playback rate control - 0.25x to 4.0x with pitch preservation
   - Single-track playback - simpler API, smaller bundle
+  - Lightweight single-track players — backs `<daw-player>` in `@dawcore/components`
 - **Features:**
-  - Play/pause/stop control
+  - Play/pause/stop control, plus player-mode `resume()` (continue from current position, vs. `play()`'s timeline-reset-to-0 semantics)
   - Seeking
   - Playback rate adjustment with pitch preservation
   - currentTime tracking via animation frame
+  - `setSource()`/`load()` for in-place source swap (reuses the element, so the once-per-element `MediaElementAudioSourceNode` and any effects routing survive)
+  - Typed event emitter (`on`/`off` over `loadedmetadata`/`play`/`pause`/`error`/`ended`/`timeupdate`), with legacy callback setters retained for back-compat
 - **When to Use:**
   - Choose `MediaElementPlaylistProvider` for streaming large files with pre-computed peaks
   - Choose `WaveformPlaylistProvider` (Tone.js) for multi-track mixing, effects, recording
-- **Dependencies:** None (pure HTMLAudioElement)
+- **Dependencies:** `@waveform-playlist/core` only (pure HTMLAudioElement, no Tone.js)
+- **Optional peer of `@waveform-playlist/browser`:** resolved via dynamic `import()`, same pattern as `playout`.
 - **Location:** `packages/media-element-playout/src/`
 - **Browser Integration:**
   - `MediaElementPlaylistProvider` - Context provider for media element playback
   - `MediaElementWaveform` - Single-track waveform component
   - Hooks: `useMediaElementAnimation`, `useMediaElementControls`, `useMediaElementState`, `useMediaElementData`
-- **Example:** `website/src/pages/examples/media-element.tsx`
+- **Web Components Integration:** `<daw-player>` in `@dawcore/components` wraps `MediaElementPlayout` directly — no `PlaylistEngine`, no adapter, no AudioContext
+- **Example:** `website/src/pages/examples/media-element.tsx`, `examples/media-element-player/`
 
 #### `@waveform-playlist/loaders`
 
@@ -571,7 +585,8 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   ├── styled.d.ts
   └── index.ts
   ```
-- **Companion package:** `@dawcore/spectrogram` (framework-agnostic) ships the FFT computation, Web Worker, `SpectrogramOrchestrator` class, and pure helpers (`classifyViewport`, `groupContiguousChunks`, `ColorLUTCache`). Used by this package's Provider AND by the dawcore Lit element layer.
+- **Companion package:** `@dawcore/spectrogram` (framework-agnostic, full description under "🧱 Web Components" below) ships the FFT computation, Web Worker, `SpectrogramOrchestrator` class, and pure helpers (`classifyViewport`, `groupContiguousChunks`, `ColorLUTCache`, `computePaddedFftRange`). Used by this package's Provider AND by the dawcore Lit element layer.
+- **Canvas-ID contract:** the `${clipId}-ch${channelIndex}-chunk${chunkIndex}` format is single-sourced in `@waveform-playlist/core` (`buildSpectrogramCanvasId`/`parseSpectrogramCanvasId`, #560/#556) — this package's `extractChunkNumber`/`parseCanvasId`/`computeChunkSampleRange` are thin adapters over core's parser + `@dawcore/spectrogram`'s `computePaddedFftRange`, not independent implementations.
 - **Integration Pattern:**
   - Browser package defines `SpectrogramIntegrationContext` (nullable)
   - Spectrogram package provides `SpectrogramProvider` that fills this context
@@ -592,6 +607,21 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Peer Dependencies:** React, @waveform-playlist/browser
 - **Example:** `website/src/components/examples/MirSpectrogramExample.tsx`
 
+#### `@waveform-playlist/midi`
+
+- **Type:** Optional package (install separately)
+- **Purpose:** MIDI file loading, parsing, and React hook integration. Separates `@tonejs/midi` into an opt-in package so audio-only users don't pay the bundle cost.
+- **Install:** `npm install @waveform-playlist/midi`
+- **Architecture (two-layer):**
+  - `parseMidiFile()`/`parseMidiUrl()` — pure functions, re-exported from `@dawcore/midi` as of v13.0.0 (moved during the dawcore framework-split; no React-side API change). Convert a `.mid` ArrayBuffer/URL to `ParsedMidi`.
+  - `useMidiTracks()` — the one original symbol still defined in this package. React hook mirroring `useAudioTracks`, producing `ClipTrack[]` with `clip.midiNotes` for `<WaveformPlaylistProvider tracks={...}>`.
+- **Data pipeline only:** MIDI synthesis (PolySynth, Transport scheduling) lives in `@waveform-playlist/playout` via `MidiToneTrack`.
+- **Multi-track expansion:** One MIDI config can produce multiple `ClipTrack`s (one per MIDI track in the file); `flatten: true` merges them into one, preserving per-note channel identity via `MidiNoteData.channel` (so percussion notes stay routable after flattening).
+- **No native sample rate:** MIDI is event-based — `sampleRate` is required on `useMidiTracks()`'s options (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
+- **Dependencies:** `@dawcore/midi`, `@tonejs/midi`, `@waveform-playlist/core`
+- **Peer Dependencies:** React ^18.0.0
+- **Location:** `packages/midi/`
+
 ### 🧱 Web Components
 
 #### `@dawcore/components`
@@ -610,6 +640,9 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - `<daw-transport>`, `<daw-play-button>`, `<daw-pause-button>`, `<daw-stop-button>`, `<daw-record-button>` — Transport controls (find target via `for` attribute)
   - `<daw-track-controls>` — Mute/solo/volume/pan per track. Height-responsive via CSS container queries: on short rows the Pan slider drops first, then Vol (name + M/S always visible). Requires an explicit height (the editor sets one per track row).
   - `<daw-keyboard-shortcuts>` — Render-less element. Boolean attribute presets: `playback`, `splitting`, `undo`. JS properties for remapping (`playbackShortcuts`, `splittingShortcuts`, `undoShortcuts`) and custom shortcuts (`customShortcuts`). Listener on `document`. Uses `handleKeyboardEvent` from `@waveform-playlist/core`.
+  - `<daw-piano-roll>`, `<daw-spectrogram>`, `<daw-grid>` — Render-mode-specific visual elements (MIDI notes, spectrogram FFT via `@dawcore/spectrogram`, beats/bars grid), same chunked-canvas (1000px) pattern as `<daw-waveform>`. Selected via `<daw-track render-mode="piano-roll" | "spectrogram">`.
+  - `<daw-time-display>`, `<daw-time-format>` — Transport-adjacent readouts/controls (target resolution like the transport buttons); target owns the state, controls sync via bubbled events.
+  - `<daw-player>` — Lightweight single-track player, independent of `<daw-editor>`. Wraps `MediaElementPlayout` from `@waveform-playlist/media-element-playout` directly — no `PlaylistEngine`, no `PlayoutAdapter`, no AudioContext. Attributes: `src`, `peaks-src` (pre-computed BBC `.dat`/`.json` peaks), `wave-height`, `timescale`, `mono`, `bar-width`, `bar-gap`, `rounded-bars`, `playback-rate`. Composes `<daw-ruler>`/`<daw-waveform>`/`<daw-playhead>` internally; scrubber fallback when `peaks-src` is omitted.
 - **Clip Interactions:**
   - `ClipPointerHandler` (`interactions/clip-pointer-handler.ts`) — Move (header drag) and trim (boundary drag) with engine delegation
   - `splitAtPlayhead` (`interactions/split-handler.ts`) — Split clip at current playhead position (S key)
@@ -634,6 +667,23 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Events:** `seek(time)` emits a `seek` event (`{ seconds }`) — consumed by the WAM transport bridge among others
 - **Dependencies:** None (zero runtime deps; `@waveform-playlist/core`/`engine` are type-only devDeps)
 - **Location:** `packages/transport/`
+
+#### `@dawcore/spectrogram`
+
+- **Purpose:** Framework-agnostic spectrogram computation, Web Worker, and viewport-aware rendering orchestrator. A **regular dependency** of `@dawcore/components` (always loaded, unlike the optional `@dawcore/wam`/`@dawcore/faust` peers) and also consumed by `@waveform-playlist/spectrogram`'s React Provider for the FFT/worker primitives.
+- **Subpath exports:** root (computation + worker + orchestrator class), `./worker/spectrogram.worker` (Worker URL target), `./orchestrator` (ESM-only — orchestrator + pure helpers without the computation/worker graph)
+- **`SpectrogramOrchestrator`:** Owns the worker pool, per-clip/per-canvas registries, viewport state, and a three-tier render dispatch (viewport → buffer/overscan → remaining via `requestIdleCallback`). Extends `EventTarget`, dispatches `viewport-ready` once per `(generation, trackId)`. Used by `<daw-spectrogram>` + `SpectrogramController` in `@dawcore/components`; the React `SpectrogramProvider` uses the lower-level worker pool directly and keeps its own tier pipeline (candidate for future consolidation).
+- **Worker pool (`createSpectrogramWorkerPool`):** one-channel-per-worker invariant (the FFT cache key is channel-agnostic per worker); grows lazily when audio has more channels than pre-spawned workers. Canvases are routed by channel parsed from the canvas ID (`clipId-ch{N}-chunk{M}`) via `@waveform-playlist/core`'s `parseSpectrogramCanvasId`.
+- **Shared FFT-range math (#560):** `computePaddedFftRange` (`computation/fftSampleRange.ts`) is the padded-by-`fftSize` sample range for a chunk group, single-sourced and shared with the React Provider's `computeChunkSampleRange` so the two spectrogram pipelines can't drift on FFT window sizing.
+- **Dependencies:** `@waveform-playlist/core`, `fft.js`
+- **Location:** `packages/dawcore-spectrogram/`
+
+#### `@dawcore/midi`
+
+- **Purpose:** Framework-agnostic MIDI file loading and parsing — no React, no DOM, no Lit. Houses `parseMidiFile()`/`parseMidiUrl()` and the `MidiLoadOptions`/`MidiLoadResult` types.
+- **Consumers:** `@dawcore/components` (optional peer — `editor.loadMidi()` dynamic-imports this package on first call) and `@waveform-playlist/midi` (regular dependency — re-exports the parser and adds the `useMidiTracks` React hook on top).
+- **Dependencies:** `@waveform-playlist/core` (for the `MidiNoteData` type), `@tonejs/midi`. No peer dependencies — truly framework-agnostic.
+- **Location:** `packages/dawcore-midi/`
 
 #### `@dawcore/wam`
 
@@ -968,17 +1018,12 @@ Output per package:
 - `dist/index.mjs` (ESM)
 - `dist/index.d.ts` (Types)
 
-### 2. Vite Bundles (browser package)
+### 2. Multi-Entry Packages
 
-```bash
-# Auto-runs during pnpm build
-vite build
-```
+All packages build with tsup — no Vite in the package build pipeline (the `browser` package migrated off Vite per #317; tsup auto-externalizes `dependencies`/`peerDependencies` so no manual `external` list drifts). Two packages emit more than a single `index` bundle:
 
-Outputs:
-
-- `packages/browser/dist/index.js` (CJS)
-- `packages/browser/dist/index.mjs` (ESM)
+- **`@waveform-playlist/browser`** — `tsup.config.ts` lists two entries, `src/index.tsx` and `src/tone.ts`, producing the engine-free core bundle plus the `@waveform-playlist/browser/tone` subpath (Tone-coupled hooks/effects/export).
+- **`@dawcore/spectrogram`** — three tsup entry blocks: main (CJS+ESM+DTS), `worker/spectrogram.worker` (ESM-only, no DTS), and `orchestrator/index` (ESM+DTS) under the `./orchestrator` subpath.
 
 ### 3. Docusaurus Website
 
@@ -1011,6 +1056,25 @@ Animation loop (requestAnimationFrame)
 Update currentTime state
     ↓
 Re-render Playhead position
+```
+
+### Optional Engine Resolution (`@waveform-playlist/browser`)
+
+`WaveformPlaylistProvider`/`MediaElementPlaylistProvider` never statically import an audio engine — `playout`, `media-element-playout`, and `tone` are optional peer dependencies resolved at runtime:
+
+```
+Provider mounts
+    ↓
+createAdapter / createPlayout prop supplied?
+    ├─ Yes → call factory directly (no import of playout/tone/media-element-playout)
+    └─ No  → dynamic import() of the default engine
+              (src/playout/resolvePlayoutAdapter.ts | resolveMediaElementPlayout.ts)
+              ├─ Success → engine constructed, provider proceeds
+              └─ Failure → install-hint error rethrown (peer not installed)
+    ↓
+Tone-coupled hooks/effects/export (useAudioTracks, useDynamicEffects, useExportWav, …)
+    are only reachable via the `@waveform-playlist/browser/tone` subpath —
+    the core entry's static import graph stays engine-free under every bundler
 ```
 
 ### Clip Mutation Flow (Move/Trim/Split)
