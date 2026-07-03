@@ -1,8 +1,10 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
-
-const MAX_CANVAS_WIDTH = 1000;
+// The orchestrator's clip-relative sample math assumes chunk k starts at
+// clip pixel k * MAX_CANVAS_WIDTH — the constant must be the shared one,
+// not a local copy that can drift (#554 layout contract).
+import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
 
 interface SpectrogramHost extends HTMLElement {
   _spectrogramRegisterCanvas?: (reg: {

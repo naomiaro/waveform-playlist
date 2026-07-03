@@ -34,6 +34,13 @@ export interface CanvasRegistration {
   readonly trackId: string;
   readonly channelIndex: number;
   readonly chunkIndex: number;
+  /**
+   * TIMELINE-absolute pixel where this chunk starts. Layout contract: every
+   * canvas of a clip must satisfy
+   * `globalPixelOffset === clipOriginPx + chunkIndex * MAX_CANVAS_WIDTH` —
+   * renderGroup's clip-relative sample math depends on it (#554), and
+   * registerCanvas warns when a registration violates it.
+   */
   readonly globalPixelOffset: number;
   readonly widthPx: number;
   readonly heightPx: number;
@@ -71,6 +78,11 @@ export class SpectrogramOrchestrator extends EventTarget {
   protected colorLUT = new ColorLUTCache();
   protected disposed = false;
   protected renderInFlight = false;
+  // Per-clip timeline origin (globalPixelOffset - chunkIndex * MAX_CANVAS_WIDTH)
+  // with a live canvas count — used to detect layout-contract violations.
+  // The origin resets once all of a clip's canvases unregister, so a moved
+  // clip re-registering at a new position doesn't false-positive.
+  protected clipOrigins = new Map<string, { originPx: number; canvasCount: number }>();
   // Tracks which trackIds have already emitted `viewport-ready` for the
   // current generation. Cleared on every generation bump (setViewport with a
   // real change, setConfig, setColorMap, setDevicePixelRatio) AND in dispose().
@@ -147,17 +159,47 @@ export class SpectrogramOrchestrator extends EventTarget {
       channelIndex: reg.channelIndex,
       chunkIndex: reg.chunkIndex,
     });
+    const originPx = reg.globalPixelOffset - reg.chunkIndex * MAX_CANVAS_WIDTH;
+    const origin = this.clipOrigins.get(reg.clipId);
+    if (!origin) {
+      this.clipOrigins.set(reg.clipId, { originPx, canvasCount: 1 });
+    } else {
+      origin.canvasCount += 1;
+      if (origin.originPx !== originPx) {
+        console.warn(
+          '[dawcore-spectrogram] registerCanvas: ' +
+            reg.canvasId +
+            ' violates the chunk layout contract (chunk ' +
+            reg.chunkIndex +
+            ' at ' +
+            reg.globalPixelOffset +
+            'px implies clip origin ' +
+            originPx +
+            'px, but other canvases imply ' +
+            origin.originPx +
+            'px) — sample math assumes chunkIndex * ' +
+            MAX_CANVAS_WIDTH +
+            'px and this clip will render shifted audio'
+        );
+      }
+    }
     this.pool.registerCanvas(reg.canvasId, reg.canvas);
     if (this.viewport) this.scheduleRender();
   }
 
   unregisterCanvas(canvasId: string): void {
     if (this.disposed) return;
-    if (!this.canvases.has(canvasId)) {
+    const entry = this.canvases.get(canvasId);
+    if (!entry) {
       console.warn('[dawcore-spectrogram] unregisterCanvas: unknown canvas ' + canvasId);
       return;
     }
     this.canvases.delete(canvasId);
+    const origin = this.clipOrigins.get(entry.clipId);
+    if (origin) {
+      origin.canvasCount -= 1;
+      if (origin.canvasCount <= 0) this.clipOrigins.delete(entry.clipId);
+    }
     this.pool.unregisterCanvas(canvasId);
   }
 
@@ -231,6 +273,7 @@ export class SpectrogramOrchestrator extends EventTarget {
     this.disposed = true;
     this.clips.clear();
     this.canvases.clear();
+    this.clipOrigins.clear();
     this.viewport = null;
     this.colorLUT.clear();
     this.readyDispatched.clear();
