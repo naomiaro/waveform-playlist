@@ -287,3 +287,27 @@ describe('spectrogram worker — frequency band sanitation (review findings on #
     expect(Array.from(inverted)).toEqual(Array.from(sane));
   });
 });
+
+describe('spectrogram worker — input validation (#558)', () => {
+  it('compute-fft with no usable channel data returns a typed error, not a NaN spectrogram', async () => {
+    handler({
+      data: {
+        type: 'compute-fft',
+        id: 'fft-empty',
+        generation: 0,
+        clipId: 'never-registered-clip',
+        channelDataArrays: [],
+        config: { fftSize: 256, zeroPaddingFactor: 1 },
+        sampleRate: 8000,
+        offsetSamples: 0,
+        durationSamples: 4000,
+        mono: true,
+      },
+    });
+    await new Promise((r) => setTimeout(r, 20));
+
+    const response = posted.find((m) => m.id === 'fft-empty');
+    expect(response?.type).toBe('error');
+    expect(response?.error).toMatch(/no channel data/i);
+  });
+});

@@ -78,6 +78,7 @@ export class SpectrogramOrchestrator extends EventTarget {
   protected colorLUT = new ColorLUTCache();
   protected disposed = false;
   protected renderInFlight = false;
+  protected renderQueued = false;
   // Per-clip timeline origin (globalPixelOffset - chunkIndex * MAX_CANVAS_WIDTH)
   // with a live canvas count — used to detect layout-contract violations.
   // The origin resets once all of a clip's canvases unregister, so a moved
@@ -280,22 +281,41 @@ export class SpectrogramOrchestrator extends EventTarget {
     this.pool.terminate();
   }
 
+  /**
+   * Coalesce render requests: `renderInFlight` is held for the WHOLE async
+   * render, not just until the microtask fires — a request arriving
+   * mid-render (e.g. a late registerCanvas) queues one follow-up run instead
+   * of starting a concurrent runRender for the same generation (#558).
+   */
   protected scheduleRender(): void {
-    if (this.renderInFlight) return;
     if (!this.viewport) return;
+    if (this.renderInFlight) {
+      this.renderQueued = true;
+      return;
+    }
     this.renderInFlight = true;
     queueMicrotask(() => {
-      this.renderInFlight = false;
-      this.runRender(this.generation).catch((err) => {
-        if (err instanceof SpectrogramAbortError) return;
-        console.warn(
-          '[dawcore-spectrogram] runRender unhandled rejection (generation ' +
-            this.generation +
-            '): ' +
-            (err instanceof Error ? err.message : String(err))
-        );
-      });
+      void this.runRenderLoop();
     });
+  }
+
+  protected async runRenderLoop(): Promise<void> {
+    try {
+      do {
+        this.renderQueued = false;
+        await this.runRender(this.generation).catch((err) => {
+          if (err instanceof SpectrogramAbortError) return;
+          console.warn(
+            '[dawcore-spectrogram] runRender unhandled rejection (generation ' +
+              this.generation +
+              '): ' +
+              (err instanceof Error ? err.message : String(err))
+          );
+        });
+      } while (this.renderQueued && !this.disposed);
+    } finally {
+      this.renderInFlight = false;
+    }
   }
 
   protected async runRender(generation: number): Promise<void> {
@@ -384,6 +404,31 @@ export class SpectrogramOrchestrator extends EventTarget {
       return;
     }
 
+    try {
+      await this.renderGroupOnce(group, generation, viewport, clip);
+    } catch (err) {
+      if (this.generation !== generation || this.disposed) throw err;
+      // Concurrent computes can LRU-evict the FFT entry between computeFFT
+      // resolving and renderChunks executing (16-entry cache). Recompute once
+      // instead of surfacing a viewport-error for a transient race (#558).
+      if (err instanceof Error && err.message.includes('cache-miss')) {
+        console.warn(
+          '[dawcore-spectrogram] FFT cache entry evicted between compute and render — retrying group once'
+        );
+        await this.renderGroupOnce(group, generation, viewport, clip);
+        return;
+      }
+      throw err;
+    }
+  }
+
+  protected async renderGroupOnce(
+    group: CanvasEntry[],
+    generation: number,
+    viewport: ViewportState,
+    clip: ClipEntry
+  ): Promise<void> {
+    const first = group[0];
     const fftSize = this.config.fftSize ?? SPECTROGRAM_DEFAULTS.fftSize;
     // `globalPixelOffset` is TIMELINE-absolute (viewport classification needs
     // scroll-pixel space), but file-space sample math needs CLIP-RELATIVE

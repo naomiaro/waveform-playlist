@@ -30,7 +30,7 @@ Class that owns the worker pool, clip+canvas registries, viewport state, and ren
 
 ## Three-Tier Render
 
-`scheduleRender()` coalesces via `queueMicrotask` (one render per tick). `runRender` groups canvases by trackId, classifies each track's canvases via `classifyViewport()`, then:
+`scheduleRender()` coalesces for the WHOLE async render: `renderInFlight` is held until `runRender` settles, and requests arriving mid-render queue exactly one follow-up run (`renderQueued` loop in `runRenderLoop`) — never a concurrent `runRender` for the same generation (#558). `runRender` groups canvases by trackId, classifies each track's canvases via `classifyViewport()`, then:
 
 1. **viewport tier** — synchronous priority render; emits `viewport-ready` when done
 2. **buffer tier** — 25% overscan; renders right after viewport

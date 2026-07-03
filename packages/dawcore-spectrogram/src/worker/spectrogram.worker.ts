@@ -506,6 +506,21 @@ async function handleComputeFFT(msg: ComputeFFTRequest): Promise<void> {
   const sampleRate =
     registered && msg.channelDataArrays.length === 0 ? registered.sampleRate : msgSampleRate;
 
+  if (channelDataArrays.length === 0) {
+    // Without this guard the mono path divides by zero channels and caches an
+    // all-NaN spectrogram as a success (#558).
+    const response: ComputeResponse = {
+      id,
+      type: 'error',
+      error:
+        'no channel data for clip "' +
+        clipId +
+        '" — pass channelDataArrays or register-audio-data the clip first',
+    };
+    (self as unknown as Worker).postMessage(response);
+    return;
+  }
+
   const fftSize = config.fftSize ?? 2048;
   const zeroPaddingFactor = config.zeroPaddingFactor ?? 2;
   const hopSize = config.hopSize ?? Math.floor(fftSize / 4);
@@ -614,7 +629,10 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     try {
       canvasRegistry.set(msg.canvasId, msg.canvas);
     } catch (err) {
-      console.warn('[spectrogram-worker] register-canvas failed:', err);
+      console.warn(
+        '[spectrogram-worker] register-canvas failed: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
     }
     return;
   }
@@ -624,7 +642,10 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     try {
       canvasRegistry.delete(msg.canvasId);
     } catch (err) {
-      console.warn('[spectrogram-worker] unregister-canvas failed:', err);
+      console.warn(
+        '[spectrogram-worker] unregister-canvas failed: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
     }
     return;
   }
@@ -637,7 +658,10 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         sampleRate: msg.sampleRate,
       });
     } catch (err) {
-      console.warn('[spectrogram-worker] register-audio-data failed:', err);
+      console.warn(
+        '[spectrogram-worker] register-audio-data failed: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
     }
     return;
   }
@@ -653,7 +677,10 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         }
       }
     } catch (err) {
-      console.warn('[spectrogram-worker] unregister-audio-data failed:', err);
+      console.warn(
+        '[spectrogram-worker] unregister-audio-data failed: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
     }
     return;
   }

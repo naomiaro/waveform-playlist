@@ -131,7 +131,9 @@ export function createSpectrogramWorker(worker: Worker): SpectrogramWorkerApi {
   };
 
   worker.onerror = (e: ErrorEvent) => {
-    terminated = true;
+    // An uncaught error in a worker message handler fires onerror but does
+    // NOT kill the worker thread — reject the operations that were pending
+    // (their responses may never arrive) but keep the API usable (#558).
     console.error(
       '[dawcore-spectrogram] worker crashed with ' +
         pending.size +
