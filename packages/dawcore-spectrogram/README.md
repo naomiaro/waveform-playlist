@@ -45,7 +45,7 @@ The orchestrator renders in three tiers (visible viewport first, then a 25% over
 
 ## Entry Points
 
-- `@dawcore/spectrogram` — `computeSpectrogram`, `computeSpectrogramMono`, `getColorMap`, `getFrequencyScale`, worker factories (`createSpectrogramWorker`, `createSpectrogramWorkerPool`, `SpectrogramAbortError`), and the orchestrator re-exports
+- `@dawcore/spectrogram` — `computeSpectrogram`, `computeSpectrogramMono`, `getColorMap`, `getFrequencyScale`, `computePaddedFftRange` (pure window-padded, clip-clamped FFT sample-range math — shared with the React provider's chunk-range computation so both pipelines can't drift), worker factories (`createSpectrogramWorker`, `createSpectrogramWorkerPool`, `SpectrogramAbortError`), and the orchestrator re-exports
 - `@dawcore/spectrogram/worker/spectrogram.worker` — the Worker module URL target (resolve with `new URL(..., import.meta.url)`)
 - `@dawcore/spectrogram/orchestrator` — `SpectrogramOrchestrator` and helpers (`classifyViewport`, `groupContiguousChunks`, `ColorLUTCache`) without the computation/worker graph, for consumers with their own FFT pipeline
 

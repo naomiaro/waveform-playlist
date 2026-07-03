@@ -1,6 +1,29 @@
 # @waveform-playlist/playout
 
-Tone.js-based `PlayoutAdapter` for [`@waveform-playlist/engine`](https://www.npmjs.com/package/@waveform-playlist/engine) — drives playback, recording, and effects on a shared global audio context. Used by `@waveform-playlist/browser` (the React surface). For native Web Audio (no Tone.js), see `@dawcore/transport`.
+Tone.js-based `PlayoutAdapter` for [`@waveform-playlist/engine`](https://www.npmjs.com/package/@waveform-playlist/engine) — drives playback, recording, and effects on a shared global Tone.js audio context. Used by `@waveform-playlist/browser` (the React surface). For native Web Audio (no Tone.js), see `@dawcore/transport`.
+
+## Installation
+
+```bash
+npm install @waveform-playlist/playout
+```
+
+Requires `tone` (`^15.0.0`) as a peer dependency — this package doesn't bundle Tone.js, so the version in your app is the one that runs. `@waveform-playlist/engine` is an optional peer; most consumers pull in both automatically via `@waveform-playlist/browser` rather than installing this package directly.
+
+## Usage
+
+```typescript
+import { createToneAdapter } from '@waveform-playlist/playout';
+import { PlaylistEngine } from '@waveform-playlist/engine';
+
+const adapter = createToneAdapter();
+const engine = new PlaylistEngine({ adapter });
+
+engine.setTracks(tracks); // ClipTrack[]
+engine.play(0);
+```
+
+`createToneAdapter()` eagerly creates the shared global Tone.js context before building its audio graph, so `adapter.audioContext` is guaranteed to be the same context the playout's nodes are on.
 
 ## Audio context is a standardized-audio-context ponyfill
 
@@ -19,3 +42,7 @@ await addRecordingWorkletModule((url) => ctx.audioWorklet.addModule(url));
 ```
 
 If you genuinely need a native `AudioContext`, own it yourself via the web-components adapter surface (`@dawcore/*`), which uses native Web Audio rather than Tone.
+
+## License
+
+MIT

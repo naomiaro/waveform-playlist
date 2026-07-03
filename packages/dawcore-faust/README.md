@@ -70,6 +70,7 @@ const plugin = await createWamInstanceFromFactory(compiled.factory, audioContext
 
 Notes:
 
+- The `name` option (and the `{ name }` passed to `addFaustEffect`) sets the descriptor name **unless the DSP itself declares one** — `declare name "My Lowpass";` in the source wins over the option.
 - The generated plugin is a standard WAM 2.0 effect — everything in [`@dawcore/wam`'s README](https://www.npmjs.com/package/@dawcore/wam) about Faust-generated plugins (flat parameter-map state, auto-generated GUI, descriptor shape) applies.
 - Factory-created instances have no `url` and cannot be cloned with `cloneInstanceInto` — recompile the DSP on the target context instead (this is what dawcore's offline export does).
 - Effects only — Faust polyphonic instruments are out of scope.

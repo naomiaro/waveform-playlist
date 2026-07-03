@@ -136,7 +136,7 @@ const { entries, warnings } = await fetchWamLibrary(
   'https://www.webaudiomodules.com/community/plugins.json',
   { baseUrl: 'https://www.webaudiomodules.com/community/plugins/' }
 );
-// entries: [{ name, url, description?, vendor?, thumbnail?, keywords? }, ...]
+// entries: [{ name, url, description?, vendor?, thumbnail?, keywords?, category? }, ...]
 // warnings: per-entry messages for invalid entries that were skipped
 ```
 
@@ -164,12 +164,29 @@ The resulting instance has no `url`, so it cannot be cloned via `cloneInstanceIn
 
 Each entry is either:
 
-- an **object** — `name` (required) plus a plugin URL in `url` or `path` (required). Optional fields are passed through when well-formed: `description` (string), `vendor` (string), `thumbnail` (string URL), `keywords` (string array). Unknown fields are ignored.
+- an **object** — `name` (required) plus a plugin URL in `url` or `path` (required). Optional fields are passed through when well-formed: `description` (string), `vendor` (string), `thumbnail` (string URL), `keywords` (string array), `category` (string or string array — normalized to a non-empty array of trimmed strings, e.g. `["Effect"]`). Unknown fields are ignored.
 - a **bare URL string** — the plugin URL; a display name is derived from the URL path (generic segments like `index.js`, `dist`, `src` are skipped, so `…/quadrafuzz/dist/index.js` becomes `quadrafuzz`).
 
 Relative plugin and thumbnail URLs are resolved against the manifest URL — or against `options.baseUrl` for registries (like webaudiomodules.com) that keep paths relative to a directory next to the manifest.
 
 Invalid entries (missing name, missing/unresolvable URL) are skipped with a per-entry message collected into `warnings` — one bad entry never fails the manifest. An unreachable manifest, invalid JSON, an unrecognized shape, or zero valid entries rejects with a `[waveform-playlist]`-prefixed error.
+
+`category` (e.g. `Effect`/`Modulation`/`Instrument`/`MIDI`/`Video`, as tagged by the webaudiomodules.com registry) is a cheap fallback for filtering non-effect entries out of a picker UI before ever loading them — see descriptor probing below for a more reliable, per-entry check.
+
+#### Descriptor probing
+
+`category` is manifest-supplied and can be wrong or absent. `fetchWamDescriptor` reads the static `descriptor.json` that WAM SDK builds ship next to the plugin module, for a more reliable audio-I/O and WAM-version check before committing to `createWamInstance`:
+
+```typescript
+import { fetchWamDescriptor } from '@dawcore/wam';
+
+const info = await fetchWamDescriptor(
+  'https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js'
+);
+// info: { apiVersion?, hasAudioInput?, hasAudioOutput?, hasMidiInput?, hasMidiOutput?, isInstrument? } | null
+```
+
+Best-effort and read-only — returns `null` when the plugin ships no readable descriptor (unreachable, non-OK response, invalid JSON, wrong shape); absence is expected for many registries, not an error. A descriptor with no boolean flags resolves to `{}` (distinct from `null`): the SDK defaults `hasAudioInput`/`hasAudioOutput` to `true` at runtime, so treat a **missing** flag as capable and gate only on an explicit `false` — never require `=== true`. `apiVersion` is asymmetric the same way: the SDK only stamps it reliably on the *runtime* instance descriptor, so a static probe can positively identify WAM 1.0 (a declared value starting with `"1"`) but an absent field usually just means a WAM 2.0 build that omitted it. `createWamInstance` remains authoritative at load time regardless of what this probe reports.
 
 ### Plugin GUIs
 

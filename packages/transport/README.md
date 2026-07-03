@@ -1,6 +1,6 @@
 # @dawcore/transport
 
-Native Web Audio transport for multi-track audio scheduling, looping, tempo, and metronome. Zero npm dependencies.
+Native Web Audio transport for the dawcore family — multi-track scheduling, looping, tempo automation, time signatures, and metronome. No Tone.js, zero npm dependencies.
 
 ## Features
 
@@ -172,6 +172,8 @@ transport.connectMasterOutput(compressor);
 transport.disconnectMasterOutput();
 ```
 
+**Note:** `ClipTrack.effects` (the Tone.js-oriented per-track effects function used by `@waveform-playlist/playout`) is not read by `NativePlayoutAdapter` — it's silently ignored. Use `connectTrackOutput`/`connectMasterOutput` for effects with the native transport, or use `TonePlayoutAdapter` if a track still relies on `ClipTrack.effects`.
+
 ## API
 
 ### Transport
@@ -269,6 +271,10 @@ Implements `PlayoutAdapter` from `@waveform-playlist/engine`. All methods delega
 - `adapter.masterOutputNode` — Master gain node for parallel taps (analyzers, recorders)
 - `adapter.init()` — Resumes a suspended AudioContext and waits for the hardware pipeline to warm up (Safari needs this before clips scheduled at time 0 play on time)
 - `setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)` — tempo/meter surface the engine uses for tick-based timeline math
+
+### Advanced (Low-Level Building Blocks)
+
+For consumers assembling a custom scheduler or embedding transport internals elsewhere, the layers underneath `Transport` are also exported: `Clock`, `Scheduler`, `Timer`, `SampleTimeline`, `TempoMap`, `MeterMap`, `MasterNode`, `TrackNode`, `ClipPlayer`, `MetronomePlayer`. See [`src/index.ts`](https://github.com/naomiaro/waveform-playlist/blob/main/packages/transport/src/index.ts) for the full export list — most consumers only need `Transport` and `NativePlayoutAdapter`.
 
 ## Examples
 
