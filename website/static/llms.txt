@@ -1,10 +1,10 @@
 # waveform-playlist
 
-> Multitrack Web Audio editor and player with canvas waveform visualization, built with React and Tone.js.
+> Multitrack Web Audio editor and player with canvas waveform visualization. Two UI surfaces over a shared framework-agnostic engine: a React component library (`@waveform-playlist/browser`, Tone.js backend) and framework-agnostic Web Components (`@dawcore/components`, native Web Audio backend).
 
 ## What It Does
 
-waveform-playlist is a React component library for building browser-based audio editing applications. It provides:
+waveform-playlist builds browser-based audio editing applications. Use the React surface (`@waveform-playlist/browser`) or the framework-agnostic Web Components surface (`@dawcore/components`, `<daw-editor>` — works in any framework or vanilla HTML). Both provide:
 
 - Multitrack audio playback, mixing, and editing
 - Canvas-based waveform and spectrogram rendering with zoom
@@ -31,7 +31,7 @@ waveform-playlist is a React component library for building browser-based audio 
 - `@waveform-playlist/webaudio-peaks` — Peak extraction from AudioBuffer
 - `@waveform-playlist/media-element-playout` — HTMLAudioElement playback with pitch-preserving speed control, optional Web Audio routing for fades and Tone.js effect bridging
 - `@waveform-playlist/midi` — React layer for MIDI: `useMidiTracks` hook converts .mid files to ClipTrack[] with midiNotes for piano roll visualization and SoundFont/PolySynth playback. As of v13+ the parser is re-exported from `@dawcore/midi`; React API surface is unchanged. The SoundFont can be provided or swapped after setup via `adapter.setSoundFontCache()` on the adapter returned by `createToneAdapter()` (the React provider forwards late `soundFontCache` prop changes automatically; construct caches with `SoundFontCache.fromUrl(url)`).
-- `@dawcore/components` — Web Components for multi-track audio editing (Lit-based): `<daw-editor>`, `<daw-track>`, `<daw-clip>`, `<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>`, transport buttons. Framework-agnostic — works in any framework or vanilla HTML. No Tone.js dependency; uses native Web Audio via `@dawcore/transport`. Consumer supplies a `PlayoutAdapter` (no default). Unified effects chains: `addEffect`/`removeEffect`/`setEffectParams`/`setEffectBypassed`/`moveEffect`/`effects` on `<daw-track>` (per-track chain) and `<daw-editor>` (master chain), with built-in `native-*` effects (gain, lowpass filter, compressor, stereo panner, delay), custom registration via `registerEffect`, and `daw-effect-add/remove/change/bypass/reorder` events. WAM 2.0 plugins join the same chains via `addWamPlugin(url)` (optional `@dawcore/wam` peer); Faust DSP source compiles in the browser into the same chains via `addFaustEffect(dspCode, {name?})` (optional `@dawcore/faust` peer — entries persist as `{kind:'wam', faustDsp, faustName, state}` and recompile on restore/export; compile errors keep Faust's line/column diagnostics and leave the chain untouched). Effect GUIs: `openEffectGui(effectId, container)`/`closeEffectGui(effectId)` on both elements mount a WAM plugin's own GUI (or a generic parameter panel for GUI-less plugins and `native-*` effects) into a consumer-provided container — close hides without interrupting audio, the element is cached for reopen, and the GUI is destroyed only when the effect is removed. Persistence: `getEffectsState()`/`setEffectsState(entries)` on both elements serialize/restore chains (WAM entries carry the plugin's getState snapshot; an unreachable saved URL becomes a bypassed passthrough placeholder + `daw-effect-error`, restore continues). Offline export: `editor.exportAudio({sampleRate?, startTime?, duration?, channels?})` renders the session through all chains on an OfflineAudioContext (WAM plugins re-instantiated offline with saved state) and resolves to an AudioBuffer. Runnable WAM demo: `examples/dawcore-wam/` (`pnpm example:dawcore-wam`).
+- `@dawcore/components` — Web Components for multi-track audio editing (Lit-based). Elements: `<daw-editor>`, `<daw-track>`, `<daw-clip>`, `<daw-waveform>`, `<daw-playhead>`, `<daw-ruler>`, `<daw-selection>`, `<daw-track-controls>`, `<daw-grid>` (beats/bars grid), `<daw-piano-roll>` (MIDI), `<daw-spectrogram>` (per-track FFT via `render-mode="spectrogram"`), `<daw-transport>` + transport buttons (`<daw-play-button>`, `<daw-pause-button>`, `<daw-stop-button>`, `<daw-record-button>`), `<daw-time-display>`, `<daw-time-format>`, `<daw-keyboard-shortcuts>`, and `<daw-player>` (lightweight single-track HTMLMediaElement player on `@waveform-playlist/media-element-playout` — no engine/adapter/AudioContext required). Framework-agnostic — works in any framework or vanilla HTML. No Tone.js dependency; uses native Web Audio via `@dawcore/transport`. Consumer supplies a `PlayoutAdapter` (no default). Unified effects chains: `addEffect`/`removeEffect`/`setEffectParams`/`setEffectBypassed`/`moveEffect`/`effects` on `<daw-track>` (per-track chain) and `<daw-editor>` (master chain), with built-in `native-*` effects (gain, lowpass filter, compressor, stereo panner, delay), custom registration via `registerEffect`, and `daw-effect-add/remove/change/bypass/reorder` events. WAM 2.0 plugins join the same chains via `addWamPlugin(url)` (optional `@dawcore/wam` peer); Faust DSP source compiles in the browser into the same chains via `addFaustEffect(dspCode, {name?})` (optional `@dawcore/faust` peer — entries persist as `{kind:'wam', faustDsp, faustName, state}` and recompile on restore/export; compile errors keep Faust's line/column diagnostics and leave the chain untouched). Effect GUIs: `openEffectGui(effectId, container)`/`closeEffectGui(effectId)` on both elements mount a WAM plugin's own GUI (or a generic parameter panel for GUI-less plugins and `native-*` effects) into a consumer-provided container — close hides without interrupting audio, the element is cached for reopen, and the GUI is destroyed only when the effect is removed. Persistence: `getEffectsState()`/`setEffectsState(entries)` on both elements serialize/restore chains (WAM entries carry the plugin's getState snapshot; an unreachable saved URL becomes a bypassed passthrough placeholder + `daw-effect-error`, restore continues). Offline export: `editor.exportAudio({sampleRate?, startTime?, duration?, channels?})` renders the session through all chains on an OfflineAudioContext (WAM plugins re-instantiated offline with saved state) and resolves to an AudioBuffer. Runnable WAM demo: `examples/dawcore-wam/` (`pnpm example:dawcore-wam`).
 - `@dawcore/midi` — Framework-agnostic MIDI parser (`parseMidiFile`, `parseMidiUrl` — pure functions, no React). Used by `@dawcore/components` via dynamic import inside `editor.loadMidi()`, and re-exported by `@waveform-playlist/midi`.
 - `@waveform-playlist/spectrogram` — Optional spectrogram package (v13+): React `SpectrogramProvider` + UI (menu items, settings modal) integrating via `SpectrogramIntegrationContext`. Computation/worker/orchestrator are imported from `@dawcore/spectrogram`.
 - `@dawcore/spectrogram` — Framework-agnostic FFT computation, Web Worker, and `SpectrogramOrchestrator` class (viewport classification, 3-tier render, generation-based abort, contiguous chunk grouping, color LUT cache). Shared between the React Provider and the dawcore Lit element layer.
@@ -61,6 +61,33 @@ function App() {
   );
 }
 ```
+
+## Web Components Quick Start
+
+No React and no build step — drop `<daw-editor>` into any HTML page and assign a `PlayoutAdapter`:
+
+```html
+<script type="module">
+  import '@dawcore/components';
+  import { NativePlayoutAdapter } from '@dawcore/transport';
+
+  const editor = document.querySelector('daw-editor');
+  editor.adapter = new NativePlayoutAdapter(new AudioContext());
+</script>
+
+<daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale>
+  <daw-track src="/audio/drums.opus" name="Drums"></daw-track>
+  <daw-track src="/audio/bass.opus" name="Bass"></daw-track>
+</daw-editor>
+
+<daw-transport for="editor">
+  <daw-play-button></daw-play-button>
+  <daw-pause-button></daw-pause-button>
+  <daw-stop-button></daw-stop-button>
+</daw-transport>
+```
+
+`<daw-editor>` does not create an `AudioContext` — you own it and assign a `PlayoutAdapter`: `NativePlayoutAdapter` (from `@dawcore/transport`) for native Web Audio, or a Tone.js adapter (from `@waveform-playlist/playout`) when you need MIDI playback.
 
 ## Architecture
 
@@ -147,10 +174,11 @@ Both providers use React Context with 4 split contexts for performance.
 
 ## Documentation
 
-- Full docs: https://naomiaro.github.io/waveform-playlist/docs/
-- LLM API reference: https://naomiaro.github.io/waveform-playlist/docs/api/llm-reference
-- Engine guide (framework-agnostic): https://naomiaro.github.io/waveform-playlist/docs/guides/engine
-- Examples: https://naomiaro.github.io/waveform-playlist/docs/examples
+- Full docs: https://naomiaro.github.io/waveform-playlist/
+- LLM API reference: https://naomiaro.github.io/waveform-playlist/docs/llm-reference
+- Web Components getting started: https://naomiaro.github.io/waveform-playlist/docs/web-components/getting-started
+- Engine guide (framework-agnostic): https://naomiaro.github.io/waveform-playlist/docs/framework-agnostic/engine
+- Examples: https://naomiaro.github.io/waveform-playlist/docs/react/examples
 - WAM Plugins guide: https://naomiaro.github.io/waveform-playlist/docs/wam-plugins
 - WAM example ("WAM! Kick It Up a Notch"): https://naomiaro.github.io/waveform-playlist/examples/wam-effects
 - GitHub: https://github.com/naomiaro/waveform-playlist
