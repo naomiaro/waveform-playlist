@@ -12,6 +12,7 @@ import { useClipViewportOrigin } from '../contexts/ClipViewportOrigin';
 import { useChunkedCanvasRefs } from '../hooks/useChunkedCanvasRefs';
 import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
 import {
+  addBarToPath,
   aggregatePeaks,
   calculateBarRects,
   calculateFirstBarPosition,
@@ -105,7 +106,13 @@ export interface ChannelProps {
   barWidth?: number;
   /** Spacing in pixels between waveform bars. Default: 0 */
   barGap?: number;
-  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
+  /**
+   * Draw bars with pill-shaped rounded caps (radius barWidth/2). Most visible
+   * with barWidth >= 3 and a non-zero barGap. In 'inverted' draw mode the
+   * canvas paints the complement around the rounded bars, so gap columns and
+   * regions without peak data are covered by waveOutlineColor (square inverted
+   * mode leaves them transparent). Default: false
+   */
   roundedBars?: boolean;
   /** If true, background is transparent (for use with external progress overlay) */
   transparentBackground?: boolean;
@@ -198,16 +205,23 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
         const canvasEndGlobal = globalPixelOffset + canvasWidth;
         const firstBarGlobal = calculateFirstBarPosition(canvasStartGlobal, barWidth, step);
 
-        // Rounded bars always use the normal-mode (peak region) rect. In
-        // inverted mode the chunk is pre-filled and the rounded bars are
-        // punched out as transparent holes, so the background/progress
-        // layering behind the canvas keeps working unchanged.
+        // Rounded bars always use the normal-mode (peak region) rect and
+        // batch every bar of the chunk into ONE path with a single fill.
+        // In inverted mode the path is the full chunk rect plus the bar
+        // subpaths filled with 'evenodd' — the complement paints once at
+        // source alpha (correct for semi-transparent colors) and the bar
+        // interiors stay transparent, so the background/progress layering
+        // behind the canvas keeps working unchanged. Note: unlike square
+        // inverted mode, gap columns and no-peak regions are covered by
+        // the complement fill.
         const rectMode = roundedBars ? 'normal' : drawMode;
         const barRadius = barWidth / 2;
-        const punchOut = roundedBars && drawMode === 'inverted';
-        if (punchOut) {
-          ctx.fillRect(0, 0, canvasWidth, waveHeight);
-          ctx.globalCompositeOperation = 'destination-out';
+        const complementFill = roundedBars && drawMode === 'inverted';
+        if (roundedBars) {
+          ctx.beginPath();
+        }
+        if (complementFill) {
+          ctx.rect(0, 0, canvasWidth, waveHeight);
         }
 
         for (
@@ -227,9 +241,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
             const rects = calculateBarRects(x, barWidth, h2, peak.min, peak.max, rectMode);
             for (const rect of rects) {
               if (roundedBars) {
-                ctx.beginPath();
-                ctx.roundRect(rect.x, rect.y, rect.width, rect.height, barRadius);
-                ctx.fill();
+                addBarToPath(ctx, rect, barRadius);
               } else {
                 ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
               }
@@ -237,8 +249,10 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
           }
         }
 
-        if (punchOut) {
-          ctx.globalCompositeOperation = 'source-over';
+        if (complementFill) {
+          ctx.fill('evenodd');
+        } else if (roundedBars) {
+          ctx.fill();
         }
 
         canvas.dataset.drawVersion = drawVersion;

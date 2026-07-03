@@ -194,6 +194,7 @@ Features:
 - Light/dark mode support with Docusaurus theme integration
 - `barWidth` - Control the width of waveform bars
 - `barGap` - Add spacing between bars
+- `roundedBars` - Pill-shaped bar caps (radius `barWidth / 2`)
 - `waveProgressColor` - Colored fill behind played portion
 - `playheadColor` - Vertical line at playback position
 - `selectedWaveOutlineColor` / `selectedWaveFillColor` - Colors when track is selected

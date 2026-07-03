@@ -97,6 +97,26 @@ export function calculateBarRects(
 }
 
 /**
+ * Adds a bar to the current canvas path with pill-shaped rounded caps.
+ * Falls back to square corners on canvases without roundRect
+ * (Safari < 16.4, Firefox < 112) instead of throwing.
+ *
+ * The caller owns beginPath()/fill() so all bars of a chunk batch into a
+ * single fill — including evenodd complement fills for inverted mode.
+ *
+ * @param ctx - Canvas context whose current path is being built
+ * @param rect - Bar rect from calculateBarRects
+ * @param radius - Corner radius (barWidth/2; roundRect spec-clamps on short bars)
+ */
+export function addBarToPath(ctx: CanvasRenderingContext2D, rect: BarRect, radius: number): void {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(rect.x, rect.y, rect.width, rect.height, radius);
+  } else {
+    ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  }
+}
+
+/**
  * Computes the first bar position (in global pixel coordinates) that could
  * affect a given canvas chunk.
  *

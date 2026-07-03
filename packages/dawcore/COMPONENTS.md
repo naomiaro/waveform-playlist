@@ -18,6 +18,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `mono` | boolean | `false` | Merge channels to mono display |
 | `bar-width` | number | `1` | Waveform bar width in pixels |
 | `bar-gap` | number | `0` | Gap between waveform bars |
+| `rounded-bars` | boolean | `false` | Pill-shaped bar caps (radius bar-width/2) |
 | `file-drop` | boolean | `false` | Enable drag-and-drop file loading |
 | `clip-headers` | boolean | `false` | Show clip name headers |
 | `clip-header-height` | number | `20` | Height of clip headers in pixels |
