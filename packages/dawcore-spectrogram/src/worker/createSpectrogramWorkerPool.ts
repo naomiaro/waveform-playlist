@@ -1,3 +1,4 @@
+import { parseSpectrogramCanvasId } from '@waveform-playlist/core';
 import {
   createSpectrogramWorker,
   SpectrogramAbortError,
@@ -8,19 +9,20 @@ import {
 
 /**
  * Parse the channel index from a canvas ID like "clipId-ch0-chunk5" → 0.
- * Anchored to the trailing `-ch{N}-chunk{M}` segment so clip IDs containing
- * a `-ch{N}-` substring don't misroute.
+ * Delegates to the canonical `parseSpectrogramCanvasId` (anchored to the trailing
+ * `-ch{N}-chunk{M}` segment so clip IDs containing a `-ch{N}-` substring don't
+ * misroute); falls back to worker 0 with a warning when the ID doesn't match.
  */
 function parseChannelFromCanvasId(canvasId: string): number {
-  const match = canvasId.match(/-ch(\d+)-chunk\d+$/);
-  if (!match) {
+  const parsed = parseSpectrogramCanvasId(canvasId);
+  if (!parsed) {
     console.warn(
       '[dawcore-spectrogram] canvas ID missing -ch{N}-chunk{M} suffix, routing to worker 0: ' +
         canvasId
     );
     return 0;
   }
-  return parseInt(match[1], 10);
+  return parsed.channelIndex;
 }
 
 /**

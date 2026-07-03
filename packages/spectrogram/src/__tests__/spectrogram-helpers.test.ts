@@ -28,13 +28,16 @@ describe('extractChunkNumber', () => {
   it('extracts the trailing chunk number', () => {
     expect(extractChunkNumber('clip-ch0-chunk5')).toBe(5);
     expect(extractChunkNumber('a-b-c-ch1-chunk42')).toBe(42);
-    expect(extractChunkNumber('chunk0')).toBe(0);
+    expect(extractChunkNumber('clip-ch0-chunk0')).toBe(0);
   });
 
   it('returns 0 and warns on an unexpected format', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // A bare `chunk0` (no `-ch{N}-` segment) is not a valid canvas ID: the
+    // canonical parser rejects it, so it warns and falls back to 0.
     expect(extractChunkNumber('not-a-valid-id')).toBe(0);
-    expect(warn).toHaveBeenCalledOnce();
+    expect(extractChunkNumber('chunk0')).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(2);
     warn.mockRestore();
   });
 });

@@ -1,11 +1,13 @@
 import {
   MAX_CANVAS_WIDTH,
+  parseSpectrogramCanvasId,
   type SpectrogramConfig,
   type SpectrogramComputeConfig,
   type ColorMapValue,
   type RenderMode,
   type TrackSpectrogramOverrides,
 } from '@waveform-playlist/core';
+import { computePaddedFftRange } from '@dawcore/spectrogram';
 
 /**
  * Pure, side-effect-free helpers extracted from `SpectrogramProvider`.
@@ -39,14 +41,18 @@ export interface ViewportMetrics {
   viewportWidth: number;
 }
 
-/** Extract the chunk number from a canvas ID like `"clipId-ch0-chunk5"` → `5`. */
+/**
+ * Extract the chunk number from a canvas ID like `"clipId-ch0-chunk5"` → `5`.
+ * Delegates to the canonical `parseSpectrogramCanvasId`; warns and returns `0`
+ * when the ID doesn't match the `${clipId}-ch${channelIndex}-chunk${n}` format.
+ */
 export function extractChunkNumber(canvasId: string): number {
-  const match = canvasId.match(/chunk(\d+)$/);
-  if (!match) {
+  const parsed = parseSpectrogramCanvasId(canvasId);
+  if (!parsed) {
     console.warn(`[spectrogram] Unexpected canvas ID format: ${canvasId}`);
     return 0;
   }
-  return parseInt(match[1], 10);
+  return parsed.chunkIndex;
 }
 
 /**
@@ -70,9 +76,8 @@ export function presentChunkIndices(
  * clip ID and channel index. Returns `null` when the ID doesn't match.
  */
 export function parseCanvasId(canvasId: string): { clipId: string; channelIndex: number } | null {
-  const match = canvasId.match(/^(.+)-ch(\d+)-chunk\d+$/);
-  if (!match) return null;
-  return { clipId: match[1], channelIndex: parseInt(match[2], 10) };
+  const parsed = parseSpectrogramCanvasId(canvasId);
+  return parsed ? { clipId: parsed.clipId, channelIndex: parsed.channelIndex } : null;
 }
 
 /**
@@ -171,26 +176,16 @@ export function computeChunkSampleRange({
   durationSamples,
   samplesPerPixel,
 }: ChunkSampleRangeParams): { paddedStart: number; paddedEnd: number } {
-  const chunkNumbers = indices.map((i) => extractChunkNumber(channelInfo.canvasIds[i]));
-  const minChunk = Math.min(...chunkNumbers);
-  const maxChunk = Math.max(...chunkNumbers);
-  const maxChunkIdx = indices[chunkNumbers.indexOf(maxChunk)];
-  const lastChunkWidth = channelInfo.canvasWidths[maxChunkIdx];
-
-  const startPx = minChunk * MAX_CANVAS_WIDTH;
-  const endPx = maxChunk * MAX_CANVAS_WIDTH + lastChunkWidth;
-
-  const rangeStartSample = offsetSamples + Math.floor(startPx * samplesPerPixel);
-  const rangeEndSample = Math.min(
-    offsetSamples + durationSamples,
-    offsetSamples + Math.ceil(endPx * samplesPerPixel)
-  );
-
-  // Pad by one window on each side to avoid edge artifacts, clamped to the clip.
-  const paddedStart = Math.max(offsetSamples, rangeStartSample - fftSize);
-  const paddedEnd = Math.min(offsetSamples + durationSamples, rangeEndSample + fftSize);
-
-  return { paddedStart, paddedEnd };
+  return computePaddedFftRange({
+    chunks: indices.map((i) => ({
+      chunkIndex: extractChunkNumber(channelInfo.canvasIds[i]),
+      widthPx: channelInfo.canvasWidths[i],
+    })),
+    fftSize,
+    offsetSamples,
+    durationSamples,
+    samplesPerPixel,
+  });
 }
 
 /** Resolve a track's effective render mode: override → track → `'waveform'`. */

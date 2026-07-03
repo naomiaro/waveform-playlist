@@ -34,6 +34,8 @@ const spectrogram = useContext(SpectrogramIntegrationContext);
 
 Canvas IDs follow `${clipId}-ch${channelIndex}-chunk${n}`. `unregisterSpectrogramCanvas` parses this format to find the right registry slot.
 
+The format's build/parse is single-sourced in `@waveform-playlist/core` (`spectrogramCanvasId.ts`); `extractChunkNumber`/`parseCanvasId`/`computeChunkSampleRange` are thin adapters over core's `parseSpectrogramCanvasId` + `@dawcore/spectrogram`'s `computePaddedFftRange` — don't reintroduce local regex/range math (#560).
+
 ## SpectrogramChannel Index vs ChannelIndex
 
 **`SpectrogramChannel`** has two index concerns: `index` (CSS positioning via Wrapper `top` offset) and `channelIndex` (canvas ID construction, e.g. `clipId-ch{channelIndex}-chunk0`). In "both" mode, `SmartChannel` passes `index={props.index * 2}` for layout interleaving but `channelIndex={props.index}` for correct canvas identity. When `channelIndex` is omitted it defaults to `index`. Never use the visual `index` for canvas IDs — the worker and Provider registry expect sequential audio channel indices (0, 1).

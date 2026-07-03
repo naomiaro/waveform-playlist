@@ -6,6 +6,7 @@ import {
 } from '@waveform-playlist/core';
 import { createSpectrogramWorkerPool, SpectrogramAbortError } from '../worker';
 import type { SpectrogramWorkerApi } from '../worker';
+import { computePaddedFftRange } from '../computation/fftSampleRange';
 import { ColorLUTCache } from './color-lut-cache';
 import { classifyViewport, type CanvasMeta, type ViewportBounds } from './viewport-classify';
 import { groupRenderableChunks } from './chunk-grouping';
@@ -436,15 +437,13 @@ export class SpectrogramOrchestrator extends EventTarget {
     // chunked-canvas layout contract. Mixing the spaces shifts the FFT range
     // by the clip's timeline position (#554).
     const clipRelativeOffsets = group.map((c) => c.chunkIndex * MAX_CANVAS_WIDTH);
-    const startPx = Math.min(...clipRelativeOffsets);
-    const endPx = Math.max(...group.map((c, i) => clipRelativeOffsets[i] + c.widthPx));
-    const startSample = clip.offsetSamples + Math.floor(startPx * viewport.samplesPerPixel);
-    const endSample = Math.min(
-      clip.offsetSamples + clip.durationSamples,
-      clip.offsetSamples + Math.ceil(endPx * viewport.samplesPerPixel)
-    );
-    const paddedStart = Math.max(clip.offsetSamples, startSample - fftSize);
-    const paddedEnd = Math.min(clip.offsetSamples + clip.durationSamples, endSample + fftSize);
+    const { paddedStart, paddedEnd } = computePaddedFftRange({
+      chunks: group.map((c) => ({ chunkIndex: c.chunkIndex, widthPx: c.widthPx })),
+      fftSize,
+      offsetSamples: clip.offsetSamples,
+      durationSamples: clip.durationSamples,
+      samplesPerPixel: viewport.samplesPerPixel,
+    });
 
     const { cacheKey } = await this.pool.computeFFT(
       {

@@ -56,6 +56,8 @@ Stale FFT requests are cancelled via `abortGeneration(generation)` to the pool. 
 
 Per-render-group sample range only, padded by `fftSize` on both sides. Avoids OOM on long clips — never computes a full-clip FFT.
 
+The padded range math is single-sourced in `computePaddedFftRange` (`computation/fftSampleRange.ts`), shared with the React `computeChunkSampleRange` so the two pipelines can't drift (#560). Canvas-ID parsing (`parseChannelFromCanvasId`) delegates to `parseSpectrogramCanvasId` in `@waveform-playlist/core`.
+
 ## Pixel Coordinate Conventions (#554)
 
 Two pixel spaces coexist — mixing them shifts the displayed audio by the clip's timeline position:

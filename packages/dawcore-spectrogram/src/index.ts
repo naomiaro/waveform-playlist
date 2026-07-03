@@ -6,11 +6,13 @@ export {
   getFrequencyScale,
   pixelColumnToFrame,
   pixelRowToBin,
+  computePaddedFftRange,
 } from './computation';
 export type {
   FrequencyScaleName,
   PixelColumnToFrameParams,
   PixelRowToBinParams,
+  PaddedFftRangeParams,
 } from './computation';
 
 // Worker
