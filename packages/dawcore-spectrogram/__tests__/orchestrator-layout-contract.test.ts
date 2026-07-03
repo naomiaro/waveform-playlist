@@ -1,19 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SpectrogramOrchestrator } from '../src/orchestrator/SpectrogramOrchestrator';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
+import { makeMockWorker } from './helpers/orchestratorTestUtils';
 
 const defaultConfig: SpectrogramConfig = { fftSize: 2048, frequencyScale: 'mel' };
-
-function makeMockWorker() {
-  return {
-    postMessage: vi.fn(),
-    terminate: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    onmessage: null,
-    onerror: null,
-  } as unknown as Worker;
-}
 
 /**
  * renderGroup's clip-relative sample math assumes chunk k sits at clip pixel

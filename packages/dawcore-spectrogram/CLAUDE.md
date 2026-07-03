@@ -32,7 +32,7 @@ Class that owns the worker pool, clip+canvas registries, viewport state, and ren
 2. **buffer tier** — 25% overscan; renders right after viewport
 3. **remaining tier** — yields via `requestIdleCallback` (setTimeout fallback) before each contiguous group
 
-Each tier uses `groupContiguousChunks()` so non-contiguous chunk indices (e.g. `[10, 14, 15, 11]`) don't trigger one huge FFT — they're FFT'd as two groups (`10-11`, `14-15`) bounded by `fftSize` padding on each side.
+Each tier uses `groupRenderableChunks()` — canvases are partitioned by `(clipId, channelIndex)` FIRST (a track's canvases span channels and clips whose chunk indices interleave, #553), then split into contiguous chunk-index runs so non-contiguous indices (e.g. `[10, 14, 15, 11]`) don't trigger one huge FFT — they're FFT'd as two groups (`10-11`, `14-15`) bounded by `fftSize` padding on each side. `groupContiguousChunks()` remains the inner contiguity primitive.
 
 Generation is checked after every `await` — stale generations bail without finishing the tier.
 
@@ -42,7 +42,7 @@ Generation is checked after every `await` — stale generations bail without fin
 
 ## Worker Pool Architecture
 
-`createSpectrogramWorkerPool(workerFactory, poolSize = 2)` — kept its existing factory signature; the orchestrator delegates rather than refactoring 15 callsites in the pool test. Pool fans out per-channel FFT across workers; canvases are routed by channel parsed from the canvas ID (`clipId-ch{N}-chunk{M}`).
+`createSpectrogramWorkerPool(workerFactory, poolSize = 2)` — `poolSize` is only the number of pre-spawned workers (clamped to the channel cap, 32). The **one-channel-per-worker invariant is load-bearing**: the worker FFT cache key is channel-agnostic (each worker stores its channel at index 0 under the same key string), so routing two channels to one worker would silently render the wrong channel's data. When audio has more channels than workers, the pool **grows lazily** to one worker per channel (#556), replaying registered clip audio into late-created workers — but only clips that actually have that worker's channel (worker k computes only channelFilter k; worker 0 additionally serves mono with the clip's full data). Canvases are routed by channel parsed from the canvas ID (`clipId-ch{N}-chunk{M}`, anchored regex). Channel-index policy is single-sourced in `assertValidChannelIndex` (integer, 0..cap-1, thrown); `registerCanvas` validates BEFORE the OffscreenCanvas transfer. `terminate()` sets a pool-level flag — post-terminate calls reject or no-op instead of resurrecting workers via growth.
 
 ## Generation-Based Abort
 

@@ -1,35 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SpectrogramOrchestrator } from '../src/orchestrator/SpectrogramOrchestrator';
+import { describe, it, expect, beforeEach } from 'vitest';
+import type { SpectrogramOrchestrator } from '../src/orchestrator/SpectrogramOrchestrator';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
+import { makeOrchestratorWithMockPool, type MockPool } from './helpers/orchestratorTestUtils';
 
 const defaultConfig: SpectrogramConfig = {
   fftSize: 2048,
   frequencyScale: 'mel',
 };
-
-function makeMockWorker() {
-  return {
-    postMessage: vi.fn(),
-    terminate: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    onmessage: null,
-    onerror: null,
-  } as unknown as Worker;
-}
-
-function makeMockPool() {
-  return {
-    registerCanvas: vi.fn(),
-    unregisterCanvas: vi.fn(),
-    registerAudioData: vi.fn(),
-    unregisterAudioData: vi.fn(),
-    computeFFT: vi.fn(() => Promise.resolve({ cacheKey: 'k' })),
-    renderChunks: vi.fn(() => Promise.resolve()),
-    abortGeneration: vi.fn(),
-    terminate: vi.fn(),
-  };
-}
 
 /**
  * Canvas `globalPixelOffset` is TIMELINE-absolute (<daw-spectrogram> registers
@@ -40,18 +17,10 @@ function makeMockPool() {
  */
 describe('SpectrogramOrchestrator — clip-relative sample ranges (#554)', () => {
   let orch: SpectrogramOrchestrator;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockPool: any;
+  let mockPool: MockPool;
 
   beforeEach(() => {
-    mockPool = makeMockPool();
-    orch = new SpectrogramOrchestrator({
-      workerFactory: () => makeMockWorker(),
-      workerPoolSize: 1,
-      config: defaultConfig,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (orch as any).pool = mockPool; // test-only seam (same as orchestrator.test.ts)
+    ({ orch, mockPool } = makeOrchestratorWithMockPool(defaultConfig));
   });
 
   it('a trimmed clip positioned mid-timeline gets an FFT range derived from clip-relative pixels', async () => {

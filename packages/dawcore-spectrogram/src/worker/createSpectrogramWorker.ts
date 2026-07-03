@@ -71,6 +71,12 @@ export interface SpectrogramWorkerApi {
     generation?: number
   ): Promise<{ cacheKey: string }>;
   renderChunks(params: SpectrogramWorkerRenderChunksParams, generation?: number): Promise<void>;
+  /**
+   * Cancel in-flight work from generations OLDER than `generation`.
+   * Pass the NEW (current) generation after bumping — the worker treats work
+   * as stale iff `workGeneration < latestAbortedGeneration`, so passing the
+   * previous generation cancels nothing (#555).
+   */
   abortGeneration(generation: number): void;
   registerCanvas(canvasId: string, canvas: OffscreenCanvas): void;
   unregisterCanvas(canvasId: string): void;

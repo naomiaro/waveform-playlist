@@ -1,35 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SpectrogramOrchestrator } from '../src/orchestrator/SpectrogramOrchestrator';
+import { describe, it, expect, beforeEach } from 'vitest';
+import type { SpectrogramOrchestrator } from '../src/orchestrator/SpectrogramOrchestrator';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
+import { makeOrchestratorWithMockPool, type MockPool } from './helpers/orchestratorTestUtils';
 
 const defaultConfig: SpectrogramConfig = {
   fftSize: 2048,
   frequencyScale: 'mel',
 };
-
-function makeMockWorker() {
-  return {
-    postMessage: vi.fn(),
-    terminate: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    onmessage: null,
-    onerror: null,
-  } as unknown as Worker;
-}
-
-function makeMockPool() {
-  return {
-    registerCanvas: vi.fn(),
-    unregisterCanvas: vi.fn(),
-    registerAudioData: vi.fn(),
-    unregisterAudioData: vi.fn(),
-    computeFFT: vi.fn(() => Promise.resolve({ cacheKey: 'k' })),
-    renderChunks: vi.fn(() => Promise.resolve()),
-    abortGeneration: vi.fn(),
-    terminate: vi.fn(),
-  };
-}
 
 const wideViewport = {
   visibleStartPx: 0,
@@ -41,18 +18,10 @@ const wideViewport = {
 
 describe('SpectrogramOrchestrator — render groups never mix channels or clips (#553)', () => {
   let orch: SpectrogramOrchestrator;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockPool: any;
+  let mockPool: MockPool;
 
   beforeEach(() => {
-    mockPool = makeMockPool();
-    orch = new SpectrogramOrchestrator({
-      workerFactory: () => makeMockWorker(),
-      workerPoolSize: 2,
-      config: defaultConfig,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (orch as any).pool = mockPool; // test-only seam (same as orchestrator.test.ts)
+    ({ orch, mockPool } = makeOrchestratorWithMockPool(defaultConfig, 2));
   });
 
   function registerCanvases(clipId: string, channelIndex: number, chunkCount: number): void {
@@ -88,7 +57,7 @@ describe('SpectrogramOrchestrator — render groups never mix channels or clips 
     await new Promise((r) => setTimeout(r, 20));
 
     const calls = mockPool.renderChunks.mock.calls.map(
-      (c: [{ canvasIds: string[]; channelIndex: number }]) => c[0]
+      (c) => c[0] as { canvasIds: string[]; channelIndex: number }
     );
     expect(calls.length).toBeGreaterThan(0);
 
@@ -128,9 +97,7 @@ describe('SpectrogramOrchestrator — render groups never mix channels or clips 
     orch.setViewport(wideViewport);
     await new Promise((r) => setTimeout(r, 20));
 
-    const calls = mockPool.renderChunks.mock.calls.map(
-      (c: [{ canvasIds: string[] }]) => c[0]
-    );
+    const calls = mockPool.renderChunks.mock.calls.map((c) => c[0] as { canvasIds: string[] });
     expect(calls.length).toBeGreaterThan(0);
 
     const renderedIds = new Set<string>();
