@@ -129,7 +129,7 @@ function HomepageHeader() {
         </Heading>
         <p className={styles.heroSubtitle}>
           Multi-track audio editor for the web.<br />
-          Built with React & Tone.js.
+          React components or framework-agnostic Web Components — Tone.js optional.
         </p>
         <div className={styles.buttons}>
           <Link
@@ -326,7 +326,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title="Multi-track Web Audio Editor"
-      description="A multi-track audio editor and player built with React and Tone.js. Features canvas-based waveform visualization, drag-and-drop clip editing, and professional audio effects.">
+      description="A multi-track audio editor and player for the web — React components or framework-agnostic Web Components (Tone.js optional). Features canvas-based waveform visualization, drag-and-drop clip editing, and professional audio effects.">
       <HomepageHeader />
       <main>
         <Screenshot />

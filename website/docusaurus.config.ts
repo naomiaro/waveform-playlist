@@ -253,7 +253,7 @@ const config: Config = {
     image: 'img/social/waveform-playlist-social.png',
     // SEO metadata
     metadata: [
-      { name: 'keywords', content: 'waveform, audio editor, web audio, react, multitrack, daw, audio visualization, tone.js' },
+      { name: 'keywords', content: 'waveform, audio editor, web audio, react, web components, multitrack, daw, audio visualization, tone.js' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:site', content: '@waveplaylist' },
       { name: 'og:type', content: 'website' },
