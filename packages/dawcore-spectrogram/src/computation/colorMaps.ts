@@ -16,6 +16,9 @@ import type { ColorMapValue } from '@waveform-playlist/core';
 type ColorLUT = Uint8Array;
 
 function interpolateLUT(stops: number[][]): ColorLUT {
+  if (stops.length === 0) {
+    throw new Error('[spectrogram] custom color map requires at least one color stop');
+  }
   const lut = new Uint8Array(256 * 3);
   const n = stops.length;
   for (let i = 0; i < 256; i++) {
