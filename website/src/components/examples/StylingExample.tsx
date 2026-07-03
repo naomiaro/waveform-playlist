@@ -154,6 +154,7 @@ function PlaybackControls({ loading }: { loading?: boolean }) {
 interface WaveformVariantProps {
   barWidth?: number;
   barGap?: number;
+  roundedBars?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
   waveformData: WaveformData;
   loading?: boolean;
@@ -162,6 +163,7 @@ interface WaveformVariantProps {
 function WaveformVariant({
   barWidth = 1,
   barGap = 0,
+  roundedBars = false,
   theme = defaultTheme,
   waveformData,
   loading,
@@ -183,6 +185,7 @@ function WaveformVariant({
       theme={theme}
       barWidth={barWidth}
       barGap={barGap}
+      roundedBars={roundedBars}
     >
       <PlaybackControls loading={loading} />
       <MediaElementWaveform />
@@ -257,6 +260,35 @@ export function StylingExample() {
           <Code>barWidth: 4, barGap: 2</Code> — <Code>waveProgressColor: 'transparent'</Code> hides the progress overlay
         </SectionDesc>
         <WaveformVariant barWidth={4} barGap={2} theme={boldTheme} waveformData={waveformData} />
+      </Section>
+
+      <Section>
+        <SectionTitle>Rounded Bars</SectionTitle>
+        <SectionDesc>
+          <Code>barWidth: 4, barGap: 2, roundedBars</Code> — pill-shaped bar caps, radius derived
+          from <Code>barWidth / 2</Code>
+        </SectionDesc>
+        <WaveformVariant
+          barWidth={4}
+          barGap={2}
+          roundedBars
+          theme={defaultTheme}
+          waveformData={waveformData}
+        />
+      </Section>
+
+      <Section>
+        <SectionTitle>Rounded Thin Bars</SectionTitle>
+        <SectionDesc>
+          <Code>barWidth: 2, barGap: 2, roundedBars</Code> — subtle rounding on narrow bars
+        </SectionDesc>
+        <WaveformVariant
+          barWidth={2}
+          barGap={2}
+          roundedBars
+          theme={neonTheme}
+          waveformData={waveformData}
+        />
       </Section>
 
       <Section>

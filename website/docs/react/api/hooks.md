@@ -95,6 +95,7 @@ function usePlaylistData(): {
   timeFormat: TimeFormat;
   barWidth: number;
   barGap: number;
+  roundedBars: boolean;
   progressBarWidth: number;
 
   // Refs for direct access

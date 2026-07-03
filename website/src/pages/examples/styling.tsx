@@ -27,8 +27,8 @@ export default function StylingExamplePage(): React.ReactElement {
       <main className="container margin-vert--lg">
         <h1>Waveform Styling</h1>
         <p>
-          Customize the visual appearance of waveforms using <code>barWidth</code> and <code>barGap</code> props,
-          combined with theme colors.
+          Customize the visual appearance of waveforms using <code>barWidth</code>, <code>barGap</code>, and{' '}
+          <code>roundedBars</code> props, combined with theme colors.
         </p>
 
         <div style={{ marginTop: '2rem' }}>
@@ -70,6 +70,12 @@ export default function StylingExamplePage(): React.ReactElement {
                 <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>4-5</td>
                 <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>2</td>
                 <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>Mobile displays, high-contrast needs</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>Rounded</td>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>3-5</td>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>1-2 + <code>roundedBars</code></td>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--ifm-color-emphasis-200)' }}>Pill-shaped caps, podcast/social players</td>
               </tr>
             </tbody>
           </table>
