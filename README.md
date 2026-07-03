@@ -214,6 +214,8 @@ npm install @waveform-playlist/playout tone  # Tone.js (effects, MIDI synths)
 | `@dawcore/transport` | Native Web Audio transport — scheduling, looping, tempo automation, time signatures, metronome |
 | `@dawcore/spectrogram` | Framework-agnostic spectrogram orchestrator, FFT worker pool, and color maps — used by `render-mode="spectrogram"` |
 | `@dawcore/midi` | Framework-agnostic MIDI parser (`parseMidiFile`, `parseMidiUrl`) — used by `editor.loadMidi()` and re-exported by `@waveform-playlist/midi` |
+| `@dawcore/wam` | Web Audio Modules (WAM 2.0) plugin hosting and generic parameter GUIs — used by `editor.addWamPlugin()` and the effects chain (optional peer, loaded on demand) |
+| `@dawcore/faust` | In-browser Faust DSP → WAM 2.0 compilation — used by `editor.addFaustEffect()` (optional peer, loaded on demand) |
 
 Run the examples locally:
 
