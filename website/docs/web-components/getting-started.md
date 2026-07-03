@@ -75,6 +75,7 @@ Runnable examples — rendered with `@dawcore/components` directly, no React in 
 
 - [**Basic**](pathname:///waveform-playlist/examples/wc-basic) — Minimal `<daw-editor>` with the native Web Audio adapter
 - [**Multiclip**](pathname:///waveform-playlist/examples/wc-multiclip) — Multiple `<daw-clip>` per track, drag/trim/split, pre-computed peaks via `<daw-keyboard-shortcuts>`
+- [**Player**](pathname:///waveform-playlist/examples/wc-player) — Lightweight single-track `<daw-player>`: HTMLMediaElement streaming, pre-computed peaks or scrubber fallback, playback rate
 
 ## Run it locally
 
