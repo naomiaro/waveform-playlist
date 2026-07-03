@@ -174,6 +174,30 @@ describe('DawPlayerElement — playback wiring', () => {
       expect(ready).toHaveBeenCalledTimes(1);
     });
 
+    it('re-renders the ruler with the real duration once metadata loads', async () => {
+      const el = loadedPlayer();
+      el.timescale = true;
+      await el.updateComplete;
+      const ruler = el.shadowRoot!.querySelector('daw-ruler') as HTMLElement & {
+        duration: number;
+      };
+      expect(ruler).toBeTruthy();
+
+      // Real browsers report duration 0/NaN until metadata arrives — establish
+      // that pre-metadata render state (MockAudio starts at 120, so force it).
+      (el.audioElement as unknown as { duration: number }).duration = 0;
+      el.requestUpdate();
+      await el.updateComplete;
+      expect(ruler.duration).toBe(0);
+
+      // Metadata arrives AFTER the last render (the peaks-first race) — the
+      // ruler must re-bind the real duration, not stay frozen at 0:00.
+      (el.audioElement as unknown as { duration: number }).duration = 120;
+      el.audioElement!.dispatchEvent(new Event('loadedmetadata'));
+      await el.updateComplete;
+      expect(ruler.duration).toBe(120);
+    });
+
     it('dispatches daw-play / daw-pause / daw-ended from native events', async () => {
       const el = loadedPlayer();
       await el.updateComplete;
