@@ -2,6 +2,7 @@ export * from './constants';
 export * from './types';
 export * from './utils';
 export * from './clipTimeHelpers';
+export * from './spectrogramCanvasId';
 export * from './fades';
 export * from './keyboard';
 export * from './probeRangeSupport';

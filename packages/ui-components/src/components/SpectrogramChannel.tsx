@@ -3,7 +3,11 @@ import styled from 'styled-components';
 import { useVisibleChunkIndices } from '../contexts/ScrollViewport';
 import { useClipViewportOrigin } from '../contexts/ClipViewportOrigin';
 import { useChunkedCanvasRefs } from '../hooks/useChunkedCanvasRefs';
-import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
+import {
+  MAX_CANVAS_WIDTH,
+  buildSpectrogramCanvasId,
+  parseSpectrogramCanvasId,
+} from '@waveform-playlist/core';
 
 interface WrapperProps {
   readonly $index: number;
@@ -113,12 +117,12 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
     // Step 1: Drop registrations for canvases that have unmounted.
     const remaining: string[] = [];
     for (const id of registeredIdsRef.current) {
-      const match = id.match(/chunk(\d+)$/);
-      if (!match) {
+      const parsed = parseSpectrogramCanvasId(id);
+      if (!parsed) {
         remaining.push(id);
         continue;
       }
-      const chunkIdx = parseInt(match[1], 10);
+      const chunkIdx = parsed.chunkIndex;
       const canvas = canvasMapRef.current.get(chunkIdx);
       if (canvas && canvas.isConnected) {
         remaining.push(id);
@@ -136,7 +140,7 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
       if (transferredCanvasesRef.current.has(canvas)) continue;
 
-      const canvasId = `${clipId}-ch${channelIndex}-chunk${canvasIdx}`;
+      const canvasId = buildSpectrogramCanvasId({ clipId, channelIndex, chunkIndex: canvasIdx });
 
       let offscreen: OffscreenCanvas;
       try {

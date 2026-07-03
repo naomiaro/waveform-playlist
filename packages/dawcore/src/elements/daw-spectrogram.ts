@@ -4,7 +4,7 @@ import type { PropertyValues } from 'lit';
 // The orchestrator's clip-relative sample math assumes chunk k starts at
 // clip pixel k * MAX_CANVAS_WIDTH — the constant must be the shared one,
 // not a local copy that can drift (#554 layout contract).
-import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
+import { MAX_CANVAS_WIDTH, buildSpectrogramCanvasId } from '@waveform-playlist/core';
 
 interface SpectrogramHost extends HTMLElement {
   _spectrogramRegisterCanvas?: (reg: {
@@ -150,7 +150,11 @@ export class DawSpectrogramElement extends LitElement {
 
     for (let i = 0; i < this._canvases.length; i++) {
       const canvas = this._canvases[i];
-      const canvasId = this.clipId + '-ch' + this.channelIndex + '-chunk' + i;
+      const canvasId = buildSpectrogramCanvasId({
+        clipId: this.clipId,
+        channelIndex: this.channelIndex,
+        chunkIndex: i,
+      });
       let offscreen: OffscreenCanvas;
       try {
         offscreen = canvas.transferControlToOffscreen();
