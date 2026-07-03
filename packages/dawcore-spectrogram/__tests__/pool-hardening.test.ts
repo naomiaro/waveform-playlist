@@ -4,6 +4,7 @@ import {
   trackingWorkerFactory,
   postedMessages,
   ackComputeFFTs,
+  respondToWorker,
 } from './helpers/poolTestUtils';
 
 const stereoParams = {
@@ -153,5 +154,44 @@ describe('worker pool — hardening (review of #559)', () => {
 
     for (const w of workers) ackComputeFFTs(w);
     await promise;
+  });
+});
+
+describe('worker pool — abort handling in multi-channel fan-out (#562)', () => {
+  it('does not warn when additional channel failures are aborts (normal control flow)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { factory, workers } = trackingWorkerFactory();
+    const pool = createSpectrogramWorkerPool(factory, 2);
+
+    const promise = pool.computeFFT(stereoParams, 1);
+    for (const w of workers) {
+      for (const msg of postedMessages(w)) {
+        if (msg.type === 'compute-fft') {
+          respondToWorker(w, { id: msg.id, type: 'aborted' });
+        }
+      }
+    }
+    await expect(promise).rejects.toThrow(/aborted/);
+
+    const abortNoise = warnSpy.mock.calls.filter((c) =>
+      String(c[0]).includes('additional channel FFT failure')
+    );
+    expect(abortNoise).toEqual([]);
+    warnSpy.mockRestore();
+  });
+
+  it('prefers throwing a real error over an abort when channel failures are mixed', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { factory, workers } = trackingWorkerFactory();
+    const pool = createSpectrogramWorkerPool(factory, 2);
+
+    const promise = pool.computeFFT(stereoParams, 1);
+    const w0fft = postedMessages(workers[0]).find((m) => m.type === 'compute-fft');
+    const w1fft = postedMessages(workers[1]).find((m) => m.type === 'compute-fft');
+    respondToWorker(workers[0], { id: w0fft!.id, type: 'aborted' });
+    respondToWorker(workers[1], { id: w1fft!.id, type: 'error', error: 'boom' });
+
+    await expect(promise).rejects.toThrow(/boom/);
+    warnSpy.mockRestore();
   });
 });

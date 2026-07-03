@@ -50,6 +50,22 @@ export function extractChunkNumber(canvasId: string): number {
 }
 
 /**
+ * Keep only indices whose canvas is registered for THIS channel.
+ *
+ * Chunk indices are derived once from channel 0's registry and reused across
+ * channels, but canvases register progressively per channel — a later channel
+ * can briefly hold fewer entries, and indexing past its registry threw
+ * `Cannot read properties of undefined (reading 'match')` (#562). Skipped
+ * chunks render on the next pass: registration bumps `spectrogramCanvasVersion`.
+ */
+export function presentChunkIndices(
+  channelInfo: { canvasIds: string[] },
+  indices: number[]
+): number[] {
+  return indices.filter((i) => channelInfo.canvasIds[i] !== undefined);
+}
+
+/**
  * Parse a canvas ID of the form `${clipId}-ch${channelIndex}-chunk${n}` into its
  * clip ID and channel index. Returns `null` when the ID doesn't match.
  */

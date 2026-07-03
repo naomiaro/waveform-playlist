@@ -1,5 +1,6 @@
 import {
   createSpectrogramWorker,
+  SpectrogramAbortError,
   type SpectrogramWorkerApi,
   type SpectrogramWorkerFFTParams,
   type SpectrogramWorkerRenderChunksParams,
@@ -192,21 +193,23 @@ export function createSpectrogramWorkerPool(
         ensureWorkerForChannel(i).computeFFT({ ...params, channelFilter: i }, generation)
       );
       // Use allSettled so one channel's failure doesn't drop surviving channel results.
-      // Throw the first failure; log additional ones so they're not silently swallowed.
       const settled = await Promise.allSettled(promises);
       const failures = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
       if (failures.length > 0) {
-        for (let i = 1; i < failures.length; i++) {
+        // Aborts are normal control flow (generation superseded) — never
+        // warned, and never allowed to mask a real error when mixed (#562).
+        const realErrors = failures.filter((f) => !(f.reason instanceof SpectrogramAbortError));
+        for (let i = 1; i < realErrors.length; i++) {
           console.warn(
             '[dawcore-spectrogram] additional channel FFT failure (' +
               i +
               '): ' +
-              (failures[i].reason instanceof Error
-                ? failures[i].reason.message
-                : String(failures[i].reason))
+              (realErrors[i].reason instanceof Error
+                ? realErrors[i].reason.message
+                : String(realErrors[i].reason))
           );
         }
-        throw failures[0].reason;
+        throw (realErrors[0] ?? failures[0]).reason;
       }
       return (settled[0] as PromiseFulfilledResult<{ cacheKey: string }>).value;
     },
