@@ -3,7 +3,6 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/webaudio-peaks" },
-    { "path": "packages/loaders" },
     { "path": "packages/playout" },
     { "path": "packages/media-element-playout" },
     { "path": "packages/ui-components" },

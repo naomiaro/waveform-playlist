@@ -20,7 +20,6 @@ waveform-playlist/
 │   ├── dawcore-spectrogram/  # Framework-agnostic FFT computation, worker, viewport orchestrator
 │   ├── dawcore-wam/       # @dawcore/wam — WAM 2.0 plugin hosting (host, loader, GUI, library, transport bridge)
 │   ├── engine/            # Framework-agnostic timeline engine
-│   ├── loaders/           # Audio file loaders
 │   ├── media-element-playout/  # Audio playback (HTMLAudioElement, no Tone.js)
 │   ├── midi/              # 📦 OPTIONAL: MIDI file parsing + useMidiTracks hook (parser now in @dawcore/midi)
 │   ├── playout/           # Audio playback (Tone.js wrapper)
@@ -409,12 +408,6 @@ const clip = createClipFromSeconds({
   - Hooks: `useMediaElementAnimation`, `useMediaElementControls`, `useMediaElementState`, `useMediaElementData`
 - **Web Components Integration:** `<daw-player>` in `@dawcore/components` wraps `MediaElementPlayout` directly — no `PlaylistEngine`, no adapter, no AudioContext
 - **Example:** `website/src/pages/examples/media-element.tsx`, `examples/media-element-player/`
-
-#### `@waveform-playlist/loaders`
-
-- **Purpose:** Load audio files from various sources
-- **Exports:** Audio loading utilities
-- **Dependencies:** Core
 
 ### 📊 BBC Waveform Data Support
 

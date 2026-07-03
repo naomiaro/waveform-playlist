@@ -32,7 +32,6 @@ const config: StorybookConfig = {
       '@waveform-playlist/ui-components': path.resolve(__dirname, '../src'),
       '@waveform-playlist/annotations': path.resolve(__dirname, '../../annotations/src'),
       '@waveform-playlist/recording': path.resolve(__dirname, '../../recording/dist'),
-      '@waveform-playlist/loaders': path.resolve(__dirname, '../../loaders/src'),
       // Force single styled-components instance to ensure ThemeProvider context works
       'styled-components': path.resolve(__dirname, '../node_modules/styled-components'),
     };
