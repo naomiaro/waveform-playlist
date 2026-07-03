@@ -211,3 +211,79 @@ describe('spectrogram worker — linear frequency scale (#557)', () => {
     }
   });
 });
+
+describe('spectrogram worker — frequency band sanitation (review findings on #557)', () => {
+  async function renderWithBand(
+    tag: string,
+    minFrequency: number,
+    maxFrequency: number
+  ): Promise<Uint8ClampedArray> {
+    const sampleRate = 8000;
+    const channel = new Float32Array(4000);
+    for (let i = 0; i < channel.length; i++) {
+      channel[i] = Math.sin(i * 1.234) * Math.sin(i * 0.517) > 0 ? 0.9 : -0.9;
+    }
+
+    const fftId = 'fft-band-' + tag;
+    handler({
+      data: {
+        type: 'compute-fft',
+        id: fftId,
+        generation: 0,
+        clipId: 'band-clip-' + tag,
+        channelDataArrays: [channel],
+        config: { fftSize: 256, zeroPaddingFactor: 1 },
+        sampleRate,
+        offsetSamples: 0,
+        durationSamples: 4000,
+        mono: false,
+      },
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    const fftResponse = posted.find((m) => m.id === fftId);
+    expect(fftResponse?.type).toBe('cache-key');
+
+    const canvasId = 'band-clip-' + tag + '-ch0-chunk0';
+    const captured: { img: CapturedImage | null } = { img: null };
+    handler({
+      data: { type: 'register-canvas', canvasId, canvas: makeMockCanvas(captured) },
+    });
+
+    const renderId = 'render-band-' + tag;
+    handler({
+      data: {
+        type: 'render-chunks',
+        id: renderId,
+        generation: 0,
+        cacheKey: fftResponse!.cacheKey!,
+        canvasIds: [canvasId],
+        canvasWidths: [10],
+        globalPixelOffsets: [0],
+        canvasHeight: 8,
+        devicePixelRatio: 1,
+        samplesPerPixel: 400,
+        colorLUT: grayscaleIdentityLUT(),
+        frequencyScale: 'linear',
+        minFrequency,
+        maxFrequency,
+        gainDb: 20,
+        rangeDb: 80,
+        channelIndex: 0,
+      },
+    });
+    expect(posted.find((m) => m.id === renderId)?.type).toBe('done');
+    return captured.img!.data;
+  }
+
+  it('NaN minFrequency renders identically to minFrequency 0 instead of smearing bin 0', async () => {
+    const sane = await renderWithBand('sane', 0, 0);
+    const nan = await renderWithBand('nan', Number.NaN, 0);
+    expect(Array.from(nan)).toEqual(Array.from(sane));
+  });
+
+  it('an inverted band (min > max) falls back to the full band instead of flipping the axis', async () => {
+    const sane = await renderWithBand('full', 0, 0);
+    const inverted = await renderWithBand('inverted', 3000, 1000);
+    expect(Array.from(inverted)).toEqual(Array.from(sane));
+  });
+});

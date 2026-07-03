@@ -338,7 +338,27 @@ function renderSpectrogramToCanvas(
   const gainDb = gainDbOverride ?? specData.gainDb;
   const rawRangeDb = rangeDbOverride ?? specData.rangeDb;
   const rangeDb = rawRangeDb === 0 ? 1 : rawRangeDb;
-  const maxF = maxFrequency > 0 ? maxFrequency : sampleRate / 2;
+
+  // Sanitize the frequency band. Config reaches the worker unvalidated; a NaN
+  // minFrequency would flow through pixelRowToBin into Int32Array's NaN→0
+  // coercion and smear bin 0 across the whole canvas, and an inverted band
+  // would flip the axis silently.
+  const nyquist = sampleRate / 2;
+  let minF = Number.isFinite(minFrequency) && minFrequency >= 0 ? minFrequency : 0;
+  let maxF =
+    Number.isFinite(maxFrequency) && maxFrequency > 0 ? Math.min(maxFrequency, nyquist) : nyquist;
+  if (minF >= maxF) {
+    console.warn(
+      '[spectrogram-worker] invalid frequency band ' +
+        minFrequency +
+        '..' +
+        maxFrequency +
+        ' Hz — falling back to 0..' +
+        nyquist
+    );
+    minF = 0;
+    maxF = nyquist;
+  }
 
   let accumulatedOffset = 0;
 
@@ -350,7 +370,7 @@ function renderSpectrogramToCanvas(
       normalizedY: 1 - y / canvasHeight,
       frequencyBinCount,
       sampleRate,
-      minFrequency,
+      minFrequency: minF,
       maxFrequency: maxF,
       scaleFn,
       isLinear: !isNonLinear,
