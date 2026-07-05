@@ -338,7 +338,29 @@ describe('RecordingController', () => {
       expect.anything(), // audioBuffer
       expect.any(Number), // startSample
       expect.any(Number), // durationSamples
-      expect.any(Number) // offsetSamples (latency compensation)
+      expect.any(Number), // offsetSamples (latency compensation)
+      undefined // clipName (none provided)
+    );
+  });
+
+  it('forwards RecordingOptions.clipName to the finalized clip', async () => {
+    host._addRecordedClip = vi.fn();
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), {
+      trackId: 'track-1',
+      clipName: 'Take 1',
+    });
+    simulateWorkletData('track-1');
+
+    await controller.stopRecording();
+
+    expect(host._addRecordedClip).toHaveBeenCalledWith(
+      'track-1',
+      expect.anything(),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      'Take 1'
     );
   });
 
@@ -503,7 +525,8 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       47520, // effectiveDuration
-      480 // latencyOffsetSamples
+      480, // latencyOffsetSamples
+      undefined // clipName
     );
   });
 
@@ -580,7 +603,8 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       48000, // full duration — no offset
-      0 // zero latency
+      0, // zero latency
+      undefined // clipName
     );
   });
 
@@ -1036,7 +1060,8 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       47520, // effectiveDuration
-      480 // latencyOffsetSamples (from the override, not outputLatency)
+      480, // latencyOffsetSamples (from the override, not outputLatency)
+      undefined // clipName
     );
   });
 });

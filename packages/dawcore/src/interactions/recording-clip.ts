@@ -33,7 +33,8 @@ export function addRecordedClip(
   buf: AudioBuffer,
   startSample: number,
   durSamples: number,
-  offsetSamples = 0
+  offsetSamples = 0,
+  clipName?: string
 ) {
   // Slice off latency samples so peaks and playback only cover the audible portion
   let trimmedBuf = buf;
@@ -56,7 +57,7 @@ export function addRecordedClip(
     durationSamples: durSamples,
     offsetSamples: 0, // offset already applied by slicing
     gain: 1,
-    name: 'Recording',
+    name: clipName ?? 'Recording',
   });
   host._clipBuffers = new Map(host._clipBuffers).set(clip.id, trimmedBuf);
   host._peakPipeline
@@ -92,7 +93,7 @@ export function addRecordedClip(
           duration: durSamples / sr,
           offset: 0,
           gain: 1,
-          name: 'Recording',
+          name: clipName ?? 'Recording',
           fadeIn: 0,
           fadeOut: 0,
           fadeType: 'linear',

@@ -2607,9 +2607,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     buf: AudioBuffer,
     startSample: number,
     durSamples: number,
-    offsetSamples = 0
+    offsetSamples = 0,
+    clipName?: string
   ) {
-    addRecordedClip(this, trackId, buf, startSample, durSamples, offsetSamples);
+    addRecordedClip(this, trackId, buf, startSample, durSamples, offsetSamples, clipName);
   }
   // --- RecordingHost bridge methods for cross-context worklet support ---
   // These delegate to the adapter's context type (native or standardized-audio-context).
@@ -2656,26 +2657,44 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const latencyPixels = Math.floor(rs.latencySamples / renderSpp);
     const left = Math.floor(rs.startSample / renderSpp);
     const w = Math.floor(audibleSamples / renderSpp);
-    return rs.peaks.map((chPeaks, ch) => {
-      // Slice peaks to skip latency prefix (2 entries per pixel: min/max)
-      const slicedPeaks = latencyPixels > 0 ? chPeaks.slice(latencyPixels * 2) : chPeaks;
-      return html`
-        <daw-waveform
-          data-recording-track=${trackId}
-          data-recording-channel=${ch}
-          style="position:absolute;left:${left}px;top:${ch * chH}px;"
-          .peaks=${slicedPeaks}
-          .length=${w}
-          .waveHeight=${chH}
-          .barWidth=${this.barWidth}
-          .barGap=${this.barGap}
-          .roundedBars=${this.roundedBars}
-          .visibleStart=${this._viewport.visibleStart}
-          .visibleEnd=${this._viewport.visibleEnd}
-          .originX=${left}
-        ></daw-waveform>
-      `;
-    });
+    // Same container + header chrome as finalized clips so the take reads as
+    // a clip WHILE it's being captured, and the waveforms sit at the same
+    // vertical offset they'll have after finalization. The container's width
+    // stays in sync with the growing take: the RecordingController calls
+    // requestUpdate() whenever the preview grows a pixel (overflow:hidden on
+    // .clip-container would otherwise clip the live canvas growth).
+    const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
+    const height = hdrH + chH * rs.peaks.length;
+    return html`<div
+      class="clip-container recording-preview"
+      style="left:${left}px;top:0;width:${w}px;height:${height}px;"
+    >
+      ${hdrH > 0
+        ? html`<div class="clip-header" data-track-id=${trackId}>
+            <span>${rs.clipName ?? 'Recording…'}</span>
+          </div>`
+        : ''}
+      ${rs.peaks.map((chPeaks, ch) => {
+        // Slice peaks to skip latency prefix (2 entries per pixel: min/max)
+        const slicedPeaks = latencyPixels > 0 ? chPeaks.slice(latencyPixels * 2) : chPeaks;
+        return html`
+          <daw-waveform
+            data-recording-track=${trackId}
+            data-recording-channel=${ch}
+            style="position:absolute;left:0;top:${hdrH + ch * chH}px;"
+            .peaks=${slicedPeaks}
+            .length=${w}
+            .waveHeight=${chH}
+            .barWidth=${this.barWidth}
+            .barGap=${this.barGap}
+            .roundedBars=${this.roundedBars}
+            .visibleStart=${this._viewport.visibleStart}
+            .visibleEnd=${this._viewport.visibleEnd}
+            .originX=${left}
+          ></daw-waveform>
+        `;
+      })}
+    </div>`;
   }
   // --- Playback animation (single RAF loop: playhead + daw-timeupdate) ---
   /** Convert playback seconds to a timeline pixel offset for the active mode. */

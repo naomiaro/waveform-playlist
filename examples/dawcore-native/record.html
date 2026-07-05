@@ -234,10 +234,14 @@
       const streamChannels = editor.recordingStream.getAudioTracks()[0]?.getSettings()?.channelCount;
       // Optional manual latency override (seconds) — empty = auto-computed.
       const latencyRaw = document.getElementById('latency-input').value;
+      // Name the take after its track — shown in the live-preview clip header
+      // during recording and used as the finalized clip's name.
+      const takeName = editor.tracks.find(t => t.trackId === editor.selectedTrackId)?.name;
       await editor.startRecording(editor.recordingStream, {
         overdub: true,
         ...(streamChannels && { channelCount: streamChannels }),
         ...(latencyRaw !== '' && { latencyOffset: Number(latencyRaw) }),
+        ...(takeName && { clipName: takeName }),
       });
     }, { capture: true }); // capture phase to run before the button's own handler
 

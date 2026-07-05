@@ -876,6 +876,10 @@ interface RecordingOptions {
    *  0 disables compensation; negative/non-finite treated as 0.
    *  When omitted, the auto-computed outputLatency value is used. */
   latencyOffset?: number;
+  /** Display name for the take: shown in the live-preview clip header while
+   *  recording (falls back to "Recording…") and used as the finalized clip's
+   *  name (falls back to "Recording"). */
+  clipName?: string;
 }
 ```
 

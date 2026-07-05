@@ -31,6 +31,12 @@ export interface RecordingOptions {
    * Negative or non-finite values are treated as 0.
    */
   latencyOffset?: number;
+  /**
+   * Display name for the take: shown in the live-preview clip header while
+   * recording (falls back to "Recording…") and used as the finalized clip's
+   * name (falls back to "Recording").
+   */
+  clipName?: string;
 }
 
 export interface RecordingSession {
@@ -52,6 +58,8 @@ export interface RecordingSession {
   isFirstMessage: boolean;
   /** Latency samples to skip in live preview (outputLatency only). */
   readonly latencySamples: number;
+  /** Display name for the take (preview header + finalized clip name). */
+  readonly clipName?: string;
   readonly wasOverdub: boolean;
   /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
   readonly _onTrackEnded: (() => void) | null;
@@ -98,7 +106,8 @@ export interface RecordingHost extends ReactiveControllerHost {
     buf: AudioBuffer,
     startSample: number,
     durSamples: number,
-    offsetSamples?: number
+    offsetSamples?: number,
+    clipName?: string
   ): void;
   play?(startTime?: number): Promise<void>;
   stop?(): void;
@@ -276,6 +285,7 @@ export class RecordingController implements ReactiveController {
         bits,
         isFirstMessage: true,
         latencySamples,
+        clipName: options.clipName,
         wasOverdub: options.overdub ?? false,
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
@@ -500,7 +510,8 @@ export class RecordingController implements ReactiveController {
         audioBuffer,
         session.startSample,
         effectiveDuration,
-        latencyOffsetSamples
+        latencyOffsetSamples,
+        session.clipName
       );
     }
   }
@@ -627,7 +638,8 @@ export class RecordingController implements ReactiveController {
     audioBuffer: AudioBuffer,
     startSample: number,
     durationSamples: number,
-    offsetSamples = 0
+    offsetSamples = 0,
+    clipName?: string
   ) {
     if (typeof this._host._addRecordedClip === 'function') {
       this._host._addRecordedClip(
@@ -635,7 +647,8 @@ export class RecordingController implements ReactiveController {
         audioBuffer,
         startSample,
         durationSamples,
-        offsetSamples
+        offsetSamples,
+        clipName
       );
     } else {
       console.warn(
