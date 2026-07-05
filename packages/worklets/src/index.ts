@@ -36,8 +36,16 @@ export async function addMeterWorkletModule(
   await addModule(meterProcessorUrl);
 }
 
-/** Message shape posted by the meter-processor worklet */
-export interface MeterMessage {
-  peak: number[];
-  rms: number[];
-}
+/**
+ * Message posted by the meter-processor worklet.
+ *
+ * A Float32Array of length 2*N (N = metered channel count):
+ * - indices [0..N-1]: per-channel peak (max absolute sample)
+ * - indices [N..2N-1]: per-channel RMS
+ *
+ * The worklet reuses one buffer across flushes (each postMessage structured-
+ * clones the contents) so the audio thread does no per-flush allocation.
+ * Receivers get a fresh copy per message and derive the channel count as
+ * `data.length / 2`.
+ */
+export type MeterMessage = Float32Array;
