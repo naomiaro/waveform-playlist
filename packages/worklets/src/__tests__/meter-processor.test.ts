@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-interface MeterMessage {
-  peak: number[];
-  rms: number[];
-}
+/**
+ * Message layout: single reused Float32Array of length 2*N.
+ * Indices [0..N-1] are per-channel peak, [N..2N-1] are per-channel RMS.
+ */
+type MeterMessage = Float32Array;
 
 interface MockProcessor {
   port: {
@@ -90,7 +91,7 @@ describe('MeterProcessor', () => {
     processor.process(makeInput([input]), makeOutput(1), {});
     expect(mockPort.postMessage).toHaveBeenCalledTimes(1);
     const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
-    expect(msg.peak[0]).toBeCloseTo(0.9, 5);
+    expect(msg[0]).toBeCloseTo(0.9, 5);
   });
 
   it('computes correct RMS for known samples', () => {
@@ -98,7 +99,7 @@ describe('MeterProcessor', () => {
     const input = new Float32Array(128).fill(0.5);
     processor.process(makeInput([input]), makeOutput(1), {});
     const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
-    expect(msg.rms[0]).toBeCloseTo(0.5, 5);
+    expect(msg[1]).toBeCloseTo(0.5, 5);
   });
 
   it('accumulates peak across multiple quantums before posting', () => {
@@ -116,19 +117,21 @@ describe('MeterProcessor', () => {
     processor.process(makeInput([silence]), makeOutput(1), {});
     expect(mockPort.postMessage).toHaveBeenCalledTimes(1);
     const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
-    expect(msg.peak[0]).toBeCloseTo(0.8, 5);
+    expect(msg[0]).toBeCloseTo(0.8, 5);
   });
 
-  it('handles multi-channel independently', () => {
+  it('handles multi-channel independently with rms in the upper half', () => {
     const processor = createProcessor({ numberOfChannels: 2, updateRate: 48000 });
     const ch0 = new Float32Array(128).fill(0);
     ch0[0] = 0.3;
-    const ch1 = new Float32Array(128).fill(0);
-    ch1[0] = 0.7;
+    const ch1 = new Float32Array(128).fill(0.5);
     processor.process(makeInput([ch0, ch1]), makeOutput(2), {});
     const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
-    expect(msg.peak[0]).toBeCloseTo(0.3, 5);
-    expect(msg.peak[1]).toBeCloseTo(0.7, 5);
+    expect(msg.length).toBe(4);
+    expect(msg[0]).toBeCloseTo(0.3, 5);
+    expect(msg[1]).toBeCloseTo(0.5, 5);
+    expect(msg[2]).toBeCloseTo(Math.sqrt((0.3 * 0.3) / 128), 5);
+    expect(msg[3]).toBeCloseTo(0.5, 5);
   });
 
   it('resets accumulators after posting', () => {
@@ -140,7 +143,22 @@ describe('MeterProcessor', () => {
     const silence = new Float32Array(128).fill(0);
     processor.process(makeInput([silence]), makeOutput(1), {});
     const msg2 = mockPort.postMessage.mock.calls[1][0] as MeterMessage;
-    expect(msg2.peak[0]).toBe(0);
+    expect(msg2[0]).toBe(0);
+    expect(msg2[1]).toBe(0);
+  });
+
+  it('reuses a single Float32Array across flushes (no per-flush allocation)', () => {
+    const processor = createProcessor({ numberOfChannels: 1, updateRate: 48000 });
+    const input = new Float32Array(128).fill(0.25);
+    processor.process(makeInput([input]), makeOutput(1), {});
+    processor.process(makeInput([input]), makeOutput(1), {});
+
+    expect(mockPort.postMessage).toHaveBeenCalledTimes(2);
+    const first = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
+    const second = mockPort.postMessage.mock.calls[1][0] as MeterMessage;
+    expect(first).toBeInstanceOf(Float32Array);
+    expect(first.length).toBe(2);
+    expect(second).toBe(first);
   });
 
   it('returns true to keep processor alive', () => {

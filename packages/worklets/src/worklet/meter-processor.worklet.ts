@@ -5,6 +5,12 @@
  * Accumulates peak (max absolute sample) and RMS (root mean square) across all
  * 128-sample quantums, posting results at ~updateRate Hz via postMessage.
  *
+ * Message format: a single reused Float32Array of length 2*N (N = channel
+ * count) — indices [0..N-1] are per-channel peak, [N..2N-1] are per-channel
+ * RMS (see MeterMessage in ../index.ts). All accumulators and the message
+ * buffer are pre-allocated at construction; steady-state process()/flush does
+ * no allocation on the audio thread.
+ *
  * RMS Strategy: Simple interval average (not sliding window).
  * Trade-off: A sliding window (like openDAW's 100ms circular buffer) provides
  * smoother loudness display. Our interval-based approach may appear jumpier
@@ -22,9 +28,12 @@ class MeterProcessor extends AudioWorkletProcessor {
   private numberOfChannels: number;
   private blocksPerUpdate: number;
   private blocksProcessed: number;
-  private maxPeak: number[];
-  private sumSquares: number[];
-  private sampleCount: number[];
+  private maxPeak: Float32Array;
+  /** Float64 to avoid precision drift when summing many squared samples */
+  private sumSquares: Float64Array;
+  private sampleCount: Uint32Array;
+  /** Reused message buffer: [0..N-1] peak, [N..2N-1] rms */
+  private levels: Float32Array;
 
   constructor(options: { processorOptions: MeterProcessorOptions }) {
     super();
@@ -32,9 +41,10 @@ class MeterProcessor extends AudioWorkletProcessor {
     this.numberOfChannels = numberOfChannels;
     this.blocksPerUpdate = Math.max(1, Math.floor(sampleRate / (128 * updateRate)));
     this.blocksProcessed = 0;
-    this.maxPeak = new Array(numberOfChannels).fill(0);
-    this.sumSquares = new Array(numberOfChannels).fill(0);
-    this.sampleCount = new Array(numberOfChannels).fill(0);
+    this.maxPeak = new Float32Array(numberOfChannels);
+    this.sumSquares = new Float64Array(numberOfChannels);
+    this.sampleCount = new Uint32Array(numberOfChannels);
+    this.levels = new Float32Array(2 * numberOfChannels);
   }
 
   process(
@@ -79,16 +89,16 @@ class MeterProcessor extends AudioWorkletProcessor {
     this.blocksProcessed++;
 
     if (this.blocksProcessed >= this.blocksPerUpdate) {
-      const peak: number[] = [];
-      const rms: number[] = [];
-
       for (let ch = 0; ch < this.numberOfChannels; ch++) {
-        peak.push(this.maxPeak[ch]);
+        this.levels[ch] = this.maxPeak[ch];
         const count = this.sampleCount[ch];
-        rms.push(count > 0 ? Math.sqrt(this.sumSquares[ch] / count) : 0);
+        this.levels[this.numberOfChannels + ch] =
+          count > 0 ? Math.sqrt(this.sumSquares[ch] / count) : 0;
       }
 
-      this.port.postMessage({ peak, rms });
+      // Structured clone copies the contents; the worklet keeps its buffer.
+      // Transferring would detach it and force a per-flush reallocation.
+      this.port.postMessage(this.levels);
 
       this.maxPeak.fill(0);
       this.sumSquares.fill(0);

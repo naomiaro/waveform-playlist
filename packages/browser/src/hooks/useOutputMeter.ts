@@ -124,17 +124,19 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       workletNode.port.onmessage = (event: MessageEvent) => {
         if (!isMounted) return;
 
-        const { peak, rms } = event.data as MeterMessage;
+        // MeterMessage layout: [0..N-1] peak, [N..2N-1] rms
+        const data = event.data as MeterMessage;
+        const workletChannels = data.length / 2;
         const smoothed = smoothedPeakRef.current;
 
         const peakValues: number[] = [];
         const rmsValues: number[] = [];
 
-        for (let ch = 0; ch < peak.length; ch++) {
+        for (let ch = 0; ch < workletChannels; ch++) {
           // Smoothed peak: jump up instantly, decay slowly
-          smoothed[ch] = Math.max(peak[ch], (smoothed[ch] ?? 0) * PEAK_DECAY);
+          smoothed[ch] = Math.max(data[ch], (smoothed[ch] ?? 0) * PEAK_DECAY);
           peakValues.push(gainToNormalized(smoothed[ch]));
-          rmsValues.push(gainToNormalized(rms[ch]));
+          rmsValues.push(gainToNormalized(data[workletChannels + ch]));
         }
 
         setLevels(peakValues);
