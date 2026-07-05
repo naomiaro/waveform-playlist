@@ -84,7 +84,10 @@ export interface UseIntegratedRecordingReturn {
   selectedDevice: string | null;
 
   // Recording controls
-  startRecording: () => void;
+  /** Start capturing on the selected track. Resolves `true` when the capture
+   *  pipeline actually started — callers that synchronize playback with
+   *  recording (overdub) should check this before starting playback. */
+  startRecording: () => Promise<boolean>;
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
@@ -157,12 +160,12 @@ export function useIntegratedRecording(
   // Start recording handler
   // Reads selectedTrackId from ref to avoid stale closures when
   // auto-create track + start recording happen in the same render cycle
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (): Promise<boolean> => {
     if (!selectedTrackIdRef.current) {
       setHookError(
         new Error('Cannot start recording: no track selected. Select or create a track first.')
       );
-      return;
+      return false;
     }
 
     try {
@@ -178,9 +181,10 @@ export function useIntegratedRecording(
       // (playback advances currentTime while recording).
       recordingStartTimeRef.current = currentTimeRef.current;
 
-      await startRec();
+      return await startRec();
     } catch (err) {
       setHookError(err instanceof Error ? err : new Error(String(err)));
+      return false;
     }
   }, [isMonitoring, startRec]);
 

@@ -1,4 +1,12 @@
-import React, { useContext, useRef, useState, useMemo, type ReactNode, useCallback } from 'react';
+import React, {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  type ReactNode,
+  useCallback,
+} from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import {
@@ -206,6 +214,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     loopEnd,
     isLoopEnabled,
     indefinitePlayback,
+    fillViewport,
   } = usePlaylistState();
   const annotationIntegration = useContext(AnnotationIntegrationContext);
   const {
@@ -221,6 +230,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     setSelectedTrackId,
     setCurrentTime,
     setLoopRegion,
+    setRecordingActive,
   } = usePlaylistControls();
   const {
     peaksDataArray,
@@ -241,6 +251,24 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   // Optional spectrogram integration (only available when SpectrogramProvider is present)
   const spectrogram = useContext(SpectrogramIntegrationContext);
+
+  // Inform the provider that a recording session is active so the animation
+  // loop suppresses the end-of-audio auto-stop (#589) — overdub playback must
+  // run past the end of existing material. Synced during render (not an
+  // effect) so the ref reflects this commit before the next animation frame,
+  // and transition-guarded so it never clobbers a consumer's eager
+  // setRecordingActive(true) made before the recording state has committed
+  // (consumers starting playback in the same handler as the recording must
+  // call it eagerly — a render round-trip loses to the first frame).
+  const recordingActive = !!recordingState?.isRecording;
+  const prevRecordingActiveRef = useRef(recordingActive);
+  if (prevRecordingActiveRef.current !== recordingActive) {
+    prevRecordingActiveRef.current = recordingActive;
+    setRecordingActive(recordingActive);
+  }
+  // Unmount only: a recording UI torn down mid-take must not leave the
+  // end-of-audio auto-stop disabled.
+  useEffect(() => () => setRecordingActive(false), [setRecordingActive]);
 
   // Per-track spectrogram rendering helpers (memoized) — only computed when spectrogram is available
   const perTrackSpectrogramHelpers = useMemo(() => {
@@ -314,8 +342,10 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         ? duration
         : DEFAULT_EMPTY_TRACK_DURATION;
 
-  // When indefinitePlayback is enabled, ensure the timeline fills the visible scroll container
-  if (indefinitePlayback) {
+  // Fill the visible scroll container when requested — indefinitePlayback
+  // implies it (endless playback needs an endless-looking timeline);
+  // fillViewport requests the layout alone (auto-stop still applies).
+  if (indefinitePlayback || fillViewport) {
     const containerWidth = scrollContainerRef.current?.clientWidth ?? 0;
     const minContainerDuration = (containerWidth * samplesPerPixel) / sampleRate;
     displayDuration = Math.max(displayDuration, minContainerDuration);

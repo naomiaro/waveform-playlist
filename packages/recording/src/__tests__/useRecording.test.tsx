@@ -121,6 +121,25 @@ afterEach(async () => {
 });
 
 describe('useRecording', () => {
+  it('startRecording resolves true on success and false without a stream', async () => {
+    const noStream = renderHook(() => useRecording(null));
+    let noStreamResult: boolean | undefined;
+    await act(async () => {
+      noStreamResult = await noStream.result.current.startRecording();
+    });
+    expect(noStreamResult).toBe(false);
+    expect(noStream.result.current.isRecording).toBe(false);
+
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+    let started: boolean | undefined;
+    await act(async () => {
+      started = await result.current.startRecording();
+    });
+    expect(started).toBe(true);
+    expect(result.current.isRecording).toBe(true);
+  });
+
   it('pauseRecording posts { command: "pause" } to the worklet', async () => {
     const stream = createMockStream();
     const { result } = renderHook(() => useRecording(stream));
@@ -424,7 +443,7 @@ describe('useRecording', () => {
     const stream = createMockStream();
     const { result, unmount } = renderHook(() => useRecording(stream));
 
-    let startPromise!: Promise<void>;
+    let startPromise!: Promise<boolean>;
     act(() => {
       startPromise = result.current.startRecording();
     });

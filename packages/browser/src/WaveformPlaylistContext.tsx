@@ -141,6 +141,9 @@ export interface PlaylistStateContextValue {
   loopEnd: number;
   /** Whether playback continues past the end of loaded audio */
   indefinitePlayback: boolean;
+  /** Whether the timeline visually fills the scroll container even when the
+   *  audio is shorter (layout only — no effect on playback) */
+  fillViewport: boolean;
   /** Whether undo is available */
   canUndo: boolean;
   /** Whether redo is available */
@@ -197,6 +200,15 @@ export interface PlaylistControlsContextValue {
   // Undo/redo
   undo: () => void;
   redo: () => void;
+
+  // Recording
+  /** Mark a recording session active/inactive. While active, the animation
+   *  loop's end-of-audio auto-stop is suppressed so overdub playback can run
+   *  past the end of existing audio (the take lands beyond the current
+   *  timeline duration). Wired automatically from the Waveform /
+   *  PlaylistVisualization `recordingState` prop — call directly only when
+   *  recording without the built-in live preview. */
+  setRecordingActive: (active: boolean) => void;
 }
 
 export interface PlaylistDataContextValue {
@@ -293,8 +305,14 @@ export interface WaveformPlaylistProviderProps {
    *  each track — flip to false when all tracks are ready for a single build. */
   deferEngineRebuild?: boolean;
   /** Disable automatic stop when the cursor reaches the end of the longest
-   *  track. Useful for DAW-style recording beyond existing audio. */
+   *  track. Useful for DAW-style recording beyond existing audio. Also
+   *  implies `fillViewport`. */
   indefinitePlayback?: boolean;
+  /** Extend the timeline (background + timescale) to fill the visible scroll
+   *  container even when the audio is shorter. Layout only — playback still
+   *  auto-stops at the end of audio. Recording UIs typically want this so the
+   *  empty timeline doesn't collapse to the audio width. */
+  fillViewport?: boolean;
   /** Desired AudioContext sample rate. Creates a cross-browser AudioContext at
    *  this rate via standardized-audio-context. Pre-computed peaks (.dat files)
    *  render instantly when they match. On mismatch, falls back to worker. */
@@ -333,6 +351,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   soundFontCache,
   deferEngineRebuild = false,
   indefinitePlayback = false,
+  fillViewport = false,
   sampleRate: sampleRateProp,
   createAdapter,
   children,
@@ -343,6 +362,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Ref for animation loop access (avoids adding prop to useCallback deps)
   const indefinitePlaybackRef = useRef(indefinitePlayback);
   indefinitePlaybackRef.current = indefinitePlayback;
+
+  // While a recording session is active, the animation loop suppresses the
+  // end-of-audio auto-stop so overdub playback can run past the end of
+  // existing material (#589). Auto-wired from PlaylistVisualization's
+  // recordingState prop; also exposed via usePlaylistControls().
+  const recordingActiveRef = useRef(false);
+  const setRecordingActive = useCallback((active: boolean) => {
+    recordingActiveRef.current = active;
+  }, []);
 
   // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
   // create a new reference every render, which would trigger engine rebuild via
@@ -1257,7 +1285,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Transport.seconds auto-wraps at loop boundaries, so getPlaybackTime() returns
       // the correct position without manual detection here.
 
-      if (time >= duration && !indefinitePlaybackRef.current) {
+      if (time >= duration && !indefinitePlaybackRef.current && !recordingActiveRef.current) {
         // Stop playback - inline to avoid circular dependency
         if (engineRef.current) {
           engineRef.current.stop();
@@ -1623,6 +1651,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       loopStart,
       loopEnd,
       indefinitePlayback,
+      fillViewport,
       canUndo,
       canRedo,
     }),
@@ -1640,6 +1669,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       loopStart,
       loopEnd,
       indefinitePlayback,
+      fillViewport,
       canUndo,
       canRedo,
     ]
@@ -1708,6 +1738,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Undo/redo
       undo,
       redo,
+
+      // Recording
+      setRecordingActive,
     }),
     [
       play,
@@ -1740,6 +1773,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       clearLoopRegion,
       undo,
       redo,
+      setRecordingActive,
     ]
   );
 

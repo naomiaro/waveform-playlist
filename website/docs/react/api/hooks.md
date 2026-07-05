@@ -349,6 +349,8 @@ interface PlaylistStateContextValue {
   loopEnd: number;
   /** Whether playback continues past the end of loaded audio */
   indefinitePlayback: boolean;
+  /** Whether the timeline visually fills the scroll container (layout only) */
+  fillViewport: boolean;
   /** Whether undo is available */
   canUndo: boolean;
   /** Whether redo is available */
@@ -439,6 +441,13 @@ interface PlaylistControlsContextValue {
   // Undo/redo
   undo: () => void;
   redo: () => void;
+
+  // Recording
+  /** Suppress the end-of-audio auto-stop while a recording session is active,
+   *  so overdub playback can run past the end of existing audio. Auto-wired
+   *  from the Waveform `recordingState` prop; call eagerly (before `play()`)
+   *  when starting playback in the same handler as the recording. */
+  setRecordingActive: (active: boolean) => void;
 }
 ```
 

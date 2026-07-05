@@ -46,8 +46,10 @@ interface WaveformPlaylistProviderProps {
   deferEngineRebuild?: boolean;           // Default: false
   /** SoundFont cache for sample-based MIDI playback */
   soundFontCache?: SoundFontCache;
-  /** Disable automatic stop when cursor reaches end of longest track */
+  /** Disable automatic stop when cursor reaches end of longest track. Implies fillViewport */
   indefinitePlayback?: boolean;           // Default: false
+  /** Timeline visually fills the scroll container (layout only — auto-stop still applies) */
+  fillViewport?: boolean;                 // Default: false
   /** Desired AudioContext sample rate for pre-computed peaks matching */
   sampleRate?: number;
   /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone */
@@ -219,6 +221,8 @@ interface PlaylistStateContextValue {
   loopEnd: number;
   /** Whether playback continues past the end of loaded audio */
   indefinitePlayback: boolean;
+  /** Whether the timeline visually fills the scroll container (layout only) */
+  fillViewport: boolean;
   /** Whether undo is available */
   canUndo: boolean;
   /** Whether redo is available */
@@ -279,6 +283,13 @@ interface PlaylistControlsContextValue {
   // Undo/redo
   undo: () => void;
   redo: () => void;
+
+  // Recording
+  /** Suppress the end-of-audio auto-stop while a recording session is active
+   *  (overdub playback runs past the end of existing audio). Auto-wired from
+   *  the Waveform recordingState prop; call eagerly (before play()) when
+   *  starting playback in the same handler as the recording. */
+  setRecordingActive: (active: boolean) => void;
 }
 ```
 
@@ -832,7 +843,9 @@ interface UseIntegratedRecordingReturn {
   devices: MicrophoneDevice[];
   hasPermission: boolean;
   selectedDevice: string | null;
-  startRecording: () => void;
+  /** Resolves true when the capture pipeline actually started — check before
+   *  starting synchronized playback (overdub). */
+  startRecording: () => Promise<boolean>;
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;

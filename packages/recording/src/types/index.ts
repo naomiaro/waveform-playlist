@@ -76,7 +76,11 @@ export interface UseRecordingReturn {
   peakLevel: number;
 
   // Controls
-  startRecording: () => Promise<void>;
+  /** Start capturing. Resolves `true` when the capture pipeline actually
+   *  started, `false` when it could not (no stream, already recording,
+   *  worklet/module failure, unmounted). Callers that synchronize playback
+   *  with recording should check the result before starting playback. */
+  startRecording: () => Promise<boolean>;
   stopRecording: () => Promise<AudioBuffer | null>;
   pauseRecording: () => void;
   resumeRecording: () => void;
