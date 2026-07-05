@@ -35,16 +35,26 @@ class MeterProcessor extends AudioWorkletProcessor {
   /** Reused message buffer: [0..N-1] peak, [N..2N-1] rms */
   private levels: Float32Array;
 
-  constructor(options: { processorOptions: MeterProcessorOptions }) {
+  constructor(options: { processorOptions?: Partial<MeterProcessorOptions> }) {
     super();
-    const { numberOfChannels, updateRate } = options.processorOptions;
-    this.numberOfChannels = numberOfChannels;
-    this.blocksPerUpdate = Math.max(1, Math.floor(sampleRate / (128 * updateRate)));
+    // Console output from a worklet is invisible — fall back to safe defaults
+    // silently instead of dying in the constructor (missing processorOptions)
+    // or never posting (updateRate <= 0 makes blocksPerUpdate Infinity).
+    const { numberOfChannels, updateRate } = options?.processorOptions ?? {};
+    this.numberOfChannels =
+      typeof numberOfChannels === 'number' && Number.isFinite(numberOfChannels)
+        ? Math.max(1, Math.floor(numberOfChannels))
+        : 1;
+    const rate =
+      typeof updateRate === 'number' && Number.isFinite(updateRate) && updateRate > 0
+        ? updateRate
+        : 60;
+    this.blocksPerUpdate = Math.max(1, Math.floor(sampleRate / (128 * rate)));
     this.blocksProcessed = 0;
-    this.maxPeak = new Float32Array(numberOfChannels);
-    this.sumSquares = new Float64Array(numberOfChannels);
-    this.sampleCount = new Uint32Array(numberOfChannels);
-    this.levels = new Float32Array(2 * numberOfChannels);
+    this.maxPeak = new Float32Array(this.numberOfChannels);
+    this.sumSquares = new Float64Array(this.numberOfChannels);
+    this.sampleCount = new Uint32Array(this.numberOfChannels);
+    this.levels = new Float32Array(2 * this.numberOfChannels);
   }
 
   process(
@@ -56,6 +66,14 @@ class MeterProcessor extends AudioWorkletProcessor {
     const output = outputs[0];
 
     if (!input || input.length === 0) {
+      // No input (ended/idle source): count a silent quantum so the flush
+      // cadence continues and levels fall to zero — an early return here
+      // freezes the meter at its last posted value.
+      for (let ch = 0; ch < this.numberOfChannels; ch++) {
+        this.sampleCount[ch] += 128;
+      }
+      this.blocksProcessed++;
+      this.flushIfDue();
       return true;
     }
 
@@ -87,26 +105,29 @@ class MeterProcessor extends AudioWorkletProcessor {
     }
 
     this.blocksProcessed++;
-
-    if (this.blocksProcessed >= this.blocksPerUpdate) {
-      for (let ch = 0; ch < this.numberOfChannels; ch++) {
-        this.levels[ch] = this.maxPeak[ch];
-        const count = this.sampleCount[ch];
-        this.levels[this.numberOfChannels + ch] =
-          count > 0 ? Math.sqrt(this.sumSquares[ch] / count) : 0;
-      }
-
-      // Structured clone copies the contents; the worklet keeps its buffer.
-      // Transferring would detach it and force a per-flush reallocation.
-      this.port.postMessage(this.levels);
-
-      this.maxPeak.fill(0);
-      this.sumSquares.fill(0);
-      this.sampleCount.fill(0);
-      this.blocksProcessed = 0;
-    }
+    this.flushIfDue();
 
     return true;
+  }
+
+  private flushIfDue(): void {
+    if (this.blocksProcessed < this.blocksPerUpdate) return;
+
+    for (let ch = 0; ch < this.numberOfChannels; ch++) {
+      this.levels[ch] = this.maxPeak[ch];
+      const count = this.sampleCount[ch];
+      this.levels[this.numberOfChannels + ch] =
+        count > 0 ? Math.sqrt(this.sumSquares[ch] / count) : 0;
+    }
+
+    // Structured clone copies the contents; the worklet keeps its buffer.
+    // Transferring would detach it and force a per-flush reallocation.
+    this.port.postMessage(this.levels);
+
+    this.maxPeak.fill(0);
+    this.sumSquares.fill(0);
+    this.sampleCount.fill(0);
+    this.blocksProcessed = 0;
   }
 }
 

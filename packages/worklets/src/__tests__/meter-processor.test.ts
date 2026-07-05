@@ -161,6 +161,49 @@ describe('MeterProcessor', () => {
     expect(second).toBe(first);
   });
 
+  it('treats empty input as silence so levels fall to zero instead of freezing', () => {
+    const processor = createProcessor({ numberOfChannels: 1, updateRate: 48000 });
+    const loud = new Float32Array(128).fill(0.5);
+    processor.process(makeInput([loud]), makeOutput(1), {});
+    expect(mockPort.postMessage).toHaveBeenCalledTimes(1);
+
+    // Ended/idle source delivering empty input must still advance the flush
+    // cadence with silent samples — a frozen VU meter stuck at the last
+    // level is indistinguishable from live signal.
+    processor.process([[]], makeOutput(1), {});
+    expect(mockPort.postMessage).toHaveBeenCalledTimes(2);
+    const msg = mockPort.postMessage.mock.calls[1][0] as MeterMessage;
+    expect(msg[0]).toBe(0);
+    expect(msg[1]).toBe(0);
+  });
+
+  it('defaults an invalid updateRate instead of never posting', () => {
+    // updateRate 0 would make blocksPerUpdate Infinity — a silent no-op meter.
+    const processor = createProcessor({ numberOfChannels: 1, updateRate: 0 });
+    const input = new Float32Array(128).fill(0.5);
+    // Default 60Hz at 48kHz → blocksPerUpdate 6
+    for (let i = 0; i < 6; i++) {
+      processor.process(makeInput([input]), makeOutput(1), {});
+    }
+    expect(mockPort.postMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('constructs with missing processorOptions using defaults (no throw)', () => {
+    const Processor = getProcessorClass();
+    expect(() => new Processor({})).not.toThrow();
+
+    mockPort.postMessage.mockClear();
+    const processor = new Processor({}) as MockProcessor;
+    const input = new Float32Array(128).fill(0.5);
+    // Defaults: 1 channel, 60Hz → blocksPerUpdate 6 at 48kHz
+    for (let i = 0; i < 6; i++) {
+      processor.process([[input]], makeOutput(1), {});
+    }
+    expect(mockPort.postMessage).toHaveBeenCalledTimes(1);
+    const msg = mockPort.postMessage.mock.calls[0][0] as MeterMessage;
+    expect(msg.length).toBe(2);
+  });
+
   it('returns true to keep processor alive', () => {
     const processor = createProcessor({ numberOfChannels: 1 });
     const result = processor.process(makeInput([new Float32Array(128)]), makeOutput(1), {});
