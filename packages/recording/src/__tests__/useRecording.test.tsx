@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -393,6 +394,21 @@ describe('useRecording', () => {
 
     expect(mockWorkletNode.port.postMessage).toHaveBeenCalledWith({ command: 'resume' });
     expect(result.current.isPaused).toBe(false);
+  });
+
+  it('records under StrictMode (unmount flag reset on remount)', async () => {
+    // StrictMode dev runs mount → unmount → remount on the SAME hook
+    // instance; refs persist, so an unmount flag set by the first cleanup
+    // must be reset in the effect body or startRecording aborts forever.
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream), { wrapper: StrictMode });
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+
+    expect(result.current.isRecording).toBe(true);
+    expect(mockContext.createMediaStreamSource).toHaveBeenCalledTimes(1);
   });
 
   it('unmount during startRecording awaits aborts the session (no leaked pipeline)', async () => {

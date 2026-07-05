@@ -124,6 +124,10 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
 
   // Check initial permission state, enumerate devices, and listen for hot-plug changes
   useEffect(() => {
+    // Reset on (re)mount — StrictMode dev remounts reuse the same hook
+    // instance, so a flag left true by the probe-unmount's cleanup would
+    // stop every future getUserMedia grant as "stale".
+    isUnmountedRef.current = false;
     // Try to enumerate devices (labels won't be available without permission)
     enumerateDevices();
 

@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useMicrophoneAccess } from '../hooks/useMicrophoneAccess';
@@ -117,6 +118,22 @@ describe('useMicrophoneAccess', () => {
     expect(s1._track.stop).toHaveBeenCalled();
     expect(s2._track.stop).not.toHaveBeenCalled();
     expect(result.current.stream).toBe(s2);
+  });
+
+  it('acquires a stream under StrictMode (unmount flag reset on remount)', async () => {
+    // StrictMode dev runs mount → unmount → remount on the SAME hook
+    // instance; refs persist, so an unmount flag set by the first cleanup
+    // must be reset in the effect body or the hook is dead after remount.
+    const s1 = createMockStream('s1');
+    getUserMediaMock.mockResolvedValueOnce(s1);
+    const { result } = renderHook(() => useMicrophoneAccess(), { wrapper: StrictMode });
+
+    await act(async () => {
+      await result.current.requestAccess();
+    });
+
+    expect(s1._track.stop).not.toHaveBeenCalled();
+    expect(result.current.stream).toBe(s1);
   });
 
   it('clears stream state when a device switch fails', async () => {

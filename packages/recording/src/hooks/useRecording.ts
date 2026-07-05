@@ -426,6 +426,10 @@ export function useRecording(
   // Pattern #16 (copy refs in effect body) doesn't apply to [] deps — refs are
   // null at mount and only set later during startRecording.
   useEffect(() => {
+    // Reset on (re)mount — StrictMode dev remounts reuse the same hook
+    // instance, so a flag left true by the probe-unmount's cleanup would
+    // make startRecording abort forever.
+    isUnmountedRef.current = false;
     return () => {
       // Abort any startRecording continuation parked on an await — it must
       // not build the capture graph after unmount.
