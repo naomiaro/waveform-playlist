@@ -34,14 +34,11 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 **Stable Releases:** Publish without tag to update `@latest`.
 
 ```bash
-# Publish stable release (all packages)
-pnpm publish --filter './packages/*' --no-git-checks
-
-# Users install with:
-npm install @waveform-playlist/browser
+pnpm release:version   # changeset version — computes all bumps incl. the dependent cascade
+pnpm release:publish   # pnpm build && changeset publish --no-git-tag
 ```
 
-**Version Bumping — Changesets owns the math (since 2026-07-05):** every PR that changes `packages/*/src` adds a changeset (`pnpm changeset`; pick `patch` for `@dawcore/*` — zerover, never minor/major). Each package follows its own semver independently. At release time `pnpm changeset version` computes all bumps INCLUDING the exact-pin dependent cascade (validated against the 2026-07-05 manual closure: identical 13-package result; `onlyUpdatePeerDependentsWhenOutOfRange` keeps floating peer floors like dawcore's `>=0.0.13` untouched; private packages excluded via `privatePackages`). Review the version diff, `pnpm build`, then `pnpm changeset publish --no-git-tag` (publishes topologically, skips versions already on the registry — safe to re-run after a partial failure). `changelog: false` — the hand-written descriptive-tag GitHub release remains the record. Then the chore(release) commit + GitHub release as below.
+**Version Bumping — Changesets owns the math (since 2026-07-05):** every PR that changes `packages/*/src` adds a changeset (`pnpm changeset`; pick `patch` for `@dawcore/*` — zerover, never minor/major). Each package follows its own semver independently. At release time `pnpm changeset version` computes all bumps INCLUDING the exact-pin dependent cascade (validated against the 2026-07-05 manual closure: identical 13-package result; `onlyUpdatePeerDependentsWhenOutOfRange` keeps floating peer floors like dawcore's `>=0.0.13` untouched; private packages excluded via `privatePackages`). Review the version diff, then `pnpm release:publish` (= `pnpm build && changeset publish --no-git-tag`: builds everything first — no prepublish hooks exist — then publishes topologically, skipping versions already on the registry; safe to re-run after a partial failure). Don't name a script `version` — `pnpm version` resolves to pnpm's built-in, not the script. The old `pnpm version:bump` (`scripts/bump-version.js`) is REMOVED — it synced ALL packages to one version, incompatible with independent versioning. `changelog: false` — the hand-written descriptive-tag GitHub release remains the record. Then the chore(release) commit + GitHub release as below.
 
 **Independent Versioning:** `@dawcore/components` and `@dawcore/transport` have their own version schemes (0.x.x), separate from the main `@waveform-playlist/*` packages.
 
