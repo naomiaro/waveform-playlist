@@ -413,13 +413,16 @@ if (derived !== prevRef.current) {
 
 **Sample-accurate metering:** Uses `meter-processor` AudioWorklet from `@waveform-playlist/worklets`. The worklet accumulates peak and RMS across all 128-sample quantums and posts results at ~60Hz — no transient is missed between animation frames.
 
-## indefinitePlayback Prop
+## End-of-Timeline Semantics (indefinitePlayback, fillViewport, setRecordingActive)
 
-**Decision:** `indefinitePlayback` controls whether the timeline fills the visible scroll container and whether playback auto-stops at the end of audio.
+**Matched with dawcore's `<daw-editor>` (#589/#590/#593, PR #592):**
 
-**Wiring:** Prop on `WaveformPlaylistProvider` → stored in ref for animation loop → exposed via `usePlaylistState()` (in `PlaylistStateContextValue`) → consumed by `PlaylistVisualization` to gate min container width calculation.
+- **Default:** the animation loop auto-stops playback when raw engine time reaches `duration` and returns the cursor to the play-start position (player style).
+- **`indefinitePlayback` prop:** opt out — the transport rolls until an explicit stop/pause (DAW style; implies the fillViewport layout). Stored in a ref for the loop; exposed via `usePlaylistState()`.
+- **`fillViewport` prop (layout only):** `PlaylistVisualization` floors `displayDuration` to fill the scroll container. `indefinitePlayback || fillViewport` gates the floor. Recording UIs want `fillViewport`, not `indefinitePlayback`.
+- **Recording session suppression:** while `setRecordingActive(true, …)` is active, the auto-stop is skipped so punch-in takes run past existing material. Overdub flows MUST call it eagerly (before `play()`) — the recordingState render round-trip loses the race against the first animation frame (empty timeline: `time 0 >= duration 0` stops instantly).
 
-**Min container width:** Only when `indefinitePlayback` is true does `displayDuration` get floored to fill the viewport. Without it, the timeline ends at the natural audio duration.
+**`setRecordingActive(active, armedTrackId?)` (usePlaylistControls):** besides the suppression, an `armedTrackId` transiently mutes that track for the session — punch-in replaces whatever the take overlaps, so the doomed material must not play under the overdub. Previous mute captured/restored via engine-level `setTrackMute` (survives adapter rebuilds); UI `trackStates` mute untouched. Auto-wired from `PlaylistVisualization`'s `recordingState` prop by an effect with cleanup (releases on recording end AND unmount; re-arms on remount-while-recording). Explicit ends (selection playback via `playbackEndTimeRef`, annotation boundaries) stop regardless of all of the above.
 
 ## Output Meter Clearing (isPlaying Prop)
 
