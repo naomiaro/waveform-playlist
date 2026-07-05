@@ -52,7 +52,7 @@ export default function RecordingExamplePage(): React.ReactElement {
             <li><strong>Drag-and-drop import</strong> — drop audio files (WAV, MP3, FLAC, etc.) onto the timeline to add backing tracks</li>
             <li><strong>VU meter</strong> — real-time input level monitoring with peak hold indicator</li>
             <li><strong>Device selection</strong> — choose between available microphones without restarting</li>
-            <li><strong>Smart recording position</strong> — recording starts from the cursor or the end of the last clip, whichever is later</li>
+            <li><strong>Punch-in recording</strong> — takes land exactly at the cursor and replace any clip content they overlap</li>
             <li><strong>Auto-scroll</strong> — the timeline scrolls to keep the recording head in view</li>
             <li><strong>WAV export</strong> — export your multitrack mix as a WAV file, entirely client-side</li>
           </ul>
