@@ -323,6 +323,10 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 **Test helper:** `WaveformData.create()` requires JSON with `{ version: 2, channels: 1, sample_rate, samples_per_pixel, bits, length, data }` — omitting `version`/`channels` causes a TypeScript error.
 
+**Provider-level animation-loop tests:** mount the REAL `WaveformPlaylistProvider` in jsdom (`// @vitest-environment jsdom` + `./jsdom-polyfills` first) with an injected fake adapter (`createAdapter` prop — no tone/playout import) whose `getCurrentTime()` the test controls, a probe child capturing context hooks, and a setTimeout-based `requestAnimationFrame` polyfill (jsdom lacks rAF without pretendToBeVisual). Reference: `animationLoopEndOfAudio.test.tsx` (end-of-audio semantics, recording suppression, armed-track mute).
+
+**Mid-playback `duration` changes already restart the animation loop** — the `reschedulePlayback` effect depends on `startAnimationLoop`, whose identity changes when `duration` state updates, so the running loop is stopped/restarted with the fresh closure. "Stale duration in the loop" is not a real failure mode (disproven while investigating #590); don't add refs/restarts for it.
+
 ## jsdom Keyboard Event Testing Quirks
 
 - `new KeyboardEvent()` has `target: null` in jsdom — use `Object.defineProperty(event, 'target', { value: document.body })` when calling handlers directly (not via `dispatchEvent`)
