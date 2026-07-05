@@ -36,7 +36,10 @@ export class DawRecordButtonElement extends DawTransportButton {
   connectedCallback() {
     super.connectedCallback();
     // Defer so <daw-transport for="..."> and the target editor are resolved
-    requestAnimationFrame(() => this._listenToTarget());
+    requestAnimationFrame(() => {
+      if (!this.isConnected) return;
+      this._ensureTargetListeners();
+    });
   }
 
   disconnectedCallback() {
@@ -44,8 +47,18 @@ export class DawRecordButtonElement extends DawTransportButton {
     this._cleanupListeners();
   }
 
-  private _listenToTarget() {
+  protected override updated() {
+    // Re-resolve on every render (pointerenter triggers one via the base
+    // class) — a target that upgrades/appears after the one-shot
+    // connectedCallback rAF would otherwise never get the recording-state
+    // listeners: the button starts recordings it can't reflect (#573).
+    this._ensureTargetListeners();
+  }
+
+  private _ensureTargetListeners() {
     const target = this.target;
+    if (target === this._targetRef) return;
+    this._cleanupListeners();
     if (!target) return;
     this._targetRef = target;
     target.addEventListener('daw-recording-start', this._onStart);
@@ -84,6 +97,9 @@ export class DawRecordButtonElement extends DawTransportButton {
       warnNoTargetOnce(this);
       return;
     }
+    // Guarantee state listeners exist for any recording this button starts
+    // (covers programmatic clicks that never trigger a re-render).
+    this._ensureTargetListeners();
     target.startRecording(target.recordingStream);
   }
 }

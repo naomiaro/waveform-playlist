@@ -42,6 +42,7 @@ function createMockHost() {
       audioWorklet: { addModule: vi.fn(() => Promise.resolve()) },
     },
     samplesPerPixel: 1024,
+    renderSamplesPerPixel: 1024,
     effectiveSampleRate: 48000,
     resolveAudioContextSampleRate: vi.fn(),
     _addRecordedClip: vi.fn(),
@@ -959,6 +960,60 @@ describe('RecordingController', () => {
 
     expect(resumeSpy).toHaveBeenCalled();
     expect(controller.isRecording).toBe(true);
+  });
+
+  it('labels the recorded AudioBuffer with the capture-time context rate (#576)', async () => {
+    const { createAudioBuffer } = await import('@waveform-playlist/core');
+    vi.mocked(createAudioBuffer).mockClear();
+    // Capture context runs at 44100; the editor-space sticky rate lags at 48000
+    // (resolveAudioContextSampleRate only sets it when unset).
+    host.audioContext.sampleRate = 44100;
+    host.effectiveSampleRate = 48000;
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 44100);
+
+    host.dispatchEvent = vi.fn(() => true);
+    await controller.stopRecording();
+
+    // Labeling with the stale editor rate plays the take ~8.9% off-speed.
+    expect(vi.mocked(createAudioBuffer).mock.calls[0][2]).toBe(44100);
+  });
+
+  it('appends live-preview peaks at renderSamplesPerPixel (beats-mode alignment, #577)', async () => {
+    const { appendPeaks } = await import('@waveform-playlist/core');
+    vi.mocked(appendPeaks).mockClear();
+    // In beats mode the render scale is derived from ticksPerPixel/bpm and
+    // differs from the raw samplesPerPixel property.
+    host.samplesPerPixel = 1024;
+    host.renderSamplesPerPixel = 512;
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 512);
+
+    expect(vi.mocked(appendPeaks).mock.calls[0][2]).toBe(512);
+  });
+
+  it('dispatches daw-recording-error when the editor is disposed mid-recording (#578)', async () => {
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 512);
+
+    const events: CustomEvent[] = [];
+    host.dispatchEvent = vi.fn((e: Event) => {
+      if (e instanceof CustomEvent) events.push(e);
+      return true;
+    });
+
+    controller.hostDisconnected();
+
+    // Without this, a record button in a still-connected <daw-transport>
+    // stays wedged red forever — its listeners are on the dead editor.
+    const errorEvent = events.find((e) => e.type === 'daw-recording-error');
+    expect(errorEvent).toBeTruthy();
+    expect(errorEvent!.detail.trackId).toBe('track-1');
   });
 
   it('latencyOffset option overrides the auto-computed offset', async () => {

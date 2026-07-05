@@ -117,6 +117,42 @@ describe('daw-record-button capability detection (#474 foundation)', () => {
     expect(startRecording).toHaveBeenCalled();
   });
 
+  it('reflects recording state from a late-appearing target (#573)', async () => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<daw-transport for="late-state-target"><daw-record-button></daw-record-button></daw-transport>'
+    );
+    const button = document.querySelector('daw-record-button')! as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    // The connectedCallback rAF runs with no target resolvable
+    await nextFrame();
+    await button.updateComplete;
+
+    const startRecording = vi.fn();
+    const late = document.createElement('div');
+    late.id = 'late-state-target';
+    Object.assign(late, { startRecording, stopRecording: vi.fn() });
+    document.body.appendChild(late);
+
+    // Hover re-render — the state listeners must (re)attach here, not only
+    // in the one-shot connectedCallback rAF
+    button.dispatchEvent(new Event('pointerenter', { bubbles: true }));
+    await button.updateComplete;
+
+    const inner = button.shadowRoot!.querySelector('button')!;
+    inner.click();
+    expect(startRecording).toHaveBeenCalled();
+
+    late.dispatchEvent(new CustomEvent('daw-recording-start', { detail: {} }));
+    await button.updateComplete;
+    expect(inner.hasAttribute('data-recording')).toBe(true);
+
+    late.dispatchEvent(new CustomEvent('daw-recording-error', { detail: {} }));
+    await button.updateComplete;
+    expect(inner.hasAttribute('data-recording')).toBe(false);
+  });
+
   it('warns once on pointer interaction when the transport target is missing', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     document.body.insertAdjacentHTML(

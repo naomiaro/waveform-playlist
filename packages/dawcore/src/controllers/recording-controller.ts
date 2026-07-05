@@ -43,6 +43,11 @@ export interface RecordingSession {
   readonly peaks: (Int8Array | Int16Array)[];
   readonly startSample: number;
   readonly channelCount: number;
+  /** Sample rate of the AudioContext the worklet captured at. The finalized
+   * AudioBuffer must be labeled with THIS rate — the host's sticky
+   * effectiveSampleRate can lag after a context swap, mislabeling the take
+   * (~8.9% off-speed for 44.1k vs 48k). */
+  readonly captureSampleRate: number;
   readonly bits: Bits;
   isFirstMessage: boolean;
   /** Latency samples to skip in live preview (outputLatency only). */
@@ -75,6 +80,11 @@ export type ReadonlyRecordingSession = Readonly<
 export interface RecordingHost extends ReactiveControllerHost {
   readonly audioContext: AudioContext;
   readonly samplesPerPixel: number;
+  /** Render-space samples-per-pixel. In beats mode this is derived from
+   * ticksPerPixel/bpm and differs from samplesPerPixel — live-preview peaks
+   * must be generated at THIS scale or the drawn waveform disagrees with the
+   * preview container's width/position. */
+  readonly renderSamplesPerPixel: number;
   readonly effectiveSampleRate: number;
   readonly _selectedTrackId: string | null;
   /** Live playhead position in seconds. Must read from the engine during
@@ -133,7 +143,10 @@ export class RecordingController implements ReactiveController {
 
   hostDisconnected() {
     for (const trackId of [...this._sessions.keys()]) {
-      this._cleanupSession(trackId);
+      // notifyError: captured audio is silently discarded here — without an
+      // event, record buttons living in a still-connected <daw-transport>
+      // stay wedged in their recording state forever.
+      this._cleanupSession(trackId, true);
     }
     this._workletLoadedCtx = null;
   }
@@ -259,6 +272,7 @@ export class RecordingController implements ReactiveController {
         ),
         startSample,
         channelCount,
+        captureSampleRate: rawCtx.sampleRate,
         bits,
         isFirstMessage: true,
         latencySamples,
@@ -439,7 +453,7 @@ export class RecordingController implements ReactiveController {
     const audioBuffer = createAudioBuffer(
       stopCtx,
       channelData,
-      this._host.effectiveSampleRate,
+      session.captureSampleRate,
       session.channelCount
     );
 
@@ -572,7 +586,10 @@ export class RecordingController implements ReactiveController {
       (session.peaks as (Int8Array | Int16Array)[])[ch] = appendPeaks(
         session.peaks[ch],
         channels[ch],
-        this._host.samplesPerPixel,
+        // Render-space scale — in beats mode this differs from
+        // samplesPerPixel, and the preview container is laid out in
+        // render space (see RecordingHost.renderSamplesPerPixel).
+        this._host.renderSamplesPerPixel,
         samplesProcessedBefore,
         session.bits
       );
@@ -596,9 +613,9 @@ export class RecordingController implements ReactiveController {
     session.isFirstMessage = false;
 
     // Throttle requestUpdate — only when container width needs to grow
-    const newPixelWidth = Math.floor(session.totalSamples / this._host.samplesPerPixel);
+    const newPixelWidth = Math.floor(session.totalSamples / this._host.renderSamplesPerPixel);
     const oldPixelWidth = Math.floor(
-      (session.totalSamples - channels[0].length) / this._host.samplesPerPixel
+      (session.totalSamples - channels[0].length) / this._host.renderSamplesPerPixel
     );
     if (newPixelWidth > oldPixelWidth) {
       this._host.requestUpdate();
@@ -635,7 +652,10 @@ export class RecordingController implements ReactiveController {
     }
   }
 
-  private _cleanupSession(trackId: string) {
+  /** @param notifyError dispatch daw-recording-error after cleanup — used by
+   * disposal paths that would otherwise discard the session silently. The
+   * startRecording catch path passes false (it dispatches its own error). */
+  private _cleanupSession(trackId: string, notifyError = false) {
     const session = this._sessions.get(trackId);
     if (!session) return;
     try {
@@ -656,6 +676,18 @@ export class RecordingController implements ReactiveController {
       // A leftover pause flag would misreport isPaused for the next session
       // and send its stop down the no-ack fast path.
       this._isPaused = false;
+    }
+    if (notifyError) {
+      this._host.dispatchEvent(
+        new CustomEvent<DawRecordingErrorDetail>('daw-recording-error', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            trackId,
+            error: new Error('Recording cancelled: editor was disconnected mid-recording'),
+          },
+        })
+      );
     }
   }
 }
