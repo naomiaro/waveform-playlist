@@ -60,6 +60,9 @@ export interface RecordingSession {
   readonly latencySamples: number;
   /** Display name for the take (preview header + finalized clip name). */
   readonly clipName?: string;
+  /** Pre-session mute state of the armed track — restored when the session
+   * ends. null = mute never engaged (no engine on the host). */
+  armedPrevMuted: boolean | null;
   readonly wasOverdub: boolean;
   /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
   readonly _onTrackEnded: (() => void) | null;
@@ -109,6 +112,14 @@ export interface RecordingHost extends ReactiveControllerHost {
     offsetSamples?: number,
     clipName?: string
   ): void;
+  /** Structural view of the editor's engine for the armed-track transient
+   *  mute (punch-in replaces the overlapped content, so the recorded-over
+   *  track's existing material must not play under the take). Optional —
+   *  hosts without an engine skip the mute. */
+  _engine?: {
+    setTrackMute(trackId: string, muted: boolean): void;
+    getState(): { tracks: Array<{ id: string; muted: boolean }> };
+  } | null;
   play?(startTime?: number): Promise<void>;
   stop?(): void;
   dispatchEvent(event: Event): boolean;
@@ -286,6 +297,7 @@ export class RecordingController implements ReactiveController {
         isFirstMessage: true,
         latencySamples,
         clipName: options.clipName,
+        armedPrevMuted: null,
         wasOverdub: options.overdub ?? false,
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
@@ -305,6 +317,20 @@ export class RecordingController implements ReactiveController {
       // Attach mic-unplug listener (stored in session for cleanup)
       if (audioTrack && onTrackEnded) {
         audioTrack.addEventListener('ended', onTrackEnded);
+      }
+
+      // Transiently mute the armed track for the session — punch-in replaces
+      // whatever the take overlaps (#579), so the doomed material must not
+      // play under the overdub. Engine-level only: the editor's _tracks
+      // descriptors (the UI mute control) are untouched. Restored by
+      // _restoreArmedTrackMute on every session-teardown path. Must engage
+      // BEFORE the overdub host.play() below so the track never blips.
+      // (Parity with the React provider's setRecordingActive.)
+      const engine = this._host._engine;
+      if (engine) {
+        session.armedPrevMuted =
+          engine.getState().tracks.find((t) => t.id === trackId)?.muted ?? false;
+        engine.setTrackMute(trackId, true);
       }
 
       this._host.dispatchEvent(
@@ -473,6 +499,7 @@ export class RecordingController implements ReactiveController {
 
     if (effectiveDuration === 0) {
       console.warn('[dawcore] RecordingController: Recording too short for latency compensation');
+      this._restoreArmedTrackMute(session);
       this._sessions.delete(id);
       this._host.requestUpdate();
       this._host.dispatchEvent(
@@ -501,6 +528,7 @@ export class RecordingController implements ReactiveController {
     const notPrevented = this._host.dispatchEvent(event);
 
     // Clean up session
+    this._restoreArmedTrackMute(session);
     this._sessions.delete(id);
     this._host.requestUpdate();
 
@@ -665,6 +693,14 @@ export class RecordingController implements ReactiveController {
     }
   }
 
+  /** Restore the armed track's pre-session mute state (idempotent — safe to
+   * call from both the finalize path and _cleanupSession). */
+  private _restoreArmedTrackMute(session: RecordingSession) {
+    if (session.armedPrevMuted === null) return;
+    this._host._engine?.setTrackMute(session.trackId, session.armedPrevMuted);
+    session.armedPrevMuted = null;
+  }
+
   /** @param notifyError dispatch daw-recording-error after cleanup — used by
    * disposal paths that would otherwise discard the session silently. The
    * startRecording catch path passes false (it dispatches its own error). */
@@ -672,6 +708,7 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(trackId);
     if (!session) return;
     try {
+      this._restoreArmedTrackMute(session);
       this._removeTrackEndedListener(session);
       session.workletNode.port.postMessage({ command: 'stop' });
       session.source.disconnect();
