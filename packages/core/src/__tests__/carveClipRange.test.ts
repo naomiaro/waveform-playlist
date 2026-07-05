@@ -46,7 +46,12 @@ describe('carveClipRange', () => {
   });
 
   it('right-trims a clip whose tail overlaps the range', () => {
-    const clip = makeClip({ id: 'tail', startSample: 0, durationSamples: 1500, offsetSamples: 100 });
+    const clip = makeClip({
+      id: 'tail',
+      startSample: 0,
+      durationSamples: 1500,
+      offsetSamples: 100,
+    });
 
     const result = carveClipRange([clip], 1000, 2000);
 

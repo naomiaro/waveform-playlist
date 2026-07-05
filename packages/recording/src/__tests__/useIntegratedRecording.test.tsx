@@ -188,6 +188,48 @@ describe('useIntegratedRecording', () => {
     expect(result.current.isRecording).toBe(true);
   });
 
+  it('punch-in: recorded clip lands at the playhead and replaces overlapped content (#579)', async () => {
+    const setTracks = vi.fn();
+    const existingClip = {
+      id: 'existing',
+      startSample: 0,
+      durationSamples: 2048,
+      offsetSamples: 0,
+      sampleRate: 48000,
+      sourceDurationSamples: 2048,
+      gain: 1,
+    };
+    const rendered = await setupRecording(
+      [makeTrack('track-1', [existingClip as ClipTrack['clips'][number]])],
+      setTracks
+    );
+
+    act(() => {
+      recNode.port.onmessage!({
+        data: { channels: [new Float32Array(1024).fill(0.2)], channelCount: 1 },
+      } as MessageEvent);
+    });
+    await act(async () => {
+      await rendered.result.current.stopRecording();
+    });
+
+    const finalTracks = setTracks.mock.calls[0][0] as ClipTrack[];
+    const t1 = finalTracks.find((t) => t.id === 'track-1')!;
+    expect(t1.clips).toHaveLength(2);
+
+    const recorded = t1.clips.find((c) => c.id !== 'existing')!;
+    const carved = t1.clips.find((c) => c.id === 'existing')!;
+
+    // The take lands AT the playhead (0), not clamped past the existing clip
+    expect(recorded.startSample).toBe(0);
+    expect(recorded.durationSamples).toBe(1024);
+
+    // The overlapped head of the existing clip is carved away
+    expect(carved.startSample).toBe(1024);
+    expect(carved.offsetSamples).toBe(1024);
+    expect(carved.durationSamples).toBe(1024);
+  });
+
   it('finalizes the clip against the latest tracks (concurrent edits survive the stop handshake)', async () => {
     const setTracks = vi.fn();
     const trackOne = makeTrack('track-1');
