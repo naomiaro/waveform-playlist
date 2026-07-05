@@ -43,8 +43,15 @@ await addMeterWorkletModule((url) => ctx.audioWorklet.addModule(url));
 
 const meterNode = new AudioWorkletNode(ctx, 'meter-processor');
 meterNode.port.onmessage = (event: MessageEvent<MeterMessage>) => {
-  const { peak, rms } = event.data; // per-channel arrays
-  updateVuMeter(peak, rms);
+  // A single Float32Array of length 2*N (N = channel count):
+  // indices [0..N-1] are per-channel peak, [N..2N-1] are per-channel RMS.
+  // The worklet reuses one buffer (zero allocation on the audio thread);
+  // each message is a structured-clone copy.
+  const data = event.data;
+  const channels = data.length / 2;
+  for (let ch = 0; ch < channels; ch++) {
+    updateVuMeter(ch, data[ch], data[channels + ch]); // peak, rms
+  }
 };
 ```
 
@@ -53,7 +60,7 @@ meterNode.port.onmessage = (event: MessageEvent<MeterMessage>) => {
 - `addRecordingWorkletModule(addModule: (url: string) => Promise<void>): Promise<void>` — registers the `recording-processor` worklet module via your context's `addModule` callback
 - `addMeterWorkletModule(addModule: (url: string) => Promise<void>): Promise<void>` — registers the `meter-processor` worklet module via your context's `addModule` callback
 - `recordingProcessorUrl` / `meterProcessorUrl` — the underlying module URLs, for consumers who want to call `audioWorklet.addModule()` directly instead of using the loaders
-- `MeterMessage` — `{ peak: number[]; rms: number[] }`, the shape posted by the `meter-processor` on its port
+- `MeterMessage` — a `Float32Array` of length `2*N` (`N` = channel count) posted by the `meter-processor`: `[0..N-1]` per-channel peak, `[N..2N-1]` per-channel RMS. Derive the channel count as `data.length / 2`
 
 ## Examples & Documentation
 

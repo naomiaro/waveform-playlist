@@ -9,7 +9,7 @@ Audio recording support for waveform-playlist using AudioWorklet — mic capture
 - **Sample-accurate VU metering** — a dedicated meter worklet measures peak/RMS on every sample, not just once per animation frame
 - **Multi-channel recording** — auto-detects the microphone's actual channel count from the `MediaStream`
 - **Overdub with latency compensation** — record against existing playback; the finalized clip's timeline position accounts for output latency and Tone.js scheduling lookahead, with an optional manual override
-- **Device selection & hot-plug** — enumerate microphones, switch devices mid-session, auto-fallback if the active device disconnects
+- **Device selection & hot-plug** — enumerate microphones, switch devices between takes (refused while actively recording — a mid-recording switch would silently record silence), auto-fallback if the active device disconnects
 - **Pause/resume** — pauses the worklet itself, not just the UI
 - **Hooks only** — no bundled UI components; wire the state into your own controls or `@waveform-playlist/ui-components`'s `SegmentedVUMeter`
 
@@ -132,7 +132,7 @@ function Recorder({
 }
 ```
 
-Stopping adds a new `AudioClip` to `selectedTrackId` at `max(currentTime at record-start, end of last clip on that track)` — safe for overdubbing onto a track that already has clips.
+Stopping adds a new `AudioClip` to `selectedTrackId` at the timeline position captured when recording STARTED (punch-in semantics): the take lands exactly at the playhead and REPLACES any existing clip content it overlaps — partial overlaps are trimmed, fully-covered clips removed, and a clip spanning the take is split in two.
 
 ## API Reference
 
@@ -168,7 +168,7 @@ The core AudioWorklet-based recording hook.
 - `isRecording: boolean`, `isPaused: boolean`, `duration: number` (seconds)
 - `peaks: (Int8Array | Int16Array)[]` — one entry per channel, growing live during recording
 - `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves
-- `level: number`, `peakLevel: number` — reserved for backwards compatibility; prefer `useMicrophoneLevel` for metering
+- `level: number`, `peakLevel: number` — **deprecated** (always `0`); use `useMicrophoneLevel` for metering. Removed in the next major
 - `startRecording: () => Promise<void>`
 - `stopRecording: () => Promise<AudioBuffer | null>` — awaits the worklet's final flush before resolving, so the last samples are never dropped
 - `pauseRecording: () => void`, `resumeRecording: () => void` — pause/resume the worklet itself, not just the UI
