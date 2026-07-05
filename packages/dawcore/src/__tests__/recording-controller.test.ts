@@ -48,7 +48,7 @@ function createMockHost() {
     play: vi.fn(() => Promise.resolve()),
     stop: vi.fn(),
     _selectedTrackId: 'track-1',
-    _currentTime: 0,
+    currentTime: 0,
   }) as any;
 }
 
@@ -248,7 +248,7 @@ describe('RecordingController', () => {
   it('computes startSample using resolved effectiveSampleRate', async () => {
     // Simulate: host effectiveSampleRate updated by resolveAudioContextSampleRate
     host.audioContext.sampleRate = 44100;
-    host._currentTime = 2.0;
+    host.currentTime = 2.0;
     host.effectiveSampleRate = 44100;
     host.resolveAudioContextSampleRate = vi.fn(() => {
       host.effectiveSampleRate = 44100;
@@ -290,7 +290,7 @@ describe('RecordingController', () => {
   });
 
   it('computes startSample from currentTime and sampleRate', async () => {
-    host._currentTime = 2.5;
+    host.currentTime = 2.5;
     host.effectiveSampleRate = 48000;
 
     const controller = new RecordingController(host);
@@ -816,6 +816,149 @@ describe('RecordingController', () => {
     // for the stopping session.
     expect(events).not.toContain('daw-recording-pause');
     expect(events).not.toContain('daw-recording-resume');
+  });
+
+  // --- entry-guard tests ---
+
+  it('concurrent startRecording calls create only one session (double-start guard)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Defer worklet module load so both calls overlap in the await window
+    let resolveAdd!: () => void;
+    host.audioContext.audioWorklet.addModule = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          resolveAdd = r;
+        })
+    );
+
+    // Count without forwarding to the real dispatchEvent — happy-dom's
+    // propagation re-invokes the patched instance method (3x per dispatch).
+    const events: string[] = [];
+    host.dispatchEvent = vi.fn((e: Event) => {
+      events.push(e.type);
+      return true;
+    });
+
+    const controller = new RecordingController(host);
+    const p1 = controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    const p2 = controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    // The dynamic import() precedes addModule — wait for the deferred point
+    await vi.waitFor(() => {
+      expect(host.audioContext.audioWorklet.addModule).toHaveBeenCalled();
+    });
+    resolveAdd();
+    await Promise.all([p1, p2]);
+
+    // Exactly one capture pipeline: one source, one worklet node, one event
+    expect(host.audioContext.createMediaStreamSource).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(AudioWorkletNode).mock.calls).toHaveLength(1);
+    expect(events.filter((t) => t === 'daw-recording-start')).toHaveLength(1);
+    expect(controller.isRecording).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('concurrent stopRecording calls produce a single clip (re-entrancy guard)', async () => {
+    // Defer the done ack so the second stop lands mid-handshake
+    let stops = 0;
+    mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
+      if (msg?.command === 'stop') {
+        stops++;
+        if (stops === 1) {
+          setTimeout(() => {
+            mockWorkletNode.port.onmessage!({
+              data: { channels: [], channelCount: 1, done: true },
+            } as MessageEvent);
+          }, 20);
+        }
+      }
+    });
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 1024);
+
+    const events: string[] = [];
+    host.dispatchEvent = vi.fn((e: Event) => {
+      events.push(e.type);
+      return true;
+    });
+
+    const s1 = controller.stopRecording();
+    const s2 = controller.stopRecording();
+    await Promise.all([s1, s2]);
+
+    expect(host._addRecordedClip).toHaveBeenCalledTimes(1);
+    expect(events.filter((t) => t === 'daw-recording-complete')).toHaveLength(1);
+    expect(controller.isRecording).toBe(false);
+  });
+
+  it('paused stop still drains in-transit flush messages', async () => {
+    const { concatenateAudioData } = await import('@waveform-playlist/core');
+    vi.mocked(concatenateAudioData).mockClear();
+
+    // Simulate the pause-time flush still being in transit when stop is
+    // called: it arrives a few ms after the stop command is posted.
+    mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
+      if (msg?.command === 'stop') {
+        setTimeout(() => {
+          if (mockWorkletNode.port.onmessage) {
+            mockWorkletNode.port.onmessage({
+              data: { channels: [new Float32Array(256).fill(0.4)], channelCount: 1 },
+            } as MessageEvent);
+          }
+        }, 6);
+      }
+    });
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 1024);
+    controller.pauseRecording();
+
+    host.dispatchEvent = vi.fn(() => true);
+    await controller.stopRecording();
+
+    // 1024 pre-pause + 256 in-transit pause flush
+    const chunkArr = vi.mocked(concatenateAudioData).mock.calls[0][0];
+    const totalLen = chunkArr.reduce((sum: number, c: Float32Array) => sum + c.length, 0);
+    expect(totalLen).toBe(1280);
+  });
+
+  it('pause state does not leak into the next session after disposal', async () => {
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    controller.pauseRecording();
+    expect(controller.isPaused).toBe(true);
+
+    controller.hostDisconnected();
+
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    expect(controller.isPaused).toBe(false);
+  });
+
+  it('computes startSample from the live currentTime getter (punch-in during playback)', async () => {
+    // Live playhead is at 10s; the cached private field lags at 0 (it is only
+    // written on pause/stop/seek). Punch-in must use the live value.
+    host.currentTime = 10.0;
+    host._currentTime = 0;
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+    const session = controller.getSession('track-1');
+    expect(session!.startSample).toBe(Math.floor(10.0 * 48000));
+  });
+
+  it('resumes a suspended AudioContext before recording starts', async () => {
+    host.audioContext.state = 'suspended';
+    const resumeSpy = host.audioContext.resume;
+
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1', 512);
+
+    expect(resumeSpy).toHaveBeenCalled();
+    expect(controller.isRecording).toBe(true);
   });
 
   it('latencyOffset option overrides the auto-computed offset', async () => {
