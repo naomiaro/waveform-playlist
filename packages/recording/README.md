@@ -169,7 +169,7 @@ The core AudioWorklet-based recording hook.
 - `peaks: (Int8Array | Int16Array)[]` — one entry per channel, growing live during recording
 - `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves
 - `level: number`, `peakLevel: number` — **deprecated** (always `0`); use `useMicrophoneLevel` for metering. Removed in the next major
-- `startRecording: () => Promise<void>`
+- `startRecording: () => Promise<boolean>` — resolves `true` when the capture pipeline actually started (`false`: no stream, already recording, worklet failure); check it before starting synchronized playback
 - `stopRecording: () => Promise<AudioBuffer | null>` — awaits the worklet's final flush before resolving, so the last samples are never dropped
 - `pauseRecording: () => void`, `resumeRecording: () => void` — pause/resume the worklet itself, not just the UI
 - `error: Error | null`
@@ -203,7 +203,9 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
   - `samplesPerPixel?: number` (default: `1024`)
   - `latencyOffset?: number` — seconds; overrides the auto-computed `outputLatency + lookAhead` compensation applied to the clip's start. `0` disables compensation; omit to auto-compute
 
-**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `duration`, `level`, `peakLevel`, `levels`, `peakLevels`, `rmsLevels`), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording`, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), `recordingPeaks` (live per-channel peaks for preview), and a combined `error`.
+**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `duration`, `level`, `peakLevel`, `levels`, `peakLevels`, `rmsLevels`), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording` — resolves `true` when capture actually started, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), `recordingPeaks` (live per-channel peaks for preview), and a combined `error`.
+
+**Overdub with `@waveform-playlist/browser`:** call `usePlaylistControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it). Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`.
 
 ### Types
 

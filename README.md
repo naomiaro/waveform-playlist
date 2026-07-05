@@ -147,7 +147,9 @@ const { masterEffects, toggleBypass, updateParameter } = useDynamicEffects();
 const { exportWav, isExporting, progress } = useExportWav();
 
 // Recording
-const { startRecording, stopRecording, isRecording } = useIntegratedRecording();
+const { startRecording, stopRecording, isRecording } = useIntegratedRecording(
+  tracks, setTracks, selectedTrackId
+);
 ```
 
 ## Web Components (Experimental)
@@ -199,11 +201,11 @@ npm install @waveform-playlist/playout tone  # Tone.js (effects, MIDI synths)
 - Keyboard shortcuts (Space=play/pause, S=split, Cmd/Ctrl+Z=undo)
 - File drop for adding tracks
 - Frozen-panes layout — height-constrained editors scroll vertically with a pinned ruler and row-locked track controls; controls adapt to short rows
-- Recording with overdub and latency compensation
+- Recording with overdub, punch-in replace (takes land at the playhead and replace overlapped content), automatic armed-track mute (the recorded-over material is silenced during the take), named takes with live clip headers, and latency compensation
 - Metronome with mixed meters and tempo changes
 - Tempo automation — linear ramps and Möbius-Ease curves with exact integration
 - Pre-computed peaks for fast initial render
-- `indefinite-playback` attribute fills the viewport when no audio is loaded — ruler renders before any track
+- Player-style end-of-timeline auto-stop by default; `indefinite-playback` rolls DAW-style until an explicit stop, `fill-viewport` fills the empty viewport so the ruler renders before any track (recording sessions suppress the auto-stop automatically)
 
 **Packages:**
 
