@@ -103,6 +103,8 @@ const normalized = gainToNormalized(rawPeak);
 
 **Pattern:** `useIntegratedRecording` captures timeline position at record start (not stop) via `recordingStartTimeRef`. During overdub, `currentTime` advances with playback — using it at stop time would place the clip at the wrong position.
 
+**Punch-in replace (#579):** The finalized clip lands exactly at the captured start position and REPLACES overlapped content via `carveClipRange` from core (trim partial overlaps, remove fully-covered clips, split spanning clips). There is no clamp-to-last-clip-end. dawcore's `addRecordedClip` applies the same carve — keep both consumers in sync.
+
 **Latency compensation:** Two sources of delay between worklet capture and audible playback:
 1. `getGlobalContext().lookAhead` (~100ms) — Tone.js Transport schedules audio ahead of real time
 2. `getGlobalAudioContext().outputLatency` — hardware DAC delay before audio reaches speakers

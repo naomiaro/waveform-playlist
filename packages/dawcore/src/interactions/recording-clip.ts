@@ -4,7 +4,7 @@
  */
 
 import type { ClipTrack, PeakData } from '@waveform-playlist/core';
-import { createClip } from '@waveform-playlist/core';
+import { carveClipRange, createClip } from '@waveform-playlist/core';
 import type { PeakPipeline } from '../workers/peakPipeline';
 import type { DawErrorDetail } from '../events';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
@@ -75,7 +75,10 @@ export function addRecordedClip(
       host._peaksData = new Map(host._peaksData).set(clip.id, pd);
       host._engineTracks = new Map(host._engineTracks).set(trackId, {
         ...t,
-        clips: [...t.clips, clip],
+        // Punch-in replace (#579): the recorded clip owns [startSample,
+        // startSample + durSamples) — carve overlapped content out of the
+        // existing clips before inserting (parity with the React provider).
+        clips: [...carveClipRange(t.clips, startSample, startSample + durSamples), clip],
       });
       // Keep _tracks in sync so public API and track controls reflect the clip
       const desc = host._tracks.get(trackId);

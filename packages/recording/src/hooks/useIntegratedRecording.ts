@@ -11,6 +11,7 @@ import type { MicrophoneDevice } from '../types';
 import {
   type ClipTrack,
   type AudioClip,
+  carveClipRange,
   resolveRecordingOffsetSamples,
 } from '@waveform-playlist/core';
 import {
@@ -21,8 +22,10 @@ import {
 
 export interface IntegratedRecordingOptions {
   /**
-   * Current playback/cursor position in seconds
-   * Recording will start from max(currentTime, lastClipEndTime)
+   * Current playback/cursor position in seconds.
+   * Punch-in semantics (#579): the recorded clip lands exactly at this
+   * position and REPLACES any existing clip content it overlaps — partial
+   * overlaps are trimmed, fully-covered clips removed, spanning clips split.
    */
   currentTime?: number;
 
@@ -207,20 +210,10 @@ export function useIntegratedRecording(
         return;
       }
 
-      const selectedTrack = currentTracks[selectedTrackIndex];
-
-      // Use the captured start time (not live currentTime which advances during overdub)
-      const recordStartTimeSamples = Math.floor(recordingStartTimeRef.current * buffer.sampleRate);
-
-      let lastClipEndSample = 0;
-      if (selectedTrack.clips.length > 0) {
-        const endSamples = selectedTrack.clips.map(
-          (clip) => clip.startSample + clip.durationSamples
-        );
-        lastClipEndSample = Math.max(...endSamples);
-      }
-
-      const startSample = Math.max(recordStartTimeSamples, lastClipEndSample);
+      // Use the captured start time (not live currentTime which advances during overdub).
+      // Punch-in replace (#579): the take lands exactly here; overlapped
+      // content is carved out below when the clip list is assembled.
+      const startSample = Math.floor(recordingStartTimeRef.current * buffer.sampleRate);
 
       // Latency compensation: an explicit latencyOffset (seconds) replaces the
       // auto-computed outputLatency + lookAhead window. Shared resolver with the
@@ -260,12 +253,16 @@ export function useIntegratedRecording(
         name: `Recording ${new Date().toLocaleTimeString()}`,
       };
 
-      // Add clip to track
+      // Add clip to track — the recorded clip owns [startSample,
+      // startSample + effectiveDuration): trim/remove/split whatever it overlaps.
       const newTracks = currentTracks.map((track, index) => {
         if (index === selectedTrackIndex) {
           return {
             ...track,
-            clips: [...track.clips, newClip],
+            clips: [
+              ...carveClipRange(track.clips, startSample, startSample + effectiveDuration),
+              newClip,
+            ],
           };
         }
         return track;

@@ -33,6 +33,42 @@ function makeBuffer(length: number): AudioBuffer {
 }
 
 describe('addRecordedClip', () => {
+  it('punch-in: carves overlapped content out of the track before inserting the clip (#579)', async () => {
+    const existing = {
+      id: 'existing',
+      startSample: 0,
+      durationSamples: 2048,
+      offsetSamples: 0,
+      sampleRate: 48000,
+      sourceDurationSamples: 2048,
+      gain: 1,
+    };
+    const host = makeHost({
+      _engineTracks: new Map([
+        ['t1', { id: 't1', name: 't1', clips: [existing] } as unknown as never],
+      ]) as RecordingClipHost['_engineTracks'],
+    });
+
+    addRecordedClip(host, 't1', makeBuffer(1024), 0, 1024, 0);
+    await vi.waitFor(() => {
+      expect(host._peakPipeline.generatePeaks).toHaveBeenCalled();
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    const track = host._engineTracks.get('t1')!;
+    expect(track.clips).toHaveLength(2);
+
+    const carved = track.clips.find((c) => c.id === 'existing')!;
+    const recorded = track.clips.find((c) => c.id !== 'existing')!;
+
+    // The recorded clip owns [0, 1024) — matching the React provider's
+    // punch-in replace semantics.
+    expect(recorded.startSample).toBe(0);
+    expect(carved.startSample).toBe(1024);
+    expect(carved.offsetSamples).toBe(1024);
+    expect(carved.durationSamples).toBe(1024);
+  });
+
   it('does not orphan a _peaksData entry when the track was removed during peak generation', async () => {
     const host = makeHost(); // _engineTracks has no track — simulates removal mid-generation
 
