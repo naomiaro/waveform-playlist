@@ -2,7 +2,7 @@
  * Hook for managing microphone access and device enumeration
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { UseMicrophoneAccessReturn, MicrophoneDevice } from '../types';
 
 export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
@@ -11,6 +11,16 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   const [hasPermission, setHasPermission] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Mirrors the stream state so unmount cleanup and overlapping requests
+  // operate on the CURRENT stream, not a stale closure capture.
+  const streamRef = useRef<MediaStream | null>(null);
+  // Generation token: bumped by every requestAccess (and by stopStream /
+  // unmount). A getUserMedia grant belonging to an older generation is a
+  // stale request — its stream must be stopped, not installed, or the mic
+  // stays hot with no owner (permission prompt resolving after unmount,
+  // or the slower of two overlapping requests).
+  const requestGenerationRef = useRef(0);
 
   // Enumerate audio input devices
   const enumerateDevices = useCallback(async () => {
@@ -34,13 +44,18 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   // Request microphone access
   const requestAccess = useCallback(
     async (deviceId?: string, audioConstraints?: MediaTrackConstraints) => {
+      const generation = ++requestGenerationRef.current;
       setIsLoading(true);
       setError(null);
 
       try {
-        // Stop existing stream if any
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop());
+        // Stop and clear the existing stream. Clearing state (not just
+        // stopping tracks) matters on failure: consumers left holding a
+        // stopped stream silently record silence with no error.
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+          setStream(null);
         }
 
         // Build audio constraints
@@ -62,6 +77,16 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         };
 
         const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // Superseded by a newer request, stopStream, or unmount while the
+        // permission prompt was open — stop the just-granted stream instead
+        // of installing it (a hot mic nobody owns).
+        if (generation !== requestGenerationRef.current) {
+          newStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = newStream;
         setStream(newStream);
         setHasPermission(true);
 
@@ -69,23 +94,30 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         await enumerateDevices();
       } catch (err) {
         console.error('Failed to access microphone:', err);
-        setError(err instanceof Error ? err : new Error('Failed to access microphone'));
-        setHasPermission(false);
+        if (generation === requestGenerationRef.current) {
+          setError(err instanceof Error ? err : new Error('Failed to access microphone'));
+          setHasPermission(false);
+        }
       } finally {
-        setIsLoading(false);
+        if (generation === requestGenerationRef.current) {
+          setIsLoading(false);
+        }
       }
     },
-    [stream, enumerateDevices]
+    [enumerateDevices]
   );
 
   // Stop the stream and revoke access
   const stopStream = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
+    // Invalidate any in-flight request so a pending grant can't re-arm the mic
+    requestGenerationRef.current++;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       setStream(null);
       setHasPermission(false);
     }
-  }, [stream]);
+  }, []);
 
   // Check initial permission state, enumerate devices, and listen for hot-plug changes
   useEffect(() => {
@@ -98,11 +130,15 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     // Cleanup on unmount
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', enumerateDevices);
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      // Invalidate any in-flight request (a grant arriving after unmount is
+      // stopped by the generation check) and stop the current stream.
+      requestGenerationRef.current++;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
     };
-  }, [enumerateDevices, stream]);
+  }, [enumerateDevices]);
 
   return {
     stream,

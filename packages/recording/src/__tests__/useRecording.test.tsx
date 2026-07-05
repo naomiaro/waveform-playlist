@@ -308,6 +308,126 @@ describe('useRecording', () => {
     cancelSpy.mockRestore();
   });
 
+  it('concurrent startRecording calls build only one capture pipeline', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+
+    await act(async () => {
+      const p1 = result.current.startRecording();
+      const p2 = result.current.startRecording();
+      await Promise.all([p1, p2]);
+    });
+
+    // A second pipeline would interleave duplicate chunks into the shared
+    // accumulator and leak a never-stopped worklet into later sessions.
+    expect(mockContext.createMediaStreamSource).toHaveBeenCalledTimes(1);
+    expect(mockContext.createAudioWorkletNode).toHaveBeenCalledTimes(1);
+    expect(result.current.isRecording).toBe(true);
+  });
+
+  it('concurrent stopRecording calls share one handshake and one stop command', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      mockWorkletNode.port.onmessage!({
+        data: { channels: [new Float32Array(512).fill(0.2)], channelCount: 1 },
+      } as MessageEvent);
+    });
+
+    // Defer the done ack so the second stop lands mid-handshake
+    let stopCommands = 0;
+    mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
+      if (msg?.command === 'stop') {
+        stopCommands++;
+        setTimeout(() => {
+          mockWorkletNode.port.onmessage?.({
+            data: { channels: [], channelCount: 1, done: true },
+          } as MessageEvent);
+        }, 10);
+      }
+    });
+
+    let b1: AudioBuffer | null = null;
+    let b2: AudioBuffer | null = null;
+    await act(async () => {
+      const p1 = result.current.stopRecording();
+      const p2 = result.current.stopRecording();
+      [b1, b2] = await Promise.all([p1, p2]);
+    });
+
+    // One stop command (a second would overwrite the ack resolver and hit
+    // the worklet's already-emptied buffers); both callers get the same buffer.
+    expect(stopCommands).toBe(1);
+    expect(b1).not.toBeNull();
+    expect(b2).toBe(b1);
+  });
+
+  it('pauseRecording works in the same tick as startRecording (refs, not stale state)', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+
+    await act(async () => {
+      await result.current.startRecording();
+      // Same tick — no re-render yet, so a state-based guard sees
+      // isRecording === false and silently drops the pause command.
+      result.current.pauseRecording();
+    });
+
+    expect(mockWorkletNode.port.postMessage).toHaveBeenCalledWith({ command: 'pause' });
+    expect(result.current.isPaused).toBe(true);
+  });
+
+  it('resumeRecording works in the same tick as pauseRecording', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+
+    await act(async () => {
+      await result.current.startRecording();
+      result.current.pauseRecording();
+      result.current.resumeRecording();
+    });
+
+    expect(mockWorkletNode.port.postMessage).toHaveBeenCalledWith({ command: 'resume' });
+    expect(result.current.isPaused).toBe(false);
+  });
+
+  it('unmount during startRecording awaits aborts the session (no leaked pipeline)', async () => {
+    const worklets = await import('@waveform-playlist/worklets');
+    let resolveLoad!: () => void;
+    vi.mocked(worklets.addRecordingWorkletModule).mockImplementationOnce(
+      () =>
+        new Promise<void>((r) => {
+          resolveLoad = r;
+        })
+    );
+
+    const stream = createMockStream();
+    const { result, unmount } = renderHook(() => useRecording(stream));
+
+    let startPromise!: Promise<void>;
+    act(() => {
+      startPromise = result.current.startRecording();
+    });
+    await act(async () => {
+      unmount();
+    });
+    resolveLoad();
+    await act(async () => {
+      await startPromise;
+    });
+
+    // The continuation must not build the capture graph after unmount —
+    // nothing would ever stop it (infinite rAF + unbounded chunk growth).
+    expect(mockContext.createMediaStreamSource).not.toHaveBeenCalled();
+    expect(mockWorkletNode.port.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'start' })
+    );
+  });
+
   it('skips peak updates while stop is in flight', async () => {
     const stream = createMockStream();
     const { result } = renderHook(() => useRecording(stream));
