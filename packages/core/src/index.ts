@@ -6,3 +6,4 @@ export * from './spectrogramCanvasId';
 export * from './fades';
 export * from './keyboard';
 export * from './probeRangeSupport';
+export * from './enumerateMicrophones';

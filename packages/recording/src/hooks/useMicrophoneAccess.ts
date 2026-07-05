@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { enumerateMicrophones } from '@waveform-playlist/core';
 import { UseMicrophoneAccessReturn, MicrophoneDevice } from '../types';
 
 export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
@@ -25,18 +26,11 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   // rejects read-modify-writes like a generation bump in cleanup functions).
   const isUnmountedRef = useRef(false);
 
-  // Enumerate audio input devices
+  // Enumerate audio input devices — delegates to the framework-agnostic core
+  // helper (redaction-aware fallback labels, SSR/insecure-context safe).
   const enumerateDevices = useCallback(async () => {
     try {
-      const allDevices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = allDevices
-        .filter((device) => device.kind === 'audioinput')
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label || `Microphone ${device.deviceId.slice(0, 8)}`,
-          groupId: device.groupId,
-        }));
-
+      const { devices: audioInputs } = await enumerateMicrophones();
       setDevices(audioInputs);
     } catch (err) {
       console.error('Failed to enumerate devices:', err);
