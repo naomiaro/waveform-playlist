@@ -62,11 +62,15 @@ export interface UseIntegratedRecordingReturn {
   duration: number;
   level: number;
   peakLevel: number;
-  /** Per-channel peak levels (0-1). Array length matches channelCount. */
+  /**
+   * Per-channel peak levels (0-1). Array length matches the metered channel
+   * count (auto-detected mic channels; mono mirrored up to channelCount —
+   * see UseMicrophoneLevelReturn.levels).
+   */
   levels: number[];
-  /** Per-channel held peak levels (0-1). Array length matches channelCount. */
+  /** Per-channel held peak levels (0-1). Same length contract as `levels`. */
   peakLevels: number[];
-  /** Per-channel RMS levels (0-1). Array length matches channelCount. */
+  /** Per-channel RMS levels (0-1). Same length contract as `levels`. */
   rmsLevels: number[];
   error: Error | null;
 
@@ -111,6 +115,11 @@ export function useIntegratedRecording(
   selectedTrackIdRef.current = selectedTrackId;
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
+  // Latest tracks for reads that happen AFTER an await — the stop handshake
+  // can take >1s, and finalizing against a closure capture would discard any
+  // track edits that landed in that window.
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
 
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
@@ -182,10 +191,13 @@ export function useIntegratedRecording(
       return;
     }
 
-    // Add clip to track after recording completes
+    // Add clip to track after recording completes. Read tracks through the
+    // ref — the awaited stop handshake above can span >1s, and the closure's
+    // tracks capture would silently revert concurrent edits.
     const trackId = selectedTrackIdRef.current;
+    const currentTracks = tracksRef.current;
     if (buffer && trackId) {
-      const selectedTrackIndex = tracks.findIndex((t) => t.id === trackId);
+      const selectedTrackIndex = currentTracks.findIndex((t) => t.id === trackId);
       if (selectedTrackIndex === -1) {
         const err = new Error(
           `Recording completed but track "${trackId}" no longer exists. The recorded audio could not be saved.`
@@ -195,7 +207,7 @@ export function useIntegratedRecording(
         return;
       }
 
-      const selectedTrack = tracks[selectedTrackIndex];
+      const selectedTrack = currentTracks[selectedTrackIndex];
 
       // Use the captured start time (not live currentTime which advances during overdub)
       const recordStartTimeSamples = Math.floor(recordingStartTimeRef.current * buffer.sampleRate);
@@ -249,7 +261,7 @@ export function useIntegratedRecording(
       };
 
       // Add clip to track
-      const newTracks = tracks.map((track, index) => {
+      const newTracks = currentTracks.map((track, index) => {
         if (index === selectedTrackIndex) {
           return {
             ...track,
@@ -261,7 +273,7 @@ export function useIntegratedRecording(
 
       setTracks(newTracks);
     }
-  }, [tracks, setTracks, stopRec, latencyOffset]);
+  }, [setTracks, stopRec, latencyOffset]);
 
   // Auto-select first device when available, or fallback if selected device was unplugged
   useEffect(() => {
@@ -279,8 +291,20 @@ export function useIntegratedRecording(
     }
   }, [hasPermission, devices, selectedDevice, resetPeak, requestAccess, audioConstraints]);
 
+  // Mirror isRecording for the device-switch guards below — reading the
+  // state directly would churn the callbacks every recording toggle.
+  const isRecordingRef = useRef(isRecording);
+  isRecordingRef.current = isRecording;
+
   // Request microphone access
   const requestMicAccess = useCallback(async () => {
+    // requestAccess stops the current stream's tracks, and track.stop() fires
+    // no 'ended' event — the recording's source is never rewired, so the rest
+    // of the take silently records silence. Refuse while recording.
+    if (isRecordingRef.current) {
+      setHookError(new Error('Cannot request microphone access while recording. Stop first.'));
+      return;
+    }
     try {
       setHookError(null);
       await requestAccess(undefined, audioConstraints);
@@ -294,6 +318,11 @@ export function useIntegratedRecording(
   // Change device
   const changeDevice = useCallback(
     async (deviceId: string) => {
+      // Same silent-silence hazard as requestMicAccess above.
+      if (isRecordingRef.current) {
+        setHookError(new Error('Cannot switch microphone while recording. Stop first.'));
+        return;
+      }
       try {
         setHookError(null);
         setSelectedDevice(deviceId);

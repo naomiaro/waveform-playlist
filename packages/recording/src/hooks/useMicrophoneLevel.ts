@@ -48,18 +48,21 @@ export interface UseMicrophoneLevelReturn {
   resetPeak: () => void;
 
   /**
-   * Per-channel peak levels (0-1). Array length matches channelCount.
+   * Per-channel peak levels (0-1). Array length matches the metered channel
+   * count: the mic's auto-detected channels, with mono mirrored up to the
+   * requested `channelCount`. A mic with MORE channels than `channelCount`
+   * yields one entry per actual channel.
    * True peak: max absolute sample value per analysis frame.
    */
   levels: number[];
 
   /**
-   * Per-channel held peak levels (0-1). Array length matches channelCount.
+   * Per-channel held peak levels (0-1). Same length contract as `levels`.
    */
   peakLevels: number[];
 
   /**
-   * Per-channel RMS levels (0-1). Array length matches channelCount.
+   * Per-channel RMS levels (0-1). Same length contract as `levels`.
    * RMS: root mean square of samples per analysis frame.
    */
   rmsLevels: number[];
@@ -189,6 +192,10 @@ export function useMicrophoneLevel(
         setRmsLevels(mirroredRms);
         setPeakLevels((prev) => mirroredPeaks.map((val, i) => Math.max(prev[i] ?? 0, val)));
       };
+
+      // Setup succeeded — clear any error from a previous failed attempt so
+      // the UI doesn't show a permanent failure while metering works.
+      setMeterError(null);
     };
 
     setupMonitoring().catch((err) => {
