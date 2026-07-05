@@ -10,6 +10,10 @@ export default defineConfig([
     splitting: false,
     sourcemap: true,
     clean: true,
+    // Without shims, the CJS build stubs import.meta as {} and the top-level
+    // `new URL('./worklet/…', import.meta.url)` throws Invalid URL at require
+    // time (#574). shims replaces import.meta.url with pathToFileURL(__filename).
+    shims: true,
   },
   {
     entry: {
