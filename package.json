@@ -28,6 +28,7 @@
     "example:media-element": "vite --config examples/media-element-player/vite.config.ts"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.60.0",
     "@types/node": "^20.19.42",
