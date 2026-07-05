@@ -11,7 +11,7 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **Keyboard shortcuts** — Play/pause, split, undo/redo via `<daw-keyboard-shortcuts>`
 - **Undo/redo** — Full transaction-based undo with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z
 - **File drop** — Drag audio files onto the editor to add tracks (enable with the `file-drop` attribute)
-- **Recording** — Live mic recording with waveform preview, pause/resume, cancelable clip creation; takes land at the playhead and replace overlapped clip content (punch-in)
+- **Recording** — Live mic recording with waveform preview (full clip chrome incl. header while capturing), pause/resume, cancelable clip creation; takes land at the playhead and replace overlapped clip content (punch-in), the recorded-over track is transiently muted during the take, and the end-of-timeline auto-stop is suppressed so takes run past existing audio
 - **Pre-computed peaks** — Instant waveform rendering from `.dat` files before audio decodes
 - **MIDI tracks** — Declarative or programmatic MIDI clips render as piano-roll. Playback via the Tone.js adapter. See [MIDI Tracks](#midi-tracks).
 - **MIDI file loading** — `editor.loadMidi(urlOrFile)` parses a `.mid` file into piano-roll tracks via the optional `@dawcore/midi` peer
@@ -353,6 +353,8 @@ const result = await editor.loadFiles(fileList);
 </script>
 ```
 
+During a take the editor shows the live preview with full clip chrome (header label from `RecordingOptions.clipName`, default "Recording…"), transiently mutes the recorded track (punch-in replaces whatever the take overlaps, so the doomed material never plays under the overdub — the track's Mute control is untouched and the previous state is restored when the session ends), and suppresses the end-of-timeline auto-stop so the take can run past existing audio.
+
 ## Single-Track Player
 
 `<daw-player>` is a standalone element for single-track playback (podcasts, audiobooks, previewing one file) — it wraps `@waveform-playlist/media-element-playout` and needs no `adapter`, `AudioContext`, or `PlaylistEngine`. `@waveform-playlist/media-element-playout` ships as a direct dependency of `@dawcore/components`, so there's nothing extra to install:
@@ -442,7 +444,8 @@ Core orchestrator. Attributes:
 | `mono` | boolean | `false` | Merge stereo to mono display |
 | `bar-width` / `bar-gap` | number | `1` / `0` | Waveform bar rendering style |
 | `rounded-bars` | boolean | `false` | Pill-shaped bar caps (radius `bar-width / 2`) |
-| `indefinite-playback` | boolean | `false` | Keep ruler/timeline filling the viewport with no clips |
+| `indefinite-playback` | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport` |
+| `fill-viewport` | boolean | `false` | Keep ruler/timeline filling the viewport even when audio is shorter (layout only) |
 | `scale-mode` | string | `'temporal'` | `'temporal'` (seconds) or `'beats'` (tick-linear grid) |
 | `ticks-per-pixel` | number | `24` | Zoom level in beats mode |
 | `snap-to` | string | `'off'` | Grid snapping in beats mode (`'bar'`, `'beat'`, `'1/2'`…`'1/16'`, `'off'`) |
@@ -458,7 +461,7 @@ Methods:
 - Display: `setTimeFormat(format)` — sugar over the `timeFormat` property, fires `daw-time-format-change`
 - Tracks & clips: `addTrack(config)`, `removeTrack(id)`, `updateTrack(id, partial)`, `addClip(trackId, config)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`
 - Editing: `splitAtPlayhead()`, `undo()`, `redo()`, `setSelection(start, end)`
-- Recording: `startRecording(stream?, options?)`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`, `togglePauseRecording()`
+- Recording: `startRecording(stream?, options?)`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`, `togglePauseRecording()`. Options include `overdub` (start playback with the take), `latencyOffset` (seconds), and `clipName` (live-preview header + finalized clip name, default `"Recording"`)
 - Effects & export: the master-chain effects API (see [Effects](#effects)), `getEffectsState()` / `setEffectsState(entries)`, `openEffectGui()` / `closeEffectGui()`, `exportAudio(options?)`
 
 ### `<daw-track>`

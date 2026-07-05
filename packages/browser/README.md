@@ -9,7 +9,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
 - **Four focused context hooks** — `usePlaybackAnimation`, `usePlaylistState`, `usePlaylistControls`, `usePlaylistData` isolate 60fps playhead updates from low-frequency state so unrelated components don't re-render on every animation frame
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
-- **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview
+- **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `setRecordingActive(active, armedTrackId)` suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the session
 - **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`
 - **WAV export** — render the full mix (including effects) offline to a downloadable WAV file
 - **MediaElement player mode** — a lightweight single-track player with pitch-preserving speed control, for podcast/audiobook-style use cases that don't need multitrack mixing
@@ -88,7 +88,7 @@ Prefer a lightweight single-track player instead? Use `MediaElementPlaylistProvi
 |------|---------|
 | `usePlaybackAnimation` | `isPlaying`, `currentTime`, animation refs, `getPlaybackTime()`, `registerFrameCallback()` for 60fps-driven UI (playhead, progress bars) |
 | `usePlaylistState` | Low-frequency state — selection, loop region, annotations, `selectedTrackId`, `canUndo`/`canRedo` |
-| `usePlaylistControls` | Actions — `play`, `pause`, `stop`, `seekTo`, track mute/solo/volume/pan, zoom, undo/redo |
+| `usePlaylistControls` | Actions — `play`, `pause`, `stop`, `seekTo`, track mute/solo/volume/pan, zoom, undo/redo, `setRecordingActive` (recording-session suppression + armed-track mute) |
 | `usePlaylistData` | Derived/config data — `tracks`, `duration`, `sampleRate`, `peaksDataArray`, `trackStates`, `isReady` |
 
 `usePlaylistDataOptional` is the same as `usePlaylistData` but returns `null` outside a provider (for components that render both inside and outside one). `MediaElementPlaylistProvider` has the equivalent `useMediaElementAnimation`, `useMediaElementState`, `useMediaElementControls`, `useMediaElementData`.
