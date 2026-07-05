@@ -127,6 +127,8 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 
 **Pattern:** `useMicrophoneAccess` listens for `navigator.mediaDevices.devicechange` to re-enumerate devices on plug/unplug. `useIntegratedRecording` auto-falls back to the first available device if the selected device disappears from the list.
 
+**Enumeration lives in core:** the actual device listing is `enumerateMicrophones()` from `@waveform-playlist/core` (framework-agnostic, permission-free, redaction-aware `hasLabels` flag, injectable `mediaDevices`). Non-React consumers (dawcore pages, vanilla JS) should use it — or `watchMicrophoneDevices()` for a hot-plug subscription — directly instead of this hook.
+
 ## Pause/Resume Must Message the Worklet
 
 `useRecording.pauseRecording()` / `resumeRecording()` must `port.postMessage({ command: 'pause' | 'resume' })` to the worklet. Flipping React state and cancelling the duration rAF is not enough — the worklet keeps capturing. Silent bug; only visible in the resulting AudioBuffer length.
