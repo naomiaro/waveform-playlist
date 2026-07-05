@@ -21,6 +21,9 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   // stays hot with no owner (permission prompt resolving after unmount,
   // or the slower of two overlapping requests).
   const requestGenerationRef = useRef(0);
+  // Set by unmount cleanup (plain assignment — the exhaustive-deps rule
+  // rejects read-modify-writes like a generation bump in cleanup functions).
+  const isUnmountedRef = useRef(false);
 
   // Enumerate audio input devices
   const enumerateDevices = useCallback(async () => {
@@ -81,7 +84,7 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         // Superseded by a newer request, stopStream, or unmount while the
         // permission prompt was open — stop the just-granted stream instead
         // of installing it (a hot mic nobody owns).
-        if (generation !== requestGenerationRef.current) {
+        if (generation !== requestGenerationRef.current || isUnmountedRef.current) {
           newStream.getTracks().forEach((track) => track.stop());
           return;
         }
@@ -131,8 +134,8 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', enumerateDevices);
       // Invalidate any in-flight request (a grant arriving after unmount is
-      // stopped by the generation check) and stop the current stream.
-      requestGenerationRef.current++;
+      // stopped by the isUnmounted check) and stop the current stream.
+      isUnmountedRef.current = true;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;

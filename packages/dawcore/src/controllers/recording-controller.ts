@@ -522,7 +522,7 @@ export class RecordingController implements ReactiveController {
 
     // Resolve the stop barrier in a finally block so a throw in peak generation
     // (e.g. samplesPerPixel=0 transient, host shadowRoot churn) doesn't strand
-    // the await in stopRecording for the full 250ms timeout.
+    // the await in stopRecording for the full 1000ms safety timeout.
     try {
       const hasSamples = !!(
         channels &&
