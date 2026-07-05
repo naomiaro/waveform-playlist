@@ -62,15 +62,17 @@ export function addRecordedClip(
   host._peakPipeline
     .generatePeaks(trimmedBuf, host.samplesPerPixel, host.mono)
     .then((pd) => {
-      host._peaksData = new Map(host._peaksData).set(clip.id, pd);
       const t = host._engineTracks.get(trackId);
       if (!t) {
-        // Track was removed during peak generation — clean up orphaned buffer
+        // Track was removed during peak generation — clean up the orphaned
+        // buffer and never insert the peaks entry (this clip never reaches
+        // the engine, so nothing else would ever delete it).
         const next = new Map(host._clipBuffers);
         next.delete(clip.id);
         host._clipBuffers = next;
         return;
       }
+      host._peaksData = new Map(host._peaksData).set(clip.id, pd);
       host._engineTracks = new Map(host._engineTracks).set(trackId, {
         ...t,
         clips: [...t.clips, clip],
