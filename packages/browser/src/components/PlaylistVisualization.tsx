@@ -213,6 +213,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     loopStart,
     loopEnd,
     isLoopEnabled,
+    indefinitePlayback,
     fillViewport,
   } = usePlaylistState();
   const annotationIntegration = useContext(AnnotationIntegrationContext);
@@ -338,8 +339,10 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         ? duration
         : DEFAULT_EMPTY_TRACK_DURATION;
 
-  // Fill the visible scroll container when requested (layout only).
-  if (fillViewport) {
+  // Fill the visible scroll container when requested — indefinitePlayback
+  // implies it (endless playback needs an endless-looking timeline);
+  // fillViewport requests the layout alone.
+  if (indefinitePlayback || fillViewport) {
     const containerWidth = scrollContainerRef.current?.clientWidth ?? 0;
     const minContainerDuration = (containerWidth * samplesPerPixel) / sampleRate;
     displayDuration = Math.max(displayDuration, minContainerDuration);

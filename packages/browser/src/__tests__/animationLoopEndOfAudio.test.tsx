@@ -1,18 +1,22 @@
 // @vitest-environment jsdom
 //
-// DAW-transport playback semantics in the WaveformPlaylistProvider animation
-// loop (issues #589 / #590).
+// End-of-audio playback semantics in the WaveformPlaylistProvider animation
+// loop (issues #589 / #590 — semantics matched with dawcore's <daw-editor>):
 //
-// 1. Playback does NOT auto-stop at the end of the timeline — like a DAW
-//    transport (and dawcore's native transport), it rolls until an explicit
-//    stop/pause. This is what lets overdub recording run past the end of
-//    existing material with no special casing.
-// 2. Explicit ends still stop: selection playback passes a playDuration and
-//    must stop at its end.
-// 3. setRecordingActive(active, armedTrackId) transiently mutes the armed
-//    track for the recording session (punch-in replaces its content — the
-//    doomed material must not play under the take) and restores the previous
-//    mute state on release.
+// 1. Default: playback auto-stops at the end of the timeline (player style)
+//    and the cursor returns to the play-start position.
+// 2. `indefinitePlayback` opts out — the transport rolls until an explicit
+//    stop/pause (DAW style, = dawcore's `indefinite-playback` attribute).
+// 3. An active recording session suppresses the auto-stop so overdub
+//    playback runs past the end of existing material. Consumers call
+//    setRecordingActive eagerly (before play()) — a render round-trip loses
+//    the race against the first animation frame on an empty timeline.
+// 4. setRecordingActive(active, armedTrackId) also transiently mutes the
+//    armed track for the session (punch-in replaces its overlapped content —
+//    the doomed material must not play under the take) and restores the
+//    previous mute state on release.
+// 5. Explicit ends still stop: selection playback passes a playDuration and
+//    stops at its end regardless.
 //
 // The provider is mounted with an injected fake adapter (createAdapter) whose
 // clock the test controls directly — no Tone.js, no real audio.
@@ -128,13 +132,18 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-function mountProvider(adapter: FakeAdapter, tracks: ClipTrack[]) {
+function mountProvider(
+  adapter: FakeAdapter,
+  tracks: ClipTrack[],
+  opts: { indefinitePlayback?: boolean } = {}
+) {
   return render(
     <WaveformPlaylistProvider
       tracks={tracks}
       onTracksChange={() => {}}
       sampleRate={SAMPLE_RATE}
       createAdapter={() => adapter}
+      indefinitePlayback={opts.indefinitePlayback}
     >
       <ProbeChild />
     </WaveformPlaylistProvider>
@@ -143,7 +152,7 @@ function mountProvider(adapter: FakeAdapter, tracks: ClipTrack[]) {
 
 const settle = (ms = 120) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-describe('DAW-transport playback semantics', () => {
+describe('end-of-audio auto-stop semantics', () => {
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -156,7 +165,7 @@ describe('DAW-transport playback semantics', () => {
     vi.restoreAllMocks();
   });
 
-  it('does not auto-stop at the end of the timeline (rolls until explicit stop)', async () => {
+  it('auto-stops at the end of the timeline by default (player style)', async () => {
     const adapter = createFakeAdapter();
     const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
     mountProvider(adapter, [trackA]);
@@ -167,7 +176,21 @@ describe('DAW-transport playback semantics', () => {
     });
     expect(probe.isPlaying).toBe(true);
 
-    // Far past the 2s end of audio — the transport keeps rolling.
+    await act(async () => {
+      adapter.setNow(2.1);
+    });
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
+  });
+
+  it('indefinitePlayback rolls past the end until explicit stop (DAW style)', async () => {
+    const adapter = createFakeAdapter();
+    const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
+    mountProvider(adapter, [trackA], { indefinitePlayback: true });
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      await probe.play(0);
+    });
     await act(async () => {
       adapter.setNow(30);
       await settle();
@@ -175,13 +198,14 @@ describe('DAW-transport playback semantics', () => {
     expect(probe.isPlaying).toBe(true);
   });
 
-  it('keeps rolling on an empty timeline (duration 0, e.g. first-take overdub)', async () => {
+  it('an active recording session suppresses the auto-stop (overdub past the end)', async () => {
     const adapter = createFakeAdapter();
-    const emptyTrack = makeTrack('track-a', []);
-    mountProvider(adapter, [emptyTrack]);
+    const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
+    mountProvider(adapter, [trackA]);
     await waitFor(() => expect(probe.isReady).toBe(true));
 
     await act(async () => {
+      probe.setRecordingActive(true, 'track-a');
       await probe.play(0);
     });
     await act(async () => {
@@ -189,6 +213,38 @@ describe('DAW-transport playback semantics', () => {
       await settle();
     });
     expect(probe.isPlaying).toBe(true);
+
+    // Session ends — the auto-stop applies again on the next frames.
+    await act(async () => {
+      probe.setRecordingActive(false);
+    });
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
+  });
+
+  it('keeps a recording session alive on an empty timeline (duration 0, first take)', async () => {
+    // The first take records into an empty timeline: play() starts with
+    // duration 0, so the very first frame satisfies time >= duration. The
+    // eager setRecordingActive(true) (called before play, like the recording
+    // example's overdub handler) must keep the transport running.
+    const adapter = createFakeAdapter();
+    const emptyTrack = makeTrack('track-a', []);
+    mountProvider(adapter, [emptyTrack]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      probe.setRecordingActive(true, 'track-a');
+      await probe.play(0);
+    });
+    await act(async () => {
+      adapter.setNow(5);
+      await settle();
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    await act(async () => {
+      probe.setRecordingActive(false);
+    });
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
   });
 
   it('still stops at an explicit playDuration end (selection playback)', async () => {

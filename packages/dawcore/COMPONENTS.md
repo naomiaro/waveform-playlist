@@ -23,6 +23,8 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `clip-headers` | boolean | `false` | Show clip name headers |
 | `clip-header-height` | number | `20` | Height of clip headers in pixels |
 | `interactive-clips` | boolean | `false` | Enable clip move/trim/split interactions |
+| `indefinite-playback` | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport`. Recording sessions suppress the auto-stop automatically |
+| `fill-viewport` | boolean | `false` | Timeline fills the visible viewport even when audio is shorter (layout only) |
 | `sample-rate` | number | `48000` | Sample rate hint for AudioContext and peaks matching |
 
 **JS Properties:**

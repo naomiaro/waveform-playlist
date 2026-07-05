@@ -139,6 +139,9 @@ export interface PlaylistStateContextValue {
   // Loop region (separate from selection) - Audacity-style loop points
   loopStart: number;
   loopEnd: number;
+  /** Whether playback continues past the end of loaded audio instead of
+   *  auto-stopping (implies the fillViewport layout) */
+  indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container even when the
    *  audio is shorter (layout only — no effect on playback) */
   fillViewport: boolean;
@@ -200,14 +203,15 @@ export interface PlaylistControlsContextValue {
   redo: () => void;
 
   // Recording
-  /** Mark a recording session active/inactive. While active with an
-   *  `armedTrackId`, that track's existing content is transiently muted —
-   *  punch-in recording replaces whatever the take overlaps (#579), so the
-   *  doomed material must not play under the overdub. The previous mute
-   *  state is restored when the session ends. Audio-only: the track's UI
-   *  mute control is untouched. Wired automatically from the Waveform /
-   *  PlaylistVisualization `recordingState` prop; overdub flows should also
-   *  call it eagerly (before `play()`) so the armed track never blips. */
+  /** Mark a recording session active/inactive. While active: (1) the
+   *  end-of-audio auto-stop is suppressed so overdub playback runs past the
+   *  end of existing material, and (2) with an `armedTrackId`, that track's
+   *  existing content is transiently muted — punch-in recording replaces
+   *  whatever the take overlaps (#579), so the doomed material must not play
+   *  under the overdub; its previous mute state is restored when the session
+   *  ends (audio-only, the UI mute control is untouched). Wired automatically
+   *  from the Waveform / PlaylistVisualization `recordingState` prop; overdub
+   *  flows should also call it eagerly (before `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 
@@ -304,6 +308,12 @@ export interface WaveformPlaylistProviderProps {
    *  Use this during progressive loading to avoid rebuilding the engine for
    *  each track — flip to false when all tracks are ready for a single build. */
   deferEngineRebuild?: boolean;
+  /** Disable the automatic stop when the cursor reaches the end of the
+   *  longest track — the transport rolls until an explicit stop/pause
+   *  (DAW-style). Implies the fillViewport layout. Recording sessions
+   *  suppress the auto-stop automatically, so most recording UIs don't
+   *  need this. */
+  indefinitePlayback?: boolean;
   /** Extend the timeline (background + timescale) to fill the visible scroll
    *  container even when the audio is shorter. Layout only. Recording UIs
    *  typically want this so the empty timeline doesn't collapse to the audio
@@ -346,6 +356,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   onTracksChange,
   soundFontCache,
   deferEngineRebuild = false,
+  indefinitePlayback = false,
   fillViewport = false,
   sampleRate: sampleRateProp,
   createAdapter,
@@ -410,15 +421,26 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const adapterRef = useRef<PlayoutAdapter | null>(null);
   const audioInitializedRef = useRef<boolean>(false);
 
-  // While a recording session is active, the armed track's existing content
-  // is transiently muted: punch-in replaces whatever the take overlaps
-  // (#579), so the doomed material must not play under the overdub. Engine-
-  // level mute (survives adapter rebuilds), captured/restored around the
-  // session; the track's UI mute state is untouched. Auto-wired from
-  // PlaylistVisualization's recordingState prop; also exposed via
-  // usePlaylistControls() for eager arming before play().
+  // Ref for animation loop access (avoids adding the prop to useCallback deps)
+  const indefinitePlaybackRef = useRef(indefinitePlayback);
+  indefinitePlaybackRef.current = indefinitePlayback;
+
+  // Recording session state. While active:
+  // 1. The animation loop's end-of-audio auto-stop is suppressed so overdub
+  //    playback runs past the end of existing material (#589/#590).
+  // 2. The armed track's existing content is transiently muted: punch-in
+  //    replaces whatever the take overlaps (#579), so the doomed material
+  //    must not play under the overdub. Engine-level mute (survives adapter
+  //    rebuilds), captured/restored around the session; the track's UI mute
+  //    state is untouched.
+  // Auto-wired from PlaylistVisualization's recordingState prop; overdub
+  // flows also call it eagerly before play() — a render round-trip loses the
+  // race against the first animation frame (empty timeline: time 0 >=
+  // duration 0 would stop playback instantly).
+  const recordingActiveRef = useRef(false);
   const armedTrackMuteRef = useRef<{ trackId: string; prevMuted: boolean } | null>(null);
   const setRecordingActive = useCallback((active: boolean, armedTrackId?: string | null) => {
+    recordingActiveRef.current = active;
     const engine = engineRef.current;
     if (!engine) return;
     if (active && armedTrackId) {
@@ -1293,10 +1315,24 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Transport.seconds auto-wraps at loop boundaries, so getPlaybackTime() returns
       // the correct position without manual detection here.
 
-      // DAW-transport semantics: playback does NOT auto-stop at the end of
-      // the timeline — it rolls until an explicit stop/pause (matching
-      // dawcore's native transport). Explicit ends (selection playback,
-      // annotation boundaries) are handled above.
+      // Auto-stop at the end of the timeline (player-style default), unless:
+      // - indefinitePlayback: the transport rolls until an explicit
+      //   stop/pause (DAW-style, matching dawcore's indefinite-playback), or
+      // - a recording session is active: overdub playback must run past the
+      //   end of existing material (#589/#590).
+      // Explicit ends (selection playback, annotation boundaries) are
+      // handled above regardless.
+      if (time >= duration && !indefinitePlaybackRef.current && !recordingActiveRef.current) {
+        // Stop playback - inline to avoid circular dependency
+        if (engineRef.current) {
+          engineRef.current.stop();
+        }
+        setIsPlaying(false);
+        setCurrentTimeRefs(playStartPositionRef.current);
+        setCurrentTime(playStartPositionRef.current);
+        setActiveAnnotationId(null);
+        return;
+      }
       startAnimationFrameLoop(updateTime);
     };
     startAnimationFrameLoop(updateTime);
@@ -1651,6 +1687,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       selectedTrackId,
       loopStart,
       loopEnd,
+      indefinitePlayback,
       fillViewport,
       canUndo,
       canRedo,
@@ -1668,6 +1705,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       selectedTrackId,
       loopStart,
       loopEnd,
+      indefinitePlayback,
       fillViewport,
       canUndo,
       canRedo,

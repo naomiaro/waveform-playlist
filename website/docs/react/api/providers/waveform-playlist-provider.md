@@ -215,8 +215,8 @@ Auto-scroll to keep playhead visible.
 
 Extend the timeline (background + timescale) to fill the visible scroll container even when the audio is shorter. Layout only. Recording UIs typically want this so an empty timeline doesn't collapse to the audio width.
 
-:::note DAW transport semantics
-Playback does **not** auto-stop at the end of the timeline — the transport rolls until an explicit `stop()`/`pause()`, matching dawcore's native transport. This is what lets punch-in recording run past the end of existing audio. Selection and annotation playback still stop at their explicit ends. (The former `indefinitePlayback` prop is gone — its layout half lives on as `fillViewport`.)
+:::note End-of-timeline behavior (matched with dawcore)
+By default playback **auto-stops** at the end of the timeline and the cursor returns to the play-start position (player style). `indefinitePlayback` opts out — the transport rolls until an explicit `stop()`/`pause()` (DAW style; same semantics as `<daw-editor indefinite-playback>`). Active recording sessions suppress the auto-stop automatically so punch-in takes can run past the end of existing audio. Selection and annotation playback stop at their explicit ends regardless.
 :::
 
 #### `deferEngineRebuild`
@@ -282,6 +282,8 @@ interface PlaylistStateContextValue {
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
+  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
+  indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
 }
@@ -321,11 +323,13 @@ interface PlaylistControlsContextValue {
   clearLoopRegion: () => void;
   undo: () => void;
   redo: () => void;
-  /** Mark a recording session active/inactive. While active with an
-   *  armedTrackId, that track's existing content is transiently muted —
-   *  punch-in replaces whatever the take overlaps — and restored when the
-   *  session ends. Auto-wired from the Waveform recordingState prop; overdub
-   *  flows should also call it eagerly (before play()). */
+  /** Mark a recording session active/inactive. While active: (1) the
+   *  end-of-audio auto-stop is suppressed so overdub playback runs past the
+   *  end of existing material, and (2) with an armedTrackId, that track's
+   *  existing content is transiently muted — punch-in replaces whatever the
+   *  take overlaps — and restored when the session ends. Auto-wired from the
+   *  Waveform recordingState prop; overdub flows should also call it eagerly
+   *  (before play()). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
@@ -441,6 +445,11 @@ interface WaveformPlaylistProviderProps {
   soundFontCache?: SoundFontCache;
   /** Defer engine build during progressive loading */
   deferEngineRebuild?: boolean;
+  /** Disable automatic stop when the cursor reaches the end of the longest
+   *  track — the transport rolls until explicit stop (DAW style, = dawcore's
+   *  indefinite-playback). Implies fillViewport. Recording sessions suppress
+   *  the auto-stop automatically. */
+  indefinitePlayback?: boolean;
   /** Extend the timeline to fill the visible scroll container even when the
    *  audio is shorter (layout only). Recording UIs typically want this. */
   fillViewport?: boolean;

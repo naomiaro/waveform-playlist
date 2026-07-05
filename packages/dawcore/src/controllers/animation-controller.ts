@@ -13,7 +13,12 @@ export class AnimationController implements ReactiveController {
     this._callback = callback;
     const loop = () => {
       this._callback?.();
-      this._rafId = requestAnimationFrame(loop);
+      // The callback may have called stop() (e.g. the editor's end-of-
+      // timeline auto-stop fires from inside a frame). Rescheduling then
+      // would leave a zombie loop burning frames with a null callback.
+      if (this._callback !== null) {
+        this._rafId = requestAnimationFrame(loop);
+      }
     };
     this._rafId = requestAnimationFrame(loop);
   }

@@ -46,6 +46,9 @@ interface WaveformPlaylistProviderProps {
   deferEngineRebuild?: boolean;           // Default: false
   /** SoundFont cache for sample-based MIDI playback */
   soundFontCache?: SoundFontCache;
+  /** Disable end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies fillViewport.
+   *  Recording sessions suppress the auto-stop automatically. */
+  indefinitePlayback?: boolean;           // Default: false
   /** Timeline visually fills the scroll container even when audio is shorter (layout only) */
   fillViewport?: boolean;                 // Default: false
   /** Desired AudioContext sample rate for pre-computed peaks matching */
@@ -217,6 +220,8 @@ interface PlaylistStateContextValue {
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
+  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
+  indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
   /** Whether undo is available */
@@ -281,11 +286,12 @@ interface PlaylistControlsContextValue {
   redo: () => void;
 
   // Recording
-  /** Mark a recording session active/inactive. While active with an armedTrackId,
-   *  that track's existing content is transiently muted (punch-in replaces what
-   *  the take overlaps) and restored when the session ends. Audio-only — the UI
-   *  mute control is untouched. Auto-wired from the Waveform recordingState prop;
-   *  overdub flows should also call it eagerly (before play()). */
+  /** Mark a recording session active/inactive. While active: (1) the end-of-audio
+   *  auto-stop is suppressed so overdub playback runs past existing material, and
+   *  (2) with an armedTrackId, that track's existing content is transiently muted
+   *  (punch-in replaces what the take overlaps) and restored when the session ends
+   *  — audio-only, the UI mute control is untouched. Auto-wired from the Waveform
+   *  recordingState prop; overdub flows should also call it eagerly (before play()). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
