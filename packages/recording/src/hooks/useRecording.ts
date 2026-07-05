@@ -106,12 +106,12 @@ export function useRecording(
     }
   }, []);
 
-  // Start recording
-  const startRecording = useCallback(async () => {
-    if (isRecordingRef.current || isStartingRef.current) return;
+  // Start recording. Resolves true when the capture pipeline started.
+  const startRecording = useCallback(async (): Promise<boolean> => {
+    if (isRecordingRef.current || isStartingRef.current) return false;
     if (!stream) {
       setError(new Error('No microphone stream available'));
-      return;
+      return false;
     }
     isStartingRef.current = true;
 
@@ -133,7 +133,7 @@ export function useRecording(
       // nodes exist. A continuation past this point would start an ownerless
       // session: the rAF loop reschedules forever and chunks accumulate with
       // nothing left to stop them.
-      if (isUnmountedRef.current) return;
+      if (isUnmountedRef.current) return false;
 
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
@@ -249,9 +249,11 @@ export function useRecording(
       setIsPaused(false);
       startTimeRef.current = performance.now();
       startDurationLoop();
+      return true;
     } catch (err) {
       console.warn('[waveform-playlist] Failed to start recording:', String(err));
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
+      return false;
     } finally {
       isStartingRef.current = false;
     }

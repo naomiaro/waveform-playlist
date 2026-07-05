@@ -1,4 +1,12 @@
-import React, { useContext, useRef, useState, useMemo, type ReactNode, useCallback } from 'react';
+import React, {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  type ReactNode,
+  useCallback,
+} from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import {
@@ -206,6 +214,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     loopEnd,
     isLoopEnabled,
     indefinitePlayback,
+    fillViewport,
   } = usePlaylistState();
   const annotationIntegration = useContext(AnnotationIntegrationContext);
   const {
@@ -221,6 +230,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     setSelectedTrackId,
     setCurrentTime,
     setLoopRegion,
+    setRecordingActive,
   } = usePlaylistControls();
   const {
     peaksDataArray,
@@ -241,6 +251,21 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   // Optional spectrogram integration (only available when SpectrogramProvider is present)
   const spectrogram = useContext(SpectrogramIntegrationContext);
+
+  // Sync the recording session (and its armed track) to the provider so the
+  // armed track's existing content is transiently muted for the take —
+  // punch-in replaces whatever it overlaps (#579/#589). The cleanup releases
+  // the session on recording end AND on unmount, restoring the track's
+  // previous mute state. Consumers that start playback in the same handler
+  // as the recording should also call setRecordingActive eagerly so the
+  // doomed material never blips before this effect commits.
+  const recordingActive = !!recordingState?.isRecording;
+  const armedTrackId = recordingState?.trackId ?? null;
+  useEffect(() => {
+    if (!recordingActive) return undefined;
+    setRecordingActive(true, armedTrackId);
+    return () => setRecordingActive(false);
+  }, [recordingActive, armedTrackId, setRecordingActive]);
 
   // Per-track spectrogram rendering helpers (memoized) — only computed when spectrogram is available
   const perTrackSpectrogramHelpers = useMemo(() => {
@@ -314,8 +339,10 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         ? duration
         : DEFAULT_EMPTY_TRACK_DURATION;
 
-  // When indefinitePlayback is enabled, ensure the timeline fills the visible scroll container
-  if (indefinitePlayback) {
+  // Fill the visible scroll container when requested — indefinitePlayback
+  // implies it (endless playback needs an endless-looking timeline);
+  // fillViewport requests the layout alone.
+  if (indefinitePlayback || fillViewport) {
     const containerWidth = scrollContainerRef.current?.clientWidth ?? 0;
     const minContainerDuration = (containerWidth * samplesPerPixel) / sampleRate;
     displayDuration = Math.max(displayDuration, minContainerDuration);

@@ -46,8 +46,11 @@ interface WaveformPlaylistProviderProps {
   deferEngineRebuild?: boolean;           // Default: false
   /** SoundFont cache for sample-based MIDI playback */
   soundFontCache?: SoundFontCache;
-  /** Disable automatic stop when cursor reaches end of longest track */
+  /** Disable end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies fillViewport.
+   *  Recording sessions suppress the auto-stop automatically. */
   indefinitePlayback?: boolean;           // Default: false
+  /** Timeline visually fills the scroll container even when audio is shorter (layout only) */
+  fillViewport?: boolean;                 // Default: false
   /** Desired AudioContext sample rate for pre-computed peaks matching */
   sampleRate?: number;
   /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone */
@@ -217,8 +220,10 @@ interface PlaylistStateContextValue {
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
-  /** Whether playback continues past the end of loaded audio */
+  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
   indefinitePlayback: boolean;
+  /** Whether the timeline visually fills the scroll container (layout only) */
+  fillViewport: boolean;
   /** Whether undo is available */
   canUndo: boolean;
   /** Whether redo is available */
@@ -279,6 +284,15 @@ interface PlaylistControlsContextValue {
   // Undo/redo
   undo: () => void;
   redo: () => void;
+
+  // Recording
+  /** Mark a recording session active/inactive. While active: (1) the end-of-audio
+   *  auto-stop is suppressed so overdub playback runs past existing material, and
+   *  (2) with an armedTrackId, that track's existing content is transiently muted
+   *  (punch-in replaces what the take overlaps) and restored when the session ends
+   *  — audio-only, the UI mute control is untouched. Auto-wired from the Waveform
+   *  recordingState prop; overdub flows should also call it eagerly (before play()). */
+  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
 
@@ -832,7 +846,9 @@ interface UseIntegratedRecordingReturn {
   devices: MicrophoneDevice[];
   hasPermission: boolean;
   selectedDevice: string | null;
-  startRecording: () => void;
+  /** Resolves true when the capture pipeline actually started — check before
+   *  starting synchronized playback (overdub). */
+  startRecording: () => Promise<boolean>;
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
@@ -860,6 +876,10 @@ interface RecordingOptions {
    *  0 disables compensation; negative/non-finite treated as 0.
    *  When omitted, the auto-computed outputLatency value is used. */
   latencyOffset?: number;
+  /** Display name for the take: shown in the live-preview clip header while
+   *  recording (falls back to "Recording…") and used as the finalized clip's
+   *  name (falls back to "Recording"). */
+  clipName?: string;
 }
 ```
 

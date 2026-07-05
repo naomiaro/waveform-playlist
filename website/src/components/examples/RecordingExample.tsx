@@ -165,7 +165,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 }) => {
   const { currentTime, isPlaying, currentTimeRef } = usePlaybackAnimation();
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
-  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause, seekTo } = usePlaylistControls();
+  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause, seekTo, setRecordingActive } = usePlaylistControls();
   const {
     isAutomaticScroll,
     selectionStart,
@@ -206,8 +206,6 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     isRecording,
     isPaused,
     duration,
-    level,
-    peakLevel,
     levels: inputLevels,
     peakLevels: inputPeaks,
     devices,
@@ -245,14 +243,47 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-entrancy guard for record start: isRecording state only commits after
+  // startRecording's internal awaits (context resume, worklet load), so a
+  // rapid second Record press would re-enter and clobber recordStartTimeRef
+  // and the armed-track mute mid-start.
+  const isStartingRecordingRef = useRef(false);
+  // Set by handleStop when the user stops before the capture finished
+  // starting — cancels the pending session instead of playing a phantom one.
+  const cancelRecordingStartRef = useRef(false);
+
   // Start recording and playback together (overdub)
   const startRecordingWithPlayback = useCallback(async () => {
-    // Read from ref to avoid stale closure (currentTime updates at 60fps)
-    recordStartTimeRef.current = currentTimeRef.current;
-    await startRecording();
-    // Start Transport so playhead advances and user hears existing tracks (overdub)
-    await play(currentTimeRef.current);
-  }, [startRecording, play, currentTimeRef]);
+    if (isStartingRecordingRef.current) return;
+    isStartingRecordingRef.current = true;
+    cancelRecordingStartRef.current = false;
+    try {
+      // Read from ref to avoid stale closure (currentTime updates at 60fps)
+      recordStartTimeRef.current = currentTimeRef.current;
+      // Arm the recorded track BEFORE starting playback: punch-in replaces
+      // whatever the take overlaps, so its existing content is transiently
+      // muted for the session and must never blip. Release is automatic via
+      // the Waveform's recordingState sync when the recording ends.
+      setRecordingActive(true, selectedTrackId);
+      const started = await startRecording();
+      if (!started || cancelRecordingStartRef.current) {
+        // Capture never started (no mic, no track, worklet failure) or the
+        // user stopped during startup — release the armed track and don't
+        // start playback.
+        if (started) stopRecording();
+        setRecordingActive(false);
+        return;
+      }
+      // Start Transport so playhead advances and user hears the other tracks (overdub)
+      try {
+        await play(currentTimeRef.current);
+      } catch (err) {
+        console.warn('[waveform-playlist] Overdub playback failed to start: ' + String(err));
+      }
+    } finally {
+      isStartingRecordingRef.current = false;
+    }
+  }, [startRecording, stopRecording, play, currentTimeRef, setRecordingActive, selectedTrackId]);
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {
@@ -285,6 +316,11 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // recording is the most recent resume point — jumping backwards on stop
   // is jarring when you've just finished recording.
   const handleStop = useCallback(() => {
+    if (isStartingRecordingRef.current) {
+      // Record was pressed moments ago and its async startup hasn't finished —
+      // cancel the pending session rather than stopping nothing.
+      cancelRecordingStartRef.current = true;
+    }
     if (isRecording) {
       stopRecording();
       pause();
@@ -428,23 +464,16 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     },
   ], [handleTogglePlayPause, handleStop, handleRewind, handleRecordShortcut, handleForceNewTrackRecord]);
 
-  // Calculate recording start position for live preview
+  // Live-preview position: the punch-in position captured at record start.
+  // Punch-in semantics (#579): the finalized clip lands exactly at the
+  // record-start playhead position — the preview must render there too.
+  // (The old Math.max(start, lastClipEnd) clamp was pre-punch-in "append
+  // after last clip" behavior; it drew the preview at the end of existing
+  // clips, far ahead of the playhead.)
   // Uses captured start time (not live currentTime which advances during overdub)
-  let recordingStartSample = 0;
-  if (isRecording && selectedTrackId) {
-    const selectedTrack = tracks.find(t => t.id === selectedTrackId);
-    if (selectedTrack) {
-      const startTimeSamples = Math.floor(recordStartTimeRef.current * sampleRate);
-      let lastClipEndSample = 0;
-      if (selectedTrack.clips.length > 0) {
-        const endSamples = selectedTrack.clips.map(clip =>
-          clip.startSample + clip.durationSamples
-        );
-        lastClipEndSample = Math.max(...endSamples);
-      }
-      recordingStartSample = Math.max(startTimeSamples, lastClipEndSample);
-    }
-  }
+  const recordingStartSample = isRecording
+    ? Math.floor(recordStartTimeRef.current * sampleRate)
+    : 0;
 
   // Auto-scroll to keep recording in view
   useEffect(() => {
@@ -464,7 +493,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       const targetScroll = recordingEndPixel - scrollContainer.clientWidth + controlWidth + bufferZone;
       scrollContainer.scrollLeft = Math.max(0, targetScroll);
     }
-  }, [isRecording, isAutomaticScroll, duration, recordingStartSample, sampleRate, samplesPerPixel, controls]);
+  }, [isRecording, isAutomaticScroll, duration, recordingStartSample, sampleRate, samplesPerPixel, controls, scrollContainerRef]);
 
   // Handle dropped/selected audio files
   const handleFiles = useCallback(
@@ -707,7 +736,7 @@ export function RecordingExample() {
           zoomLevels={[256, 512, 1024, 2048, 4096]}
           waveHeight={100}
           automaticScroll
-          indefinitePlayback
+          fillViewport
           controls={{ show: true, width: 200 }}
           theme={theme}
           timescale

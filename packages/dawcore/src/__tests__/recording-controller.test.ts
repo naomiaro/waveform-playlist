@@ -338,8 +338,98 @@ describe('RecordingController', () => {
       expect.anything(), // audioBuffer
       expect.any(Number), // startSample
       expect.any(Number), // durationSamples
-      expect.any(Number) // offsetSamples (latency compensation)
+      expect.any(Number), // offsetSamples (latency compensation)
+      undefined // clipName (none provided)
     );
+  });
+
+  it('forwards RecordingOptions.clipName to the finalized clip', async () => {
+    host._addRecordedClip = vi.fn();
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), {
+      trackId: 'track-1',
+      clipName: 'Take 1',
+    });
+    simulateWorkletData('track-1');
+
+    await controller.stopRecording();
+
+    expect(host._addRecordedClip).toHaveBeenCalledWith(
+      'track-1',
+      expect.anything(),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      'Take 1'
+    );
+  });
+
+  // --- armed-track transient mute (punch-in replaces the overlapped content,
+  // so the recorded-over track's existing material must not play under the take)
+
+  it('mutes the armed track for the session and restores it after stop', async () => {
+    host._engine = {
+      setTrackMute: vi.fn(),
+      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
+    };
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', true);
+
+    simulateWorkletData('track-1');
+    host._engine.setTrackMute.mockClear();
+    await controller.stopRecording();
+    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
+  });
+
+  it('restores a previously-muted armed track to muted, not unmuted', async () => {
+    host._engine = {
+      setTrackMute: vi.fn(),
+      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: true }] })),
+    };
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1');
+    host._engine.setTrackMute.mockClear();
+    await controller.stopRecording();
+    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', true);
+  });
+
+  it('engages the armed-track mute before overdub playback starts', async () => {
+    host._engine = {
+      setTrackMute: vi.fn(),
+      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
+    };
+    host.play = vi.fn(() => Promise.resolve());
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1', overdub: true });
+
+    const muteOrder = host._engine.setTrackMute.mock.invocationCallOrder[0];
+    const playOrder = (host.play as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    expect(muteOrder).toBeLessThan(playOrder);
+  });
+
+  it('restores the armed-track mute when sessions are cleaned up on disconnect', async () => {
+    host._engine = {
+      setTrackMute: vi.fn(),
+      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
+    };
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    host._engine.setTrackMute.mockClear();
+
+    controller.hostDisconnected();
+
+    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
+  });
+
+  it('records without error when the host has no engine', async () => {
+    host._engine = null;
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1');
+    await controller.stopRecording();
+    expect(host._addRecordedClip).toHaveBeenCalled();
   });
 
   it('does not call host._addRecordedClip when preventDefault', async () => {
@@ -503,7 +593,8 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       47520, // effectiveDuration
-      480 // latencyOffsetSamples
+      480, // latencyOffsetSamples
+      undefined // clipName
     );
   });
 
@@ -580,7 +671,8 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       48000, // full duration — no offset
-      0 // zero latency
+      0, // zero latency
+      undefined // clipName
     );
   });
 
@@ -1036,7 +1128,8 @@ describe('RecordingController', () => {
       expect.anything(),
       expect.any(Number),
       47520, // effectiveDuration
-      480 // latencyOffsetSamples (from the override, not outputLatency)
+      480, // latencyOffsetSamples (from the override, not outputLatency)
+      undefined // clipName
     );
   });
 });
