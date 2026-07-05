@@ -11,7 +11,7 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **Keyboard shortcuts** — Play/pause, split, undo/redo via `<daw-keyboard-shortcuts>`
 - **Undo/redo** — Full transaction-based undo with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z
 - **File drop** — Drag audio files onto the editor to add tracks (enable with the `file-drop` attribute)
-- **Recording** — Live mic recording with waveform preview, pause/resume, cancelable clip creation
+- **Recording** — Live mic recording with waveform preview, pause/resume, cancelable clip creation; takes land at the playhead and replace overlapped clip content (punch-in)
 - **Pre-computed peaks** — Instant waveform rendering from `.dat` files before audio decodes
 - **MIDI tracks** — Declarative or programmatic MIDI clips render as piano-roll. Playback via the Tone.js adapter. See [MIDI Tracks](#midi-tracks).
 - **MIDI file loading** — `editor.loadMidi(urlOrFile)` parses a `.mid` file into piano-roll tracks via the optional `@dawcore/midi` peer

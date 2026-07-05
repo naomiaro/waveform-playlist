@@ -69,9 +69,12 @@ parseSpectrogramCanvasId(id);
 | `utils/meterDetection` | `MeterEntry`, `detectMeterChanges` |
 | `utils/peaksGenerator` | `generatePeaks`, `appendPeaks` |
 | `utils/audioBufferUtils` | `concatenateAudioData`, `createAudioBuffer`, `appendToAudioBuffer`, `calculateDuration` |
+| `utils/latency` | `resolveRecordingOffsetSamples` — override-vs-auto recording latency compensation (shared by React + dawcore) |
+| `utils/carveClipRange` | `carveClipRange` — punch-in replace: carve a sample range out of a clip list (trim/remove/split) |
 | `keyboard` | `KeyboardShortcut`, `handleKeyboardEvent`, `getShortcutLabel` |
 | `spectrogramCanvasId` | `buildSpectrogramCanvasId`, `parseSpectrogramCanvasId`, `SpectrogramCanvasIdParts` |
 | `probeRangeSupport` | `probeRangeSupport`, `RangeSupport` |
+| `enumerateMicrophones` | `enumerateMicrophones`, `watchMicrophoneDevices`, `MicrophoneEnumeration` — permission-free device listing with `supported`/`hasLabels` flags (labels are browser-redacted pre-permission) |
 | `constants` | `MAX_CANVAS_WIDTH` |
 
 ## Examples & Documentation
