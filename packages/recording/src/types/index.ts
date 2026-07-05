@@ -63,8 +63,17 @@ export interface UseRecordingReturn {
   duration: number;
   peaks: (Int8Array | Int16Array)[];
   audioBuffer: AudioBuffer | null;
-  level: number; // Current RMS level (0-1)
-  peakLevel: number; // Peak RMS level since recording started (0-1)
+  /**
+   * @deprecated Always 0 — VU levels come from `useMicrophoneLevel`
+   * (meter-processor worklet), not this hook. Will be removed in the next
+   * major version.
+   */
+  level: number;
+  /**
+   * @deprecated Always 0 — use `useMicrophoneLevel`'s `peakLevel` instead.
+   * Will be removed in the next major version.
+   */
+  peakLevel: number;
 
   // Controls
   startRecording: () => Promise<void>;
