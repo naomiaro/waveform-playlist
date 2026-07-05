@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/worklets",
-  "version": "12.2.0",
+  "version": "13.0.0",
   "description": "AudioWorklet processors for waveform-playlist (metering, recording)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
