@@ -21,7 +21,7 @@ waveform-playlist builds browser-based audio editing applications. Use the React
 
 - `@waveform-playlist/browser` — Main package: React components, hooks, effects. Playout engines (`@waveform-playlist/playout` + `tone`, or `@waveform-playlist/media-element-playout`) are optional peer dependencies; provide `createAdapter`/`createPlayout` to inject a custom engine.
 - WAM 2.0 plugin hosting (from `@waveform-playlist/browser/tone`) — `addWamEffect`/`addWamEffectToTrack` host third-party [Web Audio Modules](https://www.webaudiomodules.com/) plugins alongside built-in Tone.js effects, requires native AudioContext mode (`configureGlobalContext({ nativeAudioContext: true })` from `@waveform-playlist/playout`; Firefox falls back automatically). `WamEffectGui` mounts plugin GUIs; `fetchWamLibrary`/`fetchWamDescriptor` from the optional `@dawcore/wam` peer discover community plugins. Same native-context call enables WAM hosting on `<daw-editor>`'s Tone.js backend (`createToneAdapter()`).
-- `@waveform-playlist/core` — Data model: ClipTrack, AudioClip, sample-based math
+- `@waveform-playlist/core` — Data model: ClipTrack, AudioClip, sample-based math, `carveClipRange` (punch-in), `enumerateMicrophones`/`watchMicrophoneDevices` (permission-free device listing)
 - `@waveform-playlist/engine` — Framework-agnostic timeline engine: PlaylistEngine class, pure clip/timeline operations, event emitter. Owns selection, loop, zoom, volume, selectedTrackId, and clip mutation state. Seek/play beyond audio duration is supported (silence where there's no audio).
 - `@waveform-playlist/playout` — Audio playback: Tone.js adapter (implements PlayoutAdapter from engine), global AudioContext. Incremental track updates via updateTrack/replaceClips — no full playout rebuild on clip operations. Optional adapter methods: addTrack, removeTrack, updateTrack.
 - `@waveform-playlist/ui-components` — Styled primitives, theming, virtual scrolling contexts, playhead components, PlaylistErrorBoundary, BeatsAndBarsProvider
@@ -155,8 +155,9 @@ Both providers use React Context with 4 split contexts for performance.
 
 ### Recording Hooks (from `@waveform-playlist/recording`)
 
-- `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: mic access, VU meter, start/stop/pause recording, auto-adds clips to selected track; recording latency compensation is configurable via `latencyOffset` (seconds) on both the React `IntegratedRecordingOptions` and the dawcore `RecordingOptions` passed to `editor.startRecording()`
+- `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: mic access, VU meter, start/stop/pause recording, adds the take at the record-start playhead position with punch-in replace semantics (overlapped clip content is trimmed/removed/split); recording latency compensation is configurable via `latencyOffset` (seconds) on both the React `IntegratedRecordingOptions` and the dawcore `RecordingOptions` passed to `editor.startRecording()`
 - `useRecording(stream, options)` — Low-level recording via AudioWorklet with live peaks
+- `enumerateMicrophones()` / `watchMicrophoneDevices(listener)` — framework-agnostic, permission-free mic listing from `@waveform-playlist/core` (`hasLabels` false pre-permission: browsers redact labels)
 - `useMicrophoneAccess()` — Request mic permission, enumerate devices, get MediaStream
 - `useMicrophoneLevel(stream, options?)` — Real-time VU meter levels from mic stream (supports multi-channel via `channelCount` option)
 - `useOutputMeter(options?)` — Real-time master output VU meter levels (from `@waveform-playlist/browser/tone`). Returns per-channel `levels`, `peakLevels`, and `resetPeak()`

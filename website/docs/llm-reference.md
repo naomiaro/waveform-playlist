@@ -802,6 +802,10 @@ function useIntegratedRecording(
 ): UseIntegratedRecordingReturn;
 
 interface IntegratedRecordingOptions {
+  /** Current playback/cursor position in seconds. Punch-in semantics: the
+   *  recorded clip lands exactly at this position and REPLACES any existing
+   *  clip content it overlaps (partial overlaps trimmed, covered clips
+   *  removed, spanning clips split). */
   currentTime?: number;
   audioConstraints?: MediaTrackConstraints;
   channelCount?: number;      // Default: 1 (auto-detected from stream; fallback)
@@ -820,6 +824,9 @@ interface UseIntegratedRecordingReturn {
   duration: number;
   level: number;
   peakLevel: number;
+  levels: number[];       // Per-channel peak levels (0-1); length = metered channel count
+  peakLevels: number[];   // Per-channel held peak levels (0-1)
+  rmsLevels: number[];    // Per-channel RMS levels (0-1)
   error: Error | null;
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
@@ -829,8 +836,8 @@ interface UseIntegratedRecordingReturn {
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
-  requestMicAccess: () => Promise<void>;
-  changeDevice: (deviceId: string) => Promise<void>;
+  requestMicAccess: () => Promise<void>;   // Refused while recording (would record silence)
+  changeDevice: (deviceId: string) => Promise<void>; // Refused while recording
   recordingPeaks: (Int8Array | Int16Array)[];
 }
 ```
@@ -870,10 +877,35 @@ function useMicrophoneLevel(
 interface UseMicrophoneLevelReturn {
   level: number;          // 0-1 peak level (max across channels)
   peakLevel: number;      // 0-1 held peak with decay (max across channels)
-  levels: number[];       // Per-channel peak levels (0-1)
+  levels: number[];       // Per-channel peak levels (0-1); length = detected mic channels (mono mirrored up to channelCount)
   peakLevels: number[];   // Per-channel held peak levels with decay (0-1)
   rmsLevels: number[];    // Per-channel RMS levels (0-1)
   resetPeak: () => void;  // Reset held peaks
+  error: Error | null;    // Meter setup error; cleared on successful re-setup
+}
+```
+
+### enumerateMicrophones (`@waveform-playlist/core`)
+
+Framework-agnostic, permission-free microphone listing — usable without React (dawcore/vanilla consumers):
+
+```typescript
+function enumerateMicrophones(mediaDevices?: MediaDevices): Promise<MicrophoneEnumeration>;
+function watchMicrophoneDevices(
+  listener: (enumeration: MicrophoneEnumeration) => void,
+  mediaDevices?: MediaDevices
+): () => void; // returns unsubscribe; fires immediately + on every devicechange
+
+interface MicrophoneEnumeration {
+  supported: boolean;   // false on SSR/insecure contexts (no navigator.mediaDevices)
+  hasLabels: boolean;   // false pre-permission — browsers redact labels (and often deviceIds)
+  devices: MicrophoneDeviceInfo[]; // fallback labels generated when redacted
+}
+
+interface MicrophoneDeviceInfo {
+  deviceId: string;
+  label: string;
+  groupId: string;
 }
 ```
 
