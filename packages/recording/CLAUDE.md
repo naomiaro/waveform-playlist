@@ -131,7 +131,7 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 
 ## Stop Must Await Done Acknowledgment
 
-`stopRecording()` awaits the worklet's `done: true` message before building the AudioBuffer (`stopAckResolveRef` + `Promise.race` against a 250ms safety timeout). Without the await, the partial buffer at stop time arrives after the synchronous chunk read and is silently dropped — last ~16ms of every recording lost.
+`stopRecording()` awaits the worklet's `done: true` message before building the AudioBuffer (`stopAckResolveRef` + `Promise.race` against a 1000ms safety timeout). Without the await, the partial buffer at stop time arrives after the synchronous chunk read and is silently dropped — last ~16ms of every recording lost.
 
 ## Hook Test Setup
 

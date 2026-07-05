@@ -145,6 +145,10 @@ class RecordingProcessor extends AudioWorkletProcessor {
     const transfer: ArrayBuffer[] = [];
     for (let i = 0; i < this.channelCount; i++) {
       const buf = this.buffers[i];
+      // Stop before start (or a repeated stop) arrives with no allocated
+      // buffers — the terminal done message must still be posted (the main
+      // thread awaits it), so skip instead of throwing on undefined.
+      if (!buf) continue;
       channels.push(buf.subarray(0, this.samplesCollected));
       // Float32Array.buffer is ArrayBufferLike (ArrayBuffer | SharedArrayBuffer)
       // in modern lib types. AudioWorklet inputs are always ArrayBuffer-backed.

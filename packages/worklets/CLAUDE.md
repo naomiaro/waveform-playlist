@@ -35,8 +35,9 @@
 ## Recording Processor Stop Handshake
 
 - `stop` command **always** sends a terminal `done: true` message (even with empty buffer). Main thread must `await` it before reading accumulated chunks — `port.postMessage` is async, so a synchronous read after sending `stop` misses the final partial buffer (~16ms loss per recording).
-- Pattern: `await Promise.race([stopAck, setTimeout(250)])` so a closed/crashed context can't hang the caller.
+- Pattern: `await Promise.race([stopAck, setTimeout(1000)])` so a closed/crashed context can't hang the caller.
 - After the final flush, drop `this.buffers = []` and zero `this.bufferSize = 0`. Without this, a stray `resume` after `stop` would set `isRecording = true` and `process()` would silently no-op writes into detached typed-array memory.
+- **`stop` is idempotent** — a stop before any `start`, or a second stop after stop, still posts the terminal `done: true` (with no channels) instead of throwing on the empty `buffers` array. Redundant stops from unmount cleanup or double-clicks must never break the always-ack contract.
 
 ## IDE-Friendly Worklet Types via Nested tsconfig
 

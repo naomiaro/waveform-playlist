@@ -10,7 +10,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 interface ProcessorMessage {
   channels: Float32Array[];
-  sampleRate: number;
   channelCount: number;
   done?: boolean;
 }
@@ -274,6 +273,32 @@ describe('RecordingProcessor', () => {
       const result = proc.process([], [], {});
       expect(result).toBe(true);
       expect(messages.length).toBe(0);
+    });
+
+    it('acknowledges stop with done even before any start (no throw)', () => {
+      // A stop can arrive before start (start failed pre-command) — the
+      // documented contract is that stop ALWAYS posts a terminal done message.
+      messages.length = 0;
+      const proc = new ProcessorClass();
+      expect(() => proc.port.onmessage!({ data: { command: 'stop' } })).not.toThrow();
+      expect(messages.length).toBe(1);
+      expect(messages[0].done).toBe(true);
+    });
+
+    it('acknowledges a second stop after stop (idempotent, no throw)', () => {
+      // Unmount cleanup can post a redundant stop after stopRecording already
+      // stopped — the second stop must ack instead of throwing on the
+      // already-dropped buffers.
+      const proc = createProcessor(44100, 1);
+      proc.process(monoInput(128, 0.3), [], {});
+      proc.port.onmessage!({ data: { command: 'stop' } });
+      expect(messages.length).toBe(1);
+      expect(messages[0].done).toBe(true);
+
+      expect(() => proc.port.onmessage!({ data: { command: 'stop' } })).not.toThrow();
+      expect(messages.length).toBe(2);
+      expect(messages[1].done).toBe(true);
+      expect(messages[1].channels.length).toBe(0);
     });
   });
 

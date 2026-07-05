@@ -53,6 +53,9 @@ export interface RecordingSession {
   readonly _audioTrack: MediaStreamTrack | null;
   /** Set during stopRecording, cleared by the done message from the worklet. */
   stopAckResolve: (() => void) | null;
+  /** In-flight stop completion — re-entrant stopRecording calls await this
+   * instead of running a second handshake. */
+  stopPromise: Promise<void> | null;
   /** True from the start of stopRecording until the session is deleted.
    * Guards pauseRecording / resumeRecording so a mid-drain pause toggle
    * can't dispatch events for a session that's already terminating. */
@@ -74,7 +77,10 @@ export interface RecordingHost extends ReactiveControllerHost {
   readonly samplesPerPixel: number;
   readonly effectiveSampleRate: number;
   readonly _selectedTrackId: string | null;
-  readonly _currentTime: number;
+  /** Live playhead position in seconds. Must read from the engine during
+   * playback — a cached field only written on pause/stop/seek lags the real
+   * position and misplaces punch-in (record-during-playback) clips. */
+  readonly currentTime: number;
   readonly shadowRoot: ShadowRoot | null;
   resolveAudioContextSampleRate(rate: number): void;
   _addRecordedClip?(
@@ -108,6 +114,11 @@ export interface RecordingHost extends ReactiveControllerHost {
 export class RecordingController implements ReactiveController {
   private _host: RecordingHost & HTMLElement;
   private _sessions = new Map<string, RecordingSession>();
+  /** Track IDs with a startRecording in flight (session not yet in _sessions).
+   * The session is only set after several awaits — without this, two rapid
+   * start calls both pass the _sessions guard and build two capture
+   * pipelines feeding one session (garbled audio + a leaked worklet). */
+  private _starting = new Set<string>();
   private _workletLoadedCtx: AudioContext | null = null;
   /** Tracks worklet pause state explicitly so external consumers (editor,
    * pause button, spacebar) can share one source of truth. */
@@ -145,10 +156,11 @@ export class RecordingController implements ReactiveController {
       console.warn('[dawcore] RecordingController: No track selected for recording');
       return;
     }
-    if (this._sessions.has(trackId)) {
+    if (this._sessions.has(trackId) || this._starting.has(trackId)) {
       console.warn('[dawcore] RecordingController: Already recording on track "' + trackId + '"');
       return;
     }
+    this._starting.add(trackId);
 
     const bits: Bits = options.bits ?? 16;
 
@@ -157,6 +169,13 @@ export class RecordingController implements ReactiveController {
 
       // Resolve editor sample rate from AudioContext before computing startSample
       this._host.resolveAudioContextSampleRate(rawCtx.sampleRate);
+
+      // A suspended context delivers no samples while the UI shows recording
+      // (worklet process() never runs). Resume before wiring the capture
+      // graph — parity with the React hook, which resumes at record start.
+      if (rawCtx.state === 'suspended') {
+        await rawCtx.resume();
+      }
 
       // Load worklet module — guard tied to context identity so a
       // swapped AudioContext gets the module re-registered.
@@ -191,7 +210,7 @@ export class RecordingController implements ReactiveController {
       const channelCount = detectedChannelCount ?? options.channelCount ?? 1;
 
       const startSample =
-        options.startSample ?? Math.floor(this._host._currentTime * this._host.effectiveSampleRate);
+        options.startSample ?? Math.floor(this._host.currentTime * this._host.effectiveSampleRate);
 
       // Compute latency offset once at start (doesn't change during session).
       // An explicit latencyOffset option (seconds) replaces the outputLatency
@@ -247,6 +266,7 @@ export class RecordingController implements ReactiveController {
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
         stopAckResolve: null,
+        stopPromise: null,
         stopping: false,
       };
       this._sessions.set(trackId, session);
@@ -275,7 +295,7 @@ export class RecordingController implements ReactiveController {
 
       // Overdub: start playback so user hears existing tracks and playhead advances
       if (options.overdub && typeof this._host.play === 'function') {
-        await this._host.play(this._host._currentTime);
+        await this._host.play(this._host.currentTime);
       }
     } catch (err) {
       // Clean up partially-created session to prevent stuck isRecording state
@@ -288,6 +308,8 @@ export class RecordingController implements ReactiveController {
           detail: { trackId, error: err },
         })
       );
+    } finally {
+      this._starting.delete(trackId);
     }
   }
 
@@ -332,14 +354,26 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(id);
     if (!session) return;
 
-    // Capture whether we were paused — pause already flushed the partial
-    // buffer, so there's nothing to wait for from the worklet on stop.
-    const wasPaused = this._isPaused;
-    this._isPaused = false;
-    // Block any further pause/resume calls on this session — they could
+    // Re-entrant stop (stop-button double-click, unmount cleanup) during the
+    // ack/drain window must not build a second AudioBuffer or dispatch a
+    // second complete event — both callers observe the same in-flight stop.
+    if (session.stopping) {
+      return session.stopPromise ?? undefined;
+    }
+    // Block any further pause/resume/stop calls on this session — they could
     // race with the drain loop and dispatch events for a session that's
     // about to be deleted.
     session.stopping = true;
+    const stopPromise = this._finishStopRecording(id, session);
+    session.stopPromise = stopPromise;
+    return stopPromise;
+  }
+
+  private async _finishStopRecording(id: string, session: RecordingSession): Promise<void> {
+    // Capture whether we were paused — pause already flushed the partial
+    // buffer, so there's no full-buffer backlog to wait for on stop.
+    const wasPaused = this._isPaused;
+    this._isPaused = false;
 
     // Stop playback only if this was an overdub session
     if (session.wasOverdub && typeof this._host.stop === 'function') {
@@ -352,6 +386,12 @@ export class RecordingController implements ReactiveController {
     // paused, making the round-trip slow / unreliable).
     if (wasPaused) {
       session.workletNode.port.postMessage({ command: 'stop' });
+      // No ack await here — the paused audio thread may be throttled, making
+      // the done round-trip slow/unreliable. But posting `stop` does NOT mean
+      // earlier messages were delivered: the pause-time flush (and any
+      // backlog) can still be in transit, so the queue must still be drained
+      // or those chunks are silently dropped from the finalized clip.
+      await this._drainWorkletQueue(session);
     } else {
       // Active recording: await the worklet's terminal flush so the partial
       // buffer at stop time isn't silently dropped.
@@ -371,22 +411,7 @@ export class RecordingController implements ReactiveController {
       clearTimeout(timeoutId);
       session.stopAckResolve = null;
 
-      // Drain the event-loop queue. During recording the worklet posts a
-      // flush every ~16ms; if main was slower than that, messages back up.
-      // Yield repeatedly until session.totalSamples stabilizes (no new
-      // messages processed) for several consecutive ticks — at that point
-      // the queue is empty and chunks are complete.
-      let lastSamples = -1;
-      let stable = 0;
-      for (let i = 0; i < 50; i++) {
-        if (session.totalSamples === lastSamples) {
-          if (++stable >= 3) break;
-        } else {
-          stable = 0;
-          lastSamples = session.totalSamples;
-        }
-        await new Promise<void>((r) => setTimeout(r, 5));
-      }
+      await this._drainWorkletQueue(session);
     }
     session.source.disconnect();
     session.workletNode.disconnect();
@@ -466,6 +491,25 @@ export class RecordingController implements ReactiveController {
     }
   }
 
+  /** Drain the event-loop queue of pending worklet flush messages. During
+   * recording the worklet posts a flush every ~16ms; if main was slower,
+   * messages back up. Yield repeatedly until session.totalSamples stabilizes
+   * (no new messages processed) for several consecutive ticks — at that
+   * point the queue is empty and chunks are complete. */
+  private async _drainWorkletQueue(session: RecordingSession): Promise<void> {
+    let lastSamples = -1;
+    let stable = 0;
+    for (let i = 0; i < 50; i++) {
+      if (session.totalSamples === lastSamples) {
+        if (++stable >= 3) break;
+      } else {
+        stable = 0;
+        lastSamples = session.totalSamples;
+      }
+      await new Promise<void>((r) => setTimeout(r, 5));
+    }
+  }
+
   // Session fields are mutated in place on the hot path (~60fps worklet messages).
   // This is intentional — creating new session objects + Map entries per message
   // would cause significant GC pressure. Mutations are confined to the controller's
@@ -478,7 +522,7 @@ export class RecordingController implements ReactiveController {
 
     // Resolve the stop barrier in a finally block so a throw in peak generation
     // (e.g. samplesPerPixel=0 transient, host shadowRoot churn) doesn't strand
-    // the await in stopRecording for the full 250ms timeout.
+    // the await in stopRecording for the full 1000ms safety timeout.
     try {
       const hasSamples = !!(
         channels &&
@@ -608,5 +652,10 @@ export class RecordingController implements ReactiveController {
       );
     }
     this._sessions.delete(trackId);
+    if (this._sessions.size === 0) {
+      // A leftover pause flag would misreport isPaused for the next session
+      // and send its stop down the no-ack fast path.
+      this._isPaused = false;
+    }
   }
 }

@@ -54,6 +54,21 @@ export function useRecording(
   // but conflating them risks pauseRecording becoming a no-op while we're
   // stopping, or vice versa.
   const isStoppingRef = useRef<boolean>(false);
+  // In-flight stop result — re-entrant stopRecording calls await this
+  // instead of running a second handshake.
+  const stopPromiseRef = useRef<Promise<AudioBuffer | null> | null>(null);
+  // Assigned each render below (same pattern as stopRecordingRef) so the
+  // stable stopRecording callback can invoke the handshake implementation.
+  const finishStopRecordingRef = useRef<(() => Promise<AudioBuffer | null>) | null>(null);
+  // Set synchronously at startRecording entry. isRecordingRef only flips
+  // after several awaits — without this, two rapid start calls both pass
+  // the guard and build two capture pipelines feeding one chunk store.
+  const isStartingRef = useRef<boolean>(false);
+  // Set by the unmount cleanup so a startRecording continuation that was
+  // parked on an await doesn't build an ownerless capture graph.
+  const isUnmountedRef = useRef<boolean>(false);
+  // Mirrors the duration state for callbacks that must not close over it.
+  const durationRef = useRef<number>(0);
 
   // Shared duration update loop — starts a rAF loop that updates duration
   // from performance.now(). Used by both startRecording and resumeRecording.
@@ -61,6 +76,7 @@ export function useRecording(
     const tick = () => {
       if (isRecordingRef.current && !isPausedRef.current && !isStoppingRef.current) {
         const elapsed = (performance.now() - startTimeRef.current) / 1000;
+        durationRef.current = elapsed;
         setDuration(elapsed);
         animationFrameRef.current = requestAnimationFrame(tick);
       }
@@ -92,11 +108,12 @@ export function useRecording(
 
   // Start recording
   const startRecording = useCallback(async () => {
-    if (isRecordingRef.current) return;
+    if (isRecordingRef.current || isStartingRef.current) return;
     if (!stream) {
       setError(new Error('No microphone stream available'));
       return;
     }
+    isStartingRef.current = true;
 
     try {
       setError(null);
@@ -111,6 +128,12 @@ export function useRecording(
 
       // Load worklet module
       await loadWorklet();
+
+      // Unmounted while awaiting resume/module load — abort before any graph
+      // nodes exist. A continuation past this point would start an ownerless
+      // session: the rAF loop reschedules forever and chunks accumulate with
+      // nothing left to stop them.
+      if (isUnmountedRef.current) return;
 
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
@@ -229,6 +252,8 @@ export function useRecording(
     } catch (err) {
       console.warn('[waveform-playlist] Failed to start recording:', String(err));
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
+    } finally {
+      isStartingRef.current = false;
     }
   }, [stream, channelCount, samplesPerPixel, bits, loadWorklet, startDurationLoop]);
 
@@ -237,14 +262,28 @@ export function useRecording(
     if (!isRecordingRef.current) {
       return null;
     }
+    // Re-entrant stop (double-click, unmount cleanup while a stop is
+    // pending): a second handshake would overwrite the ack resolver —
+    // stranding the first call on its safety timeout — and post a redundant
+    // stop command. Both callers observe the same in-flight stop.
+    if (isStoppingRef.current) {
+      return stopPromiseRef.current ?? null;
+    }
+    // Freeze the duration tick immediately so the live-preview width
+    // (durationSamples = duration * sampleRate) doesn't keep growing
+    // during the worklet stop handshake / queue drain. isStoppingRef
+    // stops the rAF tick from rescheduling; cancelling animationFrameRef
+    // kills any frame already queued.
+    isStoppingRef.current = true;
+    const stopPromise = finishStopRecordingRef.current!();
+    stopPromiseRef.current = stopPromise;
+    return stopPromise;
+  }, []);
 
+  // The actual stop handshake — only ever invoked via stopRecording's
+  // re-entrancy gate above.
+  const finishStopRecording = useCallback(async (): Promise<AudioBuffer | null> => {
     try {
-      // Freeze the duration tick immediately so the live-preview width
-      // (durationSamples = duration * sampleRate) doesn't keep growing
-      // during the worklet stop handshake / queue drain. isStoppingRef
-      // stops the rAF tick from rescheduling; cancelling animationFrameRef
-      // kills any frame already queued.
-      isStoppingRef.current = true;
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -310,6 +349,11 @@ export function useRecording(
           }
         }
         node.disconnect();
+
+        // Session fully torn down — null the refs so the unmount cleanup
+        // doesn't post a redundant stop to the already-stopped worklet.
+        workletNodeRef.current = null;
+        mediaStreamSourceRef.current = null;
       }
 
       // Create final AudioBuffer from accumulated per-channel chunks
@@ -329,6 +373,7 @@ export function useRecording(
       const buffer = createAudioBuffer(rawContext, channelData, rawContext.sampleRate, numChannels);
 
       setAudioBuffer(buffer);
+      durationRef.current = buffer.duration;
       setDuration(buffer.duration);
       // Keep peakLevel to show the peak reached during recording
 
@@ -349,10 +394,13 @@ export function useRecording(
     }
   }, [channelCount]);
   stopRecordingRef.current = stopRecording;
+  finishStopRecordingRef.current = finishStopRecording;
 
-  // Pause recording
+  // Pause recording — guards read refs, not state: a pause in the same tick
+  // as start/resume closes over stale state and silently no-ops while the
+  // worklet keeps capturing (only visible in the resulting buffer length).
   const pauseRecording = useCallback(() => {
-    if (isRecording && !isPaused) {
+    if (isRecordingRef.current && !isPausedRef.current && !isStoppingRef.current) {
       workletNodeRef.current?.port.postMessage({ command: 'pause' });
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -361,24 +409,31 @@ export function useRecording(
       isPausedRef.current = true;
       setIsPaused(true);
     }
-  }, [isRecording, isPaused]);
+  }, []);
 
-  // Resume recording
+  // Resume recording — same ref-based guards as pauseRecording.
   const resumeRecording = useCallback(() => {
-    if (isRecording && isPaused) {
+    if (isRecordingRef.current && isPausedRef.current && !isStoppingRef.current) {
       workletNodeRef.current?.port.postMessage({ command: 'resume' });
       isPausedRef.current = false;
       setIsPaused(false);
-      startTimeRef.current = performance.now() - duration * 1000;
+      startTimeRef.current = performance.now() - durationRef.current * 1000;
       startDurationLoop();
     }
-  }, [isRecording, isPaused, duration, startDurationLoop]);
+  }, [startDurationLoop]);
 
   // Cleanup on unmount — read refs in cleanup, not effect body.
   // Pattern #16 (copy refs in effect body) doesn't apply to [] deps — refs are
   // null at mount and only set later during startRecording.
   useEffect(() => {
+    // Reset on (re)mount — StrictMode dev remounts reuse the same hook
+    // instance, so a flag left true by the probe-unmount's cleanup would
+    // make startRecording abort forever.
+    isUnmountedRef.current = false;
     return () => {
+      // Abort any startRecording continuation parked on an await — it must
+      // not build the capture graph after unmount.
+      isUnmountedRef.current = true;
       // Remove mic-unplug listener
       if (audioTrackRef.current && onTrackEndedRef.current) {
         audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);
