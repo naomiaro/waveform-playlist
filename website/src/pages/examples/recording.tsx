@@ -64,7 +64,8 @@ export default function RecordingExamplePage(): React.ReactElement {
             raw PCM samples and sends them to the main thread at ~60fps intervals. On the main
             thread, peaks are incrementally appended and rendered via HTML Canvas — the same rendering
             pipeline used for loaded audio files. When recording stops, the accumulated samples are
-            assembled into an <code>AudioBuffer</code> and added as a clip on the selected track.
+            assembled into an <code>AudioBuffer</code> and added as a clip at the record-start position on
+            the selected track, replacing any clip content it overlaps (punch-in).
           </p>
         </div>
       </main>

@@ -396,7 +396,8 @@ function RecordToPlaylist() {
     }
 
     if (isRecording) {
-      // Stop recording - clip is automatically added to the selected track
+      // Stop recording — the clip lands at the record-start position and
+      // replaces any overlapped clip content on the track (punch-in)
       stopRecording();
     } else {
       startRecording();
