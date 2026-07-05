@@ -231,7 +231,7 @@ export function BeatsAndBarsExample() {
       barWidth={4}
       barGap={0}
       deferEngineRebuild={loading}
-      indefinitePlayback
+      fillViewport
     >
       <BeatsAndBarsProvider bpm={bpm} timeSignature={timeSignature} snapTo={snapTo} scaleMode={scaleMode}>
         <ClipInteractionProvider snap={snap}>

@@ -46,9 +46,7 @@ interface WaveformPlaylistProviderProps {
   deferEngineRebuild?: boolean;           // Default: false
   /** SoundFont cache for sample-based MIDI playback */
   soundFontCache?: SoundFontCache;
-  /** Disable automatic stop when cursor reaches end of longest track. Implies fillViewport */
-  indefinitePlayback?: boolean;           // Default: false
-  /** Timeline visually fills the scroll container (layout only — auto-stop still applies) */
+  /** Timeline visually fills the scroll container even when audio is shorter (layout only) */
   fillViewport?: boolean;                 // Default: false
   /** Desired AudioContext sample rate for pre-computed peaks matching */
   sampleRate?: number;
@@ -219,8 +217,6 @@ interface PlaylistStateContextValue {
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
-  /** Whether playback continues past the end of loaded audio */
-  indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
   /** Whether undo is available */
@@ -285,11 +281,12 @@ interface PlaylistControlsContextValue {
   redo: () => void;
 
   // Recording
-  /** Suppress the end-of-audio auto-stop while a recording session is active
-   *  (overdub playback runs past the end of existing audio). Auto-wired from
-   *  the Waveform recordingState prop; call eagerly (before play()) when
-   *  starting playback in the same handler as the recording. */
-  setRecordingActive: (active: boolean) => void;
+  /** Mark a recording session active/inactive. While active with an armedTrackId,
+   *  that track's existing content is transiently muted (punch-in replaces what
+   *  the take overlaps) and restored when the session ends. Audio-only — the UI
+   *  mute control is untouched. Auto-wired from the Waveform recordingState prop;
+   *  overdub flows should also call it eagerly (before play()). */
+  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
 

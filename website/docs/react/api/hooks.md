@@ -347,8 +347,6 @@ interface PlaylistStateContextValue {
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
-  /** Whether playback continues past the end of loaded audio */
-  indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
   /** Whether undo is available */
@@ -443,11 +441,13 @@ interface PlaylistControlsContextValue {
   redo: () => void;
 
   // Recording
-  /** Suppress the end-of-audio auto-stop while a recording session is active,
-   *  so overdub playback can run past the end of existing audio. Auto-wired
-   *  from the Waveform `recordingState` prop; call eagerly (before `play()`)
-   *  when starting playback in the same handler as the recording. */
-  setRecordingActive: (active: boolean) => void;
+  /** Mark a recording session active/inactive. While active with an
+   *  `armedTrackId`, that track's existing content is transiently muted —
+   *  punch-in replaces whatever the take overlaps — and its previous mute
+   *  state is restored when the session ends. Audio-only: the track's UI mute
+   *  control is untouched. Auto-wired from the Waveform `recordingState`
+   *  prop; overdub flows should also call it eagerly (before `play()`). */
+  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
 
@@ -701,7 +701,8 @@ interface UseIntegratedRecordingReturn {
   selectedDevice: string | null;
 
   // Controls
-  startRecording: () => void;
+  /** Resolves true when the capture pipeline actually started. */
+  startRecording: () => Promise<boolean>;
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
@@ -1037,7 +1038,8 @@ function useRecording(
   audioBuffer: AudioBuffer | null;
   level: number;
   peakLevel: number;
-  startRecording: () => Promise<void>;
+  /** Resolves true when the capture pipeline actually started. */
+  startRecording: () => Promise<boolean>;
   stopRecording: () => Promise<AudioBuffer | null>;
   pauseRecording: () => void;
   resumeRecording: () => void;

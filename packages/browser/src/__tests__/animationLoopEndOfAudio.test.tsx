@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
 //
-// End-of-audio auto-stop behavior in the WaveformPlaylistProvider animation loop
-// (issues #589 / #590).
+// DAW-transport playback semantics in the WaveformPlaylistProvider animation
+// loop (issues #589 / #590).
 //
-// 1. The stop boundary must track the CURRENT timeline duration. The loop used to
-//    close over the `duration` React state (set in an async effect), so a timeline
-//    that grew mid-playback (e.g. a recording finalize) kept the old boundary and
-//    stopped playback at the stale end.
-// 2. While a recording is active, the end-of-audio auto-stop must be suppressed so
-//    an overdub can run past the end of existing material (recorded clips land
-//    beyond the current duration).
+// 1. Playback does NOT auto-stop at the end of the timeline — like a DAW
+//    transport (and dawcore's native transport), it rolls until an explicit
+//    stop/pause. This is what lets overdub recording run past the end of
+//    existing material with no special casing.
+// 2. Explicit ends still stop: selection playback passes a playDuration and
+//    must stop at its end.
+// 3. setRecordingActive(active, armedTrackId) transiently mutes the armed
+//    track for the recording session (punch-in replaces its content — the
+//    doomed material must not play under the take) and restores the previous
+//    mute state on release.
 //
 // The provider is mounted with an injected fake adapter (createAdapter) whose
 // clock the test controls directly — no Tone.js, no real audio.
@@ -46,12 +49,12 @@ function makeClip(startSeconds: number, durationSeconds: number, id: string): Au
   } as AudioClip;
 }
 
-function makeTrack(id: string, clips: AudioClip[]): ClipTrack {
+function makeTrack(id: string, clips: AudioClip[], muted = false): ClipTrack {
   return {
     id,
     name: id,
     clips,
-    muted: false,
+    muted,
     soloed: false,
     volume: 1,
     pan: 0,
@@ -60,10 +63,12 @@ function makeTrack(id: string, clips: AudioClip[]): ClipTrack {
 
 interface FakeAdapter extends PlayoutAdapter {
   setNow(seconds: number): void;
+  muteCalls: Array<{ trackId: string; muted: boolean }>;
 }
 
 function createFakeAdapter(): FakeAdapter {
   let now = 0;
+  const muteCalls: Array<{ trackId: string; muted: boolean }> = [];
   return {
     audioContext: {
       currentTime: 0,
@@ -87,7 +92,9 @@ function createFakeAdapter(): FakeAdapter {
     isPlaying: () => false,
     setMasterVolume() {},
     setTrackVolume() {},
-    setTrackMute() {},
+    setTrackMute(trackId: string, muted: boolean) {
+      muteCalls.push({ trackId, muted });
+    },
     setTrackSolo() {},
     setTrackPan() {},
     setLoop() {},
@@ -95,6 +102,7 @@ function createFakeAdapter(): FakeAdapter {
     setNow(seconds: number) {
       now = seconds;
     },
+    muteCalls,
   };
 }
 
@@ -102,7 +110,7 @@ interface Probe {
   isPlaying: boolean;
   isReady: boolean;
   play: (startTime?: number, playDuration?: number) => Promise<void>;
-  setRecordingActive: (active: boolean) => void;
+  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 
 let probe: Probe;
@@ -133,26 +141,9 @@ function mountProvider(adapter: FakeAdapter, tracks: ClipTrack[]) {
   );
 }
 
-function rerenderProvider(
-  result: ReturnType<typeof render>,
-  adapter: FakeAdapter,
-  tracks: ClipTrack[]
-) {
-  result.rerender(
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      onTracksChange={() => {}}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={() => adapter}
-    >
-      <ProbeChild />
-    </WaveformPlaylistProvider>
-  );
-}
-
 const settle = (ms = 120) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-describe('animation loop end-of-audio auto-stop', () => {
+describe('DAW-transport playback semantics', () => {
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -165,91 +156,133 @@ describe('animation loop end-of-audio auto-stop', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses the live timeline duration, not a stale closure, for the stop boundary', async () => {
-    const adapter = createFakeAdapter();
-    const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
-    const result = mountProvider(adapter, [trackA]);
-    await waitFor(() => expect(probe.isReady).toBe(true));
-
-    await act(async () => {
-      await probe.play(0);
-    });
-    expect(probe.isPlaying).toBe(true);
-
-    // Grow the timeline mid-playback via the incremental-add path (existing
-    // track object untouched, new track appended) — like a finalize that
-    // extends the timeline. The loop must adopt the new 10s boundary.
-    const trackB = makeTrack('track-b', [makeClip(0, 10, 'clip-b')]);
-    await act(async () => {
-      rerenderProvider(result, adapter, [trackA, trackB]);
-    });
-
-    // Past the OLD 2s boundary but inside the new 10s timeline: must keep playing.
-    await act(async () => {
-      adapter.setNow(2.5);
-      await settle();
-    });
-    expect(probe.isPlaying).toBe(true);
-
-    // Past the NEW boundary: must stop.
-    await act(async () => {
-      adapter.setNow(10.5);
-    });
-    await waitFor(() => expect(probe.isPlaying).toBe(false));
-  });
-
-  it('suppresses the end-of-audio auto-stop while a recording is active', async () => {
+  it('does not auto-stop at the end of the timeline (rolls until explicit stop)', async () => {
     const adapter = createFakeAdapter();
     const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
     mountProvider(adapter, [trackA]);
     await waitFor(() => expect(probe.isReady).toBe(true));
 
-    expect(typeof probe.setRecordingActive).toBe('function');
-
-    await act(async () => {
-      probe.setRecordingActive(true);
-    });
     await act(async () => {
       await probe.play(0);
     });
     expect(probe.isPlaying).toBe(true);
 
-    // Way past the end of existing audio — recording is active, keep playing.
+    // Far past the 2s end of audio — the transport keeps rolling.
     await act(async () => {
-      adapter.setNow(5);
+      adapter.setNow(30);
       await settle();
     });
     expect(probe.isPlaying).toBe(true);
-
-    // Recording ends — the auto-stop applies again on the next frames.
-    await act(async () => {
-      probe.setRecordingActive(false);
-    });
-    await waitFor(() => expect(probe.isPlaying).toBe(false));
   });
 
-  it('keeps overdub playback alive on an empty timeline (duration 0)', async () => {
-    // The first take records into an empty timeline: play() starts with
-    // duration 0, so the very first frame satisfies time >= duration. An
-    // eager setRecordingActive(true) (called before play, like the recording
-    // example's overdub handler) must keep the transport running.
+  it('keeps rolling on an empty timeline (duration 0, e.g. first-take overdub)', async () => {
     const adapter = createFakeAdapter();
     const emptyTrack = makeTrack('track-a', []);
     mountProvider(adapter, [emptyTrack]);
     await waitFor(() => expect(probe.isReady).toBe(true));
 
     await act(async () => {
-      probe.setRecordingActive(true);
       await probe.play(0);
     });
     await act(async () => {
+      adapter.setNow(5);
       await settle();
+    });
+    expect(probe.isPlaying).toBe(true);
+  });
+
+  it('still stops at an explicit playDuration end (selection playback)', async () => {
+    const adapter = createFakeAdapter();
+    const trackA = makeTrack('track-a', [makeClip(0, 10, 'clip-a')]);
+    mountProvider(adapter, [trackA]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      await probe.play(0, 1.5);
     });
     expect(probe.isPlaying).toBe(true);
 
     await act(async () => {
-      probe.setRecordingActive(false);
+      adapter.setNow(1.6);
     });
     await waitFor(() => expect(probe.isPlaying).toBe(false));
+  });
+});
+
+describe('setRecordingActive armed-track mute', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      cleanup();
+    });
+    vi.restoreAllMocks();
+  });
+
+  it('mutes the armed track for the session and restores it on release', async () => {
+    const adapter = createFakeAdapter();
+    const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
+    const trackB = makeTrack('track-b', [makeClip(0, 2, 'clip-b')]);
+    mountProvider(adapter, [trackA, trackB]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      probe.setRecordingActive(true, 'track-a');
+    });
+    expect(adapter.muteCalls).toContainEqual({ trackId: 'track-a', muted: true });
+    // only the armed track is touched
+    expect(adapter.muteCalls.some((c) => c.trackId === 'track-b')).toBe(false);
+
+    adapter.muteCalls.length = 0;
+    await act(async () => {
+      probe.setRecordingActive(false);
+    });
+    expect(adapter.muteCalls).toContainEqual({ trackId: 'track-a', muted: false });
+  });
+
+  it('is idempotent while active (eager consumer call + prop-driven sync)', async () => {
+    const adapter = createFakeAdapter();
+    const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
+    mountProvider(adapter, [trackA]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      probe.setRecordingActive(true, 'track-a');
+      probe.setRecordingActive(true, 'track-a');
+    });
+    expect(adapter.muteCalls.filter((c) => c.trackId === 'track-a')).toHaveLength(1);
+  });
+
+  it('restores a previously-muted armed track to muted, not unmuted', async () => {
+    const adapter = createFakeAdapter();
+    const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')], /* muted */ true);
+    mountProvider(adapter, [trackA]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      probe.setRecordingActive(true, 'track-a');
+    });
+    adapter.muteCalls.length = 0;
+    await act(async () => {
+      probe.setRecordingActive(false);
+    });
+    // release restores the pre-session state: still muted
+    expect(adapter.muteCalls).toContainEqual({ trackId: 'track-a', muted: true });
+  });
+
+  it('activation without a trackId does not touch any track mute', async () => {
+    const adapter = createFakeAdapter();
+    const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
+    mountProvider(adapter, [trackA]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      probe.setRecordingActive(true);
+      probe.setRecordingActive(false);
+    });
+    expect(adapter.muteCalls).toHaveLength(0);
   });
 });

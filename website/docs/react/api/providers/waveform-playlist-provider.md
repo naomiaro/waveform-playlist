@@ -208,6 +208,17 @@ Array of zoom levels in samples per pixel.
 
 Auto-scroll to keep playhead visible.
 
+#### `fillViewport`
+
+**Type:** `boolean`
+**Default:** `false`
+
+Extend the timeline (background + timescale) to fill the visible scroll container even when the audio is shorter. Layout only. Recording UIs typically want this so an empty timeline doesn't collapse to the audio width.
+
+:::note DAW transport semantics
+Playback does **not** auto-stop at the end of the timeline — the transport rolls until an explicit `stop()`/`pause()`, matching dawcore's native transport. This is what lets punch-in recording run past the end of existing audio. Selection and annotation playback still stop at their explicit ends. (The former `indefinitePlayback` prop is gone — its layout half lives on as `fillViewport`.)
+:::
+
 #### `deferEngineRebuild`
 
 **Type:** `boolean`
@@ -271,8 +282,6 @@ interface PlaylistStateContextValue {
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
-  /** Whether playback continues past the end of loaded audio */
-  indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
 }
@@ -312,11 +321,12 @@ interface PlaylistControlsContextValue {
   clearLoopRegion: () => void;
   undo: () => void;
   redo: () => void;
-  /** Suppress the end-of-audio auto-stop while a recording session is active
-   *  (overdub playback runs past the end of existing audio). Auto-wired from
-   *  the Waveform recordingState prop; call eagerly (before play()) when
-   *  starting playback in the same handler as the recording. */
-  setRecordingActive: (active: boolean) => void;
+  /** Mark a recording session active/inactive. While active with an
+   *  armedTrackId, that track's existing content is transiently muted —
+   *  punch-in replaces whatever the take overlaps — and restored when the
+   *  session ends. Auto-wired from the Waveform recordingState prop; overdub
+   *  flows should also call it eagerly (before play()). */
+  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
 
@@ -431,12 +441,8 @@ interface WaveformPlaylistProviderProps {
   soundFontCache?: SoundFontCache;
   /** Defer engine build during progressive loading */
   deferEngineRebuild?: boolean;
-  /** Disable automatic stop when cursor reaches end of longest track.
-   *  Implies fillViewport. */
-  indefinitePlayback?: boolean;
   /** Extend the timeline to fill the visible scroll container even when the
-   *  audio is shorter. Layout only — playback still auto-stops at the end of
-   *  audio. Recording UIs typically want this. */
+   *  audio is shorter (layout only). Recording UIs typically want this. */
   fillViewport?: boolean;
   /** Desired AudioContext sample rate. Pre-computed peaks (.dat) render
    *  instantly when they match. On mismatch, falls back to worker. */

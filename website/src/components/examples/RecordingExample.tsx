@@ -243,26 +243,47 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-entrancy guard for record start: isRecording state only commits after
+  // startRecording's internal awaits (context resume, worklet load), so a
+  // rapid second Record press would re-enter and clobber recordStartTimeRef
+  // and the armed-track mute mid-start.
+  const isStartingRecordingRef = useRef(false);
+  // Set by handleStop when the user stops before the capture finished
+  // starting — cancels the pending session instead of playing a phantom one.
+  const cancelRecordingStartRef = useRef(false);
+
   // Start recording and playback together (overdub)
   const startRecordingWithPlayback = useCallback(async () => {
-    // Read from ref to avoid stale closure (currentTime updates at 60fps)
-    recordStartTimeRef.current = currentTimeRef.current;
-    // Suppress the end-of-audio auto-stop BEFORE starting playback. The
-    // recordingState render commit races play()'s first animation frame —
-    // on an empty timeline (duration 0) the frame would stop playback
-    // instantly. Turning suppression off is automatic: the Waveform's
-    // recordingState prop syncs it back when the recording ends.
-    setRecordingActive(true);
-    const started = await startRecording();
-    if (!started) {
-      // Capture never started (no mic, no track, worklet failure) — restore
-      // the auto-stop and don't start playback.
-      setRecordingActive(false);
-      return;
+    if (isStartingRecordingRef.current) return;
+    isStartingRecordingRef.current = true;
+    cancelRecordingStartRef.current = false;
+    try {
+      // Read from ref to avoid stale closure (currentTime updates at 60fps)
+      recordStartTimeRef.current = currentTimeRef.current;
+      // Arm the recorded track BEFORE starting playback: punch-in replaces
+      // whatever the take overlaps, so its existing content is transiently
+      // muted for the session and must never blip. Release is automatic via
+      // the Waveform's recordingState sync when the recording ends.
+      setRecordingActive(true, selectedTrackId);
+      const started = await startRecording();
+      if (!started || cancelRecordingStartRef.current) {
+        // Capture never started (no mic, no track, worklet failure) or the
+        // user stopped during startup — release the armed track and don't
+        // start playback.
+        if (started) stopRecording();
+        setRecordingActive(false);
+        return;
+      }
+      // Start Transport so playhead advances and user hears the other tracks (overdub)
+      try {
+        await play(currentTimeRef.current);
+      } catch (err) {
+        console.warn('[waveform-playlist] Overdub playback failed to start: ' + String(err));
+      }
+    } finally {
+      isStartingRecordingRef.current = false;
     }
-    // Start Transport so playhead advances and user hears existing tracks (overdub)
-    await play(currentTimeRef.current);
-  }, [startRecording, play, currentTimeRef, setRecordingActive]);
+  }, [startRecording, stopRecording, play, currentTimeRef, setRecordingActive, selectedTrackId]);
 
   // Auto-start recording when a new track is created and selected
   useEffect(() => {
@@ -295,6 +316,11 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // recording is the most recent resume point — jumping backwards on stop
   // is jarring when you've just finished recording.
   const handleStop = useCallback(() => {
+    if (isStartingRecordingRef.current) {
+      // Record was pressed moments ago and its async startup hasn't finished —
+      // cancel the pending session rather than stopping nothing.
+      cancelRecordingStartRef.current = true;
+    }
     if (isRecording) {
       stopRecording();
       pause();
